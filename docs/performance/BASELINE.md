@@ -2593,3 +2593,23 @@ are excluded. Source planning/commit dominate the retained source phases, so a
 shared publication-copy design remains unproven and deferred. See
 [`0347`](changes/0347-xlsx-cell-values-harness-calculation-closure.md) and
 [`results/change-0347`](results/change-0347/).
+
+### Change 0348: Stored ZIP borrowed validation
+
+Stored ZIP entries now undergo complete local and central metadata validation
+before immutable-slice borrowing. Signed and unsigned 32-bit descriptor
+CRC/size forms, ZIP64 local-extra provenance, encryption/overlap/duplicate
+safety, and strict nonempty zero-CRC refusal are covered; ZIP64 EOCD, Deflate,
+and generic positional sources retain owned or streaming fallback. Pointer
+identity is preserved without a cache or materialization charge, and
+concurrency is unchanged. The serialized evidence used `CARGO_BUILD_JOBS=1`,
+`test-threads=1`, and an 8 GiB process ceiling:
+`focused borrowed 10/10; full soapberry-zip lib 280/280`. Downstream
+`litchi-opc borrowed 12/12` passed; this is a filtered result, not the full
+`litchi-opc` suite. `cargo test --locked -p litchi-opc --lib borrowed
+-- --test-threads=1` and `cargo fmt --package soapberry-zip -- --check` passed
+after
+formatting. `performance_claim: none`: no latency, RSS, allocation, or bytes-copied claim;
+stored OOXML corpus representativeness remains weak. The low-level raw
+`get_entry_borrowed` accessor remains unverified and requires a verifier. See
+[Change 0348](changes/0348-stored-zip-borrow-validation.md).

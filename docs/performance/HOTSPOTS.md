@@ -2641,3 +2641,19 @@ gates and claim authorization remain false. This is harness evidence only;
 formula/date workloads are excluded, and source planning/commit dominate the
 retained source phases. A shared publication-copy design remains deferred.
 See [Change 0347](changes/0347-xlsx-cell-values-harness-calculation-closure.md).
+
+## Change 0348 update
+
+Stored ZIP borrowing now validates complete local and central metadata,
+signed and unsigned 32-bit descriptor CRC/size forms, local ZIP64-extra
+provenance, encryption/overlap/duplicate safety, and nonempty zero-CRC
+refusal. The immutable-slice path preserves pointer identity without cache or
+materialization charge; ZIP64 EOCD, Deflate, and generic positional sources
+remain owned or streaming fallbacks. Serialized evidence was
+`focused borrowed 10/10; full soapberry-zip lib 280/280` under one build job,
+one test thread, and an 8 GiB process ceiling. Downstream
+`litchi-opc borrowed 12/12` passed, and `cargo fmt --package soapberry-zip
+-- --check` passed after formatting; this is not the full `litchi-opc` suite.
+`performance_claim: none`:
+no latency/RSS/copy claim, stored OOXML representativeness is weak, and
+concurrency is unchanged. See [Change 0348](changes/0348-stored-zip-borrow-validation.md).

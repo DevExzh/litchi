@@ -471,6 +471,9 @@ pub struct ArchiveReader<'data> {
     directories: HashMap<String, Metadata>,
     /// Physical member order, retained for order-sensitive package formats.
     order: Vec<String>,
+    /// Every central entry's wayfinder, sorted by local-header offset. This
+    /// is used only to prove non-overlap before publishing a borrowed slice.
+    layout: Vec<BorrowedLayoutEntry>,
 }
 
 /// Zero-allocation iterator over an [`ArchiveReader`] file-name order.
@@ -498,6 +501,13 @@ struct EntryInfo {
     wayfinder: crate::ZipArchiveEntryWayfinder,
     compression_method: CompressionMethod,
     uncompressed_size: u64,
+    central_name: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
+struct BorrowedLayoutEntry {
+    wayfinder: crate::ZipArchiveEntryWayfinder,
+    central_name: Vec<u8>,
 }
 
 /// Opaque identifier for one non-directory member in an [`IndexedArchive`].
@@ -607,9 +617,15 @@ impl<'data> ArchiveReader<'data> {
         let mut total_metadata_bytes = 0u64;
         let mut total_uncompressed_size = 0u64;
         let mut ordered_names = Vec::new();
+        let mut layout = Vec::new();
         for entry_result in archive.entries() {
             let entry = entry_result?;
             let path = entry.file_path();
+            let central_name = path.as_ref().to_vec();
+            layout.push(BorrowedLayoutEntry {
+                wayfinder: entry.wayfinder(),
+                central_name: central_name.clone(),
+            });
 
             let member_name_bytes = path.as_ref().len() as u64;
             if member_name_bytes > limits.max_member_name_bytes {
@@ -732,6 +748,7 @@ impl<'data> ArchiveReader<'data> {
                     wayfinder: entry.wayfinder(),
                     compression_method: entry.compression_method(),
                     uncompressed_size,
+                    central_name,
                 },
             );
             ordered_names.push((local_header_offset, name));
@@ -739,12 +756,14 @@ impl<'data> ArchiveReader<'data> {
 
         ordered_names.sort_by_key(|(offset, _)| *offset);
         let order = ordered_names.into_iter().map(|(_, name)| name).collect();
+        layout.sort_unstable_by_key(|entry| entry.wayfinder.local_header_offset());
 
         Ok(Self {
             archive,
             index,
             directories,
             order,
+            layout,
         })
     }
 
@@ -937,6 +956,14 @@ impl<'data> ArchiveReader<'data> {
     /// and size were checked by [`Self::new_with_limits`] before this method
     /// can be called. Since this method does not allocate payload storage, it
     /// does not create a separate materialization budget charge.
+    ///
+    /// For compatibility with the tolerant global ZIP verifier, a declared
+    /// CRC-32 of zero normally means "not verified". Borrowed Store access is
+    /// stricter: nonempty members with that declaration are refused so a
+    /// source slice is never published without an effective checksum claim.
+    /// ZIP64 EOCD archives conservatively return `None`; callers can use
+    /// [`Self::read`] or [`Self::read_to`] as the owned fallback for those
+    /// archives.
     pub fn read_stored_borrowed(&self, name: &str) -> Result<Option<&'data [u8]>, Error> {
         let mut accounting = ZipOperationAccounting::default();
         self.read_stored_borrowed_with_accounting(name, &mut accounting)
@@ -962,14 +989,57 @@ impl<'data> ArchiveReader<'data> {
         if info.compression_method != CompressionMethod::Store {
             return Ok(None);
         }
+        if self.archive.is_zip64() {
+            return Ok(None);
+        }
+        if self
+            .layout
+            .iter()
+            .any(|entry| !entry.wayfinder.borrowed_provenance_supported())
+        {
+            return Ok(None);
+        }
 
-        let entry = self.archive.get_entry_borrowed(info.wayfinder)?;
+        self.validate_borrowed_spans()?;
+        let entry = self
+            .archive
+            .get_stored_entry_borrowed(info.wayfinder, &info.central_name)?;
         let data = entry.data();
-        entry.claim_verifier().valid(ZipVerification {
-            crc: crate::crc32(data),
-            uncompressed_size: data.len() as u64,
+        let verification = entry.claim_verifier();
+        let actual_crc = crate::crc32(data);
+        if !data.is_empty() && verification.crc() == 0 {
+            return Err(Error::from(ErrorKind::InvalidChecksum {
+                expected: 0,
+                actual: actual_crc,
+            }));
+        }
+        verification.valid(ZipVerification {
+            crc: actual_crc,
+            uncompressed_size: usize_to_u64(data.len(), "stored ZIP bytes")?,
         })?;
         Ok(Some(data))
+    }
+
+    fn validate_borrowed_spans(&self) -> Result<(), Error> {
+        self.archive.validate_borrowed_layout()?;
+        let mut previous_end = None;
+        for entry in &self.layout {
+            let (start, end) = self
+                .archive
+                .borrowed_entry_span(entry.wayfinder, &entry.central_name)?;
+            if previous_end.is_some_and(|previous_end| start < previous_end) {
+                return Err(Error::from(ErrorKind::InvalidInput {
+                    msg: "borrowed access cannot prove non-overlapping ZIP spans".to_string(),
+                }));
+            }
+            previous_end = Some(end);
+        }
+        if previous_end.is_some_and(|previous_end| previous_end > self.archive.directory_offset()) {
+            return Err(Error::from(ErrorKind::InvalidInput {
+                msg: "borrowed access span extends into the central directory".to_string(),
+            }));
+        }
+        Ok(())
     }
 
     /// Decompress and verify one member directly into a caller-owned sink.
@@ -1407,6 +1477,7 @@ where
                         wayfinder: entry.wayfinder(),
                         compression_method: entry.compression_method(),
                         uncompressed_size,
+                        central_name: path.as_ref().to_vec(),
                     },
                 });
             }
@@ -5989,6 +6060,20 @@ mod tests {
     }
 
     #[test]
+    fn borrowed_store_defers_zip64_eocd_to_owned_fallback() {
+        let bytes = include_bytes!("../assets/zip64.zip");
+        let archive = ZipArchive::from_slice(bytes).unwrap();
+        assert!(archive.is_zip64());
+
+        let reader = ArchiveReader::new(bytes).unwrap();
+        assert_eq!(reader.read_stored_borrowed("README").unwrap(), None);
+        assert_eq!(
+            reader.read("README").unwrap(),
+            b"This small file is in ZIP64 format.\n"
+        );
+    }
+
+    #[test]
     fn indexed_read_to_reports_source_and_zero_progress_sink_errors() {
         let payload = vec![b'x'; STREAM_COPY_BUFFER_SIZE + 1];
         let mut writer = StreamingArchiveWriter::new();
@@ -7300,6 +7385,497 @@ mod tests {
             indexed.file_names().collect::<Vec<_>>(),
             vec!["first.bin", "second.bin"]
         );
+    }
+
+    #[test]
+    fn borrowed_store_validates_signed_and_unsigned_descriptors_and_preserves_identity() {
+        let payload = b"descriptor payload";
+        for signature in [false, true] {
+            let bytes = stored_descriptor_fixture(payload, signature);
+            let reader = ArchiveReader::new(&bytes).unwrap();
+            let borrowed = reader.read_stored_borrowed("stored.bin").unwrap().unwrap();
+
+            let archive = ZipArchive::from_slice(bytes.as_slice()).unwrap();
+            let record = archive.entries().next().unwrap().unwrap();
+            let physical = archive
+                .get_entry_borrowed(record.wayfinder())
+                .unwrap()
+                .data();
+            assert_eq!(borrowed, payload);
+            assert_eq!(borrowed.as_ptr(), physical.as_ptr());
+            assert_eq!(borrowed.len(), physical.len());
+        }
+    }
+
+    #[test]
+    fn borrowed_store_validates_descriptors_after_a_nonzero_prelude() {
+        let payload = b"leading descriptor payload";
+        for signature in [false, true] {
+            let bytes = stored_descriptor_fixture_with_prefix(payload, signature, 17);
+            let reader = ArchiveReader::new(&bytes).unwrap();
+            let borrowed = reader.read_stored_borrowed("stored.bin").unwrap().unwrap();
+            let archive = ZipArchive::from_slice(bytes.as_slice()).unwrap();
+            let record = archive.entries().next().unwrap().unwrap();
+            let physical = archive
+                .get_entry_borrowed(record.wayfinder())
+                .unwrap()
+                .data();
+            assert_eq!(borrowed, payload);
+            assert_eq!(borrowed.as_ptr(), physical.as_ptr());
+            assert_eq!(borrowed.len(), physical.len());
+        }
+    }
+
+    #[test]
+    fn borrowed_store_rejects_corrupt_descriptor_crc_and_sizes() {
+        let payload = b"descriptor payload";
+        for signature in [false, true] {
+            for (field_offset, checksum) in [(0usize, true), (4, false), (8, false)] {
+                let mut bytes = stored_descriptor_fixture(payload, signature);
+                let descriptor = descriptor_start(payload, signature);
+                let value = if checksum { 0 } else { u32::MAX };
+                let field_start = descriptor + field_offset;
+                bytes[field_start..field_start + 4].copy_from_slice(&value.to_le_bytes());
+
+                let reader = ArchiveReader::new(&bytes).unwrap();
+                let error = reader.read_stored_borrowed("stored.bin").unwrap_err();
+                if checksum {
+                    assert!(
+                        matches!(error.kind(), ErrorKind::InvalidChecksum { .. }),
+                        "signature={signature}, field_offset={field_offset}, error_kind={:?}",
+                        error.kind()
+                    );
+                } else {
+                    assert!(
+                        matches!(error.kind(), ErrorKind::InvalidSize { .. }),
+                        "signature={signature}, field_offset={field_offset}, error_kind={:?}",
+                        error.kind()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn borrowed_store_rejects_local_central_metadata_mismatches() {
+        let payload = b"fixed stored payload";
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("stored.bin", payload).unwrap();
+        let base = writer.finish_to_bytes().unwrap();
+        assert!(!local_member_has_data_descriptor(&base, b"stored.bin"));
+        let local = local_header_offset_for_name(&base, b"stored.bin");
+
+        let mut method = base.clone();
+        method[local + 8..local + 10].copy_from_slice(&8u16.to_le_bytes());
+        let error = ArchiveReader::new(&method)
+            .unwrap()
+            .read_stored_borrowed("stored.bin")
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+
+        let mut flags = base.clone();
+        flags[local + 6..local + 8].copy_from_slice(&8u16.to_le_bytes());
+        let error = ArchiveReader::new(&flags)
+            .unwrap()
+            .read_stored_borrowed("stored.bin")
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+
+        let central = central_header_offset_for_name(&base, b"stored.bin");
+        for encrypted_flag in [1u16, 1 << 6] {
+            let mut encrypted = base.clone();
+            encrypted[local + 6..local + 8].copy_from_slice(&encrypted_flag.to_le_bytes());
+            encrypted[central + 8..central + 10].copy_from_slice(&encrypted_flag.to_le_bytes());
+            let error = ArchiveReader::new(&encrypted)
+                .unwrap()
+                .read_stored_borrowed("stored.bin")
+                .unwrap_err();
+            assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+        }
+
+        let mut name = base.clone();
+        name[local + 30] ^= 0x20;
+        let error = ArchiveReader::new(&name)
+            .unwrap()
+            .read_stored_borrowed("stored.bin")
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+
+        let mut crc = base.clone();
+        crc[local + 14..local + 18].copy_from_slice(&0u32.to_le_bytes());
+        let error = ArchiveReader::new(&crc)
+            .unwrap()
+            .read_stored_borrowed("stored.bin")
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidChecksum { .. }));
+
+        let mut compressed_size = base.clone();
+        compressed_size[local + 18..local + 22].copy_from_slice(&1u32.to_le_bytes());
+        let error = ArchiveReader::new(&compressed_size)
+            .unwrap()
+            .read_stored_borrowed("stored.bin")
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidSize { .. }));
+
+        let mut uncompressed_size = base.clone();
+        uncompressed_size[local + 22..local + 26].copy_from_slice(&1u32.to_le_bytes());
+        let error = ArchiveReader::new(&uncompressed_size)
+            .unwrap()
+            .read_stored_borrowed("stored.bin")
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidSize { .. }));
+    }
+
+    #[test]
+    fn unrelated_encrypted_store_does_not_block_an_unencrypted_target() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("target.bin", b"target").unwrap();
+        writer.write_stored("encrypted.bin", b"encrypted").unwrap();
+        let mut bytes = writer.finish_to_bytes().unwrap();
+        let encrypted_local = local_header_offset_for_name(&bytes, b"encrypted.bin");
+        let encrypted_central = central_header_offset_for_name(&bytes, b"encrypted.bin");
+        bytes[encrypted_local + 6..encrypted_local + 8].copy_from_slice(&1u16.to_le_bytes());
+        bytes[encrypted_central + 8..encrypted_central + 10].copy_from_slice(&1u16.to_le_bytes());
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(
+            reader.read_stored_borrowed("target.bin").unwrap(),
+            Some(&b"target"[..])
+        );
+    }
+
+    #[test]
+    fn deflate_borrowing_returns_none_and_owned_read_remains_available() {
+        let payload = b"deflated fallback payload";
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_deflated("deflated.bin", payload).unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let reader = ArchiveReader::new(&bytes).unwrap();
+
+        assert_eq!(reader.read_stored_borrowed("deflated.bin").unwrap(), None);
+        assert_eq!(reader.read("deflated.bin").unwrap(), payload);
+    }
+
+    #[test]
+    fn borrowed_store_refuses_an_overlapping_non_target_span() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored("underclaimed.bin", b"underclaim payload")
+            .unwrap();
+        writer.write_stored("target.bin", b"target").unwrap();
+        let mut bytes = writer.finish_to_bytes().unwrap();
+        let first_local = local_header_offset_for_name(&bytes, b"underclaimed.bin");
+        let first_central = central_header_offset_for_name(&bytes, b"underclaimed.bin");
+        let second_local = local_header_offset_for_name(&bytes, b"target.bin");
+        let name_len = usize::from(u16::from_le_bytes([
+            bytes[first_local + 26],
+            bytes[first_local + 27],
+        ]));
+        let extra_len = usize::from(u16::from_le_bytes([
+            bytes[first_local + 28],
+            bytes[first_local + 29],
+        ]));
+        let payload_offset = first_local + 30 + name_len + extra_len;
+        let declared_size = u32::try_from(second_local - payload_offset + 1).unwrap();
+        bytes[first_local + 18..first_local + 22].copy_from_slice(&declared_size.to_le_bytes());
+        bytes[first_central + 20..first_central + 24].copy_from_slice(&declared_size.to_le_bytes());
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        let error = reader.read_stored_borrowed("target.bin").unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+    }
+
+    #[test]
+    fn borrowed_store_refuses_nonempty_zero_crc_even_when_payload_is_corrupt() {
+        let payload = b"zero CRC payload";
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("stored.bin", payload).unwrap();
+        let mut bytes = writer.finish_to_bytes().unwrap();
+        let local = local_header_offset_for_name(&bytes, b"stored.bin");
+        let central = central_header_offset_for_name(&bytes, b"stored.bin");
+        let name_len = usize::from(u16::from_le_bytes([bytes[local + 26], bytes[local + 27]]));
+        let extra_len = usize::from(u16::from_le_bytes([bytes[local + 28], bytes[local + 29]]));
+        let payload_offset = local + 30 + name_len + extra_len;
+        bytes[local + 14..local + 18].copy_from_slice(&0u32.to_le_bytes());
+        bytes[central + 16..central + 20].copy_from_slice(&0u32.to_le_bytes());
+        bytes[payload_offset] ^= 0x80;
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        let error = reader.read_stored_borrowed("stored.bin").unwrap_err();
+        match error.kind() {
+            ErrorKind::InvalidChecksum { expected, actual } => {
+                assert_eq!(*expected, 0);
+                assert_ne!(*actual, 0);
+            },
+            other => panic!("expected zero-CRC refusal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn borrowed_store_rejects_payload_corruption_with_a_nonzero_crc() {
+        let payload = b"nonzero CRC payload";
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("stored.bin", payload).unwrap();
+        let mut bytes = writer.finish_to_bytes().unwrap();
+        let local = local_header_offset_for_name(&bytes, b"stored.bin");
+        let name_len = usize::from(u16::from_le_bytes([bytes[local + 26], bytes[local + 27]]));
+        let extra_len = usize::from(u16::from_le_bytes([bytes[local + 28], bytes[local + 29]]));
+        bytes[local + 30 + name_len + extra_len] ^= 0x80;
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        let error = reader.read_stored_borrowed("stored.bin").unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidChecksum { .. }));
+    }
+
+    #[test]
+    fn borrowed_store_refuses_overlapping_local_spans() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("first.bin", b"first").unwrap();
+        writer.write_stored("second.bin", b"second").unwrap();
+        let mut bytes = writer.finish_to_bytes().unwrap();
+        let first_local = local_header_offset_for_name(&bytes, b"first.bin");
+        let second_central = central_header_offset_for_name(&bytes, b"second.bin");
+        bytes[second_central + 42..second_central + 46]
+            .copy_from_slice(&(u32::try_from(first_local).unwrap()).to_le_bytes());
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        let error = reader.read_stored_borrowed("first.bin").unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+    }
+
+    #[test]
+    fn borrowed_store_accepts_valid_local_zip64_size_extra() {
+        let name = b"stored.bin";
+        let payload = b"zip64 local payload";
+        let size = u64::try_from(payload.len()).unwrap();
+        let mut extra = Vec::new();
+        push_u16(&mut extra, 1);
+        push_u16(&mut extra, 16);
+        extra.extend_from_slice(&size.to_le_bytes());
+        extra.extend_from_slice(&size.to_le_bytes());
+
+        let mut archive = Vec::new();
+        push_u32(&mut archive, 0x0403_4b50);
+        push_u16(&mut archive, 45);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        push_u32(&mut archive, crate::crc32(payload));
+        push_u32(&mut archive, u32::MAX);
+        push_u32(&mut archive, u32::MAX);
+        push_u16(&mut archive, u16::try_from(name.len()).unwrap());
+        push_u16(&mut archive, u16::try_from(extra.len()).unwrap());
+        archive.extend_from_slice(name);
+        archive.extend_from_slice(&extra);
+        archive.extend_from_slice(payload);
+
+        let central_directory_offset = u32::try_from(archive.len()).unwrap();
+        let mut central = Vec::new();
+        push_u32(&mut central, 0x0201_4b50);
+        push_u16(&mut central, 45);
+        push_u16(&mut central, 45);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u32(&mut central, crate::crc32(payload));
+        push_u32(&mut central, u32::MAX);
+        push_u32(&mut central, u32::MAX);
+        push_u16(&mut central, u16::try_from(name.len()).unwrap());
+        push_u16(&mut central, u16::try_from(extra.len()).unwrap());
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u32(&mut central, 0);
+        push_u32(&mut central, 0);
+        central.extend_from_slice(name);
+        central.extend_from_slice(&extra);
+        let central_size = u32::try_from(central.len()).unwrap();
+        archive.extend_from_slice(&central);
+        push_u32(&mut archive, 0x0605_4b50);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 1);
+        push_u16(&mut archive, 1);
+        push_u32(&mut archive, central_size);
+        push_u32(&mut archive, central_directory_offset);
+        push_u16(&mut archive, 0);
+
+        let reader = ArchiveReader::new(&archive).unwrap();
+        assert_eq!(
+            reader.read_stored_borrowed("stored.bin").unwrap(),
+            Some(&payload[..])
+        );
+
+        let physical_archive = ZipArchive::from_slice(archive.as_slice()).unwrap();
+        let physical = physical_archive
+            .get_entry_borrowed(
+                physical_archive
+                    .entries()
+                    .next()
+                    .unwrap()
+                    .unwrap()
+                    .wayfinder(),
+            )
+            .unwrap()
+            .data();
+        let borrowed = reader.read_stored_borrowed("stored.bin").unwrap().unwrap();
+        assert_eq!(borrowed.as_ptr(), physical.as_ptr());
+        assert_eq!(borrowed.len(), physical.len());
+
+        let local = local_header_offset_for_name(&archive, name);
+        let local_extra_start = local + 30 + name.len();
+        let mut truncated = archive.clone();
+        truncated[local + 28..local + 30].copy_from_slice(&12u16.to_le_bytes());
+        let error = ArchiveReader::new(&truncated)
+            .unwrap()
+            .read_stored_borrowed("stored.bin")
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+
+        let mut mismatched = archive.clone();
+        mismatched[local_extra_start + 4..local_extra_start + 12]
+            .copy_from_slice(&(size + 1).to_le_bytes());
+        let error = ArchiveReader::new(&mismatched)
+            .unwrap()
+            .read_stored_borrowed("stored.bin")
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidSize { .. }));
+
+        let duplicate_field = archive[local_extra_start..local_extra_start + extra.len()].to_vec();
+        let payload_offset = local_extra_start + extra.len();
+        let mut duplicated = archive.clone();
+        duplicated.splice(payload_offset..payload_offset, duplicate_field);
+        duplicated[local + 28..local + 30].copy_from_slice(&40u16.to_le_bytes());
+        let eocd = duplicated.len() - 22;
+        let central_offset = u32::from_le_bytes([
+            duplicated[eocd + 16],
+            duplicated[eocd + 17],
+            duplicated[eocd + 18],
+            duplicated[eocd + 19],
+        ])
+        .checked_add(u32::try_from(extra.len()).unwrap())
+        .unwrap();
+        duplicated[eocd + 16..eocd + 20].copy_from_slice(&central_offset.to_le_bytes());
+        let error = ArchiveReader::new(&duplicated)
+            .unwrap()
+            .read_stored_borrowed("stored.bin")
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+    }
+
+    fn stored_descriptor_fixture(payload: &[u8], signature: bool) -> Vec<u8> {
+        stored_descriptor_fixture_with_prefix(payload, signature, 0)
+    }
+
+    fn stored_descriptor_fixture_with_prefix(
+        payload: &[u8],
+        signature: bool,
+        prefix_len: usize,
+    ) -> Vec<u8> {
+        let name = b"stored.bin";
+        let size = u32::try_from(payload.len()).unwrap();
+        let crc = crate::crc32(payload);
+        let local_header_offset = u32::try_from(prefix_len).unwrap();
+        let mut archive = vec![0xA5; prefix_len];
+
+        push_u32(&mut archive, 0x0403_4b50);
+        push_u16(&mut archive, 20);
+        push_u16(&mut archive, 0x08);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        push_u32(&mut archive, 0);
+        push_u32(&mut archive, 0);
+        push_u32(&mut archive, 0);
+        push_u16(&mut archive, u16::try_from(name.len()).unwrap());
+        push_u16(&mut archive, 0);
+        archive.extend_from_slice(name);
+        archive.extend_from_slice(payload);
+        if signature {
+            push_u32(&mut archive, 0x0807_4b50);
+        }
+        push_u32(&mut archive, crc);
+        push_u32(&mut archive, size);
+        push_u32(&mut archive, size);
+
+        let central_directory_offset = u32::try_from(archive.len()).unwrap();
+        let mut central_directory = Vec::new();
+        push_u32(&mut central_directory, 0x0201_4b50);
+        push_u16(&mut central_directory, 20);
+        push_u16(&mut central_directory, 20);
+        push_u16(&mut central_directory, 0x08);
+        push_u16(&mut central_directory, 0);
+        push_u16(&mut central_directory, 0);
+        push_u16(&mut central_directory, 0);
+        push_u32(&mut central_directory, crc);
+        push_u32(&mut central_directory, size);
+        push_u32(&mut central_directory, size);
+        push_u16(&mut central_directory, u16::try_from(name.len()).unwrap());
+        push_u16(&mut central_directory, 0);
+        push_u16(&mut central_directory, 0);
+        push_u16(&mut central_directory, 0);
+        push_u16(&mut central_directory, 0);
+        push_u32(&mut central_directory, 0);
+        push_u32(&mut central_directory, local_header_offset);
+        central_directory.extend_from_slice(name);
+        let central_directory_size = u32::try_from(central_directory.len()).unwrap();
+        archive.extend_from_slice(&central_directory);
+
+        push_u32(&mut archive, 0x0605_4b50);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 1);
+        push_u16(&mut archive, 1);
+        push_u32(&mut archive, central_directory_size);
+        push_u32(&mut archive, central_directory_offset);
+        push_u16(&mut archive, 0);
+        archive
+    }
+
+    fn descriptor_start(payload: &[u8], signature: bool) -> usize {
+        30 + b"stored.bin".len() + payload.len() + if signature { 4 } else { 0 }
+    }
+
+    fn local_header_offset_for_name(archive: &[u8], wanted_name: &[u8]) -> usize {
+        const LOCAL_HEADER: [u8; 4] = 0x0403_4b50_u32.to_le_bytes();
+        archive
+            .windows(4)
+            .enumerate()
+            .find_map(|(offset, signature)| {
+                if signature != LOCAL_HEADER || offset.saturating_add(30) > archive.len() {
+                    return None;
+                }
+                let name_len = usize::from(u16::from_le_bytes([
+                    archive[offset + 26],
+                    archive[offset + 27],
+                ]));
+                let name_end = offset.saturating_add(30).saturating_add(name_len);
+                (name_end <= archive.len() && &archive[offset + 30..name_end] == wanted_name)
+                    .then_some(offset)
+            })
+            .expect("local member header")
+    }
+
+    fn central_header_offset_for_name(archive: &[u8], wanted_name: &[u8]) -> usize {
+        const CENTRAL_HEADER: [u8; 4] = 0x0201_4b50_u32.to_le_bytes();
+        archive
+            .windows(4)
+            .enumerate()
+            .find_map(|(offset, signature)| {
+                if signature != CENTRAL_HEADER || offset.saturating_add(46) > archive.len() {
+                    return None;
+                }
+                let name_len = usize::from(u16::from_le_bytes([
+                    archive[offset + 28],
+                    archive[offset + 29],
+                ]));
+                let name_end = offset.saturating_add(46).saturating_add(name_len);
+                (name_end <= archive.len() && &archive[offset + 46..name_end] == wanted_name)
+                    .then_some(offset)
+            })
+            .expect("central member header")
     }
 
     fn indexed_archive(bytes: Vec<u8>) -> IndexedArchive<std::io::Cursor<Vec<u8>>> {
