@@ -1,5 +1,25 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Latest XLSB source-backed fallback admission result (change 0353)
+
+Change 0353 removes the post-admission XLSB source-text retry through an eager
+full-workbook fallback, along with the eager adapter reader/caches/state and
+private detector-side duplicate source/limits state. Source typed errors,
+freshness fences, and the eager workbook cache remain; explicit
+`open_xlsb_workbook*` APIs and `DetectedFormat::Xlsb` are unchanged. Recognized
+nonworksheet tabs are skipped through filtered worksheet positions, while
+direct nonworksheet and sparkline/pivot/slicer/timeline selections remain typed
+refusals. The 0304 fallback wording is superseded only after source-owner
+admission. Final evidence is `23/23` for `litchi` `xlsb_facade` and `40/40` for
+`litchi-xlsb` `source_backed`, serialized with one job/thread, disabled
+incremental/debug compilation, one disk target, and an 8 GiB limit. The target
+reached 647 MiB; post-run available memory was approximately 15 GiB with swap
+saturated. This is correctness/admission evidence only (`performance_claim:
+none`); no latency, RSS, OOM, constant-memory, or broad XLSB claim follows.
+Smart `DetectedFormat`, explicit eager APIs, unsupported platforms,
+pre-admission recoverable probes, `Workbook::from_bytes` fallback, and selected
+worksheet/dependency materialization remain in scope.
+
 ## Latest DOCX source-backed selected-story text result (change 0352)
 
 Change 0352 adds a source-backed DOCX lifecycle for one selected `Main`,

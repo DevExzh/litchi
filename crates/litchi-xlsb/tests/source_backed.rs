@@ -226,6 +226,22 @@ fn rewrite_sheet_relationship(relationship_type: &str, content_type: &str) -> Ve
     output
 }
 
+fn rewrite_sheet_relationship_with_blob(
+    relationship_type: &str,
+    content_type: &str,
+    blob: Vec<u8>,
+) -> Vec<u8> {
+    let source = rewrite_sheet_relationship(relationship_type, content_type);
+    let mut package = OpcPackage::from_reader(Cursor::new(source)).unwrap();
+    package
+        .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.bin").unwrap())
+        .unwrap()
+        .set_blob(blob);
+    let mut output = Vec::new();
+    package.to_stream(&mut output).unwrap();
+    output
+}
+
 fn rewrite_sheet_target(target_partname: &str, target_ref: &str) -> Vec<u8> {
     let mut package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
@@ -857,29 +873,60 @@ fn source_text_rejects_stale_source_before_output() {
 }
 
 #[test]
-fn source_text_rejects_nonworksheet_with_typed_error() {
-    let source = rewrite_sheet_relationship(
-        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
-        "application/vnd.ms-excel.chartsheet",
-    );
-    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
-    let mut output = Vec::new();
-    let error = workbook
-        .write_text_to(&mut output, TextOutputOptions::default())
-        .unwrap_err();
+fn source_text_skips_known_nonworksheet_tabs_and_preserves_worksheet_text() {
+    const RELATIONSHIPS: &[(&str, &str)] = &[
+        (
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
+            "application/vnd.ms-excel.chartsheet",
+        ),
+        (
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/chartsheet",
+            "application/vnd.ms-excel.chartsheet",
+        ),
+        (
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
+            "application/vnd.ms-excel.dialogsheet",
+        ),
+        (
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/dialogsheet",
+            "application/vnd.ms-excel.dialogsheet",
+        ),
+        (
+            "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
+            "application/vnd.ms-excel.macrosheet",
+        ),
+        (
+            "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet",
+            "application/vnd.ms-excel.intlmacrosheet",
+        ),
+    ];
+    let expected_stream = "\n";
+    let expected_text = "\n\n";
+    for &(relationship_type, content_type) in RELATIONSHIPS {
+        let source =
+            rewrite_sheet_relationship_with_blob(relationship_type, content_type, vec![0xff; 8]);
+        let workbook =
+            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+        let before = workbook.cache_diagnostics();
+        let mut output = Vec::new();
+        let report = workbook
+            .write_text_to(&mut output, TextOutputOptions::default())
+            .unwrap();
 
-    assert!(matches!(
-        error,
-        TextOutputError::Document {
-            source: PackageError::UnsupportedFeature(_),
-            ..
-        }
-    ));
-    assert!(output.is_empty());
-    assert!(matches!(
-        workbook.text(),
-        Err(PackageError::UnsupportedFeature(_))
-    ));
+        assert!(report.objects_written() > 0);
+        assert_eq!(String::from_utf8(output).unwrap(), expected_stream);
+        assert_eq!(workbook.text().unwrap(), expected_text);
+        assert!(
+            workbook
+                .worksheet_by_index(0)
+                .unwrap()
+                .unwrap()
+                .workbook_position()
+                .unwrap()
+                > 0
+        );
+        assert!(workbook.cache_diagnostics().cold_loads > before.cold_loads);
+    }
 }
 
 #[test]

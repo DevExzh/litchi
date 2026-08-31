@@ -205,6 +205,18 @@ fn assert_source_changed<T>(result: litchi::sheet::Result<T>) {
     ));
 }
 
+fn assert_unsupported_feature<T>(result: litchi::sheet::Result<T>, expected: &str) {
+    let error = match result {
+        Ok(_) => panic!("unsupported XLSB operation unexpectedly succeeded"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error.downcast_ref::<xlsb::package::error::Error>(),
+        Some(xlsb::package::error::Error::UnsupportedFeature(message))
+            if message.contains(expected)
+    ));
+}
+
 fn append_eager_cell_text(output: &mut String, value: &CellValue) {
     match value {
         CellValue::Empty => {},
@@ -490,7 +502,7 @@ fn source_backed_facade_text_skips_chart_tabs() {
 }
 
 #[test]
-fn source_backed_facade_eager_fallback_keeps_tail_after_chart_tab() {
+fn source_backed_facade_strictly_refuses_sparkline_materialization() {
     let bytes = mixed_chart_tabs_with_sparkline_bytes();
     let file = fixture_file(&bytes);
     let workbook =
@@ -499,29 +511,41 @@ fn source_backed_facade_eager_fallback_keeps_tail_after_chart_tab() {
     let tail =
         WorkbookTrait::worksheet_by_index(workbook.as_ref(), 1).expect("logical second worksheet");
     assert_eq!(tail.name(), "Tail");
-    assert_eq!(
-        tail.cell_by_coordinate("A1")
-            .expect("tail worksheet cell")
-            .value(),
-        &CellValue::String("TAIL".to_string())
-    );
+    assert_unsupported_feature(tail.cell_by_coordinate("A1"), "sparkline groups");
 
     let named_tail =
         WorkbookTrait::worksheet_by_name(workbook.as_ref(), "Tail").expect("named tail worksheet");
     assert_eq!(named_tail.name(), "Tail");
+    assert_unsupported_feature(named_tail.cell_by_coordinate("A1"), "sparkline groups");
+
+    assert_unsupported_feature(
+        Workbook::open(file.path())
+            .expect("lazy XLSB facade open")
+            .text(),
+        "sparkline groups",
+    );
+
+    let bytes_dynamic = litchi::sheet::open_xlsb_workbook_from_bytes_dyn(&bytes)
+        .expect("source-backed XLSB bytes facade open");
+    let bytes_tail = WorkbookTrait::worksheet_by_name(bytes_dynamic.as_ref(), "Tail")
+        .expect("bytes-backed tail worksheet");
+    assert_unsupported_feature(bytes_tail.cell_by_coordinate("A1"), "sparkline groups");
+
+    let unified =
+        Workbook::from_bytes(bytes.clone()).expect("unified source-backed XLSB facade open");
+    assert_unsupported_feature(unified.text(), "sparkline groups");
+
+    let eager = litchi::sheet::open_xlsb_workbook_from_bytes(&bytes)
+        .expect("explicit eager XLSB API should support sparkline-bearing sheets");
+    assert_eq!(eager_text(&eager), "DATA\nTAIL\n");
     assert_eq!(
-        named_tail
+        WorkbookTrait::worksheet_by_name(&eager, "Tail")
+            .expect("eager tail worksheet")
             .cell_by_coordinate("A1")
-            .expect("named tail worksheet cell")
+            .expect("eager tail cell")
             .value(),
         &CellValue::String("TAIL".to_string())
     );
-
-    let text = Workbook::open(file.path())
-        .expect("lazy XLSB facade open")
-        .text()
-        .expect("eager fallback XLSB text");
-    assert_eq!(text, "DATA\nTAIL\n");
 }
 
 #[test]

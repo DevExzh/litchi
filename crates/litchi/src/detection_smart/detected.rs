@@ -271,16 +271,8 @@ pub(crate) enum WorkbookSourceBytesDetection {
     #[cfg(feature = "xlsx")]
     Xlsx(crate::opc::SourceBackedPackage),
     /// A validated source-retaining OPC owner whose catalog identifies XLSB.
-    ///
-    /// The source and effective read policy remain alongside the package so
-    /// the unified XLSB facade can preserve the exact positional source and
-    /// policy while consuming the package into its lazy owner.
     #[cfg(feature = "xlsb")]
-    Xlsb {
-        package: crate::opc::SourceBackedPackage,
-        source: std::sync::Arc<dyn litchi_core::ReadAt>,
-        limits: crate::opc::ReadLimits,
-    },
+    Xlsb(crate::opc::SourceBackedPackage),
     /// The original bytes for the established byte-backed detector.
     Fallback(Vec<u8>),
 }
@@ -344,10 +336,9 @@ pub(crate) fn detect_workbook_source_bytes_with_limits(
             WorkbookSourceBytesDetection::Xlsx(package)
         },
         #[cfg(feature = "xlsb")]
-        Some(litchi_core::detection::FileFormat::Xlsb) => WorkbookSourceBytesDetection::Xlsb {
-            package,
-            source,
-            limits,
+        Some(litchi_core::detection::FileFormat::Xlsb) => {
+            drop(source);
+            WorkbookSourceBytesDetection::Xlsb(package)
         },
         _ => {
             drop(package);
@@ -636,8 +627,6 @@ pub(crate) enum WorkbookSourcePathDetection {
     Xlsb {
         workbook: crate::xlsb::SourceBackedWorkbook,
         metadata: litchi_core::Metadata,
-        source: std::sync::Arc<dyn litchi_core::ReadAt>,
-        limits: crate::opc::ReadLimits,
     },
     /// A validated, source-retaining ODS owner.
     #[cfg(feature = "ods")]
@@ -801,12 +790,7 @@ pub(crate) fn detect_workbook_source_path_with_limits(
                         observed: owner_version,
                     }));
                 }
-                return Ok(WorkbookSourcePathDetection::Xlsb {
-                    workbook,
-                    metadata,
-                    source,
-                    limits,
-                });
+                return Ok(WorkbookSourcePathDetection::Xlsb { workbook, metadata });
             }
 
             let enabled = match format {

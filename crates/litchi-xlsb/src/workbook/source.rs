@@ -846,16 +846,6 @@ impl SourceBackedWorkbook {
         let mut writer = SequentialTextWriter::new(&mut checked_output, options);
         let conversion = (|| {
             check_text_state(&self.inner).map_err(|source| writer.document_error(source))?;
-            if self
-                .inner
-                .sheets
-                .iter()
-                .any(|sheet| !matches!(sheet.kind, SheetKind::Worksheet))
-            {
-                return Err(writer.document_error(Error::UnsupportedFeature(
-                    "source-backed XLSB non-worksheet materialization is not supported".to_string(),
-                )));
-            }
             for &catalog_position in &self.inner.worksheet_positions {
                 check_text_state(&self.inner).map_err(|source| writer.document_error(source))?;
                 let sheet = SourceBackedWorksheet {
