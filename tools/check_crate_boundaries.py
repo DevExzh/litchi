@@ -1975,9 +1975,11 @@ KEYNOTE_SLIDE_TABLE_TITLE_PACKAGE_MARKER_GROUPS = {
 
 # Wave99 keeps Keynote's physical row-reordering executor in litchi-iwa while
 # moving only the persisted field-44 sort configuration behind a selector-first
-# package facade.  This is deliberately a separate ratchet from the title
-# owner above: a table sort edit must not accidentally become a row/tile/UID,
-# metadata, or physical ``Sort Now`` migration.
+# package facade. The compatibility host's normal physical entry points are
+# likewise selector-first; its older raw-ID methods remain declarations only
+# for source compatibility. This is deliberately a separate ratchet from the
+# title owner above: a table sort edit must not accidentally become a row/tile/
+# UID, metadata, or focused physical ``Sort Now`` migration.
 KEYNOTE_SLIDE_TABLE_SORT_SEMANTIC_SOURCE = (
     KEYNOTE_SOURCE_ROOT / "slide" / "table" / "sort.rs"
 )
@@ -3288,7 +3290,8 @@ IWA_KEYNOTE_SLIDE_TABLE_SORT_CALL = re.compile(
     r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>slide_table_sort_order|"
     r"set_slide_table_sort_order|clear_slide_table_sort_order|"
     r"edit_slide_table_sort_order|apply_slide_table_sort_order|"
-    r"apply_slide_table_sort_order_to_rows)\b[ \t\r\n]*\(",
+    r"apply_slide_table_sort_order_to_rows|execute_slide_table_sort_order|"
+    r"execute_slide_table_sort_order_to_rows)\b[ \t\r\n]*\(",
 )
 IWA_KEYNOTE_SLIDE_TABLE_SORT_NUMBERS_HELPER = re.compile(
     r"(?<![A-Za-z0-9_])(?:table_sort_order_in_package|"
@@ -35307,7 +35310,10 @@ def _audit_iwa_keynote_slide_table_config_source_topology(
         numbers_helper = IWA_KEYNOTE_SLIDE_TABLE_SORT_NUMBERS_HELPER
         label = "sort"
         physical_methods = frozenset(
-            {"apply_slide_table_sort_order", "apply_slide_table_sort_order_to_rows"}
+            {
+                "execute_slide_table_sort_order",
+                "execute_slide_table_sort_order_to_rows",
+            }
         )
     elif feature == "dimension":
         owner_present = _keynote_slide_table_dimension_owner_present(root)
@@ -35390,10 +35396,11 @@ def _audit_iwa_keynote_slide_table_config_source_topology(
             if focused:
                 focused_call_seen = True
                 continue
-            # The sort method has one intentionally retained raw-ID route:
-            # physical Sort Now and its row-range executor.  Its Numbers
-            # helpers have distinct `apply_*` names and are not matched by
-            # the persisted-helper regex above.
+            # Physical Sort Now remains in the compatibility host, but normal
+            # production calls must use its selector-first entry points. The
+            # deprecated raw-ID `apply_*` declarations stay source-compatible;
+            # calls to them no longer pass this ratchet. Numbers executor
+            # helpers have distinct names and are not matched here.
             if method in physical_methods:
                 continue
             line_number = code.count("\n", 0, match.start("method")) + 1
@@ -35500,7 +35507,7 @@ def audit_iwa_keynote_slide_table_title_source_topology(
 def audit_iwa_keynote_slide_table_sort_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Retire persisted raw sort routes while preserving physical Sort Now."""
+    """Retire raw sort calls while preserving selector-first host Sort Now."""
 
     return _audit_iwa_keynote_slide_table_config_source_topology(root, feature="sort")
 

@@ -7044,3 +7044,26 @@ dependency declarations, 226 canonical edges, and 11 ordered migration debts
 with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, with one migration host.
 No migration debt is retired and no host exits in this amendment; the IWA
 monolith and all global deletion gates remain open.
+
+## 2026-09-01 amendment: Keynote physical-sort raw-ID retirement slice
+
+The remaining Keynote physical sorter no longer requires native table-model
+IDs from ordinary callers. Semantic slide/table selectors resolve to a private
+physical selection, deprecated raw-ID methods remain compatibility declarations
+only, and the boundary checker forbids production calls to those aliases. The
+host's unreachable persisted-sort mutation helpers are deleted; focused
+persisted configuration continues to belong to `litchi-keynote::Package`.
+
+An archive-free common permutation planner and borrowed BNC key views reduce
+duplication and payload copying, while explicit row, column, BNC-offset, and
+key-product limits reject hostile dimensions before large planning buffers are
+allocated. These changes narrow and harden the host seam but do not move its
+native transaction: generated TableModel/Tile/Header/UID values, formula and
+comment graphs, borders, hidden axes, metadata, locality, and publication still
+require host-private package knowledge.
+
+Accordingly, no ordered debt or global exit gate closes. A future physical
+table owner must provide selector-first exact-source admission, complete
+row-affine topology coverage, locality and budget proofs, conflict/inverse
+semantics, Buffa lazy projection/mutation coverage, and native acceptance before
+the physical executor can leave `litchi-iwa`.

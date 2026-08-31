@@ -415,7 +415,6 @@ pub use table_sort::{
 };
 pub(crate) use table_sort::{
     apply_table_sort_order_in_package, apply_table_sort_order_to_rows_in_package,
-    clear_table_sort_order_in_package, set_table_sort_order_in_package,
     table_sort_order_in_package,
 };
 

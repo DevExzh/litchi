@@ -15071,3 +15071,37 @@ This is a focused extraction-path migration, not a public semantic-owner exit.
 The generated editor and mutation paths remain, and Wave120 changes no package,
 dependency edge, ordered migration debt, compatibility-host count, or
 monolith-deletion gate.
+
+## 2026-09-01 amendment: Keynote physical-sort selector verification
+
+The selector-first compatibility boundary and shared row planner passed these
+focused gates:
+
+- all 154 `litchi-iwa-common` library tests, including the six table-sort value
+  and planning tests;
+- both hostile physical-sort dimension/key-budget tests;
+- all 30 Keynote slide-table host tests, including invalid selector atomicity,
+  stable duplicate ordering, selected-row scope, comment/reply movement, and
+  exact-byte second-execution no-op behavior;
+- the paired source-built Pages and Keynote physical-sort regression tests;
+- the `create_keynote_sorted_table` example check; and
+- all 712 crate-boundary checker tests.
+
+Computer Use opened the exact source-built artifact
+`/private/tmp/litchi-keynote-sort-check.Vf0C7q/selector-sort.key` in Keynote.
+Before native save it was 11,228 bytes with SHA-256
+`3fa20bc37e9e9ad0a03588b12238b54350b2817ef9fca2f12104de6f63c6ade9`.
+Keynote showed no repair or recovery UI and rendered the header followed by
+`apple / first apple`, `apple / second apple`, `banana / middle`, and
+`zebra / last`; the comment remained attached to the zebra row. After Save,
+Close, and exact-path Reopen, the same order and comment were visible without
+repair. The native-normalized artifact was 68,096 bytes with SHA-256
+`336a39286e4a26efbefb1a8ac53c643ce7ea691a9671a615c853157e9673aa20`.
+The disposable directory was removed after recording this evidence.
+
+The broad `litchi-iwa` library run is not recorded as green: 1,607 tests passed
+and 51 failed in the dirty shared worktree, concentrated in existing Numbers
+table-projection/fixture paths plus one unrelated Keynote tree test. The
+focused gates above passed, but this checkpoint makes no full-suite,
+performance/RSS, arbitrary-producer, native byte-parity, or focused physical
+storage-ownership claim.

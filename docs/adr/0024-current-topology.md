@@ -3768,3 +3768,28 @@ dependency declarations, 226 canonical edges, and 11 ordered migration debts
 with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, with one migration host.
 No migration debt is retired, no host exits, and no IWA monolith-deletion gate
 closes in this amendment.
+
+## 2026-09-01 amendment: Keynote selector-first physical-sort host seam
+
+Keynote physical `Sort Now` remains in `litchi-iwa`, but its normal entry points
+are now selector-first: `execute_slide_table_sort_order` and
+`execute_slide_table_sort_order_to_rows` resolve the slide and table before
+entering the private native-ID executor. Deprecated raw-ID `apply_*`
+declarations remain for source compatibility; production calls are rejected by
+the topology ratchet. Dormant host persisted-sort set/clear routes and their
+wire writers are removed because the focused `litchi-keynote::Package` already
+owns that transaction.
+
+The row-order algorithm is now an archive-free hidden primitive in
+`litchi-iwa-common`. The compatibility adapter supplies decoded keys through
+borrowed BNC views and applies finite dimension/key budgets before staging the
+full native transaction. Table models, tiles, headers, UIDs, formulas, comments,
+stroke layers, hidden axes, and generated Prost mutation remain in the host;
+this cut does not create a focused physical-table package or a Buffa mutation
+owner.
+
+The authoritative topology remains 64 workspace packages, 237 internal
+dependency declarations, 226 canonical edges, and 11 ordered migration debts
+with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, with one migration host.
+No package, dependency edge, debt, host, or monolith-deletion gate is removed
+by this seam hardening.

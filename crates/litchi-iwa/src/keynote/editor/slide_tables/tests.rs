@@ -12,6 +12,7 @@ use litchi_keynote::slide::table::{
     formula::{FormulaCachedValue, FormulaCellReference, FormulaExpression},
     sort::{ColumnIndex, Direction, Order, RowRange, Rule as SortRule},
 };
+use litchi_keynote::{SlideSelector, TableSelector};
 use litchi_numbers::cell::data_format::control::{Range as ControlRange, Slider, Stepper};
 use litchi_numbers::cell::data_format::custom::{
     Name as CustomFormatName, Number as CustomNumber, NumberPattern,
@@ -1463,8 +1464,44 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         focused_table_sort_order(&editor, 0, model_id).unwrap(),
         Some(order.clone())
     );
-    assert!(editor.apply_slide_table_sort_order(0, model_id).unwrap());
-    assert!(!editor.apply_slide_table_sort_order(0, model_id).unwrap());
+    let before_selector_errors = editor.to_bytes().unwrap();
+    assert!(
+        editor
+            .execute_slide_table_sort_order(SlideSelector::index(1), TableSelector::index(0))
+            .is_err()
+    );
+    assert!(
+        editor
+            .execute_slide_table_sort_order(SlideSelector::index(0), TableSelector::index(1))
+            .is_err()
+    );
+    assert!(
+        editor
+            .execute_slide_table_sort_order(SlideSelector::name(""), TableSelector::index(0))
+            .is_err()
+    );
+    assert!(
+        editor
+            .execute_slide_table_sort_order(
+                SlideSelector::name("missing"),
+                TableSelector::index(0),
+            )
+            .is_err()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), before_selector_errors);
+
+    assert!(
+        editor
+            .execute_slide_table_sort_order(SlideSelector::index(0), TableSelector::index(0))
+            .unwrap()
+    );
+    let after_first_sort = editor.to_bytes().unwrap();
+    assert!(
+        !editor
+            .execute_slide_table_sort_order(SlideSelector::index(0), TableSelector::index(0))
+            .unwrap()
+    );
+    assert_eq!(editor.to_bytes().unwrap(), after_first_sort);
     let materialized = editor.slide_table(0, model_id).unwrap();
     assert_eq!(
         materialized.get_cell(0, 0),
@@ -1561,11 +1598,19 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
         Some(selected_order)
     );
     let before_wrong_executor = reopened.to_bytes().unwrap();
-    assert!(reopened.apply_slide_table_sort_order(0, model_id).is_err());
+    assert!(
+        reopened
+            .execute_slide_table_sort_order(SlideSelector::index(0), TableSelector::index(0))
+            .is_err()
+    );
     assert_eq!(reopened.to_bytes().unwrap(), before_wrong_executor);
     assert!(
         reopened
-            .apply_slide_table_sort_order_to_rows(0, model_id, RowRange::new(1, 4).unwrap(),)
+            .execute_slide_table_sort_order_to_rows(
+                SlideSelector::index(0),
+                TableSelector::index(0),
+                RowRange::new(1, 4).unwrap(),
+            )
             .unwrap()
     );
     let table = reopened.slide_table(0, model_id).unwrap();
@@ -1619,7 +1664,11 @@ fn source_built_table_roundtrips_full_table_sort_crud() {
     let unchanged = reopened.to_bytes().unwrap();
     clear_focused_table_sort_order(&mut reopened, 0, model_id).unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), unchanged);
-    assert!(reopened.apply_slide_table_sort_order(0, model_id).is_err());
+    assert!(
+        reopened
+            .execute_slide_table_sort_order(SlideSelector::index(0), TableSelector::index(0))
+            .is_err()
+    );
     assert_eq!(reopened.to_bytes().unwrap(), unchanged);
 }
 

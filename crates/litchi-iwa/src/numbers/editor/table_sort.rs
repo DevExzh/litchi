@@ -16,10 +16,7 @@ pub use litchi_numbers::table::sort::{
 };
 
 use apply::apply_attached_table_sort_order;
-use wire::{
-    clear_table_sort_order_wire, delete_table_sort_column_wire, read_native_table_sort_order_wire,
-    write_table_sort_order_wire,
-};
+use wire::{delete_table_sort_column_wire, read_native_table_sort_order_wire};
 
 fn invalid_stored_sort(error: sort::Error) -> Error {
     Error::InvalidFormat(format!(
@@ -44,20 +41,6 @@ fn order_from_native(sort: &tst::TableSortOrderArchive) -> Result<Option<Order>>
     Order::with_scope(scope, rules)
         .map(Some)
         .map_err(invalid_stored_sort)
-}
-
-fn order_as_native(order: &Order) -> tst::TableSortOrderArchive {
-    tst::TableSortOrderArchive {
-        r#type: order.scope().native_value(),
-        rules: order
-            .rules()
-            .iter()
-            .map(|rule| tst::table_sort_order_archive::SortRuleArchive {
-                index: rule.column().native_value(),
-                direction: rule.direction().native_value(),
-            })
-            .collect(),
-    }
 }
 
 impl NumbersEditor {
@@ -269,25 +252,6 @@ pub(crate) fn table_sort_order_in_package(
     read_attached_table_sort_order(package, table_id)
 }
 
-/// Set an attached native iWork table's persisted sort-rule configuration.
-pub(crate) fn set_table_sort_order_in_package(
-    package: &mut IWorkPackage,
-    table_id: u64,
-    order: &Order,
-) -> Result<()> {
-    set_attached_table_sort_order(package, table_id, order)
-}
-
-/// Clear an attached native iWork table's stored sort rules.
-///
-/// Returns whether a non-empty native order was cleared.
-pub(crate) fn clear_table_sort_order_in_package(
-    package: &mut IWorkPackage,
-    table_id: u64,
-) -> Result<bool> {
-    clear_attached_table_sort_order(package, table_id)
-}
-
 /// Execute a validated full-table sort on an attached native iWork table.
 ///
 /// The caller supplies the configuration it has already read from or assigned
@@ -322,43 +286,6 @@ pub(super) fn read_attached_table_sort_order(
         .map(order_from_native)
         .transpose()
         .map(Option::flatten)
-}
-
-fn set_attached_table_sort_order(
-    package: &mut IWorkPackage,
-    table_id: u64,
-    order: &Order,
-) -> Result<()> {
-    let descriptor = attached_table_descriptor(package, table_id)?;
-    validate_sort_order(&descriptor.model, order)?;
-    let current = read_native_table_sort_order(package, &descriptor)?;
-    if current
-        .as_ref()
-        .map(order_from_native)
-        .transpose()?
-        .flatten()
-        .as_ref()
-        == Some(order)
-    {
-        return Ok(());
-    }
-    update_table_sort_order(package, table_id, |original, model| {
-        write_table_sort_order_wire(original, model, order)
-    })
-}
-
-fn clear_attached_table_sort_order(package: &mut IWorkPackage, table_id: u64) -> Result<bool> {
-    let descriptor = attached_table_descriptor(package, table_id)?;
-    let Some(native) = read_native_table_sort_order(package, &descriptor)? else {
-        return Ok(false);
-    };
-    if native.rules.is_empty() {
-        return Ok(false);
-    }
-    update_table_sort_order(package, table_id, |original, model| {
-        clear_table_sort_order_wire(original, model)
-    })?;
-    Ok(true)
 }
 
 fn read_native_table_sort_order(

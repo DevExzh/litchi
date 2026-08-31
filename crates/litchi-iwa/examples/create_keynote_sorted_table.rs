@@ -3,6 +3,7 @@ use std::env;
 
 use litchi_iwa::keynote::{
     KeynoteDocumentBuilder, KeynoteEditor, KeynoteTableCellUpdate, KeynoteTableCellValue,
+    SlideSelector, TableSelector,
 };
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_keynote::slide::table::headers::{
@@ -78,7 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         editor,
         Order::new([Rule::new(ColumnIndex::new(0)?, Direction::Ascending)])?,
     )?;
-    if !editor.apply_slide_table_sort_order(0, table.model_object_id)? {
+    if !editor.execute_slide_table_sort_order(SlideSelector::index(0), TableSelector::index(0))? {
         return Err("expected the source table to be reordered".into());
     }
     let moved = editor
