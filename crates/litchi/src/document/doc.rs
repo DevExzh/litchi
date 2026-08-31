@@ -695,9 +695,9 @@ impl Document {
             if let Some(candidate) =
                 crate::detection_smart::detected::detect_odt_source_path(path.as_ref())?
             {
-                let has_ooxml_catalog = candidate.has_ooxml_catalog()?;
+                let ooxml_catalog = candidate.ooxml_catalog_state()?;
                 #[cfg(any(feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-                if has_ooxml_catalog
+                if ooxml_catalog != Some(false)
                     && crate::detection_smart::detected::odt_source_candidate_has_ooxml_owner(
                         &candidate,
                     )
@@ -708,7 +708,7 @@ impl Document {
                             .to_owned(),
                     ));
                 }
-                let _ = has_ooxml_catalog;
+                let _ = ooxml_catalog;
                 return Ok(Self {
                     inner: DocumentImpl::OdtSource(candidate.into_document()?),
                 });
@@ -730,11 +730,13 @@ impl Document {
         limits: crate::docx::ReadLimits,
     ) -> Result<Self> {
         #[cfg(all(feature = "odt", any(unix, windows)))]
-        let odt_candidate =
-            crate::detection_smart::detected::detect_odt_source_path(path.as_ref())?;
+        let odt_candidate = crate::detection_smart::detected::detect_odt_source_path_with_limits(
+            path.as_ref(),
+            limits,
+        )?;
         #[cfg(all(feature = "odt", any(unix, windows)))]
         let odt_candidate = if let Some(candidate) = odt_candidate {
-            if !candidate.has_ooxml_catalog()? {
+            if candidate.ooxml_catalog_state()? == Some(false) {
                 return Ok(Self {
                     inner: DocumentImpl::OdtSource(candidate.into_document()?),
                 });
@@ -1951,7 +1953,7 @@ mod tests {
         writer.finish().unwrap().into_inner()
     }
 
-    #[cfg(any(feature = "ods", feature = "odp"))]
+    #[cfg(all(feature = "odt", any(feature = "ods", feature = "odp")))]
     fn minimal_odf_family(mimetype: &str, body: &[u8]) -> Vec<u8> {
         let mut writer = litchi_odf_common::core::PackageWriter::new();
         writer.set_mimetype(mimetype).unwrap();

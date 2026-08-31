@@ -301,11 +301,11 @@ impl Workbook {
                     inner: WorkbookImpl::XlsSource(XlsSource::new(workbook, cfb)),
                     cached_metadata: Metadata::default(),
                 }),
-                crate::detection_smart::detected::WorkbookSourcePathDetection::OtherOoxml {
-                    format: _,
-                    bytes,
-                }
-                | crate::detection_smart::detected::WorkbookSourcePathDetection::Bytes(bytes) => {
+                crate::detection_smart::detected::WorkbookSourcePathDetection::OtherOoxml(_) => {
+                    Err(Box::new(Error::NotOfficeFile)
+                        as Box<dyn std::error::Error + Send + Sync>)
+                },
+                crate::detection_smart::detected::WorkbookSourcePathDetection::Bytes(bytes) => {
                     Self::from_bytes(bytes)
                 },
                 crate::detection_smart::detected::WorkbookSourcePathDetection::DisabledOtherOoxml(
@@ -351,7 +351,32 @@ impl Workbook {
     /// - No temporary files created
     /// - Ideal for network data, streams, or in-memory content
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        #[cfg(feature = "ods")]
+        #[cfg(all(
+            feature = "ods",
+            any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+        ))]
+        let bytes = match crate::detection_smart::detected::detect_prepared_ods_with_limits(
+            bytes,
+            crate::opc::ReadLimits::default(),
+        ) {
+            Ok(Ok(prepared)) => {
+                let ods = litchi_ods::Spreadsheet::from_prepared_package(prepared)
+                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+                let metadata = ods.metadata().clone();
+                return Ok(Self {
+                    inner: WorkbookImpl::Ods(std::cell::RefCell::new(ods)),
+                    cached_metadata: metadata,
+                });
+            },
+            Ok(Err(bytes)) => bytes,
+            Err(error) => {
+                return Err(Box::new(error.error) as Box<dyn std::error::Error + Send + Sync>);
+            },
+        };
+        #[cfg(all(
+            feature = "ods",
+            not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))
+        ))]
         let bytes = match crate::detection_smart::detected::detect_prepared_ods(bytes) {
             Ok(prepared) => {
                 let ods = litchi_ods::Spreadsheet::from_prepared_package(prepared)

@@ -66,6 +66,10 @@ pub use members::{NonPartMember, NonPartReason};
 pub use package::{FontEmbedding, OpcPackage, SaveOptions};
 pub use packuri::PackURI;
 pub use part::{BlobPart, Part, XmlPart};
+pub use pkgreader::{
+    PackageCatalog, probe_package_catalog_from_reader,
+    probe_package_catalog_from_reader_with_limits,
+};
 pub use pkgwriter::PackageWriter;
 pub use rel::{Relationship, Relationships, TargetMode};
 pub use source_backed::{

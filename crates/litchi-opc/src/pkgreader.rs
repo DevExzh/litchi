@@ -18,7 +18,9 @@ use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use smallvec::SmallVec;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, TryReserveError};
+use std::io::{Read, Seek, SeekFrom};
 use std::sync::Arc;
 
 /// The small ZIP surface needed by the structural OPC reader.
@@ -193,6 +195,121 @@ pub(crate) struct SourceCatalog {
     pub(crate) non_part_members: Vec<NonPartMember>,
     /// Exact spelling of the reserved content-types member in the source ZIP.
     pub(crate) content_types_member: String,
+}
+
+/// Opaque, structurally validated information about an OPC package.
+///
+/// The catalog owns part names, content types, relationship manifests, and
+/// non-part classification. It does not own or read ordinary part payloads.
+/// Opening a catalog reads the ZIP directory, `[Content_Types].xml`, and the
+/// relationship parts needed to validate the package topology; ordinary part
+/// bytes remain unread and may still be compressed in the input source.
+#[derive(Debug)]
+pub struct PackageCatalog {
+    source: SourceCatalog,
+}
+
+impl PackageCatalog {
+    /// Return the number of ordinary OPC parts admitted by the catalog.
+    ///
+    /// Relationship parts are structural implementation details and are not
+    /// counted as ordinary parts. This value is available without reading any
+    /// ordinary part payload.
+    #[must_use]
+    pub fn part_count(&self) -> usize {
+        self.source.parts.len()
+    }
+
+    /// Iterate over admitted ordinary-part content types without allocating.
+    ///
+    /// The iterator borrows strings owned by this catalog, has exactly
+    /// [`Self::part_count`] items, and performs no ordinary payload reads.
+    #[must_use]
+    pub fn part_content_types(&self) -> impl ExactSizeIterator<Item = &str> {
+        self.source
+            .parts
+            .iter()
+            .map(|part| part.content_type.as_str())
+    }
+}
+
+/// Adapt a mutable, seekable reader to the positional ZIP reader interface.
+///
+/// The adapter is intentionally private: a caller gets a catalog, not an
+/// archive or a mutable reader handle. `try_borrow_mut` keeps malformed or
+/// re-entrant use on an error path instead of allowing `RefCell` to panic.
+struct BorrowedReaderAt<'a, R: ?Sized> {
+    reader: RefCell<&'a mut R>,
+}
+
+impl<'a, R: ?Sized> BorrowedReaderAt<'a, R> {
+    fn new(reader: &'a mut R) -> Self {
+        Self {
+            reader: RefCell::new(reader),
+        }
+    }
+}
+
+impl<R: Read + Seek + ?Sized> soapberry_zip::ReaderAt for BorrowedReaderAt<'_, R> {
+    fn read_at(&self, buffer: &mut [u8], offset: u64) -> std::io::Result<usize> {
+        let mut reader = self
+            .reader
+            .try_borrow_mut()
+            .map_err(|_| std::io::Error::other("re-entrant borrowed ZIP reader access"))?;
+        reader.seek(SeekFrom::Start(offset))?;
+        reader.read(buffer)
+    }
+}
+
+/// Probe an OPC package from a mutable seekable reader using default limits.
+///
+/// The probe validates ZIP structure, content types, relationship manifests,
+/// part-name admission, and declared part metadata. It reads structural
+/// relationship and content-type members as needed, but never reads or
+/// decompresses ordinary part payloads. The reader's cursor is restored to
+/// its position on entry on both success and failure.
+pub fn probe_package_catalog_from_reader<R: Read + Seek + ?Sized>(
+    reader: &mut R,
+) -> Result<PackageCatalog> {
+    probe_package_catalog_from_reader_with_limits(reader, ReadLimits::default())
+}
+
+/// Probe an OPC package from a mutable seekable reader under explicit limits.
+///
+/// ZIP central-directory metadata, `[Content_Types].xml`, and relationship
+/// manifests are read to build the same structural catalog used by the
+/// source-backed reader. Ordinary part payloads are never read or
+/// decompressed. The input is not copied into memory and no new OPC parser is
+/// introduced.
+///
+/// The reader's cursor is restored to its original position on every returned
+/// result. If probing fails and restoration also fails, the primary probe
+/// error is returned. If probing succeeds but restoration fails, the
+/// restoration I/O error is returned instead of the catalog.
+pub fn probe_package_catalog_from_reader_with_limits<R: Read + Seek + ?Sized>(
+    reader: &mut R,
+    limits: ReadLimits,
+) -> Result<PackageCatalog> {
+    let original_position = reader.stream_position().map_err(OpcError::from)?;
+    let probe_result = (|| {
+        let input_length = reader.seek(SeekFrom::End(0))?;
+        limits.check_input_bytes(input_length)?;
+        let archive = soapberry_zip::office::IndexedArchive::from_reader_with_limits(
+            BorrowedReaderAt::new(reader),
+            input_length,
+            limits.zip_limits(),
+        )
+        .map_err(OpcError::from)?;
+        let source = PackageReader::source_catalog(&archive, limits)?;
+        Ok(PackageCatalog { source })
+    })();
+
+    let restore_result = reader.seek(SeekFrom::Start(original_position));
+    match (probe_result, restore_result) {
+        (Ok(catalog), Ok(_)) => Ok(catalog),
+        (Ok(_catalog), Err(error)) => Err(OpcError::IoError(error)),
+        (Err(error), _) => Err(error),
+    }
 }
 
 /// Part names and content types admitted by the shared OPC catalog rules.
