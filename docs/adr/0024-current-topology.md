@@ -3743,3 +3743,28 @@ internal dependency declarations, 226 canonical edges, and 11 ordered
 migration debts with orders `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, with
 one migration host. Debt 005 is removed; debt 002, the relevant host/edge, and
 the remaining host logic stay open.
+
+## 2026-08-31 amendment: Keynote slide-table persisted sort transaction hardening (not a monolith-exit gate)
+
+The existing selector-first Keynote persisted field-44 sort transaction now
+reuses the shared `slide_table_core` authority for canonical admission, its
+bounded operation-local budget, and its locality checks. Ambiguity in archive
+roles, references, types, or wire framing fails closed before publication.
+Exact aggregate-only producer metadata and current, unversioned in-package
+cross-component edges remain admissible; partial route metadata, dangling or
+duplicate edges, and foreign inbound ownership remain rejected. The
+source-preserving rewrite continues to preserve previews, field 45,
+unknown fields, and untouched archive entries, while retaining exact no-op,
+inverse, and conflict behavior.
+
+This remains a focused persisted-configuration hardening only. Physical
+`Sort Now` and `RowRange`-based row execution, cells, and table storage remain
+owned by the legacy `litchi-iwa` host. No native semantic acceptance,
+performance, fuzz-exhaustiveness, or broader Keynote authoring claim follows
+from this amendment.
+
+The authoritative topology remains 64 workspace packages, 237 internal
+dependency declarations, 226 canonical edges, and 11 ordered migration debts
+with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, with one migration host.
+No migration debt is retired, no host exits, and no IWA monolith-deletion gate
+closes in this amendment.

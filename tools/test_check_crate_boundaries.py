@@ -1655,12 +1655,15 @@ def add_keynote_slide_table_sort_canonical_scaffold(root: Path) -> None:
             f"pub struct {name};\n"
             for name in boundaries.KEYNOTE_SLIDE_TABLE_SORT_CANONICAL_TYPES
         )
-        + "struct SortBudget;\n"
+        + "use super :: slide_table_core :: { Budget,\n"
+        + "    select_table, same_target, verify_locality,\n"
+        + "};\n"
         + "fn strict_codec() { numbers_table_sort_order_codec; decode_table_model_sort_order_with_report; prepare_table_model_sort_order_rewrite; }\n"
         + "fn prepared() { PreparedTableSortOrderRewrite; execution_requirements; report(); execute; }\n"
         + "fn fields() { TABLE_MODEL_MESSAGE_TYPE; sort_order; }\n"
         + "fn rewrite() { replace_message_preserving_header_with_limits; }\n"
-        + "fn transaction() { residual; budget; ExactArtifacts; inverse; is_noop; prepare_reassembly; candidate; reopen; validate; verify_locality; same_content; let deleted_previews: usize = 0; }\n"
+        + "fn shared_graph() { select_table(); same_target(); verify_locality(); Budget; }\n"
+        + "fn transaction() { residual; budget; ExactArtifacts; inverse; is_noop; prepare_reassembly; candidate; reopen; validate; same_content; let deleted_previews: usize = 0; }\n"
         + "impl Package {\n"
         + "pub fn slide_table_sort_order<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Option<Order>, SlideTableSortError> { let _ = (slide, table); todo!() }\n"
         + "pub fn edit_slide_table_sort_order<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<SlideTableSortEdit, SlideTableSortError> { let _ = (slide, table); todo!() }\n"
@@ -14687,6 +14690,149 @@ fn rewrite_movie_title_operation(
                 root
             )
             self.assertTrue(any("deleted_previews = 0" in item for item in violations), violations)
+
+    def test_keynote_slide_table_sort_shared_core_boundary_accepts_formatted_routes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_sort_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            source = source.replace(
+                "use super :: slide_table_core :: { Budget,\n"
+                "    select_table, same_target, verify_locality,\n"
+                "};\n",
+                "use\n"
+                "    super\n"
+                "    :: slide_table_core\n"
+                "    :: {\n"
+                "        Budget,\n"
+                "        select_table,\n"
+                "        same_target,\n"
+                "        verify_locality,\n"
+                "    };\n",
+            )
+            source += (
+                "// SortBudget ArchiveReferenceVisitor table_info_codec .max(1)\n"
+                "#[cfg(test)]\n"
+                "fn production_decoy() {\n"
+                "    let _ = (SortBudget, ArchiveReferenceVisitor, table_info_codec);\n"
+                "}\n"
+            )
+            owner.write_text(source, encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_sort_resource_source_topology(root),
+                [],
+            )
+
+    def test_keynote_slide_table_sort_shared_core_boundary_requires_every_route(self) -> None:
+        for api in boundaries.KEYNOTE_SLIDE_TABLE_SORT_SHARED_CORE_APIS:
+            with self.subTest(api=api):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    add_keynote_slide_table_sort_canonical_scaffold(root)
+                    owner = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE
+                    source = owner.read_text(encoding="utf-8").replace(api, "")
+                    owner.write_text(source, encoding="utf-8")
+
+                    violations = boundaries.audit_keynote_slide_table_sort_resource_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(
+                            f"must route {api} through slide_table_core" in item
+                            for item in violations
+                        ),
+                        violations,
+                    )
+
+    def test_keynote_slide_table_sort_shared_core_boundary_requires_calls_not_imports(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_sort_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            source = re.sub(
+                r"fn shared_graph\(\) \{.*?\}\n",
+                "fn shared_graph() { Budget; }\n",
+                source,
+                flags=re.DOTALL,
+            )
+            owner.write_text(source, encoding="utf-8")
+
+            violations = boundaries.audit_keynote_slide_table_sort_resource_source_topology(
+                root
+            )
+            for api in boundaries.KEYNOTE_SLIDE_TABLE_SORT_SHARED_CORE_APIS:
+                with self.subTest(api=api):
+                    self.assertTrue(
+                        any(
+                            f"must route {api} through slide_table_core" in item
+                            for item in violations
+                        ),
+                        violations,
+                    )
+
+    def test_keynote_slide_table_sort_shared_core_boundary_rejects_local_graph_copies(
+        self,
+    ) -> None:
+        forbidden = (
+            (
+                "local SortBudget",
+                "struct\nSortBudget;\n",
+            ),
+            (
+                "local ArchiveReferenceVisitor",
+                "use litchi_iwa_core::\nArchiveReferenceVisitor;\n",
+            ),
+            (
+                "residual limit grant via .max(1)",
+                "fn residual_limit() {\n"
+                "    let available = budget.saturating_sub(\n"
+                "        used,\n"
+                "    )\n"
+                "    .max(\n"
+                "        1,\n"
+                "    );\n"
+                "}\n",
+            ),
+            (
+                "saturating reference counter",
+                "fn census() {\n"
+                "    self.model_edges = self.model_edges\n"
+                "        .saturating_add(1);\n"
+                "}\n",
+            ),
+            (
+                "direct table_info_codec graph selection",
+                "fn graph() {\n"
+                "    table_info_codec\n"
+                "        ::decode_table_info(bytes);\n"
+                "}\n",
+            ),
+        )
+        for label, addition in forbidden:
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    add_keynote_slide_table_sort_canonical_scaffold(root)
+                    owner = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE
+                    owner.write_text(
+                        owner.read_text(encoding="utf-8") + addition,
+                        encoding="utf-8",
+                    )
+
+                    violations = boundaries.audit_keynote_slide_table_sort_resource_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"must not retain {label}" in item for item in violations),
+                        violations,
+                    )
 
     def test_keynote_slide_table_sort_audits_are_in_main_dispatch(self) -> None:
         main_source = inspect.getsource(boundaries.main)

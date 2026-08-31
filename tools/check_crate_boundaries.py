@@ -2110,9 +2110,14 @@ KEYNOTE_SLIDE_TABLE_SORT_CODEC_REQUIRED_APIS = (
     "canonical_table_sort_order",
     "rewrite_table_model_sort_order",
 )
+KEYNOTE_SLIDE_TABLE_SORT_SHARED_CORE_APIS = (
+    "select_table",
+    "same_target",
+    "verify_locality",
+)
 KEYNOTE_SLIDE_TABLE_SORT_PACKAGE_MARKER_GROUPS = {
     "aggregate transaction budget": (
-        "SortBudget",
+        "Budget",
         "residual",
         "budget",
     ),
@@ -2140,11 +2145,45 @@ KEYNOTE_SLIDE_TABLE_SORT_PACKAGE_MARKER_GROUPS = {
     ),
     "prepared reassembly": ("prepare_reassembly",),
     "candidate reopen": ("candidate", "reopen", "validate"),
-    "object/member locality": ("verify_locality", "same_content"),
+    "object/member locality": ("verify_locality", "same_target"),
     "preview preservation": (
         "deleted_previews",
     ),
 }
+KEYNOTE_SLIDE_TABLE_SORT_FORBIDDEN_OWNER_PATTERNS = (
+    (
+        "local SortBudget",
+        re.compile(r"\bSortBudget\b"),
+    ),
+    (
+        "local ArchiveReferenceVisitor",
+        re.compile(r"\bArchiveReferenceVisitor\b"),
+    ),
+    (
+        "residual limit grant via .max(1)",
+        re.compile(
+            r"(?:\bsaturating_sub\s*\([^;{}]*?\)|"
+            r"\b(?:residual|remaining_[A-Za-z0-9_]*)\b[^;{}]*?|"
+            r"\bfn\s+(?:residual|remaining_[A-Za-z0-9_]*)[A-Za-z0-9_]*\b"
+            r"[^{}]*\{[^{}]*?)"
+            r"\s*\.\s*max\s*\(\s*1\s*,?\s*\)"
+        ),
+    ),
+    (
+        "saturating reference counter",
+        re.compile(
+            r"\b(?:self\s*\.\s*)?(?:"
+            r"[A-Za-z_][A-Za-z0-9_]*_(?:reference|references|edge|edges|census)"
+            r"|(?:reference|references|edge|edges|census))"
+            r"[A-Za-z0-9_]*"
+            r"\s*=\s*[^;{}]*?\.\s*saturating_add\s*\("
+        ),
+    ),
+    (
+        "direct table_info_codec graph selection",
+        re.compile(r"\btable_info_codec\b"),
+    ),
+)
 KEYNOTE_SLIDE_TABLE_SORT_OWNER_PATH = re.compile(
     r"(?<![A-Za-z0-9_#])(?:r#)?(?:slide_table_sort_order|table[ \t\r\n]*::"
     r"[ \t\r\n]*(?:r#)?sort)(?=[ \t\r\n]*(?:::|as\b|;|=))"
@@ -33701,6 +33740,74 @@ def audit_keynote_slide_table_sort_facade_source_topology(
     return sorted(set(violations))
 
 
+def _audit_keynote_slide_table_sort_shared_core_boundary(
+    root: Path,
+    owner_path: Path,
+    owner: str,
+) -> list[str]:
+    """Keep graph authority and transaction accounting in ``slide_table_core``.
+
+    The persisted sort owner is intentionally a small field-44 transaction
+    facade.  Its selection, identity proof, locality verification, and
+    aggregate resource ledger belong to the private shared graph boundary so
+    later table-property owners cannot grow subtly different admission rules.
+    ``owner`` has already had comments, literals, and test-only items masked;
+    all patterns below therefore operate on production Rust tokens while
+    retaining source offsets for useful diagnostics.
+    """
+
+    owner_label = owner_path.relative_to(root)
+    violations: list[str] = []
+    shared_core_names = {"slide_table_core"}
+    for alias_match in re.finditer(
+        r"\buse\b[^;]*\bslide_table_core\s+as\s+"
+        r"([A-Za-z_][A-Za-z0-9_]*)\s*;",
+        owner,
+    ):
+        shared_core_names.add(alias_match.group(1))
+    qualified_owner = "|".join(
+        re.escape(name) for name in sorted(shared_core_names)
+    )
+    for api in KEYNOTE_SLIDE_TABLE_SORT_SHARED_CORE_APIS:
+        imported = re.search(
+            rf"\buse\b[^;]*\bslide_table_core\s*::[^;]*\b"
+            rf"{re.escape(api)}\b",
+            owner,
+        )
+        qualified = re.search(
+            rf"(?<![A-Za-z0-9_])(?:{qualified_owner})\s*::\s*"
+            rf"{re.escape(api)}\s*\(",
+            owner,
+        )
+        called = re.search(
+            rf"(?<![A-Za-z0-9_:]){re.escape(api)}\s*\(",
+            owner,
+        )
+        if called is not None:
+            declaration_prefix = owner[max(0, called.start() - 24) : called.start()]
+            if re.search(r"\bfn\s*$", declaration_prefix):
+                called = None
+        if qualified is None and (imported is None or called is None):
+            violations.append(
+                "focused litchi-keynote slide-table sort owner must route "
+                f"{api} through slide_table_core: "
+                f"{owner_label}"
+            )
+
+    for label, pattern in KEYNOTE_SLIDE_TABLE_SORT_FORBIDDEN_OWNER_PATTERNS:
+        match = pattern.search(owner)
+        if match is None:
+            continue
+        line_number = owner.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-keynote slide-table sort owner must not retain "
+            f"{label}; use slide_table_core: "
+            f"{owner_label}:{line_number}"
+        )
+
+    return sorted(set(violations))
+
+
 def audit_keynote_slide_table_sort_resource_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -33712,7 +33819,9 @@ def audit_keynote_slide_table_sort_resource_source_topology(
     owner = _mask_rust_non_code(
         _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
     )
-    violations: list[str] = []
+    violations = _audit_keynote_slide_table_sort_shared_core_boundary(
+        root, owner_path, owner
+    )
     for label, markers in KEYNOTE_SLIDE_TABLE_SORT_PACKAGE_MARKER_GROUPS.items():
         if not all(marker in owner for marker in markers):
             violations.append(

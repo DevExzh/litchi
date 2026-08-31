@@ -15,13 +15,15 @@ use litchi_iwa_common::wire::{
     append_length_delimited_field, append_varint_field, repeated_length_delimited_payloads,
     rewrite_repeated_length_delimited_fields,
 };
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{
+    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
+};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tst, tswp};
 use litchi_keynote::slide::table::sort::{ColumnIndex, Direction, Order, Rule, Scope};
 use litchi_keynote::{
-    Package, SlideSelector, SlideTableSortCommit, SlideTableSortDiagnostics, SlideTableSortEdit,
-    SlideTableSortError, SlideTableSortLimitKind, SlideTableSortPatch, SlideTableSortPath,
-    TableSelector,
+    Package, ReadOptions, SemanticLimits, SlideSelector, SlideTableSortCommit,
+    SlideTableSortDiagnostics, SlideTableSortEdit, SlideTableSortError, SlideTableSortLimitKind,
+    SlideTableSortPatch, SlideTableSortPath, TableSelector,
 };
 use prost::Message as _;
 
@@ -32,11 +34,28 @@ const SLIDE_NODE: u64 = 3;
 const SLIDE: u64 = 4;
 const TABLE_INFOS: [u64; 2] = [100, 101];
 const MODELS: [u64; 2] = [110, 111];
+const ROW_BUCKETS: [u64; 2] = [200, 210];
+const COLUMN_BUCKETS: [u64; 2] = [201, 211];
+const DATA_OBJECTS: [[u64; 4]; 2] = [[220, 221, 222, 223], [230, 231, 232, 233]];
 const NON_TABLE_DRAWABLE: u64 = 130;
 const TITLE_STYLE: u64 = 120;
 const SHAPE_STYLE: u64 = 121;
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
+const HEADER_BUCKET_MESSAGE_TYPE: u32 = 6_006;
+const TABLE_STYLE_MESSAGE_TYPE: u32 = 6_003;
+const TABLE_STYLE_PRESET_MESSAGE_TYPE: u32 = 6_008;
+const TABLE_STYLE_NETWORK_MESSAGE_TYPE: u32 = 6_247;
+const STYLESHEET_MESSAGE_TYPE: u32 = 401;
+const TABLE_ROLE_MESSAGE_TYPES: [u32; 7] = [
+    TABLE_INFO_MESSAGE_TYPE,
+    TABLE_MODEL_MESSAGE_TYPE,
+    HEADER_BUCKET_MESSAGE_TYPE,
+    TABLE_STYLE_MESSAGE_TYPE,
+    TABLE_STYLE_PRESET_MESSAGE_TYPE,
+    TABLE_STYLE_NETWORK_MESSAGE_TYPE,
+    STYLESHEET_MESSAGE_TYPE,
+];
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
 const METADATA_MEMBER: &str = "Index/Metadata.iwa";
 const METADATA_OBJECT: u64 = 900;
@@ -59,6 +78,7 @@ fn reference(identifier: u64) -> tsp::Reference {
 
 fn field_reference(path: impl Into<FieldPath>, references: &[u64]) -> FieldInfo {
     let mut field = FieldInfo::new(path);
+    field.r#type = Some(FieldType::ObjectReference);
     field.object_references.extend_from_slice(references);
     field
 }
@@ -74,6 +94,51 @@ fn object(
         .object_references
         .extend_from_slice(references);
     Ok(object)
+}
+
+fn data_reference_object(
+    identifier: u64,
+    type_: u32,
+    data: Vec<u8>,
+    reference: u64,
+) -> TestResult<ArchiveObject> {
+    let mut object = object(identifier, type_, data, &[])?;
+    object.archive_info.message_infos[0]
+        .data_references
+        .push(reference);
+    Ok(object)
+}
+
+fn storage_ids(index: usize) -> [u64; 6] {
+    [
+        ROW_BUCKETS[index],
+        COLUMN_BUCKETS[index],
+        DATA_OBJECTS[index][0],
+        DATA_OBJECTS[index][1],
+        DATA_OBJECTS[index][2],
+        DATA_OBJECTS[index][3],
+    ]
+}
+
+fn data_store(index: usize) -> tst::DataStore {
+    let ids = storage_ids(index);
+    tst::DataStore {
+        row_headers: tst::HeaderStorage {
+            bucket_hash_function: 1,
+            buckets: vec![reference(ids[0])],
+        },
+        column_headers: reference(ids[1]),
+        tiles: tst::TileStorage::default(),
+        string_table: reference(ids[2]),
+        style_table: reference(ids[3]),
+        formula_table: reference(ids[4]),
+        format_table_pre_bnc: reference(ids[5]),
+        next_row_strip_id: 1,
+        next_column_strip_id: 1,
+        row_tile_tree: tst::TableRbTree::default(),
+        column_tile_tree: tst::TableRbTree::default(),
+        ..tst::DataStore::default()
+    }
 }
 
 fn sort_payload(scope: Scope, rules: &[Rule], with_unknowns: bool) -> TestResult<Vec<u8>> {
@@ -110,16 +175,31 @@ fn sort_payload(scope: Scope, rules: &[Rule], with_unknowns: bool) -> TestResult
     Ok(payload)
 }
 
-fn table_model(name: &str, sort: Option<&[u8]>, with_unknowns: bool) -> TestResult<Vec<u8>> {
+fn table_model(
+    index: usize,
+    name: &str,
+    sort: Option<&[u8]>,
+    with_unknowns: bool,
+) -> TestResult<Vec<u8>> {
     let mut payload = tst::TableModelArchive {
         table_id: format!("table-{name}"),
         table_name: name.to_owned(),
+        table_style: reference(TITLE_STYLE),
+        body_text_style: reference(TITLE_STYLE),
+        header_row_text_style: reference(TITLE_STYLE),
+        header_column_text_style: reference(TITLE_STYLE),
+        footer_row_text_style: reference(TITLE_STYLE),
+        body_cell_style: reference(TITLE_STYLE),
+        header_row_style: reference(TITLE_STYLE),
+        header_column_style: reference(TITLE_STYLE),
+        footer_row_style: reference(TITLE_STYLE),
+        table_name_style: Some(reference(TITLE_STYLE)),
+        table_name_shape_style: Some(reference(SHAPE_STYLE)),
+        base_data_store: data_store(index),
         number_of_rows: 4,
         number_of_columns: 3,
         default_row_height: 20.0,
         default_column_width: 64.0,
-        table_name_style: Some(reference(TITLE_STYLE)),
-        table_name_shape_style: Some(reference(SHAPE_STYLE)),
         ..tst::TableModelArchive::default()
     }
     .encode_to_vec();
@@ -222,21 +302,27 @@ fn synthetic_package(
             .push(field_reference(vec![2], &[MODELS[index]]));
         objects.push(info_object);
 
+        let storage = storage_ids(index);
         let mut model_object = object(
             MODELS[index],
             TABLE_MODEL_MESSAGE_TYPE,
             table_model(
+                index,
                 if index == 0 { "Revenue" } else { "Costs" },
                 sort,
                 with_unknowns,
             )?,
-            &[TITLE_STYLE, SHAPE_STYLE],
+            &storage,
         )?;
         model_object.archive_info.message_infos[0]
             .field_infos
             .extend([
-                field_reference(vec![30], &[TITLE_STYLE]),
-                field_reference(vec![36], &[SHAPE_STYLE]),
+                field_reference(vec![4, 1, 2], &[storage[0]]),
+                field_reference(vec![4, 2], &[storage[1]]),
+                field_reference(vec![4, 4], &[storage[2]]),
+                field_reference(vec![4, 5], &[storage[3]]),
+                field_reference(vec![4, 6], &[storage[4]]),
+                field_reference(vec![4, 11], &[storage[5]]),
             ]);
         if with_tracker {
             let tracker = vec![0x0a, 0x02, 0x08, 0x01];
@@ -247,6 +333,21 @@ fn synthetic_package(
                 model_object.messages[0].data.len().try_into()?;
         }
         objects.push(model_object);
+        objects.push(object(
+            ROW_BUCKETS[index],
+            HEADER_BUCKET_MESSAGE_TYPE,
+            vec![0x08, 0x01],
+            &[],
+        )?);
+        objects.push(object(
+            COLUMN_BUCKETS[index],
+            HEADER_BUCKET_MESSAGE_TYPE,
+            vec![0x08, 0x01],
+            &[],
+        )?);
+        for identifier in DATA_OBJECTS[index] {
+            objects.push(object(identifier, 7_000, vec![0x08, 0x01], &[])?);
+        }
     }
     objects.push(object(TITLE_STYLE, 2_022, paragraph_style_payload(), &[])?);
     objects.push(object(SHAPE_STYLE, 2_025, shape_style_payload(), &[])?);
@@ -320,6 +421,18 @@ fn metadata_payload() -> TestResult<Vec<u8>> {
         NON_TABLE_DRAWABLE,
         TITLE_STYLE,
         SHAPE_STYLE,
+        ROW_BUCKETS[0],
+        ROW_BUCKETS[1],
+        COLUMN_BUCKETS[0],
+        COLUMN_BUCKETS[1],
+        DATA_OBJECTS[0][0],
+        DATA_OBJECTS[0][1],
+        DATA_OBJECTS[0][2],
+        DATA_OBJECTS[0][3],
+        DATA_OBJECTS[1][0],
+        DATA_OBJECTS[1][1],
+        DATA_OBJECTS[1][2],
+        DATA_OBJECTS[1][3],
     ];
     let component = tsp::ComponentInfo {
         identifier: 1,
@@ -392,6 +505,41 @@ fn rewrite_document_archive(
     )?)
 }
 
+fn rewrite_metadata(
+    package: &[u8],
+    mutate: impl FnOnce(&mut tsp::PackageMetadata) -> TestResult<()>,
+) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA_MEMBER)
+        .ok_or("missing metadata member")?;
+    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let object = archive
+        .object_mut(METADATA_OBJECT)
+        .ok_or("missing metadata object")?;
+    let message_index = object
+        .messages
+        .iter()
+        .position(|message| message.type_ == 11_006)
+        .ok_or("missing metadata message")?;
+    let mut metadata =
+        tsp::PackageMetadata::decode(object.messages[message_index].data.as_slice())?;
+    mutate(&mut metadata)?;
+    object.replace_message_preserving_header(
+        message_index,
+        RawMessage {
+            type_: 11_006,
+            data: metadata.encode_to_vec(),
+        },
+    )?;
+    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(METADATA_MEMBER, &compressed)],
+        Limits::default(),
+    )?)
+}
+
 fn rewrite_model(
     package: &[u8],
     mutate: impl FnOnce(&mut Vec<u8>) -> TestResult<()>,
@@ -426,6 +574,95 @@ fn rewrite_slide(
         let mut data = message.data.clone();
         mutate(&mut data)?;
         slide.replace_message_preserving_header(0, RawMessage { type_: 5, data })?;
+        Ok(())
+    })
+}
+
+fn rewrite_field_type(
+    package: &[u8],
+    object_identifier: u64,
+    path: &[u32],
+    field_type: FieldType,
+) -> TestResult<Vec<u8>> {
+    rewrite_document_archive(package, |archive| {
+        let object = archive
+            .object_mut(object_identifier)
+            .ok_or("missing object")?;
+        let message_info = object
+            .archive_info
+            .message_infos
+            .first_mut()
+            .ok_or("missing message info")?;
+        let field = message_info
+            .field_infos
+            .iter_mut()
+            .find(|field| field.path.as_slice() == path)
+            .ok_or("missing field info")?;
+        field.r#type = Some(field_type);
+        Ok(())
+    })
+}
+
+fn rewrite_member(package: &[u8], name: &str, data: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(name, data)], Limits::default())?)
+}
+
+fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(flat)?;
+    let inner_entries = catalog
+        .iter()
+        .filter(|entry| {
+            std::path::Path::new(entry.name())
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("iwa"))
+        })
+        .map(|entry| (entry.name(), entry.data()))
+        .collect::<Vec<_>>();
+    let inner =
+        litchi_iwa_archive::package::to_bytes(inner_entries.iter().copied(), Limits::default())?;
+    Ok(litchi_iwa_archive::package::to_bytes(
+        [
+            ("legacy.key/Index.zip", inner.as_slice()),
+            (
+                "legacy.key/Data/sentinel.bin",
+                b"legacy Keynote sort outer sentinel".as_slice(),
+            ),
+        ],
+        Limits::default(),
+    )?)
+}
+
+fn package_with_noncanonical_document_prefix(source: &[u8]) -> TestResult<Vec<u8>> {
+    let archive = document_archive(source)?;
+    let canonical = archive.to_bytes()?;
+    let (header_length, prefix_length) = litchi_iwa_common::decode_varint_from_bytes(&canonical)?;
+    if prefix_length != 1 || header_length >= 0x80 {
+        return Err("fixture expected a one-byte object prefix".into());
+    }
+    let mut noncanonical = Vec::new();
+    noncanonical.try_reserve_exact(canonical.len() + 1)?;
+    noncanonical.push(u8::try_from(header_length)? | 0x80);
+    noncanonical.push(0);
+    noncanonical.extend_from_slice(&canonical[prefix_length..]);
+    Archive::parse(&noncanonical)?;
+    rewrite_member(
+        source,
+        DOCUMENT_MEMBER,
+        &SnappyStream::compress(&noncanonical)?,
+    )
+}
+
+fn duplicate_slide_name_package() -> TestResult<Vec<u8>> {
+    let source = source_without_sort()?;
+    rewrite_document_archive(&source, |archive| {
+        let show = archive.object_mut(2).ok_or("missing show")?;
+        let message = show.messages.first_mut().ok_or("missing show message")?;
+        let mut payload = kn::ShowArchive::decode(message.data.as_slice())?;
+        payload.slide_tree.slides.push(reference(SLIDE_NODE));
+        message.data = payload.encode_to_vec();
+        let length = message.data.len().try_into()?;
+        show.archive_info.message_infos[0].length = length;
         Ok(())
     })
 }
@@ -555,6 +792,23 @@ fn assert_rejected_atomically(source: &[u8]) -> TestResult {
     Ok(())
 }
 
+fn assert_parsed_rejected_atomically(source: &[u8]) -> TestResult {
+    let package = Package::from_bytes(source)?;
+    let before = exact_bytes(&package)?;
+    assert!(
+        package
+            .slide_table_sort_order(SlideSelector::index(0), TableSelector::index(0))
+            .is_err()
+    );
+    assert!(
+        package
+            .edit_slide_table_sort_order(SlideSelector::index(0), TableSelector::index(0))
+            .is_err()
+    );
+    assert_eq!(exact_bytes(&package)?, before);
+    Ok(())
+}
+
 fn source_without_sort() -> TestResult<Vec<u8>> {
     synthetic_package(None, false, false)
 }
@@ -612,6 +866,89 @@ fn table_selector_counts_only_table_drawables_in_z_order() -> TestResult {
 }
 
 #[test]
+fn aggregate_only_storage_routes_and_unrelated_model_edges_are_preserved() -> TestResult {
+    let source = rewrite_document_archive(&source_without_sort()?, |archive| {
+        let table = archive
+            .object_mut(TABLE_INFOS[0])
+            .ok_or("missing table info")?;
+        let info = &mut table.archive_info.message_infos[0];
+        info.field_infos.clear();
+        info.object_references.push(TITLE_STYLE);
+
+        let model = archive.object_mut(MODELS[0]).ok_or("missing model")?;
+        let info = &mut model.archive_info.message_infos[0];
+        info.field_infos.clear();
+        info.object_references.push(TITLE_STYLE);
+        let mut unrelated = field_reference(vec![70], &[TITLE_STYLE]);
+        unrelated.r#type = Some(FieldType::Message);
+        info.field_infos.push(unrelated);
+        archive
+            .object_mut(NON_TABLE_DRAWABLE)
+            .ok_or("missing unrelated drawable")?
+            .archive_info
+            .message_infos[0]
+            .data_references
+            .push(777);
+        Ok(())
+    })?;
+    let source = rewrite_metadata(&source, |metadata| {
+        let component = metadata
+            .components
+            .first_mut()
+            .ok_or("missing metadata component")?;
+        component
+            .object_uuid_map_entries
+            .retain(|entry| !storage_ids(0).contains(&entry.identifier));
+        component.data_references.push(tsp::ComponentDataReference {
+            data_identifier: 777,
+            object_reference_list: vec![tsp::component_data_reference::ObjectReference {
+                object_identifier: NON_TABLE_DRAWABLE,
+                count: 1,
+            }],
+        });
+        metadata.data_metadata_map = Some(reference(SHAPE_STYLE));
+        Ok(())
+    })?;
+    let package = Package::from_bytes(&source)?;
+    assert_eq!(package.slide_table_sort_order(0usize, 0usize)?, None);
+
+    let order = one_rule(0, Direction::Ascending)?;
+    let commit = package
+        .edit_slide_table_sort_order(0usize, 0usize)?
+        .set(order.clone())
+        .commit()?;
+    assert_eq!(
+        commit.package().slide_table_sort_order(0usize, 0usize)?,
+        Some(order)
+    );
+    let target = exact_bytes(commit.package())?;
+    assert_locality(&source, &target)?;
+    let restored = commit
+        .package()
+        .apply_slide_table_sort_order(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+
+    let mismatched_count = rewrite_metadata(&source, |metadata| {
+        metadata
+            .components
+            .first_mut()
+            .and_then(|component| component.data_references.last_mut())
+            .and_then(|reference| reference.object_reference_list.first_mut())
+            .ok_or("missing unrelated data owner")?
+            .count = 2;
+        Ok(())
+    })?;
+    assert_parsed_rejected_atomically(&mismatched_count)?;
+
+    let partial = rewrite_document_archive(&source_without_sort()?, |archive| {
+        let model = archive.object_mut(MODELS[0]).ok_or("missing model")?;
+        model.archive_info.message_infos[0].field_infos.pop();
+        Ok(())
+    })?;
+    assert_parsed_rejected_atomically(&partial)
+}
+
+#[test]
 fn absent_sort_clear_and_reset_are_exact_noops() -> TestResult {
     let source = source_without_sort()?;
     let package = Package::from_bytes(&source)?;
@@ -634,6 +971,52 @@ fn absent_sort_clear_and_reset_are_exact_noops() -> TestResult {
         .commit()?;
     assert!(reset.patch().is_noop());
     assert_eq!(exact_bytes(reset.package())?, source);
+    Ok(())
+}
+
+#[test]
+fn legacy_source_allows_exact_noop_but_refuses_changed_sort() -> TestResult {
+    let flat = source_without_sort()?;
+    let legacy = legacy_package_bytes(&flat)?;
+    let package = Package::from_bytes(&legacy)?;
+    assert_eq!(package.slide_table_sort_order(0usize, 0usize)?, None);
+
+    let noop = package
+        .edit_slide_table_sort_order(0usize, 0usize)?
+        .clear()
+        .commit()?;
+    assert!(noop.patch().is_noop());
+    assert_eq!(exact_bytes(noop.package())?, legacy);
+    let applied = package.apply_slide_table_sort_order(noop.patch())?;
+    assert_eq!(exact_bytes(applied.package())?, legacy);
+
+    let before = exact_bytes(&package)?;
+    let changed = package
+        .edit_slide_table_sort_order(0usize, 0usize)?
+        .set(one_rule(0, Direction::Ascending)?)
+        .commit();
+    assert!(matches!(
+        changed,
+        Err(SlideTableSortError::UnsupportedSource)
+    ));
+    assert_eq!(exact_bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn changed_sort_rejects_noncanonical_iwa_object_framing_atomically() -> TestResult {
+    let malformed = package_with_noncanonical_document_prefix(&source_without_sort()?)?;
+    let package = Package::from_bytes(&malformed)?;
+    assert_eq!(package.slide_table_sort_order(0usize, 0usize)?, None);
+    let before = exact_bytes(&package)?;
+    assert!(
+        package
+            .edit_slide_table_sort_order(0usize, 0usize)?
+            .set(one_rule(0, Direction::Ascending)?)
+            .commit()
+            .is_err()
+    );
+    assert_eq!(exact_bytes(&package)?, before);
     Ok(())
 }
 
@@ -965,6 +1348,137 @@ fn cross_component_model_inbound_is_rejected_without_source_mutation() -> TestRe
 }
 
 #[test]
+fn cross_component_data_inbound_is_rejected_without_source_mutation() -> TestResult {
+    let source = source_without_sort()?;
+    let catalog = Catalog::from_bytes(&source)?;
+    let inbound = data_reference_object(700, 7_000, vec![0x08, 0x01], MODELS[0])?;
+    let component = SnappyStream::compress(
+        &Archive {
+            objects: vec![inbound],
+        }
+        .to_bytes()?,
+    )?;
+    let mut members = catalog
+        .iter()
+        .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
+        .collect::<Vec<_>>();
+    members.push(("Index/Other.iwa".to_owned(), component));
+    let refs = members
+        .iter()
+        .map(|(name, bytes)| (name.as_str(), bytes.as_slice()))
+        .collect::<Vec<_>>();
+    let malformed = litchi_iwa_archive::package::to_bytes(refs, Limits::default())?;
+    assert_rejected_atomically(&malformed)
+}
+
+#[test]
+fn selected_archive_info_data_references_are_rejected_atomically() -> TestResult {
+    let fixture = source_without_sort()?;
+    let slide_aggregate = rewrite_document_archive(&fixture, |archive| {
+        let slide = archive.object_mut(SLIDE).ok_or("missing slide")?;
+        slide.archive_info.message_infos[0]
+            .data_references
+            .push(TABLE_INFOS[0]);
+        Ok(())
+    })?;
+    let slide_field = rewrite_document_archive(&fixture, |archive| {
+        let slide = archive.object_mut(SLIDE).ok_or("missing slide")?;
+        let owned_field = slide.archive_info.message_infos[0]
+            .field_infos
+            .iter_mut()
+            .find(|field| field.path.as_slice() == [7])
+            .ok_or("missing slide-owned field")?;
+        owned_field.data_references.push(TABLE_INFOS[0]);
+        Ok(())
+    })?;
+    let table_aggregate = rewrite_document_archive(&fixture, |archive| {
+        let table = archive
+            .object_mut(TABLE_INFOS[0])
+            .ok_or("missing table info")?;
+        table.archive_info.message_infos[0]
+            .data_references
+            .push(MODELS[0]);
+        Ok(())
+    })?;
+    let table_field = rewrite_document_archive(&fixture, |archive| {
+        let table = archive
+            .object_mut(TABLE_INFOS[0])
+            .ok_or("missing table info")?;
+        let model_field = table.archive_info.message_infos[0]
+            .field_infos
+            .iter_mut()
+            .find(|field| field.path.as_slice() == [2])
+            .ok_or("missing table-model field")?;
+        model_field.data_references.push(MODELS[0]);
+        Ok(())
+    })?;
+    for malformed in [slide_aggregate, slide_field, table_aggregate, table_field] {
+        assert_rejected_atomically(&malformed)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn noncanonical_model_reference_path_is_rejected_atomically() -> TestResult {
+    let fixture = source_without_sort()?;
+    let malformed = rewrite_document_archive(&fixture, |archive| {
+        let table = archive
+            .object_mut(TABLE_INFOS[0])
+            .ok_or("missing table info")?;
+        table.archive_info.message_infos[0]
+            .field_infos
+            .push(field_reference(vec![99], &[MODELS[0]]));
+        Ok(())
+    })?;
+    assert_rejected_atomically(&malformed)
+}
+
+#[test]
+fn all_known_table_role_aliases_are_rejected_atomically() -> TestResult {
+    let fixture = source_without_sort()?;
+    for role_type in TABLE_ROLE_MESSAGE_TYPES {
+        let malformed_model = rewrite_document_archive(&fixture, |archive| {
+            let model = archive.object_mut(MODELS[0]).ok_or("missing model")?;
+            model.push_message(RawMessage {
+                type_: role_type,
+                data: vec![0x08, 0x01],
+            })?;
+            Ok(())
+        })?;
+        assert_rejected_atomically(&malformed_model)?;
+
+        let malformed_info = rewrite_document_archive(&fixture, |archive| {
+            let table = archive
+                .object_mut(TABLE_INFOS[0])
+                .ok_or("missing table info")?;
+            table.push_message(RawMessage {
+                type_: role_type,
+                data: vec![0x08, 0x01],
+            })?;
+            Ok(())
+        })?;
+        assert_rejected_atomically(&malformed_info)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn role_alias_on_non_table_drawable_is_rejected_atomically() -> TestResult {
+    let fixture = source_without_sort()?;
+    let malformed = rewrite_document_archive(&fixture, |archive| {
+        let drawable = archive
+            .object_mut(NON_TABLE_DRAWABLE)
+            .ok_or("missing non-table drawable")?;
+        drawable.push_message(RawMessage {
+            type_: TABLE_STYLE_MESSAGE_TYPE,
+            data: vec![0x08, 0x01],
+        })?;
+        Ok(())
+    })?;
+    assert_rejected_atomically(&malformed)
+}
+
+#[test]
 fn column_order_values_reject_empty_duplicates_and_out_of_range_native_indices() -> TestResult {
     let column = ColumnIndex::new(1)?;
     let rule = Rule::new(column, Direction::Ascending);
@@ -994,5 +1508,277 @@ fn selector_and_patch_debug_do_not_leak_native_names_or_bytes() -> TestResult {
     let patch_debug = format!("{:?}", commit.patch());
     assert!(!patch_debug.contains("Index/"));
     assert!(!patch_debug.contains("Document.iwa"));
+    Ok(())
+}
+
+#[test]
+fn selected_object_reference_routes_require_object_reference_field_types() -> TestResult {
+    let fixture = source_without_sort()?;
+    let routes = [
+        (SLIDE, [7_u32].as_slice()),
+        (SLIDE, [42_u32].as_slice()),
+        (TABLE_INFOS[0], [2_u32].as_slice()),
+    ];
+    for (object_identifier, path) in routes {
+        let malformed = rewrite_field_type(&fixture, object_identifier, path, FieldType::Value)?;
+        assert_parsed_rejected_atomically(&malformed)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn extra_foreign_and_malformed_reference_routes_fail_atomically() -> TestResult {
+    let fixture = source_without_sort()?;
+    let duplicate_slide_aggregate = rewrite_document_archive(&fixture, |archive| {
+        let slide = archive.object_mut(SLIDE).ok_or("missing slide")?;
+        slide.archive_info.message_infos[0]
+            .object_references
+            .push(TABLE_INFOS[0]);
+        Ok(())
+    })?;
+    let duplicate_table_aggregate = rewrite_document_archive(&fixture, |archive| {
+        let table = archive
+            .object_mut(TABLE_INFOS[0])
+            .ok_or("missing table info")?;
+        table.archive_info.message_infos[0]
+            .object_references
+            .push(MODELS[0]);
+        Ok(())
+    })?;
+    let foreign_aggregate = rewrite_document_archive(&fixture, |archive| {
+        let style = archive
+            .object_mut(TITLE_STYLE)
+            .ok_or("missing title style")?;
+        style.archive_info.message_infos[0]
+            .object_references
+            .push(MODELS[0]);
+        Ok(())
+    })?;
+    let foreign_field = rewrite_document_archive(&fixture, |archive| {
+        let style = archive
+            .object_mut(TITLE_STYLE)
+            .ok_or("missing title style")?;
+        style.archive_info.message_infos[0]
+            .field_infos
+            .push(field_reference(vec![77], &[MODELS[0]]));
+        Ok(())
+    })?;
+    let malformed_outer_key = rewrite_slide(&fixture, |slide| {
+        let references = repeated_length_delimited_payloads(slide, 42)?;
+        let mut rewritten = rewrite_repeated_length_delimited_fields(slide, 42, &[])?;
+        let first = references.first().ok_or("missing z-order reference")?;
+        // Field 42's canonical key is d2 02; this overlong key decodes to
+        // the same field number but is intentionally non-canonical.
+        rewritten.extend_from_slice(&[0xd2, 0x82, 0x00]);
+        push_varint(&mut rewritten, first.len() as u64);
+        rewritten.extend_from_slice(first);
+        for reference in references.into_iter().skip(1) {
+            append_length_delimited_field(&mut rewritten, 42, reference)?;
+        }
+        *slide = rewritten;
+        Ok(())
+    })?;
+    let malformed_nested_reference = rewrite_slide(&fixture, |slide| {
+        let references = repeated_length_delimited_payloads(slide, 42)?;
+        let mut rewritten = rewrite_repeated_length_delimited_fields(slide, 42, &[])?;
+        if references.is_empty() {
+            return Err("missing z-order reference".into());
+        }
+        // The identifier 100 is encoded overlong inside an otherwise valid
+        // Reference message (e4 00 instead of the canonical 64).
+        append_length_delimited_field(&mut rewritten, 42, &[0x08, 0xe4, 0x00])?;
+        for reference in references.into_iter().skip(1) {
+            append_length_delimited_field(&mut rewritten, 42, reference)?;
+        }
+        *slide = rewritten;
+        Ok(())
+    })?;
+    let wrong_reference_wire = rewrite_slide(&fixture, |slide| {
+        append_varint_field(slide, 42, TABLE_INFOS[0])?;
+        Ok(())
+    })?;
+    for malformed in [
+        duplicate_slide_aggregate,
+        duplicate_table_aggregate,
+        foreign_aggregate,
+        foreign_field,
+        malformed_outer_key,
+        malformed_nested_reference,
+        wrong_reference_wire,
+    ] {
+        assert_parsed_rejected_atomically(&malformed)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn duplicate_slide_name_is_ambiguous_and_atomic() -> TestResult {
+    let source = duplicate_slide_name_package()?;
+    let package = Package::from_bytes(&source)?;
+    let before = exact_bytes(&package)?;
+    assert!(matches!(
+        package.slide_table_sort_order("Tables", TableSelector::index(0)),
+        Err(SlideTableSortError::AmbiguousSelector)
+    ));
+    assert!(matches!(
+        package.edit_slide_table_sort_order("Tables", TableSelector::index(0)),
+        Err(SlideTableSortError::AmbiguousSelector)
+    ));
+    assert_eq!(exact_bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn missing_empty_and_out_of_range_selectors_are_typed_and_atomic() -> TestResult {
+    let source = source_without_sort()?;
+    let package = Package::from_bytes(&source)?;
+    let before = exact_bytes(&package)?;
+    assert!(matches!(
+        package.slide_table_sort_order(SlideSelector::name(""), TableSelector::index(0)),
+        Err(SlideTableSortError::EmptySlideName)
+    ));
+    assert!(matches!(
+        package.slide_table_sort_order(SlideSelector::name("missing"), TableSelector::index(0)),
+        Err(SlideTableSortError::SlideNameNotFound)
+    ));
+    assert!(matches!(
+        package.slide_table_sort_order(SlideSelector::index(9), TableSelector::index(0)),
+        Err(SlideTableSortError::SlidePositionNotFound { position }) if position.get() == 9
+    ));
+    assert!(matches!(
+        package.slide_table_sort_order(SlideSelector::index(0), TableSelector::index(9)),
+        Err(SlideTableSortError::TablePositionNotFound { position }) if position.get() == 9
+    ));
+    assert_eq!(exact_bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn stale_and_foreign_patches_conflict_without_mutating_the_source() -> TestResult {
+    let source = source_without_sort()?;
+    let commit = Package::from_bytes(&source)?
+        .edit_slide_table_sort_order(0usize, 0usize)?
+        .set(two_rule_order()?)
+        .commit()?;
+    let patch = commit.patch();
+
+    let stale_source = rewrite_member(&source, "Data/sentinel.bin", b"stale sentinel")?;
+    let stale = Package::from_bytes(&stale_source)?;
+    let stale_before = exact_bytes(&stale)?;
+    assert!(matches!(
+        stale.apply_slide_table_sort_order(patch),
+        Err(SlideTableSortError::PatchConflict)
+    ));
+    assert_eq!(exact_bytes(&stale)?, stale_before);
+
+    let foreign_source = source_with_sort(false, false)?;
+    let foreign = Package::from_bytes(&foreign_source)?;
+    let foreign_before = exact_bytes(&foreign)?;
+    assert!(matches!(
+        foreign.apply_slide_table_sort_order(patch),
+        Err(SlideTableSortError::PatchConflict)
+    ));
+    assert_eq!(exact_bytes(&foreign)?, foreign_before);
+
+    let target_before = exact_bytes(commit.package())?;
+    assert!(matches!(
+        commit.package().apply_slide_table_sort_order(patch),
+        Err(SlideTableSortError::PatchConflict)
+    ));
+    assert_eq!(exact_bytes(commit.package())?, target_before);
+    Ok(())
+}
+
+#[test]
+fn existing_sort_noop_preserves_exact_fingerprints_and_source_bytes() -> TestResult {
+    let source = source_with_sort(true, true)?;
+    let package = Package::from_bytes(&source)?;
+    let order = package
+        .slide_table_sort_order(0usize, 0usize)?
+        .ok_or("fixture sort marker missing")?;
+    let commit = package
+        .edit_slide_table_sort_order(0usize, 0usize)?
+        .set(order)
+        .commit()?;
+    assert!(commit.patch().is_noop());
+    assert_eq!(
+        commit.patch().source_fingerprint(),
+        commit.patch().target_fingerprint()
+    );
+    assert_eq!(exact_bytes(commit.package())?, source);
+    assert!(!commit.diagnostics().changed());
+    let applied = package.apply_slide_table_sort_order(commit.patch())?;
+    assert!(applied.patch().is_noop());
+    assert_eq!(exact_bytes(applied.package())?, source);
+    assert!(!applied.diagnostics().changed());
+    Ok(())
+}
+
+#[test]
+fn changing_table_position_one_is_local_and_does_not_touch_table_zero() -> TestResult {
+    let source = source_without_sort()?;
+    let order = one_rule(0, Direction::Descending)?;
+    let commit = Package::from_bytes(&source)?
+        .edit_slide_table_sort_order(0usize, TableSelector::index(1))?
+        .set(order.clone())
+        .commit()?;
+    assert_eq!(
+        commit
+            .package()
+            .slide_table_sort_order(0usize, TableSelector::index(1))?,
+        Some(order)
+    );
+    assert_eq!(
+        commit
+            .package()
+            .slide_table_sort_order(0usize, TableSelector::index(0))?,
+        None
+    );
+    let target = exact_bytes(commit.package())?;
+    assert_locality(&source, &target)?;
+    assert_eq!(
+        model_payload(&source, MODELS[0])?,
+        model_payload(&target, MODELS[0])?,
+        "unselected table model changed"
+    );
+    assert_ne!(
+        model_payload(&source, MODELS[1])?,
+        model_payload(&target, MODELS[1])?,
+        "selected table model did not change"
+    );
+    Ok(())
+}
+
+#[test]
+fn tight_publication_limit_rejects_changed_sort_atomically() -> TestResult {
+    let source = source_without_sort()?;
+    let order = two_rule_order()?;
+    let baseline = Package::from_bytes(&source)?
+        .edit_slide_table_sort_order(0usize, 0usize)?
+        .set(order.clone())
+        .commit()?;
+    let target = exact_bytes(baseline.package())?;
+    assert!(target.len() > source.len());
+    let defaults = Limits::default();
+    let limits = Limits::new(
+        u64::try_from(target.len() - 1)?,
+        defaults.max_entries(),
+        defaults.max_entry_bytes(),
+        defaults.max_total_bytes(),
+        defaults.max_iwa_stream_bytes(),
+    )?;
+    let package = Package::from_bytes_with_options(
+        &source,
+        ReadOptions::new(limits, SemanticLimits::default()),
+    )?;
+    let before = exact_bytes(&package)?;
+    let result = package
+        .edit_slide_table_sort_order(0usize, 0usize)
+        .and_then(|edit| edit.set(order).commit());
+    assert!(
+        matches!(result, Err(SlideTableSortError::LimitExceeded { .. })),
+        "unexpected tight-publication result: {result:?}"
+    );
+    assert_eq!(exact_bytes(&package)?, before);
     Ok(())
 }

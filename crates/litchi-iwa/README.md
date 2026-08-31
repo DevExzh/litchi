@@ -3163,3 +3163,25 @@ passes its byte, field, work, nesting, reference, and text limits. This is a
 private extraction-path migration: editor mutation paths and other generated
 decoders remain open, and it changes no public API, dependency edge, ordered
 migration debt, or monolith-deletion gate.
+
+## 2026-08-31 Keynote slide-table persisted sort transaction hardening
+
+The existing selector-first Keynote persisted field-44 sort transaction now
+reuses the shared `slide_table_core` authority for canonical admission, its
+bounded operation-local budget, and its locality checks. Ambiguity in archive
+roles, references, types, or wire framing fails closed before publication.
+Exact aggregate-only producer metadata and current, unversioned in-package
+cross-component edges remain admissible; partial route metadata, dangling or
+duplicate edges, and foreign inbound ownership remain rejected. The
+source-preserving rewrite continues to preserve previews, field 45,
+unknown fields, and untouched archive entries, while retaining exact no-op,
+inverse, and conflict behavior.
+
+This is persisted-configuration hardening only. Physical `Sort Now` and
+`RowRange`-based row execution, cells, and table storage remain owned by the
+legacy `litchi-iwa` host. The amendment makes no native semantic acceptance,
+performance, fuzz-exhaustiveness, broader Keynote authoring, or monolith-
+deletion claim. The authoritative topology remains 64 workspace packages,
+237 internal dependency declarations, 226 canonical edges, and 11 ordered
+migration debts `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, with one migration
+host; no migration debt is retired and no host exits.

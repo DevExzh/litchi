@@ -7019,3 +7019,28 @@ not move the generic text registry into a concrete format owner. Other
 TableDataList editor/mutation consumers still use generated values, so no
 dependency edge, ordered migration debt, host-exit item, or monolith-deletion
 gate closes in Wave120. The post-Wave119 topology inventory remains unchanged.
+
+## 2026-08-31 amendment: Keynote slide-table persisted sort transaction hardening (not a monolith-exit gate)
+
+The existing selector-first Keynote persisted field-44 sort transaction now
+reuses the shared `slide_table_core` authority for canonical admission, its
+bounded operation-local budget, and its locality checks. Ambiguity in archive
+roles, references, types, or wire framing fails closed before publication.
+Exact aggregate-only producer metadata and current, unversioned in-package
+cross-component edges remain admissible; partial route metadata, dangling or
+duplicate edges, and foreign inbound ownership remain rejected. The
+source-preserving rewrite continues to preserve previews, field 45,
+unknown fields, and untouched archive entries, while retaining exact no-op,
+inverse, and conflict behavior.
+
+This hardening advances only the focused persisted-configuration seam. Physical
+`Sort Now` and `RowRange`-based row execution, cells, and table storage remain
+owned by the legacy `litchi-iwa` host. It does not close any global monolith
+deletion gate and provides no native semantic acceptance, performance,
+fuzz-exhaustiveness, or broader Keynote authoring claim.
+
+The authoritative topology remains 64 workspace packages, 237 internal
+dependency declarations, 226 canonical edges, and 11 ordered migration debts
+with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, with one migration host.
+No migration debt is retired and no host exits in this amendment; the IWA
+monolith and all global deletion gates remain open.

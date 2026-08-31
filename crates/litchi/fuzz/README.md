@@ -84,6 +84,17 @@ names remain valid. The command recipes under
 `corpus/keynote_slide_table_name/` are not native package fixtures, and the
 target does not duplicate the low-level table-model codec fuzz target.
 
+`keynote_slide_table_sort_order` is the focused selector-first persisted
+slide-table sort target. It replays bounded command streams against the same
+source-built and locked Keynote table packages and covers semantic sort reads,
+entire-table and selected-row values, clear/reset/no-op edits, exact candidate
+readback, source-byte immutability, patch apply/conflict/inverse replay,
+locked-edit refusal, selector redaction, and package/semantic limits. It
+intentionally owns the package/facade lifecycle only; strict field-44 wire
+admission and source-preserving codec behavior remain covered by the neutral
+`table_sort_order_codec` fuzz target. The command recipes under
+`corpus/keynote_slide_table_sort_order/` are not native package fixtures.
+
 `keynote_chart_title` is the focused selector-first chart-title target. It
 drives tiny source-built packages through positional and exact-name chart
 selectors, visible-empty and hidden-stale title states, set/clear/no-op
@@ -311,6 +322,11 @@ profile. Name commands consume at most 1 KiB after optional `hex:` decoding;
 bounded name values consume at most 1 KiB; keep `-max_len` at 4 KiB so
 malformed ingress and both source-built package variants receive every command
 stream.
+
+`keynote_slide_table_sort_order` uses the same finite Keynote physical and
+semantic profile. Sort commands consume at most 1 KiB after optional `hex:`
+decoding; keep `-max_len` at 4 KiB so malformed ingress and both source-built
+package variants receive every command stream.
 
 `keynote_chart_title` uses the same finite Keynote physical and semantic
 profile. Chart-title command bytes consume at most 1 KiB; keep `-max_len` at
@@ -551,6 +567,14 @@ Run the focused Keynote slide-table-name target with its command seeds:
 ```sh
 cargo +nightly fuzz run keynote_slide_table_name \
   corpus/keynote_slide_table_name -- \
+  -max_len=4096 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Keynote persisted-sort target with its command seeds:
+
+```sh
+cargo +nightly fuzz run keynote_slide_table_sort_order \
+  corpus/keynote_slide_table_sort_order -- \
   -max_len=4096 -timeout=10 -rss_limit_mb=2048
 ```
 

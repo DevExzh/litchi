@@ -33,6 +33,8 @@ target
 !/corpus/keynote_slide_movie_geometry/*
 !/corpus/keynote_slide_table_headers/
 !/corpus/keynote_slide_table_headers/*
+!/corpus/keynote_slide_table_sort_order/
+!/corpus/keynote_slide_table_sort_order/*
 !/corpus/keynote_slide_table_lock_state/
 !/corpus/keynote_slide_table_lock_state/*
 artifacts
