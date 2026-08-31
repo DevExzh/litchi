@@ -422,6 +422,43 @@ mod buffa_keynote_chart_title_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for the selected Keynote chart-legend
+/// generated-extension field.
+#[doc(hidden)]
+mod buffa_keynote_chart_legend_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "buffa-build output is generated from the derived wire projection."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-keynote-chart-legend/iwa_keynote_chart_legend_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for the selected Keynote chart-axis
 /// title generated-extension fields.
 #[doc(hidden)]
@@ -1377,6 +1414,11 @@ pub mod keynote_chart_caption_graph_codec;
 /// preservation authority.
 #[doc(hidden)]
 pub mod keynote_chart_title_codec;
+
+/// Internal strict Keynote chart-legend visibility projection. Generated
+/// types remain private and source bytes remain the preservation authority.
+#[doc(hidden)]
+pub mod keynote_chart_legend_codec;
 
 /// Internal strict Keynote chart-axis-title generated-extension projection.
 /// Generated types remain private and caller-owned source bytes remain the

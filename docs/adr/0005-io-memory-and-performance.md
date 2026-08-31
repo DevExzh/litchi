@@ -1773,3 +1773,29 @@ and graph repair are refused before publication and have no successful-route
 resource claim. The record is scoped to the tested direct-leaf lifecycle and
 does not change production dependency ownership or normal generated-schema,
 Prost, or Buffa responsibilities.
+
+## 2026-08-31 amendment: Wave117 Keynote chart-legend visibility resource record
+
+The focused Keynote chart-legend visibility route reuses finite package,
+archive, and source-catalog limits while the private codec applies its own
+bounded message, field, work, nesting, output, retained-byte, allocation, and
+scratch ceilings. Strict preflight and the prepared plan check the selected
+field before the rewrite output is reserved; execution emits one
+source-preserving candidate and validates its semantic readback before
+publication. Exact no-ops reuse the source snapshot and do not reassemble a
+candidate. Failed selection, validation, limit, allocation, conflict, or
+candidate checks leave the immutable source unpublished.
+
+This is a bounded focused operation, not a claim that all package, archive,
+ZIP, Snappy, candidate, and patch allocations share one aggregate counter.
+Package caches, decompressed archives, the process allocator, RSS, and
+codec-internal allocator behavior are not measured. No single-allocation,
+zero-copy, package-wide peak-memory, latency, throughput, or general
+performance claim follows. The focused 156,278-byte native source produced a
+46,022-byte candidate after three stale root previews were removed; Keynote
+then saved a 154,754-byte native copy. Those observed sizes are acceptance
+evidence, not peak-memory or compression-performance measurements. No
+production dependency edge or normal Prost owner changes by this record.
+Wave117 adds only a private Buffa projection schema/module under the existing
+`litchi-iwa-protos` owner; generated values remain private to the package
+implementation.

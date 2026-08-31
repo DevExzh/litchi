@@ -11,6 +11,23 @@ from pathlib import Path
 
 from tools import check_crate_boundaries as boundaries
 
+KEYNOTE_CHART_LEGEND_RETAINED_STYLE_METHODS = frozenset(
+    {
+        "slide_chart_legend_fill",
+        "set_slide_chart_legend_fill",
+        "slide_chart_legend_frame",
+        "set_slide_chart_legend_frame",
+        "slide_chart_legend_font",
+        "set_slide_chart_legend_font",
+        "slide_chart_legend_font_size",
+        "set_slide_chart_legend_font_size",
+        "slide_chart_legend_stroke",
+        "set_slide_chart_legend_stroke",
+        "slide_chart_legend_shadow",
+        "set_slide_chart_legend_shadow",
+    }
+)
+
 
 def valid_snapshot(policy: boundaries.Policy) -> boundaries.Snapshot:
     edges = policy.canonical_edges | policy.migration_edges
@@ -29739,6 +29756,274 @@ fn rewrite_movie_title_operation(
             "+ audit_keynote_chart_axis_value_settings_completion_source_topology()",
         ):
             self.assertIn(expression, main_source)
+
+    def test_keynote_chart_legend_visibility_public_api_is_selector_first_and_generated_free(
+        self,
+    ) -> None:
+        """Keep the focused legend surface semantic at the crate boundary.
+
+        This is deliberately a declaration-level check rather than a full
+        source snapshot.  Private package code may still carry native graph
+        state, but no public owner method or re-export may leak an object ID,
+        generated archive type, or the physical package representation.
+        """
+
+        owner_path = boundaries.KEYNOTE_CHART_LEGEND_OWNER_SOURCE
+        package_path, lib_path = boundaries.KEYNOTE_CHART_LEGEND_EXPORT_SOURCES
+        paths = tuple(
+            boundaries.ROOT / path for path in (owner_path, package_path, lib_path)
+        )
+        for path in paths:
+            self.assertTrue(path.is_file(), f"missing focused legend source: {path}")
+
+        owner_source = boundaries._mask_rust_cfg_test_items(
+            paths[0].read_text(encoding="utf-8")
+        )
+        owner_methods = {
+            name: declaration
+            for name, declaration, _line in boundaries._rust_public_methods_in_impl(
+                owner_source, "Package"
+            )
+        }
+        for method in boundaries.KEYNOTE_CHART_LEGEND_PACKAGE_METHODS:
+            with self.subTest(method=method):
+                declaration = owner_methods.get(method)
+                self.assertIsNotNone(
+                    declaration,
+                    f"focused Package method is missing: {method}",
+                )
+                if declaration is None:
+                    continue
+                if method == "apply_slide_chart_legend":
+                    self.assertRegex(
+                        declaration, r"\bChartLegendVisibilityPatch\b"
+                    )
+                else:
+                    self.assertRegex(declaration, r"\bSlideSelector\b")
+                    self.assertRegex(declaration, r"\bChartSelector\b")
+                self.assertNotRegex(declaration, r"\bu64\b")
+                self.assertIsNone(
+                    re.search(
+                        r"\b(?:native_id|object_id|drawable_object_id|"
+                        r"chart_object_id|identifier)\b",
+                        declaration,
+                    ),
+                    f"focused legend Package method leaks a native identifier: {declaration}",
+                )
+
+        # Public declarations include the owner signatures and the explicit
+        # package/lib re-exports, but stop before function bodies.  This keeps
+        # the assertion resilient to private implementation refactors.
+        public_declarations = []
+        for index, path in enumerate(paths):
+            source = boundaries._mask_rust_cfg_test_items(
+                path.read_text(encoding="utf-8")
+            )
+            if index:
+                # package.rs/lib.rs contain many unrelated public package and
+                # error declarations.  Only inspect the explicit legend
+                # re-export rather than coupling this test to those surfaces.
+                declarations = (
+                    declaration
+                    for declaration, _line in boundaries._rust_public_declarations(
+                        source
+                    )
+                    if "slide_chart_legend" in declaration
+                    or any(
+                        name in declaration
+                        for name in boundaries.KEYNOTE_CHART_LEGEND_CANONICAL_TYPES
+                    )
+                )
+            else:
+                declarations = (
+                    declaration
+                    for declaration, _line in boundaries._rust_public_declarations(
+                        source
+                    )
+                )
+            public_declarations.extend(declarations)
+        forbidden_public_tokens = re.compile(
+            r"\b(?:native_id|object_id|drawable_object_id|chart_object_id|"
+            r"identifier|prost|prost_types|buffa|kn\w*|tsch?\w*|tsd\w*|"
+            r"Archive|RawMessage|IWorkPackage|ComponentCatalog)\b"
+        )
+        for declaration in public_declarations:
+            with self.subTest(declaration=declaration):
+                self.assertIsNone(
+                    forbidden_public_tokens.search(declaration),
+                    "focused legend public declaration leaks "
+                    f"native/generated state: {declaration}",
+                )
+
+        canonical_types = boundaries.KEYNOTE_CHART_LEGEND_CANONICAL_TYPES
+        exported_identifiers = set()
+        for path in paths:
+            source = boundaries._mask_rust_cfg_test_items(
+                path.read_text(encoding="utf-8")
+            )
+            exported_identifiers.update(
+                boundaries._rust_canonical_exports(source, canonical_types)
+            )
+        self.assertTrue(
+            canonical_types <= exported_identifiers,
+            f"focused legend canonical transaction types are not all exported: "
+            f"{sorted(canonical_types - exported_identifiers)}",
+        )
+        for path in paths[1:]:
+            source = boundaries._mask_rust_cfg_test_items(
+                path.read_text(encoding="utf-8")
+            )
+            missing = canonical_types - boundaries._rust_canonical_exports(
+                source, canonical_types
+            )
+            self.assertFalse(
+                missing,
+                f"focused legend canonical types are not re-exported by {path}: "
+                f"{sorted(missing)}",
+            )
+
+    def test_iwa_keynote_chart_legend_visibility_raw_surface_is_retired_without_removing_style_apis(
+        self,
+    ) -> None:
+        """Retire only the raw visibility path from the Keynote host.
+
+        Other legend style methods intentionally remain in the compatibility
+        editor for now; this guard must not turn a narrow migration into a
+        broad, accidental legend API removal.
+        """
+
+        path = boundaries.ROOT / boundaries.IWA_KEYNOTE_CHART_LEGEND_SOURCE
+        self.assertTrue(path.is_file(), f"missing Keynote legend host source: {path}")
+        source = boundaries._mask_rust_cfg_test_items(
+            path.read_text(encoding="utf-8")
+        )
+        code = boundaries._mask_rust_non_code(source)
+        declarations = {
+            name for name, _line in boundaries._rust_function_declarations(code)
+        }
+        for method in boundaries.IWA_KEYNOTE_CHART_LEGEND_LEGACY_METHODS:
+            with self.subTest(method=method):
+                self.assertNotIn(method, declarations)
+
+        # The shared chart-options helper is still valid for Pages and
+        # Numbers.  Only the Keynote host's direct visibility helper/import is
+        # forbidden here, so unrelated format migrations remain independent.
+        self.assertNotRegex(
+            code,
+            boundaries.KEYNOTE_CHART_LEGEND_DIRECT_HELPER,
+        )
+
+        for method in KEYNOTE_CHART_LEGEND_RETAINED_STYLE_METHODS:
+            with self.subTest(retained_method=method):
+                self.assertIn(method, declarations)
+
+    def test_keynote_chart_legend_visibility_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_chart_legend_visibility_facade_source_topology()",
+            "+ audit_iwa_keynote_chart_legend_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_chart_legend_visibility_facade_audit_catches_missing_selector_api(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.KEYNOTE_CHART_LEGEND_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "pub struct ChartLegendVisibilityPatch;\n"
+                "impl Package {\n"
+                "    pub fn slide_chart_legend_visible(&self, object_id: u64, chart: u64) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.KEYNOTE_CHART_LEGEND_EXPORT_SOURCES[0]
+            package.parent.mkdir(parents=True, exist_ok=True)
+            package.write_text("mod slide_chart_legend;\n", encoding="utf-8")
+            library = root / boundaries.KEYNOTE_CHART_LEGEND_EXPORT_SOURCES[1]
+            library.parent.mkdir(parents=True, exist_ok=True)
+            library.write_text("", encoding="utf-8")
+
+            violations = boundaries.audit_keynote_chart_legend_visibility_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("missing edit_slide_chart_legend" in item for item in violations), violations)
+            self.assertTrue(any("missing apply_slide_chart_legend" in item for item in violations), violations)
+            self.assertTrue(any("selector-first SlideSelector" in item for item in violations), violations)
+            self.assertTrue(any("not expose u64" in item for item in violations), violations)
+            self.assertTrue(any("raw identifier object_id" in item for item in violations), violations)
+            self.assertTrue(any("missing canonical type" in item for item in violations), violations)
+
+    def test_keynote_chart_legend_visibility_audits_wait_for_owner_module_wiring(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_KEYNOTE_CHART_LEGEND_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "fn set_slide_chart_legend_visible(&mut self, object_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_chart_legend_source_topology(root), []
+            )
+
+            owner = root / boundaries.KEYNOTE_CHART_LEGEND_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text("pub struct ChartLegendVisibilityPatch;\n", encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_chart_legend_source_topology(root), []
+            )
+
+            package = root / boundaries.KEYNOTE_CHART_LEGEND_EXPORT_SOURCES[0]
+            package.parent.mkdir(parents=True, exist_ok=True)
+            package.write_text("mod slide_chart_legend;\n", encoding="utf-8")
+            violations = boundaries.audit_iwa_keynote_chart_legend_source_topology(root)
+            self.assertTrue(any("raw-ID method" in item for item in violations), violations)
+
+    def test_iwa_keynote_chart_legend_audit_catches_raw_host_path_and_allows_styles(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.KEYNOTE_CHART_LEGEND_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text("pub struct ChartLegendVisibilityPatch;\n", encoding="utf-8")
+            package = root / boundaries.KEYNOTE_CHART_LEGEND_EXPORT_SOURCES[0]
+            package.parent.mkdir(parents=True, exist_ok=True)
+            package.write_text("mod slide_chart_legend;\n", encoding="utf-8")
+            host = root / boundaries.IWA_KEYNOTE_CHART_LEGEND_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_chart_legend_visible(&self, object_id: u64) {}\n"
+                "    pub fn set_slide_chart_legend_visible(&mut self, object_id: u64) {}\n"
+                "    fn set_chart_legend_visible(&mut self) {}\n"
+                "    pub fn slide_chart_legend_fill(&self) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_chart_legend_source_topology(root)
+            self.assertTrue(any("raw-ID method slide_chart_legend_visible" in item for item in violations), violations)
+            self.assertTrue(any("raw-ID method set_slide_chart_legend_visible" in item for item in violations), violations)
+            self.assertTrue(any("direct helper set_chart_legend_visible" in item for item in violations), violations)
+
+            host.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_chart_legend_fill(&self) {}\n"
+                "    pub fn set_slide_chart_legend_fill(&mut self) {}\n"
+                "    #[cfg(test)]\n"
+                "    fn set_chart_legend_visible(&mut self) {}\n"
+                "    // fn set_slide_chart_legend_visible(&mut self, object_id: u64) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_chart_legend_source_topology(root), []
+            )
 
 
 if __name__ == "__main__":

@@ -130,6 +130,9 @@ println!("objects: {}", stats.total_objects);
   data charts, typed native caption CRUD, and duplicate operations with fresh
   private graphs, preserved editable data, theme-preset registration, UUIDs,
   and native placement offsets
+- Selector-first Keynote chart-legend visibility through
+  `litchi-keynote::Package`, with semantic slide/chart selectors, exact-source
+  no-op and inverse patches, and private native graph identifiers
 - Typed copy-on-write text-box paragraph alignment, native line-spacing modes,
   atomic before/after spacing, first-line/left/right indentation, and ordered
   left/center/right/decimal tab stops with leaders across Pages, Numbers, and Keynote
@@ -251,10 +254,37 @@ Minor-gridline visibility is independently typed through
 start with minor gridlines hidden on both primary axes, and duplicate and
 package round-trip operations keep each axis independent.
 
-Chart legend visibility is likewise native and typed through
-`body_chart_legend_visible`, `sheet_chart_legend_visible`, and
-`slide_chart_legend_visible`; use `set_*_chart_legend_visible` to toggle the
-same `Chart Options > Legend` switch that all three apps save.
+Chart legend visibility remains a migration-host operation for Pages and
+Numbers through `body_chart_legend_visible` / `set_body_chart_legend_visible`
+and `sheet_chart_legend_visible` / `set_sheet_chart_legend_visible`. For
+Keynote, use the focused selector-first package transaction instead:
+
+```rust,no_run
+use litchi_keynote::Package;
+
+let package = Package::open("input.key")?;
+let before = package.slide_chart_legend_visible("Charts", "Revenue")?;
+let commit = package
+    .edit_slide_chart_legend("Charts", "Revenue")?
+    .set(!before)
+    .commit()?;
+assert_eq!(
+    commit.package().slide_chart_legend_visible("Charts", "Revenue")?,
+    !before,
+);
+let restored = commit
+    .package()
+    .apply_slide_chart_legend(&commit.patch().inverse())?;
+assert_eq!(
+    restored.package().slide_chart_legend_visible("Charts", "Revenue")?,
+    before,
+);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+The focused Keynote owner keeps native chart graph identifiers and raw records
+private, preserves unknown fields, and validates exact-source no-op/change,
+candidate readback, and inverse behavior.
 
 Charts also expose their native generic Object Caption control through
 `body_chart_caption`, `sheet_chart_caption`, and `slide_chart_caption`.
@@ -3050,3 +3080,41 @@ monolith gate remain unchanged. Resource limits are conservative logical
 envelopes; package caches, decompressed Archives, ZIP/Snappy buffers,
 codec-internal allocation, the process allocator, RSS, and zero-copy behavior
 are not directly measured.
+
+## Wave117 Keynote chart-legend visibility ownership
+
+Selector-first `litchi_keynote::Package` now owns the effective visibility of
+an existing Keynote slide-chart legend through
+`Package::{slide_chart_legend_visible, edit_slide_chart_legend,
+apply_slide_chart_legend}`. Select slides and charts by semantic position or
+exact visible name. The archive-free transaction values are
+`ChartLegendVisibility{Edit,Patch,Commit,Diagnostics,Error,LimitKind}`;
+native object IDs, component names, archives, generated messages, and Buffa
+views remain private. An absent native field reads as effective visibility
+`false` while its presence is preserved in the source-backed implementation.
+
+The focused owner performs exact-source no-op/change, inverse, conflict,
+candidate-readback, root-preview invalidation, and package-wide locality
+checks. Its private
+`litchi-iwa-protos::keynote_chart_legend_codec` uses strict preflight followed
+by a lazy Buffa projection and prepared source-preserving rewrite of the chart
+non-style field 20. Unknown fields, groups, and ordering remain untouched.
+
+The raw-ID `KeynoteEditor::{slide_chart_legend_visible,
+set_slide_chart_legend_visible}` methods are retired with no fallback. The
+legacy host still owns Keynote legend fill/frame/font/shadow/stroke, chart
+creation and duplication/removal, and broader graph work; Pages and Numbers
+continue to use their host legend operations.
+
+Wave117 verification records 13/13 codec tests, 10/10 focused package tests,
+the allocation-mapping unit, strict library/test Clippy, all-target checks,
+696/696 boundary-policy tests, and a 1,000-run nightly fuzz smoke over 12
+checked-in corpus seeds. Computer Use opened the 46,022-byte focused output
+without repair, showed the selected chart's Legend checkbox off, saved and
+reopened a 154,754-byte native copy with Legend still off, and the focused API
+reverse-read and reproduced the native copy byte-for-byte. The focused and
+native SHA-256 values are
+`2ecf1327971c206e4017168cfd5fac86b0954ae32a0f2f0ba894f3b6b84c5acd`
+and `b82af597b4469b056b559cde678db508fca13d7ec725633bdd82749fab560adf`.
+These are disposable acceptance artifacts, not checked-in fixtures or a
+complete monolith-exit claim.
