@@ -8,6 +8,7 @@ use litchi_iwa::keynote::KeynoteDocumentBuilder;
 use litchi_iwa::numbers::NumbersDocumentBuilder;
 use litchi_iwa::pages::PagesDocumentBuilder;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_keynote::ChartArrangement as KeynoteChartArrangement;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut arguments = env::args().skip(1);
@@ -68,7 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut keynote = KeynoteDocumentBuilder::new()
         .title("Chart Arrangement CRUD")
         .build()?;
-    let chart = keynote.add_slide_chart(
+    let _chart = keynote.add_slide_chart(
         0,
         Kind::Line2d,
         data()?,
@@ -79,10 +80,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     )?;
     keynote.set_slide_chart_title_by_selector(0, 0usize, "Locked and constrained")?;
-    keynote.set_slide_chart_arrangement(0, chart.drawable_object_id, arrangement)?;
+    let keynote_arrangement =
+        KeynoteChartArrangement::new(arrangement.locked(), arrangement.constrain_proportions());
+    keynote.set_slide_chart_arrangement_by_selector(0, 0usize, keynote_arrangement)?;
     assert_eq!(
-        keynote.slide_chart_arrangement(0, chart.drawable_object_id)?,
-        arrangement
+        keynote.slide_chart_arrangement_by_selector(0, 0usize)?,
+        keynote_arrangement
     );
     keynote.save(output.join("chart-arrangement-crate.key"))?;
 

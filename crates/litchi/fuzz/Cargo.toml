@@ -103,6 +103,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "keynote_chart_arrangement"
+path = "fuzz_targets/keynote_chart_arrangement.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "keynote_chart_axis_title"
 path = "fuzz_targets/keynote_chart_axis_title.rs"
 test = false

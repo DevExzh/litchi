@@ -21,6 +21,55 @@ pub mod axis {
     };
 }
 
+/// Archive-free state exposed by a chart's Arrange panel.
+///
+/// The value describes only interaction behavior for an existing chart. It
+/// carries no native drawable identifier, archive name, protobuf message, or
+/// other package identity. A concrete package owner resolves the selected
+/// chart and applies these flags to its native drawable graph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct ChartArrangement {
+    locked: bool,
+    constrain_proportions: bool,
+}
+
+impl ChartArrangement {
+    /// Construct Arrange-panel state from its two native interaction flags.
+    #[must_use]
+    pub const fn new(locked: bool, constrain_proportions: bool) -> Self {
+        Self {
+            locked,
+            constrain_proportions,
+        }
+    }
+
+    /// Return whether the chart is locked against interactive editing.
+    #[must_use]
+    pub const fn locked(self) -> bool {
+        self.locked
+    }
+
+    /// Return whether interactive resizing preserves the chart's aspect ratio.
+    #[must_use]
+    pub const fn constrain_proportions(self) -> bool {
+        self.constrain_proportions
+    }
+
+    /// Return this state with the requested interactive lock.
+    #[must_use]
+    pub const fn with_locked(mut self, locked: bool) -> Self {
+        self.locked = locked;
+        self
+    }
+
+    /// Return this state with the requested aspect-ratio constraint.
+    #[must_use]
+    pub const fn with_constrain_proportions(mut self, constrain_proportions: bool) -> Self {
+        self.constrain_proportions = constrain_proportions;
+        self
+    }
+}
+
 /// Preserve the historical `litchi_keynote::chart::Axis` path.
 pub use axis::Axis;
 
@@ -62,7 +111,7 @@ impl<'a> ChartSelector<'a> {
     /// This checked constructor is useful at input boundaries where an empty
     /// visible chart title should be rejected before a chart catalog or native
     /// adapter is consulted. [`Self::name`] remains available for callers that
-    /// intentionally preserve an empty title as a positional-only selector.
+    /// need to preserve an unchecked name selector for later validation.
     ///
     /// # Errors
     ///
@@ -127,7 +176,7 @@ impl From<Position> for ChartSelector<'_> {
     }
 }
 
-/// A semantic chart summary in one slide's stable source order.
+/// A semantic chart summary in one slide's chart-drawable z-order.
 ///
 /// The summary deliberately has no native identity. Its position is only
 /// meaningful within the [`ChartCatalog`] that produced it, and its title is
@@ -199,16 +248,17 @@ impl std::error::Error for ChartSelectorError {}
 
 /// An immutable semantic catalog of charts owned by one slide.
 ///
-/// The catalog stores only source order and optional visible titles. It is a
-/// safe hand-off object for a native adapter: resolving a selector yields a
-/// [`ChartDescriptor`] or its semantic position, never a native object ID.
+/// The catalog stores only chart-drawable z-order and optional visible titles.
+/// It is a safe hand-off object for a native adapter: resolving a selector
+/// yields a [`ChartDescriptor`] or its semantic position, never a native
+/// object ID.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChartCatalog {
     charts: Box<[ChartDescriptor]>,
 }
 
 impl ChartCatalog {
-    /// Build a catalog from chart titles in slide source order.
+    /// Build a catalog from titles in slide chart-drawable z-order.
     ///
     /// Missing titles are represented by `None`; an empty title is retained as
     /// an existing native title but cannot be used as a name selector. Use a
@@ -306,7 +356,7 @@ impl ChartCatalog {
         })
     }
 
-    /// Borrow chart summaries in source order.
+    /// Borrow chart summaries in slide chart-drawable z-order.
     #[must_use]
     pub fn charts(&self) -> &[ChartDescriptor] {
         &self.charts

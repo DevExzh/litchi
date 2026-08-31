@@ -11,6 +11,7 @@ mod rendering_invalidation;
 mod save;
 pub(crate) mod show_settings;
 mod slide_background;
+mod slide_chart_arrangement;
 mod slide_chart_axis_title;
 mod slide_chart_caption;
 mod slide_chart_legend;
@@ -88,6 +89,10 @@ pub use save::SaveError;
 pub use slide_background::{
     SlideBackgroundCommit, SlideBackgroundDiagnostics, SlideBackgroundEdit, SlideBackgroundError,
     SlideBackgroundLimitKind, SlideBackgroundPatch,
+};
+pub use slide_chart_arrangement::{
+    ChartArrangementCommit, ChartArrangementDiagnostics, ChartArrangementEdit,
+    ChartArrangementError, ChartArrangementLimitKind, ChartArrangementPatch,
 };
 pub use slide_chart_axis_title::{
     ChartAxisTitleCommit, ChartAxisTitleDiagnostics, ChartAxisTitleEdit, ChartAxisTitleError,

@@ -7,6 +7,8 @@ use crate::package_metadata::component_identifier_for_object_uuid;
 pub(super) struct SlideChartGraph {
     pub(super) archive_name: String,
     pub(super) component_id: u64,
+    pub(super) chart_count: usize,
+    pub(super) chart_position: usize,
     pub(super) info: KeynoteSlideChartInfo,
     pub(super) object_ids: Vec<u64>,
     pub(super) uuid_object_ids: Vec<u64>,
@@ -56,6 +58,37 @@ pub(super) fn chart_graph(
             "Keynote drawable {drawable_object_id} is not exactly one chart"
         )));
     };
+    let mut chart_count = 0;
+    let mut chart_position = None;
+    for reference in &context.slide.drawables_z_order {
+        let is_chart = graph
+            .objects
+            .get(&reference.identifier)
+            .is_some_and(|messages| {
+                messages
+                    .iter()
+                    .any(|message| message.type_ == CHART_MESSAGE_TYPE)
+            });
+        if !is_chart {
+            continue;
+        }
+        if reference.identifier == drawable_object_id {
+            chart_position = Some(chart_count);
+        }
+        chart_count += 1;
+    }
+    let Some(chart_position) = chart_position else {
+        return Err(Error::ParseError(format!(
+            "Keynote slide {} chart {drawable_object_id} has no chart position",
+            context.slide_id
+        )));
+    };
+    if chart_count == 0 {
+        return Err(Error::ParseError(format!(
+            "Keynote slide {} has no chart entries",
+            context.slide_id
+        )));
+    }
     let chart = IWorkChartArchive::decode(&message.data)?;
     let drawable = chart.drawable.super_.as_ref().ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -301,6 +334,8 @@ pub(super) fn chart_graph(
     Ok(SlideChartGraph {
         archive_name,
         component_id,
+        chart_count,
+        chart_position,
         info: KeynoteSlideChartInfo {
             slide_index,
             slide_id: context.slide_id,
@@ -317,10 +352,10 @@ pub(super) fn chart_graph(
             ),
             data: chart_data("Keynote", drawable_object_id, payload)?,
             geometry: drawable_geometry("Keynote", drawable_object_id, drawable)?,
-            arrangement: ChartArrangement::new(
-                drawable.locked.unwrap_or(false),
-                drawable.aspect_ratio_locked.unwrap_or(false),
-            ),
+            // Arrange state is filled by `slide_charts` through the focused
+            // selector-first package owner. Graph discovery intentionally
+            // does not decode this semantic value from the native payload.
+            arrangement: ChartArrangement::default(),
         },
         object_ids,
         uuid_object_ids,

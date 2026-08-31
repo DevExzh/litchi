@@ -1,0 +1,17 @@
+// Wire-only projection for the Keynote chart Arrange state.
+//
+// The native path is TSCH.ChartDrawableArchive.super (field 1) to the two
+// selected TSD.DrawableArchive scalar controls (fields 5 and 7). The chart
+// envelope and every unrelated source field remain caller-owned.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message DrawableArchive {
+  optional bool locked = 5;
+  optional bool aspect_ratio_locked = 7;
+}
+
+message ChartDrawableArchive {
+  optional .LitchiIwaProjection.DrawableArchive super = 1;
+}

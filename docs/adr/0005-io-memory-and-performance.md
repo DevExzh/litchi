@@ -1966,3 +1966,27 @@ This removes two eager production decoder calls from one private extraction
 path. It is not a latency, throughput, allocation-count, or whole-graph memory
 claim. Other host editor paths still use generated Prost values, and no public
 API, dependency edge, ordered migration debt, or monolith-deletion gate changes.
+
+## 2026-09-01 amendment: Keynote chart Arrange bounded resource record
+
+The existing-chart Arrange transaction is a bounded source-preserving rewrite
+of the native chart's `locked` and `constrain_proportions` fields. Its private
+strict codec validates wire types, duplicate fields, nesting, work, and
+payload bounds before any changed candidate is staged. The codec uses a
+private Buffa lazy view for the admitted fields; generated Prost values,
+archive containers, and native identifiers do not cross the semantic API.
+Source bytes remain authoritative for unselected fields and members.
+
+The operation resolves `SlideSelector` and `ChartSelector` first, charges its
+finite package, wire, field, work, nesting, reference, output, retained-byte,
+and allocation ceilings with checked arithmetic, and uses fallible staging.
+An exact no-op shares the source snapshot. A changed candidate is assembled
+once, reopened, and semantically reread before atomic publication. Since the
+flags are non-rendering Arrange metadata, preview invalidation/removal is not
+part of this transaction; verification must prove previews remain preserved.
+
+This record makes no zero-copy, single-allocation, package-wide peak-memory,
+RSS, latency, throughput, or general performance claim. It also does not
+claim Buffa ownership of chart data or other chart graphs. Legend visibility,
+persisted sort configuration, and physical `Sort Now` remain separate slices.
+No normal dependency edge or migration-host ownership changes in this record.

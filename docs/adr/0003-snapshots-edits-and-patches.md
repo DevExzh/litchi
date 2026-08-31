@@ -1627,3 +1627,31 @@ source-authorized, a second apply conflicts, and the inverse restores the exact
 source artifact. Unsupported topology, stale source, lock violation, cycle,
 cache mismatch, allocation failure, or any budget/reopen/locality disagreement
 fails before publication.
+
+## 2026-09-01 amendment: Keynote chart Arrange transaction contract
+
+The existing-chart Arrange slice adds a focused, selector-first transaction to
+`litchi_keynote::Package`: `slide_chart_arrangement`,
+`edit_slide_chart_arrangement`, and `apply_slide_chart_arrangement`. The
+archive-free `ChartArrangement` value contains only the `locked` and
+`constrain_proportions` interaction flags. A `SlideSelector` and a
+`ChartSelector` resolve the existing chart before staging; native drawable
+identifiers, archive members, protobuf values, and raw IDs never cross the
+public boundary.
+
+An edit is staged against one immutable exact package snapshot. An exact
+no-op preserves the source artifact and performs no candidate publication. A
+changed edit produces an exact-source patch with an exact inverse; applying a
+patch to a stale, foreign, ambiguous, or otherwise conflicting source fails
+before publication. Candidate reopening and semantic readback are part of the
+commit, and publication remains atomic. The operation changes only the two
+admitted interaction flags, so it does not invalidate or remove previews and
+preserves every unselected field, object, and archive member according to the
+proven locality.
+
+This contract is distinct from chart legend visibility and persisted chart
+sort configuration. It does not reorder physical table rows (`Sort Now`),
+edit chart data, geometry, titles, captions, legends, formulas, or any other
+chart graph, and it does not add durable patch serialization, composition,
+merge, or history semantics. Apple Keynote native open/save/close/reopen
+acceptance and focused semantic reread are recorded in the verification ADR.

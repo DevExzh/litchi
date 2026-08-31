@@ -3421,3 +3421,30 @@ The amendment closes no migration debt, dependency edge, host, or monolith
 deletion gate; the documented topology remains 64 workspace packages, 237
 internal dependency declarations, 226 canonical edges, 11 ordered migration
 debts, and one migration host.
+
+## 2026-09-01 amendment: Keynote chart Arrange focused-owner semantics
+
+Implementation revision: this commit.
+
+The focused `litchi-keynote` owner now exposes existing-chart Arrange state
+through `Package::{slide_chart_arrangement, edit_slide_chart_arrangement,
+apply_slide_chart_arrangement}`. `ChartArrangement` is an archive-free,
+strictly typed value containing only `locked` and `constrain_proportions`.
+Callers select a slide with `SlideSelector` and a chart within that slide
+with `ChartSelector`; native drawable identity and raw IDs remain private to
+the package implementation.
+
+The transaction is source-bound and existing-object-only. It resolves and
+validates the selected chart before staging either flag, retains unknown and
+unselected bytes, exposes an exact-source patch and inverse, rejects stale,
+foreign, ambiguous, or conflicting sources before publication, and verifies
+the reopened candidate. Because these flags affect Arrange interaction state
+but do not render content, a changed commit does not invalidate or delete
+previews. Apple Keynote native open/save/close/reopen acceptance and focused
+semantic reread are recorded in ADR 0008.
+
+This semantic owner is separate from the existing chart-legend visibility
+owner and from both persisted legend/sort settings and physical table
+`Sort Now`. It does not own chart data, series, geometry, layout, titles,
+captions, legend styling, formulas, physical row order, chart creation, or
+graph transfer. No public native graph API is introduced.
