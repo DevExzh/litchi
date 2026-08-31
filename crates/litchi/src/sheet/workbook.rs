@@ -275,13 +275,9 @@ impl Workbook {
                 crate::detection_smart::detected::WorkbookSourcePathDetection::Xlsb {
                     workbook,
                     metadata,
-                    source,
-                    limits,
                 } => Ok(Self {
                     inner: WorkbookImpl::XlsbSource(
-                        super::adapters::XlsbWorkbook::from_source_backed(
-                            workbook, source, limits,
-                        )?,
+                        super::adapters::XlsbWorkbook::from_source_backed(workbook)?,
                     ),
                     cached_metadata: metadata,
                 }),
@@ -393,12 +389,7 @@ impl Workbook {
         #[cfg(any(feature = "xlsx", feature = "xlsb"))]
         let bytes = match crate::detection_smart::detected::detect_workbook_source_bytes(bytes) {
             #[cfg(feature = "xlsb")]
-            crate::detection_smart::detected::WorkbookSourceBytesDetection::Xlsb {
-                package,
-                source,
-                limits,
-                ..
-            } => {
+            crate::detection_smart::detected::WorkbookSourceBytesDetection::Xlsb(package) => {
                 let metadata = crate::ooxml_common::properties::read_source_backed(&package)
                     .map_err(crate::map_ooxml_error)?
                     .map(litchi_core::Metadata::from)
@@ -406,8 +397,7 @@ impl Workbook {
                 let workbook =
                     crate::xlsb::SourceBackedWorkbook::from_source_backed_package(package)
                         .map_err(crate::map_ooxml_error)?;
-                let adapter =
-                    super::adapters::XlsbWorkbook::from_source_backed(workbook, source, limits)?;
+                let adapter = super::adapters::XlsbWorkbook::from_source_backed(workbook)?;
                 return Ok(Self {
                     inner: WorkbookImpl::XlsbSource(adapter),
                     cached_metadata: metadata,

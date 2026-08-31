@@ -1,5 +1,26 @@
 # Performance optimization ADR-compliance matrix
 
+## XLSB source-backed fallback admission boundary (change 0353)
+
+Change 0353 keeps XLSB ownership in `litchi-xlsb` and facade admission/routing
+in `litchi`; no eager archive type, physical identifier, runtime handle, lock,
+unsafe storage, or dependency edge is added. Post-admission source-owner
+`UnsupportedFeature` no longer enters an eager full-workbook fallback. The eager
+adapter reader/caches/state and private detector-side duplicate source/limits
+state are removed, while typed errors, freshness fences, eager cache behavior,
+explicit `open_xlsb_workbook*`, and `DetectedFormat::Xlsb` remain. Recognized
+nonworksheet tabs are filtered by worksheet position; direct nonworksheet and
+sparkline/pivot/slicer/timeline selections retain typed refusals. Recoverable
+pre-admission probes may use the existing `Workbook::from_bytes` fallback, and
+smart detection and explicit eager APIs remain eager. A selected worksheet and
+required dependencies still materialize. The `23/23` and `40/40` serial tests
+ran under one job/thread, disabled incremental/debug compilation, one disk
+target, and an 8 GiB limit; 647 MiB target and approximately 15 GiB available
+memory with saturated swap are not resource bounds. `performance_claim: none`;
+no latency, RSS, OOM, constant-memory, allocation, physical-I/O, or broad XLSB
+claim is made. This supersedes 0304's fallback wording only after source-owner
+admission and does not alter the public eager contracts.
+
 ## DOCX selected-story source-backed lifecycle (change 0352)
 
 The selected-story lifecycle remains in the DOCX owner and uses the existing

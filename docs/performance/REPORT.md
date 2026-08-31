@@ -1,5 +1,26 @@
 # Performance program phase report
 
+## XLSB source-backed fallback admission boundary (change 0353)
+
+Change 0353 closes the post-admission fallback boundary for dynamic/source-
+backed XLSB text. Once the source owner admits the operation, `UnsupportedFeature`
+no longer retries through an eager full-workbook parse; the eager adapter
+reader/caches/state and private detector-side duplicate source/limits state were
+removed. Recognized nonworksheet tabs are skipped through filtered worksheet
+positions, while direct nonworksheet and sparkline/pivot/slicer/timeline
+selections remain typed refusals. Existing typed errors, freshness fences, eager
+cache behavior, explicit `open_xlsb_workbook*`, and `DetectedFormat::Xlsb`
+contracts remain. The exact serial evidence is `23/23` (`litchi` `xlsb_facade`)
+and `40/40` (`litchi-xlsb` `source_backed`) under an 8 GiB virtual-memory limit,
+one Cargo job/test thread, disabled incremental/debug compilation, and one disk
+target. The target reached 647 MiB and post-run available memory was
+approximately 15 GiB with swap saturated. `performance_claim: none`; these are
+correctness/resource-run observations, not latency, RSS, OOM, constant-memory,
+or broad XLSB evidence. 0304's fallback behavior is superseded only after
+source-owner admission; smart detection, explicit eager APIs, unsupported
+platforms, pre-admission probes, `Workbook::from_bytes` fallback, and selected
+worksheet/dependency materialization remain eager paths.
+
 ## 2026-08-25: freshness-session replication aborted at identity gate
 
 - Control reproduced exactly; candidate did not match the pinned size/SHA-256, so the 24,000-sample run was never started.

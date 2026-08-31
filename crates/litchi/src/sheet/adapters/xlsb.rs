@@ -6,14 +6,12 @@
 //! spreadsheet traits.
 
 use crate::xlsb;
-use litchi_core::ReadAt;
 use litchi_core::sheet::{
     Cell as CoreCell, CellIterator, CellValue, Result as SheetResult, RowIterator, WorkbookTrait,
     Worksheet as CoreWorksheet, WorksheetIterator,
 };
-use litchi_opc::{OpcError, ReadLimits};
+use litchi_opc::OpcError;
 use std::borrow::Cow;
-use std::io::{self, Read, Seek, SeekFrom};
 use std::sync::{Arc, Mutex, OnceLock};
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
@@ -35,88 +33,13 @@ fn boxed_xlsb_error(error: XlsbError) -> BoxError {
     }
 }
 
-/// A checked `Read + Seek` view over an immutable positional source.
-///
-/// The eager XLSB compatibility loader requires a conventional stream, while
-/// source-backed owners intentionally expose only positional reads. Keeping
-/// this bridge local ensures the fallback cannot accidentally share a cursor
-/// with another operation.
-struct ReadAtReader {
-    source: Arc<dyn ReadAt>,
-    position: u64,
-}
-
-impl ReadAtReader {
-    fn new(source: Arc<dyn ReadAt>) -> Self {
-        Self {
-            source,
-            position: 0,
-        }
-    }
-}
-
-impl Read for ReadAtReader {
-    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
-        if output.is_empty() {
-            return Ok(0);
-        }
-        let read = self.source.read_at(self.position, output)?;
-        if read > output.len() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "positional source reported more bytes than requested",
-            ));
-        }
-        let next = self
-            .position
-            .checked_add(u64::try_from(read).map_err(|_| {
-                io::Error::new(io::ErrorKind::InvalidData, "read count does not fit u64")
-            })?)
-            .ok_or_else(|| {
-                io::Error::new(io::ErrorKind::InvalidInput, "stream position overflow")
-            })?;
-        self.position = next;
-        Ok(read)
-    }
-}
-
-impl Seek for ReadAtReader {
-    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
-        let next = match position {
-            SeekFrom::Start(offset) => offset,
-            SeekFrom::Current(offset) => checked_seek(self.position, offset)?,
-            SeekFrom::End(offset) => checked_seek(self.source.len()?, offset)?,
-        };
-        self.position = next;
-        Ok(next)
-    }
-}
-
-fn checked_seek(base: u64, offset: i64) -> io::Result<u64> {
-    if offset >= 0 {
-        base.checked_add(u64::try_from(offset).map_err(|_| {
-            io::Error::new(io::ErrorKind::InvalidInput, "seek offset does not fit u64")
-        })?)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "seek position overflow"))
-    } else {
-        base.checked_sub(offset.unsigned_abs()).ok_or_else(|| {
-            io::Error::new(io::ErrorKind::InvalidInput, "seek before start of stream")
-        })
-    }
-}
-
 /// Internal dynamic-trait view over a source-backed XLSB workbook.
 pub(crate) struct Workbook {
     workbook: xlsb::SourceBackedWorkbook,
-    source: Arc<dyn ReadAt>,
-    limits: ReadLimits,
     names: Box<[String]>,
     date1904: bool,
     active_catalog_position: Option<usize>,
     active_worksheet_ordinal: Option<usize>,
-    eager: OnceLock<xlsb::Workbook>,
-    eager_init: Mutex<()>,
-    worksheet_ordinals: Box<[Option<usize>]>,
     worksheets: Box<[OnceLock<Arc<xlsb::Worksheet>>]>,
     worksheet_init: Box<[Mutex<()>]>,
 }
@@ -133,43 +56,15 @@ impl std::fmt::Debug for Workbook {
 }
 
 impl Workbook {
-    /// Create an adapter from the source owner and the exact source used to
-    /// build it. The date-system value is retained by the facade so no eager
-    /// compatibility parse is needed for ordinary catalog queries.
-    pub(crate) fn from_source_backed(
-        workbook: xlsb::SourceBackedWorkbook,
-        source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-    ) -> SheetResult<Self> {
+    /// Create an adapter from the source owner. The date-system value is
+    /// retained by the facade so no compatibility parse is needed for
+    /// ordinary catalog queries.
+    pub(crate) fn from_source_backed(workbook: xlsb::SourceBackedWorkbook) -> SheetResult<Self> {
         let names = workbook
             .worksheet_names()
             .map_err(boxed_xlsb_error)?
             .into_boxed_slice();
         let catalog_count = workbook.sheet_count().map_err(boxed_xlsb_error)?;
-        let source_worksheets = workbook.worksheets().map_err(boxed_xlsb_error)?;
-        let mut worksheet_ordinals = Vec::new();
-        worksheet_ordinals
-            .try_reserve_exact(catalog_count)
-            .map_err(|source| {
-                Box::new(litchi_core::Error::Allocation {
-                    resource: "XLSB worksheet ordinal map",
-                    source,
-                }) as BoxError
-            })?;
-        worksheet_ordinals.resize(catalog_count, None);
-        for (worksheet_index, worksheet) in source_worksheets.iter().enumerate() {
-            let catalog_position = worksheet.workbook_position().map_err(boxed_xlsb_error)?;
-            let ordinal = worksheet_ordinals
-                .get_mut(catalog_position)
-                .ok_or_else(|| {
-                    boxed_error("XLSB worksheet ordinal map position is out of bounds")
-                })?;
-            if ordinal.replace(worksheet_index).is_some() {
-                return Err(boxed_error(
-                    "XLSB worksheet ordinal map contains a duplicate catalog position",
-                ));
-            }
-        }
         let date1904 = workbook.is_1904_date_system().map_err(boxed_xlsb_error)?;
         let active_catalog_position = workbook
             .active_catalog_position()
@@ -187,15 +82,10 @@ impl Workbook {
             .into_boxed_slice();
         Ok(Self {
             workbook,
-            source,
-            limits,
             names,
             date1904,
             active_catalog_position,
             active_worksheet_ordinal,
-            eager: OnceLock::new(),
-            eager_init: Mutex::new(()),
-            worksheet_ordinals: worksheet_ordinals.into_boxed_slice(),
             worksheets,
             worksheet_init,
         })
@@ -206,71 +96,6 @@ impl Workbook {
             .source_version()
             .map(|_| ())
             .map_err(boxed_xlsb_error)
-    }
-
-    fn eager_workbook(&self) -> SheetResult<&xlsb::Workbook> {
-        self.ensure_source_current()?;
-        if self.eager.get().is_none() {
-            let _guard = self
-                .eager_init
-                .lock()
-                .map_err(|_| boxed_error("XLSB eager initialization lock was poisoned"))?;
-            if self.eager.get().is_none() {
-                let reader = ReadAtReader::new(Arc::clone(&self.source));
-                let eager = xlsb::Workbook::new_with_limits(reader, self.limits)
-                    .map_err(boxed_xlsb_error)?;
-                self.ensure_source_current()?;
-                self.eager.set(eager).map_err(|_| {
-                    boxed_error("XLSB eager compatibility workbook was already published")
-                })?;
-            }
-        }
-        self.eager
-            .get()
-            .ok_or_else(|| boxed_error("XLSB eager compatibility workbook was not published"))
-    }
-
-    fn eager_worksheet(
-        &self,
-        index: usize,
-        workbook: &xlsb::Workbook,
-    ) -> SheetResult<Arc<xlsb::Worksheet>> {
-        let source = self
-            .worksheets
-            .get(index)
-            .ok_or_else(|| boxed_error("XLSB eager worksheet cache position is out of bounds"))?;
-        let init = self
-            .worksheet_init
-            .get(index)
-            .ok_or_else(|| boxed_error("XLSB eager worksheet lock position is out of bounds"))?;
-        if let Some(worksheet) = source.get() {
-            return Ok(Arc::clone(worksheet));
-        }
-        let _guard = init
-            .lock()
-            .map_err(|_| boxed_error("XLSB worksheet initialization lock was poisoned"))?;
-        if let Some(worksheet) = source.get() {
-            return Ok(Arc::clone(worksheet));
-        }
-        let worksheet_index = self
-            .worksheet_ordinals
-            .get(index)
-            .copied()
-            .flatten()
-            .ok_or_else(|| {
-                boxed_error("XLSB eager worksheet catalog position is not a worksheet")
-            })?;
-        let worksheet = Arc::new(
-            workbook
-                .worksheet(worksheet_index)
-                .map_err(boxed_xlsb_error)?,
-        );
-        self.ensure_source_current()?;
-        source.set(Arc::clone(&worksheet)).map_err(|error| {
-            drop(error);
-            boxed_error("XLSB eager worksheet was already published")
-        })?;
-        Ok(worksheet)
     }
 
     fn materialize<'a, T>(
@@ -290,7 +115,7 @@ impl Workbook {
         let result = match source.get() {
             Some(worksheet) => operation(worksheet.as_ref()),
             None => {
-                let guard = init
+                let _guard = init
                     .lock()
                     .map_err(|_| boxed_error("XLSB worksheet initialization lock was poisoned"))?;
                 if let Some(worksheet) = source.get() {
@@ -311,13 +136,6 @@ impl Workbook {
                                     .as_ref(),
                             )
                         },
-                        Err(XlsbError::UnsupportedFeature(_)) => {
-                            drop(guard);
-                            let workbook = self.eager_workbook()?;
-                            let worksheet =
-                                self.eager_worksheet(handle.catalog_position, workbook)?;
-                            operation(worksheet.as_ref())
-                        },
                         Err(error) => Err(boxed_xlsb_error(error)),
                     }
                 }
@@ -328,37 +146,7 @@ impl Workbook {
     }
 
     pub(crate) fn text(&self) -> SheetResult<String> {
-        match self.workbook.text() {
-            Ok(text) => Ok(text),
-            Err(XlsbError::UnsupportedFeature(_)) => self.eager_text(),
-            Err(error) => Err(boxed_xlsb_error(error)),
-        }
-    }
-
-    fn eager_text(&self) -> SheetResult<String> {
-        let workbook = self.eager_workbook()?;
-        let source_worksheets = self.workbook.worksheets().map_err(boxed_xlsb_error)?;
-        let mut output = String::new();
-        for source_worksheet in source_worksheets {
-            self.ensure_source_current()?;
-            let catalog_position = source_worksheet
-                .workbook_position()
-                .map_err(boxed_xlsb_error)?;
-            let worksheet = self.eager_worksheet(catalog_position, workbook)?;
-            let mut rows = worksheet.rows();
-            while let Some(row) = rows.next() {
-                let row = row?;
-                for (column, cell) in row.iter().enumerate() {
-                    if column != 0 {
-                        output.push('\t');
-                    }
-                    append_eager_cell_text(&mut output, cell);
-                }
-                output.push('\n');
-            }
-        }
-        self.ensure_source_current()?;
-        Ok(output)
+        self.workbook.text().map_err(boxed_xlsb_error)
     }
 
     fn worksheet(&self, index: usize) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
@@ -387,29 +175,6 @@ impl Workbook {
             catalog_position,
             handle,
         )?))
-    }
-}
-
-fn append_eager_cell_text(output: &mut String, value: &CellValue) {
-    match value {
-        CellValue::Empty => {},
-        CellValue::Bool(value) => output.push_str(if *value { "TRUE" } else { "FALSE" }),
-        CellValue::Int(value) => output.push_str(&value.to_string()),
-        CellValue::Float(value) | CellValue::DateTime(value) => output.push_str(&value.to_string()),
-        CellValue::String(value) | CellValue::Error(value) => output.push_str(value),
-        CellValue::Formula {
-            formula,
-            cached_value,
-            ..
-        } => match cached_value.as_deref() {
-            Some(value) if !matches!(value, CellValue::Empty) => {
-                append_eager_cell_text(output, value)
-            },
-            _ => {
-                output.push('=');
-                output.push_str(formula);
-            },
-        },
     }
 }
 
@@ -716,7 +481,6 @@ mod tests {
     use super::Workbook;
     use litchi_core::sheet::{CellValue, WorkbookTrait};
     use litchi_core::{ReadAt, SourceVersion};
-    use litchi_opc::ReadLimits;
     use std::io;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier};
@@ -782,39 +546,7 @@ mod tests {
         let read_at: Arc<dyn ReadAt> = source.clone();
         let workbook =
             crate::xlsb::SourceBackedWorkbook::from_read_at(Arc::clone(&read_at)).unwrap();
-        Workbook::from_source_backed(workbook, read_at, ReadLimits::default()).unwrap()
-    }
-
-    #[test]
-    fn eager_initialization_is_shared_across_barrier_synchronized_calls() {
-        let baseline_source = Arc::new(CountingSource::new(fixture()));
-        let baseline = adapter(&baseline_source);
-        baseline_source.reset_reads();
-        let baseline_count = baseline.eager_workbook().unwrap().worksheet_count();
-        let baseline_reads = baseline_source.read_count();
-
-        let concurrent_source = Arc::new(CountingSource::new(fixture()));
-        let concurrent = Arc::new(adapter(&concurrent_source));
-        concurrent_source.reset_reads();
-        let barrier = Arc::new(Barrier::new(3));
-        let workers = (0..2)
-            .map(|_| {
-                let workbook = Arc::clone(&concurrent);
-                let barrier = Arc::clone(&barrier);
-                thread::spawn(move || {
-                    barrier.wait();
-                    workbook.eager_workbook().unwrap().worksheet_count()
-                })
-            })
-            .collect::<Vec<_>>();
-        barrier.wait();
-        let results = workers
-            .into_iter()
-            .map(|worker| worker.join().unwrap())
-            .collect::<Vec<_>>();
-
-        assert_eq!(results, vec![baseline_count, baseline_count]);
-        assert_eq!(concurrent_source.read_count(), baseline_reads);
+        Workbook::from_source_backed(workbook).unwrap()
     }
 
     #[test]

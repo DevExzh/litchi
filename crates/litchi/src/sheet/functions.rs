@@ -255,15 +255,12 @@ pub fn open_xlsb_workbook_dyn_with_limits<P: AsRef<std::path::Path>>(
     {
         if let crate::detection_smart::detected::WorkbookSourcePathDetection::Xlsb {
             workbook,
-            source,
-            limits,
             ..
         } = crate::detection_smart::detected::detect_workbook_source_path_with_limits(
             path.as_ref(),
             limits,
         )? {
-            let workbook =
-                super::adapters::XlsbWorkbook::from_source_backed(workbook, source, limits)?;
+            let workbook = super::adapters::XlsbWorkbook::from_source_backed(workbook)?;
             return Ok(Box::new(workbook));
         }
     }
@@ -295,7 +292,7 @@ pub fn open_xlsb_workbook_from_bytes_dyn_with_limits(
         limits,
     )
     .map_err(crate::map_ooxml_error)?;
-    let workbook = super::adapters::XlsbWorkbook::from_source_backed(workbook, source, limits)?;
+    let workbook = super::adapters::XlsbWorkbook::from_source_backed(workbook)?;
     Ok(Box::new(workbook))
 }
 

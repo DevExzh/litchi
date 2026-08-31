@@ -1,5 +1,22 @@
 # Performance hotspot inventory
 
+## XLSB source-backed fallback admission boundary (change 0353)
+
+Change 0353 is correctness/admission closure, not a measured hotspot
+(`performance_claim: none`). After source-owner admission, dynamic/source-backed
+XLSB text no longer retries through an eager full-workbook fallback; the eager
+adapter reader/caches/state and private detector-side duplicate source/limits
+state are gone. Recognized nonworksheet tabs are skipped via filtered worksheet
+positions, while direct nonworksheet and sparkline/pivot/slicer/timeline
+selections remain typed refusals. Explicit eager APIs and `DetectedFormat::Xlsb`
+remain unchanged, and pre-admission recoverable probes may retain the existing
+`Workbook::from_bytes` fallback. Evidence is `23/23` and `40/40` under serial
+8 GiB-constrained execution; the 647 MiB target and approximately 15 GiB
+post-run available memory with saturated swap are run observations only. No
+latency, RSS, OOM, constant-memory, allocation, physical-I/O, or broad XLSB
+claim follows. A selected worksheet and required dependencies still
+materialize.
+
 ## Selected-story text lifecycle boundary (change 0352)
 
 Change 0352 is a DOCX source-backed correctness/CRUD closure, not a measured
