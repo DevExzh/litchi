@@ -3793,3 +3793,34 @@ dependency declarations, 226 canonical edges, and 11 ordered migration debts
 with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, with one migration host.
 No package, dependency edge, debt, host, or monolith-deletion gate is removed
 by this seam hardening.
+
+## 2026-09-01 amendment: Numbers table-relocation owner (topology unchanged)
+
+Physical relocation of one existing Numbers table between existing sheets now
+has a focused owner at
+`litchi_numbers::table::relocation::transaction::{Commit, Diagnostics, Edit,
+Error, LimitKind, Patch, Path}`. The package surface is
+`litchi_numbers::Package::{edit_table_relocation, move_table,
+apply_table_relocation}` (`apply_table_move` remains an alias): callers provide a
+source `SheetSelector`, a source-sheet `TableSelector`, and a destination
+`SheetSelector`; native IDs and raw archive/protobuf values do not cross the
+boundary.
+
+The focused transaction owns exact-source patch construction and application,
+`Patch::inverse()` restoration, conflict/stale/foreign-source refusal, and
+locality proof. A same-sheet selection is an exact no-op and replays without a
+write. For a changed move, the native fixture evidence is limited to
+`Index/Document.iwa` and `Index/Tables.iwa`; table payload/content/unknowns and
+unrelated members are preserved. The legacy
+`litchi_iwa::NumbersEditor::move_table` remains a compatibility delegate for
+ordinary graphs. Historical host-built storage outside the focused cell
+projection uses a doc-hidden selector-first admission function in
+`litchi-numbers` that calls the same rewrite/verification engine; the host only
+performs legacy candidate readback. Unsupported graphs fail closed, and this
+does not add a second physical owner.
+
+This focused seam does not change the authoritative inventory: 64 workspace
+packages, 237 internal dependency declarations, 226 canonical edges, 11
+ordered migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`,
+and one migration host remain. No package, edge, debt, host, or monolith-
+deletion gate is removed by this ownership transfer.

@@ -230,6 +230,19 @@ host operation. The checked-in recipes under
 `corpus/numbers_table_sort_order/` are command inputs, not native package
 copies.
 
+`numbers_table_relocation` is the focused selector-first Numbers table-ownership
+move target. It source-builds a small strict two-sheet package from the
+existing archive/core/protobuf helpers and interprets a bounded `hex:` prefix
+as same-sheet no-op, changed move, changed move plus patch inverse, or
+invalid-selector commands.
+It checks exact no-op/source atomicity, index/name selectors, semantic
+destination ownership, exact-source patch conflict/inverse replay, bounded
+malformed ingress, and the 512-KiB input ceiling. It calls the focused package
+operation only through `SheetSelector` and `TableSelector`; no native IDs or
+table-sort codec paths are duplicated. The checked-in recipes under
+`corpus/numbers_table_relocation/` are command inputs, not native package
+copies.
+
 
 `pages_page_layout` is the focused Pages document-layout target. It offers
 arbitrary bytes to checked Pages package ingress and reuses them as bounded
@@ -680,6 +693,14 @@ Run the focused Numbers persisted-sort target with its command seeds:
 cargo +nightly fuzz run numbers_table_sort_order \
   corpus/numbers_table_sort_order -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Numbers table-relocation target with its command seeds:
+
+```sh
+cargo +nightly fuzz run numbers_table_relocation \
+  corpus/numbers_table_relocation -- \
+  -max_len=64 -timeout=10 -rss_limit_mb=2048
 ```
 
 

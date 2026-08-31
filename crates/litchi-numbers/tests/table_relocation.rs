@@ -13,7 +13,7 @@ use litchi_iwa_archive::{
     package::{Catalog, EntryEdit},
 };
 use litchi_iwa_common::wire::{WireView, append_varint_field};
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsd, tsp, tst};
 use litchi_numbers::{
     Package, SheetSelector, TableSelector,
@@ -367,6 +367,34 @@ fn with_malformed_table_info(source: &[u8]) -> TestResult<Vec<u8>> {
     })
 }
 
+fn with_wrong_sheet_reference_type(source: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_component(source, DOCUMENT_MEMBER, |archive| {
+        let sheet = archive
+            .object_mut(SOURCE_SHEET_ID)
+            .ok_or_else(|| io::Error::other("source sheet is missing"))?;
+        let field = sheet.archive_info.message_infos[0]
+            .field_infos
+            .first_mut()
+            .ok_or_else(|| io::Error::other("sheet drawable metadata is missing"))?;
+        field.r#type = Some(FieldType::DataReference);
+        Ok(())
+    })
+}
+
+fn with_wrong_parent_reference_path(source: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_component(source, TABLES_MEMBER, |archive| {
+        let table_info = archive
+            .object_mut(BETA_INFO_ID)
+            .ok_or_else(|| io::Error::other("selected table-info is missing"))?;
+        let field = table_info.archive_info.message_infos[0]
+            .field_infos
+            .first_mut()
+            .ok_or_else(|| io::Error::other("table parent metadata is missing"))?;
+        field.path.path = vec![9];
+        Ok(())
+    })
+}
+
 fn object_message(
     source: &[u8],
     member_name: &str,
@@ -577,7 +605,12 @@ fn changed_move_appends_in_order_preserves_content_unknowns_and_locality() -> Te
     let destination_unknown = raw_fields(&destination_sheet, 92)?;
     let table_unknown = raw_fields(&table_info, 90)?;
 
-    let commit = package.move_table(SOURCE_SHEET_NAME, BETA_TABLE_NAME, DESTINATION_SHEET_NAME)?;
+    let edit = package.edit_table_relocation(
+        SOURCE_SHEET_NAME,
+        BETA_TABLE_NAME,
+        DESTINATION_SHEET_NAME,
+    )?;
+    let commit = edit.commit()?;
     let target = commit.package().exact_bytes();
     let reopened = Package::from_bytes(&target)?;
     assert!(!commit.patch().is_noop());
@@ -620,7 +653,7 @@ fn changed_move_appends_in_order_preserves_content_unknowns_and_locality() -> Te
         vec![GAMMA_TABLE_NAME.to_owned(), BETA_TABLE_NAME.to_owned()]
     );
     assert_eq!(
-        commit.package().sheets()[1].tables().nth(0).cloned(),
+        commit.package().sheets()[1].tables().next().cloned(),
         Some(gamma)
     );
     assert_eq!(
@@ -709,6 +742,14 @@ fn malformed_or_ambiguous_ownership_is_refused_without_partial_mutation() -> Tes
     assert_atomic_refusal(&with_duplicate_owner(&bytes)?, "duplicate rooted owner")?;
     assert_atomic_refusal(&with_parent_mismatch(&bytes)?, "parent/owner mismatch")?;
     assert_atomic_refusal(&with_malformed_table_info(&bytes)?, "malformed table-info")?;
+    assert_atomic_refusal(
+        &with_wrong_sheet_reference_type(&bytes)?,
+        "wrong sheet drawable reference type",
+    )?;
+    assert_atomic_refusal(
+        &with_wrong_parent_reference_path(&bytes)?,
+        "wrong table parent reference path",
+    )?;
     Ok(())
 }
 

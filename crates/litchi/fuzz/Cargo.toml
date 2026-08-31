@@ -166,6 +166,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "numbers_table_relocation"
+path = "fuzz_targets/numbers_table_relocation.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "pages_body_table_sort_order"
 path = "fuzz_targets/pages_body_table_sort_order.rs"
 test = false

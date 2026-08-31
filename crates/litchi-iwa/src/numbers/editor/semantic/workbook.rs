@@ -52,11 +52,7 @@ impl NumbersEditor {
     }
 
     pub fn tables(&self) -> Result<Vec<NumbersTableInfo>> {
-        let focused_package = Package::from_bytes(&self.package.to_bytes()?).map_err(|error| {
-            Error::InvalidFormat(format!(
-                "Numbers table-appearance package projection failed: {error}"
-            ))
-        })?;
+        let focused_package = Package::from_bytes(&self.package.to_bytes()?);
         let read_focused_appearance = litchi_numbers::Package::table_appearance;
         // Source-built and older compatibility packages may not carry the
         // strict Metadata ownership required for focused appearance edits.
@@ -74,19 +70,31 @@ impl NumbersEditor {
                     name: descriptor.model.table_name,
                     rows: descriptor.model.number_of_rows as usize,
                     columns: descriptor.model.number_of_columns as usize,
-                    appearance: match read_focused_appearance(
-                        &focused_package,
-                        sheet_selector,
-                        table_selector,
-                    ) {
-                        Ok(appearance) => appearance,
+                    appearance: match &focused_package {
+                        Ok(package) => match read_focused_appearance(
+                            package,
+                            sheet_selector,
+                            table_selector,
+                        ) {
+                            Ok(appearance) => appearance,
+                            Err(focused_error) => read_compatibility_appearance(
+                                &self.package,
+                                descriptor.object_id,
+                            )
+                            .map_err(|compatibility_error| {
+                                Error::InvalidFormat(format!(
+                                    "Numbers table-appearance projection failed: focused owner: \
+                                     {focused_error}; compatibility reader: {compatibility_error}"
+                                ))
+                            })?,
+                        },
                         Err(focused_error) => read_compatibility_appearance(
                             &self.package,
                             descriptor.object_id,
                         )
                         .map_err(|compatibility_error| {
                             Error::InvalidFormat(format!(
-                                "Numbers table-appearance projection failed: focused owner: \
+                                "Numbers table-appearance package projection failed: focused owner: \
                                  {focused_error}; compatibility reader: {compatibility_error}"
                             ))
                         })?,

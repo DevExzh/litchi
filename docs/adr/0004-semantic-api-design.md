@@ -3382,3 +3382,42 @@ persisted-sort set/clear writers were removed from the host. This amendment
 does not claim that the physical executor or generated table schemas have
 moved to `litchi-keynote`; persisted configuration remains the focused owner's
 transaction, and physical storage remains migration-host work.
+
+## 2026-09-01 amendment: Numbers table-relocation focused owner
+
+Existing-table physical relocation is now a separate focused Numbers
+transaction. Its public contract is
+`litchi_numbers::table::relocation::transaction::{Commit, Diagnostics, Edit,
+Error, LimitKind, Patch, Path}` together with
+`litchi_numbers::Package::{edit_table_relocation, move_table,
+apply_table_relocation}`; `apply_table_move` remains a compatibility spelling.
+`move_table` is
+selector-first: it takes a source `SheetSelector`, a sheet-scoped
+`TableSelector`, and an existing destination `SheetSelector`. Native object
+identifiers, protobuf payloads, archive members, and raw IDs are deliberately
+absent from that API.
+
+The focused owner performs the native ownership rewrite and publishes only
+after exact-source admission. A changed `Patch` is bound to its exact source,
+has an exact `inverse`, rejects stale, foreign, malformed, or otherwise
+conflicting sources before publication, and records exact locality: the
+fixture's changed members are limited to `Index/Document.iwa` and
+`Index/Tables.iwa`; table model/content/unknown fields and unrelated members
+remain byte-preserved. Selecting the table's current source as the destination
+is an exact same-sheet no-op, including no-write replay through
+`apply_table_relocation`.
+
+The legacy `litchi_iwa::NumbersEditor::move_table` remains a compatibility
+entry point. It resolves the historical workbook-wide selector and delegates
+ordinary graphs to `litchi_numbers::Package::move_table`. Host-built tables
+outside the focused cell projection enter through a doc-hidden selector-first
+physical admission function in the same focused crate; it reuses the exact
+relocation engine, and the legacy reader verifies the candidate before
+publication. Unsupported graphs remain fail-closed, and the host is not a
+second native relocation owner. This is a bounded physical-relocation ownership transfer,
+not a claim about persisted sort configuration or about table creation,
+deletion, cell/formula/comment/storage authoring, or cross-workbook moves.
+The amendment closes no migration debt, dependency edge, host, or monolith
+deletion gate; the documented topology remains 64 workspace packages, 237
+internal dependency declarations, 226 canonical edges, 11 ordered migration
+debts, and one migration host.

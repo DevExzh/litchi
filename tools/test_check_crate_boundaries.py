@@ -675,6 +675,30 @@ def add_numbers_table_sort_canonical_scaffold(root: Path) -> None:
         (root / corpus).mkdir(parents=True, exist_ok=True)
 
 
+def add_numbers_table_move_canonical_scaffold(root: Path) -> None:
+    """Create the minimal focused relocation owner used by boundary tests."""
+
+    owner = root / boundaries.NUMBERS_TABLE_MOVE_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "impl Package {\n"
+        "    pub fn move_table(\n"
+        "        &self,\n"
+        "        source_sheet: impl Into<SheetSelector<'_>>,\n"
+        "        table: impl Into<TableSelector<'_>>,\n"
+        "        destination_sheet: impl Into<SheetSelector<'_>>,\n"
+        "    ) -> Result<(), Error> {\n"
+        "        let _ = (source_sheet, table, destination_sheet);\n"
+        "        todo!()\n"
+        "    }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    package = root / boundaries.NUMBERS_TABLE_MOVE_EXPORT_SOURCES[1]
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_text("mod table_relocation;\n", encoding="utf-8")
+
+
 def add_numbers_table_title_settings_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -9361,6 +9385,144 @@ class BoundaryPolicyTests(unittest.TestCase):
             fuzz.write_text("fn main() {}\n", encoding="utf-8")
             violations = boundaries.audit_numbers_table_sort_facade_source_topology(root)
             self.assertTrue(any("missing fuzz_target! harness" in violation for violation in violations))
+
+    def test_numbers_table_move_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.IWA_NUMBERS_TABLE_MOVE_SOURCE,
+            Path("crates/litchi-iwa/src/numbers/editor/table_move.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_MOVE_OWNER_SOURCE,
+            Path("crates/litchi-numbers/src/package/table_relocation.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_MOVE_PACKAGE_METHOD,
+            "move_table",
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_MOVE_SELECTOR_TYPES,
+            ("SheetSelector", "TableSelector"),
+        )
+
+    def test_focused_numbers_table_move_is_dormant_until_owner_is_wired(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            host = root / boundaries.IWA_NUMBERS_TABLE_MOVE_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "pub fn move_table() { remove_sheet_drawable(); }\n"
+                "fn remove_sheet_drawable() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_move_source_topology(root), []
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_move_facade_source_topology(root), []
+            )
+
+    def test_focused_numbers_table_move_rejects_host_physical_route(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_move_canonical_scaffold(root)
+            host = root / boundaries.IWA_NUMBERS_TABLE_MOVE_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "use crate::wire::parse_wire_fields;\n"
+                "pub fn move_table() {\n"
+                "    SheetArchive::decode(bytes);\n"
+                "    remove_sheet_drawable();\n"
+                "}\n"
+                "fn remove_sheet_drawable() {}\n"
+                "fn patch_table_parent() {}\n"
+                "fn decode_table_info() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_move_source_topology(root)
+            self.assertTrue(
+                any("does not delegate" in violation for violation in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("independent archive/wire mutation helper" in violation for violation in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("archive/wire import" in violation for violation in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("generated Sheet/TableInfo decode" in violation for violation in violations),
+                violations,
+            )
+
+    def test_focused_numbers_table_move_accepts_package_route_and_masks_tests(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_move_canonical_scaffold(root)
+            host = root / boundaries.IWA_NUMBERS_TABLE_MOVE_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "use litchi_numbers::Package as FocusedNumbersPackage;\n"
+                "pub fn move_table(&mut self, table: TableSelector, target: SheetSelector) {\n"
+                "    let source = FocusedNumbersPackage::from_bytes(bytes).unwrap();\n"
+                "    source.move_table(source_sheet, table, target);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    fn remove_sheet_drawable() {}\n"
+                "    fn decode_table_info() {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_move_source_topology(root), []
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_move_facade_source_topology(root), []
+            )
+
+    def test_focused_numbers_table_move_facade_rejects_raw_ids_and_public_module(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_move_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_MOVE_OWNER_SOURCE
+            owner.write_text(
+                "impl Package {\n"
+                "    pub fn move_table(&mut self, table_id: u64, sheet_id: u64) -> Result<(), Error> { todo!() }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.NUMBERS_TABLE_MOVE_EXPORT_SOURCES[1]
+            package.write_text("pub mod table_relocation;\n", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_move_facade_source_topology(root)
+            self.assertTrue(
+                any("package module must remain private" in violation for violation in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("raw identifier parameter" in violation for violation in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("selector-first SheetSelector" in violation for violation in violations),
+                violations,
+            )
+
+    def test_focused_numbers_table_move_dispatch_is_wired(self) -> None:
+        main_source = Path(boundaries.__file__).read_text(encoding="utf-8")
+        self.assertIn(
+            "+ audit_iwa_numbers_table_move_source_topology()", main_source
+        )
+        self.assertIn(
+            "+ audit_numbers_table_move_facade_source_topology()", main_source
+        )
 
     def test_numbers_sheet_order_boundary_inventories_are_exact(self) -> None:
         self.assertEqual(

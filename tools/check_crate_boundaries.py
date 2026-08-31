@@ -7573,6 +7573,124 @@ NUMBERS_TABLE_SORT_RAW_PARAMETER = re.compile(
     r"\b[ \t\r\n]*:[ \t\r\n]*(?:u64|u32|usize|i64|i32|&\s*\[\s*u8\s*\])\b"
 )
 
+# Moving an existing Numbers table is a physical graph transaction, not a
+# second compatibility-host graph owner.  Keep this inventory dormant until
+# the focused package has a private relocation module; once activated the IWA
+# host may only adapt selectors/bytes around ``Package::move_table``.  The
+# explicit helper/type lists describe the old host seam and are deliberately
+# narrower than a ban on every private adapter helper: conversion helpers that
+# do not inspect or mutate archives remain available to the compatibility
+# wrapper.
+IWA_NUMBERS_TABLE_MOVE_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "table_move.rs"
+)
+NUMBERS_TABLE_MOVE_OWNER_SOURCE = (
+    NUMBERS_SOURCE_ROOT / "package" / "table_relocation.rs"
+)
+NUMBERS_TABLE_MOVE_EXPORT_SOURCES = (
+    NUMBERS_SOURCE_ROOT / "lib.rs",
+    NUMBERS_SOURCE_ROOT / "package.rs",
+)
+NUMBERS_TABLE_MOVE_PACKAGE_METHOD = "move_table"
+NUMBERS_TABLE_MOVE_SELECTOR_TYPES = ("SheetSelector", "TableSelector")
+NUMBERS_PACKAGE_TABLE_MOVE_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?table_relocation\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_NUMBERS_PACKAGE_TABLE_MOVE_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?table_relocation\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+NUMBERS_TABLE_MOVE_RAW_PARAMETER = re.compile(
+    r"\b(?:[A-Za-z_]+_)?(?:sheet|table|sheet_id|table_id|table_object_id|"
+    r"object_id|model_id|native_id|raw_object_id|raw_object_identifier|"
+    r"object_identifier|native_object_id)"
+    r"\b[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize)\b"
+)
+IWA_NUMBERS_TABLE_MOVE_MUTATION_HELPER_NAMES = frozenset(
+    {
+        "add_metadata_reference",
+        "append_sheet_drawable",
+        "decode_sheet",
+        "decode_sheet_data",
+        "decode_table_info",
+        "find_table_owner",
+        "object_locations",
+        "patch_table_parent",
+        "remove_metadata_reference",
+        "remove_repeated_length_delimited_field_where",
+        "remove_sheet_drawable",
+        "replace_metadata_reference",
+        "replace_reference_values",
+        "remap_numbers_reference_paths",
+        "transform_length_delimited_field",
+        "transform_sheet_wire",
+    }
+)
+IWA_NUMBERS_TABLE_MOVE_MUTATION_HELPER_NAME = re.compile(
+    r"(?i)^(?:[a-z_]*(?:archive|wire|metadata|drawable|reference|payload|"
+    r"message|table_info|sheet_info|parent)[a-z_]*)$"
+)
+IWA_NUMBERS_TABLE_MOVE_FORBIDDEN_IMPORTS = (
+    re.compile(
+        r"(?m)^[ \t]*(?:pub[ \t]+)?use[^;\n]*(?:crate[ \t\r\n]*::"
+        r"(?:wire|protobuf)|litchi_iwa_(?:archive|core|protos|common)|"
+        r"(?:tn|tsp|tst)[ \t\r\n]*::)"
+    ),
+)
+IWA_NUMBERS_TABLE_MOVE_FORBIDDEN_PATTERNS = (
+    (
+        "archive mutation helper",
+        re.compile(
+            r"\b(?:update_archive|object_mut|replace_message|"
+            r"replace_message_preserving_header|add_metadata_reference|"
+            r"remove_metadata_reference|replace_metadata_reference|"
+            r"replace_reference_values|remap_numbers_reference_paths)\b"
+            r"[ \t\r\n]*(?:\(|::)"
+        ),
+    ),
+    (
+        "wire mutation helper",
+        re.compile(
+            r"\b(?:append_repeated_length_delimited_field|"
+            r"remove_repeated_length_delimited_field_where|"
+            r"transform_length_delimited_field|transform_sheet_wire|"
+            r"parse_wire_fields|parse_wire_field)\b"
+            r"[ \t\r\n]*(?:\(|::)"
+        ),
+    ),
+    (
+        "archive/IWA type",
+        re.compile(
+            r"\b(?:Archive|ArchiveObject|IWorkPackage|RawMessage|"
+            r"SheetArchive|FormBasedSheetArchive|TableInfoArchive|"
+            r"TableModelArchive)\b"
+        ),
+    ),
+)
+IWA_NUMBERS_TABLE_MOVE_GENERATED_DECODE = re.compile(
+    r"\b(?:Sheet|SheetArchive|FormBasedSheetArchive|TableInfo|"
+    r"TableInfoArchive|TableModelArchive)\b[ \t\r\n]*::"
+    r"[ \t\r\n]*decode\b[ \t\r\n]*\("
+    r"|\b(?:decode_sheet|decode_sheet_data|decode_table_info)\b"
+    r"[ \t\r\n]*\("
+    r"|\b(?:decode_type|decode_unique(?:_any)?|decode_message)\b"
+    r"[ \t\r\n]*::?[ \t\r\n]*<[^>]*\b(?:Sheet|TableInfo)"
+)
+IWA_NUMBERS_TABLE_MOVE_FOCUSED_UFCS_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:litchi_numbers[ \t\r\n]*::[ \t\r\n]*)?"
+    r"Package[ \t\r\n]*::[ \t\r\n]*move_table\b"
+    r"[ \t\r\n]*\("
+)
+IWA_NUMBERS_TABLE_MOVE_RECEIVER_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)"
+    r"[ \t\r\n]*(?:\([^;{}\n]*\))?[ \t\r\n]*\??"
+    r"[ \t\r\n]*\.[ \t\r\n]*move_table\b[ \t\r\n]*\("
+)
+
 NUMBERS_TABLE_LOCK_IMPLEMENTATION_SOURCES = (
     NUMBERS_SOURCE_ROOT / "package" / "table_lock.rs",
     NUMBERS_SOURCE_ROOT / "table" / "lock.rs",
@@ -16402,6 +16520,294 @@ def audit_numbers_table_sort_facade_source_topology(
                     "focused litchi-numbers table-sort public API exposes raw "
                     f"parameter {parameter}: {path.relative_to(root)}:{parameter_line}"
                 )
+
+    return sorted(set(violations))
+
+
+def _numbers_table_move_owner_present(root: Path) -> bool:
+    """Return whether the private focused Numbers relocation owner is wired."""
+
+    owner_path = root / NUMBERS_TABLE_MOVE_OWNER_SOURCE
+    package_path = root / NUMBERS_TABLE_MOVE_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return owner_path.is_file() and NUMBERS_PACKAGE_TABLE_MOVE_MODULE.search(
+        package_source
+    ) is not None
+
+
+def _numbers_table_move_focused_call_in_body(
+    body: str,
+    source: str = "",
+) -> bool:
+    """Return whether a host body calls the focused ``Package`` owner.
+
+    Rust method calls are normally written as ``package.move_table(...)``;
+    accept that spelling for the conventional focused-package variable names
+    and for a source that visibly constructs/imports ``litchi_numbers::Package``.
+    An unqualified or ``self`` call is not enough because it can simply route
+    back to the compatibility host method.
+    """
+
+    code = _mask_rust_non_code(body)
+    if IWA_NUMBERS_TABLE_MOVE_FOCUSED_UFCS_CALL.search(code) is not None:
+        return True
+    focused_receivers = {
+        "focused",
+        "focused_package",
+        "litchi_package",
+        "numbers_package",
+        "package",
+    }
+    host_receivers = {
+        "editor",
+        "host",
+        "legacy",
+        "self",
+        "staged",
+    }
+    for match in IWA_NUMBERS_TABLE_MOVE_RECEIVER_CALL.finditer(code):
+        receiver = match.group("receiver")
+        if receiver in host_receivers:
+            continue
+        if receiver in focused_receivers:
+            return True
+        if receiver in host_receivers:
+            continue
+        if re.search(
+            r"(?:litchi_numbers[ \t\r\n]*::[ \t\r\n]*)?Package\b",
+            source or code,
+        ) is not None:
+            return True
+    return False
+
+
+def audit_iwa_numbers_table_move_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep physical Numbers table relocation out of the compatibility host.
+
+    The host ``NumbersEditor`` method remains a source-compatibility wrapper,
+    but once the focused owner is wired it must delegate the complete graph
+    transaction to ``litchi_numbers::Package::move_table``.  The old host
+    implementation decoded generated sheet/table-info messages and patched
+    archive metadata/wire fields itself; those helpers and their imports are
+    the exact seam this ratchet retires.  Test-gated fixtures are masked before
+    scanning so production ownership cannot be hidden in ``cfg(test)`` code.
+    """
+
+    if not _numbers_table_move_owner_present(root):
+        return []
+
+    path = root / IWA_NUMBERS_TABLE_MOVE_SOURCE
+    if not path.is_file():
+        return [
+            "litchi-iwa Numbers table-move production source is missing: "
+            f"{IWA_NUMBERS_TABLE_MOVE_SOURCE}"
+        ]
+
+    raw_source = path.read_text(encoding="utf-8")
+    production_source = _mask_rust_cfg_test_items(raw_source)
+    code = _mask_rust_non_code(production_source)
+    violations: list[str] = []
+
+    def function_records(source: str) -> dict[str, list[tuple[str, int]]]:
+        """Return production function bodies for this dedicated host module."""
+
+        masked = _mask_rust_non_code(source)
+        records: dict[str, list[tuple[str, int]]] = {}
+        for declaration in RUST_FUNCTION_DECLARATION.finditer(masked):
+            opening = masked.find("{", declaration.end())
+            if opening < 0:
+                continue
+            depth = 1
+            cursor = opening + 1
+            while cursor < len(masked) and depth:
+                if masked[cursor] == "{":
+                    depth += 1
+                elif masked[cursor] == "}":
+                    depth -= 1
+                cursor += 1
+            if depth:
+                continue
+            records.setdefault(declaration.group(1), []).append(
+                (masked[opening + 1 : cursor - 1], opening + 1)
+            )
+        return records
+
+    functions = function_records(production_source)
+    move_records = functions.get(NUMBERS_TABLE_MOVE_PACKAGE_METHOD, [])
+    if not move_records:
+        violations.append(
+            "litchi-iwa Numbers table-move compatibility wrapper is missing "
+            f"production move_table: {IWA_NUMBERS_TABLE_MOVE_SOURCE}"
+        )
+    else:
+        pending = [
+            (NUMBERS_TABLE_MOVE_PACKAGE_METHOD, body)
+            for body, _offset in move_records
+        ]
+        reachable: list[tuple[str, str]] = []
+        visited: set[tuple[str, str]] = set()
+        while pending:
+            name, body = pending.pop()
+            key = (name, body)
+            if key in visited:
+                continue
+            visited.add(key)
+            reachable.append((name, body))
+            for helper_name, helper_records in functions.items():
+                if helper_name == name:
+                    continue
+                call = re.compile(
+                    rf"(?<![A-Za-z0-9_:#])(?:r#)?{re.escape(helper_name)}"
+                    r"[ \t\r\n]*\("
+                )
+                if call.search(body) is None:
+                    continue
+                pending.extend(
+                    (helper_name, helper_body)
+                    for helper_body, _helper_offset in helper_records
+                )
+        if not any(
+            _numbers_table_move_focused_call_in_body(body, production_source)
+            for _name, body in reachable
+        ):
+            body_offset = move_records[0][1]
+            line_number = production_source.count("\n", 0, body_offset) + 1
+            violations.append(
+                "litchi-iwa Numbers table-move wrapper does not delegate to "
+                "litchi_numbers::Package::move_table: "
+                f"{IWA_NUMBERS_TABLE_MOVE_SOURCE}:{line_number}"
+            )
+
+    for name, line_number in _rust_function_declarations(production_source):
+        if name == NUMBERS_TABLE_MOVE_PACKAGE_METHOD:
+            continue
+        if (
+            name in IWA_NUMBERS_TABLE_MOVE_MUTATION_HELPER_NAMES
+            or IWA_NUMBERS_TABLE_MOVE_MUTATION_HELPER_NAME.fullmatch(name)
+            is not None
+        ):
+            violations.append(
+                "litchi-iwa Numbers table-move production path retains "
+                f"independent archive/wire mutation helper {name}: "
+                f"{IWA_NUMBERS_TABLE_MOVE_SOURCE}:{line_number}"
+            )
+
+    for pattern in IWA_NUMBERS_TABLE_MOVE_FORBIDDEN_IMPORTS:
+        for match in pattern.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "litchi-iwa Numbers table-move production path retains "
+                f"archive/wire import: {IWA_NUMBERS_TABLE_MOVE_SOURCE}:{line_number}"
+            )
+
+    for label, pattern in IWA_NUMBERS_TABLE_MOVE_FORBIDDEN_PATTERNS:
+        for match in pattern.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            token = re.sub(r"\s+", " ", match.group(0)).strip()
+            violations.append(
+                "litchi-iwa Numbers table-move production path uses "
+                f"{label} {token}: {IWA_NUMBERS_TABLE_MOVE_SOURCE}:{line_number}"
+            )
+
+    for match in IWA_NUMBERS_TABLE_MOVE_GENERATED_DECODE.finditer(code):
+        line_number = code.count("\n", 0, match.start()) + 1
+        token = re.sub(r"\s+", " ", match.group(0)).strip()
+        violations.append(
+            "litchi-iwa Numbers table-move production path retains generated "
+            f"Sheet/TableInfo decode {token}: "
+            f"{IWA_NUMBERS_TABLE_MOVE_SOURCE}:{line_number}"
+        )
+
+    # A type alias can hide the generated message name from the direct decode
+    # expression.  Resolve only aliases declared in this dedicated source;
+    # unrelated aliases in the wider Numbers host are outside this boundary.
+    aliases: list[tuple[str, str]] = []
+    for match in re.finditer(
+        r"\b(?:Sheet|SheetArchive|FormBasedSheetArchive|TableInfo|"
+        r"TableInfoArchive|TableModelArchive)\b"
+        r"[ \t\r\n]+as[ \t\r\n]+(?:r#)?"
+        r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b",
+        code,
+    ):
+        aliases.append((match.group("alias"), match.group(0).split()[0]))
+    for alias, original in aliases:
+        decode = re.compile(
+            rf"\b(?:r#)?{re.escape(alias)}[ \t\r\n]*::"
+            r"[ \t\r\n]*decode\b[ \t\r\n]*\("
+        )
+        for match in decode.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "litchi-iwa Numbers table-move production path retains generated "
+                f"{original} alias decode {alias}: "
+                f"{IWA_NUMBERS_TABLE_MOVE_SOURCE}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_numbers_table_move_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require a private selector-first focused Numbers relocation owner."""
+
+    if not _numbers_table_move_owner_present(root):
+        return []
+
+    owner_path = root / NUMBERS_TABLE_MOVE_OWNER_SOURCE
+    package_path = root / NUMBERS_TABLE_MOVE_EXPORT_SOURCES[1]
+    owner_source = _mask_rust_cfg_test_items(
+        owner_path.read_text(encoding="utf-8")
+    )
+    package_source = _mask_rust_cfg_test_items(
+        package_path.read_text(encoding="utf-8")
+    )
+    package_code = _mask_rust_non_code(package_source)
+    violations: list[str] = []
+
+    for match in PUBLIC_NUMBERS_PACKAGE_TABLE_MOVE_MODULE.finditer(package_code):
+        line_number = package_code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-numbers table-move package module must remain private: "
+            f"{NUMBERS_TABLE_MOVE_EXPORT_SOURCES[1]}:{line_number}"
+        )
+
+    methods = {
+        name: (declaration, line_number)
+        for name, declaration, line_number in _rust_public_methods_in_impl(
+            owner_source, "Package"
+        )
+    }
+    method_record = methods.get(NUMBERS_TABLE_MOVE_PACKAGE_METHOD)
+    if method_record is None:
+        violations.append(
+            "focused litchi-numbers table-move public API is missing "
+            f"Package::{NUMBERS_TABLE_MOVE_PACKAGE_METHOD}: "
+            f"{NUMBERS_TABLE_MOVE_OWNER_SOURCE}"
+        )
+        return sorted(set(violations))
+
+    declaration, line_number = method_record
+    for selector in NUMBERS_TABLE_MOVE_SELECTOR_TYPES:
+        if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
+            violations.append(
+                "focused litchi-numbers table-move Package method "
+                f"{NUMBERS_TABLE_MOVE_PACKAGE_METHOD} must accept selector-first "
+                f"{selector}: {NUMBERS_TABLE_MOVE_OWNER_SOURCE}:{line_number}"
+            )
+    for match in NUMBERS_TABLE_MOVE_RAW_PARAMETER.finditer(declaration):
+        parameter = re.sub(r"\s+", " ", match.group(0)).strip()
+        violations.append(
+            "focused litchi-numbers table-move Package method exposes raw "
+            f"identifier parameter {parameter}: "
+            f"{NUMBERS_TABLE_MOVE_OWNER_SOURCE}:{line_number}"
+        )
 
     return sorted(set(violations))
 
@@ -38676,6 +39082,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_sheet_order_facade_source_topology()
         + audit_iwa_numbers_table_sort_source_topology()
         + audit_numbers_table_sort_facade_source_topology()
+        + audit_iwa_numbers_table_move_source_topology()
+        + audit_numbers_table_move_facade_source_topology()
         + audit_iwa_numbers_table_header_settings_source_topology()
         + audit_numbers_table_header_settings_facade_source_topology()
         + audit_iwa_numbers_chart_caption_source_topology()

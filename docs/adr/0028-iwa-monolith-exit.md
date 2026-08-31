@@ -7067,3 +7067,32 @@ table owner must provide selector-first exact-source admission, complete
 row-affine topology coverage, locality and budget proofs, conflict/inverse
 semantics, Buffa lazy projection/mutation coverage, and native acceptance before
 the physical executor can leave `litchi-iwa`.
+
+## 2026-09-01 amendment: Numbers table-relocation focused-owner slice (not a monolith-exit gate)
+
+The existing-table physical relocation slice now has the focused contract
+`litchi_numbers::table::relocation::transaction::{Commit, Diagnostics, Edit,
+Error, LimitKind, Patch, Path}` and
+`litchi_numbers::Package::{edit_table_relocation, move_table,
+apply_table_relocation}` (`apply_table_move` remains an alias). It is
+selector-first (source `SheetSelector`, sheet-scoped `TableSelector`, existing
+destination `SheetSelector`) and exposes no native IDs, protobuf payloads,
+archive members, or raw identifiers. It owns exact-source patch admission,
+`Patch::inverse()` restoration, conflict/stale/foreign refusal, exact locality,
+and the exact same-sheet no-op. The changed fixture rewrites only
+`Index/Document.iwa` and `Index/Tables.iwa`, preserving table content/model
+bytes, unknown fields, and unrelated members.
+
+`litchi_iwa::NumbersEditor::move_table` is retained as a compatibility shell
+that resolves its historical selector and delegates ordinary graphs to the
+focused package owner. A doc-hidden selector-first admission function handles
+historical host-built storage outside the current cell projection while reusing
+the same focused rewrite/verification engine; the host performs only legacy
+candidate readback. Unsupported graphs remain fail-closed. This is a
+bounded ownership slice, not proof of complete row-affine coverage, native
+Numbers acceptance, Buffa projection/mutation parity, or host independence.
+Consequently none of the six monolith-exit gates closes: no migration debt or
+dependency edge is retired, the migration host remains, and no monolith-
+deletion claim is made. The documented topology remains 64 workspace packages,
+237 internal dependency declarations, 226 canonical edges, 11 ordered
+migration debts, and one migration host.

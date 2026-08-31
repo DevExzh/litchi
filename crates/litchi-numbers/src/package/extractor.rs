@@ -11540,7 +11540,7 @@ mod tests {
         };
         let standalone_local = AstNodeArchive {
             ast_node_type: AstNodeType::LocalCellReferenceNode as i32,
-            ast_local_cell_reference_node_reference: Some(sticky_local.clone()),
+            ast_local_cell_reference_node_reference: Some(sticky_local),
             ..Default::default()
         };
         assert_eq!(
