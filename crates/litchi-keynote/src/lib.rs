@@ -331,6 +331,8 @@ pub use package::{
     ChartAxisTitleCommit, ChartAxisTitleDiagnostics, ChartAxisTitleEdit, ChartAxisTitleError,
     ChartAxisTitleLimitKind, ChartAxisTitlePatch, ChartCaptionCommit, ChartCaptionDiagnostics,
     ChartCaptionEdit, ChartCaptionError, ChartCaptionLimitKind, ChartCaptionPatch,
+    ChartLegendVisibilityCommit, ChartLegendVisibilityDiagnostics, ChartLegendVisibilityEdit,
+    ChartLegendVisibilityError, ChartLegendVisibilityLimitKind, ChartLegendVisibilityPatch,
     ChartTitleCommit, ChartTitleDiagnostics, ChartTitleEdit, ChartTitleError, ChartTitleLimitKind,
     ChartTitlePatch, Commit, Diagnostics, Edit, EditError, Limits, MAX_OBJECTS, MAX_REFERENCES,
     MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package, Patch,

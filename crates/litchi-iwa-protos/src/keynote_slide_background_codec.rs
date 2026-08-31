@@ -206,7 +206,8 @@ pub struct ColorSnapshot {
     pub rgb_space: Option<i32>,
 }
 
-/// Borrowed gradient scalars. Stops are re-read from `raw` by [`stops`], so
+/// Borrowed gradient scalars. Stops are re-read from `raw` by
+/// [`GradientSnapshot::stops`], so
 /// decoding this snapshot never allocates a repeated generated view.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GradientSnapshot<'source> {

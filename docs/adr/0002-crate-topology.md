@@ -4186,3 +4186,61 @@ saved a 500,006-byte native copy with SHA-256
 that copy closed and reopened without repair. These disposable artifacts are
 not checked-in fixtures, and this is not a full-workspace-green, performance,
 or broader format-support claim.
+
+## 2026-08-31 amendment: Wave117 Keynote chart-legend visibility ownership
+
+Wave117 gives `litchi-keynote::Package` selector-first ownership of the
+effective visibility of an existing slide-chart legend. The archive-free
+surface is `Package::{slide_chart_legend_visible, edit_slide_chart_legend,
+apply_slide_chart_legend}` with `SlideSelector`, `ChartSelector`, and
+`ChartLegendVisibility{Edit,Patch,Commit,Diagnostics,Error,LimitKind}` values.
+An absent native field reads as the effective value `false`, while the
+source-preserved distinction between absent and explicit false stays private.
+Native chart, non-style, component, message, and object identifiers do not
+cross the supported API.
+
+The hidden `litchi-iwa-protos::keynote_chart_legend_codec` projects only field
+20 of the generated `TSCH.Generated.ChartNonStyleArchive` extension. Strict
+wire preflight runs before the private Buffa lazy view; the prepared rewrite
+preserves unknown fields, groups, and source ordering and executes with finite
+limits. The selected raw payload remains the preservation authority, and the
+codec neither resolves charts nor owns package transactions.
+
+The focused owner resolves a rooted, uniquely selected slide/chart graph and
+owns exact-source no-op/change behavior, inverse and conflict-checked patches,
+candidate validation and semantic readback, package-wide locality checks,
+root-preview invalidation, and atomic publication. The changed route rewrites
+only the selected chart non-style legend field and preserves unrelated chart
+data, legend styling, and package members. Unsupported, ambiguous, malformed,
+shared/aliased, or otherwise unproven graphs fail closed.
+
+The raw-ID `KeynoteEditor::{slide_chart_legend_visible,
+set_slide_chart_legend_visible}` methods are retired with no fallback. The
+shared private chart-options helper remains for the Pages and Numbers host
+paths, and Keynote legend fill, frame, font, shadow, stroke, creation,
+duplication/removal, and other chart graph responsibilities remain migration
+host work. No raw-ID or generated compatibility alias replaces the retired
+surface.
+
+Scoped verification records 13/13 chart-legend codec unit tests, 10/10 focused
+package integration tests, the focused allocation-mapping unit test, strict
+library/test Clippy, all-target checks, 696/696 boundary-policy tests, and a
+1,000-run nightly fuzz smoke over the source-preserving codec harness. The
+checked-in corpus has 12 hand-authored valid and malformed wire seeds.
+
+Computer Use opened the 46,022-byte focused output (SHA-256
+`2ecf1327971c206e4017168cfd5fac86b0954ae32a0f2f0ba894f3b6b84c5acd`)
+without repair, showed the selected `Quarterly revenue` chart with its Legend
+checkbox off while retaining its two series, axes, title, and caption, and
+saved and reopened a 154,754-byte native copy (SHA-256
+`b82af597b4469b056b559cde678db508fca13d7ec725633bdd82749fab560adf`).
+The focused API reverse-read that native copy as hidden and reproduced it
+byte-for-byte on an exact no-op. These disposable artifacts are not checked-in
+fixtures, and this remains scoped native evidence rather than a general
+performance, full-workspace, or all-Keynote-chart claim.
+
+The authoritative inventory remains 64 workspace packages, 238 internal
+dependency declarations (167 required normal, 60 optional normal, and 11
+development), 226 canonical edges, and 12 ordered migration debts. Debt 014
+and the `litchi-iwa -> litchi-keynote` edge remain open, as do the migration
+host and the IWA monolith deletion gate.

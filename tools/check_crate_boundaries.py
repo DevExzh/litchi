@@ -308,6 +308,53 @@ IWA_KEYNOTE_CHART_TITLE_IDENTIFIER_POSITION_FALLBACK = re.compile(
     r"drawable_object_id|chart_object_id|native_id|object_id|identifier"
     r")[^{}\n|]{0,400}\)"
 )
+
+# Wave117 moves only the Keynote chart-legend visibility bit into the focused
+# package owner. Keep this seam independent from the remaining legacy legend
+# style operations (fill, frame, font, stroke, and shadow), and from the
+# shared Pages/Numbers chart-options helper.
+KEYNOTE_CHART_LEGEND_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_chart_legend.rs"
+)
+KEYNOTE_CHART_LEGEND_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_CHART_LEGEND_PACKAGE_MODULE = "slide_chart_legend"
+KEYNOTE_CHART_LEGEND_PACKAGE_METHODS = frozenset(
+    {
+        "slide_chart_legend_visible",
+        "edit_slide_chart_legend",
+        "apply_slide_chart_legend",
+    }
+)
+KEYNOTE_CHART_LEGEND_CANONICAL_TYPES = frozenset(
+    {
+        "ChartLegendVisibilityCommit",
+        "ChartLegendVisibilityDiagnostics",
+        "ChartLegendVisibilityEdit",
+        "ChartLegendVisibilityError",
+        "ChartLegendVisibilityLimitKind",
+        "ChartLegendVisibilityPatch",
+    }
+)
+KEYNOTE_CHART_LEGEND_RAW_ID_TOKEN = re.compile(
+    r"\b(?:native_id|object_id|drawable_object_id|chart_object_id|identifier)\b"
+)
+KEYNOTE_CHART_LEGEND_DIRECT_HELPER = re.compile(
+    r"\b(?:(?:read|set)_native_|(?:read|set)_)?chart_legend_visible\b"
+)
+IWA_KEYNOTE_CHART_LEGEND_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_charts" / "legend.rs"
+)
+IWA_KEYNOTE_CHART_LEGEND_LEGACY_METHODS = frozenset(
+    {"slide_chart_legend_visible", "set_slide_chart_legend_visible"}
+)
+IWA_KEYNOTE_CHART_LEGEND_LEGACY_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>slide_chart_legend_visible|"
+    r"set_slide_chart_legend_visible)(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+
 KEYNOTE_CHART_CAPTION_LEGACY_CALL = re.compile(
     r"(?<![A-Za-z0-9_])(?:r#)?(?P<method>set_slide_chart_caption|"
     r"remove_slide_chart_caption)(?![A-Za-z0-9_])[ \t\r\n]*\("
@@ -27522,6 +27569,271 @@ def audit_iwa_keynote_chart_title_source_topology(root: Path = ROOT) -> list[str
     return sorted(set(violations))
 
 
+def _keynote_chart_legend_boundary_active(root: Path) -> bool:
+    """Return whether the focused owner crossed its package-module seam."""
+
+    owner_path = root / KEYNOTE_CHART_LEGEND_OWNER_SOURCE
+    package_path = root / KEYNOTE_CHART_LEGEND_EXPORT_SOURCES[0]
+    if not owner_path.is_file() or not package_path.is_file():
+        return False
+    package_source = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+    )
+    return re.search(
+        rf"(?m)^(?:pub(?:\([^()]*\))?\s+)?mod\s+"
+        rf"{re.escape(KEYNOTE_CHART_LEGEND_PACKAGE_MODULE)}\s*;",
+        package_source,
+    ) is not None
+
+
+def audit_keynote_chart_legend_visibility_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require the selector-first, generated-free focused legend facade.
+
+    This audit remains dormant until the owner and private package module are
+    wired together, so historical checkouts continue to pass while a
+    migration is being staged. Once active, it checks only public Rust
+    declarations and explicit re-exports; private graph identifiers are
+    intentionally outside this boundary scan.
+    """
+
+    if not _keynote_chart_legend_boundary_active(root):
+        return []
+
+    violations: list[str] = []
+    owner_path = root / KEYNOTE_CHART_LEGEND_OWNER_SOURCE
+    package_path, lib_path = (
+        root / path for path in KEYNOTE_CHART_LEGEND_EXPORT_SOURCES
+    )
+
+    if not owner_path.is_file():
+        violations.append(
+            "focused litchi-keynote chart-legend visibility public API is missing "
+            f"private package owner source: {KEYNOTE_CHART_LEGEND_OWNER_SOURCE}"
+        )
+    if not package_path.is_file():
+        violations.append(
+            "focused litchi-keynote chart-legend visibility public API is missing "
+            f"package export source: {KEYNOTE_CHART_LEGEND_EXPORT_SOURCES[0]}"
+        )
+    if not lib_path.is_file():
+        violations.append(
+            "focused litchi-keynote chart-legend visibility public API is missing "
+            f"crate export source: {KEYNOTE_CHART_LEGEND_EXPORT_SOURCES[1]}"
+        )
+
+    package_source = (
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    package_code = _mask_rust_non_code(package_source)
+    module_matches = list(
+        re.finditer(
+            rf"(?m)^(?P<indent>\s*)(?P<public>pub(?:\([^()]*\))?\s+)?"
+            rf"mod\s+{re.escape(KEYNOTE_CHART_LEGEND_PACKAGE_MODULE)}\s*;",
+            package_code,
+        )
+    )
+    if not module_matches:
+        violations.append(
+            "focused litchi-keynote chart-legend visibility public API is missing "
+            f"private package owner module: {KEYNOTE_CHART_LEGEND_EXPORT_SOURCES[0]}"
+        )
+    elif any(match.group("public") for match in module_matches):
+        line_number = package_code.count("\n", 0, module_matches[0].start()) + 1
+        violations.append(
+            "focused litchi-keynote chart-legend visibility owner module must remain "
+            f"private: {KEYNOTE_CHART_LEGEND_EXPORT_SOURCES[0]}:{line_number}"
+        )
+
+    owner_source = (
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+        if owner_path.is_file()
+        else ""
+    )
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line in _rust_public_methods_in_impl(
+            owner_source, "Package"
+        )
+    }
+    for name in sorted(KEYNOTE_CHART_LEGEND_PACKAGE_METHODS):
+        declaration = owner_methods.get(name)
+        if declaration is None:
+            violations.append(
+                "focused litchi-keynote chart-legend visibility Package method is "
+                f"missing {name}: {KEYNOTE_CHART_LEGEND_OWNER_SOURCE}"
+            )
+            continue
+        if name == "apply_slide_chart_legend":
+            required = "ChartLegendVisibilityPatch"
+            if re.search(rf"\b{re.escape(required)}\b", declaration) is None:
+                violations.append(
+                    "focused litchi-keynote chart-legend visibility apply method must "
+                    f"accept {required}: {KEYNOTE_CHART_LEGEND_OWNER_SOURCE}"
+                )
+        else:
+            for selector in ("SlideSelector", "ChartSelector"):
+                if re.search(rf"\b{selector}\b", declaration) is None:
+                    violations.append(
+                        "focused litchi-keynote chart-legend visibility Package method "
+                        f"{name} must accept selector-first {selector}: "
+                        f"{KEYNOTE_CHART_LEGEND_OWNER_SOURCE}"
+                    )
+        if re.search(r"\bu64\b", declaration):
+            violations.append(
+                "focused litchi-keynote chart-legend visibility Package method must "
+                f"not expose u64: {name}: {KEYNOTE_CHART_LEGEND_OWNER_SOURCE}"
+            )
+        raw_id = KEYNOTE_CHART_LEGEND_RAW_ID_TOKEN.search(declaration)
+        if raw_id is not None:
+            violations.append(
+                "focused litchi-keynote chart-legend visibility Package method must "
+                f"not expose raw identifier {raw_id.group(0)}: "
+                f"{name}: {KEYNOTE_CHART_LEGEND_OWNER_SOURCE}"
+            )
+
+    owner_declarations = _rust_public_declarations(owner_source)
+    for declaration, line_number in owner_declarations:
+        for match in KEYNOTE_CHART_LEGEND_RAW_ID_TOKEN.finditer(declaration):
+            violations.append(
+                "focused litchi-keynote chart-legend visibility public API exposes "
+                f"raw identifier {match.group(0)}: "
+                f"{KEYNOTE_CHART_LEGEND_OWNER_SOURCE}:{line_number}"
+            )
+        for match in RUST_BYTE_SLICE.finditer(declaration):
+            raw_slice = re.sub(r"\s+", "", match.group(0))
+            violations.append(
+                "focused litchi-keynote chart-legend visibility public API exposes "
+                f"raw byte slice {raw_slice}: "
+                f"{KEYNOTE_CHART_LEGEND_OWNER_SOURCE}:{line_number}"
+            )
+        if re.search(
+            r"\b(?:prost|prost_types|buffa|kn\w*|tsch?\w*|tsd\w*|"
+            r"Archive|RawMessage|IWorkPackage|ComponentCatalog|WireView)\b",
+            declaration,
+        ):
+            violations.append(
+                "focused litchi-keynote chart-legend visibility public API exposes "
+                f"generated/physical type: {KEYNOTE_CHART_LEGEND_OWNER_SOURCE}:"
+                f"{line_number}"
+            )
+
+    for path in (package_path, lib_path):
+        if not path.is_file():
+            continue
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        exported = _rust_canonical_exports(source, KEYNOTE_CHART_LEGEND_CANONICAL_TYPES)
+        for name in sorted(KEYNOTE_CHART_LEGEND_CANONICAL_TYPES - exported):
+            violations.append(
+                "focused litchi-keynote chart-legend visibility public API is missing "
+                f"canonical type {name}: {path.relative_to(root)}"
+            )
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if not (
+                "slide_chart_legend" in declaration
+                or identifiers & KEYNOTE_CHART_LEGEND_CANONICAL_TYPES
+            ):
+                continue
+            for match in KEYNOTE_CHART_LEGEND_RAW_ID_TOKEN.finditer(declaration):
+                violations.append(
+                    "focused litchi-keynote chart-legend visibility public API exposes "
+                    f"raw identifier {match.group(0)}: {path.relative_to(root)}:"
+                    f"{line_number}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                raw_slice = re.sub(r"\s+", "", match.group(0))
+                violations.append(
+                    "focused litchi-keynote chart-legend visibility public API exposes "
+                    f"raw byte slice {raw_slice}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            if re.search(
+                r"\b(?:prost|prost_types|buffa|kn\w*|tsch?\w*|tsd\w*|"
+                r"Archive|RawMessage|IWorkPackage|ComponentCatalog|WireView)\b",
+                declaration,
+            ):
+                violations.append(
+                    "focused litchi-keynote chart-legend visibility public API exposes "
+                    f"generated/physical type: {path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_chart_legend_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire only the raw Keynote chart-legend visibility host path."""
+
+    if not _keynote_chart_legend_boundary_active(root):
+        return []
+
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    violations: list[str] = []
+    if source_root.is_dir():
+        paths = sorted(source_root.rglob("*.rs"))
+    else:
+        paths = []
+    for path in paths:
+        if path.name == "tests.rs" or "tests" in path.parts:
+            continue
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        code = _mask_rust_non_code(source)
+        for name, line_number in _rust_function_declarations(code):
+            if name not in IWA_KEYNOTE_CHART_LEGEND_LEGACY_METHODS:
+                continue
+            violations.append(
+                "retired litchi-iwa Keynote chart-legend visibility raw-ID method "
+                f"{name}: {path.relative_to(root)}:{line_number}"
+            )
+        for match in IWA_KEYNOTE_CHART_LEGEND_LEGACY_CALL.finditer(code):
+            line_start = code.rfind("\n", 0, match.start()) + 1
+            line_end = code.find("\n", match.end())
+            if line_end < 0:
+                line_end = len(code)
+            if re.search(
+                rf"\bfn[ \t\r\n]+{re.escape(match.group('method'))}\b",
+                code[line_start:line_end],
+            ):
+                # The declaration already has a focused method finding above;
+                # keep the production audit concise without hiding calls in
+                # unrelated function bodies.
+                continue
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote chart-legend visibility raw-ID call "
+                f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+            )
+        for match in KEYNOTE_CHART_LEGEND_DIRECT_HELPER.finditer(code):
+            line_number = code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote chart-legend visibility direct helper "
+                f"{match.group(0)}: {path.relative_to(root)}:{line_number}"
+            )
+
+    examples = root / Path("crates/litchi-iwa/examples")
+    if examples.is_dir():
+        for path in sorted(examples.rglob("*.rs")):
+            code = _mask_rust_non_code(
+                _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+            )
+            for match in IWA_KEYNOTE_CHART_LEGEND_LEGACY_CALL.finditer(code):
+                line_number = code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote chart-legend visibility example "
+                    f"retains raw-ID call {match.group('method')}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def _keynote_chart_axis_title_owner_present(root: Path) -> bool:
     """Return whether the Wave112 axis-title owner crossed its wiring seam."""
 
@@ -37783,6 +38095,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_package_no_eager_prost_source_topology()
         + audit_keynote_chart_title_legacy_calls()
         + audit_iwa_keynote_chart_title_source_topology()
+        + audit_keynote_chart_legend_visibility_facade_source_topology()
+        + audit_iwa_keynote_chart_legend_source_topology()
         + audit_keynote_chart_axis_title_legacy_calls()
         + audit_iwa_keynote_chart_axis_title_source_topology()
         + audit_keynote_chart_axis_title_facade_source_topology()

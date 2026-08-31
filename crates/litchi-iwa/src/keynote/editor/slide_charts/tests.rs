@@ -1984,75 +1984,6 @@ fn scratch_presentation_supports_native_chart_axis_tick_mark_location_crud() {
 }
 
 #[test]
-fn scratch_presentation_supports_native_chart_legend_visibility_crud() {
-    let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
-    let source = editor
-        .add_slide_chart(0, Kind::Column2d, sample_data(), POSITION, SIZE)
-        .unwrap();
-
-    assert!(
-        editor
-            .slide_chart_legend_visible(0, source.drawable_object_id)
-            .unwrap()
-    );
-    let baseline = editor.to_bytes().unwrap();
-    editor
-        .set_slide_chart_legend_visible(0, source.drawable_object_id, true)
-        .unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
-    editor
-        .set_slide_chart_legend_visible(0, source.drawable_object_id, false)
-        .unwrap();
-    assert!(
-        !editor
-            .slide_chart_legend_visible(0, source.drawable_object_id)
-            .unwrap()
-    );
-
-    let duplicate = editor
-        .duplicate_slide_chart(0, chart_selector(&editor, &source))
-        .unwrap();
-    assert!(
-        !editor
-            .slide_chart_legend_visible(0, duplicate.drawable_object_id)
-            .unwrap()
-    );
-
-    editor
-        .set_slide_chart_legend_visible(0, source.drawable_object_id, true)
-        .unwrap();
-    assert!(
-        editor
-            .slide_chart_legend_visible(0, source.drawable_object_id)
-            .unwrap()
-    );
-    assert!(
-        !editor
-            .slide_chart_legend_visible(0, duplicate.drawable_object_id)
-            .unwrap()
-    );
-
-    let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert!(
-        reopened
-            .slide_chart_legend_visible(0, source.drawable_object_id)
-            .unwrap()
-    );
-    assert!(
-        !reopened
-            .slide_chart_legend_visible(0, duplicate.drawable_object_id)
-            .unwrap()
-    );
-    reopened
-        .remove_slide_chart(0, chart_selector(&reopened, &source))
-        .unwrap();
-    reopened
-        .remove_slide_chart(0, chart_selector(&reopened, &duplicate))
-        .unwrap();
-    assert!(reopened.slide_charts(0).unwrap().is_empty());
-}
-
-#[test]
 fn scratch_presentation_supports_exact_chart_legend_fill_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let chart = editor
@@ -2072,8 +2003,6 @@ fn scratch_presentation_supports_exact_chart_legend_fill_crud() {
         .set_slide_chart_legend_fill(0, object_id, &solid)
         .unwrap();
     assert_eq!(editor.slide_chart_legend_fill(0, object_id).unwrap(), solid);
-    assert!(editor.slide_chart_legend_visible(0, object_id).unwrap());
-
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened.slide_chart_legend_fill(0, object_id).unwrap(),

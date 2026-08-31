@@ -1,0 +1,12 @@
+// Wire-only projection of the generated chart non-style legend switch.
+//
+// The native `TSCH.Generated.ChartNonStyleArchive` stores this control in
+// field 20. The outer `TSCH.ChartNonStyleArchive` envelope and all unrelated
+// fields remain caller-owned; this sidecar intentionally carries one scalar.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message ChartLegendArchive {
+  optional bool tschchartinfodefaultshowlegend = 20;
+}

@@ -6879,3 +6879,47 @@ native copy with SHA-256
 and reopened that copy without repair. This is preservation evidence only;
 the remaining semantic parity, raw-facade removal, and monolith deletion gates
 remain open.
+
+## 2026-08-31 amendment: Wave117 Keynote chart-legend visibility raw-ID host seam
+
+Wave117 moves the admitted Keynote chart-legend visibility operation to the
+selector-first `litchi-keynote::Package` owner. Callers use
+`Package::{slide_chart_legend_visible, edit_slide_chart_legend,
+apply_slide_chart_legend}` with semantic `SlideSelector` and `ChartSelector`
+values; the archive-free transaction types are
+`ChartLegendVisibility{Edit,Patch,Commit,Diagnostics,Error,LimitKind}`.
+Absent field 20 has effective visibility `false`, while native presence and
+all graph identities remain private. The owner admits a rooted, unique chart
+graph, keeps source bytes authoritative, and validates exact no-op, changed,
+inverse restoration, conflict, candidate-readback, preview invalidation, and
+package-wide locality behavior.
+
+The private `litchi-iwa-protos::keynote_chart_legend_codec` performs strict
+preflight before its lazy Buffa projection and prepared source-preserving
+rewrite of the generated chart non-style legend field. Unknown fields,
+groups, and ordering remain untouched; malformed, duplicate, wrong-wire,
+noncanonical, depth, work, output, and allocation failures are rejected before
+publication. Generated/Prost/Buffa values, native IDs, and package records do
+not cross the supported format boundary.
+
+The raw-ID `KeynoteEditor::{slide_chart_legend_visible,
+set_slide_chart_legend_visible}` methods are retired with no fallback. This
+does not retire the remaining host chart surface: legend fill, frame, font,
+shadow, stroke, chart creation, duplication/removal, and broader graph work
+remain in `litchi-iwa`; Pages and Numbers continue to use their host legend
+paths. The shared chart-options helper is therefore not deleted by this cut.
+
+The scoped verification records 13/13 codec tests, 10/10 focused package
+tests, the allocation-mapping unit, strict library/test Clippy, all-target
+checks, 696/696 boundary-policy tests, and a 1,000-run nightly fuzz smoke with
+12 checked-in corpus seeds. Computer Use opened the 46,022-byte focused
+candidate without repair, observed the selected chart's Legend checkbox off,
+saved and reopened a 154,754-byte native copy with Legend still off, and the
+focused API reverse-read and byte-exactly reproduced that native copy. Their
+SHA-256 values are
+`2ecf1327971c206e4017168cfd5fac86b0954ae32a0f2f0ba894f3b6b84c5acd`
+and `b82af597b4469b056b559cde678db508fca13d7ec725633bdd82749fab560adf`.
+These are disposable native artifacts, not checked-in fixtures or a general
+Keynote support claim. The slice closes no package, manifest edge, or ordered
+debt: debt 014, the `litchi-iwa -> litchi-keynote` edge, and the remaining
+semantic parity, host-removal, and monolith-deletion gates remain open.

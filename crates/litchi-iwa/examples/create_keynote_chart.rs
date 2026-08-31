@@ -195,7 +195,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Pattern::MediumDash,
         )),
     )?;
-    editor.set_slide_chart_legend_visible(0, chart.drawable_object_id, true)?;
     editor.set_slide_chart_legend_font(
         0,
         chart.drawable_object_id,
@@ -310,7 +309,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_slide_chart_caption_by_selector(0, 0usize, "Revenue by region")?;
     editor.save(output)?;
     println!(
-        "created Keynote {:?} chart {} with native chart and axis titles, a light-blue color background, a visible blue 3 pt medium-dash chart border, a grouped blue 15 pt shadow, 20% rounded outside corners, 25% item and 70% set gaps, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label and line, a visible 18 pt Avenir Next Bold pale-blue legend with a blue 2.5 pt medium-dash stroke and black 12 pt shadow, visible category-axis series names, explicitly number-formatted currency-affixed data value labels placed outside with per-series Auto-Fit, linear and moving-average series trendlines, fixed and percentage series error bars with per-series Auto-Fit, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on slide {}",
+        "created Keynote {:?} chart {} with native chart and axis titles, a light-blue color background, a visible blue 3 pt medium-dash chart border, a grouped blue 15 pt shadow, 20% rounded outside corners, 25% item and 70% set gaps, a logarithmic value-axis scale with fixed bounds and steps, hidden category-axis labels and minor tick marks, outside category-axis major tick marks, a hidden value-axis minimum label and line, 18 pt Avenir Next Bold pale-blue legend styling with a blue 2.5 pt medium-dash stroke and black 12 pt shadow, visible category-axis series names, explicitly number-formatted currency-affixed data value labels placed outside with per-series Auto-Fit, linear and moving-average series trendlines, fixed and percentage series error bars with per-series Auto-Fit, hidden value-axis major gridlines, visible value-axis minor gridlines, and a caption on slide {}",
         chart.kind, chart.drawable_object_id, chart.slide_index
     );
     Ok(())

@@ -14853,3 +14853,51 @@ dependency topology, and the IWA monolith deletion gate remain unchanged.
 The operation ledger is a conservative logical envelope: package caches,
 decompressed Archives, ZIP/Snappy buffers, codec-internal allocations, the
 process allocator, RSS, and zero-copy behavior are not directly measured.
+
+## 2026-08-31 amendment: Wave117 Keynote chart-legend visibility verification
+
+Wave117 records the focused selector-first Keynote chart-legend visibility
+slice. The codec suite passes 13/13, covering absent-versus-explicit presence,
+explicit visible and hidden values, duplicate/wrong-wire/noncanonical and
+truncated input rejection, unknown-field/group preservation and depth limits,
+replacement, append, clear, prepared execution requirements, inclusive
+work/output limits, and bounded allocation reservation. The focused package
+suite passes 10/10, covering position/name selectors, effective absent defaults,
+exact no-op and reapplication, changed transitions with reopen and inverse,
+unknown and package-wide unrelated-payload locality, preview invalidation,
+source-checked conflicts, missing or ambiguous selectors, malformed inner and
+outer payloads, shared/aliased ownership refusal, and public handle
+thread-safety. The allocation-mapping unit passes independently. Strict
+library/test Clippy and all-target checks pass for the focused owners;
+696/696 boundary-policy tests pass; and the nightly chart-legend codec harness
+passes a 1,000-run smoke with 12 checked-in hand-authored corpus seeds. These
+are scoped checks, not a claim of full-workspace health, exhaustive
+sanitizer/fuzz coverage, or performance telemetry.
+
+The former raw-ID Keynote visibility methods are retired; the supported path
+uses `litchi-keynote::Package` with semantic slide and chart selectors. Native
+IDs, generated/Prost/Buffa values, and raw package records remain private, and
+the private Buffa codec is checked by strict source-wire validation before its
+lazy view and source-preserving rewrite. Broader Keynote chart creation,
+duplication/removal, legend styling, and the Pages/Numbers legend paths remain
+legacy migration-host responsibilities.
+
+The native gate used the app-authored
+`/private/tmp/litchi-wave112.RZbsUR/native-resaved.key` source (156,278 bytes,
+SHA-256 `87db4dc036ece68c27144ab0303d54517b02dc433b839337b598fdd677788a8c`).
+The focused example read Legend as visible, wrote it hidden, invalidated three
+root previews, reopened the candidate, and emitted 46,022 bytes with SHA-256
+`2ecf1327971c206e4017168cfd5fac86b0954ae32a0f2f0ba894f3b6b84c5acd`.
+Computer Use opened it without repair, observed the selected chart's Legend
+checkbox at `0`, retained the North/South series, axes, title and caption,
+saved a native copy, closed it, and reopened it with Legend still at `0`.
+The native copy is 154,754 bytes with SHA-256
+`b82af597b4469b056b559cde678db508fca13d7ec725633bdd82749fab560adf`;
+the focused API reverse-read `false` and reproduced that copy byte-for-byte on
+an exact no-op. The disposable files are not checked-in CI fixtures.
+
+The authoritative topology remains 64 workspace packages, 238 internal
+dependency declarations, 226 canonical edges, and 12 ordered migration
+debts, with one migration host. Debt 014 and the `litchi-iwa ->
+litchi-keynote` edge remain open, as do the remaining semantic parity and
+monolith-deletion gates.

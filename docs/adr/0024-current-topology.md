@@ -3616,3 +3616,49 @@ copy was 500,006 bytes with SHA-256
 `18aaa4042124fd5cc5d94fb37e6b8b2f8b4f4f7fe3d5bd44dc50e2487d0cdfdd`
 and closed/reopened without repair. This does not prove the Cargo edge itself
 and is not a full-workspace-green or performance claim.
+
+## 2026-08-31 amendment: Wave117 current-topology Keynote chart-legend visibility owner (not a monolith-exit gate)
+
+Wave117 gives `litchi-keynote::Package` selector-first ownership of the
+effective visibility of an existing slide-chart legend through
+`Package::{slide_chart_legend_visible, edit_slide_chart_legend,
+apply_slide_chart_legend}`. The archive-free transaction values are
+`ChartLegendVisibility{Edit,Patch,Commit,Diagnostics,Error,LimitKind}`;
+callers use semantic `SlideSelector` and `ChartSelector` values. An absent
+native field has effective visibility `false`, while its presence distinction
+remains source-private. Native chart/non-style/component/object identifiers,
+archives, ZIP members, generated messages, and Buffa views do not cross the
+supported boundary.
+
+The hidden `litchi-iwa-protos::keynote_chart_legend_codec` projects only the
+generated chart non-style legend field (field 20). Strict wire preflight runs
+before the private Buffa lazy view, and the prepared rewrite preserves all
+unselected source spans, unknown fields, groups, and ordering while executing
+under finite limits. The package owner retains rooted graph selection, exact
+no-op/change and inverse behavior, source-checked conflicts, candidate
+semantic readback, root-preview invalidation, and package-wide
+locality/atomic-publication checks.
+
+The raw-ID `KeynoteEditor` legend-visibility methods are retired with no
+fallback. Keynote legend fill, frame, font, shadow, stroke, chart creation,
+duplication/removal, and broader graph work remain in the migration host; the
+shared private chart-options helper remains used by the Pages and Numbers
+legend paths. This is a focused owner boundary, not a replacement for those
+physical compatibility responsibilities.
+
+Scoped verification records 13/13 codec tests, 10/10 focused package tests,
+the allocation-mapping unit, strict library/test Clippy, all-target checks,
+696/696 boundary-policy tests, and a 1,000-run nightly fuzz smoke over 12
+checked-in corpus seeds. Computer Use opened the 46,022-byte focused candidate
+without repair, observed the chart Legend checkbox off, saved and reopened a
+154,754-byte native copy with Legend still off, and the focused API reverse-read
+and exactly reproduced that native copy. The candidate and native-copy
+SHA-256 values are respectively
+`2ecf1327971c206e4017168cfd5fac86b0954ae32a0f2f0ba894f3b6b84c5acd`
+and `b82af597b4469b056b559cde678db508fca13d7ec725633bdd82749fab560adf`.
+This amendment changes no package or dependency direction. The
+authoritative topology remains 64 workspace packages and 238 internal
+dependency declarations (167 required normal, 60 optional normal, and 11
+development), with 226 canonical edges, 12 ordered debts, and one migration
+host. Debt 014 and the `litchi-iwa -> litchi-keynote` edge remain open, as do
+the IWA monolith deletion gate and all broader semantic parity work.
