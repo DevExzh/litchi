@@ -2702,10 +2702,23 @@ ambiguous, or unsupported sources.
 
 Raw Keynote title, persisted-sort, and persisted-lock configuration methods and
 calls are retired from the legacy editor host. `litchi-iwa` retains the
-physical `Sort Now` row executor, but it runs only after focused Package
-persisted `Order` and lock admission. There is no lock fallback: every focused
-lock error propagates. Physical rows/cells, storage, formulas, tiles, and
-broader table compatibility remain legacy host responsibilities.
+physical `Sort Now` row executor behind
+`execute_slide_table_sort_order(SlideSelector, TableSelector)` and
+`execute_slide_table_sort_order_to_rows(SlideSelector, TableSelector,
+RowRange)`. It runs only after focused Package persisted `Order` and lock
+admission. The old raw-ID `apply_*` methods remain deprecated declarations for
+source compatibility, and the boundary checker rejects production calls to
+them. There is no lock fallback: every focused lock error propagates. Physical
+rows/cells, storage, formulas, tiles, and broader table compatibility remain
+legacy host responsibilities.
+
+Physical row planning is archive-free and shared through the hidden common
+`RowPermutation` primitive. It validates rule arity and scalar domains, uses
+source offsets as the final key for deterministic stable duplicate ordering,
+and builds its inverse with one fallibly reserved buffer. The compatibility
+adapter borrows BNC cell views while planning and rejects hostile row, column,
+and key-product dimensions before allocating. It still owns the generated
+table/tile mutation path; this is not yet a focused physical-storage owner.
 
 The scoped gates are 17/17 for the lock codec, 9/9 for focused Keynote lock
 integration, 30/30 for the IWA slide-table suite, four migrated Keynote example

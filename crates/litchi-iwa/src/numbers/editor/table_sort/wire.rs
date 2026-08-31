@@ -3,9 +3,8 @@
 use super::*;
 
 use crate::wire::{
-    patch_length_delimited_field, patch_varint_field, repeated_length_delimited_payloads,
-    repeated_varint_values, rewrite_repeated_length_delimited_fields,
-    transform_length_delimited_field,
+    repeated_length_delimited_payloads, repeated_varint_values,
+    rewrite_repeated_length_delimited_fields, transform_length_delimited_field,
 };
 
 const SORT_ORDER_FIELD: u32 = 44;
@@ -89,30 +88,6 @@ fn validate_required_varint(
     }
 }
 
-pub(super) fn write_table_sort_order_wire(
-    original: &[u8],
-    model: &TableModelArchive,
-    order: &Order,
-) -> Result<Vec<u8>> {
-    let existing = read_native_table_sort_order_wire(original, model)?;
-    let expected = order_as_native(order);
-    let data = if existing.is_some() {
-        transform_length_delimited_field(original, SORT_ORDER_FIELD, |sort_order| {
-            rewrite_sort_order_wire(sort_order, &expected)
-        })?
-    } else {
-        let replacement = expected.encode_to_vec();
-        patch_length_delimited_field(original, SORT_ORDER_FIELD, false, Some(&replacement))?
-    };
-    let verified = TableModelArchive::decode(data.as_slice())?;
-    if read_native_table_sort_order_wire(&data, &verified)?.as_ref() != Some(&expected) {
-        return Err(Error::InvalidFormat(
-            "Numbers table sort-order wire patch failed validation".to_owned(),
-        ));
-    }
-    Ok(data)
-}
-
 pub(super) fn delete_table_sort_column_wire(
     original: &[u8],
     model: &TableModelArchive,
@@ -164,96 +139,6 @@ fn delete_sort_column_wire(
     if tst::TableSortOrderArchive::decode(data.as_slice())? != *expected {
         return Err(Error::InvalidFormat(
             "Numbers table sort-rule deletion failed validation".to_owned(),
-        ));
-    }
-    Ok(data)
-}
-
-fn rewrite_sort_order_wire(
-    original: &[u8],
-    expected: &tst::TableSortOrderArchive,
-) -> Result<Vec<u8>> {
-    let previous = tst::TableSortOrderArchive::decode(original)?;
-    let raw_rules = repeated_length_delimited_payloads(original, SORT_RULES_FIELD)?;
-    if raw_rules.len() != previous.rules.len() {
-        return Err(Error::InvalidFormat(
-            "Numbers table sort order has an inconsistent rule wire payload".to_owned(),
-        ));
-    }
-
-    let mut data = patch_varint_field(
-        original,
-        SORT_TYPE_FIELD,
-        true,
-        Some(expected.r#type as u64),
-    )?;
-    let rules = expected
-        .rules
-        .iter()
-        .enumerate()
-        .map(|(index, rule)| {
-            raw_rules.get(index).map_or_else(
-                || Ok(rule.encode_to_vec()),
-                |raw| rewrite_sort_rule_wire(raw, rule),
-            )
-        })
-        .collect::<Result<Vec<_>>>()?;
-    data = rewrite_repeated_length_delimited_fields(&data, SORT_RULES_FIELD, &rules)?;
-
-    if tst::TableSortOrderArchive::decode(data.as_slice())? != *expected {
-        return Err(Error::InvalidFormat(
-            "Numbers table sort-order mutation failed validation".to_owned(),
-        ));
-    }
-    Ok(data)
-}
-
-fn rewrite_sort_rule_wire(
-    original: &[u8],
-    expected: &tst::table_sort_order_archive::SortRuleArchive,
-) -> Result<Vec<u8>> {
-    let mut data = patch_varint_field(
-        original,
-        SORT_RULE_COLUMN_FIELD,
-        true,
-        Some(u64::from(expected.index)),
-    )?;
-    data = patch_varint_field(
-        &data,
-        SORT_RULE_DIRECTION_FIELD,
-        true,
-        Some(expected.direction as u64),
-    )?;
-    if tst::table_sort_order_archive::SortRuleArchive::decode(data.as_slice())? != *expected {
-        return Err(Error::InvalidFormat(
-            "Numbers table sort-rule mutation failed validation".to_owned(),
-        ));
-    }
-    Ok(data)
-}
-
-pub(super) fn clear_table_sort_order_wire(
-    original: &[u8],
-    model: &TableModelArchive,
-) -> Result<Vec<u8>> {
-    let native = read_native_table_sort_order_wire(original, model)?.ok_or_else(|| {
-        Error::InvalidFormat("Numbers table has no native sort order to clear".to_owned())
-    })?;
-    if native.rules.is_empty() {
-        return Ok(original.to_vec());
-    }
-    let data = transform_length_delimited_field(original, SORT_ORDER_FIELD, |sort_order| {
-        rewrite_repeated_length_delimited_fields(sort_order, SORT_RULES_FIELD, &[])
-    })?;
-    let verified = TableModelArchive::decode(data.as_slice())?;
-    let Some(cleared) = read_native_table_sort_order_wire(&data, &verified)? else {
-        return Err(Error::InvalidFormat(
-            "Numbers table sort-order clear removed its native marker".to_owned(),
-        ));
-    };
-    if !cleared.rules.is_empty() || cleared.r#type != native.r#type {
-        return Err(Error::InvalidFormat(
-            "Numbers table sort-order clear failed wire validation".to_owned(),
         ));
     }
     Ok(data)

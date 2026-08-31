@@ -3354,3 +3354,31 @@ and Pages/Keynote comment mutation are outside this slice and fail closed.
 Authored content remains redacted from `Debug`. Native direct-reply acceptance
 is withheld, so these semantics are a strict Rust package contract rather
 than a claim about every Numbers producer graph.
+
+## 2026-09-01 amendment: Keynote physical-sort selector boundary
+
+The remaining Keynote physical `Sort Now` compatibility operation now accepts
+`SlideSelector` and `TableSelector` through
+`execute_slide_table_sort_order` and
+`execute_slide_table_sort_order_to_rows`. Public callers choose a semantic
+slide and table position or an exact slide name; native table-model IDs stay
+inside `litchi-iwa`. Empty, missing, ambiguous, and out-of-range selectors fail
+before package mutation. The prior raw-ID `apply_*` methods remain deprecated
+declarations for source compatibility, while the boundary ratchet rejects new
+production calls to them.
+
+The hidden `litchi-iwa-common::table::sort::planning` module owns only an
+archive-free, body-relative stable permutation. It validates one key per rule,
+consistent scalar domains, allocation, and bijection invariants. Duplicate
+keys use their original row offsets as the final comparison key, so an
+allocation-free unstable sort still has deterministic stable semantics. The
+format adapter remains responsible for semantic key decoding and for moving
+tiles, headers, UIDs, borders, comments, formulas, hidden axes, and every other
+row-affine native structure as one staged operation.
+
+Planning borrows BNC cell slices rather than cloning each payload and admits
+finite row, column, and key-cell products before allocation. Dormant legacy
+persisted-sort set/clear writers were removed from the host. This amendment
+does not claim that the physical executor or generated table schemas have
+moved to `litchi-keynote`; persisted configuration remains the focused owner's
+transaction, and physical storage remains migration-host work.

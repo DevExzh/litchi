@@ -14535,7 +14535,7 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
-    def test_iwa_keynote_slide_table_sort_preserves_physical_executor(self) -> None:
+    def test_iwa_keynote_slide_table_sort_requires_selector_first_physical_calls(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             add_keynote_slide_table_sort_canonical_scaffold(root)
@@ -14556,12 +14556,16 @@ fn rewrite_movie_title_operation(
             self.assertTrue(any("slide-table-sort method" in item for item in violations), violations)
             self.assertTrue(any("slide-table-sort call" in item for item in violations), violations)
             self.assertTrue(any("Numbers persisted table-sort" in item for item in violations), violations)
-            self.assertFalse(any("apply_slide_table_sort_order" in item for item in violations), violations)
+            self.assertTrue(any("apply_slide_table_sort_order" in item for item in violations), violations)
 
             host.write_text(
+                "#[deprecated]\n"
                 "pub fn apply_slide_table_sort_order(&mut self, slide_index: usize, model_id: u64) {}\n"
+                "#[deprecated]\n"
                 "pub fn apply_slide_table_sort_order_to_rows(&mut self, slide_index: usize, model_id: u64, rows: RowRange) {}\n"
-                "fn physical() { editor.apply_slide_table_sort_order(0, 7); editor.apply_slide_table_sort_order_to_rows(0, 7, rows); }\n"
+                "pub fn execute_slide_table_sort_order(&mut self, slide: SlideSelector, table: TableSelector) {}\n"
+                "pub fn execute_slide_table_sort_order_to_rows(&mut self, slide: SlideSelector, table: TableSelector, rows: RowRange) {}\n"
+                "fn physical() { editor.execute_slide_table_sort_order(slide, table); editor.execute_slide_table_sort_order_to_rows(slide, table, rows); }\n"
                 "fn focused() { package.slide_table_sort_order(slide, table); package.edit_slide_table_sort_order(slide, table); package.apply_slide_table_sort_order(&patch); }\n",
                 encoding="utf-8",
             )
@@ -14576,8 +14580,8 @@ fn rewrite_movie_title_operation(
             host = root / "crates/litchi-iwa/src/keynote/editor/slide_tables/sort.rs"
             host.parent.mkdir(parents=True, exist_ok=True)
             host.write_text(
-                "pub fn apply_slide_table_sort_order(&mut self, slide_index: usize, model_id: u64) {}\n"
-                "fn physical() { editor.apply_slide_table_sort_order(0, 7); }\n",
+                "pub fn execute_slide_table_sort_order(&mut self, slide: SlideSelector, table: TableSelector) {}\n"
+                "fn physical() { editor.execute_slide_table_sort_order(slide, table); }\n",
                 encoding="utf-8",
             )
             violations = boundaries.audit_iwa_keynote_slide_table_sort_source_topology(root)

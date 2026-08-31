@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use prost::Message;
 
-use crate::numbers::bnc::{BncCell, CachedScalar, StoredValue};
+use crate::numbers::bnc::{BncCellView, CachedScalar, StoredValue};
 use crate::numbers::editor::stroke_layers::{
     reorder_rows as reorder_stroke_rows, validate_row_reorder as validate_stroke_row_reorder,
 };
@@ -15,6 +15,9 @@ use crate::numbers::editor::table_topology::{
 };
 use crate::table_hidden_axes::{positional_user_hidden_axes, restore_positional_user_hidden_axes};
 use litchi_iwa_common::table::axis::HiddenAxes;
+use litchi_iwa_common::table::sort::planning::{
+    Error as RowPlanError, RowPermutation, stable_body_row_permutation,
+};
 
 use super::*;
 
@@ -22,57 +25,56 @@ mod storage;
 
 use storage::{reorder_body_row_headers, reorder_body_table_tile_rows, reorder_row_uids};
 
+const MAX_PHYSICAL_SORT_ROWS: usize = 1 << 20;
+const MAX_PHYSICAL_SORT_COLUMNS: usize = 1 << 14;
+const MAX_PHYSICAL_SORT_KEY_CELLS: usize = 1 << 20;
+
 #[derive(Debug)]
 pub(super) struct BodySortPlan {
     body_start: usize,
-    sources_by_destination: Vec<usize>,
+    permutation: RowPermutation,
 }
 
 impl BodySortPlan {
     fn reorders_rows(&self) -> bool {
-        self.sources_by_destination
-            .iter()
-            .enumerate()
-            .any(|(destination_offset, source)| *source != self.body_start + destination_offset)
+        self.permutation.changes_rows()
     }
 
     fn destinations_by_source(&self) -> Result<Vec<usize>> {
-        let mut destinations = vec![None; self.sources_by_destination.len()];
-        for (destination_offset, source) in self.sources_by_destination.iter().copied().enumerate()
+        let rows = self.permutation.len();
+        let mut destinations = Vec::new();
+        destinations
+            .try_reserve_exact(rows)
+            .map_err(|_allocation| {
+                Error::ParseError(format!(
+                    "Failed to allocate the inverse physical table sort plan for {rows} rows"
+                ))
+            })?;
+        destinations.resize(rows, usize::MAX);
+        for (destination_offset, source) in self
+            .permutation
+            .sources_by_destination()
+            .iter()
+            .copied()
+            .enumerate()
         {
-            let source_offset = source
-                .checked_sub(self.body_start)
-                .filter(|offset| *offset < self.sources_by_destination.len());
-            let Some(source_offset) = source_offset else {
-                return Err(Error::InvalidFormat(
-                    "Numbers sort plan contains a source row outside the body".to_owned(),
-                ));
-            };
-            if destinations[source_offset]
-                .replace(
-                    self.body_start
-                        .checked_add(destination_offset)
-                        .ok_or_else(|| {
-                            Error::ParseError("Numbers sort destination overflow".to_owned())
-                        })?,
-                )
-                .is_some()
-            {
+            let source_offset = source.get();
+            if destinations[source_offset] != usize::MAX {
                 return Err(Error::InvalidFormat(
                     "Numbers sort plan contains a source row more than once".to_owned(),
                 ));
             }
+            destinations[source_offset] = self
+                .body_start
+                .checked_add(destination_offset)
+                .ok_or_else(|| Error::ParseError("Numbers sort destination overflow".to_owned()))?;
         }
-        destinations
-            .into_iter()
-            .map(|destination| {
-                destination.ok_or_else(|| {
-                    Error::InvalidFormat(
-                        "Numbers sort plan does not cover every body row".to_owned(),
-                    )
-                })
-            })
-            .collect()
+        if destinations.contains(&usize::MAX) {
+            return Err(Error::InvalidFormat(
+                "Numbers sort plan does not cover every body row".to_owned(),
+            ));
+        }
+        Ok(destinations)
     }
 }
 
@@ -199,6 +201,7 @@ fn apply_attached_table_sort_range(
     row_start: usize,
     row_end: usize,
 ) -> Result<bool> {
+    validate_physical_sort_limits(&descriptor.model, order, row_start, row_end)?;
     if row_end.saturating_sub(row_start) < 2 {
         return Ok(false);
     }
@@ -276,8 +279,49 @@ fn apply_attached_table_sort_range(
     Ok(true)
 }
 
+fn validate_physical_sort_limits(
+    model: &TableModelArchive,
+    order: &Order,
+    row_start: usize,
+    row_end: usize,
+) -> Result<()> {
+    let rows = usize::try_from(model.number_of_rows).map_err(|_conversion| {
+        Error::InvalidFormat("Numbers table row count exceeds this platform".to_owned())
+    })?;
+    let columns = usize::try_from(model.number_of_columns).map_err(|_conversion| {
+        Error::InvalidFormat("Numbers table column count exceeds this platform".to_owned())
+    })?;
+    if rows > MAX_PHYSICAL_SORT_ROWS {
+        return Err(Error::ParseError(format!(
+            "Cannot execute a physical table sort with {rows} rows; the safety limit is {MAX_PHYSICAL_SORT_ROWS}"
+        )));
+    }
+    if columns > MAX_PHYSICAL_SORT_COLUMNS {
+        return Err(Error::ParseError(format!(
+            "Cannot execute a physical table sort with {columns} columns; the safety limit is {MAX_PHYSICAL_SORT_COLUMNS}"
+        )));
+    }
+    if row_start > row_end || row_end > rows {
+        return Err(Error::InvalidFormat(
+            "Numbers physical sort range is outside the declared table rows".to_owned(),
+        ));
+    }
+    let selected_rows = row_end - row_start;
+    let key_cells = selected_rows
+        .checked_mul(order.rules().len())
+        .ok_or_else(|| Error::ParseError("Numbers physical sort key budget overflow".to_owned()))?;
+    if key_cells > MAX_PHYSICAL_SORT_KEY_CELLS {
+        return Err(Error::ParseError(format!(
+            "Cannot execute a physical table sort over {key_cells} row keys; the safety limit is {MAX_PHYSICAL_SORT_KEY_CELLS}"
+        )));
+    }
+    Ok(())
+}
+
 fn table_body_bounds(model: &TableModelArchive) -> Result<(usize, usize)> {
-    let rows = model.number_of_rows as usize;
+    let rows = usize::try_from(model.number_of_rows).map_err(|_conversion| {
+        Error::InvalidFormat("Numbers table row count exceeds this platform".to_owned())
+    })?;
     let settings = table_headers::settings_from_model(model)?;
     let body_start = settings.header_row_count();
     let body_end = rows
@@ -366,8 +410,12 @@ fn plan_body_sort(
     body_end: usize,
     order: &Order,
 ) -> Result<BodySortPlan> {
-    let rows = model.number_of_rows as usize;
-    let columns = model.number_of_columns as usize;
+    let rows = usize::try_from(model.number_of_rows).map_err(|_conversion| {
+        Error::InvalidFormat("Numbers table row count exceeds this platform".to_owned())
+    })?;
+    let columns = usize::try_from(model.number_of_columns).map_err(|_conversion| {
+        Error::InvalidFormat("Numbers table column count exceeds this platform".to_owned())
+    })?;
     let tile_size = model.base_data_store.tiles.tile_size.unwrap_or(256);
     if tile_size == 0 {
         return Err(Error::InvalidFormat(
@@ -414,7 +462,9 @@ fn plan_body_sort(
                 .checked_mul(tile_size)
                 .and_then(|base| base.checked_add(row.tile_row_index))
                 .ok_or_else(|| Error::ParseError("Numbers tile row overflow".to_owned()))?;
-            let global_row = global_row as usize;
+            let global_row = usize::try_from(global_row).map_err(|_conversion| {
+                Error::InvalidFormat("Numbers tile row exceeds this platform".to_owned())
+            })?;
             if global_row >= rows {
                 return Err(Error::InvalidFormat(format!(
                     "Numbers table stores row {global_row} outside its {rows} rows"
@@ -430,8 +480,8 @@ fn plan_body_sort(
                 )));
             }
             let mut sort_values = vec![None; order.rules().len()];
-            for (column, cell) in split_row(row)?.iter().enumerate() {
-                let Some(cell) = cell.as_deref() else {
+            for (column, cell) in split_row_views(row)?.into_iter().enumerate() {
+                let Some(cell) = cell else {
                     continue;
                 };
                 if column >= columns {
@@ -439,7 +489,7 @@ fn plan_body_sort(
                         "Numbers body row {global_row} stores a cell outside the table columns"
                     )));
                 }
-                let cell = BncCell::parse(cell)?;
+                let cell = BncCellView::parse(cell)?;
                 validate_movable_body_cell(&cell, global_row, column)?;
                 if let Some(&rule_position) = rule_positions.get(&column) {
                     sort_values[rule_position] = Some(sort_scalar(&cell, global_row, column)?);
@@ -473,7 +523,6 @@ fn plan_body_sort(
             })
         })
         .collect::<Result<Vec<_>>>()?;
-    validate_consistent_scalar_kinds(&keys_by_body_row, order)?;
     let text_identifiers = keys_by_body_row
         .iter()
         .flatten()
@@ -490,23 +539,49 @@ fn plan_body_sort(
     )?;
     validate_sort_text_references(&keys_by_body_row, body_start, order, &text_by_identifier)?;
 
-    let mut source_offsets = (0..keys_by_body_row.len()).collect::<Vec<_>>();
-    source_offsets.sort_by(|left, right| {
-        compare_body_rows(
-            &keys_by_body_row[*left],
-            &keys_by_body_row[*right],
-            order,
-            &text_by_identifier,
-        )
-        .then_with(|| left.cmp(right))
-    });
+    let permutation = stable_body_row_permutation(
+        &keys_by_body_row,
+        order,
+        |scalar| scalar.kind(),
+        |left, right| (*left).compare(*right, &text_by_identifier),
+    )
+    .map_err(|error| map_row_plan_error(error, order))?;
     Ok(BodySortPlan {
         body_start,
-        sources_by_destination: source_offsets
-            .into_iter()
-            .map(|source_offset| body_start + source_offset)
-            .collect(),
+        permutation,
     })
+}
+
+fn map_row_plan_error(error: RowPlanError, order: &Order) -> Error {
+    match error {
+        RowPlanError::KeyArity {
+            row,
+            expected,
+            actual,
+        } => Error::InvalidFormat(format!(
+            "Numbers body-row sort key {} contains {actual} values; expected {expected}",
+            row.get()
+        )),
+        RowPlanError::MixedScalarKinds { row, rule } => {
+            let column = order
+                .rules()
+                .get(rule)
+                .map_or(rule, |rule| rule.column().get());
+            Error::ParseError(format!(
+                "Numbers sort column {column} mixes scalar types at body-row offset {}; use one Number, plain Text, Boolean, Date, or Duration type per rule",
+                row.get()
+            ))
+        },
+        RowPlanError::Allocation { rows } => Error::ParseError(format!(
+            "Failed to allocate the physical table sort plan for {rows} rows"
+        )),
+        RowPlanError::InvalidPermutation => Error::InvalidFormat(
+            "Numbers physical table sort produced an invalid row permutation".to_owned(),
+        ),
+        _ => Error::InvalidFormat(
+            "Numbers physical table sort planner returned an unsupported error".to_owned(),
+        ),
+    }
 }
 
 fn decode_unique_tile(object: &ArchiveObject, tile_id: u64) -> Result<Tile> {
@@ -526,7 +601,7 @@ fn decode_unique_tile(object: &ArchiveObject, tile_id: u64) -> Result<Tile> {
     }
 }
 
-fn validate_movable_body_cell(cell: &BncCell, row: usize, column: usize) -> Result<()> {
+fn validate_movable_body_cell(cell: &BncCellView<'_>, row: usize, column: usize) -> Result<()> {
     if cell.formula_error_identifier().is_some() {
         return Err(Error::ParseError(format!(
             "Cannot yet execute a Numbers sort with a formula error in body cell ({row}, {column})"
@@ -552,11 +627,11 @@ fn validate_movable_body_cell(cell: &BncCell, row: usize, column: usize) -> Resu
     }
 }
 
-fn sort_scalar(cell: &BncCell, row: usize, column: usize) -> Result<SortScalar> {
+fn sort_scalar(cell: &BncCellView<'_>, row: usize, column: usize) -> Result<SortScalar> {
     if let StoredValue::Text(identifier) = cell.stored_value() {
         return Ok(SortScalar::Text(identifier));
     }
-    let scalar = match cell.cached_scalar()? {
+    let scalar = match cell.cached_scalar() {
         Some(CachedScalar::Number(value)) => SortScalar::Number(value.get()),
         Some(CachedScalar::Boolean(value)) => SortScalar::Boolean(value),
         Some(CachedScalar::Date(value)) => SortScalar::Date(value.get()),
@@ -573,28 +648,6 @@ fn sort_scalar(cell: &BncCell, row: usize, column: usize) -> Result<SortScalar> 
         },
     };
     Ok(scalar)
-}
-
-fn validate_consistent_scalar_kinds(
-    keys_by_body_row: &[Vec<SortScalar>],
-    order: &Order,
-) -> Result<()> {
-    let Some(first) = keys_by_body_row.first() else {
-        return Ok(());
-    };
-    for (rule_position, rule) in order.rules().iter().enumerate() {
-        let kind = first[rule_position].kind();
-        if keys_by_body_row
-            .iter()
-            .any(|keys| keys[rule_position].kind() != kind)
-        {
-            return Err(Error::ParseError(format!(
-                "Numbers sort column {} mixes scalar types; use one Number, plain Text, Boolean, Date, or Duration type per rule",
-                rule.column().get()
-            )));
-        }
-    }
-    Ok(())
 }
 
 fn validate_sort_text_references(
@@ -623,21 +676,44 @@ fn validate_sort_text_references(
     Ok(())
 }
 
-fn compare_body_rows(
-    left: &[SortScalar],
-    right: &[SortScalar],
-    order: &Order,
-    text_by_identifier: &HashMap<u32, String>,
-) -> Ordering {
-    for ((left, right), rule) in left.iter().zip(right).zip(order.rules()) {
-        let ordering = left.compare(*right, text_by_identifier);
-        let ordering = match rule.direction() {
-            Direction::Ascending => ordering,
-            Direction::Descending => ordering.reverse(),
-        };
-        if ordering != Ordering::Equal {
-            return ordering;
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn order(columns: &[usize]) -> Order {
+        Order::new(columns.iter().map(|column| {
+            Rule::new(
+                ColumnIndex::new(*column).expect("test column is native-compatible"),
+                Direction::Ascending,
+            )
+        }))
+        .expect("test order is non-empty and unique")
     }
-    Ordering::Equal
+
+    #[test]
+    fn physical_sort_limits_reject_hostile_dimensions_before_allocation() {
+        let mut model = TableModelArchive {
+            number_of_rows: u32::try_from(MAX_PHYSICAL_SORT_ROWS + 1).unwrap(),
+            number_of_columns: 1,
+            ..Default::default()
+        };
+        assert!(validate_physical_sort_limits(&model, &order(&[0]), 0, 1).is_err());
+
+        model.number_of_rows = 1;
+        model.number_of_columns = u32::try_from(MAX_PHYSICAL_SORT_COLUMNS + 1).unwrap();
+        assert!(validate_physical_sort_limits(&model, &order(&[0]), 0, 1).is_err());
+    }
+
+    #[test]
+    fn physical_sort_limits_bound_key_products_and_ranges() {
+        let rows = MAX_PHYSICAL_SORT_KEY_CELLS / 2 + 1;
+        let model = TableModelArchive {
+            number_of_rows: u32::try_from(rows).unwrap(),
+            number_of_columns: 2,
+            ..Default::default()
+        };
+        assert!(validate_physical_sort_limits(&model, &order(&[0, 1]), 0, rows).is_err());
+        assert!(validate_physical_sort_limits(&model, &order(&[0]), rows, rows - 1).is_err());
+        assert!(validate_physical_sort_limits(&model, &order(&[0]), 0, rows + 1).is_err());
+    }
 }

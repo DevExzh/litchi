@@ -3981,7 +3981,8 @@ pub(super) fn update_row_header(
     })
 }
 
-pub(super) fn split_row(row: &TileRowInfo) -> Result<Vec<Option<Vec<u8>>>> {
+/// Borrow each BNC cell from one tile row without copying cell payloads.
+pub(super) fn split_row_views(row: &TileRowInfo) -> Result<Vec<Option<&[u8]>>> {
     let storage = row.cell_storage_buffer.as_deref().ok_or_else(|| {
         Error::ParseError("Pre-BNC Numbers rows are not yet writable".to_string())
     })?;
@@ -3993,12 +3994,24 @@ pub(super) fn split_row(row: &TileRowInfo) -> Result<Vec<Option<Vec<u8>>>> {
             "Numbers cell offset table has an odd byte length".to_string(),
         ));
     }
+    let columns = offsets.len() / 2;
+    const MAX_BNC_ROW_COLUMNS: usize = 1 << 14;
+    if columns > MAX_BNC_ROW_COLUMNS {
+        return Err(Error::ParseError(format!(
+            "Numbers row stores {columns} column offsets; the safety limit is {MAX_BNC_ROW_COLUMNS}"
+        )));
+    }
     let width = if row.has_wide_offsets.unwrap_or(false) {
         4usize
     } else {
         1usize
     };
     let mut starts = Vec::new();
+    starts.try_reserve_exact(columns).map_err(|_allocation| {
+        Error::ParseError(format!(
+            "Failed to allocate a Numbers row offset view for {columns} columns"
+        ))
+    })?;
     for (column, bytes) in offsets.chunks_exact(2).enumerate() {
         let raw = u16::from_le_bytes([bytes[0], bytes[1]]);
         if raw == u16::MAX {
@@ -4015,7 +4028,10 @@ pub(super) fn split_row(row: &TileRowInfo) -> Result<Vec<Option<Vec<u8>>>> {
         }
         starts.push((column, start));
     }
-    if starts.len() != row.cell_count as usize {
+    let cell_count = usize::try_from(row.cell_count).map_err(|_conversion| {
+        Error::InvalidFormat("Numbers row cell count exceeds this platform".to_owned())
+    })?;
+    if starts.len() != cell_count {
         return Err(Error::ParseError(format!(
             "Numbers row declares {} cells but stores {}",
             row.cell_count,
@@ -4023,7 +4039,13 @@ pub(super) fn split_row(row: &TileRowInfo) -> Result<Vec<Option<Vec<u8>>>> {
         )));
     }
 
-    let mut cells = vec![None; offsets.len() / 2];
+    let mut cells = Vec::new();
+    cells.try_reserve_exact(columns).map_err(|_allocation| {
+        Error::ParseError(format!(
+            "Failed to allocate a Numbers row cell view for {columns} columns"
+        ))
+    })?;
+    cells.resize(columns, None);
     for (index, &(column, start)) in starts.iter().enumerate() {
         let end = starts
             .get(index + 1)
@@ -4033,9 +4055,18 @@ pub(super) fn split_row(row: &TileRowInfo) -> Result<Vec<Option<Vec<u8>>>> {
                 "Numbers cell offsets are not strictly increasing".to_string(),
             ));
         }
-        cells[column] = Some(storage[start..end].to_vec());
+        cells[column] = Some(&storage[start..end]);
     }
     Ok(cells)
+}
+
+pub(super) fn split_row(row: &TileRowInfo) -> Result<Vec<Option<Vec<u8>>>> {
+    split_row_views(row).map(|cells| {
+        cells
+            .into_iter()
+            .map(|cell| cell.map(<[u8]>::to_vec))
+            .collect()
+    })
 }
 
 pub(super) fn rebuild_row(row: &mut TileRowInfo, cells: &[Option<Vec<u8>>]) -> Result<()> {
