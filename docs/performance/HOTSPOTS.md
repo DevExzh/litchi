@@ -1,5 +1,29 @@
 # Performance hotspot inventory
 
+## Indexed-stream validation boundary (change 0351)
+
+Change 0351 is not a measured hotspot (`performance_claim: none`). No artifact
+supports the rejected compressor/zlib `~65%` premise; existing `read_to*` is
+already fixed-buffer. The strict sink and locator now have structural checks
+for encryption/method, single-disk ZIP64 provenance, complete local/central
+metadata and descriptor agreement, all physical spans, counts/offsets/
+adjacency, short buffers, fallible growth, retryable layout single-flight, and
+`ReaderAt` byte stability. Store uses an exact range and Deflate exact
+`total_in`; strict CRC-zero is sink-only, with ordinary owned/borrowed fallback
+compatibility unchanged. Boundedness is one 16 KiB scratch buffer for one
+active member, excluding source/index, sink/output, cache, process memory, and
+concurrency. Evidence is `315/315` soapberry-zip and `13/13` litchi-opc under
+serialized constrained execution. No latency, throughput, RSS, allocation,
+syscall, physical-I/O, decompression, concurrency, selector, or artifact claim
+is made.
+
+The final successful package/scenario-scoped commands, not workspace-wide, are
+recorded in [Change 0351](changes/0351-indexed-stream-validation.md): `cargo
+fmt --package soapberry-zip -- --check`; `cargo test -p soapberry-zip --lib --
+--test-threads=1` => `315/315`; and `cargo test -p litchi-opc --test
+operation_accounting -- --test-threads=1` => `13/13`, with the record's exact
+`ulimit`, target, serialized job/thread, and debug/incremental environment.
+
 ## Verified-streaming hardening boundary (change 0350)
 
 Change 0350 is not a measured hotspot (`performance_claim: none`). Shared

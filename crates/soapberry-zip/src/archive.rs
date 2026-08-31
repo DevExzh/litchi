@@ -91,6 +91,11 @@ impl<T: AsRef<[u8]>> ZipSliceArchive<T> {
         self.eocd.entries()
     }
 
+    /// Returns the resolved, declared central-directory byte size.
+    pub(crate) fn central_directory_size(&self) -> u64 {
+        self.eocd.central_directory_size()
+    }
+
     /// Whether this archive uses ZIP64 end-of-central-directory metadata.
     #[inline]
     pub fn is_zip64(&self) -> bool {
@@ -201,6 +206,49 @@ impl<'data> ZipSliceArchive<&'data [u8]> {
         slice_stored_entry(self.data, entry, central_name, self.eocd.directory_offset())
     }
 
+    pub(crate) fn validate_strict_stream_target(
+        &self,
+        entry: ZipArchiveEntryWayfinder,
+    ) -> Result<(), Error> {
+        validate_borrowed_wayfinder(&entry)
+    }
+
+    pub(crate) fn validate_strict_entry_layout(
+        &self,
+        entry: ZipArchiveEntryWayfinder,
+        central_name: &[u8],
+    ) -> Result<StrictEntryLayout, Error> {
+        let metadata = validate_borrowed_entry_metadata(
+            self.data,
+            &entry,
+            central_name,
+            self.eocd.directory_offset(),
+        )?;
+        Ok(StrictEntryLayout {
+            local_header_offset: u64::try_from(metadata.header_offset)
+                .map_err(|_| Error::from(ErrorKind::Eof))?,
+            data_start_offset: u64::try_from(metadata.data_start_offset)
+                .map_err(|_| Error::from(ErrorKind::Eof))?,
+            data_end_offset: u64::try_from(metadata.data_end_offset)
+                .map_err(|_| Error::from(ErrorKind::Eof))?,
+            span_end: u64::try_from(metadata.span_end).map_err(|_| Error::from(ErrorKind::Eof))?,
+            verifier: ZipVerification {
+                crc: entry.crc,
+                uncompressed_size: entry.uncompressed_size,
+            },
+        })
+    }
+
+    pub(crate) fn strict_payload(&self, layout: StrictEntryLayout) -> Result<&'data [u8], Error> {
+        let start =
+            usize::try_from(layout.data_start_offset).map_err(|_| Error::from(ErrorKind::Eof))?;
+        let end =
+            usize::try_from(layout.data_end_offset).map_err(|_| Error::from(ErrorKind::Eof))?;
+        self.data
+            .get(start..end)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))
+    }
+
     /// Validate archive-level metadata used by the borrowed Store path.
     pub(crate) fn validate_borrowed_layout(&self) -> Result<(), Error> {
         validate_single_disk_archive(self.data, &self.eocd)
@@ -260,7 +308,18 @@ fn slice_entry(data: &[u8], entry: ZipArchiveEntryWayfinder) -> Result<ZipSliceE
 #[derive(Debug, Clone, Copy)]
 struct BorrowedEntryMetadata {
     header_offset: usize,
+    data_start_offset: usize,
+    data_end_offset: usize,
     span_end: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct StrictEntryLayout {
+    pub(crate) local_header_offset: u64,
+    pub(crate) data_start_offset: u64,
+    pub(crate) data_end_offset: u64,
+    pub(crate) span_end: u64,
+    pub(crate) verifier: ZipVerification,
 }
 
 /// Validate all metadata needed to use an entry's local span for borrowed
@@ -384,6 +443,10 @@ fn validate_borrowed_entry_metadata(
 
     Ok(BorrowedEntryMetadata {
         header_offset,
+        data_start_offset: header_offset
+            .checked_add(variable_end)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?,
+        data_end_offset: payload_end,
         span_end,
     })
 }
@@ -533,6 +596,147 @@ fn borrowed_entry_span(
     let metadata =
         validate_borrowed_entry_metadata(data, &entry, central_name, central_directory_offset)?;
     Ok((metadata.header_offset, metadata.span_end))
+}
+
+fn validate_reader_entry_layout<R: ReaderAt>(
+    reader: &R,
+    entry: &ZipArchiveEntryWayfinder,
+    central_name: &[u8],
+    central_directory_offset: u64,
+) -> Result<StrictEntryLayout, Error> {
+    validate_borrowed_wayfinder_metadata(entry)?;
+    if entry.local_header_offset > central_directory_offset {
+        return Err(Error::from(ErrorKind::Eof));
+    }
+
+    let mut fixed_buffer = [0u8; ZipLocalFileHeaderFixed::SIZE];
+    reader.read_exact_at(&mut fixed_buffer, entry.local_header_offset)?;
+    let file_header = ZipLocalFileHeaderFixed::parse(&fixed_buffer)?;
+    let variable_length = file_header.variable_length();
+    let variable_end = ZipLocalFileHeaderFixed::SIZE
+        .checked_add(variable_length)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    let variable_end_u64 = u64::try_from(variable_end).map_err(|_| Error::from(ErrorKind::Eof))?;
+    let local_end = entry
+        .local_header_offset
+        .checked_add(variable_end_u64)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    if local_end > central_directory_offset {
+        return Err(Error::from(ErrorKind::Eof));
+    }
+
+    let mut variable_data = Vec::new();
+    variable_data
+        .try_reserve_exact(variable_length)
+        .map_err(|source| {
+            Error::from(ErrorKind::Allocation {
+                resource: "strict ZIP local metadata",
+                source,
+            })
+        })?;
+    variable_data.resize(variable_length, 0);
+    if variable_length != 0 {
+        let variable_offset = entry
+            .local_header_offset
+            .checked_add(ZipLocalFileHeaderFixed::SIZE as u64)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+        reader.read_exact_at(&mut variable_data, variable_offset)?;
+    }
+
+    if file_header.compression_method != entry.compression_method {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "strict local and central compression methods differ".to_string(),
+        }));
+    }
+    if file_header.flags != entry.flags {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "strict local and central flags differ".to_string(),
+        }));
+    }
+    let file_name_len = usize::from(file_header.file_name_len);
+    let local_name = variable_data
+        .get(..file_name_len)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    if local_name != central_name {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "strict local and central names differ".to_string(),
+        }));
+    }
+    let local_extra = variable_data
+        .get(file_name_len..)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    let local_has_zip64_sentinel =
+        file_header.compressed_size == u32::MAX || file_header.uncompressed_size == u32::MAX;
+    if local_has_zip64_sentinel && !entry.zip64_sizes {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "strict local header uses ZIP64 sizes absent from the central entry".to_string(),
+        }));
+    }
+    let (local_compressed_size, local_uncompressed_size) = if local_has_zip64_sentinel {
+        local_header_sizes(&file_header, local_extra)?
+    } else {
+        (
+            u64::from(file_header.compressed_size),
+            u64::from(file_header.uncompressed_size),
+        )
+    };
+    if !entry.has_data_descriptor || local_has_zip64_sentinel {
+        if local_compressed_size != entry.compressed_size {
+            return Err(Error::from(ErrorKind::InvalidSize {
+                expected: entry.compressed_size,
+                actual: local_compressed_size,
+            }));
+        }
+        if local_uncompressed_size != entry.uncompressed_size {
+            return Err(Error::from(ErrorKind::InvalidSize {
+                expected: entry.uncompressed_size,
+                actual: local_uncompressed_size,
+            }));
+        }
+    }
+    if !entry.has_data_descriptor && file_header.crc32 != entry.crc {
+        return Err(Error::from(ErrorKind::InvalidChecksum {
+            expected: entry.crc,
+            actual: file_header.crc32,
+        }));
+    }
+
+    let data_start_offset = local_end;
+    let data_end_offset = data_start_offset
+        .checked_add(entry.compressed_size)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    if data_end_offset > central_directory_offset {
+        return Err(Error::from(ErrorKind::Eof));
+    }
+    let span_end = if entry.has_data_descriptor {
+        let descriptor = DataDescriptor::parse_complete_at(
+            reader,
+            data_end_offset,
+            central_directory_offset,
+            entry,
+        )?;
+        data_end_offset
+            .checked_add(
+                u64::try_from(descriptor.encoded_size).map_err(|_| Error::from(ErrorKind::Eof))?,
+            )
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?
+    } else {
+        data_end_offset
+    };
+    if span_end > central_directory_offset {
+        return Err(Error::from(ErrorKind::Eof));
+    }
+
+    Ok(StrictEntryLayout {
+        local_header_offset: entry.local_header_offset,
+        data_start_offset,
+        data_end_offset,
+        span_end,
+        verifier: ZipVerification {
+            crc: entry.crc,
+            uncompressed_size: entry.uncompressed_size,
+        },
+    })
 }
 
 fn validate_borrowed_wayfinder(entry: &ZipArchiveEntryWayfinder) -> Result<(), Error> {
@@ -1055,6 +1259,11 @@ impl<R> ZipArchive<R> {
         self.eocd.entries()
     }
 
+    /// Returns the resolved, declared central-directory byte size.
+    pub(crate) fn central_directory_size(&self) -> u64 {
+        self.eocd.central_directory_size()
+    }
+
     /// Whether this archive uses ZIP64 end-of-central-directory metadata.
     #[inline]
     pub fn is_zip64(&self) -> bool {
@@ -1157,6 +1366,40 @@ impl<R> ZipArchive<R>
 where
     R: ReaderAt,
 {
+    pub(crate) fn validate_strict_stream_target(
+        &self,
+        entry: ZipArchiveEntryWayfinder,
+    ) -> Result<(), Error> {
+        validate_borrowed_wayfinder(&entry)
+    }
+
+    pub(crate) fn validate_strict_entry_layout(
+        &self,
+        entry: ZipArchiveEntryWayfinder,
+        central_name: &[u8],
+    ) -> Result<StrictEntryLayout, Error> {
+        validate_reader_entry_layout(
+            &self.reader,
+            &entry,
+            central_name,
+            self.eocd.directory_offset(),
+        )
+    }
+
+    pub(crate) fn strict_payload_reader(
+        &self,
+        entry: ZipArchiveEntryWayfinder,
+        layout: StrictEntryLayout,
+    ) -> ZipReader<&R> {
+        ZipReader {
+            entry,
+            range_reader: RangeReader::new(
+                self.get_ref(),
+                layout.data_start_offset..layout.data_end_offset,
+            ),
+        }
+    }
+
     /// Seeks to the given file entry in the zip archive.
     pub fn get_entry(&self, entry: ZipArchiveEntryWayfinder) -> Result<ZipEntry<'_, R>, Error> {
         let mut buffer = [0u8; ZipLocalFileHeaderFixed::SIZE];
@@ -1596,7 +1839,7 @@ impl DataDescriptor {
         data: &[u8],
         entry: &ZipArchiveEntryWayfinder,
     ) -> Result<DataDescriptor, Error> {
-        let width = if entry.zip64_sizes { 8 } else { 4 };
+        let width: usize = if entry.zip64_sizes { 8 } else { 4 };
         let has_signature = data.get(..4).map(le_u32) == Some(Self::SIGNATURE);
 
         if has_signature {
@@ -1637,6 +1880,32 @@ impl DataDescriptor {
             Self::parse_fields(data, 0, width).ok_or_else(|| Error::from(ErrorKind::Eof))?;
         descriptor.validate(entry)?;
         Ok(descriptor)
+    }
+
+    fn parse_complete_at<R: ReaderAt>(
+        reader: &R,
+        offset: u64,
+        central_directory_offset: u64,
+        entry: &ZipArchiveEntryWayfinder,
+    ) -> Result<DataDescriptor, Error> {
+        if offset > central_directory_offset {
+            return Err(Error::from(ErrorKind::Eof));
+        }
+        let width: usize = if entry.zip64_sizes { 8 } else { 4 };
+        let maximum = 4usize
+            .checked_add(4)
+            .and_then(|size| size.checked_add(width.checked_mul(2)?))
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+        let available = central_directory_offset - offset;
+        let read_length = usize::try_from(
+            available.min(u64::try_from(maximum).map_err(|_| Error::from(ErrorKind::Eof))?),
+        )
+        .map_err(|_| Error::from(ErrorKind::Eof))?;
+        let mut buffer = [0u8; 24];
+        if read_length != 0 {
+            reader.read_exact_at(&mut buffer[..read_length], offset)?;
+        }
+        Self::parse_complete(&buffer[..read_length], entry)
     }
 
     fn parse_fields(data: &[u8], offset: usize, width: usize) -> Option<DataDescriptor> {
@@ -1732,8 +2001,13 @@ where
 
             let remaining = self.end - self.pos;
             self.buffer.copy_within(self.pos..self.end, 0);
-            let max_read = ((self.central_dir_end_pos - self.offset) as usize)
-                .min(self.buffer.len() - remaining);
+            let remaining_central = self
+                .central_dir_end_pos
+                .checked_sub(self.offset)
+                .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+            let max_read = usize::try_from(remaining_central)
+                .unwrap_or(usize::MAX)
+                .min(self.buffer.len().saturating_sub(remaining));
             let read = self.archive.reader.read_at_least_at(
                 &mut self.buffer[remaining..][..max_read],
                 ZipFileHeaderFixed::SIZE,
@@ -1832,8 +2106,13 @@ where
             // Need to read more data
             let remaining = self.end - self.pos;
             self.buffer.copy_within(self.pos..self.end, 0);
-            let max_read = ((self.central_dir_end_pos - self.offset) as usize)
-                .min(self.buffer.len() - remaining);
+            let remaining_central = self
+                .central_dir_end_pos
+                .checked_sub(self.offset)
+                .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+            let max_read = usize::try_from(remaining_central)
+                .unwrap_or(usize::MAX)
+                .min(self.buffer.len().saturating_sub(remaining));
             let read = self.archive.reader.read_at_least_at(
                 &mut self.buffer[remaining..][..max_read],
                 variable_length - remaining,
@@ -2762,6 +3041,29 @@ impl ZipFileHeaderFixed {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn complete_descriptor_rejects_ambiguous_signature() {
+        let signature = DataDescriptor::SIGNATURE;
+        let entry = ZipArchiveEntryWayfinder {
+            uncompressed_size: u64::from(signature),
+            compressed_size: u64::from(signature),
+            local_header_offset: 0,
+            crc: signature,
+            has_data_descriptor: true,
+            flags: 0,
+            compression_method: CompressionMethodId(0),
+            zip64_sizes: false,
+            zip64_uncompressed_size_resolved: true,
+            zip64_compressed_size_resolved: true,
+            zip64_local_header_offset_resolved: true,
+            zip64_disk_start_resolved: true,
+            disk_number_start: 0,
+        };
+        let descriptor = signature.to_le_bytes().repeat(4);
+        let error = DataDescriptor::parse_complete(&descriptor, &entry).unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+    }
+
     use super::*;
     use std::io::{self, Cursor, Read};
 
