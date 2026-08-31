@@ -175,11 +175,48 @@ impl<'data> ZipSliceArchive<&'data [u8]> {
     /// This behaves exactly like [`Self::get_entry`], but the returned entry
     /// remains valid for the complete source lifetime, which lets a caller
     /// retain borrowed member bytes beyond the archive borrow.
+    /// The returned entry exposes raw compressed bytes; its CRC and
+    /// uncompressed-size claims are not verified until the caller validates
+    /// [`ZipSliceEntry::claim_verifier`] or consumes a verifying reader. The
+    /// stricter trusted borrowed Store contract is provided by
+    /// `office::ArchiveReader::read_stored_borrowed`.
     pub fn get_entry_borrowed(
         &self,
         entry: ZipArchiveEntryWayfinder,
     ) -> Result<ZipSliceEntry<'data>, Error> {
         slice_entry(self.data, entry)
+    }
+
+    /// Seeks to a stored entry and validates the local record before exposing
+    /// its source slice.  The central name is supplied by the index because a
+    /// wayfinder deliberately does not own a copy of the member name.
+    pub(crate) fn get_stored_entry_borrowed(
+        &self,
+        entry: ZipArchiveEntryWayfinder,
+        central_name: &[u8],
+    ) -> Result<ZipSliceEntry<'data>, Error> {
+        validate_single_disk_archive(self.data, &self.eocd)?;
+        slice_stored_entry(self.data, entry, central_name, self.eocd.directory_offset())
+    }
+
+    /// Validate archive-level metadata used by the borrowed Store path.
+    pub(crate) fn validate_borrowed_layout(&self) -> Result<(), Error> {
+        validate_single_disk_archive(self.data, &self.eocd)
+    }
+
+    /// Return the validated local span of one entry for borrowed-access
+    /// overlap admission.  This does not alter ordinary owned reads.
+    pub(crate) fn borrowed_entry_span(
+        &self,
+        entry: ZipArchiveEntryWayfinder,
+        central_name: &[u8],
+    ) -> Result<(u64, u64), Error> {
+        let (start, end) =
+            borrowed_entry_span(self.data, entry, central_name, self.eocd.directory_offset())?;
+        Ok((
+            u64::try_from(start).map_err(|_| Error::from(ErrorKind::Eof))?,
+            u64::try_from(end).map_err(|_| Error::from(ErrorKind::Eof))?,
+        ))
     }
 }
 
@@ -216,6 +253,439 @@ fn slice_entry(data: &[u8], entry: ZipArchiveEntryWayfinder) -> Result<ZipSliceE
         local_header_offset: entry.local_header_offset,
         data_start_offset: header_size,
     })
+}
+
+#[derive(Debug, Clone, Copy)]
+struct BorrowedEntryMetadata {
+    header_offset: usize,
+    span_end: usize,
+}
+
+/// Validate all metadata needed to use an entry's local span for borrowed
+/// access.  Encryption eligibility is intentionally handled by the target
+/// path separately so an unrelated encrypted member cannot poison the global
+/// non-overlap proof.
+fn validate_borrowed_entry_metadata(
+    data: &[u8],
+    entry: &ZipArchiveEntryWayfinder,
+    central_name: &[u8],
+    central_directory_offset: u64,
+) -> Result<BorrowedEntryMetadata, Error> {
+    validate_borrowed_wayfinder_metadata(entry)?;
+    let header_offset =
+        usize::try_from(entry.local_header_offset).map_err(|_| Error::from(ErrorKind::Eof))?;
+    let central_directory_offset =
+        usize::try_from(central_directory_offset).map_err(|_| Error::from(ErrorKind::Eof))?;
+    if header_offset > central_directory_offset || central_directory_offset > data.len() {
+        return Err(Error::from(ErrorKind::Eof));
+    }
+
+    let header = data
+        .get(header_offset..central_directory_offset)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    let file_header = ZipLocalFileHeaderFixed::parse(header)?;
+    if file_header.compression_method != entry.compression_method {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "stored local and central compression methods differ".to_string(),
+        }));
+    }
+    if file_header.flags != entry.flags {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "stored local and central flags differ".to_string(),
+        }));
+    }
+
+    let variable_length = file_header.variable_length();
+    let variable_end = ZipLocalFileHeaderFixed::SIZE
+        .checked_add(variable_length)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    let variable_data = header
+        .get(ZipLocalFileHeaderFixed::SIZE..variable_end)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    let file_name_len = usize::from(file_header.file_name_len);
+    let local_name = variable_data
+        .get(..file_name_len)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    if local_name != central_name {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "stored local and central names differ".to_string(),
+        }));
+    }
+    let local_extra = variable_data
+        .get(file_name_len..)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+
+    let local_has_zip64_sentinel =
+        file_header.compressed_size == u32::MAX || file_header.uncompressed_size == u32::MAX;
+    if local_has_zip64_sentinel && !entry.zip64_sizes {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "stored local header uses ZIP64 sizes absent from the central entry".to_string(),
+        }));
+    }
+    let (local_compressed_size, local_uncompressed_size) = if local_has_zip64_sentinel {
+        local_header_sizes(&file_header, local_extra)?
+    } else {
+        (
+            u64::from(file_header.compressed_size),
+            u64::from(file_header.uncompressed_size),
+        )
+    };
+
+    if !entry.has_data_descriptor || local_has_zip64_sentinel {
+        if local_compressed_size != entry.compressed_size {
+            return Err(Error::from(ErrorKind::InvalidSize {
+                expected: entry.compressed_size,
+                actual: local_compressed_size,
+            }));
+        }
+        if local_uncompressed_size != entry.uncompressed_size {
+            return Err(Error::from(ErrorKind::InvalidSize {
+                expected: entry.uncompressed_size,
+                actual: local_uncompressed_size,
+            }));
+        }
+    }
+    if !entry.has_data_descriptor && file_header.crc32 != entry.crc {
+        return Err(Error::from(ErrorKind::InvalidChecksum {
+            expected: entry.crc,
+            actual: file_header.crc32,
+        }));
+    }
+
+    let compressed_size =
+        usize::try_from(entry.compressed_size).map_err(|_| Error::from(ErrorKind::Eof))?;
+    let payload_end_relative = variable_end
+        .checked_add(compressed_size)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    if payload_end_relative > header.len() {
+        return Err(Error::from(ErrorKind::Eof));
+    }
+    let payload_end = header_offset
+        .checked_add(payload_end_relative)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+
+    let span_end = if entry.has_data_descriptor {
+        let descriptor_data = data
+            .get(payload_end..central_directory_offset)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+        let descriptor = DataDescriptor::parse_complete(descriptor_data, entry)?;
+        let descriptor_end = payload_end
+            .checked_add(descriptor.encoded_size)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+        if descriptor_end > central_directory_offset {
+            return Err(Error::from(ErrorKind::Eof));
+        }
+        descriptor_end
+    } else {
+        payload_end
+    };
+
+    Ok(BorrowedEntryMetadata {
+        header_offset,
+        span_end,
+    })
+}
+
+/// Locates a stored member and validates all metadata that can affect safe
+/// immutable-slice publication.  This is intentionally separate from
+/// `slice_entry`: the latter is the compatibility path used by decompression
+/// and keeps its historical central-directory-authoritative behavior.
+fn slice_stored_entry<'data>(
+    data: &'data [u8],
+    entry: ZipArchiveEntryWayfinder,
+    central_name: &[u8],
+    central_directory_offset: u64,
+) -> Result<ZipSliceEntry<'data>, Error> {
+    validate_borrowed_wayfinder(&entry)?;
+    validate_borrowed_entry_metadata(data, &entry, central_name, central_directory_offset)?;
+    let header_offset =
+        usize::try_from(entry.local_header_offset).map_err(|_| Error::from(ErrorKind::Eof))?;
+    let central_directory_offset =
+        usize::try_from(central_directory_offset).map_err(|_| Error::from(ErrorKind::Eof))?;
+    if header_offset > central_directory_offset || central_directory_offset > data.len() {
+        return Err(Error::from(ErrorKind::Eof));
+    }
+
+    let header = data
+        .get(header_offset..central_directory_offset)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    let file_header = ZipLocalFileHeaderFixed::parse(header)?;
+    if file_header.compression_method != entry.compression_method {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "stored local and central compression methods differ".to_string(),
+        }));
+    }
+    if file_header.flags != entry.flags {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "stored local and central flags differ".to_string(),
+        }));
+    }
+
+    let variable_length = file_header.variable_length();
+    let variable_end = ZipLocalFileHeaderFixed::SIZE
+        .checked_add(variable_length)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    let variable_data = header
+        .get(ZipLocalFileHeaderFixed::SIZE..variable_end)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    let file_name_len = usize::from(file_header.file_name_len);
+    let local_name = variable_data
+        .get(..file_name_len)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    if local_name != central_name {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "stored local and central names differ".to_string(),
+        }));
+    }
+    let local_extra = variable_data
+        .get(file_name_len..)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+
+    let local_has_zip64_sentinel =
+        file_header.compressed_size == u32::MAX || file_header.uncompressed_size == u32::MAX;
+    if local_has_zip64_sentinel && !entry.zip64_sizes {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "stored local header uses ZIP64 sizes absent from the central entry".to_string(),
+        }));
+    }
+    let (local_compressed_size, local_uncompressed_size) = if local_has_zip64_sentinel {
+        local_header_sizes(&file_header, local_extra)?
+    } else {
+        (
+            u64::from(file_header.compressed_size),
+            u64::from(file_header.uncompressed_size),
+        )
+    };
+
+    if !entry.has_data_descriptor {
+        if file_header.crc32 != entry.crc {
+            return Err(Error::from(ErrorKind::InvalidChecksum {
+                expected: entry.crc,
+                actual: file_header.crc32,
+            }));
+        }
+        if local_compressed_size != entry.compressed_size {
+            return Err(Error::from(ErrorKind::InvalidSize {
+                expected: entry.compressed_size,
+                actual: local_compressed_size,
+            }));
+        }
+        if local_uncompressed_size != entry.uncompressed_size {
+            return Err(Error::from(ErrorKind::InvalidSize {
+                expected: entry.uncompressed_size,
+                actual: local_uncompressed_size,
+            }));
+        }
+    }
+
+    let compressed_size =
+        usize::try_from(entry.compressed_size).map_err(|_| Error::from(ErrorKind::Eof))?;
+    let payload_end_relative = variable_end
+        .checked_add(compressed_size)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    if payload_end_relative > header.len() {
+        return Err(Error::from(ErrorKind::Eof));
+    }
+    let payload_end = header_offset
+        .checked_add(payload_end_relative)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+
+    let expected_crc = if entry.has_data_descriptor {
+        let descriptor_data = data
+            .get(payload_end..central_directory_offset)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+        let descriptor = DataDescriptor::parse_complete(descriptor_data, &entry)?;
+        let descriptor_end = payload_end
+            .checked_add(descriptor.encoded_size)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+        if descriptor_end > central_directory_offset {
+            return Err(Error::from(ErrorKind::Eof));
+        }
+
+        descriptor.crc
+    } else {
+        entry.crc
+    };
+
+    let data_start_offset = u32::try_from(variable_end).map_err(|_| Error::from(ErrorKind::Eof))?;
+    let entire_entry = data
+        .get(header_offset..payload_end)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    Ok(ZipSliceEntry {
+        data: entire_entry,
+        verifier: ZipVerification {
+            crc: expected_crc,
+            uncompressed_size: entry.uncompressed_size,
+        },
+        local_header_offset: entry.local_header_offset,
+        data_start_offset,
+    })
+}
+
+fn borrowed_entry_span(
+    data: &[u8],
+    entry: ZipArchiveEntryWayfinder,
+    central_name: &[u8],
+    central_directory_offset: u64,
+) -> Result<(usize, usize), Error> {
+    let metadata =
+        validate_borrowed_entry_metadata(data, &entry, central_name, central_directory_offset)?;
+    Ok((metadata.header_offset, metadata.span_end))
+}
+
+fn validate_borrowed_wayfinder(entry: &ZipArchiveEntryWayfinder) -> Result<(), Error> {
+    validate_borrowed_wayfinder_metadata(entry)?;
+    if entry.flags & ((1 << 0) | (1 << 6)) != 0 {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "borrowed access refuses encrypted Store entries".to_string(),
+        }));
+    }
+    Ok(())
+}
+
+fn validate_borrowed_wayfinder_metadata(entry: &ZipArchiveEntryWayfinder) -> Result<(), Error> {
+    if !entry.zip64_local_header_offset_resolved || !entry.zip64_disk_start_resolved {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "borrowed access refuses unresolved ZIP64 offset or disk metadata".to_string(),
+        }));
+    }
+    if entry.disk_number_start != 0 {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "borrowed access refuses nonzero disk-start metadata".to_string(),
+        }));
+    }
+    if !entry.zip64_compressed_size_resolved || !entry.zip64_uncompressed_size_resolved {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "borrowed access refuses unresolved ZIP64 size metadata".to_string(),
+        }));
+    }
+    Ok(())
+}
+
+fn validate_single_disk_archive(data: &[u8], eocd: &EndOfCentralDirectory) -> Result<(), Error> {
+    let tail_offset =
+        usize::try_from(eocd.tail_eocd_offset()).map_err(|_| Error::from(ErrorKind::Eof))?;
+    let tail_end = tail_offset
+        .checked_add(EndOfCentralDirectoryRecordFixed::SIZE)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    let tail = data
+        .get(tail_offset..tail_end)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    let fixed = EndOfCentralDirectoryRecordFixed::parse(tail)?;
+
+    if !eocd.is_zip64() {
+        if fixed.disk_number != 0 || fixed.eocd_disk != 0 {
+            return Err(Error::from(ErrorKind::InvalidInput {
+                msg: "borrowed access refuses multi-disk archive metadata".to_string(),
+            }));
+        }
+        return Ok(());
+    }
+
+    // In a ZIP64 archive the classic EOCD uses 0xffff sentinels.  Any other
+    // nonzero value is still a multi-disk declaration and is refused.
+    if (fixed.disk_number != 0 && fixed.disk_number != u16::MAX)
+        || (fixed.eocd_disk != 0 && fixed.eocd_disk != u16::MAX)
+    {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "borrowed access refuses multi-disk archive metadata".to_string(),
+        }));
+    }
+
+    let zip64_offset =
+        usize::try_from(eocd.head_eocd_offset()).map_err(|_| Error::from(ErrorKind::Eof))?;
+    let zip64_end = zip64_offset
+        .checked_add(56)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    let zip64 = data
+        .get(zip64_offset..zip64_end)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    let signature = le_u32(zip64.get(..4).ok_or_else(|| Error::from(ErrorKind::Eof))?);
+    if signature != END_OF_CENTRAL_DIR_SIGNATURE64 {
+        return Err(Error::from(ErrorKind::InvalidSignature {
+            expected: END_OF_CENTRAL_DIR_SIGNATURE64,
+            actual: signature,
+        }));
+    }
+    let disk_number = le_u32(
+        zip64
+            .get(16..20)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?,
+    );
+    let central_directory_disk = le_u32(
+        zip64
+            .get(20..24)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?,
+    );
+    if disk_number != 0 || central_directory_disk != 0 {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "borrowed access refuses multi-disk archive metadata".to_string(),
+        }));
+    }
+    Ok(())
+}
+
+fn local_header_sizes(
+    file_header: &ZipLocalFileHeaderFixed,
+    extra: &[u8],
+) -> Result<(u64, u64), Error> {
+    let needs_uncompressed = file_header.uncompressed_size == u32::MAX;
+    let needs_compressed = file_header.compressed_size == u32::MAX;
+    if !needs_uncompressed && !needs_compressed {
+        return Ok((
+            u64::from(file_header.compressed_size),
+            u64::from(file_header.uncompressed_size),
+        ));
+    }
+
+    let mut zip64_data = None;
+    let mut fields = ExtraFields::new(extra);
+    while let Some((field_id, field_data)) = fields.next() {
+        if field_id != ExtraFieldId::ZIP64 {
+            continue;
+        }
+        if zip64_data.replace(field_data).is_some() {
+            return Err(Error::from(ErrorKind::InvalidInput {
+                msg: "stored local header contains duplicate ZIP64 extra fields".to_string(),
+            }));
+        }
+    }
+    if !fields.remaining_bytes().is_empty() {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "stored local header contains malformed extra fields".to_string(),
+        }));
+    }
+    let zip64_data = zip64_data.ok_or_else(|| {
+        Error::from(ErrorKind::InvalidInput {
+            msg: "stored local header is missing its ZIP64 size extra field".to_string(),
+        })
+    })?;
+
+    let mut pos = 0usize;
+    let mut uncompressed_size = u64::from(file_header.uncompressed_size);
+    let mut compressed_size = u64::from(file_header.compressed_size);
+    if needs_uncompressed {
+        let end = pos
+            .checked_add(8)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+        uncompressed_size = zip64_data.get(pos..end).map(le_u64).ok_or_else(|| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: "stored local ZIP64 uncompressed size is truncated".to_string(),
+            })
+        })?;
+        pos = end;
+    }
+    if needs_compressed {
+        let end = pos
+            .checked_add(8)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+        compressed_size = zip64_data.get(pos..end).map(le_u64).ok_or_else(|| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: "stored local ZIP64 compressed size is truncated".to_string(),
+            })
+        })?;
+    }
+    Ok((compressed_size, uncompressed_size))
 }
 
 /// Represents a single entry (file or directory) within a `ZipSliceArchive`.
@@ -1054,6 +1524,9 @@ impl<'a> ZipLocalFileHeader<'a> {
 #[derive(Debug, Clone)]
 pub(crate) struct DataDescriptor {
     crc: u32,
+    compressed_size: u64,
+    uncompressed_size: u64,
+    encoded_size: usize,
 }
 
 impl DataDescriptor {
@@ -1078,7 +1551,108 @@ impl DataDescriptor {
         // needed, so we skip them.
         Ok(DataDescriptor {
             crc: le_u32(&data[pos..pos + 4]),
+            compressed_size: 0,
+            uncompressed_size: 0,
+            encoded_size: pos + 4,
         })
+    }
+
+    fn parse_complete(
+        data: &[u8],
+        entry: &ZipArchiveEntryWayfinder,
+    ) -> Result<DataDescriptor, Error> {
+        let width = if entry.zip64_sizes { 8 } else { 4 };
+        let has_signature = data.get(..4).map(le_u32) == Some(Self::SIGNATURE);
+
+        if has_signature {
+            let signed = Self::parse_fields(data, 4, width);
+            let unsigned = (entry.crc == Self::SIGNATURE)
+                .then(|| Self::parse_fields(data, 0, width))
+                .flatten();
+            match (signed, unsigned) {
+                (Some(signed), Some(unsigned)) => {
+                    match (signed.matches(entry), unsigned.matches(entry)) {
+                        (true, true) => {
+                            return Err(Error::from(ErrorKind::InvalidInput {
+                                msg: "ambiguous stored data descriptor signature".to_string(),
+                            }));
+                        },
+                        (true, false) => return Ok(signed),
+                        (false, true) => return Ok(unsigned),
+                        (false, false) => {
+                            signed.validate(entry)?;
+                            unsigned.validate(entry)?;
+                        },
+                    }
+                },
+                (Some(signed), None) => {
+                    signed.validate(entry)?;
+                    return Ok(signed);
+                },
+                (None, Some(unsigned)) => {
+                    unsigned.validate(entry)?;
+                    return Ok(unsigned);
+                },
+                (None, None) => return Err(Error::from(ErrorKind::Eof)),
+            }
+            return Err(Error::from(ErrorKind::Eof));
+        }
+
+        let descriptor =
+            Self::parse_fields(data, 0, width).ok_or_else(|| Error::from(ErrorKind::Eof))?;
+        descriptor.validate(entry)?;
+        Ok(descriptor)
+    }
+
+    fn parse_fields(data: &[u8], offset: usize, width: usize) -> Option<DataDescriptor> {
+        let crc_end = offset.checked_add(4)?;
+        let compressed_end = crc_end.checked_add(width)?;
+        let uncompressed_end = compressed_end.checked_add(width)?;
+        let crc = le_u32(data.get(offset..crc_end)?);
+        let compressed_size = match width {
+            4 => u64::from(le_u32(data.get(crc_end..compressed_end)?)),
+            8 => le_u64(data.get(crc_end..compressed_end)?),
+            _ => return None,
+        };
+        let uncompressed_size = match width {
+            4 => u64::from(le_u32(data.get(compressed_end..uncompressed_end)?)),
+            8 => le_u64(data.get(compressed_end..uncompressed_end)?),
+            _ => return None,
+        };
+        Some(DataDescriptor {
+            crc,
+            compressed_size,
+            uncompressed_size,
+            encoded_size: uncompressed_end,
+        })
+    }
+
+    fn matches(&self, entry: &ZipArchiveEntryWayfinder) -> bool {
+        self.crc == entry.crc
+            && self.compressed_size == entry.compressed_size
+            && self.uncompressed_size == entry.uncompressed_size
+    }
+
+    fn validate(&self, entry: &ZipArchiveEntryWayfinder) -> Result<(), Error> {
+        if self.crc != entry.crc {
+            return Err(Error::from(ErrorKind::InvalidChecksum {
+                expected: entry.crc,
+                actual: self.crc,
+            }));
+        }
+        if self.compressed_size != entry.compressed_size {
+            return Err(Error::from(ErrorKind::InvalidSize {
+                expected: entry.compressed_size,
+                actual: self.compressed_size,
+            }));
+        }
+        if self.uncompressed_size != entry.uncompressed_size {
+            return Err(Error::from(ErrorKind::InvalidSize {
+                expected: entry.uncompressed_size,
+                actual: self.uncompressed_size,
+            }));
+        }
+        Ok(())
     }
 
     fn read_at<R>(reader: R, offset: u64) -> Result<DataDescriptor, Error>
@@ -1564,6 +2138,11 @@ pub struct ZipFileHeaderRecord<'a> {
     extra_field: &'a [u8],
     file_comment: ZipStr<'a>,
     is_zip64: bool,
+    zip64_sizes: bool,
+    zip64_uncompressed_size_resolved: bool,
+    zip64_compressed_size_resolved: bool,
+    zip64_local_header_offset_resolved: bool,
+    zip64_disk_start_resolved: bool,
 }
 
 impl<'a> ZipFileHeaderRecord<'a> {
@@ -1598,6 +2177,11 @@ impl<'a> ZipFileHeaderRecord<'a> {
             extra_field,
             file_comment: ZipStr::new(file_comment),
             is_zip64: false,
+            zip64_sizes: header.uncompressed_size == u32::MAX || header.compressed_size == u32::MAX,
+            zip64_uncompressed_size_resolved: header.uncompressed_size != u32::MAX,
+            zip64_compressed_size_resolved: header.compressed_size != u32::MAX,
+            zip64_local_header_offset_resolved: header.local_header_offset != u32::MAX,
+            zip64_disk_start_resolved: header.disk_number_start != u16::MAX,
         };
 
         if result.uncompressed_size != u64::from(u32::MAX)
@@ -1623,6 +2207,7 @@ impl<'a> ZipFileHeaderRecord<'a> {
                     break;
                 };
                 result.uncompressed_size = uncompressed_size;
+                result.zip64_uncompressed_size_resolved = true;
                 field = &field[8..];
             }
 
@@ -1631,6 +2216,7 @@ impl<'a> ZipFileHeaderRecord<'a> {
                     break;
                 };
                 result.compressed_size = compressed_size;
+                result.zip64_compressed_size_resolved = true;
                 field = &field[8..];
             }
 
@@ -1639,6 +2225,7 @@ impl<'a> ZipFileHeaderRecord<'a> {
                     break;
                 };
                 result.local_header_offset = local_header_offset;
+                result.zip64_local_header_offset_resolved = true;
                 field = &field[8..];
             }
 
@@ -1647,6 +2234,7 @@ impl<'a> ZipFileHeaderRecord<'a> {
                     break;
                 };
                 result.disk_number_start = disk_number_start;
+                result.zip64_disk_start_resolved = true;
             }
 
             break;
@@ -1690,6 +2278,14 @@ impl<'a> ZipFileHeaderRecord<'a> {
             local_header_offset: self.local_header_offset,
             has_data_descriptor: self.has_data_descriptor(),
             crc: self.crc32,
+            flags: self.flags,
+            compression_method: self.compression_method,
+            zip64_sizes: self.zip64_sizes,
+            zip64_uncompressed_size_resolved: self.zip64_uncompressed_size_resolved,
+            zip64_compressed_size_resolved: self.zip64_compressed_size_resolved,
+            zip64_local_header_offset_resolved: self.zip64_local_header_offset_resolved,
+            zip64_disk_start_resolved: self.zip64_disk_start_resolved,
+            disk_number_start: self.disk_number_start,
         }
     }
 
@@ -1891,6 +2487,14 @@ pub struct ZipArchiveEntryWayfinder {
     local_header_offset: u64,
     crc: u32,
     has_data_descriptor: bool,
+    flags: u16,
+    compression_method: CompressionMethodId,
+    zip64_sizes: bool,
+    zip64_uncompressed_size_resolved: bool,
+    zip64_compressed_size_resolved: bool,
+    zip64_local_header_offset_resolved: bool,
+    zip64_disk_start_resolved: bool,
+    disk_number_start: u32,
 }
 
 impl ZipArchiveEntryWayfinder {
@@ -1916,6 +2520,13 @@ impl ZipArchiveEntryWayfinder {
     #[inline]
     pub(crate) fn local_header_offset(&self) -> u64 {
         self.local_header_offset
+    }
+
+    pub(crate) fn borrowed_provenance_supported(&self) -> bool {
+        self.zip64_uncompressed_size_resolved
+            && self.zip64_compressed_size_resolved
+            && self.zip64_local_header_offset_resolved
+            && self.zip64_disk_start_resolved
     }
 }
 
