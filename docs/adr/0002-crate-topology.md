@@ -4141,3 +4141,48 @@ the native file was 502,679 bytes with SHA-256
 This is native UI persistence evidence, not a library-emitted-output claim: the
 legacy table-creation example compiles but still returns
 `UnsupportedDependency` before writing a file.
+
+## 2026-08-31 amendment: Wave116 package-store host-edge retirement
+
+Wave116 removes the direct normal `litchi-iwa -> litchi-iwa-package` edge and
+retires ordered migration debt 009 without renumbering the remaining debts.
+The legacy package host now reaches the four neutral values it still needs
+through doc-hidden, archive-owned renamed re-exports: `PackageEntry`,
+`PackageEntryChangeKind`, `PackageEntryStoreError`, and `PackagePatch`. These
+are transparent re-exports of the package leaf's existing types, not wrappers
+or new semantic APIs, so the deprecated raw `Commit` and `Snapshot` surface
+retains exact type identity and copy-on-write behavior without conversion,
+allocation, or runtime overhead. The archive's physical ZIP `Entry` remains a
+separate type. This amendment supersedes the historical statement above that
+the host depends directly on the package leaf.
+
+`litchi-iwa-package` remains the dependency-light, archive-neutral entry-store
+leaf. Its canonical inbound edges from `litchi-iwa-archive` and
+`litchi-iwa-detect` remain; in particular, archive is the owner through which
+the host now composes package state. The raw package facade, its transaction
+implementation, the concrete-format migrations, and deletion of `litchi-iwa`
+remain open. This routing change does not alter ZIP/Snappy/protobuf bytes,
+Buffa or Prost generation, lazy decoding, cache policy, or application
+semantics.
+
+The authoritative inventory is now 64 workspace packages and 238 internal
+dependency declarations: 167 required normal, 60 optional normal, and 11
+development declarations. Boundary policy contains 226 canonical edges and
+12 ordered migration debts, with remaining orders
+`[1, 2, 4, 5, 8, 10, 12, 13, 14, 15, 16, 17]`; one migration host remains.
+Scoped evidence is 1/1 archive alias-identity test, 10/10 archive package-state
+tests, 9/9 archive atomicity tests, 44/44 host package tests, 1/1 host-only raw
+package compile/roundtrip test, and 690/690 boundary tests. Cargo metadata,
+source search, and AST search prove that the host has no direct manifest or
+Rust import of `litchi-iwa-package` while the canonical archive edge remains.
+
+Computer Use supplied a preservation gate, not dependency-graph evidence. A
+no-op raw snapshot/patch replay and inverse emitted the known 5-by-4 Keynote
+table package byte-for-byte at 500,128 bytes with SHA-256
+`47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b`.
+Keynote opened it without repair or recovery, displayed the 5-by-4 table, and
+saved a 500,006-byte native copy with SHA-256
+`18aaa4042124fd5cc5d94fb37e6b8b2f8b4f4f7fe3d5bd44dc50e2487d0cdfdd`;
+that copy closed and reopened without repair. These disposable artifacts are
+not checked-in fixtures, and this is not a full-workspace-green, performance,
+or broader format-support claim.

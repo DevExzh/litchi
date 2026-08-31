@@ -3581,3 +3581,38 @@ the native file was 502,679 bytes with SHA-256
 This is native UI persistence evidence, not a library-emitted-output claim: the
 legacy table-creation example compiles but still returns
 `UnsupportedDependency` before writing a file.
+
+## 2026-08-31 amendment: Wave116 current-topology package-store edge retirement
+
+Wave116 removes the direct normal `litchi-iwa -> litchi-iwa-package` edge and
+ordered debt 009. The host's remaining entry, patch, change-kind, and store-
+error uses now resolve through doc-hidden renamed re-exports owned by
+`litchi-iwa-archive::package`. They preserve the exact neutral package types;
+there are no wrappers, conversions, allocations, cache changes, or runtime
+behavior changes. The physical archive `Entry` remains distinct from the
+neutral `PackageEntry` alias.
+
+`litchi-iwa-package` remains a workspace leaf with canonical inbound edges
+from `litchi-iwa-archive` and `litchi-iwa-detect`; the archive edge is now the
+host's composition boundary. The deprecated raw package facade and its
+transactions remain in `litchi-iwa`, as do the other concrete-format and
+monolith-exit responsibilities. Buffa/lazy codecs and source-byte authority
+are unchanged by this dependency-only routing slice.
+
+The authoritative current topology is 64 workspace packages, 238 internal
+dependency declarations (167 required normal, 60 optional normal, and 11
+development), 226 canonical edges, 12 ordered migration debts, and one
+migration host. Remaining debt orders are
+`[1, 2, 4, 5, 8, 10, 12, 13, 14, 15, 16, 17]`. Scoped verification passes
+1 alias-identity, 10 package-state, 9 package-state atomicity, 44 host package,
+1 host-only raw roundtrip, and 690 boundary cases. Cargo metadata plus source
+and AST audits find no direct host reference to `litchi-iwa-package`.
+
+As a preservation-only native gate, the host no-op replay/inverse emitted the
+5-by-4 Keynote table fixture byte-exact at 500,128 bytes and SHA-256
+`47cf0d9648ed9e189f03d5f6e66047d3fa94340e2b0ba89d312e683455bb563b`.
+Keynote opened it without repair and displayed the table. A native Save As
+copy was 500,006 bytes with SHA-256
+`18aaa4042124fd5cc5d94fb37e6b8b2f8b4f4f7fe3d5bd44dc50e2487d0cdfdd`
+and closed/reopened without repair. This does not prove the Cargo edge itself
+and is not a full-workspace-green or performance claim.

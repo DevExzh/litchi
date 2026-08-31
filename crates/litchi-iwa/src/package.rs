@@ -12,27 +12,27 @@ use crate::snappy::{SnappyLimits, SnappyStream};
 use crate::{Error, Result};
 use litchi_core::ReadAt;
 use litchi_iwa_archive::package::{
-    GetOrInsertError, PackageState, ParseError, is_legacy_operation_storage,
+    GetOrInsertError, PackageEntry, PackageEntryStoreError, PackagePatch, PackageState, ParseError,
+    is_legacy_operation_storage,
 };
-use litchi_iwa_package::{Entry, Error as EntryStoreError, Patch};
 
-fn entry_store_error(error: EntryStoreError) -> Error {
+fn entry_store_error(error: PackageEntryStoreError) -> Error {
     match error {
-        EntryStoreError::DuplicateEntry(name) => {
+        PackageEntryStoreError::DuplicateEntry(name) => {
             Error::Bundle(format!("Duplicate package entry is ambiguous: {name}"))
         },
-        EntryStoreError::InvalidPosition { position, len } => Error::Bundle(format!(
+        PackageEntryStoreError::InvalidPosition { position, len } => Error::Bundle(format!(
             "Package entry position {position} is outside a table of length {len}"
         )),
-        EntryStoreError::Allocation { requested } => Error::Bundle(format!(
+        PackageEntryStoreError::Allocation { requested } => Error::Bundle(format!(
             "Failed to allocate package entry index for {requested} entries"
         )),
         error => Error::Bundle(format!("Package entry storage error: {error}")),
     }
 }
 
-fn package_patch_error(error: EntryStoreError) -> Error {
-    if matches!(error, EntryStoreError::PatchSourceMismatch) {
+fn package_patch_error(error: PackageEntryStoreError) -> Error {
+    if matches!(error, PackageEntryStoreError::PatchSourceMismatch) {
         Error::InvalidFormat("iWork package patch source does not match".to_owned())
     } else {
         entry_store_error(error)
@@ -112,7 +112,7 @@ pub struct Snapshot {
 pub struct Commit<T> {
     value: T,
     snapshot: Snapshot,
-    patch: Patch,
+    patch: PackagePatch,
 }
 
 impl<T> Commit<T> {
@@ -127,7 +127,7 @@ impl<T> Commit<T> {
     }
 
     /// Borrow the reversible package patch produced by this commit.
-    pub fn patch(&self) -> &Patch {
+    pub fn patch(&self) -> &PackagePatch {
         &self.patch
     }
 
@@ -137,7 +137,7 @@ impl<T> Commit<T> {
     }
 
     /// Consume the commit and return its result, snapshot, and patch.
-    pub fn into_parts_with_patch(self) -> (T, Snapshot, Patch) {
+    pub fn into_parts_with_patch(self) -> (T, Snapshot, PackagePatch) {
         (self.value, self.snapshot, self.patch)
     }
 }
@@ -531,7 +531,7 @@ impl IWorkPackage {
         for entry in catalog {
             let (name, data) = entry.into_parts();
             validate_entry_name(&name)?;
-            entries.push(Entry::new(name, data));
+            entries.push(PackageEntry::new(name, data));
         }
         let archive_limits = limits.effective_archive_limits()?;
         let package = Self {
@@ -597,7 +597,7 @@ impl IWorkPackage {
     }
 
     pub fn entry_names(&self) -> impl Iterator<Item = &str> {
-        self.state.iter().map(Entry::name)
+        self.state.iter().map(PackageEntry::name)
     }
 
     /// Enumerate package members that contain IWA object archives.
@@ -823,7 +823,7 @@ impl IWorkPackage {
         self.validate_entry_update(None, &compressed)?;
         let state = Arc::make_mut(&mut self.state);
         state
-            .try_insert_entry_at(position, Entry::new(normalized, compressed))
+            .try_insert_entry_at(position, PackageEntry::new(normalized, compressed))
             .map_err(entry_store_error)?;
         self.mark_mutated();
         Ok(())
@@ -1014,7 +1014,7 @@ impl IWorkPackage {
         let state = Arc::make_mut(&mut self.state);
         let position = usize::from(name != "Index/Document.iwa") * state.len();
         state
-            .try_insert_entry_at(position, Entry::new(name, data))
+            .try_insert_entry_at(position, PackageEntry::new(name, data))
             .map_err(entry_store_error)?;
         Ok(())
     }
@@ -1064,7 +1064,7 @@ impl Snapshot {
 
     /// Enumerate package members in preserved source order.
     pub fn entry_names(&self) -> impl Iterator<Item = &str> {
-        self.state.iter().map(Entry::name)
+        self.state.iter().map(PackageEntry::name)
     }
 
     /// Borrow one package member without copying it.
@@ -1083,7 +1083,7 @@ impl Snapshot {
     }
 
     /// Apply a source-checked package patch without mutating this snapshot.
-    pub fn apply(&self, patch: &Patch) -> Result<Self> {
+    pub fn apply(&self, patch: &PackagePatch) -> Result<Self> {
         self.validate()?;
         let state = self.state.apply_patch(patch).map_err(package_patch_error)?;
         let target = Self {
@@ -1226,7 +1226,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::thread;
 
-    use litchi_iwa_package::EntryChangeKind;
+    use litchi_iwa_archive::package::PackageEntryChangeKind;
 
     use super::*;
     use crate::archive::{ArchiveObject, RawMessage};
@@ -1939,11 +1939,11 @@ mod tests {
         })?;
 
         assert_eq!(commit.value(), &2);
-        assert_eq!(commit.patch().version(), Patch::VERSION);
+        assert_eq!(commit.patch().version(), PackagePatch::VERSION);
         assert_eq!(commit.patch().len(), 1);
         let change = &commit.patch().changes()[0];
         assert_eq!(change.name(), "Data/changed");
-        assert_eq!(change.kind(), EntryChangeKind::Added);
+        assert_eq!(change.kind(), PackageEntryChangeKind::Added);
         assert_eq!(change.after_position(), Some(1));
         assert_eq!(change.after_len(), Some(7));
         assert_eq!(source.len(), 1);
