@@ -154,22 +154,31 @@ jobs:
           python3 tools/non_iwork_gate.py verify
 
       - name: Check non-iWork workspace and safe facade
-        run: python3 tools/non_iwork_gate.py check
+        run: python3 tools/non_iwork_gate.py --record-file target/non-iwork-gate-reports/check.json check
 
       - name: Lint non-iWork workspace and safe facade
-        run: python3 tools/non_iwork_gate.py clippy
+        run: python3 tools/non_iwork_gate.py --record-file target/non-iwork-gate-reports/clippy.json clippy
 
       - name: Build non-iWork documentation
-        run: python3 tools/non_iwork_gate.py doc
+        run: python3 tools/non_iwork_gate.py --record-file target/non-iwork-gate-reports/doc.json doc
 
       - name: Run non-iWork library and integration tests
-        run: python3 tools/non_iwork_gate.py lib-tests
+        run: python3 tools/non_iwork_gate.py --record-file target/non-iwork-gate-reports/lib-tests.json lib-tests
 
       - name: Run non-iWork documentation tests
-        run: python3 tools/non_iwork_gate.py doc-tests
+        run: python3 tools/non_iwork_gate.py --record-file target/non-iwork-gate-reports/doc-tests.json doc-tests
 
       - name: Reject deprecated non-iWork API use
-        run: python3 tools/non_iwork_gate.py deprecated
+        run: python3 tools/non_iwork_gate.py --record-file target/non-iwork-gate-reports/deprecated.json deprecated
+
+      - name: Upload non-iWork gate reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: non-iwork-gate-reports
+          path: target/non-iwork-gate-reports/*.json
+          if-no-files-found: warn
+          retention-days: 14
 
   portable-foundations:
     name: foundation tests (${{ matrix.os }})

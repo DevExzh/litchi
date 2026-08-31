@@ -6,18 +6,18 @@ workspace as the Office and ODF packages.  This gate is the cheap, explicit
 non-iWork slice: it derives the package and facade-feature sets from Cargo
 metadata, checks every selected dependency tree, and then runs the requested
 Cargo operation with the 45 ordinary packages plus the safe facade feature
-closure.  The library-test mode serializes package roots and cleans each
-successful root's artifacts to keep its test target from retaining every
-package's test binaries at once.
+closure.  Library tests and the other high-memory modes serialize package
+roots; library tests clean each successful root's artifacts to keep its test
+target from retaining every package's test binaries at once.
 
 All Cargo invocations are argv lists.  In particular, feature names and
 package exclusions never pass through a shell.  ``verify`` does not build
 targets; it performs metadata and ``cargo tree`` checks and may resolve the
-workspace or update the ignored root lockfile.  Most other modes run one bulk
-workspace command and separate facade commands using an isolated target
-directory by default.  The facade's actual default-feature closure is checked
-in its own invocation, in addition to each safe feature and the combined
-explicit ``--no-default-features`` closure.
+workspace or update the ignored root lockfile.  Other execution modes run one
+command per bulk package root and separate facade commands using an isolated
+target directory by default.  The facade's actual default-feature closure is
+checked in its own invocation, in addition to each safe feature and the
+combined explicit ``--no-default-features`` closure.
 """
 
 from __future__ import annotations
@@ -26,13 +26,19 @@ import argparse
 import json
 import os
 import posixpath
+import platform
 import re
 import shlex
+import signal
+import stat
 import subprocess
 import sys
+import tempfile
+import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 from urllib.parse import unquote, urlsplit
 
 
@@ -241,6 +247,30 @@ TARGET_KINDS = frozenset(
         "custom-build",
     }
 )
+REPORT_VERSION = 1
+RECORDED_ENV_KEYS = frozenset(
+    {
+        "CARGO_BUILD_JOBS",
+        "CARGO_INCREMENTAL",
+        "CARGO_PROFILE_DEV_DEBUG",
+        "CARGO_PROFILE_TEST_DEBUG",
+        "CARGO_TARGET_DIR",
+        "RUSTDOCFLAGS",
+        "RUSTFLAGS",
+    }
+)
+RSS_POLL_INTERVAL_SECONDS = 0.02
+RSS_SAMPLE_INTERVAL_MS = 20
+RSS_MEASUREMENT = "sampled_summed_descendant_process_tree_high_water"
+MAX_REPORT_ERROR_LENGTH = 4096
+MAX_RECORDED_ENV_VALUE_LENGTH = 512
+CAPTURE_CHUNK_BYTES = 64 * 1024
+CAPTURE_OUTPUT_LIMIT_BYTES = 8 * 1024 * 1024
+CAPTURE_POLL_INTERVAL_SECONDS = 0.02
+PROCESS_TERM_GRACE_SECONDS = 1.0
+TARGET_SCAN_MAX_ENTRIES = 100_000
+TARGET_SCAN_MAX_DIRECTORIES = 20_000
+TARGET_SCAN_MAX_DEPTH = 64
 
 MODES = (
     "print",
@@ -256,6 +286,19 @@ MODES = (
 
 class GateError(RuntimeError):
     """Raised for a topology, metadata, or Cargo gate failure."""
+
+
+class CaptureLimitError(GateError):
+    """Raised when a bounded Cargo probe output exceeds its byte limit."""
+
+    def __init__(self, argv: Sequence[str], stream: str, limit_bytes: int) -> None:
+        self.argv = tuple(argv)
+        self.stream = stream
+        self.limit_bytes = limit_bytes
+        super().__init__(
+            f"{shlex.join(self.argv)} {stream} output exceeded the "
+            f"{limit_bytes}-byte capture limit"
+        )
 
 
 @dataclass(frozen=True)
@@ -332,6 +375,89 @@ class CommandSpec:
     scope: str
     argv: tuple[str, ...]
     env: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True)
+class TargetFootprint:
+    """A logical regular-file inventory of the Cargo target directory."""
+
+    status: str
+    regular_file_bytes: int | None
+    regular_file_count: int | None
+    reason: str = ""
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "regular_file_bytes": self.regular_file_bytes,
+            "regular_file_count": self.regular_file_count,
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True)
+class ChildRss:
+    """Cumulative sampled RSS for a child process tree."""
+
+    high_water_bytes: int | None
+    platform: str
+    scope: str
+    status: str = "unavailable"
+    reason: str = ""
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "measurement": RSS_MEASUREMENT,
+            "high_water_bytes": self.high_water_bytes,
+            "platform": self.platform,
+            "scope": self.scope,
+            "status": self.status,
+            "reason": self.reason,
+            "sample_interval_ms": RSS_SAMPLE_INTERVAL_MS,
+        }
+
+
+@dataclass(frozen=True)
+class CommandExecution:
+    """The correctness-relevant result of one non-shell child command."""
+
+    returncode: int
+    elapsed_ns: int
+    child_rss: ChildRss
+
+
+@dataclass(frozen=True)
+class PhaseRecord:
+    """One ordered execution phase in the optional JSON report."""
+
+    mode: str
+    index: int
+    scope: str
+    argv: tuple[str, ...]
+    status: str
+    returncode: int | None
+    elapsed_ns: int
+    target_before: TargetFootprint
+    target_after: TargetFootprint
+    child_rss: ChildRss
+    env_keys: tuple[str, ...]
+    cargo_env: tuple[tuple[str, str], ...] = ()
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "mode": self.mode,
+            "index": self.index,
+            "scope": self.scope,
+            "argv": list(self.argv),
+            "status": self.status,
+            "returncode": self.returncode,
+            "elapsed_ns": self.elapsed_ns,
+            "target_before": self.target_before.as_dict(),
+            "target_after": self.target_after.as_dict(),
+            "child_rss": self.child_rss.as_dict(),
+            "env_keys": list(self.env_keys),
+            "cargo_env": dict(self.cargo_env),
+        }
 
 
 class TreeEntries(dict[str, frozenset[Path | PureWindowsPath | None]]):
@@ -1099,11 +1225,202 @@ def derive_plan(metadata: Mapping[str, Any]) -> WorkspacePlan:
     )
 
 
+def _wait_for_process(process: Any, timeout: float | None) -> bool:
+    """Wait for a process when possible, reporting timeout/unavailable state."""
+
+    try:
+        if timeout is None:
+            process.wait()
+        else:
+            process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return False
+    except TypeError:
+        # Small injected test doubles may not accept Popen's timeout keyword.
+        process.wait()
+    except OSError:
+        return False
+    return True
+
+
+def _terminate_and_reap_process(
+    process: Any, *, process_group: bool = False
+) -> None:
+    """Best-effort terminate/reap for an interrupted or capped child."""
+
+    pid = getattr(process, "pid", None)
+    group_signal_sent = False
+    if process_group and os.name == "posix" and isinstance(pid, int) and pid > 0:
+        try:
+            os.killpg(pid, signal.SIGTERM)
+            group_signal_sent = True
+        except OSError:
+            pass
+    if not group_signal_sent:
+        try:
+            process.terminate()
+        except (AttributeError, OSError):
+            pass
+    if _wait_for_process(process, PROCESS_TERM_GRACE_SECONDS):
+        return
+
+    killed = False
+    if process_group and os.name == "posix" and isinstance(pid, int) and pid > 0:
+        try:
+            os.killpg(pid, signal.SIGKILL)
+            killed = True
+        except OSError:
+            pass
+    if not killed:
+        try:
+            process.kill()
+        except (AttributeError, OSError):
+            pass
+    _wait_for_process(process, PROCESS_TERM_GRACE_SECONDS)
+
+
+def _drain_capture_stream(
+    stream: Any,
+    stream_name: str,
+    limit_bytes: int,
+    output: bytearray,
+    state: dict[str, str | None],
+    state_lock: threading.Lock,
+) -> None:
+    """Drain one pipe while retaining at most the configured byte cap."""
+
+    bytes_seen = 0
+    try:
+        while True:
+            chunk = stream.read(CAPTURE_CHUNK_BYTES)
+            if not chunk:
+                break
+            if isinstance(chunk, str):
+                chunk = chunk.encode("utf-8", errors="replace")
+            if not isinstance(chunk, (bytes, bytearray, memoryview)):
+                raise TypeError("capture stream returned a non-byte chunk")
+            chunk_bytes = bytes(chunk)
+            if bytes_seen < limit_bytes:
+                output.extend(chunk_bytes[: limit_bytes - bytes_seen])
+            bytes_seen += len(chunk_bytes)
+            if bytes_seen > limit_bytes:
+                with state_lock:
+                    state["exceeded_stream"] = state["exceeded_stream"] or stream_name
+    except BaseException as error:
+        with state_lock:
+            state["read_error"] = state["read_error"] or (
+                f"{type(error).__name__}: {error}"
+            )
+    finally:
+        try:
+            stream.close()
+        except OSError:
+            pass
+
+
+def _run_capped_capture(
+    argv: Sequence[str],
+    *,
+    cwd: Path = ROOT,
+    env: Mapping[str, str] | None = None,
+    limit_bytes: int = CAPTURE_OUTPUT_LIMIT_BYTES,
+    popen_factory: Callable[..., Any] | None = None,
+    sleep_fn: Callable[[float], None] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Capture bounded decoded output while continuously draining both pipes."""
+
+    if limit_bytes < 1:
+        raise GateError("capture output limit must be positive")
+    factory = popen_factory or subprocess.Popen
+    popen_kwargs: dict[str, Any] = {
+        "cwd": cwd,
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.PIPE,
+    }
+    if env is not None:
+        popen_kwargs["env"] = dict(env)
+    isolated_posix_session = popen_factory is None and os.name == "posix"
+    if isolated_posix_session:
+        popen_kwargs["start_new_session"] = True
+    process = factory(list(argv), **popen_kwargs)
+    outputs = {"stdout": bytearray(), "stderr": bytearray()}
+    state: dict[str, str | None] = {
+        "exceeded_stream": None,
+        "read_error": None,
+    }
+    state_lock = threading.Lock()
+    threads = [
+        threading.Thread(
+            target=_drain_capture_stream,
+            args=(
+                process.stdout,
+                "stdout",
+                limit_bytes,
+                outputs["stdout"],
+                state,
+                state_lock,
+            ),
+            daemon=True,
+        ),
+        threading.Thread(
+            target=_drain_capture_stream,
+            args=(
+                process.stderr,
+                "stderr",
+                limit_bytes,
+                outputs["stderr"],
+                state,
+                state_lock,
+            ),
+            daemon=True,
+        ),
+    ]
+    for thread in threads:
+        thread.start()
+    sleeper = sleep_fn or time.sleep
+    try:
+        while True:
+            returncode = process.poll()
+            with state_lock:
+                exceeded_stream = state["exceeded_stream"]
+            if exceeded_stream is not None:
+                _terminate_and_reap_process(
+                    process,
+                    process_group=isolated_posix_session,
+                )
+                break
+            if returncode is not None:
+                break
+            sleeper(CAPTURE_POLL_INTERVAL_SECONDS)
+        returncode = process.wait()
+    except KeyboardInterrupt:
+        _terminate_and_reap_process(
+            process,
+            process_group=isolated_posix_session,
+        )
+        raise
+    finally:
+        for thread in threads:
+            thread.join()
+    with state_lock:
+        exceeded_stream = state["exceeded_stream"]
+        read_error = state["read_error"]
+    if read_error is not None:
+        raise GateError(
+            f"{shlex.join(argv)} output capture failed: {read_error}"
+        )
+    if exceeded_stream is not None:
+        raise CaptureLimitError(argv, exceeded_stream, limit_bytes)
+    stdout = bytes(outputs["stdout"]).decode("utf-8", errors="replace")
+    stderr = bytes(outputs["stderr"]).decode("utf-8", errors="replace")
+    return subprocess.CompletedProcess(list(argv), returncode, stdout, stderr)
+
+
 def _cargo_metadata(cargo: str) -> Mapping[str, Any]:
     """Read workspace metadata through Cargo without invoking a shell."""
 
     target_platform = _target_platform()
-    result = subprocess.run(
+    result = _run_capped_capture(
         [
             cargo,
             "metadata",
@@ -1114,9 +1431,6 @@ def _cargo_metadata(cargo: str) -> Mapping[str, Any]:
             "--no-deps",
         ],
         cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
     )
     if result.returncode:
         details = result.stderr.strip() or result.stdout.strip()
@@ -1142,13 +1456,7 @@ def _target_platform() -> str:
             )
         return configured
     rustc = os.environ.get("RUSTC", "rustc")
-    result = subprocess.run(
-        [rustc, "-vV"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _run_capped_capture([rustc, "-vV"], cwd=ROOT)
     if result.returncode:
         details = result.stderr.strip() or result.stdout.strip()
         raise GateError(f"rustc host target probe failed ({result.returncode}): {details}")
@@ -1196,8 +1504,34 @@ def _facade_tree_selection(
     return selection
 
 
+def _bulk_root_specs(
+    cargo: str,
+    plan: WorkspacePlan,
+    subcommand: str,
+    common: Sequence[str],
+    updates: tuple[tuple[str, str], ...],
+) -> list[CommandSpec]:
+    """Generate one all-feature command for every sorted bulk package root."""
+
+    return [
+        CommandSpec(
+            f"bulk/{package}",
+            (
+                cargo,
+                subcommand,
+                "--package",
+                package,
+                "--all-features",
+                *common,
+            ),
+            updates,
+        )
+        for package in sorted(plan.bulk_packages)
+    ]
+
+
 def command_specs(cargo: str, plan: WorkspacePlan, mode: str) -> tuple[CommandSpec, ...]:
-    """Generate the bulk and facade argv lists for one run mode."""
+    """Generate serialized bulk-root and facade argv lists for one mode."""
 
     if mode not in MODES or mode in {"print", "verify"}:
         raise GateError(f"{mode!r} does not generate Cargo run commands")
@@ -1219,6 +1553,8 @@ def command_specs(cargo: str, plan: WorkspacePlan, mode: str) -> tuple[CommandSp
                         "--all-features",
                         "--lib",
                         "--tests",
+                        "--",
+                        "--test-threads=1",
                     ),
                 )
             )
@@ -1235,6 +1571,8 @@ def command_specs(cargo: str, plan: WorkspacePlan, mode: str) -> tuple[CommandSp
             FACADE_PACKAGE,
             "--lib",
             "--tests",
+            "--",
+            "--test-threads=1",
         )
         if "default" in plan.safe_facade_features:
             specs.append(CommandSpec("facade-default-feature", facade_default))
@@ -1247,6 +1585,8 @@ def command_specs(cargo: str, plan: WorkspacePlan, mode: str) -> tuple[CommandSp
             *_facade_feature_args(plan),
             "--lib",
             "--tests",
+            "--",
+            "--test-threads=1",
         )
         specs.append(CommandSpec("facade-safe-features", facade))
         specs.append(
@@ -1257,9 +1597,10 @@ def command_specs(cargo: str, plan: WorkspacePlan, mode: str) -> tuple[CommandSp
         )
         return tuple(specs)
     # All features are intentional for bulk roots: each of the 45 packages
-    # must prove that its non-default feature surface remains non-iWork.  The
-    # facade is selected separately with the exact safe closure below.
-    bulk_selection = ["--workspace", "--all-features", *_workspace_exclusions(plan)]
+    # must prove that its non-default feature surface remains non-iWork.  Each
+    # root is isolated so Cargo does not retain every high-memory target in a
+    # single workspace invocation.  The facade is selected separately with
+    # the exact safe closure below.
     facade_selection = [
         "--package",
         FACADE_PACKAGE,
@@ -1279,18 +1620,17 @@ def command_specs(cargo: str, plan: WorkspacePlan, mode: str) -> tuple[CommandSp
     elif mode == "doc":
         subcommand, common = "doc", ["--no-deps"]
     elif mode == "doc-tests":
-        subcommand, common = "test", ["--doc"]
+        subcommand, common = "test", ["--doc", "--", "--test-threads=1"]
     else:
         subcommand, common = "check", ["--all-targets"]
-    bulk = (cargo, subcommand, *bulk_selection, *common)
-    facade_default = (cargo, subcommand, "--package", FACADE_PACKAGE, *common)
-    facade = (cargo, subcommand, *facade_selection, *common)
     updates: tuple[tuple[str, str], ...] = ()
     if mode in {"doc", "doc-tests"}:
         updates = (("RUSTDOCFLAGS", "-D warnings"),)
     elif mode == "deprecated":
         updates = (("RUSTFLAGS", "-D deprecated"),)
-    specs = [CommandSpec("bulk", bulk, updates)]
+    specs = _bulk_root_specs(cargo, plan, subcommand, common, updates)
+    facade_default = (cargo, subcommand, "--package", FACADE_PACKAGE, *common)
+    facade = (cargo, subcommand, *facade_selection, *common)
     if "default" in plan.safe_facade_features:
         specs.append(CommandSpec("facade-default-feature", facade_default, updates))
     specs.append(CommandSpec("facade-safe-features", facade, updates))
@@ -1407,13 +1747,7 @@ def _capture_tree(
     cargo: str, selection: Sequence[str]
 ) -> dict[str, frozenset[Path | PureWindowsPath | None]]:
     argv = _tree_command(cargo, selection)
-    result = subprocess.run(
-        argv,
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _run_capped_capture(argv, cwd=ROOT)
     if result.returncode:
         details = result.stderr.strip() or result.stdout.strip()
         raise GateError(f"{shlex.join(argv)} failed ({result.returncode}): {details}")
@@ -1553,18 +1887,15 @@ def _environment(target_dir: str | None) -> dict[str, str]:
         candidate = Path(target_dir)
         if not candidate.is_absolute():
             candidate = ROOT / candidate
-        environment["CARGO_TARGET_DIR"] = str(candidate)
     else:
-        environment.setdefault("CARGO_TARGET_DIR", str(ROOT / "target/non-iwork-gate"))
-    environment.setdefault("CARGO_BUILD_JOBS", "1")
-    # All six CI modes share one isolated target sequentially. Disable
-    # incremental directories so repeated modes do not accumulate a second
-    # per-crate object graph alongside the reusable non-incremental artifacts.
-    environment.setdefault("CARGO_INCREMENTAL", "0")
-    # Keep debug/test artifacts small enough for the serialized six-mode job;
-    # this changes symbol retention only, not which targets are checked.
-    environment.setdefault("CARGO_PROFILE_DEV_DEBUG", "0")
-    environment.setdefault("CARGO_PROFILE_TEST_DEBUG", "0")
+        candidate = ROOT / "target/non-iwork-gate"
+    # These values are gate invariants.  Ambient values must not silently
+    # widen the process fan-out or select a second artifact directory.
+    environment["CARGO_TARGET_DIR"] = str(candidate)
+    environment["CARGO_BUILD_JOBS"] = "1"
+    environment["CARGO_INCREMENTAL"] = "0"
+    environment["CARGO_PROFILE_DEV_DEBUG"] = "0"
+    environment["CARGO_PROFILE_TEST_DEBUG"] = "0"
     return environment
 
 
@@ -1572,30 +1903,639 @@ def _updated_environment(
     base: Mapping[str, str], updates: Sequence[tuple[str, str]]
 ) -> dict[str, str]:
     environment = dict(base)
+    encoded_equivalents = {
+        "RUSTFLAGS": "CARGO_ENCODED_RUSTFLAGS",
+        "RUSTDOCFLAGS": "CARGO_ENCODED_RUSTDOCFLAGS",
+    }
     for key, value in updates:
-        existing = environment.get(key)
-        if existing and value not in existing:
-            environment[key] = f"{existing} {value}"
-        else:
-            environment[key] = value
+        # These policies must be exact.  Cargo gives the encoded variables
+        # precedence when both forms are present, so remove only the paired
+        # flag variables rather than broadly scrubbing compiler wrappers.
+        environment[key] = value
+        encoded_key = encoded_equivalents.get(key)
+        if encoded_key is not None:
+            environment.pop(encoded_key, None)
     return environment
 
 
-def run_mode(cargo: str, plan: WorkspacePlan, mode: str, environment: Mapping[str, str]) -> None:
+def _bounded_env_keys(environment: Mapping[str, str]) -> tuple[str, ...]:
+    """Return only the non-secret, bounded environment key allow-list."""
+
+    return tuple(sorted(key for key in RECORDED_ENV_KEYS if key in environment))
+
+
+def _bounded_env_values(environment: Mapping[str, str]) -> tuple[tuple[str, str], ...]:
+    """Return bounded values for the enforced Cargo environment allow-list."""
+
+    values: list[tuple[str, str]] = []
+    for key in sorted(RECORDED_ENV_KEYS):
+        if key not in environment:
+            continue
+        value = environment[key]
+        if len(value) > MAX_RECORDED_ENV_VALUE_LENGTH:
+            value = value[:MAX_RECORDED_ENV_VALUE_LENGTH] + "..."
+        values.append((key, value))
+    return tuple(values)
+
+
+def _unavailable_target_footprint(
+    reason: str = "target directory is unavailable"
+) -> TargetFootprint:
+    return TargetFootprint("unavailable", None, None, reason)
+
+
+def _target_footprint(
+    target_dir: Path | None,
+    *,
+    max_entries: int = TARGET_SCAN_MAX_ENTRIES,
+    max_directories: int = TARGET_SCAN_MAX_DIRECTORIES,
+    max_depth: int = TARGET_SCAN_MAX_DEPTH,
+) -> TargetFootprint:
+    """Count regular files without following symlinks or exceeding scan caps."""
+
+    if max_entries < 1 or max_directories < 1 or max_depth < 0:
+        return TargetFootprint(
+            "incomplete",
+            None,
+            None,
+            "target scan limits must allow at least one entry and directory",
+        )
+    if target_dir is None:
+        return _unavailable_target_footprint("target directory was not configured")
+    try:
+        root_stat = os.lstat(target_dir)
+    except OSError:
+        return _unavailable_target_footprint(
+            "target directory is missing or unreadable"
+        )
+    if not stat.S_ISDIR(root_stat.st_mode):
+        return _unavailable_target_footprint("target path is not a directory")
+
+    total_bytes = 0
+    total_count = 0
+    entry_count = 0
+    directory_count = 1
+    complete = True
+    incomplete_reason = "one or more target entries changed or could not be read"
+    directories: list[tuple[Path, int]] = [(target_dir, 0)]
+    while directories:
+        directory, depth = directories.pop()
+        try:
+            # Recheck before opening each directory so a replacement symlink
+            # is not deliberately traversed while a report is being made.
+            directory_stat = os.lstat(directory)
+            if not stat.S_ISDIR(directory_stat.st_mode):
+                complete = False
+                incomplete_reason = "a target directory changed during the scan"
+                continue
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    entry_count += 1
+                    if entry_count > max_entries:
+                        complete = False
+                        incomplete_reason = "target scan entry cap reached"
+                        directories.clear()
+                        break
+                    try:
+                        entry_stat = os.lstat(entry.path)
+                    except OSError:
+                        complete = False
+                        incomplete_reason = (
+                            "one or more target entries changed or could not be read"
+                        )
+                        continue
+                    if stat.S_ISREG(entry_stat.st_mode):
+                        total_count += 1
+                        total_bytes += entry_stat.st_size
+                    elif stat.S_ISDIR(entry_stat.st_mode):
+                        if depth >= max_depth:
+                            complete = False
+                            incomplete_reason = "target scan depth cap reached"
+                            directories.clear()
+                            break
+                        if directory_count >= max_directories:
+                            complete = False
+                            incomplete_reason = "target scan directory cap reached"
+                            directories.clear()
+                            break
+                        directory_count += 1
+                        directories.append((Path(entry.path), depth + 1))
+        except OSError:
+            complete = False
+            incomplete_reason = "one or more target directories could not be read"
+
+    if not complete:
+        return TargetFootprint("incomplete", None, None, incomplete_reason)
+    return TargetFootprint(
+        "complete",
+        total_bytes,
+        total_count,
+        "regular directory entries counted with lstat; symlinks were not followed",
+    )
+
+
+def _linux_process_rss(pid: int) -> int | None:
+    """Sample cumulative RSS for a Linux process and its descendants."""
+
+    if not sys.platform.startswith("linux"):
+        return None
+    try:
+        process_names = os.listdir("/proc")
+    except OSError:
+        return None
+
+    processes: dict[int, tuple[int, int]] = {}
+    for name in process_names:
+        if not name.isdigit():
+            continue
+        process_id = int(name)
+        parent_id: int | None = None
+        rss_bytes: int | None = None
+        try:
+            with open(
+                f"/proc/{name}/status",
+                encoding="ascii",
+                errors="replace",
+            ) as status_file:
+                for line in status_file:
+                    if line.startswith("PPid:"):
+                        fields = line.split()
+                        if len(fields) == 2:
+                            parent_id = int(fields[1])
+                    elif line.startswith("VmRSS:"):
+                        fields = line.split()
+                        if len(fields) >= 2:
+                            # Linux reports VmRSS in KiB.
+                            rss_bytes = int(fields[1]) * 1024
+        except (OSError, ValueError):
+            continue
+        if parent_id is not None and rss_bytes is not None:
+            processes[process_id] = (parent_id, rss_bytes)
+
+    if pid not in processes:
+        return None
+    descendants = {pid}
+    changed = True
+    while changed:
+        changed = False
+        for process_id, (parent_id, _) in processes.items():
+            if process_id not in descendants and parent_id in descendants:
+                descendants.add(process_id)
+                changed = True
+    return sum(processes[process_id][1] for process_id in descendants)
+
+
+def _rss_configuration(
+    enabled: bool,
+    sampler: Callable[[int], int | None] | None,
+    platform: str | None,
+    scope: str | None,
+) -> tuple[Callable[[int], int | None] | None, str, str]:
+    """Select a truthful RSS source, including explicit unavailable states."""
+
+    current_platform = platform or sys.platform or "unknown"
+    if not enabled:
+        return None, current_platform, scope or "not-collected"
+    if sampler is not None:
+        return sampler, platform or "injected", scope or "injected-process-tree"
+    if sys.platform.startswith("linux"):
+        return _linux_process_rss, "linux", "sampled-descendant-process-tree"
+    return None, current_platform, scope or "unavailable"
+
+
+class _ChildRssTracker:
+    """Keep the maximum cumulative sampled child RSS without affecting a run."""
+
+    def __init__(
+        self,
+        sampler: Callable[[int], int | None] | None,
+        platform: str,
+        scope: str,
+    ) -> None:
+        self.sampler = sampler
+        self.platform = platform
+        self.scope = scope
+        self.high_water_bytes: int | None = None
+        self.sample_count = 0
+        self.sample_errors = 0
+
+    def sample(self, pid: int) -> None:
+        if self.sampler is None:
+            return
+        try:
+            value = self.sampler(pid)
+        except (OSError, ValueError):
+            self.sample_errors += 1
+            return
+        if not isinstance(value, int) or value < 0:
+            self.sample_errors += 1
+            return
+        self.sample_count += 1
+        if self.high_water_bytes is None or value > self.high_water_bytes:
+            self.high_water_bytes = value
+
+    def result(self) -> ChildRss:
+        if self.sampler is None:
+            status = "not_collected" if self.scope == "not-collected" else "unavailable"
+            reason = (
+                "RSS collection was disabled"
+                if status == "not_collected"
+                else "RSS sampling is unavailable on this host"
+            )
+        elif self.high_water_bytes is None:
+            status = "unavailable"
+            reason = "no readable process-tree samples were observed"
+        else:
+            status = "partial" if self.sample_errors else "available"
+            reason = (
+                "one or more process-tree samples were unreadable"
+                if self.sample_errors
+                else "sampled process-tree RSS sums"
+            )
+        return ChildRss(
+            self.high_water_bytes,
+            self.platform,
+            self.scope,
+            status,
+            reason,
+        )
+
+
+def _execute_command(
+    argv: Sequence[str],
+    environment: Mapping[str, str],
+    *,
+    clock: Callable[[], int] | None = None,
+    popen_factory: Callable[..., Any] | None = None,
+    rss_enabled: bool = False,
+    rss_sampler: Callable[[int], int | None] | None = None,
+    rss_platform: str | None = None,
+    rss_scope: str | None = None,
+    sleep_fn: Callable[[float], None] | None = None,
+) -> CommandExecution:
+    """Run one argv command while optionally sampling child-process RSS."""
+
+    clock_fn = clock or time.monotonic_ns
+    factory = popen_factory or subprocess.Popen
+    sleeper = sleep_fn or time.sleep
+    configured_sampler, configured_platform, configured_scope = _rss_configuration(
+        rss_enabled, rss_sampler, rss_platform, rss_scope
+    )
+    tracker = _ChildRssTracker(
+        configured_sampler,
+        configured_platform,
+        configured_scope,
+    )
+    started_ns = clock_fn()
+    popen_kwargs: dict[str, Any] = {
+        "cwd": ROOT,
+        "env": dict(environment),
+    }
+    isolated_posix_session = popen_factory is None and os.name == "posix"
+    if isolated_posix_session:
+        popen_kwargs["start_new_session"] = True
+    process = factory(list(argv), **popen_kwargs)
+    try:
+        if configured_sampler is None:
+            returncode = process.wait()
+        else:
+            while True:
+                tracker.sample(process.pid)
+                returncode = process.poll()
+                if returncode is not None:
+                    break
+                sleeper(RSS_POLL_INTERVAL_SECONDS)
+    except KeyboardInterrupt:
+        _terminate_and_reap_process(
+            process,
+            process_group=isolated_posix_session,
+        )
+        raise
+    elapsed_ns = max(0, clock_fn() - started_ns)
+    return CommandExecution(returncode, elapsed_ns, tracker.result())
+
+
+class ExecutionRecorder:
+    """Collect correctness-only execution telemetry for one gate mode."""
+
+    def __init__(
+        self,
+        mode: str,
+        environment: Mapping[str, str],
+        *,
+        clock: Callable[[], int] | None = None,
+        target_scanner: Callable[[Path | None], TargetFootprint] | None = None,
+        popen_factory: Callable[..., Any] | None = None,
+        rss_sampler: Callable[[int], int | None] | None = None,
+        rss_platform: str | None = None,
+        rss_scope: str | None = None,
+        sleep_fn: Callable[[float], None] | None = None,
+    ) -> None:
+        self.mode = mode
+        self.environment = dict(environment)
+        target_text = self.environment.get("CARGO_TARGET_DIR")
+        self.target_dir = Path(target_text) if target_text else None
+        self.clock = clock or time.monotonic_ns
+        self.target_scanner = target_scanner or _target_footprint
+        self.popen_factory = popen_factory
+        self.rss_sampler, self.rss_platform, self.rss_scope = _rss_configuration(
+            True, rss_sampler, rss_platform, rss_scope
+        )
+        self.sleep_fn = sleep_fn
+        self.started_ns = self.clock()
+        self.target_before = self._scan_target()
+        self.target_after = self.target_before
+        self.phases: list[PhaseRecord] = []
+        self.child_rss_high_water_bytes: int | None = None
+        self.outcome = "running"
+        self.error: str | None = None
+        self.elapsed_ns = 0
+
+    def _scan_target(self) -> TargetFootprint:
+        try:
+            value = self.target_scanner(self.target_dir)
+        except (OSError, ValueError, TypeError):
+            return _unavailable_target_footprint()
+        if not isinstance(value, TargetFootprint):
+            return _unavailable_target_footprint()
+        return value
+
+    def run_phase(
+        self,
+        index: int,
+        spec: CommandSpec,
+        command_environment: Mapping[str, str],
+    ) -> int:
+        """Execute and record one phase, preserving command failures."""
+
+        target_before = self._scan_target()
+        started_ns = self.clock()
+        try:
+            execution = _execute_command(
+                spec.argv,
+                command_environment,
+                clock=self.clock,
+                popen_factory=self.popen_factory,
+                rss_enabled=True,
+                rss_sampler=self.rss_sampler,
+                rss_platform=self.rss_platform,
+                rss_scope=self.rss_scope,
+                sleep_fn=self.sleep_fn,
+            )
+        except OSError:
+            target_after = self._scan_target()
+            elapsed_ns = max(0, self.clock() - started_ns)
+            self.phases.append(
+                PhaseRecord(
+                    self.mode,
+                    index,
+                    spec.scope,
+                    spec.argv,
+                    "error",
+                    None,
+                    elapsed_ns,
+                    target_before,
+                    target_after,
+                    ChildRss(
+                        None,
+                        self.rss_platform,
+                        self.rss_scope,
+                        "unavailable",
+                        "child process could not be started",
+                    ),
+                    _bounded_env_keys(command_environment),
+                    _bounded_env_values(command_environment),
+                )
+            )
+            self.target_after = target_after
+            raise
+        except KeyboardInterrupt:
+            target_after = self._scan_target()
+            elapsed_ns = max(0, self.clock() - started_ns)
+            self.phases.append(
+                PhaseRecord(
+                    self.mode,
+                    index,
+                    spec.scope,
+                    spec.argv,
+                    "interrupted",
+                    None,
+                    elapsed_ns,
+                    target_before,
+                    target_after,
+                    ChildRss(
+                        None,
+                        self.rss_platform,
+                        self.rss_scope,
+                        "unavailable",
+                        "KeyboardInterrupt interrupted RSS sampling",
+                    ),
+                    _bounded_env_keys(command_environment),
+                    _bounded_env_values(command_environment),
+                )
+            )
+            self.target_after = target_after
+            raise
+        target_after = self._scan_target()
+        status = "passed" if execution.returncode == 0 else "failed"
+        self.phases.append(
+            PhaseRecord(
+                self.mode,
+                index,
+                spec.scope,
+                spec.argv,
+                status,
+                execution.returncode,
+                execution.elapsed_ns,
+                target_before,
+                target_after,
+                execution.child_rss,
+                _bounded_env_keys(command_environment),
+                _bounded_env_values(command_environment),
+            )
+        )
+        if execution.child_rss.high_water_bytes is not None and (
+            self.child_rss_high_water_bytes is None
+            or execution.child_rss.high_water_bytes > self.child_rss_high_water_bytes
+        ):
+            self.child_rss_high_water_bytes = execution.child_rss.high_water_bytes
+        self.target_after = target_after
+        return execution.returncode
+
+    def _aggregate_rss_status(self) -> tuple[str, str]:
+        statuses = [phase.child_rss.status for phase in self.phases]
+        if not statuses:
+            return "unavailable", "no execution phases were sampled"
+        if all(status == "available" for status in statuses):
+            return "available", "all phases had readable process-tree RSS samples"
+        if all(status in {"unavailable", "not_collected"} for status in statuses):
+            return "unavailable", "RSS sampling was unavailable for all phases"
+        return "partial", "one or more phase RSS samples were partial or unavailable"
+
+    def finish(self, outcome: str, error: str | None) -> None:
+        """Close the report state even when a phase stopped the mode early."""
+
+        self.outcome = outcome
+        self.error = error[:MAX_REPORT_ERROR_LENGTH] if error else None
+        self.target_after = self._scan_target()
+        self.elapsed_ns = max(0, self.clock() - self.started_ns)
+
+    def as_dict(self) -> dict[str, Any]:
+        rss_status, rss_reason = self._aggregate_rss_status()
+        return {
+            "version": REPORT_VERSION,
+            "mode": self.mode,
+            "claim_scope": "no performance claim",
+            "outcome": self.outcome,
+            "error": self.error,
+            "elapsed_ns": self.elapsed_ns,
+            "clock": {
+                "name": "time.monotonic_ns",
+                "unit": "ns",
+                "monotonic": True,
+            },
+            "host": {
+                "platform": sys.platform,
+                "os_name": os.name,
+                "python_implementation": platform.python_implementation(),
+                "python_version": platform.python_version(),
+                "machine": platform.machine(),
+            },
+            "target_dir": str(self.target_dir) if self.target_dir else None,
+            "target_scan_limits": {
+                "max_entries": TARGET_SCAN_MAX_ENTRIES,
+                "max_directories": TARGET_SCAN_MAX_DIRECTORIES,
+                "max_depth": TARGET_SCAN_MAX_DEPTH,
+            },
+            "env_keys": list(_bounded_env_keys(self.environment)),
+            "cargo_env": dict(_bounded_env_values(self.environment)),
+            "target_before": self.target_before.as_dict(),
+            "target_after": self.target_after.as_dict(),
+            "child_rss": {
+                "measurement": RSS_MEASUREMENT,
+                "high_water_bytes": self.child_rss_high_water_bytes,
+                "platform": self.rss_platform,
+                "scope": self.rss_scope,
+                "status": rss_status,
+                "reason": rss_reason,
+                "sample_interval_ms": RSS_SAMPLE_INTERVAL_MS,
+            },
+            "cleanup": {
+                "disposition": "retained_by_policy",
+                "recursive": False,
+                "failure_artifacts": "failing phase/root retained",
+                "prior_successful_lib_test_roots": "may be cleaned",
+                "package_clean_scopes": [
+                    phase.scope
+                    for phase in self.phases
+                    if phase.scope.startswith("bulk-clean/")
+                    or phase.scope == "facade-clean"
+                ],
+                "package_clean_commands": [
+                    {
+                        "scope": phase.scope,
+                        "argv": list(phase.argv),
+                    }
+                    for phase in self.phases
+                    if phase.scope.startswith("bulk-clean/")
+                    or phase.scope == "facade-clean"
+                ],
+            },
+            "feature_unification": {
+                "gate_scope": "per-package-root --all-features",
+                "aggregate_workspace_unification": "not_claimed",
+                "aggregate_guard": "existing workspace CI",
+            },
+            "limitations": {
+                "rss": (
+                    "20 ms sampled sums of readable descendant VmRSS values; "
+                    "short-lived processes and unreadable descendants may be missed; "
+                    "this is not an OS or child-process peak-RSS measurement"
+                ),
+                "target_scan": (
+                    "logical regular-file entries are counted with lstat without "
+                    "following symlinks; concurrent changes or access errors produce "
+                    "incomplete/unavailable status; traversal is bounded by explicit "
+                    f"entry={TARGET_SCAN_MAX_ENTRIES}, "
+                    f"directory={TARGET_SCAN_MAX_DIRECTORIES}, "
+                    f"depth={TARGET_SCAN_MAX_DEPTH} caps"
+                ),
+                "interruption": (
+                    "KeyboardInterrupt returns 130 and requests best-effort child or "
+                    "process-group termination; SIGTERM handling is not guaranteed"
+                ),
+            },
+            "phases": [phase.as_dict() for phase in self.phases],
+        }
+
+
+def _record_path(value: str | Path) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else ROOT / path
+
+
+def _write_atomic_report(path_value: str | Path, report: Mapping[str, Any]) -> None:
+    """Write a complete JSON report through same-directory replacement."""
+
+    path = _record_path(path_value)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as report_file:
+            temporary_path = Path(report_file.name)
+            json.dump(report, report_file, sort_keys=True, indent=2)
+            report_file.write("\n")
+            report_file.flush()
+            os.fsync(report_file.fileno())
+        os.replace(temporary_path, path)
+        try:
+            directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+            directory_fd = os.open(path.parent, directory_flags)
+        except (AttributeError, OSError):
+            pass
+        else:
+            try:
+                os.fsync(directory_fd)
+            except OSError:
+                pass
+            finally:
+                os.close(directory_fd)
+    finally:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink()
+            except FileNotFoundError:
+                pass
+
+
+def run_mode(
+    cargo: str,
+    plan: WorkspacePlan,
+    mode: str,
+    environment: Mapping[str, str],
+    *,
+    recorder: ExecutionRecorder | None = None,
+) -> None:
     """Run one generated mode, stopping at the first failed Cargo command."""
 
-    for spec in command_specs(cargo, plan, mode):
+    for index, spec in enumerate(command_specs(cargo, plan, mode), start=1):
         command_environment = _updated_environment(environment, spec.env)
         print(f"[{mode}/{spec.scope}] $ {shlex.join(spec.argv)}", flush=True)
-        result = subprocess.run(
-            list(spec.argv),
-            cwd=ROOT,
-            env=command_environment,
-            check=False,
-        )
-        if result.returncode:
+        if recorder is None:
+            execution = _execute_command(spec.argv, command_environment)
+            returncode = execution.returncode
+        else:
+            returncode = recorder.run_phase(index, spec, command_environment)
+        if returncode:
             raise GateError(
-                f"{mode}/{spec.scope} failed with exit status {result.returncode}"
+                f"{mode}/{spec.scope} failed with exit status {returncode}"
             )
 
 
@@ -1625,31 +2565,76 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--target-dir",
         help="isolated Cargo target directory (default: target/non-iwork-gate)",
     )
+    parser.add_argument(
+        "--record-file",
+        help="atomically write a correctness-only JSON execution report",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
+    execution_mode = args.mode not in {"print", "verify"}
+    environment: Mapping[str, str] = {}
+    recorder: ExecutionRecorder | None = None
+    status = 0
+    error_message: str | None = None
     try:
+        if execution_mode:
+            environment = _environment(args.target_dir)
+            if args.record_file:
+                recorder = ExecutionRecorder(args.mode, environment)
         plan = derive_plan(_cargo_metadata(args.cargo))
         if args.mode == "print":
             print_plan(plan)
-            return 0
-        if args.mode == "verify":
+        elif args.mode == "verify":
             print_plan(plan)
             bulk_count, facade_count = verify_dependency_trees(args.cargo, plan)
             print(f"verified_bulk_tree_roots={bulk_count}")
             print(f"verified_facade_safe_trees={facade_count}")
             print("verified_facade_combined_tree=1")
-            return 0
-        run_mode(args.cargo, plan, args.mode, _environment(args.target_dir))
-        return 0
+        else:
+            run_mode(
+                args.cargo,
+                plan,
+                args.mode,
+                environment,
+                recorder=recorder,
+            )
     except GateError as error:
-        print(f"non-iWork release gate: {error}", file=sys.stderr)
-        return 1
+        status = 1
+        error_message = f"non-iWork release gate: {error}"
+        if recorder is not None:
+            recorder.finish("failed", str(error))
     except OSError as error:
-        print(f"non-iWork release gate: cannot execute Cargo: {error}", file=sys.stderr)
-        return 1
+        status = 1
+        error_message = f"non-iWork release gate: cannot execute Cargo: {error}"
+        if recorder is not None:
+            recorder.finish("failed", str(error))
+    except KeyboardInterrupt:
+        status = 130
+        error_message = "non-iWork release gate: interrupted"
+        if recorder is not None:
+            recorder.finish("interrupted", "KeyboardInterrupt")
+    else:
+        if recorder is not None:
+            recorder.finish("passed", None)
+
+    if recorder is not None and args.record_file:
+        try:
+            _write_atomic_report(args.record_file, recorder.as_dict())
+        except OSError as error:
+            report_error = f"non-iWork release gate: cannot write execution report: {error}"
+            if status == 0:
+                status = 1
+                error_message = report_error
+            elif error_message:
+                error_message = f"{error_message}; {report_error}"
+            else:
+                error_message = report_error
+    if error_message:
+        print(error_message, file=sys.stderr)
+    return status
 
 
 if __name__ == "__main__":  # pragma: no cover - exercised by the CLI
