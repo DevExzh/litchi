@@ -1084,6 +1084,79 @@ mod tests {
     }
 
     #[test]
+    fn malformed_body_footnote_corpus_cases_remain_rejected() {
+        #[derive(Clone, Copy)]
+        enum ExpectedError {
+            Missing(&'static str),
+            Duplicate(&'static str),
+            Noncanonical(&'static str),
+            Wire,
+        }
+
+        let assert_error = |result: Result<(), DecodeError>, expected: ExpectedError| {
+            let error = result.expect_err("malformed corpus case must fail");
+            match expected {
+                ExpectedError::Missing(field) => {
+                    assert_eq!(error.missing_required_field(), Some(field));
+                },
+                ExpectedError::Duplicate(field) => {
+                    assert_eq!(error.duplicate_singular_field(), Some(field));
+                },
+                ExpectedError::Noncanonical(reason) => {
+                    assert_eq!(error.noncanonical_reason(), Some(reason));
+                },
+                ExpectedError::Wire => {
+                    assert!(matches!(&error.kind, DecodeErrorKind::Wire(_)));
+                },
+            }
+        };
+
+        let document_cases: [(&[u8], ExpectedError); 4] = [
+            (
+                &[0x22, 0x04, 0x08, 0x01, 0x08, 0x02, 0x7a, 0x00],
+                ExpectedError::Duplicate("TSP.Reference.identifier"),
+            ),
+            (
+                &[0x22, 0x00, 0x7a, 0x00],
+                ExpectedError::Missing("TSP.Reference.identifier"),
+            ),
+            (
+                &[0x22, 0x03, 0x08, 0x80, 0x00, 0x7a, 0x00],
+                ExpectedError::Noncanonical("protobuf varint value"),
+            ),
+            (&[0x22, 0x02, 0x0a, 0x00, 0x7a, 0x00], ExpectedError::Wire),
+        ];
+        for (source, expected) in document_cases {
+            assert_error(
+                decode_document_body(source, options(source)).map(|_| ()),
+                expected,
+            );
+        }
+
+        let boundary_cases: [(&[u8], ExpectedError); 4] = [
+            (
+                &[0x08, 0x01, 0x12, 0x02, 0x08, 0x01, 0x12, 0x02, 0x08, 0x02],
+                ExpectedError::Duplicate("TSWP.ObjectAttributeTable.ObjectAttribute.object"),
+            ),
+            (
+                &[0x12, 0x02, 0x08, 0x01],
+                ExpectedError::Missing("TSWP.ObjectAttributeTable.ObjectAttribute.character_index"),
+            ),
+            (
+                &[0x08, 0x01, 0x12, 0x00],
+                ExpectedError::Missing("TSP.Reference.identifier"),
+            ),
+            (&[0x08, 0x01, 0x12, 0x02, 0x0a, 0x00], ExpectedError::Wire),
+        ];
+        for (source, expected) in boundary_cases {
+            assert_error(
+                decode_section_boundary(source, options(source)).map(|_| ()),
+                expected,
+            );
+        }
+    }
+
+    #[test]
     fn malformed_deferred_reference_is_forced() {
         let source = [0x22, 0x01, 0x08, 0x7a, 0x00];
         let direct: projection::PagesDocumentBodyArchiveLazyView<'_> = BuffaOptions::new()
