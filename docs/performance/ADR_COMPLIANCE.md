@@ -1,5 +1,21 @@
 # Performance optimization ADR-compliance matrix
 
+## PhysPkgReader stored-Part borrowed consumer (change 0349)
+
+Crate-scoped formatting evidence: `cargo fmt --package soapberry-zip --package litchi-opc -- --check` passed after formatting.
+
+Change 0349 keeps the stored-Part borrow in the low-level immutable-slice
+`litchi-opc::PhysPkgReader` boundary. It returns a validated source-backed
+`&[u8]` only for the eligible Store case, after limits, CRC, and local/central
+layout checks; the destination `Vec` allocation/memcpy and materialization
+budget/cache charge are thereby avoided. Encrypted Store/Deflate inputs retain
+typed errors before owned fallback, and nonempty CRC-zero inputs return `None`.
+Deflate, ZIP64 EOCD, generic `ReadAt`, file, remote, `SourceBackedPackage`,
+content-type, and signature paths are unchanged. The `8/8`, `10/10`, and
+`281/281` serialized validation evidence is correctness/ownership only, with
+`performance_claim: none`; no timing, RSS, throughput, physical-I/O,
+decompression, or allocator claim follows.
+
 ## 2026-08-25: change 0280 leaves architecture unchanged
 
 - Binary identity failed before replication smoke or collection.

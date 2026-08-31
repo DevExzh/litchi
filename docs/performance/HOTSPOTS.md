@@ -1,5 +1,20 @@
 # Performance hotspot inventory
 
+## PhysPkgReader stored-Part borrow boundary (change 0349)
+
+Crate-scoped formatting evidence: `cargo fmt --package soapberry-zip --package litchi-opc -- --check` passed after formatting.
+
+Change 0349 removes one logical destination `Vec` allocation and payload
+`memcpy` for an eligible validated Store Part consumed through an immutable
+slice, and avoids the materialization budget/cache charge. CRC and local/
+central ZIP layout validation remain. Encrypted Store/Deflate members keep
+typed errors before owned fallback; nonempty CRC-zero members return `None`.
+The evidence is correctness/ownership only (`8/8`, `10/10`, `281/281`) with
+serialized jobs/test threads and an 8 GiB ceiling. This is not a measured
+hotspot: `performance_claim: none`, with no timing/RSS/throughput,
+physical-I/O, decompression, or allocator claim. Source-backed positional
+owners and weak mixed stored corpora remain outside scope.
+
 ## 2026-08-25: unchanged freshness-session replication closed
 
 - Change 0280 failed its binary identity gate before smoke; do not retry the unchanged change 0279 candidate or reinterpret the prior rejected tails.

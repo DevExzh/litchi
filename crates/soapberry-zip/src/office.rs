@@ -499,6 +499,7 @@ impl ExactSizeIterator for ArchiveReaderNames<'_> {}
 #[derive(Debug, Clone)]
 struct EntryInfo {
     wayfinder: crate::ZipArchiveEntryWayfinder,
+    flags: u16,
     compression_method: CompressionMethod,
     uncompressed_size: u64,
     central_name: Vec<u8>,
@@ -746,6 +747,7 @@ impl<'data> ArchiveReader<'data> {
                 name.clone(),
                 EntryInfo {
                     wayfinder: entry.wayfinder(),
+                    flags: entry.flags(),
                     compression_method: entry.compression_method(),
                     uncompressed_size,
                     central_name,
@@ -944,13 +946,15 @@ impl<'data> ArchiveReader<'data> {
 
     /// Borrow and verify a stored member without materializing a second copy.
     ///
-    /// `Some` is returned only for ZIP Store members. Deflated and otherwise
-    /// unsupported members return `None`, allowing a caller to fall back to
-    /// [`Self::read`]. Before the borrowed slice is published, the local
-    /// header, data descriptor (when present), declared size, and CRC are
-    /// validated. The returned bytes borrow the source archive for the
-    /// lifetime of this reader and are never inserted into a decompression
-    /// cache.
+    /// `Some` is returned only for unencrypted ZIP Store members. Unencrypted
+    /// Deflated and otherwise unsupported members return `None`, allowing a
+    /// caller to fall back to [`Self::read`]. Targets declaring encryption in
+    /// general-purpose flag bits 0 or 6 return a typed error before this
+    /// ineligible-compression fallback. Before the borrowed slice is
+    /// published, the local header, data descriptor (when present), declared
+    /// size, and CRC are validated. The returned bytes borrow the source
+    /// archive for the lifetime of this reader and are never inserted into a
+    /// decompression cache.
     ///
     /// Archive limits are admission limits: the member's declared metadata
     /// and size were checked by [`Self::new_with_limits`] before this method
@@ -958,9 +962,11 @@ impl<'data> ArchiveReader<'data> {
     /// does not create a separate materialization budget charge.
     ///
     /// For compatibility with the tolerant global ZIP verifier, a declared
-    /// CRC-32 of zero normally means "not verified". Borrowed Store access is
-    /// stricter: nonempty members with that declaration are refused so a
-    /// source slice is never published without an effective checksum claim.
+    /// CRC-32 of zero normally means "not verified". Nonempty members with
+    /// that declaration return `None` because borrowed access cannot publish
+    /// an unverifiable source slice; callers can use [`Self::read`] for the
+    /// owned fallback. Empty members with a zero CRC remain eligible after
+    /// their structural checks.
     /// ZIP64 EOCD archives conservatively return `None`; callers can use
     /// [`Self::read`] or [`Self::read_to`] as the owned fallback for those
     /// archives.
@@ -986,6 +992,11 @@ impl<'data> ArchiveReader<'data> {
             .get(&lookup.name)
             .filter(|_| !lookup.explicit_directory)
             .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
+        if info.flags & ((1 << 0) | (1 << 6)) != 0 {
+            return Err(Error::from(ErrorKind::InvalidInput {
+                msg: "borrowed access refuses encrypted entries".to_string(),
+            }));
+        }
         if info.compression_method != CompressionMethod::Store {
             return Ok(None);
         }
@@ -1006,13 +1017,10 @@ impl<'data> ArchiveReader<'data> {
             .get_stored_entry_borrowed(info.wayfinder, &info.central_name)?;
         let data = entry.data();
         let verification = entry.claim_verifier();
-        let actual_crc = crate::crc32(data);
         if !data.is_empty() && verification.crc() == 0 {
-            return Err(Error::from(ErrorKind::InvalidChecksum {
-                expected: 0,
-                actual: actual_crc,
-            }));
+            return Ok(None);
         }
+        let actual_crc = crate::crc32(data);
         verification.valid(ZipVerification {
             crc: actual_crc,
             uncompressed_size: usize_to_u64(data.len(), "stored ZIP bytes")?,
@@ -1475,6 +1483,7 @@ where
                     name,
                     info: EntryInfo {
                         wayfinder: entry.wayfinder(),
+                        flags: entry.flags(),
                         compression_method: entry.compression_method(),
                         uncompressed_size,
                         central_name: path.as_ref().to_vec(),
@@ -4275,9 +4284,13 @@ impl<'data> LazyArchiveReader<'data> {
     /// Borrow and verify a stored member without populating the lazy cache.
     ///
     /// This is the zero-copy structural-ingress fast path for callers that
-    /// consume a stored XML member immediately. Deflated members return
-    /// `None` and should use [`Self::read`] instead. The returned slice remains
-    /// tied to the source bytes borrowed by this reader.
+    /// consume a stored XML member immediately. Unencrypted Deflated members
+    /// return `None` and should use [`Self::read`] instead. Targets declaring
+    /// encryption in general-purpose flag bits 0 or 6 return a typed error.
+    /// Nonempty Store members with a declared CRC-32 of zero also return
+    /// `None` because borrowed access cannot verify them.
+    /// The returned slice remains tied to the source bytes borrowed by this
+    /// reader.
     #[inline]
     pub fn read_stored_borrowed(&self, name: &str) -> Result<Option<&'data [u8]>, Error> {
         let mut accounting = ZipOperationAccounting::default();
@@ -7557,6 +7570,31 @@ mod tests {
     }
 
     #[test]
+    fn encrypted_deflate_borrowing_is_rejected_before_ineligible_fallback() {
+        let payload = b"encrypted deflated payload";
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_deflated("deflated.bin", payload).unwrap();
+        let base = writer.finish_to_bytes().unwrap();
+        let local = local_header_offset_for_name(&base, b"deflated.bin");
+        let central = central_header_offset_for_name(&base, b"deflated.bin");
+
+        for encrypted_flag in [1u16, 1 << 6] {
+            let mut encrypted = base.clone();
+            encrypted[local + 6..local + 8].copy_from_slice(&encrypted_flag.to_le_bytes());
+            encrypted[central + 8..central + 10].copy_from_slice(&encrypted_flag.to_le_bytes());
+            let reader = ArchiveReader::new(&encrypted).unwrap();
+            let error = reader.read_stored_borrowed("deflated.bin").unwrap_err();
+            assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+
+            let mut accounting = ZipOperationAccounting::default();
+            let error = reader
+                .read_stored_borrowed_with_accounting("deflated.bin", &mut accounting)
+                .unwrap_err();
+            assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+        }
+    }
+
+    #[test]
     fn borrowed_store_refuses_an_overlapping_non_target_span() {
         let mut writer = StreamingArchiveWriter::new();
         writer
@@ -7586,7 +7624,7 @@ mod tests {
     }
 
     #[test]
-    fn borrowed_store_refuses_nonempty_zero_crc_even_when_payload_is_corrupt() {
+    fn borrowed_store_returns_none_for_nonempty_zero_crc_even_when_payload_is_corrupt() {
         let payload = b"zero CRC payload";
         let mut writer = StreamingArchiveWriter::new();
         writer.write_stored("stored.bin", payload).unwrap();
@@ -7601,14 +7639,14 @@ mod tests {
         bytes[payload_offset] ^= 0x80;
 
         let reader = ArchiveReader::new(&bytes).unwrap();
-        let error = reader.read_stored_borrowed("stored.bin").unwrap_err();
-        match error.kind() {
-            ErrorKind::InvalidChecksum { expected, actual } => {
-                assert_eq!(*expected, 0);
-                assert_ne!(*actual, 0);
-            },
-            other => panic!("expected zero-CRC refusal, got {other:?}"),
-        }
+        assert_eq!(reader.read_stored_borrowed("stored.bin").unwrap(), None);
+        let mut accounting = ZipOperationAccounting::default();
+        assert_eq!(
+            reader
+                .read_stored_borrowed_with_accounting("stored.bin", &mut accounting)
+                .unwrap(),
+            None
+        );
     }
 
     #[test]

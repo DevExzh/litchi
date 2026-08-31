@@ -349,6 +349,39 @@ impl<'data> PhysPkgReader<'data> {
         }
     }
 
+    /// Borrow validated bytes for an OPC part when the ZIP layout permits
+    /// zero-copy access.
+    ///
+    /// `Some` is returned only for a validated ZIP Store member whose bytes
+    /// can be borrowed from the immutable package source. `None` means the
+    /// existing member is borrow-ineligible, such as a Deflate member or an
+    /// archive with ZIP64 or otherwise conservative layout metadata; it does
+    /// not mean that the part is missing. Callers can use [`Self::blob_for`]
+    /// as the explicit owned fallback.
+    ///
+    /// The declared uncompressed size is checked against the configured
+    /// per-part byte ceiling before borrowing is attempted. This admission
+    /// check does not reserve or charge the `max_parts` or aggregate
+    /// materialization budgets.
+    ///
+    /// Missing, malformed, or encrypted members return typed errors. This
+    /// operation does not populate a ZIP cache or consume an OPC materialized
+    /// part budget. It makes no content-type or signature claim about the
+    /// returned bytes.
+    pub fn blob_for_borrowed(&self, pack_uri: &PackURI) -> Result<Option<&'data [u8]>> {
+        let membername = pack_uri.membername();
+        let label = pack_uri.to_string();
+        let declared = self.declared_part_bytes(membername, &label)?;
+        self.limits.check(
+            ReadResource::PartBytes,
+            declared,
+            self.limits.max_part_bytes(),
+        )?;
+        self.archive
+            .read_stored_borrowed(membername)
+            .map_err(|error| map_part_error(&label, &error))
+    }
+
     /// Read an archive member by its normalized ZIP name.
     ///
     /// This low-level physical operation is archive-budgeted only. It does not

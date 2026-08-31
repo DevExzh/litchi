@@ -1,5 +1,21 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Latest PhysPkgReader stored-Part borrow result (change 0349)
+
+Crate-scoped formatting evidence: `cargo fmt --package soapberry-zip --package litchi-opc -- --check` passed after formatting.
+
+Change 0349 records a validated immutable-slice `PhysPkgReader` consumer for
+eligible stored Parts. The source-backed `&[u8]` handoff removes the legacy
+destination `Vec` allocation/memcpy and Part materialization budget/cache
+charge, while CRC and ZIP layout validation remain. Encrypted Store/Deflate
+inputs return typed errors before owned fallback, and nonempty CRC-zero inputs
+return `None` for the legacy owned path. The bounded evidence is
+`litchi-opc` integration `8/8`, lower borrowed filter `10/10`, and full
+`soapberry-zip` `281/281`, serialized with one job/test thread and an 8 GiB
+ceiling. `performance_claim: none`; no timing, RSS, throughput,
+physical-I/O, decompression, or allocator claim follows. The mixed stored
+corpora remain too weak for timing evidence.
+
 ## 2026-08-25: change 0280 replication aborted before smoke
 
 - The frozen replication required exact 0279 binary identities; control matched, candidate did not, so collection stopped with zero samples and performance_claim:none.

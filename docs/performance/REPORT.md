@@ -338,6 +338,22 @@ protected, formula, markup-compatibility, macro, and unsupported-owner refusal
 contracts remain inherited. This is correctness-only evidence with no latency,
 allocation, RSS, decompression, physical-I/O, or producer claim.
 
+Crate-scoped formatting evidence: `cargo fmt --package soapberry-zip --package litchi-opc -- --check` passed after formatting.
+
+## Shared lazy OPC structural members (change 0259)
+
+[Change 0349](changes/0349-opc-phys-reader-stored-part-borrowed.md) adds a
+validated immutable-slice `PhysPkgReader` consumer for eligible stored Parts.
+The consumer returns source-backed `&[u8]` without the owned destination `Vec`
+allocation/memcpy or Part materialization budget/cache charge; CRC and ZIP
+layout scanning remain. Encrypted Store/Deflate inputs return typed errors
+before owned fallback, while nonempty CRC-zero inputs return `None` for the
+legacy owned path. The bounded results are `litchi-opc` integration `8/8`,
+lower borrowed filter `10/10`, and full `soapberry-zip` `281/281`, serialized
+with one job/test thread and an 8 GiB ceiling. `performance_claim: none`:
+there is no timing, RSS, throughput, physical-I/O, decompression, or allocator
+claim, and mixed stored corpora are too weak for timing evidence.
+
 ## Shared lazy OPC structural members (change 0259)
 
 [Change 0259](changes/0259-opc-shared-structural-members.md) carries the lazy
