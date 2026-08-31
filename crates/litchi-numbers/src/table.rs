@@ -22,6 +22,8 @@ pub mod headers;
 pub mod lock;
 /// Compact merged-cell geometry and topology algebra.
 pub mod merge;
+/// Exact-source transactions for moving a rooted table between sheets.
+pub mod relocation;
 /// Checked, archive-free table sort semantics.
 pub mod sort;
 /// Compact, presence-preserving table title semantics.

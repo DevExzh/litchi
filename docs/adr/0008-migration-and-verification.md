@@ -15105,3 +15105,63 @@ table-projection/fixture paths plus one unrelated Keynote tree test. The
 focused gates above passed, but this checkpoint makes no full-suite,
 performance/RSS, arbitrary-producer, native byte-parity, or focused physical
 storage-ownership claim.
+
+## 2026-09-01 amendment: Numbers table-relocation focused-owner verification
+
+The focused physical contract to verify is
+`litchi_numbers::table::relocation::transaction::{Commit, Diagnostics, Edit,
+Error, LimitKind, Patch, Path}` and
+`litchi_numbers::Package::{edit_table_relocation, move_table,
+apply_table_relocation}` (`apply_table_move` is the compatibility spelling).
+Verification must
+exercise selector-first source-sheet, sheet-scoped table, and destination-sheet
+admission without raw IDs; exact same-sheet no-op bytes and no-write replay;
+changed relocation order and preservation of table content, model bytes,
+unknown fields, and unrelated archive members; exact-source patch application;
+`Patch::inverse()` and byte-for-byte restoration; stale/foreign/conflicting or
+ambiguous ownership refusal before publication; redacted errors; and exact
+locality (only `Index/Document.iwa` and `Index/Tables.iwa` in the fixture).
+The legacy `NumbersEditor::move_table` path must also be shown to delegate the
+admitted graph to the focused package owner.
+
+The focused gates completed as follows:
+
+- `cargo test -p litchi-numbers --test table_relocation --no-fail-fast` passed
+  all 6 tests. The suite includes strict metadata path/type refusal, exact
+  same-sheet no-op, changed-order/content/locality preservation, exact-source
+  conflict handling, and inverse byte restoration.
+- `cargo check -p litchi-numbers --all-targets` and
+  `cargo clippy -p litchi-numbers --all-targets -- -D warnings` passed.
+- The new deterministic fuzz binary compiled with
+  `cargo check --manifest-path crates/litchi/fuzz/Cargo.toml --bin
+  numbers_table_relocation`; a 2,000-run libFuzzer smoke test completed without
+  a crash at 5,691 coverage points and 8,459 features.
+- The legacy compatibility module test passed 1/1, and the populated-table
+  losslessness regression passed 1/1, including independent move-away/move-back
+  byte restoration.
+- All 718 Python boundary-checker unit tests passed, and both live Numbers
+  relocation ownership/facade audits returned no violations. The whole dirty-
+  worktree checker is not recorded as green: it reported exactly three
+  unrelated violations from the pre-existing untracked
+  `crates/litchi-iwa/src/pages/editor/tables/lock.rs` draft.
+
+Computer Use then opened the exact final Rust artifact in Numbers. The native
+source was 145,611 bytes with SHA-256
+`bd77888f9030ea95b5381e7e3eab5203ed808deb49baa73f1b59d308f36eaff6`;
+the pre-save candidate was 88,158 bytes with SHA-256
+`a11c8ed68c7fb8f9a8cf803bcc6082c162f51fbbbdcf9b838d29f8b88702697a`.
+Numbers showed no repair, recovery, or conversion UI. `Sheet 1` contained no
+table, while `Destination` contained `Table 1` followed by `Relocate Me`; the
+moved table still rendered `Litchi native Numbers fixture` and `42`. After
+Save, Close, and exact-path Reopen, the same graph and values remained without
+repair. The native-normalized candidate was 97,895 bytes with SHA-256
+`ab2226e144d1c60fdc7e0766aa88112f28265b8ad931d8bb68b2515c09881576`,
+and the focused `read_numbers` example reopened it as two sheets with both
+destination tables and two materialized cells apiece.
+
+The authoritative topology remains 64 workspace packages, 237 internal
+dependency declarations, 226 canonical edges, 11 ordered migration debts, and
+one migration host; no debt, edge, host, or monolith-exit claim is made by the
+focused owner transfer. This checkpoint does not claim full-workspace tests,
+arbitrary-producer parity, benchmark/RSS results, or complete Numbers table
+authoring ownership.

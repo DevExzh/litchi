@@ -1806,7 +1806,7 @@ pub(super) fn preflight_sheet_payload(
     source: &[u8],
     maximum_drawables: usize,
 ) -> Result<(&str, Vec<u64>), Error> {
-    let name = decode_sheet_name(message_type, source)?;
+    let name = preflight_sheet_name(message_type, source)?;
     let mut identifiers = Vec::new();
     let wire_limits = WireLimits::default()
         .with_input_bytes(
@@ -1875,6 +1875,15 @@ pub(super) fn preflight_sheet_payload(
         other => map_wire_error(other),
     })?;
     Ok((name, identifiers))
+}
+
+/// Decode only a sheet's borrowed visible name without materializing its
+/// drawable-reference catalog.
+pub(in crate::package) fn preflight_sheet_name(
+    message_type: u32,
+    source: &[u8],
+) -> Result<&str, Error> {
+    decode_sheet_name(message_type, source)
 }
 
 fn require_local_reference(source: &[u8], expected_identifier: u64) -> Result<(), Error> {

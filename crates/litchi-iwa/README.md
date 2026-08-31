@@ -3198,3 +3198,28 @@ deletion claim. The authoritative topology remains 64 workspace packages,
 237 internal dependency declarations, 226 canonical edges, and 11 ordered
 migration debts `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, with one migration
 host; no migration debt is retired and no host exits.
+
+## 2026-09-01 Numbers table relocation focused owner
+
+Physical relocation of an existing Numbers table now belongs to
+`litchi_numbers::table::relocation::transaction::{Commit, Diagnostics, Edit,
+Error, LimitKind, Patch, Path}` through
+`litchi_numbers::Package::{edit_table_relocation, move_table,
+apply_table_relocation}` (`apply_table_move` remains a compatibility spelling).
+The contract is
+selector-first (`SheetSelector` source and destination plus a source-sheet
+`TableSelector`) and exposes no native IDs or raw archive values. Same-sheet
+moves are exact no-ops; changed moves provide exact-source, conflict-checked
+patches and inverses with locality checks while preserving table content.
+
+The legacy `NumbersEditor::move_table` remains a compatibility entry point and
+delegates ordinary packages to the focused transaction. Historical host-built
+packages whose cell storage is outside the current semantic projection use a
+doc-hidden, selector-first physical-admission seam in `litchi-numbers`; that
+seam calls the same rewrite/verification engine and the legacy reader validates
+the candidate before publication. Unsupported graphs remain fail-closed. This
+note supersedes the older migration prose
+that described physical table moves as host-owned. It is a bounded ownership
+transfer only: no migration debt, dependency edge, host, or monolith-deletion
+claim changes, and the documented topology remains 64 packages, 237 internal
+declarations, 226 canonical edges, 11 ordered debts, and one migration host.

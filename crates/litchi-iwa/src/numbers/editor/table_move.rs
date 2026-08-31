@@ -35,21 +35,34 @@ impl NumbersEditor {
         let (source_sheet, focused_table) =
             super::selectors::focused_table_location(self, table_id)?;
         let source_bytes = self.to_bytes()?;
-        let source = FocusedNumbersPackage::from_bytes(&source_bytes).map_err(|error| {
-            Error::InvalidFormat(format!(
-                "focused Numbers table-move source validation failed: {error}"
-            ))
-        })?;
-        let commit = source
-            .move_table(source_sheet, focused_table, target)
-            .map_err(|error| {
-                Error::InvalidFormat(format!("focused Numbers table move failed: {error}"))
-            })?;
-        let mut bytes = Vec::new();
-        commit
-            .package()
-            .write_to(&mut bytes)
-            .map_err(|error| Error::Io(error.into_io_error()))?;
+        let bytes = match FocusedNumbersPackage::from_bytes(&source_bytes) {
+            Ok(source) => {
+                let commit = source
+                    .move_table(source_sheet, focused_table, target)
+                    .map_err(|error| {
+                        Error::InvalidFormat(format!("focused Numbers table move failed: {error}"))
+                    })?;
+                let mut bytes = Vec::new();
+                commit
+                    .package()
+                    .write_to(&mut bytes)
+                    .map_err(|error| Error::Io(error.into_io_error()))?;
+                bytes
+            },
+            Err(_projection_error) => {
+                FocusedNumbersPackage::__move_table_from_bytes_for_compatibility(
+                    &source_bytes,
+                    source_sheet,
+                    focused_table,
+                    target,
+                )
+                .map_err(|error| {
+                    Error::InvalidFormat(format!(
+                        "focused Numbers table-move compatibility admission failed: {error}"
+                    ))
+                })?
+            },
+        };
         let verified = Self::from_bytes(&bytes)?;
         let verified_owner = find_table_owner(verified.package(), table_id)?;
         let verified_table = verified

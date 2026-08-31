@@ -134,6 +134,156 @@ pub(in crate::package) fn resolve_target(
     Err(Error::TableNotFound)
 }
 
+/// Resolve rooted table topology without decoding the table-storage payload.
+///
+/// The legacy migration host can hold a producer-authored table whose exact
+/// storage bytes are intentionally outside the current semantic projection.
+/// This narrow path still validates sheet/table ownership, TableInfo, and the
+/// model message, but leaves storage-derived header dimensions at their
+/// neutral values because relocation never edits them.
+pub(in crate::package) fn resolve_target_physical(
+    source: &Package,
+    sheet_position: usize,
+    table_position: usize,
+) -> Result<Target, Error> {
+    let document_object = source
+        .state
+        .components
+        .get_archive("Index/Document.iwa")
+        .and_then(|archive| archive.object(1))
+        .ok_or(Error::InvalidSource {
+            path: Path::Package,
+        })?;
+    let (_document_index, document_message) = unique_message_index(
+        &document_object.messages,
+        super::super::DOCUMENT_MESSAGE_TYPE,
+    )?
+    .ok_or(Error::InvalidSource {
+        path: Path::Package,
+    })?;
+    let sheet_payloads = repeated_length_payloads(&document_message.data, 1)?;
+    let sheet_identifier = local_reference_identifier(
+        sheet_payloads
+            .get(sheet_position)
+            .ok_or(Error::SheetNotFound)?,
+    )?;
+    let sheet = source
+        .state
+        .index
+        .resolve_ref_id(&source.state.components, sheet_identifier)
+        .map_err(map_read_error)?
+        .ok_or(Error::InvalidSource {
+            path: Path::Package,
+        })?;
+    let sheet_message_index = unique_sheet_message_index(sheet.messages)?;
+    let sheet_message = sheet
+        .messages
+        .get(sheet_message_index)
+        .ok_or(Error::InvalidSource {
+            path: Path::Package,
+        })?;
+    let drawable_payloads = sheet_drawable_payloads(sheet_message.type_, &sheet_message.data)?;
+    let mut semantic_table = 0usize;
+    for (drawable_position, drawable_payload) in drawable_payloads.iter().enumerate() {
+        let drawable_identifier = local_reference_identifier(drawable_payload)?;
+        let info = source
+            .state
+            .index
+            .resolve_ref_id(&source.state.components, drawable_identifier)
+            .map_err(map_read_error)?
+            .ok_or(Error::InvalidSource {
+                path: Path::Package,
+            })?;
+        let Some((info_message_index, info_message)) = unique_table_info(info)? else {
+            continue;
+        };
+        let info_object = source
+            .state
+            .components
+            .catalog()
+            .get_index(info.component_index)
+            .and_then(|component| component.archive().objects.get(info.object_index))
+            .ok_or(Error::InvalidSource {
+                path: Path::Package,
+            })?;
+        validate_message_metadata(info_object, info_message_index)?;
+        if info_object.archive_info.identifier != Some(drawable_identifier) {
+            return Err(Error::InvalidSource {
+                path: Path::Package,
+            });
+        }
+        let info_snapshot = table_info_codec::decode_table_info(
+            &info_message.data,
+            table_info_decode_options(&info_message.data),
+        )
+        .map_err(map_table_info_codec_error)?;
+        if semantic_table != table_position {
+            semantic_table = semantic_table.checked_add(1).ok_or(Error::InvalidSource {
+                path: Path::Package,
+            })?;
+            continue;
+        }
+        let model_identifier = info_snapshot.table_model().identifier().get();
+        let model = source
+            .state
+            .index
+            .resolve_ref_id(&source.state.components, model_identifier)
+            .map_err(map_read_error)?
+            .ok_or(Error::InvalidSource {
+                path: Path::Package,
+            })?;
+        let (message_index, message) = unique_table_model(model.messages)?;
+        let model_object = source
+            .state
+            .components
+            .catalog()
+            .get_index(model.component_index)
+            .and_then(|component| component.archive().objects.get(model.object_index))
+            .ok_or(Error::InvalidSource {
+                path: Path::Package,
+            })?;
+        validate_message_metadata(model_object, message_index)?;
+        if model_object.archive_info.identifier != Some(model_identifier) {
+            return Err(Error::InvalidSource {
+                path: Path::Package,
+            });
+        }
+        if sheet_identifier == drawable_identifier
+            || sheet_identifier == model_identifier
+            || drawable_identifier == model_identifier
+        {
+            return Err(Error::InvalidSource {
+                path: Path::Package,
+            });
+        }
+        return Ok(Target {
+            sheet_position,
+            table_position,
+            model_identifier,
+            sheet_identifier,
+            drawable_identifier,
+            drawable_position,
+            sheet_component_index: sheet.component_index,
+            sheet_object_index: sheet.object_index,
+            sheet_message_index,
+            sheet_message_type: sheet_message.type_,
+            info_component_index: info.component_index,
+            info_object_index: info.object_index,
+            info_message_index,
+            info_message_type: info_message.type_,
+            component_index: model.component_index,
+            object_index: model.object_index,
+            message_index,
+            message_type: message.type_,
+            settings: Settings::default(),
+            rows: 0,
+            columns: 0,
+            locked: LockState::from_locked(info_snapshot.locked().unwrap_or(false)),
+        });
+    }
+    Err(Error::TableNotFound)
+}
+
 pub(super) fn settings_at_target(source: &Package, target: Target) -> Result<Settings, Error> {
     let object = source
         .state

@@ -58,6 +58,12 @@ pub(crate) mod table_cells;
 pub(crate) mod table_dimension;
 pub(crate) mod table_headers;
 mod table_lock;
+pub(crate) mod table_relocation;
+#[allow(
+    dead_code,
+    reason = "The physical-only relocation seam is retained solely for the legacy migration host."
+)]
+mod table_relocation_compat;
 pub(crate) mod table_sort;
 pub(crate) mod table_title;
 
