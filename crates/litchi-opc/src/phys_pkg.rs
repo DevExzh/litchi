@@ -1282,7 +1282,7 @@ impl Default for PhysPkgWriter<Cursor<Vec<u8>>> {
     }
 }
 
-fn read_limited<R: Read>(mut reader: R, limits: ReadLimits) -> Result<Vec<u8>> {
+pub(crate) fn read_limited<R: Read>(mut reader: R, limits: ReadLimits) -> Result<Vec<u8>> {
     let Ok(maximum) = usize::try_from(limits.max_input_bytes()) else {
         return Err(OpcError::InvalidReadLimit {
             resource: ReadResource::InputBytes,
@@ -1290,7 +1290,7 @@ fn read_limited<R: Read>(mut reader: R, limits: ReadLimits) -> Result<Vec<u8>> {
         });
     };
     let mut data = Vec::new();
-    data.try_reserve(maximum.min(8 * 1024))
+    data.try_reserve_exact(maximum.min(8 * 1024))
         .map_err(|source| OpcError::Allocation {
             resource: "OPC package input",
             source,
@@ -1301,7 +1301,14 @@ fn read_limited<R: Read>(mut reader: R, limits: ReadLimits) -> Result<Vec<u8>> {
         let remaining = maximum.saturating_sub(data.len());
         if remaining == 0 {
             let mut extra = [0u8; 1];
-            if reader.read(&mut extra)? != 0 {
+            let read = loop {
+                match reader.read(&mut extra) {
+                    Ok(read) => break read,
+                    Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                    Err(error) => return Err(error.into()),
+                }
+            };
+            if read != 0 {
                 return Err(OpcError::ReadLimit {
                     resource: ReadResource::InputBytes,
                     actual: maximum as u64 + 1,
@@ -1312,11 +1319,24 @@ fn read_limited<R: Read>(mut reader: R, limits: ReadLimits) -> Result<Vec<u8>> {
         }
 
         let chunk = remaining.min(buffer.len());
-        let read = reader.read(&mut buffer[..chunk])?;
+        let read = loop {
+            match reader.read(&mut buffer[..chunk]) {
+                Ok(read) => break read,
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(error) => return Err(error.into()),
+            }
+        };
+        if read > chunk {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "reader returned more bytes than the provided buffer",
+            )
+            .into());
+        }
         if read == 0 {
             return Ok(data);
         }
-        data.try_reserve(read)
+        data.try_reserve_exact(read)
             .map_err(|source| OpcError::Allocation {
                 resource: "OPC package input",
                 source,

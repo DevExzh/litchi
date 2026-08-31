@@ -4,7 +4,7 @@
 //! OPC catalog and mandatory presentation root, then resolves only slide
 //! metadata. A slide body is loaded when a selected [`SourceSlide`] is read.
 
-use std::io::Write;
+use std::io::{Read, Write};
 #[cfg(any(unix, windows))]
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -697,6 +697,25 @@ impl SourceBackedPresentation {
         Self::from_read_at_with_limits(source, ReadLimits::default())
     }
 
+    /// Open a PPTX source from a sequential reader using the standard bounded
+    /// OPC read policy.
+    ///
+    /// The reader is consumed once into the source-backed positional owner;
+    /// slide payloads remain deferred until a selected slide is read.
+    pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
+        Self::from_source_backed_package(SourceBackedPackage::from_reader(reader)?)
+    }
+
+    /// Open a PPTX source from a sequential reader with explicit OPC limits.
+    ///
+    /// Reader ingestion is bounded by `limits.max_input_bytes()`, and slide
+    /// payloads remain deferred after the presentation graph is indexed.
+    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
+        Self::from_source_backed_package(SourceBackedPackage::from_reader_with_limits(
+            reader, limits,
+        )?)
+    }
+
     /// Open from a positional source with explicit OPC resource limits.
     ///
     /// # Errors
@@ -1098,6 +1117,27 @@ impl SourceBackedPresentationEditor {
     /// without materializing ordinary slide payloads.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
         Self::from_read_at_with_limits(source, ReadLimits::default())
+    }
+
+    /// Open a PPTX source-backed editor from a sequential reader using the
+    /// standard bounded OPC read policy.
+    ///
+    /// The reader is consumed once into the source-backed positional owner;
+    /// slide payloads remain deferred until a selected slide is captured.
+    pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
+        Self::from_reader_with_limits(reader, ReadLimits::default())
+    }
+
+    /// Open a PPTX source-backed editor from a sequential reader with
+    /// explicit OPC limits.
+    ///
+    /// Reader ingestion is bounded by `limits.max_input_bytes()`, and slide
+    /// payloads remain deferred after the presentation graph is indexed.
+    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
+        Self::from_source_backed_package(
+            SourceBackedPackage::from_reader_with_limits(reader, limits)?,
+            limits,
+        )
     }
 
     /// Open an ordinary PPTX source with explicit OPC resource limits.

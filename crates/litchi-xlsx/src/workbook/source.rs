@@ -12,6 +12,7 @@
 //! allocation from that reservation.
 
 use std::collections::HashMap;
+use std::io::Read;
 #[cfg(any(unix, windows))]
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
@@ -312,6 +313,29 @@ impl SourceBackedWorkbook {
     /// Open an ordinary XLSX package from a caller-provided positional source.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
         Self::from_read_at_with_limits(source, ReadLimits::default())
+    }
+
+    /// Open an XLSX package from a sequential reader with the default
+    /// bounded OPC policy.
+    ///
+    /// The reader is consumed into the source-backed owner's bounded byte
+    /// storage. Workbook metadata is validated at open, while worksheet and
+    /// other ordinary payloads remain deferred until a selected read asks for
+    /// them. The resulting owned source has stable freshness identity for the
+    /// lifetime of this immutable snapshot.
+    pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
+        Self::from_reader_with_limits(reader, ReadLimits::default())
+    }
+
+    /// Open an XLSX package from a sequential reader with explicit OPC limits.
+    ///
+    /// Input ingestion and all later deferred payload reads use the same
+    /// bounded source-backed package policy; unselected worksheets remain
+    /// cold until explicitly selected.
+    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
+        Self::from_source_backed_package(SourceBackedPackage::from_reader_with_limits(
+            reader, limits,
+        )?)
     }
 
     /// Open from a positional source with explicit OPC resource limits.

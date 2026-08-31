@@ -58,7 +58,7 @@ pub(super) use litchi_opc::constants::content_type as ct;
 pub(super) use litchi_opc::packuri::PackURI;
 pub(super) use litchi_opc::part::{BlobPart, Part};
 pub(super) use litchi_opc::rel::TargetMode;
-pub(super) use std::io::{Read, Seek, Write};
+pub(super) use std::io::{Read, Write};
 pub(super) use std::path::Path;
 
 pub(super) const MAX_MAIL_MERGE_RELATIONSHIPS: usize = 65_536;

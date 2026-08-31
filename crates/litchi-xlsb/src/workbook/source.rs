@@ -1,7 +1,7 @@
 //! Deferred, source-backed XLSB worksheet catalog and materialization.
 
 use std::fmt;
-use std::io::{self, Cursor, Write};
+use std::io::{self, Cursor, Read, Write};
 use std::sync::{Arc, Mutex};
 
 use litchi_core::sheet::{Cell as SheetCell, Worksheet as SheetWorksheet};
@@ -145,6 +145,58 @@ impl SourceBackedWorkbook {
     /// Open with the default bounded OPC read and cache policies.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
         Self::from_source_backed_package(SourceBackedPackage::from_read_at(source)?)
+    }
+
+    /// Open an XLSB package from a sequential reader with the default bounded
+    /// OPC and external-link policies.
+    ///
+    /// The reader is consumed into the source-backed owner's bounded byte
+    /// storage. Workbook metadata is validated at open, while worksheet,
+    /// shared-string, style, table, and external-link payloads remain
+    /// deferred until their selected semantic reads require them. The owned
+    /// source has stable freshness identity for this immutable snapshot.
+    pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
+        Self::from_reader_with_limits_and_external_link_limits(
+            reader,
+            ReadLimits::default(),
+            ExternalLinkLimits::default(),
+        )
+    }
+
+    /// Open an XLSB package from a sequential reader with explicit OPC
+    /// resource limits.
+    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
+        Self::from_reader_with_limits_and_external_link_limits(
+            reader,
+            limits,
+            ExternalLinkLimits::default(),
+        )
+    }
+
+    /// Open an XLSB package from a sequential reader with explicit
+    /// external-link resource limits and the default OPC policy.
+    pub fn from_reader_with_external_link_limits<R: Read>(
+        reader: R,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        Self::from_reader_with_limits_and_external_link_limits(
+            reader,
+            ReadLimits::default(),
+            external_link_limits,
+        )
+    }
+
+    /// Open an XLSB package from a sequential reader with explicit OPC and
+    /// external-link resource limits.
+    pub fn from_reader_with_limits_and_external_link_limits<R: Read>(
+        reader: R,
+        limits: ReadLimits,
+        external_link_limits: ExternalLinkLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package_with_external_link_limits(
+            SourceBackedPackage::from_reader_with_limits(reader, limits)?,
+            external_link_limits,
+        )
     }
 
     /// Open with an explicit bounded OPC read policy.

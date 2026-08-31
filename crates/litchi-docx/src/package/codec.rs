@@ -19,8 +19,7 @@
 use super::model::{
     CustomProps, CustomPropsHost, DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL,
     DIAGRAM_QUICK_STYLE_REL, Error, MutableDocument, OpcPackage, PackURI, Package, Path, Read,
-    Result, Seek, Slot, Write, WriteRollbackGuard, ct, docx_web,
-    validate_document_main_content_type,
+    Result, Slot, Write, WriteRollbackGuard, ct, docx_web, validate_document_main_content_type,
 };
 #[cfg(feature = "encryption")]
 pub(super) use super::model::{Limits, Mode};
@@ -393,7 +392,7 @@ impl Package {
     ///
     /// # Arguments
     ///
-    /// * `reader` - A reader containing the .docx file data (must implement Read + Seek)
+    /// * `reader` - A reader containing the .docx file data (must implement Read)
     ///
     /// # Examples
     ///
@@ -410,7 +409,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn from_reader<R: Read + Seek>(reader: R) -> Result<Self> {
+    pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
         Self::from_reader_with_limits(reader, litchi_opc::ReadLimits::default())
     }
 
@@ -419,7 +418,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn from_reader_with_limits<R: Read + Seek>(
+    pub fn from_reader_with_limits<R: Read>(
         reader: R,
         limits: litchi_opc::ReadLimits,
     ) -> Result<Self> {

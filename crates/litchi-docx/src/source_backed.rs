@@ -41,7 +41,7 @@ use quick_xml::reader::NsReader;
 use sha2::{Digest as _, Sha256};
 use smallvec::SmallVec;
 use std::borrow::Cow;
-use std::io::Write;
+use std::io::{Read, Write};
 #[cfg(any(unix, windows))]
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -302,6 +302,28 @@ impl Package {
     /// does not decompress or materialize the main-document payload.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
         Self::from_source_backed(SourceBackedPackage::from_read_at(source)?)
+    }
+
+    /// Open a DOCX source from a sequential reader using the standard bounded
+    /// OPC read policy.
+    ///
+    /// The reader is consumed once into the source-backed positional owner;
+    /// ordinary package payloads remain deferred until a query asks for them.
+    pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
+        Self::from_source_backed(SourceBackedPackage::from_reader(reader)?)
+    }
+
+    /// Open a DOCX source from a sequential reader with explicit OPC limits.
+    ///
+    /// Reader ingestion is bounded by `limits.max_input_bytes()`, and
+    /// ordinary package payloads remain deferred after the source is indexed.
+    pub fn from_reader_with_limits<R: Read>(
+        reader: R,
+        limits: litchi_opc::ReadLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed(SourceBackedPackage::from_reader_with_limits(
+            reader, limits,
+        )?)
     }
 
     /// Open a DOCX source with an explicit bounded OPC read policy.
