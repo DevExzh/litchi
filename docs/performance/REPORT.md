@@ -340,6 +340,25 @@ allocation, RSS, decompression, physical-I/O, or producer claim.
 
 Crate-scoped formatting evidence: `cargo fmt --package soapberry-zip --package litchi-opc -- --check` passed after formatting.
 
+## DOCX source-backed selected-story text lifecycle (change 0352)
+
+Change 0352 records a source-backed DOCX correctness/CRUD closure only
+(`performance_claim: none`). One selected `Main`, `Header(index)`, or
+`Footer(index)` story now has bounded snapshot/text streaming, direct-paragraph
+edits, reversible source-bound patches/inverses, and same-topology one-part
+overlay publication. Exact no-op/trailing-byte copying, canonical
+relationship/content-type/external/shared-target validation, resolved
+namespace/MCE handling, freshness/lineage/fingerprint/signature checks,
+cancellation, and failure atomicity remain enforced; unsupported XML and
+managed edits are typed refusals. The new target passed `11/11` and existing
+`source_backed` passed `16/16` in serialized constrained runs; the 347 MiB
+target and approximately 15 GiB post-run available memory with saturated swap
+are observations only. Footnotes, endnotes, comments, and glossary are not in
+this slice. No speed, RSS, allocation, physical-I/O, benchmark, or broader
+DOCX claim follows. Focused coverage includes strict duplicate/end-tag
+validation, inverse hostile-writer refusal, decoded namespaces, and actual
+emitted-byte bounds.
+
 ## Indexed-stream validation (change 0351)
 
 Change 0351 records correctness/resource hardening only

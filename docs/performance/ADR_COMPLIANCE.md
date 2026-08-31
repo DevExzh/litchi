@@ -1,5 +1,23 @@
 # Performance optimization ADR-compliance matrix
 
+## DOCX selected-story source-backed lifecycle (change 0352)
+
+The selected-story lifecycle remains in the DOCX owner and uses the existing
+`SourceBackedPackage` source/overlay boundary; it adds no facade archive type,
+dependency edge, lock/runtime handle, or unsafe storage. `Main`,
+`Header(index)`, and `Footer(index)` snapshot, text-streaming, direct-paragraph
+edit, source-bound patch/inverse, and same-topology one-part publication keep
+source lineage, freshness, fingerprints, signature, cancellation, and failure
+atomicity checks. Exact no-op/trailing-byte copying and canonical
+relationship/content-type/external/shared-target plus namespace/MCE validation
+preserve unsupported content by typed refusal. Managed edits and
+footnote/endnote/comment/glossary stories remain outside this slice. Evidence
+is `11/11` for the new story-text target and `16/16` for existing
+`source_backed`, serialized under the 8 GiB limit with one job/thread; the 347
+MiB target and approximately 15 GiB post-run available memory with saturated
+swap are not performance evidence. `performance_claim: none`; no speed, RSS,
+allocation, physical-I/O, benchmark, or whole-GOAL claim.
+
 ## Indexed-stream validation (change 0351)
 
 The low-level indexed stream proof remains within the ZIP/OPC ownership
