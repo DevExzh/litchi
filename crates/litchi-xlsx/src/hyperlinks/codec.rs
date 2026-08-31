@@ -732,6 +732,19 @@ pub(crate) fn rewrite_hyperlinks(
     values: &[Hyperlink],
     relationship_ids: &[Option<&str>],
 ) -> Result<Vec<u8>> {
+    rewrite_hyperlinks_checked(xml, values, relationship_ids, || Ok(()))
+}
+
+pub(crate) fn rewrite_hyperlinks_checked<F>(
+    xml: &[u8],
+    values: &[Hyperlink],
+    relationship_ids: &[Option<&str>],
+    mut check: F,
+) -> Result<Vec<u8>>
+where
+    F: FnMut() -> Result<()>,
+{
+    check()?;
     if values.len() != relationship_ids.len() {
         return Err(invalid(
             "XLSX hyperlink rewrite values and relationships differ",
@@ -742,15 +755,16 @@ pub(crate) fn rewrite_hyperlinks(
             "XLSX worksheet exceeds the {MAX_HYPERLINKS} hyperlink safety limit"
         )));
     }
-    if values.is_empty() && scan_rewrite_layout(xml)?.container_span.is_none() {
+    let layout = scan_rewrite_layout_checked(xml, &mut check)?;
+    if values.is_empty() && layout.container_span.is_none() {
         return Ok(xml.to_vec());
     }
-    let layout = scan_rewrite_layout(xml)?;
     let replacement = write_hyperlinks(
         layout.element_prefix.as_deref().unwrap_or(""),
         layout.relationship_namespace,
         values,
         relationship_ids,
+        &mut check,
     )?;
     if let Some(span) = layout.container_span {
         return replace_span(xml, span, &replacement);
@@ -778,6 +792,11 @@ pub(crate) fn rewrite_hyperlinks(
         output.extend_from_slice(&xml[layout.root_end..]);
         return Ok(output);
     }
+    if layout.unknown_direct_child {
+        return Err(invalid(
+            "XLSX hyperlink insertion refuses unknown direct worksheet children",
+        ));
+    }
     let insertion = layout
         .successor_start
         .or(layout.root_close_start)
@@ -798,6 +817,7 @@ pub(crate) fn rewrite_hyperlinks(
     output.extend_from_slice(&xml[..insertion]);
     output.extend_from_slice(&replacement);
     output.extend_from_slice(&xml[insertion..]);
+    check()?;
     Ok(output)
 }
 
@@ -822,9 +842,17 @@ struct RewriteLayout {
     successor_start: Option<usize>,
     element_prefix: Option<String>,
     relationship_namespace: &'static str,
+    unknown_direct_child: bool,
 }
 
 fn scan_rewrite_layout(xml: &[u8]) -> Result<RewriteLayout> {
+    scan_rewrite_layout_checked(xml, &mut || Ok(()))
+}
+
+fn scan_rewrite_layout_checked<F>(xml: &[u8], check: &mut F) -> Result<RewriteLayout>
+where
+    F: FnMut() -> Result<()>,
+{
     if xml.len() > MAX_WORKSHEET_XML_BYTES {
         return Err(invalid(format!(
             "XLSX worksheet XML exceeds the {MAX_WORKSHEET_XML_BYTES} byte safety limit"
@@ -841,7 +869,20 @@ fn scan_rewrite_layout(xml: &[u8]) -> Result<RewriteLayout> {
     let mut successor_start = None;
     let mut stack = Vec::<(Box<[u8]>, usize, usize)>::new();
     let mut container_depth = None;
+    let mut unknown_direct_child = false;
+    let mut event_count = 0usize;
     loop {
+        if event_count % 256 == 0 {
+            check()?;
+        }
+        event_count = event_count
+            .checked_add(1)
+            .ok_or_else(|| invalid("XLSX worksheet XML event count overflows usize"))?;
+        if event_count > MAX_XML_EVENTS {
+            return Err(invalid(format!(
+                "XLSX worksheet exceeds the {MAX_XML_EVENTS} XML event safety limit"
+            )));
+        }
         let event = reader
             .read_event()
             .map_err(|error| invalid(format!("invalid XLSX worksheet hyperlink XML: {error}")))?;
@@ -878,8 +919,14 @@ fn scan_rewrite_layout(xml: &[u8]) -> Result<RewriteLayout> {
                     }
                     container_start = Some(start);
                     container_depth = Some(depth + 1);
-                } else if depth == 1 && successor_start.is_none() && is_hyperlink_successor(local) {
-                    successor_start = Some(start);
+                } else if depth == 1 {
+                    if !is_known_worksheet_child(local) || !same_element_prefix(&name, &stack[0].0)
+                    {
+                        unknown_direct_child = true;
+                    }
+                    if successor_start.is_none() && is_hyperlink_successor(local) {
+                        successor_start = Some(start);
+                    }
                 } else if container_depth == Some(depth) && local != "hyperlink" {
                     return Err(invalid(
                         "XLSX hyperlink owner contains unsupported child markup",
@@ -924,8 +971,14 @@ fn scan_rewrite_layout(xml: &[u8]) -> Result<RewriteLayout> {
                     }
                     container_start = Some(start);
                     container_end = Some(end);
-                } else if depth == 1 && successor_start.is_none() && is_hyperlink_successor(local) {
-                    successor_start = Some(start);
+                } else if depth == 1 {
+                    if !is_known_worksheet_child(local) || !same_element_prefix(&name, &stack[0].0)
+                    {
+                        unknown_direct_child = true;
+                    }
+                    if successor_start.is_none() && is_hyperlink_successor(local) {
+                        successor_start = Some(start);
+                    }
                 } else if container_depth == Some(depth) && local != "hyperlink" {
                     return Err(invalid(
                         "XLSX hyperlink owner contains unsupported child markup",
@@ -978,6 +1031,7 @@ fn scan_rewrite_layout(xml: &[u8]) -> Result<RewriteLayout> {
     if !root_empty && (depth != 0 || !stack.is_empty()) {
         return Err(invalid("XLSX worksheet hyperlink XML is not balanced"));
     }
+    check()?;
     Ok(RewriteLayout {
         root_start,
         root_end,
@@ -988,7 +1042,62 @@ fn scan_rewrite_layout(xml: &[u8]) -> Result<RewriteLayout> {
         successor_start,
         element_prefix,
         relationship_namespace,
+        unknown_direct_child,
     })
+}
+
+fn is_known_worksheet_child(local: &str) -> bool {
+    matches!(
+        local,
+        "sheetPr"
+            | "dimension"
+            | "sheetViews"
+            | "sheetFormatPr"
+            | "cols"
+            | "sheetData"
+            | "sheetCalcPr"
+            | "sheetProtection"
+            | "protectedRanges"
+            | "scenarios"
+            | "autoFilter"
+            | "sortState"
+            | "dataConsolidate"
+            | "customSheetViews"
+            | "mergeCells"
+            | "phoneticPr"
+            | "conditionalFormatting"
+            | "dataValidations"
+            | "hyperlinks"
+            | "printOptions"
+            | "pageMargins"
+            | "pageSetup"
+            | "headerFooter"
+            | "rowBreaks"
+            | "colBreaks"
+            | "customProperties"
+            | "cellWatches"
+            | "ignoredErrors"
+            | "smartTags"
+            | "drawing"
+            | "legacyDrawing"
+            | "legacyDrawingHF"
+            | "picture"
+            | "oleObjects"
+            | "controls"
+            | "webPublishItems"
+            | "tableParts"
+            | "extLst"
+    )
+}
+
+fn same_element_prefix(left: &[u8], right: &[u8]) -> bool {
+    element_name_prefix(left) == element_name_prefix(right)
+}
+
+fn element_name_prefix(name: &[u8]) -> &[u8] {
+    name.iter()
+        .position(|byte| *byte == b':')
+        .map_or(&[], |colon| &name[..colon])
 }
 
 fn is_hyperlink_successor(local: &str) -> bool {
@@ -1016,12 +1125,17 @@ fn is_hyperlink_successor(local: &str) -> bool {
     )
 }
 
-fn write_hyperlinks(
+fn write_hyperlinks<F>(
     prefix: &str,
     relationship_namespace: &str,
     values: &[Hyperlink],
     relationship_ids: &[Option<&str>],
-) -> Result<Vec<u8>> {
+    check: &mut F,
+) -> Result<Vec<u8>>
+where
+    F: FnMut() -> Result<()>,
+{
+    check()?;
     if values.is_empty() {
         return Ok(Vec::new());
     }
@@ -1040,7 +1154,10 @@ fn write_hyperlinks(
         output.extend_from_slice(b"\"");
     }
     output.extend_from_slice(b">");
-    for (value, relationship_id) in values.iter().zip(relationship_ids) {
+    for (index, (value, relationship_id)) in values.iter().zip(relationship_ids).enumerate() {
+        if index % 256 == 0 {
+            check()?;
+        }
         output.extend_from_slice(b"<");
         output.extend_from_slice(qualified_link.as_bytes());
         write_attribute(&mut output, "ref", value.reference().as_str());
@@ -1061,6 +1178,7 @@ fn write_hyperlinks(
     output.extend_from_slice(b"</");
     output.extend_from_slice(qualified_container.as_bytes());
     output.push(b'>');
+    check()?;
     Ok(output)
 }
 
