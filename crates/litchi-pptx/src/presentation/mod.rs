@@ -6,6 +6,7 @@
 
 mod codec;
 mod model;
+mod order;
 mod package;
 mod source;
 mod source_cross_copy;
@@ -18,6 +19,10 @@ pub mod embedded;
 pub mod media;
 
 pub use model::Presentation;
+pub use order::{
+    SourceBackedSlideOrderCommit, SourceBackedSlideOrderEdit, SourceBackedSlideOrderPatch,
+    SourceBackedSlideOrderSnapshot,
+};
 pub use source::{
     MAX_SOURCE_BACKED_SLIDE_BATCH, SourceBackedPresentation, SourceBackedPresentationEditor,
     SourceBackedSlideBatchCommit, SourceBackedSlideBatchEdit, SourceBackedSlideBatchPatch,

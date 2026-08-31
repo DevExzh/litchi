@@ -246,42 +246,104 @@ struct ShapeTextEdit<'a> {
 }
 
 pub(crate) fn reorder_slides(xml: &[u8], current: &[Slide], ordered: &[u32]) -> Result<Vec<u8>> {
+    let mut current_bindings = Vec::new();
+    current_bindings
+        .try_reserve_exact(current.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation slide bindings",
+            source,
+        })?;
+    for slide in current {
+        current_bindings.push((slide.id, slide.relationship_id.as_str()));
+    }
+    let mut ordered_bindings = Vec::new();
+    ordered_bindings
+        .try_reserve(ordered.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation ordered slide bindings",
+            source,
+        })?;
+    for id in ordered {
+        let relationship_id = current
+            .iter()
+            .find(|slide| slide.id == *id)
+            .map_or("", |slide| slide.relationship_id.as_str());
+        ordered_bindings.push((*id, relationship_id));
+    }
+    reorder_slide_bindings(xml, &current_bindings, &ordered_bindings, None)
+}
+
+/// Validate and reorder a raw `p:sldIdLst` against exact `(id, r:id)` bindings.
+///
+/// The entry spans are permuted as opaque byte ranges. Every byte before the
+/// first entry, between entry slots, and after the final entry remains at its
+/// original position; IDs and relationship IDs are never regenerated.
+pub(crate) fn reorder_slide_bindings(
+    xml: &[u8],
+    current: &[(u32, &str)],
+    ordered: &[(u32, &str)],
+    context: Option<&litchi_core::ExecutionContext>,
+) -> Result<Vec<u8>> {
     if ordered.len() != current.len() {
         return Err(invalid(
             "opened-presentation slide order is not a complete permutation",
         ));
     }
-    let elements = slide_id_elements(xml, false)?;
-    if elements.len() != current.len() {
-        return Err(invalid(
-            "opened-presentation slide-order XML differs from the semantic graph",
-        ));
-    }
-    for (element, slide) in elements.iter().zip(current) {
-        if element.id != slide.id || element.relationship_id != slide.relationship_id {
-            return Err(invalid(
-                "opened-presentation slide-order binding changed during staging",
-            ));
-        }
-    }
+    let elements = slide_id_elements(xml, false, context)?;
+    validate_slide_elements(&elements, current, context)?;
     let mut selected = Vec::new();
     selected
-        .try_reserve_exact(ordered.len())
+        .try_reserve(ordered.len())
         .map_err(|source| Error::Allocation {
             resource: "opened-presentation slide permutation",
             source,
         })?;
-    let mut seen = HashSet::new();
-    for id in ordered {
-        if !seen.insert(*id) {
+    let mut seen_ids = HashSet::new();
+    let mut seen_relationships = HashSet::new();
+    seen_ids
+        .try_reserve(ordered.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation ordered slide IDs",
+            source,
+        })?;
+    seen_relationships
+        .try_reserve(ordered.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation ordered slide relationship IDs",
+            source,
+        })?;
+    let mut indexes = HashMap::new();
+    indexes
+        .try_reserve(current.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation slide binding index",
+            source,
+        })?;
+    for (index, binding) in current.iter().enumerate() {
+        if index % 256 == 0 {
+            check_execution_context(context)?;
+        }
+        if indexes.insert(*binding, index).is_some() {
+            return Err(invalid(
+                "opened-presentation slide-order bindings are ambiguous",
+            ));
+        }
+    }
+    for (index, (id, relationship_id)) in ordered.iter().enumerate() {
+        if index % 256 == 0 {
+            check_execution_context(context)?;
+        }
+        if !seen_ids.insert(*id) || !seen_relationships.insert(*relationship_id) {
             return Err(invalid(
                 "opened-presentation slide order repeats an identity",
             ));
         }
-        let index = elements
-            .iter()
-            .position(|element| element.id == *id)
-            .ok_or_else(|| invalid("opened-presentation slide order references an unknown ID"))?;
+        let index = indexes
+            .get(&(*id, *relationship_id))
+            .copied()
+            .ok_or_else(|| {
+                invalid("opened-presentation slide order references an unknown binding")
+            })?;
         selected.push(index);
     }
     if selected
@@ -289,7 +351,8 @@ pub(crate) fn reorder_slides(xml: &[u8], current: &[Slide], ordered: &[u32]) -> 
         .enumerate()
         .all(|(left, right)| left == *right)
     {
-        return Ok(xml.to_vec());
+        check_execution_context(context)?;
+        return clone_xml_bytes(xml, "opened-presentation unchanged XML");
     }
     let first = elements
         .first()
@@ -297,6 +360,7 @@ pub(crate) fn reorder_slides(xml: &[u8], current: &[Slide], ordered: &[u32]) -> 
     let last = elements
         .last()
         .ok_or_else(|| invalid("opened-presentation slide list is empty"))?;
+    check_execution_context(context)?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(xml.len())
@@ -306,6 +370,9 @@ pub(crate) fn reorder_slides(xml: &[u8], current: &[Slide], ordered: &[u32]) -> 
         })?;
     output.extend_from_slice(&xml[..first.span.start]);
     for (position, source_index) in selected.into_iter().enumerate() {
+        if position % 256 == 0 {
+            check_execution_context(context)?;
+        }
         let source = &elements[source_index];
         output.extend_from_slice(&xml[source.span.clone()]);
         if let Some(next) = elements.get(position + 1) {
@@ -316,8 +383,62 @@ pub(crate) fn reorder_slides(xml: &[u8], current: &[Slide], ordered: &[u32]) -> 
     Ok(output)
 }
 
+/// Validate that a raw presentation XML stream has exactly the supplied
+/// ordered slide bindings without producing a rewritten buffer.
+pub(crate) fn validate_slide_bindings(
+    xml: &[u8],
+    current: &[(u32, &str)],
+    context: Option<&litchi_core::ExecutionContext>,
+) -> Result<()> {
+    let elements = slide_id_elements(xml, false, context)?;
+    validate_slide_elements(&elements, current, context)
+}
+
+fn validate_slide_elements(
+    elements: &[SlideIdElement],
+    current: &[(u32, &str)],
+    context: Option<&litchi_core::ExecutionContext>,
+) -> Result<()> {
+    if elements.len() != current.len() {
+        return Err(invalid(
+            "opened-presentation slide-order XML differs from the semantic graph",
+        ));
+    }
+    let mut current_ids = HashSet::new();
+    let mut current_relationships = HashSet::new();
+    current_ids
+        .try_reserve(current.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation slide IDs",
+            source,
+        })?;
+    current_relationships
+        .try_reserve(current.len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation slide relationship IDs",
+            source,
+        })?;
+    for (index, (element, (id, relationship_id))) in elements.iter().zip(current).enumerate() {
+        if index % 256 == 0 {
+            check_execution_context(context)?;
+        }
+        if element.id != *id || element.relationship_id != *relationship_id {
+            return Err(invalid(
+                "opened-presentation slide-order binding changed during staging",
+            ));
+        }
+        if !current_ids.insert(*id) || !current_relationships.insert(*relationship_id) {
+            return Err(invalid(
+                "opened-presentation slide-order bindings are ambiguous",
+            ));
+        }
+    }
+    check_execution_context(context)?;
+    Ok(())
+}
+
 pub(crate) fn remove_slide(xml: &[u8], current: &[Slide], id: u32) -> Result<Vec<u8>> {
-    let elements = slide_id_elements(xml, false)?;
+    let elements = slide_id_elements(xml, false, None)?;
     if elements.len() != current.len() {
         return Err(invalid(
             "opened-presentation slide-order XML differs from the semantic graph",
@@ -386,7 +507,7 @@ where
             "opened-presentation slide insertion position is out of bounds",
         ));
     }
-    let elements = slide_id_elements(xml, true)?;
+    let elements = slide_id_elements(xml, true, None)?;
     if elements.len() != current_len {
         return Err(invalid(
             "opened-presentation slide-order XML differs from the semantic graph",
@@ -1170,7 +1291,11 @@ fn shape_identity_from_attributes(attributes: &[(Vec<u8>, String)]) -> Result<Op
         .map_err(|_err| invalid("opened-presentation non-visual shape identity is invalid"))
 }
 
-fn slide_id_elements(xml: &[u8], capture_names: bool) -> Result<Vec<SlideIdElement>> {
+fn slide_id_elements(
+    xml: &[u8],
+    capture_names: bool,
+    context: Option<&litchi_core::ExecutionContext>,
+) -> Result<Vec<SlideIdElement>> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
@@ -1206,6 +1331,9 @@ fn slide_id_elements(xml: &[u8], capture_names: bool) -> Result<Vec<SlideIdEleme
         match event {
             Event::Start(element) => {
                 bump(&mut nodes)?;
+                if nodes % 256 == 0 {
+                    check_execution_context(context)?;
+                }
                 if depth >= MAX_XML_DEPTH {
                     return Err(Error::Limit {
                         resource: "opened-presentation XML depth",
@@ -1213,15 +1341,22 @@ fn slide_id_elements(xml: &[u8], capture_names: bool) -> Result<Vec<SlideIdEleme
                     });
                 }
                 if pml_namespace && element.local_name().as_ref() == b"sldIdLst" {
-                    lists = lists.saturating_add(1);
+                    if depth != 1 {
+                        return Err(invalid(
+                            "opened-presentation slide-ID list must be a direct root child",
+                        ));
+                    }
+                    lists = lists.checked_add(1).ok_or_else(|| {
+                        invalid("opened-presentation slide-ID list count overflow")
+                    })?;
                     if lists != 1 {
                         return Err(invalid("opened-presentation has multiple slide-ID lists"));
                     }
                     list_depth = Some(depth + 1);
-                } else if list_depth == Some(depth) {
-                    if !pml_namespace || element.local_name().as_ref() != b"sldId" {
+                } else if pml_namespace && element.local_name().as_ref() == b"sldId" {
+                    if list_depth != Some(depth) {
                         return Err(invalid(
-                            "opened-presentation slide-ID list has an unsupported child",
+                            "opened-presentation slide ID is not a direct slide-list child",
                         ));
                     }
                     if capture_names {
@@ -1240,61 +1375,94 @@ fn slide_id_elements(xml: &[u8], capture_names: bool) -> Result<Vec<SlideIdEleme
                         start,
                         depth: depth + 1,
                     });
-                }
-                depth += 1;
-            },
-            Event::Empty(element) => {
-                bump(&mut nodes)?;
-                if list_depth == Some(depth) {
+                } else if list_depth == Some(depth) {
                     if !pml_namespace || element.local_name().as_ref() != b"sldId" {
                         return Err(invalid(
                             "opened-presentation slide-ID list has an unsupported child",
                         ));
                     }
+                }
+                depth += 1;
+            },
+            Event::Empty(element) => {
+                bump(&mut nodes)?;
+                if nodes % 256 == 0 {
+                    check_execution_context(context)?;
+                }
+                if pml_namespace && element.local_name().as_ref() == b"sldIdLst" {
+                    if depth != 1 || lists != 0 {
+                        return Err(invalid(
+                            "opened-presentation has an additional or nested slide-ID list",
+                        ));
+                    }
+                    lists = lists.checked_add(1).ok_or_else(|| {
+                        invalid("opened-presentation slide-ID list count overflow")
+                    })?;
+                } else if pml_namespace && element.local_name().as_ref() == b"sldId" {
+                    if list_depth != Some(depth) {
+                        return Err(invalid(
+                            "opened-presentation slide ID is not a direct slide-list child",
+                        ));
+                    }
                     let capture_element_names = capture_names && elements.is_empty();
                     let (id, relationship_id, relationship_attribute_name, relationship_namespace) =
                         parse_slide_id(&element, &reader, capture_element_names)?;
-                    elements.push(SlideIdElement {
-                        id,
-                        relationship_id,
-                        span: start..end,
-                        element_name: if capture_element_names {
-                            Some(clone_xml_name(
-                                element.name().as_ref(),
-                                "opened-presentation slide entry name",
-                            )?)
-                        } else {
-                            None
+                    push_slide_id_element(
+                        &mut elements,
+                        SlideIdElement {
+                            id,
+                            relationship_id,
+                            span: start..end,
+                            element_name: if capture_element_names {
+                                Some(clone_xml_name(
+                                    element.name().as_ref(),
+                                    "opened-presentation slide entry name",
+                                )?)
+                            } else {
+                                None
+                            },
+                            element_namespace: captured_element_namespace,
+                            relationship_attribute_name,
+                            relationship_namespace,
                         },
-                        element_namespace: captured_element_namespace,
-                        relationship_attribute_name,
-                        relationship_namespace,
-                    });
+                    )?;
+                } else if list_depth == Some(depth) {
+                    if !pml_namespace || element.local_name().as_ref() != b"sldId" {
+                        return Err(invalid(
+                            "opened-presentation slide-ID list has an unsupported child",
+                        ));
+                    }
                 }
             },
             Event::End(element) => {
-                if let Some(active) = &open
-                    && active.depth == depth
-                    && pml_namespace
-                    && element.local_name().as_ref() == b"sldId"
-                {
+                if pml_namespace && element.local_name().as_ref() == b"sldId" {
+                    if !open.as_ref().is_some_and(|active| active.depth == depth) {
+                        return Err(invalid(
+                            "opened-presentation slide ID is nested or not opened",
+                        ));
+                    }
                     let active = open
                         .take()
                         .ok_or_else(|| invalid("opened-presentation slide ID disappeared"))?;
-                    elements.push(SlideIdElement {
-                        id: active.id,
-                        relationship_id: active.relationship_id,
-                        span: active.start..end,
-                        element_name: None,
-                        element_namespace: None,
-                        relationship_attribute_name: None,
-                        relationship_namespace: None,
-                    });
+                    push_slide_id_element(
+                        &mut elements,
+                        SlideIdElement {
+                            id: active.id,
+                            relationship_id: active.relationship_id,
+                            span: active.start..end,
+                            element_name: None,
+                            element_namespace: None,
+                            relationship_attribute_name: None,
+                            relationship_namespace: None,
+                        },
+                    )?;
                 }
-                if list_depth == Some(depth)
-                    && pml_namespace
-                    && element.local_name().as_ref() == b"sldIdLst"
-                {
+                if pml_namespace && element.local_name().as_ref() == b"sldIdLst" {
+                    if list_depth != Some(depth) {
+                        return Err(invalid(
+                            "opened-presentation slide-ID list is nested or not opened",
+                        ));
+                    }
                     list_depth = None;
                 }
                 depth = depth
@@ -1326,7 +1494,22 @@ fn slide_id_elements(xml: &[u8], capture_names: bool) -> Result<Vec<SlideIdEleme
     if lists != 1 {
         return Err(invalid("opened-presentation has no slide-ID list"));
     }
+    check_execution_context(context)?;
     Ok(elements)
+}
+
+fn push_slide_id_element(
+    elements: &mut Vec<SlideIdElement>,
+    element: SlideIdElement,
+) -> Result<()> {
+    elements
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation slide ID elements",
+            source,
+        })?;
+    elements.push(element);
+    Ok(())
 }
 
 fn parse_slide_id(
@@ -1389,6 +1572,15 @@ fn parse_slide_id(
 }
 
 fn clone_xml_name(value: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    output.extend_from_slice(value);
+    Ok(output)
+}
+
+fn clone_xml_bytes(value: &[u8], resource: &'static str) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     output
         .try_reserve_exact(value.len())
@@ -1548,6 +1740,18 @@ fn is_presentation_namespace(namespace: &ResolveResult<'_>) -> bool {
 fn position(reader: &NsReader<&[u8]>) -> Result<usize> {
     usize::try_from(reader.buffer_position())
         .map_err(|_err| invalid("opened-presentation XML position exceeds usize"))
+}
+
+fn check_execution_context(context: Option<&litchi_core::ExecutionContext>) -> Result<()> {
+    if let Some(context) = context {
+        context.check().map_err(|error| {
+            Error::Opc(match error {
+                litchi_core::ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                error => litchi_opc::OpcError::Execution(error),
+            })
+        })?;
+    }
+    Ok(())
 }
 
 fn bump(nodes: &mut usize) -> Result<()> {

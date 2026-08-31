@@ -129,7 +129,9 @@ pub use comments::{
     update_presentation_comment, update_presentation_comment_author, write_comment_authors,
     write_slide_comments,
 };
-pub use error::{Error, Result, ShapeTransferRefusal, SlideCopyRefusal, SlideRemovalRefusal};
+pub use error::{
+    Error, Result, ShapeTransferRefusal, SlideCopyRefusal, SlideOrderRefusal, SlideRemovalRefusal,
+};
 pub use format::{ImageFormat, TextFormat};
 pub use hyperlinks::Hyperlink;
 #[cfg(feature = "encryption")]
@@ -163,8 +165,9 @@ pub use presentation::{
     SourceBackedCrossSlideCopySnapshot, SourceBackedPresentation, SourceBackedPresentationEditor,
     SourceBackedSlideBatchCommit, SourceBackedSlideBatchEdit, SourceBackedSlideBatchPatch,
     SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit, SourceBackedSlideEdit,
-    SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceImage, SourceImageDescriptor,
-    SourceImageTarget, SourceSlide,
+    SourceBackedSlideOrderCommit, SourceBackedSlideOrderEdit, SourceBackedSlideOrderPatch,
+    SourceBackedSlideOrderSnapshot, SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceImage,
+    SourceImageDescriptor, SourceImageTarget, SourceSlide,
 };
 pub use presentation_properties::{
     BrowserSupport, Color, ColorKind, Extension, HtmlPublish, HtmlTarget, OpaqueExtension, Print,

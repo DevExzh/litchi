@@ -94,6 +94,18 @@ impl SourcePart {
             rels: view.rels().clone(),
         }
     }
+
+    pub(super) fn source_data(&self) -> &PartData {
+        &self.data
+    }
+
+    pub(super) fn source_partname(&self) -> &PackURI {
+        &self.partname
+    }
+
+    pub(super) fn source_relationships(&self) -> &Relationships {
+        &self.rels
+    }
 }
 
 struct SourceCheckedTextSink<'a, W: ?Sized> {
@@ -463,7 +475,7 @@ pub struct SourceBackedPresentationEditor {
     // reparse the immutable presentation root and rebuild the complete slide
     // graph. Snapshot capture still checks execution, the selected Part, and
     // the exact source version before publishing anything.
-    _presentation: SourcePart,
+    pub(super) _presentation: SourcePart,
     pub(super) slides: Box<[Arc<SourceSlideData>]>,
     package_relationships: Arc<[RelationshipBinding]>,
     presentation_binding: Arc<PartBinding>,
