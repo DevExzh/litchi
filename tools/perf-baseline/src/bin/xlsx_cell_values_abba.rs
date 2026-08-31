@@ -1055,6 +1055,26 @@ impl<'a> RunState<'a> {
         match leg {
             "A1" => state.eager_output = Some(observation.output_sha256.clone()),
             "B1" => {
+                let expected_untouched_member_count = expected_cell_untouched_member_count(
+                    usize::try_from(observation.corpus.archive_member_count).map_err(|_| {
+                        "source corpus member count does not fit usize".to_owned()
+                    })?,
+                    cell.workload,
+                )
+                .ok_or_else(|| "source untouched-member count underflows closure".to_owned())?;
+                if observation.untouched_member_count != Some(expected_untouched_member_count) {
+                    self.failure(
+                        sample,
+                        warmup,
+                        cell,
+                        leg,
+                        Implementation::Source,
+                        format!(
+                            "source untouched-member count differs: expected {expected_untouched_member_count}, observed {:?}",
+                            observation.untouched_member_count
+                        ),
+                    )?;
+                }
                 state.source_output = Some(observation.output_sha256.clone());
                 state.source_semantic = observation.semantic_sha256.clone();
                 state.source_untouched_count = observation.untouched_member_count;
@@ -1282,6 +1302,17 @@ fn parse_child_report(
     }
 
     let corpus = parse_corpus(report, cell)?;
+    let (expected_archive_bytes, expected_archive_sha256) =
+        pinned_cell_corpus_identity(cell.shape)?;
+    if corpus.archive_member_count != 17
+        || usize::try_from(corpus.archive_bytes).ok() != Some(expected_archive_bytes)
+        || corpus.archive_sha256 != expected_archive_sha256
+    {
+        return Err(format!(
+            "xlsx cell-values ABBA v1 requires the pinned 17-member four-sheet no-calcChain {} corpus",
+            cell.shape
+        ));
+    }
     let results = required_array(report, "results")?;
     if results.len() != 1 {
         return Err("child report did not contain exactly one result".to_owned());
@@ -1868,6 +1899,71 @@ const fn expected_touched_worksheets(workload: Workload) -> usize {
     match workload {
         Workload::OneEdit => 1,
         Workload::OnePercent | Workload::Batch => 4,
+    }
+}
+
+fn pinned_cell_corpus_identity(shape: &str) -> Result<(usize, &'static str), String> {
+    match shape {
+        "medium" => Ok((
+            4_226_429,
+            "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        )),
+        "dense-sparse" => Ok((
+            4_251_863,
+            "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a",
+        )),
+        _ => Err(format!(
+            "xlsx cell-values ABBA v1 does not claim corpus shape '{shape}'"
+        )),
+    }
+}
+
+fn expected_cell_untouched_member_count(
+    archive_member_count: usize,
+    workload: Workload,
+) -> Option<usize> {
+    archive_member_count
+        .checked_sub(expected_touched_worksheets(workload))
+        .and_then(|count| count.checked_sub(1))
+}
+
+#[cfg(test)]
+mod xlsx_cell_values_abba_identity_tests {
+    use super::*;
+
+    #[test]
+    fn pinned_current_shape_identities_are_exact() {
+        assert_eq!(
+            pinned_cell_corpus_identity("medium").unwrap(),
+            (
+                4_226_429,
+                "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+            )
+        );
+        assert_eq!(
+            pinned_cell_corpus_identity("dense-sparse").unwrap(),
+            (
+                4_251_863,
+                "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a"
+            )
+        );
+        assert!(pinned_cell_corpus_identity("unknown").is_err());
+    }
+
+    #[test]
+    fn pinned_current_shape_untouched_counts_are_exact() {
+        assert_eq!(
+            expected_cell_untouched_member_count(17, Workload::OneEdit),
+            Some(15)
+        );
+        assert_eq!(
+            expected_cell_untouched_member_count(17, Workload::OnePercent),
+            Some(12)
+        );
+        assert_eq!(
+            expected_cell_untouched_member_count(17, Workload::Batch),
+            Some(12)
+        );
     }
 }
 

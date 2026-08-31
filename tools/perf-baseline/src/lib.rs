@@ -17863,17 +17863,93 @@ fn verify_xlsx_cell_crud_package_identity(
     let has_vendor_extension = corpus.manifest.shape == XlsxCellCrudShape::VendorExtension.name();
     verify_xlsx_vendor_extension_package(&source, has_vendor_extension)?;
     verify_xlsx_vendor_extension_package(&candidate, has_vendor_extension)?;
-    if source.part_count() != candidate.part_count()
+    let allow_calculation_invalidation = corpus.manifest.generator
+        == XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR
+        && corpus.archive.as_slice() != output;
+    let source_chain = xlsx_calc_chain_identity(&source)?;
+    let candidate_chain = xlsx_calc_chain_identity(&candidate)?;
+    verify_xlsx_calc_chain_content_type_topology(
+        &corpus.archive,
+        output,
+        source_chain.as_ref(),
+        candidate_chain.as_ref(),
+    )?;
+    let removed_chain = match (source_chain.as_ref(), candidate_chain.as_ref()) {
+        (None, None) => None,
+        (Some(chain), None) if allow_calculation_invalidation => Some(chain),
+        (Some(_), None) => {
+            return Err("XLSX cell CRUD output changed package topology".into());
+        },
+        (None, Some(_)) => {
+            return Err("XLSX cell CRUD output added a calculation-chain closure".into());
+        },
+        (Some(_), Some(_)) if allow_calculation_invalidation => {
+            return Err("XLSX cell CRUD output retained a calculation-chain closure".into());
+        },
+        (Some(source), Some(candidate)) if source == candidate => None,
+        (Some(_), Some(_)) => {
+            return Err("XLSX cell CRUD output changed package topology".into());
+        },
+    };
+    let removed_member = removed_chain.map(|chain| chain.target_member.as_str());
+    let expected_part_count = candidate
+        .part_count()
+        .checked_add(usize::from(removed_member.is_some()))
+        .ok_or("XLSX cell CRUD package part count overflows usize")?;
+    if source.part_count() != expected_part_count
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
     {
         return Err("XLSX cell CRUD output changed package topology".into());
     }
+    let source_parts = source
+        .iter_parts()
+        .map(|part| part.partname().membername().to_owned())
+        .collect::<BTreeSet<_>>();
+    let candidate_parts = candidate
+        .iter_parts()
+        .map(|part| part.partname().membername().to_owned())
+        .collect::<BTreeSet<_>>();
+    if source_parts
+        .iter()
+        .any(|name| Some(name.as_str()) != removed_member && !candidate_parts.contains(name))
+        || candidate_parts.iter().any(|name| !source_parts.contains(name))
+    {
+        return Err("XLSX cell CRUD output changed package part set".into());
+    }
+    verify_xlsx_cell_crud_workbook_calculation_closure(
+        corpus,
+        output,
+        allow_calculation_invalidation,
+    )?;
+    if let Some(chain) = removed_chain {
+        verify_xlsx_cell_crud_raw_calculation_chain_removal(
+            &corpus.archive,
+            output,
+            chain,
+        )?;
+    }
+    let workbook_uri = PackURI::new("/xl/workbook.xml")?;
+    let source_workbook = source.get_part(&workbook_uri)?;
+    let candidate_workbook = candidate.get_part(&workbook_uri)?;
+    let removed_relationship = removed_chain.map(|chain| chain.relationship_id.as_str());
+    let source_workbook_relationships =
+        xlsx_relationship_signatures_without(source_workbook.rels(), removed_relationship);
+    let candidate_workbook_relationships = relationship_signatures(candidate_workbook.rels());
+    if source_workbook_relationships != candidate_workbook_relationships {
+        return Err("XLSX cell CRUD output changed workbook relationships".into());
+    }
     for source_part in source.iter_parts() {
+        if Some(source_part.partname().membername()) == removed_member {
+            continue;
+        }
         let candidate_part = candidate.get_part(source_part.partname())?;
-        if candidate_part.content_type() != source_part.content_type()
-            || relationship_signatures(candidate_part.rels())
-                != relationship_signatures(source_part.rels())
-        {
+        let relationships_match = if source_part.partname() == &workbook_uri {
+            relationship_signatures(candidate_part.rels()) == candidate_workbook_relationships
+        } else {
+            relationship_signatures(candidate_part.rels())
+                == relationship_signatures(source_part.rels())
+        };
+        if candidate_part.content_type() != source_part.content_type() || !relationships_match {
             return Err("XLSX cell CRUD output changed Part metadata".into());
         }
         if source_part.partname().membername().starts_with("xl/media/")
@@ -17892,22 +17968,102 @@ fn xlsx_cell_crud_untouched_member_evidence(
 ) -> Result<(usize, String), Box<dyn Error>> {
     let source = raw_zip_members(&corpus.archive)?;
     let candidate = raw_zip_members(output)?;
-    if source.keys().ne(candidate.keys()) {
+    let allow_calculation_invalidation = corpus.manifest.generator
+        == XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR
+        && corpus.archive.as_slice() != output;
+    let source_package = OpcPackage::from_bytes(&corpus.archive)?;
+    let candidate_package = OpcPackage::from_bytes(output)?;
+    let source_chain = xlsx_calc_chain_identity(&source_package)?;
+    let candidate_chain = xlsx_calc_chain_identity(&candidate_package)?;
+    let removed_chain = match (source_chain.as_ref(), candidate_chain.as_ref()) {
+        (None, None) => None,
+        (Some(chain), None) if allow_calculation_invalidation => Some(chain),
+        (Some(_), None) => {
+            return Err("XLSX source CRUD package topology differs from source".into());
+        },
+        (None, Some(_)) => {
+            return Err("XLSX source CRUD output added a calculation-chain closure".into());
+        },
+        (Some(_), Some(_)) if allow_calculation_invalidation => {
+            return Err("XLSX source CRUD output retained a calculation-chain closure".into());
+        },
+        (Some(source), Some(candidate)) if source == candidate => None,
+        (Some(_), Some(_)) => {
+            return Err("XLSX source CRUD package topology differs from source".into());
+        },
+    };
+    let removed_member = removed_chain.map(|chain| chain.target_member.as_str());
+    if source
+        .keys()
+        .any(|name| Some(name.as_str()) != removed_member && !candidate.contains_key(name))
+        || candidate
+            .keys()
+            .any(|name| !source.contains_key(name))
+    {
         return Err("XLSX source CRUD raw ZIP member set differs from source".into());
     }
     let touched = updated
         .iter()
         .map(|coordinate| format!("xl/worksheets/sheet{}.xml", coordinate.sheet + 1))
         .collect::<BTreeSet<_>>();
+    let mut calculation_closure = BTreeSet::new();
+    if allow_calculation_invalidation {
+        calculation_closure.insert("xl/workbook.xml".to_owned());
+        if let Some(chain) = removed_chain {
+            calculation_closure.insert("xl/_rels/workbook.xml.rels".to_owned());
+            calculation_closure.insert("[Content_Types].xml".to_owned());
+            calculation_closure.insert(chain.target_member.clone());
+            verify_xlsx_cell_crud_raw_calculation_chain_removal(
+                &corpus.archive,
+                output,
+                chain,
+            )?;
+        }
+    }
+    if allow_calculation_invalidation {
+        verify_xlsx_cell_crud_workbook_calculation_closure(
+            corpus,
+            output,
+            true,
+        )?;
+    }
+    let mut all_members = source.keys().cloned().collect::<BTreeSet<_>>();
+    all_members.extend(candidate.keys().cloned());
+    let actual_changed_members = all_members
+        .iter()
+        .filter(|name| source.get(*name) != candidate.get(*name))
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let effective_output = corpus.archive.as_slice() != output;
+    let mut expected_changed_members = if effective_output {
+        touched.clone()
+    } else {
+        BTreeSet::new()
+    };
+    if effective_output && allow_calculation_invalidation {
+        expected_changed_members.insert(XLSX_WORKBOOK_MEMBER.to_owned());
+        if let Some(chain) = removed_chain {
+            expected_changed_members.insert(XLSX_WORKBOOK_RELATIONSHIPS_MEMBER.to_owned());
+            expected_changed_members.insert(XLSX_CONTENT_TYPES_MEMBER.to_owned());
+            expected_changed_members.insert(chain.target_member.clone());
+        }
+    }
+    if actual_changed_members != expected_changed_members {
+        return Err(format!(
+            "XLSX source CRUD changed-member set differs: expected {:?}, observed {:?}",
+            expected_changed_members, actual_changed_members
+        )
+        .into());
+    }
     let mut hasher = Sha256::new();
     let mut candidate_hasher = Sha256::new();
     let mut untouched_count = 0usize;
-    for (name, source_member) in source {
-        if !touched.contains(&name) {
+    for (name, source_member) in &source {
+        if !touched.contains(name) && !calculation_closure.contains(name) {
             let candidate_member = candidate
-                .get(&name)
+                .get(name)
                 .ok_or_else(|| format!("XLSX source CRUD lost raw unselected ZIP member {name}"))?;
-            if candidate_member != &source_member {
+            if candidate_member != source_member {
                 return Err(
                     format!("XLSX source CRUD changed raw unselected ZIP member {name}").into(),
                 );
@@ -36408,6 +36564,7 @@ fn run_xlsx_cell_values_edit_save(
     let partial_sink_verified = run_xlsx_cell_value_lifecycle_gates(corpus, spec)?;
     let expected = xlsx_cell_crud_eager_output(corpus, &updates)?;
     let expected_digest = sha256_hex(&expected);
+    let expected_semantic = xlsx_cell_values_output_semantic_hash(&expected, spec)?;
     let source_backed = case.is_xlsx_cell_values_source_backed();
     let managed = case.is_xlsx_cell_values_managed();
     let expected_touched = xlsx_update_sheet_selectors(&updates).len();
@@ -36684,7 +36841,11 @@ fn run_xlsx_cell_values_edit_save(
             )?);
         }
         let semantic_digest = if source_backed {
-            Some(xlsx_cell_values_output_semantic_hash(&sink.bytes, spec)?)
+            let semantic = xlsx_cell_values_output_semantic_hash(&sink.bytes, spec)?;
+            if semantic != expected_semantic {
+                return Err("XLSX source CRUD semantic output differs from eager output".into());
+            }
+            Some(semantic)
         } else {
             None
         };
@@ -45260,35 +45421,942 @@ struct RawZipMember {
     central_without_offset: Vec<u8>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct XlsxCalcChainIdentity {
+    relationship_id: String,
+    relationship_type: String,
+    target_ref: String,
+    target_member: String,
+    content_type: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum XlsxXmlTokenKind {
+    Start,
+    End,
+    Empty,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct XlsxXmlToken {
+    start: usize,
+    end: usize,
+    name_start: usize,
+    name_end: usize,
+    kind: XlsxXmlTokenKind,
+}
+
+const XLSX_WORKBOOK_MEMBER: &str = "xl/workbook.xml";
+const XLSX_WORKBOOK_RELATIONSHIPS_MEMBER: &str = "xl/_rels/workbook.xml.rels";
+const XLSX_CONTENT_TYPES_MEMBER: &str = "[Content_Types].xml";
+const XLSX_CALC_CHAIN_CONTENT_TYPE: &str =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml";
+const XLSX_SPREADSHEETML_MAIN_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const XLSX_SPREADSHEETML_MAIN_STRICT_NAMESPACE: &[u8] =
+    b"http://purl.oclc.org/ooxml/spreadsheetml/main";
+const XLSX_PACKAGE_RELATIONSHIPS_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/package/2006/relationships";
+const XLSX_PACKAGE_RELATIONSHIPS_STRICT_NAMESPACE: &[u8] =
+    b"http://purl.oclc.org/ooxml/package/relationships";
+const XLSX_PACKAGE_CONTENT_TYPES_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/package/2006/content-types";
+const XLSX_XML_ORACLE_MAX_BYTES: usize = 16 * 1024 * 1024;
+const XLSX_XML_ORACLE_MAX_DEPTH: usize = 256;
+const XLSX_XML_ORACLE_MAX_TOKENS: usize = 1_000_000;
+const XLSX_XML_ORACLE_MAX_ALLOCATED_BYTES: usize = 32 * 1024 * 1024;
+const XLSX_XML_ORACLE_MAX_NAMESPACE_DECLARATIONS: usize = 1024;
+
+fn xlsx_xml_tag_end(xml: &[u8], start: usize) -> Result<usize, Box<dyn Error>> {
+    let mut quote = None;
+    for (offset, byte) in xml.iter().enumerate().skip(start + 1) {
+        match quote {
+            Some(value) if *byte == value => quote = None,
+            Some(_) => {}
+            None if *byte == b'\'' || *byte == b'"' => quote = Some(*byte),
+            None if *byte == b'>' => return Ok(offset + 1),
+            None => {}
+        }
+    }
+    Err(format!("unterminated XML tag at byte {start}").into())
+}
+
+fn xlsx_xml_next_token(
+    xml: &[u8],
+    cursor: &mut usize,
+) -> Result<Option<XlsxXmlToken>, Box<dyn Error>> {
+    loop {
+        let Some(relative_start) = xml
+            .get(*cursor..)
+            .and_then(|rest| rest.iter().position(|byte| *byte == b'<'))
+        else {
+            *cursor = xml.len();
+            return Ok(None);
+        };
+        let start = *cursor + relative_start;
+        if xml.get(start..).is_some_and(|value| value.starts_with(b"<!--")) {
+            let end = xml
+                .get(start + 4..)
+                .and_then(|value| value.windows(3).position(|window| window == b"-->"))
+                .map(|offset| start + 4 + offset + 3)
+                .ok_or_else(|| format!("unterminated XML comment at byte {start}"))?;
+            *cursor = end;
+            continue;
+        }
+        if xml.get(start..).is_some_and(|value| value.starts_with(b"<![CDATA[")) {
+            let end = xml
+                .get(start + 9..)
+                .and_then(|value| value.windows(3).position(|window| window == b"]]>"))
+                .map(|offset| start + 9 + offset + 3)
+                .ok_or_else(|| format!("unterminated CDATA section at byte {start}"))?;
+            *cursor = end;
+            continue;
+        }
+        if xml.get(start..).is_some_and(|value| value.starts_with(b"<?")) {
+            let end = xml
+                .get(start + 2..)
+                .and_then(|value| value.windows(2).position(|window| window == b"?>"))
+                .map(|offset| start + 2 + offset + 2)
+                .ok_or_else(|| {
+                    format!("unterminated XML processing instruction at byte {start}")
+                })?;
+            *cursor = end;
+            continue;
+        }
+        if xml.get(start..).is_some_and(|value| value.starts_with(b"<!")) {
+            *cursor = xlsx_xml_tag_end(xml, start)?;
+            continue;
+        }
+
+        let end = xlsx_xml_tag_end(xml, start)?;
+        let mut name_start = start + 1;
+        let initial_kind = if xml.get(name_start) == Some(&b'/') {
+            name_start += 1;
+            XlsxXmlTokenKind::End
+        } else {
+            XlsxXmlTokenKind::Start
+        };
+        while xml
+            .get(name_start)
+            .is_some_and(|byte| byte.is_ascii_whitespace())
+        {
+            name_start += 1;
+        }
+        let mut name_end = name_start;
+        while xml.get(name_end).is_some_and(|byte| {
+            !byte.is_ascii_whitespace() && *byte != b'/' && *byte != b'>'
+        }) {
+            name_end += 1;
+        }
+        if name_end == name_start {
+            return Err(format!("XML tag has no name at byte {start}").into());
+        }
+        let mut before_end = end.saturating_sub(1);
+        while before_end > start && xml[before_end - 1].is_ascii_whitespace() {
+            before_end -= 1;
+        }
+        let kind = if initial_kind == XlsxXmlTokenKind::Start
+            && before_end > start
+            && xml[before_end - 1] == b'/'
+        {
+            XlsxXmlTokenKind::Empty
+        } else {
+            initial_kind
+        };
+        *cursor = end;
+        return Ok(Some(XlsxXmlToken {
+            start,
+            end,
+            name_start,
+            name_end,
+            kind,
+        }));
+    }
+}
+
+fn xlsx_xml_local_name(name: &[u8]) -> &[u8] {
+    name.rsplit(|byte| *byte == b':').next().unwrap_or(name)
+}
+
+fn xlsx_xml_attribute_value<'a>(tag: &'a [u8], wanted: &[u8]) -> Option<&'a [u8]> {
+    let mut cursor = 1;
+    if tag.get(cursor) == Some(&b'/') {
+        cursor += 1;
+    }
+    while tag.get(cursor).is_some_and(|byte| {
+        !byte.is_ascii_whitespace() && *byte != b'/' && *byte != b'>'
+    }) {
+        cursor += 1;
+    }
+    while cursor < tag.len() {
+        while tag
+            .get(cursor)
+            .is_some_and(|byte| byte.is_ascii_whitespace() || *byte == b'/')
+        {
+            cursor += 1;
+        }
+        if tag.get(cursor).is_none() || tag[cursor] == b'>' {
+            break;
+        }
+        let key_start = cursor;
+        while tag.get(cursor).is_some_and(|byte| {
+            !byte.is_ascii_whitespace() && *byte != b'=' && *byte != b'/' && *byte != b'>'
+        }) {
+            cursor += 1;
+        }
+        let key = &tag[key_start..cursor];
+        while tag
+            .get(cursor)
+            .is_some_and(|byte| byte.is_ascii_whitespace())
+        {
+            cursor += 1;
+        }
+        if tag.get(cursor) != Some(&b'=') {
+            while tag.get(cursor).is_some_and(|byte| {
+                *byte != b'>' && !byte.is_ascii_whitespace()
+            }) {
+                cursor += 1;
+            }
+            continue;
+        }
+        cursor += 1;
+        while tag
+            .get(cursor)
+            .is_some_and(|byte| byte.is_ascii_whitespace())
+        {
+            cursor += 1;
+        }
+        let quote = *tag.get(cursor)?;
+        if quote != b'\'' && quote != b'"' {
+            return None;
+        }
+        cursor += 1;
+        let value_start = cursor;
+        while tag.get(cursor).is_some_and(|byte| *byte != quote) {
+            cursor += 1;
+        }
+        if cursor >= tag.len() {
+            return None;
+        }
+        let value = tag.get(value_start..cursor)?;
+        if key == wanted {
+            return Some(value);
+        }
+        cursor += 1;
+    }
+    None
+}
+
+fn xlsx_xml_namespace_declarations(
+    tag: &[u8],
+) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Box<dyn Error>> {
+    let mut declarations = Vec::new();
+    let mut cursor = 1;
+    if tag.get(cursor) == Some(&b'/') {
+        cursor += 1;
+    }
+    while tag.get(cursor).is_some_and(|byte| {
+        !byte.is_ascii_whitespace() && *byte != b'/' && *byte != b'>'
+    }) {
+        cursor += 1;
+    }
+    while cursor < tag.len() {
+        while tag
+            .get(cursor)
+            .is_some_and(|byte| byte.is_ascii_whitespace() || *byte == b'/')
+        {
+            cursor += 1;
+        }
+        if tag.get(cursor).is_none() || tag[cursor] == b'>' {
+            break;
+        }
+        let key_start = cursor;
+        while tag.get(cursor).is_some_and(|byte| {
+            !byte.is_ascii_whitespace() && *byte != b'=' && *byte != b'/' && *byte != b'>'
+        }) {
+            cursor += 1;
+        }
+        let key = &tag[key_start..cursor];
+        while tag
+            .get(cursor)
+            .is_some_and(|byte| byte.is_ascii_whitespace())
+        {
+            cursor += 1;
+        }
+        if tag.get(cursor) != Some(&b'=') {
+            while tag.get(cursor).is_some_and(|byte| {
+                *byte != b'>' && !byte.is_ascii_whitespace()
+            }) {
+                cursor += 1;
+            }
+            continue;
+        }
+        cursor += 1;
+        while tag
+            .get(cursor)
+            .is_some_and(|byte| byte.is_ascii_whitespace())
+        {
+            cursor += 1;
+        }
+        let quote = *tag
+            .get(cursor)
+            .ok_or("namespace declaration has no quoted value")?;
+        if quote != b'\'' && quote != b'"' {
+            return Err("namespace declaration value is not quoted".into());
+        }
+        cursor += 1;
+        let value_start = cursor;
+        while tag.get(cursor).is_some_and(|byte| *byte != quote) {
+            cursor += 1;
+        }
+        if cursor >= tag.len() {
+            return Err("unterminated namespace declaration".into());
+        }
+        let value = tag
+            .get(value_start..cursor)
+            .ok_or("unterminated namespace declaration")?;
+        let prefix = if key == b"xmlns" {
+            Some(&b""[..])
+        } else {
+            key.strip_prefix(b"xmlns:")
+        };
+        if let Some(prefix) = prefix {
+            if declarations.len() >= XLSX_XML_ORACLE_MAX_NAMESPACE_DECLARATIONS {
+                return Err("XML namespace declaration bound exceeded".into());
+            }
+            declarations.push((prefix.to_vec(), value.to_vec()));
+        }
+        cursor += 1;
+    }
+    Ok(declarations)
+}
+
+fn xlsx_xml_resolved_namespace<'a>(
+    name: &[u8],
+    namespace_frames: &'a [Vec<(Vec<u8>, Vec<u8>)>],
+) -> &'a [u8] {
+    let prefix = name
+        .iter()
+        .position(|byte| *byte == b':')
+        .map(|index| &name[..index])
+        .unwrap_or(&[]);
+    for frame in namespace_frames.iter().rev() {
+        if let Some((_, value)) = frame
+            .iter()
+            .rev()
+            .find(|(candidate, _)| candidate.as_slice() == prefix)
+        {
+            return value.as_slice();
+        }
+    }
+    &[]
+}
+
+fn xlsx_xml_expected_namespace(local_name: &[u8]) -> &'static [u8] {
+    if local_name == b"calcPr" {
+        XLSX_SPREADSHEETML_MAIN_NAMESPACE
+    } else if local_name == b"Relationship" {
+        XLSX_PACKAGE_RELATIONSHIPS_NAMESPACE
+    } else if local_name == b"Override" {
+        XLSX_PACKAGE_CONTENT_TYPES_NAMESPACE
+    } else {
+        &[]
+    }
+}
+
+fn xlsx_xml_namespace_matches(local_name: &[u8], namespace: &[u8]) -> bool {
+    if local_name == b"calcPr" {
+        namespace == XLSX_SPREADSHEETML_MAIN_NAMESPACE
+            || namespace == XLSX_SPREADSHEETML_MAIN_STRICT_NAMESPACE
+    } else if local_name == b"Relationship" {
+        namespace == XLSX_PACKAGE_RELATIONSHIPS_NAMESPACE
+            || namespace == XLSX_PACKAGE_RELATIONSHIPS_STRICT_NAMESPACE
+    } else if local_name == b"Override" {
+        namespace == XLSX_PACKAGE_CONTENT_TYPES_NAMESPACE
+    } else {
+        namespace == xlsx_xml_expected_namespace(local_name)
+    }
+}
+
+fn xlsx_xml_strip_direct_element(
+    xml: &[u8],
+    wanted_local_name: &[u8],
+    attribute: Option<(&[u8], &[u8])>,
+) -> Result<(Vec<u8>, usize), Box<dyn Error>> {
+    if xml.len() > XLSX_XML_ORACLE_MAX_BYTES {
+        return Err("XML normalization input exceeds its byte bound".into());
+    }
+    let mut cursor = 0;
+    let mut depth = 0usize;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut active_start = None;
+    let mut removed = None;
+    let mut token_count = 0usize;
+    let mut allocated_bytes = 0usize;
+    let mut namespace_frames = Vec::<Vec<(Vec<u8>, Vec<u8>)>>::new();
+    while let Some(token) = xlsx_xml_next_token(xml, &mut cursor)? {
+        token_count = token_count
+            .checked_add(1)
+            .ok_or("XML token count overflows usize")?;
+        if token_count > XLSX_XML_ORACLE_MAX_TOKENS {
+            return Err("XML normalization token bound exceeded".into());
+        }
+        let qualified_name = &xml[token.name_start..token.name_end];
+        let name = xlsx_xml_local_name(qualified_name);
+        match token.kind {
+            XlsxXmlTokenKind::Start => {
+                if depth == 0 {
+                    if root_seen || root_closed {
+                        return Err("XML has more than one root element".into());
+                    }
+                    root_seen = true;
+                }
+                if depth >= XLSX_XML_ORACLE_MAX_DEPTH {
+                    return Err("XML normalization depth bound exceeded".into());
+                }
+                let declarations =
+                    xlsx_xml_namespace_declarations(&xml[token.start..token.end])?;
+                for (prefix, value) in &declarations {
+                    allocated_bytes = allocated_bytes
+                        .checked_add(prefix.len())
+                        .and_then(|bytes| bytes.checked_add(value.len()))
+                        .ok_or("XML namespace allocation bound overflows usize")?;
+                }
+                if allocated_bytes > XLSX_XML_ORACLE_MAX_ALLOCATED_BYTES {
+                    return Err("XML normalization allocation bound exceeded".into());
+                }
+                namespace_frames.push(declarations);
+                let namespace =
+                    xlsx_xml_resolved_namespace(qualified_name, &namespace_frames);
+                if depth == 0
+                    && !xlsx_xml_namespace_matches(wanted_local_name, namespace)
+                {
+                    return Err(
+                        "XML root namespace is not canonical for the requested part".into(),
+                    );
+                }
+                if depth == 1
+                    && name == wanted_local_name
+                    && xlsx_xml_namespace_matches(wanted_local_name, namespace)
+                    && attribute.is_none_or(|(key, value)| {
+                        xlsx_xml_attribute_value(&xml[token.start..token.end], key)
+                            == Some(value)
+                    })
+                {
+                    if active_start.is_some() || removed.is_some() {
+                        return Err("XML contains multiple direct target elements".into());
+                    }
+                    active_start = Some(token.start);
+                }
+                depth += 1;
+            }
+            XlsxXmlTokenKind::Empty => {
+                if depth == 0 {
+                    if root_seen || root_closed {
+                        return Err("XML has more than one root element".into());
+                    }
+                    root_seen = true;
+                    root_closed = true;
+                }
+                let declarations =
+                    xlsx_xml_namespace_declarations(&xml[token.start..token.end])?;
+                for (prefix, value) in &declarations {
+                    allocated_bytes = allocated_bytes
+                        .checked_add(prefix.len())
+                        .and_then(|bytes| bytes.checked_add(value.len()))
+                        .ok_or("XML namespace allocation bound overflows usize")?;
+                }
+                if allocated_bytes > XLSX_XML_ORACLE_MAX_ALLOCATED_BYTES {
+                    return Err("XML normalization allocation bound exceeded".into());
+                }
+                namespace_frames.push(declarations);
+                let namespace =
+                    xlsx_xml_resolved_namespace(qualified_name, &namespace_frames);
+                if depth == 0
+                    && !xlsx_xml_namespace_matches(wanted_local_name, namespace)
+                {
+                    return Err(
+                        "XML root namespace is not canonical for the requested part".into(),
+                    );
+                }
+                if depth == 1
+                    && name == wanted_local_name
+                    && xlsx_xml_namespace_matches(wanted_local_name, namespace)
+                    && attribute.is_none_or(|(key, value)| {
+                        xlsx_xml_attribute_value(&xml[token.start..token.end], key)
+                            == Some(value)
+                    })
+                {
+                    if removed.is_some() {
+                        return Err("XML contains multiple direct target elements".into());
+                    }
+                    removed = Some((token.start, token.end));
+                }
+                namespace_frames.pop();
+            }
+            XlsxXmlTokenKind::End => {
+                if depth == 0 {
+                    return Err("unexpected XML closing tag".into());
+                }
+                let namespace =
+                    xlsx_xml_resolved_namespace(qualified_name, &namespace_frames);
+                if depth == 2 {
+                    if let Some(start) = active_start.take() {
+                        if name != wanted_local_name
+                            || !xlsx_xml_namespace_matches(wanted_local_name, namespace)
+                        {
+                            return Err("XML direct element nesting is malformed".into());
+                        }
+                        removed = Some((start, token.end));
+                    }
+                }
+                depth -= 1;
+                if depth == 0 {
+                    root_closed = true;
+                }
+                if namespace_frames.pop().is_none() {
+                    return Err("XML namespace frame stack underflow".into());
+                }
+            }
+        }
+    }
+    if !root_seen
+        || !root_closed
+        || depth != 0
+        || !namespace_frames.is_empty()
+        || active_start.is_some()
+    {
+        return Err("XML document is not well formed enough for the raw oracle".into());
+    }
+    let Some((start, end)) = removed else {
+        allocated_bytes = allocated_bytes
+            .checked_add(xml.len())
+            .ok_or("XML normalization allocation bound overflows usize")?;
+        if allocated_bytes > XLSX_XML_ORACLE_MAX_ALLOCATED_BYTES {
+            return Err("XML normalization allocation bound exceeded".into());
+        }
+        return Ok((xml.to_vec(), 0));
+    };
+    allocated_bytes = allocated_bytes
+        .checked_add(xml.len().saturating_sub(end - start))
+        .ok_or("XML normalization allocation bound overflows usize")?;
+    if allocated_bytes > XLSX_XML_ORACLE_MAX_ALLOCATED_BYTES {
+        return Err("XML normalization allocation bound exceeded".into());
+    }
+    let mut normalized = Vec::with_capacity(xml.len().saturating_sub(end - start));
+    normalized.extend_from_slice(&xml[..start]);
+    normalized.extend_from_slice(&xml[end..]);
+    Ok((normalized, 1))
+}
+
+fn xlsx_calc_chain_identity(
+    package: &OpcPackage,
+) -> Result<Option<XlsxCalcChainIdentity>, Box<dyn Error>> {
+    let workbook = package.get_part(&PackURI::new("/xl/workbook.xml")?)?;
+    let calc_chain_part_count = package
+        .iter_parts()
+        .filter(|part| part.content_type() == XLSX_CALC_CHAIN_CONTENT_TYPE)
+        .count();
+    let mut result = None;
+    for relationship in workbook.rels().iter().filter(|relationship| {
+        xlsx_is_calc_chain_relationship_type(relationship.reltype())
+    }) {
+        if result.is_some() {
+            return Err("XLSX package has multiple calculation-chain relationships".into());
+        }
+        if relationship.is_external() {
+            return Err("XLSX calculation-chain relationship is external".into());
+        }
+        let target = relationship.target_partname()?;
+        let target_part = package.get_part(&target)?;
+        if target_part.content_type() != XLSX_CALC_CHAIN_CONTENT_TYPE {
+            return Err("XLSX calculation-chain content type is not canonical".into());
+        }
+        if target_part.rels().iter().next().is_some() {
+            return Err("XLSX calculation-chain part unexpectedly has relationships".into());
+        }
+        result = Some(XlsxCalcChainIdentity {
+            relationship_id: relationship.r_id().to_owned(),
+            relationship_type: relationship.reltype().to_owned(),
+            target_ref: relationship.target_ref().to_owned(),
+            target_member: target_part.partname().membername().to_owned(),
+            content_type: target_part.content_type().to_owned(),
+        });
+    }
+    match (&result, calc_chain_part_count) {
+        (None, 0) | (Some(_), 1) => {}
+        (None, _) => {
+            return Err("XLSX package has an orphan calculation-chain part".into());
+        },
+        (Some(_), _) => {
+            return Err("XLSX package has additional calculation-chain parts".into());
+        },
+    }
+    Ok(result)
+}
+
+fn xlsx_is_calc_chain_relationship_type(value: &str) -> bool {
+    value == relationship_type::CALC_CHAIN || value == relationship_type::STRICT_CALC_CHAIN
+}
+
+fn xlsx_calc_chain_content_type_override_count(
+    xml: &[u8],
+) -> Result<usize, Box<dyn Error>> {
+    if xml.len() > XLSX_XML_ORACLE_MAX_BYTES {
+        return Err("XML calculation-chain override input exceeds its byte bound".into());
+    }
+    let mut remaining = xml.to_vec();
+    let mut count = 0usize;
+    loop {
+        let (next, removed) = xlsx_xml_strip_direct_element(
+            &remaining,
+            b"Override",
+            Some((b"ContentType", XLSX_CALC_CHAIN_CONTENT_TYPE.as_bytes())),
+        )?;
+        if removed == 0 {
+            return Ok(count);
+        }
+        count = count
+            .checked_add(removed)
+            .ok_or("XLSX calculation-chain override count overflows usize")?;
+        if count > XLSX_XML_ORACLE_MAX_TOKENS {
+            return Err("XLSX calculation-chain override bound exceeded".into());
+        }
+        remaining = next;
+    }
+}
+
+fn verify_xlsx_calc_chain_content_type_topology(
+    source: &[u8],
+    output: &[u8],
+    source_chain: Option<&XlsxCalcChainIdentity>,
+    candidate_chain: Option<&XlsxCalcChainIdentity>,
+) -> Result<(), Box<dyn Error>> {
+    let source_archive = ArchiveReader::new(source)?;
+    let candidate_archive = ArchiveReader::new(output)?;
+    let source_content_types = source_archive.read(XLSX_CONTENT_TYPES_MEMBER)?;
+    let candidate_content_types = candidate_archive.read(XLSX_CONTENT_TYPES_MEMBER)?;
+    let source_count = xlsx_calc_chain_content_type_override_count(source_content_types.as_ref())?;
+    let candidate_count =
+        xlsx_calc_chain_content_type_override_count(candidate_content_types.as_ref())?;
+    if source_count != usize::from(source_chain.is_some())
+        || candidate_count != usize::from(candidate_chain.is_some())
+    {
+        return Err(
+            "XLSX calculation-chain content-type topology is orphaned or duplicated".into(),
+        );
+    }
+    if let Some(chain) = source_chain {
+        let part_name = format!("/{}", chain.target_member);
+        let (_, count) = xlsx_xml_strip_direct_element(
+            source_content_types.as_ref(),
+            b"Override",
+            Some((b"PartName", part_name.as_bytes())),
+        )?;
+        if count != 1 {
+            return Err(
+                "XLSX source calculation-chain part lacks its exact content-type Override".into(),
+            );
+        }
+    }
+    if let Some(chain) = candidate_chain {
+        let part_name = format!("/{}", chain.target_member);
+        let (_, count) = xlsx_xml_strip_direct_element(
+            candidate_content_types.as_ref(),
+            b"Override",
+            Some((b"PartName", part_name.as_bytes())),
+        )?;
+        if count != 1 {
+            return Err(
+                "XLSX candidate calculation-chain part lacks its exact content-type Override"
+                    .into(),
+            );
+        }
+    }
+    Ok(())
+}
+
+fn xlsx_relationship_signatures_without(
+    relationships: &Relationships,
+    removed_relationship_id: Option<&str>,
+) -> Vec<(String, String, String, bool)> {
+    let mut signatures = relationship_signatures(relationships);
+    if let Some(removed_relationship_id) = removed_relationship_id {
+        signatures.retain(|signature| signature.0 != removed_relationship_id);
+    }
+    signatures
+}
+
+fn verify_xlsx_cell_crud_workbook_calculation_closure(
+    corpus: &Corpus,
+    output: &[u8],
+    require_invalidation: bool,
+) -> Result<(), Box<dyn Error>> {
+    let source_archive = ArchiveReader::new(&corpus.archive)?;
+    let candidate_archive = ArchiveReader::new(output)?;
+    let source_workbook = source_archive.read(XLSX_WORKBOOK_MEMBER)?;
+    let candidate_workbook = candidate_archive.read(XLSX_WORKBOOK_MEMBER)?;
+    let (source_without_calc_pr, source_count) =
+        xlsx_xml_strip_direct_element(source_workbook.as_ref(), b"calcPr", None)?;
+    let (candidate_without_calc_pr, candidate_count) =
+        xlsx_xml_strip_direct_element(candidate_workbook.as_ref(), b"calcPr", None)?;
+    if source_count > 1 || candidate_count > 1 {
+        return Err("XLSX workbook contains multiple direct calcPr elements".into());
+    }
+    if source_without_calc_pr != candidate_without_calc_pr {
+        return Err("XLSX workbook changed outside direct calcPr".into());
+    }
+    let effective_invalidation = require_invalidation && corpus.archive.as_slice() != output;
+    if candidate_count != usize::from(effective_invalidation) {
+        return Err(format!(
+            "XLSX calcPr invalidation presence mismatch: expected {}, observed {candidate_count}",
+            usize::from(effective_invalidation)
+        )
+        .into());
+    }
+    if effective_invalidation {
+        let source_package = litchi_xlsx::Package::from_slice(&corpus.archive)?;
+        let candidate_package = litchi_xlsx::Package::from_slice(output)?;
+        let mut expected = source_package
+            .calculation_metadata()?
+            .properties()
+            .cloned()
+            .unwrap_or_default();
+        expected.set_calculation_id(Some(0));
+        expected.set_full_calculation_on_load(Some(true));
+        expected.set_force_full_calculation(Some(true));
+        expected.set_calculation_completed(Some(false));
+        expected.set_calculate_on_save(Some(true));
+        let candidate_metadata = candidate_package.calculation_metadata()?;
+        let actual = candidate_metadata
+            .properties()
+            .ok_or("XLSX invalidated output is missing calcPr")?;
+        if !expected.same_specification(actual) {
+            return Err("XLSX calcPr invalidation flags differ from the required closure".into());
+        }
+    }
+    Ok(())
+}
+
+fn verify_xlsx_cell_crud_raw_calculation_chain_removal(
+    source: &[u8],
+    output: &[u8],
+    chain: &XlsxCalcChainIdentity,
+) -> Result<(), Box<dyn Error>> {
+    let source_archive = ArchiveReader::new(source)?;
+    let candidate_archive = ArchiveReader::new(output)?;
+    let source_relationships = source_archive.read(XLSX_WORKBOOK_RELATIONSHIPS_MEMBER)?;
+    let candidate_relationships = candidate_archive.read(XLSX_WORKBOOK_RELATIONSHIPS_MEMBER)?;
+    let (source_without_chain, source_relationship_count) = xlsx_xml_strip_direct_element(
+        source_relationships.as_ref(),
+        b"Relationship",
+        Some((b"Id", chain.relationship_id.as_bytes())),
+    )?;
+    let (_, candidate_relationship_count) = xlsx_xml_strip_direct_element(
+        candidate_relationships.as_ref(),
+        b"Relationship",
+        Some((b"Id", chain.relationship_id.as_bytes())),
+    )?;
+    if source_relationship_count != 1 || candidate_relationship_count != 0 {
+        return Err("XLSX calculation-chain relationship was not removed exactly once".into());
+    }
+    if source_without_chain != candidate_relationships.as_slice() {
+        return Err("XLSX workbook relationships changed outside calc-chain removal".into());
+    }
+
+    let source_content_types = source_archive.read(XLSX_CONTENT_TYPES_MEMBER)?;
+    let candidate_content_types = candidate_archive.read(XLSX_CONTENT_TYPES_MEMBER)?;
+    let part_name = format!("/{}", chain.target_member);
+    let (source_without_override, source_override_count) = xlsx_xml_strip_direct_element(
+        source_content_types.as_ref(),
+        b"Override",
+        Some((b"PartName", part_name.as_bytes())),
+    )?;
+    let (_, candidate_override_count) = xlsx_xml_strip_direct_element(
+        candidate_content_types.as_ref(),
+        b"Override",
+        Some((b"PartName", part_name.as_bytes())),
+    )?;
+    if source_override_count != 1 || candidate_override_count != 0 {
+        return Err(
+            "XLSX calculation-chain content-type override was not removed exactly once".into(),
+        );
+    }
+    if source_without_override != candidate_content_types.as_slice() {
+        return Err("XLSX content types changed outside calc-chain removal".into());
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod xlsx_cell_crud_oracle_tests {
+    use super::*;
+
+    #[test]
+    fn current_no_chain_workbook_shape_has_exact_calc_pr_closure() {
+        let source = br#"<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheets><sheet name="Sheet1"/></sheets></workbook>"#;
+        let (source_without_calc_pr, source_count) =
+            xlsx_xml_strip_direct_element(source, b"calcPr", None).unwrap();
+        assert_eq!(source_count, 0);
+        assert_eq!(source_without_calc_pr, source.as_slice());
+
+        let candidate = br#"<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><x:calcPr xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main" calcId="0" fullCalcOnLoad="1" forceFullCalc="1" calcCompleted="0" calcOnSave="1"/><sheets><sheet name="Sheet1"/></sheets></workbook>"#;
+        let (candidate_without_calc_pr, candidate_count) =
+            xlsx_xml_strip_direct_element(candidate, b"calcPr", None).unwrap();
+        assert_eq!(candidate_count, 1);
+        assert_eq!(candidate_without_calc_pr, source.as_slice());
+    }
+
+    #[test]
+    fn unexpected_untouched_workbook_mutation_is_not_normalized_away() {
+        let source = br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheets><sheet name="Sheet1"/></sheets></workbook>"#;
+        let candidate = br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheets><sheet name="Changed"/></sheets></workbook>"#;
+        let (source_without_calc_pr, _) =
+            xlsx_xml_strip_direct_element(source, b"calcPr", None).unwrap();
+        let (candidate_without_calc_pr, _) =
+            xlsx_xml_strip_direct_element(candidate, b"calcPr", None).unwrap();
+        assert_ne!(source_without_calc_pr, candidate_without_calc_pr);
+    }
+
+    #[test]
+    fn calc_chain_closure_removes_only_relationship_part_and_override() {
+        let source_relationships = br#"<p:Relationships xmlns:p="http://schemas.openxmlformats.org/package/2006/relationships"><p:Relationship Id="rId1" Type="other" Target="worksheets/sheet1.xml"/><p:Relationship Id="rId9" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain" Target="calcChain.xml"/></p:Relationships>"#;
+        let candidate_relationships = br#"<p:Relationships xmlns:p="http://schemas.openxmlformats.org/package/2006/relationships"><p:Relationship Id="rId1" Type="other" Target="worksheets/sheet1.xml"/></p:Relationships>"#;
+        let (source_without_chain, source_count) = xlsx_xml_strip_direct_element(
+            source_relationships,
+            b"Relationship",
+            Some((b"Id", b"rId9")),
+        )
+        .unwrap();
+        let (candidate_without_chain, candidate_count) = xlsx_xml_strip_direct_element(
+            candidate_relationships,
+            b"Relationship",
+            Some((b"Id", b"rId9")),
+        )
+        .unwrap();
+        assert_eq!(source_count, 1);
+        assert_eq!(candidate_count, 0);
+        assert_eq!(source_without_chain, candidate_relationships.as_slice());
+        assert_eq!(candidate_without_chain, candidate_relationships.as_slice());
+
+        let foreign_relationships = br#"<p:Relationships xmlns:p="http://schemas.openxmlformats.org/package/2006/relationships" xmlns:f="urn:foreign"><f:Relationship Id="rId9" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain" Target="calcChain.xml"/></p:Relationships>"#;
+        let (_, foreign_count) = xlsx_xml_strip_direct_element(
+            foreign_relationships,
+            b"Relationship",
+            Some((b"Id", b"rId9")),
+        )
+        .unwrap();
+        assert_eq!(foreign_count, 0);
+
+        let source_content_types = br#"<t:Types xmlns:t="http://schemas.openxmlformats.org/package/2006/content-types"><t:Default Extension="xml" ContentType="application/xml"/><t:Override PartName="/xl/calcChain.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml"/></t:Types>"#;
+        let candidate_content_types = br#"<t:Types xmlns:t="http://schemas.openxmlformats.org/package/2006/content-types"><t:Default Extension="xml" ContentType="application/xml"/></t:Types>"#;
+        let (source_without_override, source_count) = xlsx_xml_strip_direct_element(
+            source_content_types,
+            b"Override",
+            Some((b"PartName", b"/xl/calcChain.xml")),
+        )
+        .unwrap();
+        let (candidate_without_override, candidate_count) = xlsx_xml_strip_direct_element(
+            candidate_content_types,
+            b"Override",
+            Some((b"PartName", b"/xl/calcChain.xml")),
+        )
+        .unwrap();
+        assert_eq!(source_count, 1);
+        assert_eq!(candidate_count, 0);
+        assert_eq!(source_without_override, candidate_content_types.as_slice());
+        assert_eq!(candidate_without_override, candidate_content_types.as_slice());
+
+        let foreign_content_types = br#"<t:Types xmlns:t="http://schemas.openxmlformats.org/package/2006/content-types" xmlns:f="urn:foreign"><f:Override PartName="/xl/calcChain.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml"/></t:Types>"#;
+        let (_, foreign_count) = xlsx_xml_strip_direct_element(
+            foreign_content_types,
+            b"Override",
+            Some((b"PartName", b"/xl/calcChain.xml")),
+        )
+        .unwrap();
+        assert_eq!(foreign_count, 0);
+
+        let foreign_calc_pr = br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:f="urn:foreign"><f:calcPr/></workbook>"#;
+        let (_, foreign_count) =
+            xlsx_xml_strip_direct_element(foreign_calc_pr, b"calcPr", None).unwrap();
+        assert_eq!(foreign_count, 0);
+    }
+
+    #[test]
+    fn calc_chain_relationship_matching_is_exact_for_both_canonical_uris() {
+        assert!(xlsx_is_calc_chain_relationship_type(
+            relationship_type::CALC_CHAIN
+        ));
+        assert!(xlsx_is_calc_chain_relationship_type(
+            relationship_type::STRICT_CALC_CHAIN
+        ));
+        assert!(!xlsx_is_calc_chain_relationship_type(&format!(
+            "{}/near-miss",
+            relationship_type::CALC_CHAIN
+        )));
+    }
+
+    #[test]
+    fn duplicate_normalized_zip_member_names_are_rejected() {
+        let mut members = BTreeMap::new();
+        let member = RawZipMember {
+            local: vec![1],
+            central_without_offset: vec![2],
+        };
+        assert!(insert_raw_zip_member(&mut members, "xl/styles.xml".to_owned(), member).is_ok());
+        let duplicate = RawZipMember {
+            local: vec![3],
+            central_without_offset: vec![4],
+        };
+        assert!(insert_raw_zip_member(
+            &mut members,
+            "xl/styles.xml".to_owned(),
+            duplicate,
+        )
+        .is_err());
+    }
+}
+
+fn insert_raw_zip_member(
+    members: &mut BTreeMap<String, RawZipMember>,
+    name: String,
+    member: RawZipMember,
+) -> Result<(), Box<dyn Error>> {
+    if members.insert(name, member).is_some() {
+        return Err("ZIP contains duplicate normalized member names".into());
+    }
+    Ok(())
+}
+
 fn raw_zip_members(bytes: &[u8]) -> Result<BTreeMap<String, RawZipMember>, Box<dyn Error>> {
     let archive = ZipArchive::from_slice(bytes)?.into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
     let index = PreservationIndex::new(&archive, &mut buffer)?;
     let mut records = archive.entries(&mut buffer);
-    index
-        .entries()
-        .iter()
-        .map(|preserved| {
-            let record = records
-                .next_entry()?
-                .ok_or("ZIP preservation index has no matching central record")?;
-            let name = record.file_path().try_normalize()?.as_ref().to_owned();
-            let local = bytes
-                [preserved.local_span().start as usize..preserved.local_span().end as usize]
-                .to_vec();
-            let central = preserved.central_record();
-            let mut central_without_offset =
-                bytes[central.start as usize..central.end as usize].to_vec();
-            central_without_offset[42..46].fill(0);
-            Ok((
-                name,
-                RawZipMember {
-                    local,
-                    central_without_offset,
-                },
-            ))
-        })
-        .collect()
+    let mut members = BTreeMap::new();
+    for preserved in index.entries() {
+        let record = records
+            .next_entry()?
+            .ok_or("ZIP preservation index has no matching central record")?;
+        let name = record.file_path().try_normalize()?.as_ref().to_owned();
+        let local = bytes
+            [preserved.local_span().start as usize..preserved.local_span().end as usize]
+            .to_vec();
+        let central = preserved.central_record();
+        let mut central_without_offset =
+            bytes[central.start as usize..central.end as usize].to_vec();
+        central_without_offset[42..46].fill(0);
+        insert_raw_zip_member(
+            &mut members,
+            name,
+            RawZipMember {
+                local,
+                central_without_offset,
+            },
+        )?;
+    }
+    Ok(members)
 }
 
 fn verify_xlsx_conditional_formatting_raw_preservation(
@@ -55408,8 +56476,27 @@ mod tests {
             .unwrap();
         let (untouched_count, untouched_digest) =
             super::xlsx_cell_crud_untouched_member_evidence(&first, &expected, &target).unwrap();
-        assert_eq!(untouched_count, first.manifest.archive_member_count - 1);
+        assert_eq!(untouched_count, first.manifest.archive_member_count - 2);
         assert!(!untouched_digest.is_empty());
+        super::verify_xlsx_cell_crud_package_identity(&first, &expected).unwrap();
+        super::verify_xlsx_cell_crud_package_identity(&first, &first.archive).unwrap();
+        let (noop_count, noop_digest) =
+            super::xlsx_cell_crud_untouched_member_evidence(&first, &first.archive, &[]).unwrap();
+        assert_eq!(noop_count, first.manifest.archive_member_count);
+        assert!(!noop_digest.is_empty());
+
+        let mut mutated = super::OpcPackage::from_bytes(&first.archive).unwrap();
+        let styles_uri = super::PackURI::new("/xl/styles.xml").unwrap();
+        let mut styles = mutated.get_part(&styles_uri).unwrap().blob().to_vec();
+        styles.push(b' ');
+        mutated.get_part_mut(&styles_uri).unwrap().set_blob(styles);
+        let mutated_bytes = super::PackageWriter::to_bytes(&mutated).unwrap();
+        assert!(super::xlsx_cell_crud_untouched_member_evidence(
+            &first,
+            &mutated_bytes,
+            &[],
+        )
+        .is_err());
         let candidate_package = super::OpcPackage::from_bytes(&expected).unwrap();
         super::verify_xlsx_vendor_extension_package(&candidate_package, true).unwrap();
 

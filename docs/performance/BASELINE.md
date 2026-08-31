@@ -2579,3 +2579,17 @@ no XLS/CFB fence changed, and `performance_claim: none`. The evidence is
 diagnostic only; the next XLS line must target a different design. See
 [`0346`](changes/0346-file-source-lock-candidate-rejected.md) and
 [`results/change-0346`](results/change-0346/).
+
+## Change 0347: XLSX cell-values harness calculation-closure repair
+
+Change 0347 is harness-only evidence (`performance_claim: none`). The old
+clean control failed on the intentional `calcPr` invalidation as a stale raw
+unselected `xl/workbook.xml` oracle; the repaired oracle passes the direct
+medium one-edit eager/source smoke with three warmups and 30 samples, plus a
+24-row ABBA v1 smoke with zero warmups and one sample, recording zero failure
+rows and complete rows. Timing gates and claim authorization remain false.
+The numeric medium and dense-sparse identities are pinned; formula/date cases
+are excluded. Source planning/commit dominate the retained source phases, so a
+shared publication-copy design remains unproven and deferred. See
+[`0347`](changes/0347-xlsx-cell-values-harness-calculation-closure.md) and
+[`results/change-0347`](results/change-0347/).

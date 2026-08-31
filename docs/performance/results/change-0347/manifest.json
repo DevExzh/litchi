@@ -1,0 +1,38 @@
+{
+  "change": "0347",
+  "schema_version": 1,
+  "performance_claim": "none",
+  "raw_files": [
+    {
+      "path": "direct-medium-one-edit.json",
+      "bytes": 95094,
+      "sha256": "be116b6e88be62ef41db06715510e2d4acffe1be5894d003c937f59813535009",
+      "source": "/home/zhuhe/CodeProjects/.perf/change-0347/smoke/direct-medium-one-edit.json",
+      "copied_unchanged": true
+    }
+  ],
+  "retained_binaries": [],
+  "bounded_status": {
+    "direct_medium_one_edit": {
+      "warmup_iterations": 3,
+      "samples_per_case": 30,
+      "cases": 2,
+      "execution_workers": 1,
+      "failure_rows": 0,
+      "complete_rows": true
+    },
+    "abba_v1": {
+      "rows": 24,
+      "warmup_iterations": 0,
+      "samples_per_case": 1,
+      "failure_rows": 0,
+      "complete_rows": true,
+      "timing_gates_passed": false,
+      "claim_authorized": false
+    }
+  },
+  "corpus_sha256": {
+    "medium": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+    "dense-sparse": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a"
+  }
+}
