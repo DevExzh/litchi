@@ -121,6 +121,14 @@ pub(crate) struct MergeCellsSlot {
 }
 
 #[derive(Debug)]
+pub(crate) struct SharedFormulaGroup {
+    pub(crate) index: u32,
+    pub(crate) reference: Box<str>,
+    pub(crate) origin: Address,
+    pub(crate) members: Box<[Address]>,
+}
+
+#[derive(Debug)]
 pub(crate) struct Layout {
     pub(crate) root: RootSlot,
     pub(crate) defaults: Option<DefaultsSlot>,
@@ -132,6 +140,7 @@ pub(crate) struct Layout {
     pub(crate) validations: Box<[SelectionRange]>,
     pub(crate) extended_validation: bool,
     pub(crate) formula_ranges: Box<[SelectionRange]>,
+    pub(crate) shared_formulas: Box<[SharedFormulaGroup]>,
     pub(crate) defaults_compatibility: bool,
     pub(crate) merge_cells: Option<MergeCellsSlot>,
     pub(crate) merge_insertion: usize,

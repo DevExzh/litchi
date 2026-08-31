@@ -6,6 +6,7 @@ use litchi_sheet::{Cell as Address, Rect};
 
 use super::super::formula::Range as FormulaRange;
 use super::x14ac;
+use crate::cell::SharedFormulaStorage;
 use crate::column::{self, Assignments};
 use crate::layout::Defaults;
 use crate::row;
@@ -127,6 +128,7 @@ pub(super) struct RawCell {
     // materialization. Keep the master's declared range beside that text so
     // a scalar-looking follower cannot lose its range ownership.
     pub(super) formula_range: Option<FormulaRange>,
+    pub(super) shared_formula: Option<SharedFormulaStorage>,
     pub(super) formula: Option<RawFormula>,
 }
 
@@ -151,6 +153,8 @@ pub(super) struct SharedMaster {
     pub(super) row: u32,
     pub(super) column: u32,
     pub(super) range: FormulaRange,
+    pub(super) rect: Rect,
+    pub(super) reference: Box<str>,
     pub(super) text: String,
 }
 

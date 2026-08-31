@@ -565,6 +565,86 @@ fn date_source() -> Vec<u8> {
     )
 }
 
+fn shared_formula_source() -> Vec<u8> {
+    let mut package = fixture_package(
+        format!(
+            r#"<worksheet xmlns="{SML}"><dimension ref="A1:C3"/><sheetData><row r="1"><c r="A1"><f xmlns:unused="urn:litchi:test" t="shared" ref="A1:B2" si="7">A1+$B2+C$3+$D$4</f><v>11</v></c><c r="B1"><f t="shared" si="7"/><v>12</v></c><c r="C1"><v>901</v></c></row><row r="2"><c r="A2"><f t="shared" si="7"/><v>21</v></c><c r="B2"><f t="shared" si="7"/><v>22</v></c><c r="C2" t="inlineStr"><is><t>untouched</t></is></c></row><row r="3"><c r="C3"><v>903</v></c></row></sheetData></worksheet>"#
+        ),
+        false,
+    );
+    package
+        .get_part_mut(&PackURI::new(MAIN).unwrap())
+        .unwrap()
+        .set_blob(
+            format!(
+                r#"<workbook xmlns="{SML}" xmlns:r="{REL}"><bookViews><workbookView/></bookViews><sheets><sheet name="Sheet1" sheetId="1" r:id="rIdSheet"/></sheets><calcPr calcId="123" calcMode="manual" fullCalcOnLoad="0" calcCompleted="1" forceFullCalc="0"/></workbook>"#
+            )
+            .into_bytes(),
+        );
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new(CALC_CHAIN).unwrap(),
+            CALC_CHAIN_CONTENT_TYPE.to_owned(),
+            format!(
+                r#"<calcChain xmlns="{SML}"><c r="A1" i="1"/><c r="B1" i="1"/><c r="A2" i="1"/><c r="B2" i="1"/><c r="C3" i="1"/></calcChain>"#
+            )
+            .into_bytes(),
+        )))
+        .unwrap();
+    package
+        .get_part_mut(&PackURI::new(MAIN).unwrap())
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            rt::CALC_CHAIN.to_owned(),
+            "calcChain.xml".to_owned(),
+            CALC_CHAIN_REL_ID.to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    PackageWriter::to_bytes(&package).unwrap()
+}
+
+fn incomplete_shared_formula_source() -> Vec<u8> {
+    fixture(
+        format!(
+            r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><f t="shared" ref="A1:B2" si="7">A1+$B2</f><v>11</v></c><c r="B1"><f t="shared" si="7"/><v>12</v></c></row></sheetData></worksheet>"#
+        ),
+        false,
+    )
+}
+
+fn oversized_shared_formula_source() -> Vec<u8> {
+    let mut sheet = format!(r#"<worksheet xmlns="{SML}"><sheetData>"#);
+    for row in 1..=16u32 {
+        sheet.push_str(&format!(r#"<row r="{row}">"#));
+        for column in b'A'..=b'Q' {
+            let reference = format!("{}{}", char::from(column), row);
+            if reference == "A1" {
+                sheet.push_str(
+                    r#"<c r="A1"><f t="shared" ref="A1:Q16" si="8">A1+$B2</f><v>1</v></c>"#,
+                );
+            } else {
+                sheet.push_str(&format!(
+                    r#"<c r="{reference}"><f t="shared" si="8"/><v>1</v></c>"#
+                ));
+            }
+        }
+        if row == 1 {
+            sheet.push_str(r#"<c r="R1"><v>9</v></c>"#);
+        }
+        sheet.push_str("</row>");
+    }
+    sheet.push_str("</sheetData></worksheet>");
+    fixture(sheet, false)
+}
+
+fn worksheet_cell_fragment<'a>(xml: &'a str, reference: &str) -> &'a str {
+    let start = xml.find(&format!(r#"<c r="{reference}""#)).unwrap();
+    let end = xml[start..].find("</c>").unwrap();
+    &xml[start..start + end + "</c>".len()]
+}
+
 #[test]
 fn first_middle_last_batch_reopens_preserves_unselected_parts_and_inverts() {
     let source_bytes = three_cells();
@@ -2046,4 +2126,235 @@ fn formula_publication_rejects_a_stale_source_before_output() {
         Err(Error::Package(OpcError::SourceChanged { .. }))
     ));
     assert!(output.is_empty());
+}
+
+#[test]
+fn shared_formula_master_edit_preserves_wire_group_and_drops_group_caches() {
+    let bytes = shared_formula_source();
+    let source_package = OpcPackage::from_bytes(&bytes).unwrap();
+    let unused = source_package
+        .get_part(&PackURI::new(UNUSED).unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+
+    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.set_shared_formula(address("A1"), Formula::new("B2+$C3+D$4+$E$5").unwrap())
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.changed());
+    assert!(matches!(
+        commit.snapshot().cell(address("A1")),
+        Some(Cell::Formula(formula))
+            if formula.text() == "B2+$C3+D$4+$E$5" && formula.cached().is_none()
+    ));
+
+    let mut output = Vec::new();
+    editor
+        .publish_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    let published = OpcPackage::from_bytes(&output).unwrap();
+    assert!(!has_calculation_chain(&published));
+    assert_eq!(
+        published
+            .get_part(&PackURI::new(UNUSED).unwrap())
+            .unwrap()
+            .blob(),
+        unused.as_slice(),
+    );
+
+    let worksheet_xml = String::from_utf8(zip_member(&output, "xl/worksheets/sheet1.xml")).unwrap();
+    let master = worksheet_cell_fragment(&worksheet_xml, "A1");
+    assert!(master.contains(r#"t="shared""#));
+    assert!(master.contains(r#"ref="A1:B2""#));
+    assert!(master.contains(r#"si="7""#));
+    assert!(master.contains("B2+$C3+D$4+$E$5"));
+    for reference in ["A1", "B1", "A2", "B2"] {
+        let fragment = worksheet_cell_fragment(&worksheet_xml, reference);
+        assert!(
+            fragment.contains(r#"t="shared""#),
+            "{reference} lost shared type"
+        );
+        assert!(
+            fragment.contains(r#"si="7""#),
+            "{reference} lost shared index"
+        );
+        assert!(
+            !fragment.contains("<v"),
+            "{reference} retained a formula cache"
+        );
+    }
+    assert!(worksheet_cell_fragment(&worksheet_xml, "C1").contains("<v>901</v>"));
+    assert!(worksheet_cell_fragment(&worksheet_xml, "C3").contains("<v>903</v>"));
+    assert!(worksheet_xml.contains("untouched"));
+}
+
+#[test]
+fn shared_formula_follower_is_rejected_without_staging() {
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(shared_formula_source())))
+            .unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    assert!(
+        edit.set_shared_formula(address("B1"), Formula::new("B2+$C3").unwrap())
+            .is_err()
+    );
+    assert!(edit.is_empty());
+}
+
+#[test]
+fn ordinary_cell_edits_refuse_shared_group_without_staging() {
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(shared_formula_source())))
+            .unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    assert!(
+        edit.set_formula(address("B1"), Formula::new("B2+$C3").unwrap())
+            .is_err()
+    );
+    assert!(edit.set(address("B1"), Number::new("42").unwrap()).is_err());
+    assert!(edit.clear(address("B1")).is_err());
+    assert!(edit.remove(address("B1")).is_err());
+    assert!(edit.is_empty());
+}
+
+#[test]
+fn shared_formula_master_noop_is_byte_exact_and_retains_caches_and_chain() {
+    let bytes = shared_formula_source();
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let commit = editor.edit("Sheet1").unwrap().commit().unwrap();
+    assert!(!commit.changed());
+    assert!(commit.patch().is_empty());
+
+    let mut output = Vec::new();
+    editor
+        .publish_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, bytes);
+    let package = OpcPackage::from_bytes(&output).unwrap();
+    assert!(has_calculation_chain(&package));
+    let worksheet_xml = String::from_utf8(zip_member(&output, "xl/worksheets/sheet1.xml")).unwrap();
+    for reference in ["A1", "B1", "A2", "B2"] {
+        assert!(worksheet_cell_fragment(&worksheet_xml, reference).contains("<v>"));
+    }
+}
+
+#[test]
+fn shared_formula_patch_inverse_restores_original_bytes_semantics_and_topology() {
+    let bytes = shared_formula_source();
+    let original = OpcPackage::from_bytes(&bytes).unwrap();
+    let original_sheet = original
+        .get_part(&PackURI::new(SHEET).unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    let original_chain = original
+        .get_part(&PackURI::new(CALC_CHAIN).unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    let original_chain_target = calculation_chain_target(&original);
+    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.set_shared_formula(address("A1"), Formula::new("B2+$C3+D$4+$E$5").unwrap())
+        .unwrap();
+    let commit = edit.commit().unwrap();
+
+    let mut replay = original.clone();
+    commit.patch().apply(&mut replay).unwrap();
+    assert!(!has_calculation_chain(&replay));
+    for reference in ["A1", "B1", "A2", "B2"] {
+        assert!(
+            !worksheet_cell_fragment(
+                &String::from_utf8(
+                    replay
+                        .get_part(&PackURI::new(SHEET).unwrap())
+                        .unwrap()
+                        .blob()
+                        .to_vec(),
+                )
+                .unwrap(),
+                reference,
+            )
+            .contains("<v")
+        );
+    }
+
+    commit.patch().inverse().apply(&mut replay).unwrap();
+    assert_eq!(
+        replay
+            .get_part(&PackURI::new(SHEET).unwrap())
+            .unwrap()
+            .blob(),
+        original_sheet.as_slice(),
+    );
+    assert_eq!(calculation_chain_target(&replay), original_chain_target);
+    assert_eq!(
+        replay
+            .get_part(&PackURI::new(CALC_CHAIN).unwrap())
+            .unwrap()
+            .blob(),
+        original_chain.as_slice(),
+    );
+    let restored = litchi_xlsx::cell_values::Snapshot::load(&replay, "Sheet1").unwrap();
+    assert!(matches!(
+        restored.cell(address("A1")),
+        Some(Cell::Formula(formula))
+            if formula.text() == "A1+$B2+C$3+$D$4" && formula.cached().is_some()
+    ));
+}
+
+#[test]
+fn malformed_or_incomplete_shared_formula_groups_are_refused() {
+    let cases = [
+        incomplete_shared_formula_source(),
+        fixture(
+            format!(
+                r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><f t="shared" si="7">A1+$B2</f><v>11</v></c><c r="B1"><f t="shared" si="7" ref="B1:B2"/><v>12</v></c></row><row r="2"><c r="A2"><f t="shared" si="7"/><v>21</v></c><c r="B2"><f t="shared" si="7"/><v>22</v></c></row></sheetData></worksheet>"#
+            ),
+            false,
+        ),
+    ];
+    for bytes in cases {
+        let result = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes)))
+            .and_then(|editor| {
+                let mut edit = editor.edit("Sheet1")?;
+                edit.set_shared_formula(address("A1"), Formula::new("B2+$C3").unwrap())
+            });
+        assert!(result.is_err());
+    }
+}
+
+#[test]
+fn shared_formula_expansion_over_256_members_is_refused() {
+    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(
+        oversized_shared_formula_source(),
+    )))
+    .unwrap();
+    let result = editor.edit("Sheet1").and_then(|mut edit| {
+        edit.set_shared_formula(address("A1"), Formula::new("B1+$C2").unwrap())
+    });
+    assert!(result.is_err());
+}
+
+#[test]
+fn unrelated_scalar_edit_preserves_an_oversized_shared_formula_group() {
+    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(
+        oversized_shared_formula_source(),
+    )))
+    .unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.set(address("R1"), Number::new("10").unwrap()).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.changed());
+    assert!(matches!(
+        commit.snapshot().cell(address("R1")),
+        Some(Cell::Value(Value::Number(number))) if number == &Number::new("10").unwrap()
+    ));
+    assert!(matches!(
+        commit.snapshot().cell(address("Q16")),
+        Some(Cell::Formula(_))
+    ));
 }

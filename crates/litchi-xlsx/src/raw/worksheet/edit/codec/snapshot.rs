@@ -9,7 +9,7 @@ mod write;
 
 pub(crate) use model::{
     Attribute, CellSlot, ColumnSlot, ColumnsSlot, DefaultsSlot, DimensionTag, Layout,
-    MergeCellsSlot, MergeSlot, RootEffect, RowSlot, SheetData, Span, Tag,
+    MergeCellsSlot, MergeSlot, RootEffect, RowSlot, SharedFormulaGroup, SheetData, Span, Tag,
 };
 pub(crate) use scan::scan;
 #[cfg(test)]

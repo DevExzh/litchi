@@ -968,6 +968,7 @@ impl Parser {
             inline: cell.saw_inline.then_some(cell.inline),
             inline_rich: cell.saw_inline_run,
             formula_range: None,
+            shared_formula: None,
             formula,
         });
         Ok(())

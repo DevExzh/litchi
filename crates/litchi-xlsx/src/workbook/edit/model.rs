@@ -66,6 +66,13 @@ impl State {
             Some(Payload::SharedString { text, .. }) => {
                 Cell::Value(crate::Value::Text(text.clone()))
             },
+            Some(Payload::SharedFormula {
+                formula: Some(formula),
+                ..
+            }) => Cell::Formula(formula.clone()),
+            Some(Payload::SharedFormula { formula: None, .. }) => {
+                before.map_or(Cell::Empty, |stored| stored.cell.clone())
+            },
             Some(Payload::Clear | Payload::ClearIfPresent) => Cell::Empty,
             None => before.map_or(Cell::Empty, |stored| stored.cell.clone()),
         };
@@ -89,7 +96,12 @@ impl State {
                 *index,
                 Arc::clone(&workbook.inner.shared_string_lineage),
             )),
-            Some(Payload::Set(_) | Payload::Clear | Payload::ClearIfPresent) => None,
+            Some(
+                Payload::Set(_)
+                | Payload::SharedFormula { .. }
+                | Payload::Clear
+                | Payload::ClearIfPresent,
+            ) => None,
             None => before.and_then(|stored| stored.shared_string).map(|index| {
                 SharedStringKey::new(index, Arc::clone(&workbook.inner.shared_string_lineage))
             }),
@@ -408,7 +420,8 @@ fn has_content_after(before: Option<&Cell>, action: Option<&Action>) -> bool {
     match action {
         Some(Action::Remove) => false,
         Some(Action::Update {
-            payload: Some(Payload::Set(_) | Payload::SharedString { .. }),
+            payload:
+                Some(Payload::Set(_) | Payload::SharedString { .. } | Payload::SharedFormula { .. }),
             ..
         }) => true,
         Some(Action::Update {

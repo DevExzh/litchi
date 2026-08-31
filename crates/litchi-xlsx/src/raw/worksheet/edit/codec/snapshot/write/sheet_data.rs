@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use litchi_core::xml::escape_xml;
 use litchi_sheet::{Cell as Address, Row};
 
-use super::super::super::wire::{sibling_name, write_close, write_tag};
+use super::super::super::wire::{sibling_name, write_attribute, write_close, write_tag};
 use super::super::model::{CellSlot, RowSlot, SheetData, Span, Tag};
 use crate::cell::{Content, Value};
 use crate::error::{Result, invalid};
@@ -272,9 +272,12 @@ fn write_cell(output: &mut Vec<u8>, source: &[u8], cell: &CellSlot, action: &Act
     let Action::Update { payload, style } = action else {
         return Err(invalid("cannot rewrite a removed cell"));
     };
-    let content = payload
-        .as_ref()
-        .filter(|payload| matches!(payload, Payload::Set(_) | Payload::SharedString { .. }));
+    let content = payload.as_ref().filter(|payload| {
+        matches!(
+            payload,
+            Payload::Set(_) | Payload::SharedString { .. } | Payload::SharedFormula { .. }
+        )
+    });
     let cell_type = content.and_then(payload_type);
     let mut removed = vec!["r"];
     if payload.is_some() {
@@ -327,9 +330,12 @@ fn write_new_action(
     if !action.creates_missing() {
         return Ok(());
     }
-    let content = payload
-        .as_ref()
-        .filter(|payload| matches!(payload, Payload::Set(_) | Payload::SharedString { .. }));
+    let content = payload.as_ref().filter(|payload| {
+        matches!(
+            payload,
+            Payload::Set(_) | Payload::SharedString { .. } | Payload::SharedFormula { .. }
+        )
+    });
     let name = sibling_name(row_name, "c");
     let tag = Tag {
         name: name.clone().into_boxed_str(),
@@ -365,6 +371,7 @@ fn payload_type(payload: &Payload) -> Option<&'static str> {
     match payload {
         Payload::Set(content) => content_type(content),
         Payload::SharedString { .. } => Some("s"),
+        Payload::SharedFormula { .. } => None,
         Payload::Clear | Payload::ClearIfPresent => None,
     }
 }
@@ -376,8 +383,42 @@ fn write_payload(output: &mut Vec<u8>, cell_name: &str, payload: &Payload) -> Re
             write_text_element(output, cell_name, "v", &index.to_string());
             Ok(())
         },
+        Payload::SharedFormula {
+            index,
+            reference,
+            formula,
+        } => write_shared_formula(output, cell_name, *index, reference, formula.as_ref()),
         Payload::Clear | Payload::ClearIfPresent => Ok(()),
     }
+}
+
+fn write_shared_formula(
+    output: &mut Vec<u8>,
+    cell_name: &str,
+    index: u32,
+    reference: &str,
+    formula: Option<&crate::formula::Formula>,
+) -> Result<()> {
+    require_xml_text(reference)?;
+    if let Some(formula) = formula {
+        require_xml_text(formula.text())?;
+    }
+    let name = sibling_name(cell_name, "f");
+    output.extend_from_slice(b"<");
+    output.extend_from_slice(name.as_bytes());
+    write_attribute(output, "t", "shared");
+    if formula.is_some() {
+        write_attribute(output, "ref", reference);
+    }
+    write_attribute(output, "si", &index.to_string());
+    if let Some(formula) = formula {
+        output.extend_from_slice(b">");
+        output.extend_from_slice(escape_xml(formula.text()).as_bytes());
+        write_close(output, &name);
+    } else {
+        output.extend_from_slice(b"/>");
+    }
+    Ok(())
 }
 
 fn write_content(output: &mut Vec<u8>, cell_name: &str, content: &Content) -> Result<()> {

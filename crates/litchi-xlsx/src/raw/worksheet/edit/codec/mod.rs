@@ -23,8 +23,9 @@ pub(super) use snapshot::scan_with_event_limit;
 )]
 pub(super) use snapshot::{
     Attribute, CellSlot, ColumnSlot, ColumnsSlot, DefaultsSlot, DimensionTag, Layout,
-    MergeCellsSlot, MergeSlot, RootEffect, RowSlot, SheetData, Span, Tag, scan, write_columns,
-    write_defaults, write_new_columns, write_new_defaults, write_root, write_sheet_data,
+    MergeCellsSlot, MergeSlot, RootEffect, RowSlot, SharedFormulaGroup, SheetData, Span, Tag, scan,
+    write_columns, write_defaults, write_new_columns, write_new_defaults, write_root,
+    write_sheet_data,
 };
 #[allow(
     unused_imports,

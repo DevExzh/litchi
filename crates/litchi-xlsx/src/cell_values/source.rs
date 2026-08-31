@@ -31,6 +31,8 @@ pub enum CellValueEdit {
     Set { address: Address, value: Value },
     /// Replace the payload with a checked cacheless scalar formula.
     SetFormula { address: Address, formula: Formula },
+    /// Replace one validated shared-formula master and all of its members.
+    SetSharedFormula { address: Address, formula: Formula },
     /// Remove the stored scalar payload while retaining the cell record.
     Clear { address: Address },
     /// Remove the complete stored scalar cell record.
@@ -75,6 +77,18 @@ impl<'a> SheetCellValueEdit<'a> {
         }
     }
 
+    /// Construct a selector-first shared-formula master replacement.
+    pub fn set_shared_formula(
+        selector: impl Into<Selector<'a>>,
+        address: Address,
+        formula: Formula,
+    ) -> Self {
+        Self {
+            selector: selector.into(),
+            edit: CellValueEdit::set_shared_formula(address, formula),
+        }
+    }
+
     /// Construct a selector-first scalar clear.
     #[must_use]
     pub fn clear(selector: impl Into<Selector<'a>>, address: Address) -> Self {
@@ -109,6 +123,12 @@ impl CellValueEdit {
         Self::SetFormula { address, formula }
     }
 
+    /// Construct a checked shared-formula master replacement.
+    #[must_use]
+    pub const fn set_shared_formula(address: Address, formula: Formula) -> Self {
+        Self::SetSharedFormula { address, formula }
+    }
+
     /// Construct a scalar-value clear.
     #[must_use]
     pub const fn clear(address: Address) -> Self {
@@ -127,6 +147,7 @@ impl CellValueEdit {
         match self {
             Self::Set { address, .. }
             | Self::SetFormula { address, .. }
+            | Self::SetSharedFormula { address, .. }
             | Self::Clear { address }
             | Self::Remove { address } => *address,
         }
@@ -136,6 +157,7 @@ impl CellValueEdit {
 #[derive(Clone, Debug)]
 enum StagedValueEdit {
     Set(Content),
+    SetSharedFormula(Formula),
     Clear,
     Remove,
 }
@@ -648,6 +670,11 @@ impl SourceEdit {
         self.apply_batch([CellValueEdit::set_formula(address, formula)])
     }
 
+    /// Stage one shared-formula master replacement.
+    pub fn set_shared_formula(&mut self, address: Address, formula: Formula) -> Result<()> {
+        self.apply_batch([CellValueEdit::set_shared_formula(address, formula)])
+    }
+
     /// Stage one scalar clear. Repeated selectors are rejected.
     pub fn clear(&mut self, address: Address) -> Result<()> {
         self.apply_batch([CellValueEdit::clear(address)])
@@ -707,6 +734,11 @@ impl SourceEdit {
                     self.before.require_formula_target(address)?;
                     StagedValueEdit::Set(Content::Formula(formula))
                 },
+                CellValueEdit::SetSharedFormula { formula, .. } => {
+                    Content::Formula(formula.clone()).validate_for_write()?;
+                    self.before.shared_formula_group(address, MAX_BATCH_EDITS)?;
+                    StagedValueEdit::SetSharedFormula(formula)
+                },
                 CellValueEdit::Clear { .. } => {
                     if !matches!(source, Cell::Value(_)) {
                         return Err(self.before.edit_blocked(address));
@@ -736,19 +768,15 @@ impl SourceEdit {
     /// Validate, rewrite once, and freeze an exact reversible commit.
     pub fn commit(self) -> Result<Commit> {
         self.before.check_execution()?;
+        let expected_actions = effective_action_count(&self.before, &self.staged)?;
+        if expected_actions > MAX_BATCH_EDITS {
+            return Err(invalid(format!(
+                "value-only batch exceeds {MAX_BATCH_EDITS} expanded cell actions"
+            )));
+        }
         let mut actions = BTreeMap::new();
         for (address, value) in &self.staged {
-            let action = match value {
-                StagedValueEdit::Set(content) => {
-                    if self.before.cell(*address) == Some(&content.as_cell()) {
-                        continue;
-                    }
-                    Action::set(content.clone())
-                },
-                StagedValueEdit::Clear => Action::clear(false),
-                StagedValueEdit::Remove => Action::Remove,
-            };
-            actions.insert(*address, action);
+            append_actions(&self.before, *address, value, &mut actions)?;
         }
         if actions.is_empty() {
             let patch = Patch::new(self.before.clone(), self.before.clone());
@@ -764,6 +792,13 @@ impl SourceEdit {
                 StagedValueEdit::Set(content) => {
                     snapshot.cell(*address) == Some(&content.as_cell())
                 },
+                StagedValueEdit::SetSharedFormula(formula) => shared_formula_readback(
+                    &self.before,
+                    &snapshot,
+                    *address,
+                    formula,
+                    shared_formula_changed(&self.before, *address, formula)?,
+                )?,
                 StagedValueEdit::Clear => {
                     snapshot.contains_cell(*address) && snapshot.value(*address).is_none()
                 },
@@ -832,6 +867,18 @@ impl MultiSourceEdit {
         formula: Formula,
     ) -> Result<()> {
         self.apply_batch([SheetCellValueEdit::set_formula(selector, address, formula)])
+    }
+
+    /// Stage one selector-first shared-formula master replacement.
+    pub fn set_shared_formula<'a>(
+        &mut self,
+        selector: impl Into<Selector<'a>>,
+        address: Address,
+        formula: Formula,
+    ) -> Result<()> {
+        self.apply_batch([SheetCellValueEdit::set_shared_formula(
+            selector, address, formula,
+        )])
     }
 
     /// Stage one selector-first scalar clear.
@@ -910,6 +957,11 @@ impl MultiSourceEdit {
                     snapshot.require_formula_target(address)?;
                     StagedValueEdit::Set(Content::Formula(formula))
                 },
+                CellValueEdit::SetSharedFormula { formula, .. } => {
+                    Content::Formula(formula.clone()).validate_for_write()?;
+                    snapshot.shared_formula_group(address, MAX_BATCH_EDITS)?;
+                    StagedValueEdit::SetSharedFormula(formula)
+                },
                 CellValueEdit::Clear { .. } => {
                     if !matches!(source, Cell::Value(_)) {
                         return Err(snapshot.edit_blocked(address));
@@ -972,6 +1024,19 @@ impl MultiSourceEdit {
     /// Validate, rewrite, and freeze one atomic multi-worksheet commit.
     pub fn commit(self) -> Result<MultiCommit> {
         self.before.check_execution()?;
+        let mut expected_actions = 0usize;
+        for snapshot in self.before.sheets() {
+            if let Some(staged) = self.staged.get(&snapshot.sheet_position()) {
+                expected_actions = expected_actions
+                    .checked_add(effective_action_count(snapshot, staged)?)
+                    .ok_or_else(|| invalid("expanded value-only action count overflows usize"))?;
+                if expected_actions > MAX_BATCH_EDITS {
+                    return Err(invalid(format!(
+                        "multi-sheet value-only batch exceeds {MAX_BATCH_EDITS} expanded cell actions"
+                    )));
+                }
+            }
+        }
         let mut after = Vec::new();
         after
             .try_reserve_exact(self.before.len())
@@ -995,17 +1060,7 @@ impl MultiSourceEdit {
             };
             let mut actions = BTreeMap::new();
             for (address, value) in staged {
-                let action = match value {
-                    StagedValueEdit::Set(content) => {
-                        if snapshot.cell(*address) == Some(&content.as_cell()) {
-                            continue;
-                        }
-                        Action::set(content.clone())
-                    },
-                    StagedValueEdit::Clear => Action::clear(false),
-                    StagedValueEdit::Remove => Action::Remove,
-                };
-                actions.insert(*address, action);
+                append_actions(snapshot, *address, value, &mut actions)?;
             }
             if actions.is_empty() {
                 aggregate_bytes = super::snapshot::checked_multi_bytes(
@@ -1030,6 +1085,13 @@ impl MultiSourceEdit {
                     StagedValueEdit::Set(content) => {
                         candidate.cell(*address) == Some(&content.as_cell())
                     },
+                    StagedValueEdit::SetSharedFormula(formula) => shared_formula_readback(
+                        snapshot,
+                        &candidate,
+                        *address,
+                        formula,
+                        shared_formula_changed(snapshot, *address, formula)?,
+                    )?,
                     StagedValueEdit::Clear => {
                         candidate.contains_cell(*address) && candidate.value(*address).is_none()
                     },
@@ -1061,6 +1123,132 @@ impl MultiSourceEdit {
             touched_worksheets,
         ))
     }
+}
+
+fn effective_action_count(
+    snapshot: &Snapshot,
+    staged: &[(Address, StagedValueEdit)],
+) -> Result<usize> {
+    let mut count = 0usize;
+    for (address, value) in staged {
+        let next = match value {
+            StagedValueEdit::Set(content) => {
+                usize::from(snapshot.cell(*address) != Some(&content.as_cell()))
+            },
+            StagedValueEdit::SetSharedFormula(formula) => {
+                let group = snapshot.shared_formula_group(*address, MAX_BATCH_EDITS)?;
+                let current = snapshot.cell(group.master).ok_or_else(|| {
+                    invalid("shared formula master disappeared from the source snapshot")
+                })?;
+                let Cell::Formula(current) = current else {
+                    return Err(invalid("shared formula master is not a scalar formula"));
+                };
+                if current.text() == formula.text() {
+                    0
+                } else {
+                    group.members.len()
+                }
+            },
+            StagedValueEdit::Clear | StagedValueEdit::Remove => 1,
+        };
+        count = count
+            .checked_add(next)
+            .ok_or_else(|| invalid("expanded value-only action count overflows usize"))?;
+        if count > MAX_BATCH_EDITS {
+            return Err(invalid(format!(
+                "value-only batch exceeds {MAX_BATCH_EDITS} expanded cell actions"
+            )));
+        }
+    }
+    Ok(count)
+}
+
+fn append_actions(
+    snapshot: &Snapshot,
+    address: Address,
+    value: &StagedValueEdit,
+    actions: &mut BTreeMap<Address, Action>,
+) -> Result<()> {
+    match value {
+        StagedValueEdit::Set(content) => {
+            if snapshot.cell(address) != Some(&content.as_cell()) {
+                actions.insert(address, Action::set(content.clone()));
+            }
+        },
+        StagedValueEdit::SetSharedFormula(formula) => {
+            let group = snapshot.shared_formula_group(address, MAX_BATCH_EDITS)?;
+            let current = snapshot.cell(group.master).ok_or_else(|| {
+                invalid("shared formula master disappeared from the source snapshot")
+            })?;
+            let Cell::Formula(current) = current else {
+                return Err(invalid("shared formula master is not a scalar formula"));
+            };
+            if current.text() == formula.text() {
+                return Ok(());
+            }
+            for member in &group.members {
+                let replacement = (*member == group.master).then(|| formula.clone());
+                let action = Action::set_shared_formula(
+                    group.storage.index,
+                    group.storage.reference.clone(),
+                    replacement,
+                );
+                if actions.insert(*member, action).is_some() {
+                    return Err(invalid("shared formula groups overlap in one cell edit"));
+                }
+            }
+        },
+        StagedValueEdit::Clear => {
+            actions.insert(address, Action::clear(false));
+        },
+        StagedValueEdit::Remove => {
+            actions.insert(address, Action::Remove);
+        },
+    }
+    Ok(())
+}
+
+fn shared_formula_changed(
+    snapshot: &Snapshot,
+    address: Address,
+    formula: &Formula,
+) -> Result<bool> {
+    let group = snapshot.shared_formula_group(address, MAX_BATCH_EDITS)?;
+    let current = snapshot
+        .cell(group.master)
+        .ok_or_else(|| invalid("shared formula master disappeared from the source snapshot"))?;
+    let Cell::Formula(current) = current else {
+        return Err(invalid("shared formula master is not a scalar formula"));
+    };
+    Ok(current.text() != formula.text())
+}
+
+fn shared_formula_readback(
+    before: &Snapshot,
+    after: &Snapshot,
+    address: Address,
+    formula: &Formula,
+    require_cacheless: bool,
+) -> Result<bool> {
+    let expected = before.shared_formula_group(address, MAX_BATCH_EDITS)?;
+    let actual = after.shared_formula_group(address, MAX_BATCH_EDITS)?;
+    if expected != actual {
+        return Ok(false);
+    }
+    let Some(Cell::Formula(master)) = after.cell(expected.master) else {
+        return Ok(false);
+    };
+    if master.text() != formula.text() {
+        return Ok(false);
+    }
+    if require_cacheless
+        && expected.members.iter().any(|member| {
+            !matches!(after.cell(*member), Some(Cell::Formula(formula)) if formula.cached().is_none())
+        })
+    {
+        return Ok(false);
+    }
+    Ok(true)
 }
 
 fn resolve_snapshot_selector(snapshots: &MultiSnapshot, selector: &Selector<'_>) -> Result<usize> {
