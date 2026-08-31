@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## Verified-streaming hardening boundary (change 0350)
+
+Change 0350 is not a measured hotspot (`performance_claim: none`). Shared
+overreported-read checks cover `ReaderAt` loops, ZIP verification, streaming,
+and the OPC `BorrowedReaderAt` boundary; offsets/counters are checked, bounded
+sink `read_to*` / `read_entry_to*` use strict CRC equality, owned reads retain
+zero-CRC compatibility, and borrowed nonempty zero-CRC returns `None` for the
+owned fallback. Deflate extra output retains `InvalidSize` precedence. The
+only bounded statement is one fixed-size scratch buffer for one active member,
+excluding source/archive/index, sink/output, cache, and aggregate process
+memory. Final evidence is `287/287` soapberry-zip, `4/4` litchi-opc with `261`
+filtered, and successful package formatting under one job/thread, disabled
+incremental/debug compilation, one disk target, and an 8 GiB limit. No
+latency, throughput, RSS, allocation, syscall, decompression, or concurrency
+claim follows.
+
 ## PhysPkgReader stored-Part borrow boundary (change 0349)
 
 Crate-scoped formatting evidence: `cargo fmt --package soapberry-zip --package litchi-opc -- --check` passed after formatting.

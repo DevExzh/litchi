@@ -257,7 +257,17 @@ impl<R: Read + Seek + ?Sized> soapberry_zip::ReaderAt for BorrowedReaderAt<'_, R
             .try_borrow_mut()
             .map_err(|_| std::io::Error::other("re-entrant borrowed ZIP reader access"))?;
         reader.seek(SeekFrom::Start(offset))?;
-        reader.read(buffer)
+        let read = reader.read(buffer)?;
+        if read > buffer.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "OPC source reader returned {read} bytes for a {}-byte read",
+                    buffer.len()
+                ),
+            ));
+        }
+        Ok(read)
     }
 }
 
@@ -1749,6 +1759,7 @@ mod tests {
     )]
     use super::*;
     use std::cell::Cell;
+    use std::io::{self, Cursor, Read, Seek, SeekFrom};
     use std::sync::Arc;
 
     fn package_bytes(root_relationships: &[u8], document: &[u8]) -> Vec<u8> {
@@ -1764,6 +1775,46 @@ mod tests {
             .unwrap();
         writer.write_stored("word/document.xml", document).unwrap();
         writer.finish_to_bytes().unwrap()
+    }
+
+    #[derive(Debug)]
+    struct OverreportingSeekReader {
+        inner: Cursor<Vec<u8>>,
+    }
+
+    impl Read for OverreportingSeekReader {
+        fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+            Ok(buffer.len().saturating_add(1))
+        }
+    }
+
+    impl Seek for OverreportingSeekReader {
+        fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+            self.inner.seek(position)
+        }
+    }
+
+    #[test]
+    fn public_reader_probe_rejects_overreported_reads_without_panicking() {
+        let bytes = package_bytes(
+            br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#,
+            b"document",
+        );
+        let mut reader = OverreportingSeekReader {
+            inner: Cursor::new(bytes),
+        };
+        reader.seek(SeekFrom::Start(3)).unwrap();
+        let original_position = reader.stream_position().unwrap();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            probe_package_catalog_from_reader_with_limits(&mut reader, ReadLimits::default())
+        }))
+        .expect("public OPC probe must not panic on a hostile reader");
+        let error = result.unwrap_err();
+        match error {
+            OpcError::ZipError(message) => assert!(message.contains("OPC source reader returned")),
+            other => panic!("expected typed hostile-reader error, got {other:?}"),
+        }
+        assert_eq!(reader.stream_position().unwrap(), original_position);
     }
 
     #[test]
@@ -1829,7 +1880,7 @@ mod tests {
             .unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
         let archive = soapberry_zip::office::IndexedArchive::from_reader(
-            std::io::Cursor::new(bytes.clone()),
+            Cursor::new(bytes.clone()),
             bytes.len() as u64,
         )
         .unwrap();

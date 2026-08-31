@@ -340,6 +340,23 @@ allocation, RSS, decompression, physical-I/O, or producer claim.
 
 Crate-scoped formatting evidence: `cargo fmt --package soapberry-zip --package litchi-opc -- --check` passed after formatting.
 
+## Verified-streaming hardening (change 0350)
+
+Change 0350 records correctness/resource hardening only
+(`performance_claim: none`). Shared overreported-read validation now covers
+`ReaderAt` loops, ZIP verification, streaming, and the OPC `BorrowedReaderAt`
+boundary, with checked offsets/counters. Strict CRC equality applies only to
+bounded sink `read_to*` / `read_entry_to*`; ordinary owned reads keep
+zero-CRC compatibility, borrowed nonempty zero-CRC returns `None` for owned
+fallback, and Deflate extra output keeps `InvalidSize` precedence over
+accounting overflow. The bounded statement is one fixed-size scratch buffer
+for one active member, excluding caller source/archive/index, sink/output,
+cache, and aggregate process memory. Final evidence is fmt success,
+`287/287` soapberry-zip, and `4/4` litchi-opc with `261` filtered, under one
+job/thread, disabled incremental/debug compilation, one disk target, and an
+8 GiB limit. No latency, throughput, RSS, allocation, syscall,
+decompression, or concurrency claim is made.
+
 ## Shared lazy OPC structural members (change 0259)
 
 [Change 0349](changes/0349-opc-phys-reader-stored-part-borrowed.md) adds a
