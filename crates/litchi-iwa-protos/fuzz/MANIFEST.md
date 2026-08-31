@@ -9,12 +9,15 @@ generated libFuzzer output part of the repository.
 | `numbers_tile_storage` | `fuzz_targets/numbers_tile_storage.rs` | `corpus/numbers_tile_storage/` |
 | `numbers_formula_archive` | `fuzz_targets/numbers_formula_archive.rs` | `corpus/numbers_formula_archive/` |
 | `pages_section_codec` | `fuzz_targets/pages_section_codec.rs` | `corpus/pages_section_codec/` |
+| `pages_section_text_codec` | `fuzz_targets/pages_section_text_codec.rs` | `corpus/pages_section_text_codec/` |
 | `pages_body_footnote_codec` | `fuzz_targets/pages_body_footnote_codec.rs` | `corpus/pages_body_footnote_codec/` |
 | `pages_footnote_graph_codec` | `fuzz_targets/pages_footnote_graph_codec.rs` | `corpus/pages_footnote_graph_codec/` |
 | `pages_footnote_codec` | `fuzz_targets/pages_footnote_codec.rs` | `corpus/pages_footnote_codec/` |
 | `pages_movie_caption_codec` | `fuzz_targets/pages_movie_caption_codec.rs` | `corpus/pages_movie_caption_codec/` |
 | `pages_header_footer_codec` | `fuzz_targets/pages_header_footer_codec.rs` | `corpus/pages_header_footer_codec/` |
 | `numbers_table_data_list` | `fuzz_targets/numbers_table_data_list.rs` | `corpus/numbers_table_data_list/` |
+| `table_dimension` | `fuzz_targets/table_dimension.rs` | `corpus/table_dimension/` |
+| `table_info_codec` | `fuzz_targets/table_info_codec.rs` | `corpus/table_info_codec/` |
 | `table_appearance` | `fuzz_targets/table_appearance.rs` | `corpus/table_appearance/` |
 | `numbers_table_sort_order_codec` | `fuzz_targets/numbers_table_sort_order_codec.rs` | `corpus/numbers_table_sort_order_codec/` |
 | `numbers_table_header_settings_codec` | `fuzz_targets/numbers_table_header_settings_codec.rs` | `corpus/numbers_table_header_settings_codec/` |
@@ -23,6 +26,14 @@ generated libFuzzer output part of the repository.
 | `comment_storage_codec` | `fuzz_targets/comment_storage_codec.rs` | `corpus/comment_storage_codec/` |
 | `comment_storage_reply_codec` | `fuzz_targets/comment_storage_reply_codec.rs` | `corpus/comment_storage_reply_codec/` |
 | `keynote_chart_title` | `fuzz_targets/keynote_chart_title.rs` | `corpus/keynote_chart_title/` |
+| `keynote_chart_legend_codec` | `fuzz_targets/keynote_chart_legend_codec.rs` | `corpus/keynote_chart_legend_codec/` |
+| `keynote_chart_axis_title_codec` | `fuzz_targets/keynote_chart_axis_title_codec.rs` | `corpus/keynote_chart_axis_title/` |
+| `keynote_chart_axis_value_settings_codec` | `fuzz_targets/keynote_chart_axis_value_settings_codec.rs` | `corpus/keynote_chart_axis_value_settings_codec/` |
+| `keynote_chart_caption` | `fuzz_targets/keynote_chart_caption.rs` | `corpus/keynote_chart_caption/` |
+| `keynote_movie_caption` | `fuzz_targets/keynote_movie_caption.rs` | `corpus/keynote_movie_caption/` |
+| `keynote_movie_geometry_codec` | `fuzz_targets/keynote_movie_geometry_codec.rs` | `corpus/keynote_movie_geometry_codec/` |
+| `numbers_table_cell_pop_up_menu_codec` | `fuzz_targets/numbers_table_cell_pop_up_menu_codec.rs` | `corpus/numbers_table_cell_pop_up_menu_codec/` |
+| `numbers_table_cell_control_codec` | `fuzz_targets/numbers_table_cell_control_codec.rs` | `corpus/numbers_table_cell_control_codec/` |
 | `movie_playback_codec` | `fuzz_targets/movie_playback_codec.rs` | `corpus/movie_playback_codec/` |
 
 `fuzz_targets/numbers_table_model.rs` is retained as a source-only harness and
