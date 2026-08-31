@@ -758,6 +758,7 @@ mod tests {
             Error::Relationship(_) => "relationship",
             Error::Invalid(_) => "invalid",
             Error::Limit { .. } => "limit",
+            Error::Allocation { .. } => "allocation",
             Error::Uri(_) => "uri",
             #[cfg(feature = "vba-inspection")]
             Error::Vba(_) => "vba",
