@@ -28,4 +28,6 @@ pub use transaction::{Commit, Transaction};
 pub(crate) use model::{capture_with_provenance, package_fingerprint};
 pub(crate) use patch::apply;
 pub(crate) use remove_plan::apply_patch as apply_removal_patch;
-pub(crate) use xml::{insert_slide_binding, stage_shape_texts};
+pub(crate) use xml::{
+    insert_slide_binding, reorder_slide_bindings, stage_shape_texts, validate_slide_bindings,
+};

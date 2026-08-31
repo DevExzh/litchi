@@ -122,81 +122,183 @@ impl<'a> PresentationPart<'a> {
         let mut slide_ids = HashSet::new();
         let mut relationship_ids = HashSet::new();
         let mut target_part_names = HashSet::new();
+        let mut depth = 0usize;
+        let mut roots = 0usize;
+        let mut lists = 0usize;
+        let mut list_depth = None;
         loop {
             let (namespace, event) = reader.read_resolved_event()?;
             match event {
-                Event::Start(element) | Event::Empty(element)
-                    if crate::namespace::is_presentationml_name(
+                Event::Start(element) => {
+                    let is_presentation = crate::namespace::is_presentationml_name(
+                        &namespace,
+                        element.name(),
+                        b"presentation",
+                    );
+                    let is_list = crate::namespace::is_presentationml_name(
+                        &namespace,
+                        element.name(),
+                        b"sldIdLst",
+                    );
+                    let is_slide = crate::namespace::is_presentationml_name(
                         &namespace,
                         element.name(),
                         b"sldId",
-                    ) =>
-                {
-                    if references.len() == MAX_SLIDES {
-                        return Err(Error::Limit {
-                            resource: "presentation slide references",
-                            limit: MAX_SLIDES,
-                        });
-                    }
-                    let id = litchi_ooxml_common::xml::unqualified_attribute_value(
-                        &element,
-                        b"id",
-                        reader.decoder(),
-                    )?
-                    .ok_or_else(|| invalid("presentation slide reference lacks an id"))?;
-                    let relationship_id = relationship_attribute(&element, &reader)?
-                        .ok_or_else(|| invalid("presentation slide reference lacks r:id"))?;
-                    let id = super::parse_u32(&id, "slide ID")?;
-                    if !(256..=2_147_483_647).contains(&id) {
-                        return Err(invalid(
-                            "presentation slide reference id is outside 256..=2147483647",
-                        ));
-                    }
-                    slide_ids
-                        .try_reserve(1)
-                        .map_err(|source| Error::Allocation {
-                            resource: "presentation slide reference IDs",
-                            source,
-                        })?;
-                    if !slide_ids.insert(id) {
-                        return Err(invalid("presentation slide reference ids must be unique"));
-                    }
-                    relationship_ids
-                        .try_reserve(1)
-                        .map_err(|source| Error::Allocation {
-                            resource: "presentation slide reference relationship IDs",
-                            source,
-                        })?;
-                    if !relationship_ids.insert(relationship_id.clone()) {
-                        return Err(invalid(
-                            "presentation slide reference relationship ids must be unique",
-                        ));
-                    }
-                    if let Some(relationship) = self.part.rels().get(&relationship_id)
-                        && !relationship.is_external()
-                    {
-                        let target = relationship.target_partname()?;
-                        let target_key = target.as_str().to_ascii_lowercase();
-                        target_part_names
-                            .try_reserve(1)
-                            .map_err(|source| Error::Allocation {
-                                resource: "presentation slide reference target names",
-                                source,
-                            })?;
-                        if !target_part_names.insert(target_key) {
+                    );
+                    if depth == 0 {
+                        roots = roots
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("presentation XML root count overflow"))?;
+                        if !is_presentation {
                             return Err(invalid(
-                                "presentation slide reference targets must be unique",
+                                "PresentationML main part does not have a presentation root",
                             ));
                         }
                     }
-                    references.push(SlideReference {
-                        id,
-                        relationship_id,
-                    });
+                    if is_list {
+                        if depth != 1 {
+                            return Err(invalid(
+                                "presentation slide-ID list must be a direct root child",
+                            ));
+                        }
+                        lists = lists
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("presentation slide-ID list count overflow"))?;
+                        if lists != 1 {
+                            return Err(invalid("presentation has multiple slide-ID lists"));
+                        }
+                        reject_slide_id_list_attributes(&element)?;
+                        list_depth = Some(depth + 1);
+                    } else if is_slide {
+                        if list_depth != Some(depth) {
+                            return Err(invalid(
+                                "presentation slide reference is not a direct slide-ID-list child",
+                            ));
+                        }
+                        append_slide_reference(
+                            &mut references,
+                            &mut slide_ids,
+                            &mut relationship_ids,
+                            &mut target_part_names,
+                            self.part,
+                            &element,
+                            &reader,
+                        )?;
+                    } else if list_depth == Some(depth) {
+                        return Err(invalid(
+                            "presentation slide-ID list contains a non-slide child",
+                        ));
+                    }
+                    depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("presentation XML depth overflow"))?;
+                },
+                Event::Empty(element) => {
+                    let is_presentation = crate::namespace::is_presentationml_name(
+                        &namespace,
+                        element.name(),
+                        b"presentation",
+                    );
+                    let is_list = crate::namespace::is_presentationml_name(
+                        &namespace,
+                        element.name(),
+                        b"sldIdLst",
+                    );
+                    let is_slide = crate::namespace::is_presentationml_name(
+                        &namespace,
+                        element.name(),
+                        b"sldId",
+                    );
+                    if depth == 0 {
+                        roots = roots
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("presentation XML root count overflow"))?;
+                        if !is_presentation {
+                            return Err(invalid(
+                                "PresentationML main part does not have a presentation root",
+                            ));
+                        }
+                    }
+                    if is_list {
+                        if depth != 1 || lists != 0 {
+                            return Err(invalid(
+                                "presentation has an additional or nested slide-ID list",
+                            ));
+                        }
+                        lists = lists
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("presentation slide-ID list count overflow"))?;
+                        reject_slide_id_list_attributes(&element)?;
+                    } else if is_slide {
+                        if list_depth != Some(depth) {
+                            return Err(invalid(
+                                "presentation slide reference is not a direct slide-ID-list child",
+                            ));
+                        }
+                        append_slide_reference(
+                            &mut references,
+                            &mut slide_ids,
+                            &mut relationship_ids,
+                            &mut target_part_names,
+                            self.part,
+                            &element,
+                            &reader,
+                        )?;
+                    } else if list_depth == Some(depth) {
+                        return Err(invalid(
+                            "presentation slide-ID list contains a non-slide child",
+                        ));
+                    }
+                },
+                Event::End(element) => {
+                    if crate::namespace::is_presentationml_name(
+                        &namespace,
+                        element.name(),
+                        b"sldIdLst",
+                    ) {
+                        if list_depth != Some(depth) {
+                            return Err(invalid(
+                                "presentation slide-ID list is nested or not opened",
+                            ));
+                        }
+                        list_depth = None;
+                    } else if crate::namespace::is_presentationml_name(
+                        &namespace,
+                        element.name(),
+                        b"sldId",
+                    ) && list_depth == Some(depth)
+                    {
+                        return Err(invalid(
+                            "presentation slide-ID entry unexpectedly remains open",
+                        ));
+                    }
+                    depth = depth
+                        .checked_sub(1)
+                        .ok_or_else(|| invalid("presentation XML depth underflow"))?;
+                },
+                Event::Text(value) if list_depth == Some(depth) => {
+                    if !value
+                        .decode()
+                        .map_err(|error| Error::Xml(error.to_string()))?
+                        .trim()
+                        .is_empty()
+                    {
+                        return Err(invalid("presentation slide-ID list contains text content"));
+                    }
+                },
+                Event::CData(_) | Event::GeneralRef(_) if list_depth == Some(depth) => {
+                    return Err(invalid(
+                        "presentation slide-ID list contains unsupported content",
+                    ));
                 },
                 Event::Eof => break,
                 _ => {},
             }
+        }
+        if roots != 1 || depth != 0 || list_depth.is_some() || lists != 1 {
+            return Err(invalid(
+                "presentation must contain exactly one direct slide-ID list",
+            ));
         }
         Ok(references)
     }
@@ -294,4 +396,93 @@ impl<'a> PresentationPart<'a> {
     pub fn validate_related_part(&self, part: &dyn Part, expected: &str) -> Result<()> {
         validate_content_type(part, expected)
     }
+}
+
+fn reject_slide_id_list_attributes(element: &quick_xml::events::BytesStart<'_>) -> Result<()> {
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let key = attribute.key.as_ref();
+        if key != b"xmlns" && !key.starts_with(b"xmlns:") {
+            return Err(invalid(
+                "presentation slide-ID list permits only namespace declarations",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn append_slide_reference(
+    references: &mut Vec<SlideReference>,
+    slide_ids: &mut HashSet<u32>,
+    relationship_ids: &mut HashSet<String>,
+    target_part_names: &mut HashSet<String>,
+    part: &dyn Part,
+    element: &quick_xml::events::BytesStart<'_>,
+    reader: &NsReader<&[u8]>,
+) -> Result<()> {
+    if references.len() == MAX_SLIDES {
+        return Err(Error::Limit {
+            resource: "presentation slide references",
+            limit: MAX_SLIDES,
+        });
+    }
+    let id =
+        litchi_ooxml_common::xml::unqualified_attribute_value(element, b"id", reader.decoder())?
+            .ok_or_else(|| invalid("presentation slide reference lacks an id"))?;
+    let relationship_id = relationship_attribute(element, reader)?
+        .ok_or_else(|| invalid("presentation slide reference lacks r:id"))?;
+    let id = super::parse_u32(&id, "slide ID")?;
+    if !(256..=2_147_483_647).contains(&id) {
+        return Err(invalid(
+            "presentation slide reference id is outside 256..=2147483647",
+        ));
+    }
+    slide_ids
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "presentation slide reference IDs",
+            source,
+        })?;
+    if !slide_ids.insert(id) {
+        return Err(invalid("presentation slide reference ids must be unique"));
+    }
+    relationship_ids
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "presentation slide reference relationship IDs",
+            source,
+        })?;
+    if !relationship_ids.insert(relationship_id.clone()) {
+        return Err(invalid(
+            "presentation slide reference relationship ids must be unique",
+        ));
+    }
+    if let Some(relationship) = part.rels().get(&relationship_id)
+        && !relationship.is_external()
+    {
+        let target = relationship.target_partname()?;
+        let target_key = target.as_str().to_ascii_lowercase();
+        target_part_names
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "presentation slide reference target names",
+                source,
+            })?;
+        if !target_part_names.insert(target_key) {
+            return Err(invalid(
+                "presentation slide reference targets must be unique",
+            ));
+        }
+    }
+    references
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "presentation slide references",
+            source,
+        })?;
+    references.push(SlideReference {
+        id,
+        relationship_id,
+    });
+    Ok(())
 }

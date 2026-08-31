@@ -4,19 +4,23 @@ use std::io::Write;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use litchi_core::{ReadAt, SourceVersion};
+use litchi_core::{
+    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, SourceVersion,
+};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter};
 use litchi_pptx::transition::{Kind as TransitionKind, Ms, Side, Speed, Transition};
 use litchi_pptx::{
     Error, MAX_SHAPE_TEXT_REPLACEMENTS, MAX_SOURCE_BACKED_SLIDE_BATCH, ReadLimits,
-    ShapeTextReplacement, SourceBackedPresentation, SourceBackedPresentationEditor,
+    ShapeTextReplacement, SlideOrderRefusal, SourceBackedPresentation,
+    SourceBackedPresentationEditor,
 };
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";
 const DRAWINGML: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 const MAIN: &str = "/ppt/presentation.xml";
 const SLIDE: &str = "/ppt/slides/slide1.xml";
 const SLIDE_THREE: &str = "/ppt/slides/slide3.xml";
@@ -260,6 +264,95 @@ fn multi_fixture(slide_count: usize, signed: bool) -> Vec<u8> {
     PackageWriter::to_bytes(&package).unwrap()
 }
 
+fn with_presentation_xml(source: &[u8], presentation_xml: String) -> Vec<u8> {
+    let mut package = OpcPackage::from_bytes(source).unwrap();
+    let main = PackURI::new(MAIN).unwrap();
+    package
+        .get_part_mut(&main)
+        .unwrap()
+        .set_blob(presentation_xml.into_bytes());
+    PackageWriter::to_bytes(&package).unwrap()
+}
+
+fn multi_fixture_with_presentation_suffix(
+    slide_count: usize,
+    signed: bool,
+    suffix: &str,
+) -> Vec<u8> {
+    let source = multi_fixture(slide_count, signed);
+    let package = OpcPackage::from_bytes(&source).unwrap();
+    let main = PackURI::new(MAIN).unwrap();
+    let presentation = String::from_utf8(package.get_part(&main).unwrap().blob().to_vec()).unwrap();
+    let presentation = presentation.replacen(
+        "</p:presentation>",
+        &format!("{suffix}</p:presentation>"),
+        1,
+    );
+    with_presentation_xml(&source, presentation)
+}
+
+fn multi_fixture_with_ignorable_root(slide_count: usize) -> Vec<u8> {
+    let source = multi_fixture(slide_count, false);
+    let package = OpcPackage::from_bytes(&source).unwrap();
+    let main = PackURI::new(MAIN).unwrap();
+    let presentation = String::from_utf8(package.get_part(&main).unwrap().blob().to_vec()).unwrap();
+    let start = format!(r#"<p:presentation xmlns:p="{PML}" xmlns:r="{REL}""#);
+    let replacement = format!(
+        r#"{start} xmlns:mc="{MCE}" xmlns:future="urn:litchi:test:future" mc:Ignorable="future""#
+    );
+    let presentation = presentation.replacen(&start, &replacement, 1);
+    with_presentation_xml(&source, presentation)
+}
+
+fn multi_fixture_with_metadata(view_xml: Option<&str>, presentation_xml: Option<&str>) -> Vec<u8> {
+    let source = multi_fixture(3, false);
+    let mut package = OpcPackage::from_bytes(&source).unwrap();
+    let main = PackURI::new(MAIN).unwrap();
+    if let Some(xml) = view_xml {
+        let uri = PackURI::new("/ppt/viewProps.xml").unwrap();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                uri,
+                ct::PML_VIEW_PROPS.to_owned(),
+                xml.as_bytes().to_vec(),
+            )))
+            .unwrap();
+        package
+            .get_part_mut(&main)
+            .unwrap()
+            .rels_mut()
+            .try_add_relationship(
+                rt::VIEW_PROPS.to_owned(),
+                "viewProps.xml".to_owned(),
+                "rIdViewProps".to_owned(),
+                litchi_opc::TargetMode::Internal,
+            )
+            .unwrap();
+    }
+    if let Some(xml) = presentation_xml {
+        let uri = PackURI::new("/ppt/presProps.xml").unwrap();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                uri,
+                ct::PML_PRES_PROPS.to_owned(),
+                xml.as_bytes().to_vec(),
+            )))
+            .unwrap();
+        package
+            .get_part_mut(&main)
+            .unwrap()
+            .rels_mut()
+            .try_add_relationship(
+                rt::PRES_PROPS.to_owned(),
+                "presProps.xml".to_owned(),
+                "rIdPresProps".to_owned(),
+                litchi_opc::TargetMode::Internal,
+            )
+            .unwrap();
+    }
+    PackageWriter::to_bytes(&package).unwrap()
+}
+
 #[derive(Debug)]
 struct RawRecord {
     local: Vec<u8>,
@@ -319,6 +412,50 @@ fn relationship_signatures(relationships: &litchi_opc::Relationships) -> Vec<Str
         .collect::<Vec<_>>();
     signatures.sort_unstable();
     signatures
+}
+
+fn slide_ids(bytes: &[u8]) -> Vec<u32> {
+    SourceBackedPresentation::from_read_at(Arc::new(VersionedSource::new(bytes.to_vec())))
+        .unwrap()
+        .slides()
+        .map(|slide| slide.slide_id())
+        .collect()
+}
+
+fn assert_only_raw_member_changed(source: &[u8], output: &[u8], changed: &[&[u8]]) {
+    let source_raw = raw_records(source);
+    let output_raw = raw_records(output);
+    for (name, source_record) in source_raw {
+        if changed.contains(&name.as_slice()) {
+            assert_ne!(output_raw[&name].local, source_record.local, "{name:?}");
+        } else {
+            assert_eq!(output_raw[&name].local, source_record.local, "{name:?}");
+            assert_eq!(
+                central_without_local_offset(&output_raw[&name].central),
+                central_without_local_offset(&source_record.central),
+                "{name:?}"
+            );
+        }
+    }
+}
+
+fn source_order_context() -> (CancellationSource, ExecutionContext) {
+    let budget = Budget::root(
+        "pptx-source-slide-order-test",
+        Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (cancellation_source, cancellation) = CancellationSource::pair();
+    let execution_limits = ExecutionLimits::new(
+        std::num::NonZeroUsize::new(1).unwrap(),
+        std::num::NonZeroUsize::new(1).unwrap(),
+        std::num::NonZeroU64::new(u64::MAX).unwrap(),
+        0,
+    )
+    .unwrap();
+    (
+        cancellation_source,
+        ExecutionContext::new(budget, cancellation, execution_limits),
+    )
 }
 
 #[test]
@@ -1232,4 +1369,336 @@ fn direct_transition_rejects_malformed_dtd_limits_stale_source_and_partial_sink(
         Err(Error::Opc(OpcError::IncompleteOutput { .. }))
     ));
     assert_eq!(sink.accepted, 128);
+}
+
+#[test]
+fn source_slide_order_move_changes_only_root_and_keeps_payloads_lazy() {
+    let source = multi_fixture(3, false);
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        source.clone(),
+    )))
+    .unwrap();
+    let before = editor.cache_diagnostics();
+    assert_eq!(before.successful_loads, 1);
+    assert_eq!(before.hits, 0);
+
+    let mut edit = editor.edit_slide_order().unwrap();
+    assert!(edit.move_slide(0, 2).unwrap());
+    let commit = edit.commit().unwrap();
+    assert!(commit.is_changed());
+    let replayed = commit.patch().apply(commit.patch().source()).unwrap();
+    let restored = commit.patch().inverse().apply(&replayed).unwrap();
+    assert!(restored.is_exactly_same_as(commit.patch().source()));
+    let after = editor.cache_diagnostics();
+    assert_eq!(after.successful_loads, before.successful_loads);
+    assert_eq!(after.hits, before.hits);
+
+    let mut output = Vec::new();
+    let published = editor
+        .publish_slide_order_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert!(commit.patch().inverse().apply(&published).is_ok());
+    assert_eq!(slide_ids(&output), vec![257, 258, 256]);
+    assert_only_raw_member_changed(&source, &output, &[b"ppt/presentation.xml"]);
+}
+
+#[test]
+fn source_slide_order_noop_is_byte_exact_signed_and_bad_positions_are_refused() {
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        multi_fixture(3, false),
+    )))
+    .unwrap();
+    assert!(matches!(
+        editor.edit_slide_order().unwrap().commit(),
+        Err(Error::SlideOrderPlan {
+            kind: SlideOrderRefusal::NoMove,
+            ..
+        })
+    ));
+
+    let signed = multi_fixture(3, true);
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        signed.clone(),
+    )))
+    .unwrap();
+    let mut edit = editor.edit_slide_order().unwrap();
+    assert!(!edit.move_slide(1, 1).unwrap());
+    let commit = edit.commit().unwrap();
+    assert!(!commit.is_changed());
+    let mut output = Vec::new();
+    editor
+        .publish_slide_order_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, signed);
+
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        multi_fixture(3, false),
+    )))
+    .unwrap();
+    let mut edit = editor.edit_slide_order().unwrap();
+    assert!(matches!(
+        edit.move_slide(3, 0),
+        Err(Error::SlideIndexOutOfBounds { index: 3, len: 3 })
+    ));
+    assert!(matches!(
+        edit.move_slide(0, 3),
+        Err(Error::SlideIndexOutOfBounds { index: 3, len: 3 })
+    ));
+    assert!(edit.move_slide(0, 2).unwrap());
+    assert!(matches!(
+        edit.move_slide(1, 2),
+        Err(Error::SlideOrderPlan {
+            kind: SlideOrderRefusal::MultipleMoves,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn source_slide_order_refuses_stale_foreign_signed_cancelled_and_partial_output() {
+    let source_bytes = multi_fixture(3, false);
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        source_bytes.clone(),
+    )))
+    .unwrap();
+    let mut edit = editor.edit_slide_order().unwrap();
+    edit.move_slide(0, 2).unwrap();
+    let commit = edit.commit().unwrap();
+
+    let foreign = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        fixture("<p:extLst/>", shape_xml(PML, "before"), false),
+    )))
+    .unwrap();
+    let mut output = Vec::new();
+    assert!(matches!(
+        foreign.publish_slide_order_commit_to_stream(&mut output, &commit),
+        Err(Error::StaleSource)
+    ));
+    assert!(output.is_empty());
+
+    let source = Arc::new(VersionedSource::new(source_bytes.clone()));
+    let editor = SourceBackedPresentationEditor::from_read_at(source.clone()).unwrap();
+    let mut edit = editor.edit_slide_order().unwrap();
+    edit.move_slide(0, 2).unwrap();
+    let commit = edit.commit().unwrap();
+    source.changed();
+    output.clear();
+    assert!(matches!(
+        editor.publish_slide_order_commit_to_stream(&mut output, &commit),
+        Err(Error::Opc(OpcError::SourceChanged { .. }))
+    ));
+    assert!(output.is_empty());
+
+    let signed = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        multi_fixture(3, true),
+    )))
+    .unwrap();
+    let mut edit = signed.edit_slide_order().unwrap();
+    edit.move_slide(0, 2).unwrap();
+    let signed_commit = edit.commit().unwrap();
+    output.clear();
+    assert!(matches!(
+        signed.publish_slide_order_commit_to_stream(&mut output, &signed_commit),
+        Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+    ));
+    assert!(output.is_empty());
+
+    let (cancellation_source, context) = source_order_context();
+    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+        Arc::new(VersionedSource::new(multi_fixture(3, false))),
+        ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let mut edit = editor.edit_slide_order().unwrap();
+    edit.move_slide(0, 2).unwrap();
+    let cancelled_commit = edit.commit().unwrap();
+    cancellation_source.cancel();
+    output.clear();
+    assert!(matches!(
+        editor.publish_slide_order_commit_to_stream(&mut output, &cancelled_commit),
+        Err(Error::Opc(OpcError::Cancelled))
+    ));
+    assert!(output.is_empty());
+
+    let trailing = {
+        let mut bytes = source_bytes.clone();
+        bytes.extend_from_slice(b"trailing-source-data");
+        bytes
+    };
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        trailing.clone(),
+    )))
+    .unwrap();
+    let mut edit = editor.edit_slide_order().unwrap();
+    edit.move_slide(0, 2).unwrap();
+    let commit = edit.commit().unwrap();
+    output.clear();
+    assert!(matches!(
+        editor.publish_slide_order_commit_to_stream(&mut output, &commit),
+        Err(Error::Opc(OpcError::SourceBackedOverlayUnavailable { .. }))
+    ));
+    assert!(output.is_empty());
+
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        trailing.clone(),
+    )))
+    .unwrap();
+    let mut edit = editor.edit_slide_order().unwrap();
+    assert!(!edit.move_slide(1, 1).unwrap());
+    let commit = edit.commit().unwrap();
+    output.clear();
+    editor
+        .publish_slide_order_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, trailing);
+
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        multi_fixture(3, false),
+    )))
+    .unwrap();
+    let mut edit = editor.edit_slide_order().unwrap();
+    edit.move_slide(0, 2).unwrap();
+    let commit = edit.commit().unwrap();
+    let mut sink = FailingSink {
+        accepted: 0,
+        limit: 128,
+    };
+    assert!(matches!(
+        editor.publish_slide_order_commit_to_stream(&mut sink, &commit),
+        Err(Error::Opc(OpcError::IncompleteOutput { .. }))
+    ));
+    assert_eq!(sink.accepted, 128);
+}
+
+#[test]
+fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
+    let limits = ReadLimits::builder()
+        .max_part_bytes(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        SourceBackedPresentationEditor::from_read_at_with_limits(
+            Arc::new(VersionedSource::new(multi_fixture(3, false))),
+            limits,
+        ),
+        Err(Error::Opc(OpcError::ReadLimit { .. }))
+    ));
+
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        multi_fixture(3, false),
+    )))
+    .unwrap();
+    let mut edit = editor.edit_slide_order().unwrap();
+    assert!(matches!(
+        edit.move_slide(3, 0),
+        Err(Error::SlideIndexOutOfBounds { index: 3, len: 3 })
+    ));
+    assert!(matches!(
+        edit.move_slide(0, 3),
+        Err(Error::SlideIndexOutOfBounds { index: 3, len: 3 })
+    ));
+
+    let mce = multi_fixture_with_ignorable_root(3);
+    let editor =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(mce))).unwrap();
+    let mut edit = editor.edit_slide_order().unwrap();
+    assert!(matches!(
+        edit.move_slide(0, 2),
+        Err(Error::SlideOrderPlan {
+            kind: SlideOrderRefusal::MarkupCompatibility,
+            ..
+        })
+    ));
+
+    let additional = multi_fixture_with_presentation_suffix(3, false, "<p:sldIdLst/>");
+    assert!(matches!(
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(additional))),
+        Err(Error::Invalid(_))
+    ));
+
+    let nested =
+        multi_fixture_with_presentation_suffix(3, false, "<p:extLst><p:sldIdLst/></p:extLst>");
+    assert!(matches!(
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(nested))),
+        Err(Error::Invalid(_))
+    ));
+
+    let custom_suffix = r#"<p:custShowLst><p:custShow name="Opening" id="7"><p:sldLst><p:sld r:id="rIdSlide1"/><p:sld r:id="rIdSlide3"/></p:sldLst></p:custShow></p:custShowLst>"#;
+    let custom = multi_fixture_with_presentation_suffix(3, false, custom_suffix);
+    let editor =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(custom)))
+            .unwrap();
+    let mut edit = editor.edit_slide_order().unwrap();
+    edit.move_slide(0, 2).unwrap();
+    let commit = edit.commit().unwrap();
+    let mut output = Vec::new();
+    editor
+        .publish_slide_order_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(slide_ids(&output), vec![257, 258, 256]);
+    let package = OpcPackage::from_bytes(&output).unwrap();
+    let root = std::str::from_utf8(
+        package
+            .get_part(&PackURI::new(MAIN).unwrap())
+            .unwrap()
+            .blob(),
+    )
+    .unwrap();
+    assert!(root.contains(custom_suffix));
+
+    let safe_view = format!(r#"<p:viewPr xmlns:p="{PML}"/>"#);
+    let safe_presentation = format!(r#"<p:presentationPr xmlns:p="{PML}"/>"#);
+    let safe = multi_fixture_with_metadata(Some(&safe_view), Some(&safe_presentation));
+    let editor =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(safe))).unwrap();
+    let mut edit = editor.edit_slide_order().unwrap();
+    edit.move_slide(0, 2).unwrap();
+    let commit = edit.commit().unwrap();
+    output.clear();
+    editor
+        .publish_slide_order_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(slide_ids(&output), vec![257, 258, 256]);
+
+    let outline = format!(
+        r#"<p:viewPr xmlns:p="{PML}"><p:outlineViewPr><p:sldLst/></p:outlineViewPr></p:viewPr>"#
+    );
+    let source = multi_fixture_with_metadata(Some(&outline), None);
+    let editor =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
+            .unwrap();
+    let mut edit = editor.edit_slide_order().unwrap();
+    edit.move_slide(0, 2).unwrap();
+    let commit = edit.commit().unwrap();
+    output.clear();
+    assert!(matches!(
+        editor.publish_slide_order_commit_to_stream(&mut output, &commit),
+        Err(Error::SlideOrderPlan {
+            kind: SlideOrderRefusal::ViewProperties,
+            ..
+        })
+    ));
+    assert!(output.is_empty());
+
+    let range = format!(
+        r#"<p:presentationPr xmlns:p="{PML}"><p:showPr><p:sldRg st="1" end="2"/></p:showPr></p:presentationPr>"#
+    );
+    let source = multi_fixture_with_metadata(None, Some(&range));
+    let editor =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
+            .unwrap();
+    let mut edit = editor.edit_slide_order().unwrap();
+    edit.move_slide(0, 2).unwrap();
+    let commit = edit.commit().unwrap();
+    output.clear();
+    assert!(matches!(
+        editor.publish_slide_order_commit_to_stream(&mut output, &commit),
+        Err(Error::SlideOrderPlan {
+            kind: SlideOrderRefusal::PresentationProperties,
+            ..
+        })
+    ));
+    assert!(output.is_empty());
 }

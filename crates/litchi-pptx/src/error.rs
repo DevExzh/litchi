@@ -82,6 +82,33 @@ pub enum SlideRemovalRefusal {
     FinalSlide,
 }
 
+/// Stable classification for a source-backed slide-order edit that cannot
+/// prove every positional owner remains coherent after the move.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SlideOrderRefusal {
+    /// No positional move was staged before commit.
+    NoMove,
+    /// More than one positional move was requested from one snapshot.
+    MultipleMoves,
+    /// Markup-compatibility input would require choosing or rewriting a branch.
+    MarkupCompatibility,
+    /// PowerPoint section metadata would retain the old slide positions.
+    Sections,
+    /// Custom-show metadata could not be retained as stable relationship selections.
+    CustomShows,
+    /// The presentation view-properties part owns positional state.
+    ViewProperties,
+    /// The presentation-properties part owns positional state.
+    PresentationProperties,
+    /// Another known positional semantic owner is present.
+    PositionalOwner,
+    /// The raw slide list or its `(id, r:id)` bindings are ambiguous.
+    AmbiguousBindings,
+    /// A direct presentation-root modify verifier is not safe to preserve through reordering.
+    ModifyVerifier,
+}
+
 impl std::fmt::Display for SlideCopyRefusal {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
@@ -116,6 +143,23 @@ impl std::fmt::Display for SlideRemovalRefusal {
     }
 }
 
+impl std::fmt::Display for SlideOrderRefusal {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::NoMove => "no slide-order move",
+            Self::MultipleMoves => "multiple slide-order moves",
+            Self::MarkupCompatibility => "markup-compatibility surface",
+            Self::Sections => "presentation sections",
+            Self::CustomShows => "custom shows",
+            Self::ViewProperties => "presentation view properties",
+            Self::PresentationProperties => "presentation properties",
+            Self::PositionalOwner => "positional semantic owner",
+            Self::AmbiguousBindings => "ambiguous slide-order bindings",
+            Self::ModifyVerifier => "presentation modify verifier",
+        })
+    }
+}
+
 impl std::fmt::Display for ShapeTransferRefusal {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
@@ -138,6 +182,16 @@ pub enum Error {
     SlideRemovalPlan {
         /// Machine-readable refusal family.
         kind: SlideRemovalRefusal,
+        /// Bounded human-readable source context.
+        detail: String,
+    },
+
+    /// A source-backed slide-order prerequisite was classified and refused
+    /// without mutation.
+    #[error("unsupported PresentationML slide-order edit ({kind}): {detail}")]
+    SlideOrderPlan {
+        /// Machine-readable refusal family.
+        kind: SlideOrderRefusal,
         /// Bounded human-readable source context.
         detail: String,
     },
