@@ -345,6 +345,184 @@ fn signed_source_bytes() -> Vec<u8> {
     stored_archive(&entries, b"")
 }
 
+fn source_bytes_with_non_part_signature_member(name: &str) -> Vec<u8> {
+    let content_types = canonical_content_types();
+    let root_relationships = canonical_root_relationships();
+    let entries = [
+        Entry {
+            name: b"[Content_Types].xml",
+            data: &content_types,
+            local_extra: b"",
+            central_extra: b"",
+            comment: b"",
+        },
+        Entry {
+            name: b"_rels/.rels",
+            data: &root_relationships,
+            local_extra: b"",
+            central_extra: b"",
+            comment: b"",
+        },
+        Entry {
+            name: b"word/document.xml",
+            data: b"<before/>",
+            local_extra: b"",
+            central_extra: b"",
+            comment: b"",
+        },
+        Entry {
+            name: name.as_bytes(),
+            data: b"orphan-signature-bytes",
+            local_extra: b"\x99\x99\x04\x00sigx",
+            central_extra: b"\x88\x88\x02\x00sigc",
+            comment: b"signature-member-comment",
+        },
+    ];
+    stored_archive(&entries, b"signature-member-archive-comment")
+}
+
+fn source_bytes_with_duplicate_non_part_members(first: &str, second: &str) -> Vec<u8> {
+    let content_types = canonical_content_types();
+    let root_relationships = canonical_root_relationships();
+    let entries = [
+        Entry {
+            name: b"[Content_Types].xml",
+            data: &content_types,
+            local_extra: b"",
+            central_extra: b"",
+            comment: b"",
+        },
+        Entry {
+            name: b"_rels/.rels",
+            data: &root_relationships,
+            local_extra: b"",
+            central_extra: b"",
+            comment: b"",
+        },
+        Entry {
+            name: b"word/document.xml",
+            data: b"<before/>",
+            local_extra: b"",
+            central_extra: b"",
+            comment: b"",
+        },
+        Entry {
+            name: first.as_bytes(),
+            data: b"first-duplicate",
+            local_extra: b"",
+            central_extra: b"",
+            comment: b"",
+        },
+        Entry {
+            name: second.as_bytes(),
+            data: b"second-duplicate",
+            local_extra: b"",
+            central_extra: b"",
+            comment: b"",
+        },
+    ];
+    stored_archive(&entries, b"duplicate-member-archive-comment")
+}
+
+fn source_bytes_with_signature_content_type_spoof() -> Vec<u8> {
+    let content_types = format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="{CONTENT_TYPES_NS}"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/custom/spoof.bin" ContentType="application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml"/></Types>"#
+    )
+    .into_bytes();
+    let root_relationships = canonical_root_relationships();
+    let entries = [
+        Entry {
+            name: b"[Content_Types].xml",
+            data: &content_types,
+            local_extra: b"",
+            central_extra: b"",
+            comment: b"",
+        },
+        Entry {
+            name: b"_rels/.rels",
+            data: &root_relationships,
+            local_extra: b"",
+            central_extra: b"",
+            comment: b"",
+        },
+        Entry {
+            name: b"word/document.xml",
+            data: b"<before/>",
+            local_extra: b"",
+            central_extra: b"",
+            comment: b"",
+        },
+        Entry {
+            name: b"custom/spoof.bin",
+            data: b"signature-looking-spoof",
+            local_extra: b"\x99\x99\x04\x00spfx",
+            central_extra: b"\x88\x88\x02\x00spfc",
+            comment: b"signature-spoof-comment",
+        },
+    ];
+    stored_archive(&entries, b"signature-spoof-archive-comment")
+}
+
+fn assert_signature_like_source_is_locked(source: &[u8], label: &str) {
+    let mut overlay_noop = Vec::new();
+    open(source)
+        .write_part_overlay_to_stream(
+            &mut overlay_noop,
+            &pack("/word/document.xml"),
+            b"<before/>".to_vec(),
+        )
+        .unwrap();
+    assert_eq!(overlay_noop, source, "exact overlay no-op for {label}");
+
+    let topology_noop = publish(source, SourceTopologyPlan::new()).unwrap();
+    assert_eq!(topology_noop, source, "exact topology no-op for {label}");
+
+    let mut overlay_output = Vec::new();
+    let error = open(source)
+        .write_part_overlay_to_stream(
+            &mut overlay_output,
+            &pack("/word/document.xml"),
+            b"<after/>".to_vec(),
+        )
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        OpcError::SignedSourceRequiresExplicitPolicy
+    ));
+    assert!(overlay_output.is_empty(), "overlay output for {label}");
+
+    let mut topology = SourceTopologyPlan::new();
+    topology
+        .try_add_part(
+            pack("/custom/new.bin"),
+            "application/octet-stream",
+            b"new bytes".to_vec(),
+        )
+        .unwrap();
+    let mut topology_output = Vec::new();
+    let error = open(source)
+        .write_topology_to_stream(&mut topology_output, topology)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        OpcError::SignedSourceRequiresExplicitPolicy
+    ));
+    assert!(topology_output.is_empty(), "topology output for {label}");
+}
+
+fn assert_unsigned_topology_mutation_is_refused(plan: SourceTopologyPlan, label: &str) {
+    let source = source_bytes(false, false, false);
+    let mut output = Vec::new();
+    let error = open(&source)
+        .write_topology_to_stream(&mut output, plan)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        OpcError::SignedSourceRequiresExplicitPolicy
+    ));
+    assert!(output.is_empty(), "topology output for {label}");
+}
+
 fn malformed_xml_source_bytes() -> Vec<u8> {
     let content_types = canonical_content_types();
     let root_relationships = canonical_root_relationships();
@@ -840,6 +1018,125 @@ fn signed_exact_noop_replacement_is_byte_exact_but_topology_change_is_refused() 
         error,
         OpcError::SignedSourceRequiresExplicitPolicy
     ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn orphan_non_part_signature_member_is_mutation_locked() {
+    let source = source_bytes_with_non_part_signature_member("_xmlsignatures/orphan.sigs");
+    assert_signature_like_source_is_locked(&source, "orphan non-Part _xmlsignatures member");
+}
+
+#[test]
+fn raw_signature_non_part_materialization_is_owned_mutation_locked() {
+    let source = source_bytes_with_non_part_signature_member("_xmlsignatures/orphan.sigs");
+
+    let materialized = open(&source).to_opc_package().unwrap();
+    assert!(materialized.is_signed());
+
+    let mut changed = open(&source).to_opc_package().unwrap();
+    changed
+        .get_part_mut(&pack("/word/document.xml"))
+        .unwrap()
+        .set_blob(b"<after/>".to_vec());
+    let mut output = Vec::new();
+    let error = changed.to_stream(&mut output).unwrap_err();
+    assert!(matches!(
+        error,
+        OpcError::SignedSourceRequiresExplicitPolicy
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn case_and_nested_signature_member_paths_are_mutation_locked() {
+    for (name, label) in [
+        (
+            "_XMLSIGNATURES/case-variant.sigs",
+            "case-variant _xmlsignatures member",
+        ),
+        (
+            ".\\_xmlsignatures\\path-variant.sigs",
+            "root-equivalent dot-backslash _xmlsignatures member",
+        ),
+    ] {
+        let source = source_bytes_with_non_part_signature_member(name);
+        assert_signature_like_source_is_locked(&source, label);
+    }
+}
+
+#[test]
+fn signature_content_type_spoof_is_mutation_locked() {
+    let source = source_bytes_with_signature_content_type_spoof();
+    assert_signature_like_source_is_locked(&source, "signature-looking content type spoof");
+}
+
+#[test]
+fn unsigned_source_empty_topology_plan_remains_an_exact_copy() {
+    let source = source_bytes(false, false, false);
+    let output = publish(&source, SourceTopologyPlan::new()).unwrap();
+    assert_eq!(output, source);
+}
+
+#[test]
+fn topology_addition_of_root_signature_part_is_refused_before_output() {
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_add_part(
+        pack("/_xmlsignatures/sig1.xml"),
+        "application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml",
+        b"<Signature/>".to_vec(),
+    )
+    .unwrap();
+    assert_unsigned_topology_mutation_is_refused(plan, "root signature Part");
+}
+
+#[test]
+fn topology_addition_of_signature_content_type_spoof_is_refused_before_output() {
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_add_part(
+        pack("/custom/spoof.bin"),
+        "application/vnd.openxmlformats-package.digital-signature-xmlsignature+xml",
+        b"spoof".to_vec(),
+    )
+    .unwrap();
+    assert_unsigned_topology_mutation_is_refused(plan, "signature content type spoof");
+}
+
+#[test]
+fn topology_addition_of_signature_relationship_or_target_is_refused_before_output() {
+    let cases = [
+        (
+            "signature relationship type",
+            "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature",
+            "/custom/existing.xml",
+        ),
+        (
+            "signature-looking relationship target",
+            CUSTOM_REL,
+            "/_xmlsignatures/sig1.xml",
+        ),
+    ];
+    for (label, reltype, target) in cases {
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_add_internal_relationship(pack("/"), "rIdSignature", reltype, pack(target))
+            .unwrap();
+        assert_unsigned_topology_mutation_is_refused(plan, label);
+    }
+}
+
+#[test]
+fn case_equivalent_physical_names_refuse_changed_publication() {
+    let source = source_bytes_with_duplicate_non_part_members("custom/case.bin", "custom/CASE.BIN");
+    let exact = publish(&source, SourceTopologyPlan::new()).unwrap();
+    assert_eq!(exact, source);
+
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_replace_part(pack("/word/document.xml"), b"<after/>".to_vec())
+        .unwrap();
+    let mut output = Vec::new();
+    let _error = open(&source)
+        .write_topology_to_stream(&mut output, plan)
+        .unwrap_err();
     assert!(output.is_empty());
 }
 

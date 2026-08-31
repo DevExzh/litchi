@@ -702,8 +702,13 @@ impl OpcPackage {
     /// This is a cheap capability check. It intentionally includes orphaned or
     /// partially formed signature parts and relationship targets, because a
     /// mutating writer must not treat an incomplete signature graph as an
-    /// unsigned package. Use `signatures` when graph validation and
-    /// cryptographic verification are required.
+    /// unsigned package. Opaque non-Part members whose names are rooted in the
+    /// reserved signature directory are treated conservatively for the same
+    /// reason. `unsign` remains the explicit authorization boundary for
+    /// publishing a package after signature handling; opaque members are not
+    /// exposed as raw payloads and are preserved as source archive entries.
+    /// Use `signatures` when graph validation and cryptographic verification
+    /// are required.
     #[must_use]
     pub fn is_signed(&self) -> bool {
         self.rels.iter().any(is_signature_relationship_or_target)
@@ -711,6 +716,10 @@ impl OpcPackage {
                 is_signature_infrastructure(&**part)
                     || part.rels().iter().any(is_signature_relationship_or_target)
             })
+            || self
+                .non_part_members
+                .iter()
+                .any(|member| is_signature_member_path(member.name()))
     }
 
     /// Verifies every OPC signature with the safe strict policy.
@@ -1350,6 +1359,22 @@ fn is_signature_path(path: &str) -> bool {
     path.as_bytes()
         .get(..DIRECTORY.len())
         .is_some_and(|prefix| prefix.eq_ignore_ascii_case(DIRECTORY))
+}
+
+/// Return whether an opaque ZIP member name is rooted in the reserved OPC
+/// signature directory.
+///
+/// Part names are absolute (`/_xmlsignatures/...`) while ZIP member names are
+/// relative (`_xmlsignatures/...`). Non-Part names can also contain malformed
+/// separators or harmless leading dot segments, so compare their first
+/// meaningful path component using both separator styles. Only that root
+/// component is accepted; a nested `_xmlsignatures` directory is unrelated to
+/// the package signature directory.
+fn is_signature_member_path(path: &str) -> bool {
+    path.split(['/', '\\'])
+        .filter(|segment| !segment.is_empty() && *segment != ".")
+        .next()
+        .is_some_and(|segment| segment.eq_ignore_ascii_case("_xmlsignatures"))
 }
 
 fn is_signature_infrastructure(part: &dyn Part) -> bool {
