@@ -3561,3 +3561,23 @@ closure. The authoritative inventory remains 64 workspace packages, 239
 internal dependency edges, 13 ordered debts, and one monolithic IWA host.
 The `litchi-iwa -> litchi-keynote` edge and debt 014/open monolith-exit edge
 remain open; no topology, debt, or monolith gate closes in Wave114.
+
+## 2026-08-31 amendment: Wave115 current-topology Keynote table-title compatibility-alias cleanup
+
+Wave115 removes only the `litchi-iwa` Keynote table-title compatibility alias
+module and its `KeynoteTableTitleSettings` re-exports. The selector-first
+`litchi-keynote` table-title owner and its private Buffa/lazy codec remain
+unchanged. Focused tests and the table-creation example now use the focused
+`Settings` type directly from `litchi_keynote::slide::table::title`.
+
+This narrow alias cleanup records no dependency, debt, or workspace-topology
+change. Native evidence is deliberately scoped: Computer Use opened the known
+5-by-4 Keynote table fixture, created
+`/private/tmp/litchi-wave115-title-alias-native.key` with Keynote's Save As,
+enabled both `Title` and `Outline Table Title`, saved, closed, and reopened it
+without a repair or recovery prompt. The reopened controls remained enabled;
+the native file was 502,679 bytes with SHA-256
+`57f8b172b7dbf741b73c12a6c66123e7343b82961270bac2a62e613af1f5f608`.
+This is native UI persistence evidence, not a library-emitted-output claim: the
+legacy table-creation example compiles but still returns
+`UnsupportedDependency` before writing a file.

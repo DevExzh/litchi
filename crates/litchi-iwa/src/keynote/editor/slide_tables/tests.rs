@@ -6,6 +6,7 @@ use litchi_iwa_common::table::cell::BorderSide;
 use litchi_iwa_common::table::cell::conditional_highlight::{
     Condition, Rule, Style as ConditionalHighlightStyle, Text as ConditionalText,
 };
+use litchi_keynote::slide::table::title::Settings as TableTitleSettings;
 use litchi_keynote::slide::table::{
     dimension::{Dimension, Size},
     formula::{FormulaCachedValue, FormulaCellReference, FormulaExpression},
@@ -149,7 +150,7 @@ fn focused_table_title_settings(
     editor: &KeynoteEditor,
     slide_index: usize,
     model_object_id: u64,
-) -> Result<KeynoteTableTitleSettings> {
+) -> Result<TableTitleSettings> {
     let table_index = focused_table_index(editor, slide_index, model_object_id)?;
     focused_table_package(editor)?
         .slide_table_title_settings(
@@ -165,7 +166,7 @@ fn set_focused_table_title_settings(
     editor: &mut KeynoteEditor,
     slide_index: usize,
     model_object_id: u64,
-    settings: KeynoteTableTitleSettings,
+    settings: TableTitleSettings,
 ) -> Result<()> {
     let table_index = focused_table_index(editor, slide_index, model_object_id)?;
     let commit = focused_table_package(editor)?
@@ -1971,8 +1972,8 @@ fn source_built_table_roundtrips_title_settings_transactionally() {
     let table = editor
         .add_slide_table(0, "Forecast", 2, 2, position, size)
         .unwrap();
-    let visible = KeynoteTableTitleSettings::new(Some(true), Some(true));
-    let initially_hidden = KeynoteTableTitleSettings::new(Some(false), None);
+    let visible = TableTitleSettings::new(Some(true), Some(true));
+    let initially_hidden = TableTitleSettings::new(Some(false), None);
     assert_eq!(
         focused_table_title_settings(&editor, 0, table.model_object_id).unwrap(),
         initially_hidden
@@ -1988,7 +1989,7 @@ fn source_built_table_roundtrips_title_settings_transactionally() {
     set_focused_table_title_settings(&mut reopened, 0, table.model_object_id, visible).unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), unchanged);
 
-    let explicit_hidden = KeynoteTableTitleSettings::new(Some(false), Some(false));
+    let explicit_hidden = TableTitleSettings::new(Some(false), Some(false));
     set_focused_table_title_settings(&mut reopened, 0, table.model_object_id, explicit_hidden)
         .unwrap();
     assert_eq!(
@@ -1999,12 +2000,12 @@ fn source_built_table_roundtrips_title_settings_transactionally() {
         &mut reopened,
         0,
         table.model_object_id,
-        KeynoteTableTitleSettings::default(),
+        TableTitleSettings::default(),
     )
     .unwrap();
     assert_eq!(
         focused_table_title_settings(&reopened, 0, table.model_object_id).unwrap(),
-        KeynoteTableTitleSettings::default()
+        TableTitleSettings::default()
     );
 
     let before_error = reopened.to_bytes().unwrap();

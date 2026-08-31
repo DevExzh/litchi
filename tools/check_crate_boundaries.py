@@ -3153,6 +3153,26 @@ IWA_KEYNOTE_SLIDE_TABLE_HEADERS_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples"
 RETIRED_IWA_KEYNOTE_SLIDE_TABLE_TITLE_METHODS = frozenset(
     {"slide_table_title_settings", "set_slide_table_title_settings"}
 )
+# The focused Keynote package now owns the semantic title settings value.  The
+# former migration-host alias was a second public route to that value, so keep
+# its exact source/module/export shape retired as part of the title audit.
+RETIRED_IWA_KEYNOTE_SLIDE_TABLE_TITLE_SETTINGS_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables" / "title.rs"
+)
+RETIRED_IWA_KEYNOTE_SLIDE_TABLE_TITLE_SETTINGS_ALIAS = "KeynoteTableTitleSettings"
+IWA_KEYNOTE_SLIDE_TABLE_TITLE_SETTINGS_MODULE_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables.rs"
+)
+IWA_KEYNOTE_SLIDE_TABLE_TITLE_SETTINGS_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?(title)\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+IWA_KEYNOTE_SLIDE_TABLE_TITLE_SETTINGS_ALIAS = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?"
+    + re.escape(RETIRED_IWA_KEYNOTE_SLIDE_TABLE_TITLE_SETTINGS_ALIAS)
+    + r"\b"
+)
 IWA_KEYNOTE_SLIDE_TABLE_TITLE_CALL = re.compile(
     r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>slide_table_title_settings|"
     r"set_slide_table_title_settings|edit_slide_table_title|"
@@ -34611,7 +34631,60 @@ def audit_iwa_keynote_slide_table_title_source_topology(
 ) -> list[str]:
     """Retire raw Keynote title configuration in favor of Package calls."""
 
-    return _audit_iwa_keynote_slide_table_config_source_topology(root, feature="title")
+    violations = _audit_iwa_keynote_slide_table_config_source_topology(
+        root, feature="title"
+    )
+
+    retired_source = root / RETIRED_IWA_KEYNOTE_SLIDE_TABLE_TITLE_SETTINGS_SOURCE
+    if retired_source.is_file():
+        violations.append(
+            "retired litchi-iwa Keynote slide-table title settings source returned: "
+            f"{RETIRED_IWA_KEYNOTE_SLIDE_TABLE_TITLE_SETTINGS_SOURCE}"
+        )
+
+    # ``title`` is a valid module name for other Keynote features (for
+    # example, slide-chart titles), so scope this check to the old
+    # slide-table owner file instead of scanning every ``mod title`` in the
+    # compatibility host.
+    module_source = root / IWA_KEYNOTE_SLIDE_TABLE_TITLE_SETTINGS_MODULE_SOURCE
+    if module_source.is_file():
+        source = _mask_rust_non_code(module_source.read_text(encoding="utf-8"))
+        for match in IWA_KEYNOTE_SLIDE_TABLE_TITLE_SETTINGS_MODULE.finditer(source):
+            line_number = source.count("\n", 0, match.start(1)) + 1
+            violations.append(
+                "retired litchi-iwa Keynote slide-table title settings module "
+                f"{match.group(1)}: "
+                f"{IWA_KEYNOTE_SLIDE_TABLE_TITLE_SETTINGS_MODULE_SOURCE}:{line_number}"
+            )
+
+    # Keep the canonical semantic import available to production adapters,
+    # tests, and examples, while forbidding the exact old alias in every
+    # production public declaration.  This also prevents a later change from
+    # moving the type alias to a differently named compatibility module.
+    # Test-only inline modules and dedicated test files are excluded from this
+    # host-export scan.
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            if path.name == "tests.rs" or "tests" in path.parts:
+                continue
+            production_source = _mask_rust_cfg_test_items(
+                path.read_text(encoding="utf-8")
+            )
+            for declaration, line_number in _rust_public_declarations(
+                production_source
+            ):
+                if IWA_KEYNOTE_SLIDE_TABLE_TITLE_SETTINGS_ALIAS.search(
+                    declaration
+                ) is None:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Keynote slide-table title settings alias "
+                    f"{RETIRED_IWA_KEYNOTE_SLIDE_TABLE_TITLE_SETTINGS_ALIAS}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
 
 
 def audit_iwa_keynote_slide_table_sort_source_topology(

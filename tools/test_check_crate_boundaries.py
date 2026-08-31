@@ -14234,7 +14234,7 @@ fn rewrite_movie_title_operation(
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             add_keynote_slide_table_title_canonical_scaffold(root)
-            host = root / "crates/litchi-iwa/src/keynote/editor/slide_tables/title.rs"
+            host = root / "crates/litchi-iwa/src/keynote/editor/slide_tables/legacy.rs"
             host.parent.mkdir(parents=True, exist_ok=True)
             host.write_text(
                 "pub fn slide_table_title_settings(&self, slide_index: usize, model_id: u64) {}\n"
@@ -14296,6 +14296,116 @@ fn rewrite_movie_title_operation(
             host.write_text("fn physical_only() {}\n", encoding="utf-8")
             violations = boundaries.audit_iwa_keynote_slide_table_title_source_topology(root)
             self.assertTrue(any("must call the focused litchi-keynote Package" in item for item in violations), violations)
+
+    def test_retired_iwa_keynote_slide_table_title_alias_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_title_canonical_scaffold(root)
+
+            retired_source = root / boundaries.RETIRED_IWA_KEYNOTE_SLIDE_TABLE_TITLE_SETTINGS_SOURCE
+            retired_source.parent.mkdir(parents=True, exist_ok=True)
+            retired_source.write_text(
+                "pub type KeynoteTableTitleSettings = "
+                "litchi_keynote::slide::table::title::Settings;\n",
+                encoding="utf-8",
+            )
+
+            module_source = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_TITLE_SETTINGS_MODULE_SOURCE
+            module_source.parent.mkdir(parents=True, exist_ok=True)
+            module_source.write_text(
+                "// mod title;\n"
+                'const DECOY: &str = "pub use title::KeynoteTableTitleSettings;";\n'
+                "#[cfg(test)]\n"
+                "pub use title::KeynoteTableTitleSettings;\n"
+                "mod title;\n"
+                "pub use title::KeynoteTableTitleSettings;\n"
+                "fn focused() { package.slide_table_title_settings(slide, table); }\n",
+                encoding="utf-8",
+            )
+
+            editor_source = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "editor.rs"
+            editor_source.parent.mkdir(parents=True, exist_ok=True)
+            editor_source.write_text(
+                "pub use slide_tables::KeynoteTableTitleSettings;\n"
+                "pub use slide_tables::KeynoteTableTitleSettingsExtra;\n",
+                encoding="utf-8",
+            )
+            legacy_source = (
+                root
+                / boundaries.IWA_KEYNOTE_SOURCE_ROOT
+                / "editor"
+                / "slide_tables"
+                / "legacy.rs"
+            )
+            legacy_source.write_text(
+                "pub type KeynoteTableTitleSettings = "
+                "litchi_keynote::slide::table::title::Settings;\n",
+                encoding="utf-8",
+            )
+            keynote_source = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "mod.rs"
+            keynote_source.write_text(
+                "pub use editor::KeynoteTableTitleSettings;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_keynote_slide_table_title_source_topology(root)
+
+            self.assertTrue(
+                any("title settings source returned" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("title settings module title" in item for item in violations),
+                violations,
+            )
+            alias_violations = [
+                item for item in violations if "alias KeynoteTableTitleSettings:" in item
+            ]
+            self.assertEqual(len(alias_violations), 5, violations)
+            self.assertFalse(
+                any("KeynoteTableTitleSettingsExtra" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_keynote_slide_table_title_allows_canonical_settings_imports(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_title_canonical_scaffold(root)
+
+            host = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables.rs"
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "use litchi_keynote::slide::table::title::Settings;\n"
+                "fn focused(settings: Settings) {\n"
+                "    let _ = settings;\n"
+                "    package.slide_table_title_settings(slide, table);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "pub use litchi_keynote::slide::table::title::Settings;\n",
+                encoding="utf-8",
+            )
+            tests = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables" / "tests.rs"
+            tests.parent.mkdir(parents=True, exist_ok=True)
+            tests.write_text(
+                "use litchi_keynote::slide::table::title::Settings;\n"
+                "pub use litchi_keynote::slide::table::title::Settings;\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_CONFIG_EXAMPLE_ROOT / "create_keynote_table.rs"
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text(
+                "use litchi_keynote::slide::table::title::Settings;\n"
+                "fn create() {\n"
+                "    let _ = Settings::default();\n"
+                "    package.edit_slide_table_title(slide, table);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_title_source_topology(root),
+                [],
+            )
 
     def test_iwa_keynote_slide_table_sort_preserves_physical_executor(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
