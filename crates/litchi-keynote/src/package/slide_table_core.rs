@@ -31,6 +31,7 @@ use litchi_iwa_core::{
 };
 use litchi_iwa_protos::{
     package_metadata_codec, table_dimension_codec, table_info_codec, table_model_discovery_codec,
+    table_sort_order_codec,
 };
 
 use super::{Package, PayloadLimitKind, PhysicalSource, ReadError, SemanticLimitKind};
@@ -397,6 +398,10 @@ impl Budget {
         )
     }
 
+    pub(crate) fn remaining_references(&self) -> Result<usize> {
+        Self::remaining(self.references, self.max_references, LimitKind::References)
+    }
+
     pub(crate) fn remaining_retained(&self) -> Result<usize> {
         Self::remaining(self.retained, self.max_retained, LimitKind::Retained)
     }
@@ -573,6 +578,37 @@ impl Budget {
         self.retained(report.retained_bytes())?;
         self.scratch(report.scratch_bytes())?;
         self.nesting(report.max_depth() as usize)
+    }
+
+    /// Charge strict persisted table-sort decoding and preparation against
+    /// the same operation ledger used by graph admission and archive work.
+    pub(crate) fn sort_codec_report(
+        &mut self,
+        report: table_sort_order_codec::DecodeReport,
+    ) -> Result<()> {
+        self.input(report.input_bytes())?;
+        self.output(report.output_bytes())?;
+        self.fields(report.fields())?;
+        self.work(report.work_bytes())?;
+        self.references(report.rules())?;
+        self.allocations(report.allocations())?;
+        self.retained(report.retained_bytes())?;
+        self.scratch(report.scratch_bytes())?;
+        self.nesting(report.max_depth() as usize)
+    }
+
+    pub(crate) fn sort_rewrite_requirements(
+        &mut self,
+        requirements: table_sort_order_codec::RewriteExecutionRequirements,
+    ) -> Result<()> {
+        self.output(requirements.output_bytes)?;
+        self.fields(requirements.fields)?;
+        self.work(requirements.work_bytes)?;
+        self.references(requirements.rules)?;
+        self.allocations(requirements.allocations)?;
+        self.retained(requirements.retained_bytes)?;
+        self.scratch(requirements.scratch_bytes)?;
+        self.nesting(requirements.max_depth as usize)
     }
 
     fn storage_codec_report(&mut self, report: table_dimension_codec::DecodeReport) -> Result<()> {
@@ -767,6 +803,8 @@ pub(crate) struct Target {
     pub(crate) slide_message_index: usize,
     pub(crate) table_info_message_index: usize,
     pub(crate) model_message_index: usize,
+    pub(crate) rows: u32,
+    pub(crate) columns: u32,
     storage: Vec<StorageRoute>,
     pub(crate) locked: bool,
 }
@@ -845,9 +883,9 @@ pub(crate) fn select_table(
         }
         let model_identifier = info.table_model().identifier().get();
         validate_table_info_metadata(
+            package,
             info_object,
             info_message_index,
-            parent,
             model_identifier,
             budget,
         )?;
@@ -866,20 +904,23 @@ pub(crate) fn select_table(
         }
         let (model_message_index, model_payload) =
             unique_message(model_object, TABLE_MODEL_MESSAGE_TYPE, budget)?;
-        validate_model_payload(model_payload, package, budget)?;
+        let (rows, columns) = validate_model_payload(model_payload, package, budget)?;
         candidates.push((
             info_location,
             model_location,
             info_message_index,
             model_message_index,
+            rows,
+            columns,
             info.locked().unwrap_or(false),
         ));
     }
     let table_position = table_selector.as_position();
-    let (table_info, model, table_info_message_index, model_message_index, locked) = candidates
-        .into_iter()
-        .nth(table_position.get())
-        .ok_or(Error::TablePositionNotFound(table_position))?;
+    let (table_info, model, table_info_message_index, model_message_index, rows, columns, locked) =
+        candidates
+            .into_iter()
+            .nth(table_position.get())
+            .ok_or(Error::TablePositionNotFound(table_position))?;
     ensure_unique_identity(package, slide.identifier, budget)?;
     ensure_unique_identity(package, table_info.identifier, budget)?;
     ensure_unique_identity(package, model.identifier, budget)?;
@@ -926,6 +967,8 @@ pub(crate) fn select_table(
         slide_message_index,
         table_info_message_index,
         model_message_index,
+        rows,
+        columns,
         storage,
         locked,
     })
@@ -1031,6 +1074,9 @@ pub(crate) fn component_archive(
     budget.physical(stream.as_bytes().len())?;
     let archive =
         Archive::parse_with_limits(stream.as_bytes(), limits).map_err(|_| Error::Archive)?;
+    archive
+        .validate_canonical_object_framing(stream.as_bytes())
+        .map_err(|_| Error::Archive)?;
     charge_archive_inventory(&archive, budget)?;
     Ok(archive)
 }
@@ -1520,7 +1566,10 @@ fn validate_slide_metadata(
             .checked_add(info.data_references.len())
             .ok_or(Error::InvalidSource)?,
     )?;
-    let expected_capacity = owned.len().saturating_add(z_order.len());
+    let expected_capacity = owned
+        .len()
+        .checked_add(z_order.len())
+        .ok_or(Error::InvalidSource)?;
     budget.allocations(expected_capacity)?;
     let mut expected = HashMap::new();
     expected
@@ -1590,9 +1639,9 @@ fn validate_slide_metadata(
 }
 
 fn validate_table_info_metadata(
+    package: &Package,
     object: &ArchiveObject,
     message_index: usize,
-    parent: u64,
     model: u64,
     budget: &mut Budget,
 ) -> Result<()> {
@@ -1605,18 +1654,34 @@ fn validate_table_info_metadata(
     if !info.data_references.is_empty() {
         return Err(Error::UnsupportedDependency);
     }
-    let direct_is_canonical = info.object_references.as_slice() == [model]
-        || (info.object_references.len() == 2
-            && info.object_references.contains(&parent)
-            && info.object_references.contains(&model));
-    if !direct_is_canonical {
-        return Err(Error::InvalidSource);
-    }
-    if !info.object_references.is_empty() {
-        reject_duplicates(&info.object_references, budget)?;
-    }
     budget.references(info.object_references.len())?;
     budget.fields(info.field_infos.len())?;
+    budget.allocations(info.object_references.len())?;
+    budget.retained(
+        info.object_references
+            .len()
+            .checked_mul(size_of::<u64>())
+            .ok_or(Error::InvalidSource)?,
+    )?;
+    budget.work(info.object_references.len())?;
+    let mut aggregate_references = HashSet::new();
+    aggregate_references
+        .try_reserve(info.object_references.len())
+        .map_err(|_| Error::Allocation(info.object_references.len()))?;
+    for identifier in &info.object_references {
+        if !aggregate_references.insert(*identifier) {
+            return Err(Error::InvalidSource);
+        }
+    }
+    if !aggregate_references.contains(&model) {
+        return Err(Error::InvalidSource);
+    }
+    // Native producers may include caption, title, summary, and category
+    // objects beside the selected model in this aggregate. Focused edits
+    // preserve those edges, but every one must resolve physically.
+    for identifier in &info.object_references {
+        locate_object(package, *identifier)?;
+    }
     let mut saw_model = false;
     for field in &info.field_infos {
         budget.references(
@@ -1629,23 +1694,33 @@ fn validate_table_info_metadata(
         if !field.data_references.is_empty() {
             return Err(Error::UnsupportedDependency);
         }
-        match field.path.as_slice() {
-            [TABLE_MODEL_FIELD] => {
-                if saw_model
-                    || !is_message_reference_field(field)
-                    || field.object_references.as_slice() != [model]
-                {
-                    return Err(Error::InvalidSource);
-                }
-                saw_model = true;
-            },
-            _ if !field.object_references.is_empty() => return Err(Error::UnsupportedTopology),
-            _ => {},
+        if field.object_references.is_empty() {
+            continue;
+        }
+        if !is_message_reference_field(field)
+            || field
+                .object_references
+                .iter()
+                .any(|identifier| !aggregate_references.contains(identifier))
+        {
+            return Err(Error::UnsupportedDependency);
+        }
+        if field.object_references.contains(&model) {
+            if saw_model
+                || field.path.as_slice() != [TABLE_MODEL_FIELD]
+                || field.object_references.as_slice() != [model]
+            {
+                return Err(Error::InvalidSource);
+            }
+            saw_model = true;
+        } else if field.path.as_slice() == [TABLE_MODEL_FIELD] {
+            return Err(Error::InvalidSource);
         }
     }
-    if !saw_model {
-        return Err(Error::InvalidSource);
-    }
+    // Native producers may omit the field-local model route while retaining
+    // the exact aggregate edge. If present, the loop above proves that the
+    // field-local route is unique and canonical; the aggregate remains the
+    // mandatory authority in both producer shapes.
     Ok(())
 }
 
@@ -1680,11 +1755,17 @@ fn decode_table_info(
     Ok(snapshot)
 }
 
-fn validate_model_payload(payload: &[u8], package: &Package, budget: &mut Budget) -> Result<()> {
+fn validate_model_payload(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<(u32, u32)> {
     let options = budget.model_codec_options(package, payload)?;
-    let (_, report) = table_model_discovery_codec::decode_table_model_with_report(payload, options)
-        .map_err(|_| Error::Codec)?;
-    budget.codec_report(report)
+    let (snapshot, report) =
+        table_model_discovery_codec::decode_table_model_with_report(payload, options)
+            .map_err(|_| Error::Codec)?;
+    budget.codec_report(report)?;
+    Ok((snapshot.rows(), snapshot.columns()))
 }
 
 struct RowStorageCollector {
@@ -1879,15 +1960,41 @@ fn validate_model_storage_metadata(
             .and_then(|value| value.checked_add(nested_references))
             .ok_or(Error::InvalidSource)?,
     )?;
-    if !info.data_references.is_empty()
-        || info.object_references.len() != routes.len()
-        || !info
-            .object_references
-            .iter()
-            .copied()
-            .eq(routes.iter().map(|route| route.location.identifier))
-    {
+    if !info.data_references.is_empty() {
         return Err(Error::UnsupportedDependency);
+    }
+    budget.allocations(info.object_references.len())?;
+    budget.retained(
+        info.object_references
+            .len()
+            .checked_mul(size_of::<u64>())
+            .ok_or(Error::InvalidSource)?,
+    )?;
+    budget.work(info.object_references.len())?;
+    let mut aggregate_references = HashSet::new();
+    aggregate_references
+        .try_reserve(info.object_references.len())
+        .map_err(|_| Error::Allocation(info.object_references.len()))?;
+    for identifier in &info.object_references {
+        if !aggregate_references.insert(*identifier) {
+            return Err(Error::UnsupportedDependency);
+        }
+    }
+    for route in routes {
+        if !aggregate_references.contains(&route.location.identifier) {
+            return Err(Error::UnsupportedDependency);
+        }
+    }
+    // References unrelated to the selected storage spine are preserved by
+    // focused edits. Prove that every such aggregate edge resolves to one
+    // physical object so an opaque/dangling dependency cannot hide there.
+    for identifier in &info.object_references {
+        if routes
+            .iter()
+            .all(|route| route.location.identifier != *identifier)
+        {
+            locate_object(package, *identifier)?;
+        }
     }
     budget.allocations(routes.len())?;
     budget.retained(
@@ -1907,22 +2014,44 @@ fn validate_model_storage_metadata(
         if field.object_references.is_empty() {
             continue;
         }
+        if field
+            .object_references
+            .iter()
+            .any(|identifier| !aggregate_references.contains(identifier))
+        {
+            return Err(Error::UnsupportedDependency);
+        }
+        let mut selected_route = None;
+        for route in routes {
+            if field.object_references.contains(&route.location.identifier)
+                && selected_route.replace(route).is_some()
+            {
+                return Err(Error::UnsupportedDependency);
+            }
+        }
+        let Some(route) = selected_route else {
+            if !field
+                .r#type
+                .is_none_or(|kind| matches!(kind, FieldType::ObjectReference | FieldType::Message))
+            {
+                return Err(Error::UnsupportedDependency);
+            }
+            continue;
+        };
         let [identifier] = field.object_references.as_slice() else {
             return Err(Error::UnsupportedDependency);
         };
-        let Some(route) = routes
-            .iter()
-            .find(|route| route.location.identifier == *identifier)
-        else {
-            return Err(Error::UnsupportedDependency);
-        };
-        if field.path.as_slice() != route.kind.path() || !seen_fields.insert(*identifier) {
+        if !is_message_reference_field(field)
+            || field.path.as_slice() != route.kind.path()
+            || !seen_fields.insert(*identifier)
+        {
             return Err(Error::UnsupportedDependency);
         }
     }
-    if routes
-        .iter()
-        .any(|route| !seen_fields.contains(&route.location.identifier))
+    if !seen_fields.is_empty()
+        && routes
+            .iter()
+            .any(|route| !seen_fields.contains(&route.location.identifier))
     {
         return Err(Error::UnsupportedDependency);
     }
@@ -1966,7 +2095,13 @@ fn ensure_unique_table_owner(
             budget.payload_objects(1)?;
             for message in &object.messages {
                 budget.payload_messages(1)?;
-                budget.work(message.data.len().saturating_add(1))?;
+                budget.work(
+                    message
+                        .data
+                        .len()
+                        .checked_add(1)
+                        .ok_or(Error::InvalidSource)?,
+                )?;
                 if message.type_ == SLIDE_MESSAGE_TYPE {
                     let owned_refs = repeated_references(
                         &message.data,
@@ -1984,8 +2119,8 @@ fn ensure_unique_table_owner(
                         .iter()
                         .filter(|id| **id == table_info_identifier)
                         .count();
-                    owned = owned.saturating_add(owned_hits);
-                    z_order = z_order.saturating_add(z_hits);
+                    owned = owned.checked_add(owned_hits).ok_or(Error::InvalidSource)?;
+                    z_order = z_order.checked_add(z_hits).ok_or(Error::InvalidSource)?;
                     if object.archive_info.identifier == Some(slide_identifier)
                         && owned_hits == 1
                         && z_hits == 1
@@ -1995,7 +2130,7 @@ fn ensure_unique_table_owner(
                 } else if message.type_ == TABLE_INFO_MESSAGE_TYPE {
                     let info = decode_table_info(&message.data, package, budget)?;
                     if info.table_model().identifier().get() == model_identifier {
-                        model_owners = model_owners.saturating_add(1);
+                        model_owners = model_owners.checked_add(1).ok_or(Error::InvalidSource)?;
                     }
                 }
             }
@@ -2012,6 +2147,8 @@ fn ensure_unique_table_owner(
 struct MetadataTarget<'a> {
     identifier: u64,
     component_name: &'a str,
+    requires_uuid: bool,
+    storage: bool,
 }
 
 fn validate_package_metadata(
@@ -2040,6 +2177,7 @@ fn validate_package_metadata(
         .try_reserve(physical_capacity)
         .map_err(|_| Error::Allocation(physical_capacity))?;
     let mut physical_maximum = 0u64;
+    let mut data_reference_capacity = 0usize;
     for component in package.state.source.components().iter() {
         budget.components(1)?;
         for object in &component.archive().objects {
@@ -2049,6 +2187,38 @@ fn validate_package_metadata(
                 return Err(Error::UnsupportedDependency);
             }
             physical_maximum = physical_maximum.max(identifier);
+            for info in &object.archive_info.message_infos {
+                data_reference_capacity = data_reference_capacity
+                    .checked_add(info.data_references.len())
+                    .ok_or(Error::InvalidSource)?;
+            }
+        }
+    }
+    budget.references(data_reference_capacity)?;
+    budget.work(data_reference_capacity)?;
+    budget.allocations(data_reference_capacity)?;
+    budget.retained(
+        data_reference_capacity
+            .checked_mul(size_of::<((u64, u64), usize)>())
+            .ok_or(Error::InvalidSource)?,
+    )?;
+    let mut physical_data_references = HashMap::new();
+    physical_data_references
+        .try_reserve(data_reference_capacity)
+        .map_err(|_| Error::Allocation(data_reference_capacity))?;
+    for component in package.state.source.components().iter() {
+        budget.components(1)?;
+        for object in &component.archive().objects {
+            budget.payload_objects(1)?;
+            let identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
+            for info in &object.archive_info.message_infos {
+                for data_identifier in &info.data_references {
+                    let count = physical_data_references
+                        .entry((identifier, *data_identifier))
+                        .or_insert(0usize);
+                    *count = count.checked_add(1).ok_or(Error::InvalidSource)?;
+                }
+            }
         }
     }
     let mut selected_targets = Vec::new();
@@ -2069,12 +2239,16 @@ fn validate_package_metadata(
         selected_targets.push(MetadataTarget {
             identifier: target.identifier,
             component_name: target.component.as_ref(),
+            requires_uuid: true,
+            storage: false,
         });
     }
     for route in storage {
         selected_targets.push(MetadataTarget {
             identifier: route.location.identifier,
             component_name: route.location.component.as_ref(),
+            requires_uuid: false,
+            storage: true,
         });
     }
     let mut payload = None;
@@ -2097,16 +2271,18 @@ fn validate_package_metadata(
     }
     let payload = payload.ok_or(Error::InvalidSource)?;
     let limits = budget.residual(package)?;
-    let remaining_components = budget
-        .max_components
-        .saturating_sub(budget.components)
-        .max(1);
-    let remaining_references = budget
-        .max_references
-        .saturating_sub(budget.references)
-        .max(1);
+    let remaining_components = Budget::remaining(
+        budget.components,
+        budget.max_components,
+        LimitKind::Components,
+    )?;
+    let remaining_references = Budget::remaining(
+        budget.references,
+        budget.max_references,
+        LimitKind::References,
+    )?;
     let metadata_map_capacity = physical_capacity
-        .checked_mul(6)
+        .checked_mul(7)
         .ok_or(Error::InvalidSource)?;
     budget.allocations(metadata_map_capacity)?;
     budget.retained(
@@ -2115,7 +2291,7 @@ fn validate_package_metadata(
             .ok_or(Error::InvalidSource)?,
     )?;
     let options = package_metadata_codec::RewriteOptions::new(
-        payload.len().max(1).min(limits.max_input_bytes()),
+        payload.len().min(limits.max_input_bytes()),
         limits.max_output_bytes(),
         limits.max_fields(),
         limits.max_rewrite_work(),
@@ -2124,8 +2300,12 @@ fn validate_package_metadata(
         remaining_references,
         remaining_references,
     );
-    let mut visitor = StrictPackageMetadataVisitor::new(&physical_identifiers, &selected_targets)
-        .map_err(|_| Error::Allocation(selected_targets.len()))?;
+    let mut visitor = StrictPackageMetadataVisitor::new(
+        &physical_identifiers,
+        &physical_data_references,
+        &selected_targets,
+    )
+    .map_err(|_| Error::Allocation(selected_targets.len()))?;
     let inspection = package_metadata_codec::inspect_package_metadata_with_visitor(
         payload,
         options,
@@ -2133,6 +2313,21 @@ fn validate_package_metadata(
     )
     .map_err(|_| Error::Codec)?;
     budget.metadata_report(inspection.report())?;
+    let storage_targets = selected_targets
+        .iter()
+        .filter(|target| target.storage)
+        .count();
+    let bound_storage_targets = selected_targets
+        .iter()
+        .filter(|target| {
+            target.storage && visitor.object_components.contains_key(&target.identifier)
+        })
+        .count();
+    let partial_storage_authority =
+        bound_storage_targets != 0 && bound_storage_targets != storage_targets;
+    let incomplete_data_reference = visitor
+        .active_data_reference
+        .is_some_and(|reference| reference.remaining_owners != 0);
     if visitor.unknown
         || visitor
             .external_component_identifiers
@@ -2147,9 +2342,12 @@ fn validate_package_metadata(
         || visitor.duplicate_uuid
         || visitor.duplicate_component
         || visitor.selected_mismatch
-        || selected_targets
-            .iter()
-            .any(|target| !visitor.object_components.contains_key(&target.identifier))
+        || partial_storage_authority
+        || incomplete_data_reference
+        || visitor.seen_data_owners.len() != physical_data_references.len()
+        || selected_targets.iter().any(|target| {
+            target.requires_uuid && !visitor.object_components.contains_key(&target.identifier)
+        })
     {
         return Err(Error::UnsupportedDependency);
     }
@@ -2166,8 +2364,16 @@ fn metadata_component_matches_physical(metadata: &str, physical: &str) -> bool {
     without_iwa(basename(metadata)) == without_iwa(basename(physical))
 }
 
+#[derive(Clone, Copy)]
+struct ActiveDataReference {
+    component_identifier: u64,
+    data_identifier: u64,
+    remaining_owners: usize,
+}
+
 struct StrictPackageMetadataVisitor<'a> {
     physical_identifiers: &'a HashSet<u64>,
+    physical_data_references: &'a HashMap<(u64, u64), usize>,
     selected_targets: &'a [MetadataTarget<'a>],
     unknown: bool,
     authority_invalid: bool,
@@ -2180,11 +2386,15 @@ struct StrictPackageMetadataVisitor<'a> {
     uuid_pairs: HashSet<(u64, u64)>,
     object_bindings: HashMap<(u64, u64), (u64, u64)>,
     object_components: HashMap<u64, u64>,
+    active_data_reference: Option<ActiveDataReference>,
+    seen_data_owners: HashSet<(u64, u64)>,
+    saw_data_metadata_map: bool,
 }
 
 impl<'a> StrictPackageMetadataVisitor<'a> {
     fn new(
         physical_identifiers: &'a HashSet<u64>,
+        physical_data_references: &'a HashMap<(u64, u64), usize>,
         selected_targets: &'a [MetadataTarget<'a>],
     ) -> std::result::Result<Self, ()> {
         let capacity = physical_identifiers.len();
@@ -2206,8 +2416,13 @@ impl<'a> StrictPackageMetadataVisitor<'a> {
         object_bindings.try_reserve(capacity).map_err(|_| ())?;
         let mut object_components = HashMap::new();
         object_components.try_reserve(capacity).map_err(|_| ())?;
+        let mut seen_data_owners = HashSet::new();
+        seen_data_owners
+            .try_reserve(physical_data_references.len())
+            .map_err(|_| ())?;
         Ok(Self {
             physical_identifiers,
+            physical_data_references,
             selected_targets,
             unknown: false,
             authority_invalid: false,
@@ -2220,6 +2435,9 @@ impl<'a> StrictPackageMetadataVisitor<'a> {
             uuid_pairs,
             object_bindings,
             object_components,
+            active_data_reference: None,
+            seen_data_owners,
+            saw_data_metadata_map: false,
         })
     }
 }
@@ -2306,11 +2524,13 @@ impl package_metadata_codec::PackageMetadataVisitor for StrictPackageMetadataVis
         &mut self,
         reference: package_metadata_codec::ExternalReferenceDescriptor<'_>,
     ) -> std::result::Result<(), package_metadata_codec::RewriteError> {
-        // The focused owner rewrites a rooted native object and therefore
-        // admits only the current package object/UUID authority.  Any
-        // external edge would make that authority ambiguous, even when the
-        // target component happens to be current and locally present.
-        self.authority_invalid = true;
+        // Cross-component edges are a normal part of current Keynote table
+        // graphs. They remain admissible only when the source is current,
+        // unversioned, and the target component/object is proven below to be
+        // part of this physical package.
+        if !reference.source().is_current() || reference.is_versioned() {
+            self.authority_invalid = true;
+        }
         self.external_component_identifiers
             .try_reserve(1)
             .map_err(|_| package_metadata_codec::RewriteError::allocation(1))?;
@@ -2327,17 +2547,63 @@ impl package_metadata_codec::PackageMetadataVisitor for StrictPackageMetadataVis
 
     fn visit_data_reference(
         &mut self,
-        _reference: package_metadata_codec::DataReferenceDescriptor<'_>,
+        reference: package_metadata_codec::DataReferenceDescriptor<'_>,
     ) -> std::result::Result<(), package_metadata_codec::RewriteError> {
-        self.authority_invalid = true;
+        if self
+            .active_data_reference
+            .is_some_and(|active| active.remaining_owners != 0)
+            || !reference.component().is_current()
+            || reference.has_unknown_fields()
+            || reference.owner_count() == 0
+        {
+            self.authority_invalid = true;
+        }
+        self.active_data_reference = Some(ActiveDataReference {
+            component_identifier: reference.component().identifier(),
+            data_identifier: reference.data_identifier(),
+            remaining_owners: reference.owner_count(),
+        });
         Ok(())
     }
 
     fn visit_data_reference_owner(
         &mut self,
-        _owner: package_metadata_codec::DataReferenceOwnerDescriptor<'_>,
+        owner: package_metadata_codec::DataReferenceOwnerDescriptor<'_>,
     ) -> std::result::Result<(), package_metadata_codec::RewriteError> {
-        self.authority_invalid = true;
+        let Some(active) = self.active_data_reference else {
+            self.authority_invalid = true;
+            return Ok(());
+        };
+        let key = (owner.object_identifier(), owner.data_identifier());
+        let reported_count = usize::try_from(owner.count()).ok();
+        let selected_owner = self
+            .selected_targets
+            .iter()
+            .any(|target| target.identifier == owner.object_identifier());
+        let valid = owner.component().is_current()
+            && !owner.has_unknown_fields()
+            && owner.component().identifier() == active.component_identifier
+            && owner.data_identifier() == active.data_identifier
+            && active.remaining_owners != 0
+            && self
+                .physical_identifiers
+                .contains(&owner.object_identifier())
+            && !selected_owner
+            && reported_count
+                .is_some_and(|count| self.physical_data_references.get(&key) == Some(&count))
+            && !self.seen_data_owners.contains(&key);
+        if !valid {
+            self.authority_invalid = true;
+        } else if !self.seen_data_owners.insert(key) {
+            // The membership check above and insert are intentionally kept
+            // together: the visitor is single-threaded, so disagreement can
+            // only indicate an internal invariant violation.
+            self.authority_invalid = true;
+        } else if let Some(active) = self.active_data_reference.as_mut() {
+            active.remaining_owners -= 1;
+        } else {
+            self.authority_invalid = true;
+        }
         Ok(())
     }
 
@@ -2352,10 +2618,20 @@ impl package_metadata_codec::PackageMetadataVisitor for StrictPackageMetadataVis
 
     fn visit_data_metadata_map(
         &mut self,
-        _object_identifier: u64,
-        _has_unknown_fields: bool,
+        object_identifier: u64,
+        has_unknown_fields: bool,
     ) -> std::result::Result<(), package_metadata_codec::RewriteError> {
-        self.authority_invalid = true;
+        if self.saw_data_metadata_map
+            || has_unknown_fields
+            || !self.physical_identifiers.contains(&object_identifier)
+            || self
+                .selected_targets
+                .iter()
+                .any(|target| target.identifier == object_identifier)
+        {
+            self.authority_invalid = true;
+        }
+        self.saw_data_metadata_map = true;
         Ok(())
     }
 }
@@ -2428,8 +2704,12 @@ fn validate_global_inbound_references(
         .try_reserve(storage.len())
         .map_err(|_| Error::Allocation(storage.len()))?;
     for route in storage {
+        let expected = reference_occurrence_count(model_info, route.location.identifier)?;
+        if expected == 0 {
+            return Err(Error::UnsupportedDependency);
+        }
         if model_targets
-            .insert(route.location.identifier, 2usize)
+            .insert(route.location.identifier, expected)
             .is_some()
         {
             return Err(Error::UnsupportedDependency);
@@ -2457,7 +2737,9 @@ fn validate_global_inbound_references(
             model_route_fields.insert(field_index);
         }
     }
-    if model_targets.is_empty() || model_route_fields.len() != storage.len() {
+    if model_targets.is_empty()
+        || (!model_route_fields.is_empty() && model_route_fields.len() != storage.len())
+    {
         return Err(Error::UnsupportedDependency);
     }
     let mut model_edges = HashMap::new();
@@ -2658,7 +2940,11 @@ impl ArchiveReferenceVisitor for InboundReferenceCensus {
             {
                 self.invalid = true;
             } else {
-                self.info_edges = self.info_edges.saturating_add(1);
+                if let Some(next) = self.info_edges.checked_add(1) {
+                    self.info_edges = next;
+                } else {
+                    self.invalid = true;
+                }
             }
         }
         if occurrence.referenced_identifier == self.model_identifier {
@@ -2676,7 +2962,11 @@ impl ArchiveReferenceVisitor for InboundReferenceCensus {
             {
                 self.invalid = true;
             } else {
-                self.model_info_edges = self.model_info_edges.saturating_add(1);
+                if let Some(next) = self.model_info_edges.checked_add(1) {
+                    self.model_info_edges = next;
+                } else {
+                    self.invalid = true;
+                }
             }
         }
         if let Some(expected) = self.model_targets.get(&occurrence.referenced_identifier) {
@@ -2698,8 +2988,12 @@ impl ArchiveReferenceVisitor for InboundReferenceCensus {
                     .model_edges
                     .entry(occurrence.referenced_identifier)
                     .or_insert(0);
-                *count = count.saturating_add(1);
-                if *count > *expected {
+                if let Some(next) = count.checked_add(1) {
+                    *count = next;
+                    if next > *expected {
+                        self.invalid = true;
+                    }
+                } else {
                     self.invalid = true;
                 }
             }
