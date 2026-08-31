@@ -3603,3 +3603,17 @@ freshness fence changed, and `performance_claim: none`. This is diagnostic
 evidence only; no latency, memory, allocation, physical-I/O or iWork claim
 follows. See [Change 0346](changes/0346-file-source-lock-candidate-rejected.md)
 and [the retained evidence](results/change-0346/).
+
+## Change 0347: XLSX cell-values calculation-closure harness
+
+Change 0347 records a source-only harness repair, not a production
+optimization or timing claim. The old clean control rejected the intentional
+`calcPr` rewrite as an unselected workbook mutation. The repaired direct
+medium one-edit eager/source smoke uses three warmups and 30 samples; the
+serialized ABBA v1 smoke has 24 rows, zero warmups and one sample, with zero
+failure rows and complete rows. Timing gates and claim authorization are
+false. Numeric medium and dense-sparse identities are pinned, formula/date
+workloads are excluded, and source planning/commit dominate the retained
+source phases. A shared publication-copy design remains unproven and
+deferred. See [Change 0347](changes/0347-xlsx-cell-values-harness-calculation-closure.md)
+and [the bounded evidence](results/change-0347/).

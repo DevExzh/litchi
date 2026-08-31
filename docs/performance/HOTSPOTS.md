@@ -2630,3 +2630,14 @@ gain is only 0.36-0.40%. No candidate was applied, no XLS/CFB freshness fence
 changed, and `performance_claim: none`. Do not revive the unchanged 0279
 freshness session; the next XLS work must use a different measured design. See
 [Change 0346](changes/0346-file-source-lock-candidate-rejected.md).
+
+## Change 0347 update
+
+The XLSX cell-values calculation-closure oracle now accepts only the direct
+`calcPr` rewrite and exact optional calc-chain removal closure, while raw
+identity remains required for all other members. Direct medium one-edit and a
+24-row serialized ABBA smoke are complete with zero failure rows, but timing
+gates and claim authorization remain false. This is harness evidence only;
+formula/date workloads are excluded, and source planning/commit dominate the
+retained source phases. A shared publication-copy design remains deferred.
+See [Change 0347](changes/0347-xlsx-cell-values-harness-calculation-closure.md).

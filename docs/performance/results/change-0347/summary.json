@@ -1,0 +1,100 @@
+{
+  "change": "0347",
+  "schema_version": 1,
+  "performance_claim": "none",
+  "status": {
+    "old_clean_control_failure": "XLSX source CRUD changed raw unselected ZIP member xl/workbook.xml",
+    "failure_context": "intentional calcPr invalidation on an effective source-backed cell edit",
+    "failure_rows": 0,
+    "complete_rows": true,
+    "timing_gates_passed": false,
+    "claim_authorized": false
+  },
+  "direct_smoke": {
+    "raw_report": "direct-medium-one-edit.json",
+    "raw_report_sha256": "be116b6e88be62ef41db06715510e2d4acffe1be5894d003c937f59813535009",
+    "warmup_iterations": 3,
+    "samples_per_case": 30,
+    "execution_workers": [1],
+    "corpus": {
+      "shape": "medium",
+      "archive_member_count": 17,
+      "archive_bytes": 4226429,
+      "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+      "sheet_count": 4,
+      "rows_per_sheet": 48,
+      "columns_per_sheet": 48
+    },
+    "cases": [
+      {
+        "case": "xlsx_eager_cell_values_one_edit_save",
+        "sample_count": 30,
+        "p50_ns": 9028668,
+        "mean_ns": 9206709.166666668,
+        "p95_ns": 10386013,
+        "p99_ns": 10455471,
+        "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1"
+      },
+      {
+        "case": "xlsx_source_backed_cell_values_one_edit_save",
+        "sample_count": 30,
+        "p50_ns": 8021234,
+        "mean_ns": 8103566.1,
+        "p95_ns": 8572825,
+        "p99_ns": 8916088,
+        "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+        "semantic_sha256": "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+        "untouched_member_count": 15,
+        "untouched_member_sha256": "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+        "source_read_calls": 240,
+        "source_read_bytes": 4232733,
+        "ordinary_payload_read_calls": 143,
+        "ordinary_payload_read_bytes": 4223551,
+        "payload_materializations": 3,
+        "max_in_flight_reads": 1
+      }
+    ]
+  },
+  "abba_smoke": {
+    "schema": "litchi.xlsx.cell-values-abba.v1",
+    "rows": 24,
+    "warmup_iterations": 0,
+    "samples_per_case": 1,
+    "failure_rows": 0,
+    "complete_rows": true,
+    "timing_gates_passed": false,
+    "claim_authorized": false,
+    "shapes": ["medium", "dense-sparse"],
+    "workloads": ["one-edit", "one-percent", "batch"],
+    "untouched_member_counts": {
+      "one-edit": 15,
+      "one-percent": 12,
+      "batch": 12
+    }
+  },
+  "corpus_identities": {
+    "medium": {
+      "archive_bytes": 4226429,
+      "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036"
+    },
+    "dense-sparse": {
+      "archive_bytes": 4251863,
+      "archive_sha256": "893ad3f5dd6a98aec44bc541a140048072c84c579b4b9e332431f779b097cb1a"
+    }
+  },
+  "focused_tests": [
+    "current_no_chain_workbook_shape_has_exact_calc_pr_closure",
+    "unexpected_untouched_workbook_mutation_is_not_normalized_away",
+    "calc_chain_closure_removes_only_relationship_part_and_override",
+    "calc_chain_relationship_matching_is_exact_for_both_canonical_uris",
+    "duplicate_normalized_zip_member_names_are_rejected",
+    "pinned_current_shape_identities_are_exact",
+    "pinned_current_shape_untouched_counts_are_exact"
+  ],
+  "limitations": [
+    "numeric cell-values only; formula/date workloads excluded",
+    "no production optimization or timing claim",
+    "source planning and commit dominate the retained source phase evidence",
+    "shared publication-copy design remains unproven and deferred"
+  ]
+}

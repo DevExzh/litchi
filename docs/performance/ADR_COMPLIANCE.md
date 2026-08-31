@@ -284,3 +284,18 @@ probe's 0.36-0.40% modeled whole-operation gain is below the usefulness
 threshold, so no lock substitution candidate was retained and
 `performance_claim: none`. The next XLS performance batch must target a
 different design; the unchanged 0279 freshness candidate remains rejected.
+
+## Change 0347 update
+
+Change 0347 adds no production code, dependency edge, public type, or iWork
+path. It records a bounded XLSX cell-values harness repair: eager/source typed
+semantic equality, exact source lineage, no-op bytes, deterministic output,
+namespace-aware URI matching, finite XML normalization bounds, duplicate ZIP
+name refusal, exact changed-member sets, and pinned 17-member numeric corpus
+identities remain explicit. Only direct `calcPr` invalidation and the exact
+optional calc-chain relationship/part/content-type removal closure are
+accepted; other raw members remain identity-checked. Formula/date workloads
+are excluded. `performance_claim: none`; direct medium one-edit and the
+24-row serialized ABBA v1 smoke have zero failure rows and complete rows, but
+timing gates and claim authorization are false. No production optimization,
+RSS, allocation, physical-I/O, or broad XLSX claim follows.
