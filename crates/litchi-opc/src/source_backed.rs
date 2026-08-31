@@ -625,6 +625,30 @@ impl SourceTopologyPlan {
             && self.removals.is_empty()
             && self.relationships.is_empty()
     }
+
+    fn introduces_signature_infrastructure(&self) -> bool {
+        self.replacements
+            .iter()
+            .any(|replacement| is_signature_member_path(replacement.partname.as_str()))
+            || self.additions.iter().any(|addition| {
+                is_signature_member_path(addition.partname.as_str())
+                    || is_signature_content_type(addition.content_type.as_str())
+            })
+            || self.relationships.iter().any(|change| {
+                let (reltype, target) = match &change.operation {
+                    TopologyRelationshipOperation::Add { reltype, target }
+                    | TopologyRelationshipOperation::Replace {
+                        reltype, target, ..
+                    } => (reltype.as_str(), Some(target)),
+                    TopologyRelationshipOperation::Remove { .. } => ("", None),
+                };
+                is_signature_relationship(reltype)
+                    || target.is_some_and(|target| {
+                        matches!(target, SourceRelationshipTarget::Internal(partname)
+                            if is_signature_member_path(partname.as_str()))
+                    })
+            })
+    }
 }
 
 #[derive(Debug)]
@@ -3563,6 +3587,7 @@ impl SourceBackedPackage {
         if plan.is_empty() {
             return self.write_exact_source(writer);
         }
+        let introduces_signature = plan.introduces_signature_infrastructure();
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
 
@@ -3586,6 +3611,9 @@ impl SourceBackedPackage {
                 .then_with(|| left.r_id.cmp(&right.r_id))
         });
         self.check_topology_progress()?;
+        if introduces_signature && !self.has_signature_infrastructure() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
         if (!additions.is_empty() || !removals.is_empty()) && self.has_signature_infrastructure() {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
@@ -5734,9 +5762,16 @@ impl SourceBackedPackage {
     }
 
     fn has_signature_infrastructure(&self) -> bool {
-        self.package_relationships
-            .iter()
-            .any(is_signature_relationship_or_target)
+        // The central-directory names are the authoritative physical-member
+        // inventory. Scanning them does not materialize any payload and also
+        // covers raw/non-Part members (including reserved relationship
+        // members) that are intentionally absent from `self.parts` and may
+        // not be retained in `self.non_part_members` for classification.
+        self.archive.file_names().any(is_signature_member_path)
+            || self
+                .package_relationships
+                .iter()
+                .any(is_signature_relationship_or_target)
             || self.parts.iter().any(|part| {
                 is_signature_path(part.partname.as_str())
                     || is_signature_content_type(&part.content_type)
@@ -5843,14 +5878,16 @@ impl SourceBackedPackage {
         member_name: &str,
         physical_members: &PhysicalMemberLookup,
     ) -> Result<Option<EntryId>> {
-        if let Some(entry) = self.archive.entry_id(member_name) {
-            return Ok(Some(entry));
-        }
         let key = folded_ascii_name(member_name, "source-backed OPC folded physical member name")?;
-        Ok(physical_members
-            .by_folded_name
-            .get(&key)
-            .map(|info| info.entry_id))
+        if let Some(info) = physical_members.by_folded_name.get(&key) {
+            if info.count != 1 {
+                return Err(overlay_unavailable(format!(
+                    "physical member name '{member_name}' is ambiguous under ASCII case folding"
+                )));
+            }
+            return Ok(self.archive.entry_id(member_name).or(Some(info.entry_id)));
+        }
+        Ok(self.archive.entry_id(member_name))
     }
 
     fn check_topology_progress(&self) -> Result<()> {
@@ -7580,6 +7617,24 @@ fn is_signature_path(path: &str) -> bool {
     path.as_bytes()
         .get(..DIRECTORY.len())
         .is_some_and(|prefix| prefix.eq_ignore_ascii_case(DIRECTORY))
+}
+
+/// Return whether a physical member name is rooted in the reserved OPC
+/// signature directory.
+///
+/// Part names are absolute (`/_xmlsignatures/...`) while ZIP member names are
+/// relative (`_xmlsignatures/...`). The source-backed catalog deliberately
+/// keeps the latter spelling for raw/non-Part members, so detection must treat
+/// both spellings, ASCII case variants, harmless leading separators/dot
+/// segments, and malformed separator variants as the same conservative
+/// signature-shaped path. Only the first meaningful component is accepted as
+/// the root; an unrelated nested directory named `_xmlsignatures` is not
+/// mistaken for the package signature directory.
+fn is_signature_member_path(path: &str) -> bool {
+    path.split(['/', '\\'])
+        .filter(|segment| !segment.is_empty() && *segment != ".")
+        .next()
+        .is_some_and(|segment| segment.eq_ignore_ascii_case("_xmlsignatures"))
 }
 
 fn is_signature_content_type(value: &str) -> bool {
