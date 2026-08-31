@@ -17,13 +17,18 @@ use litchi_opc::{
 use litchi_xlsx::cell_values::{
     CellValueEdit, MAX_BATCH_EDITS, SheetCellValueEdit, SourceBackedEditor,
 };
-use litchi_xlsx::{Address, Error, ErrorValue, Number, Value};
+use litchi_xlsx::{Address, Cell, Error, ErrorValue, Formula, Number, Value};
+use soapberry_zip::office::ArchiveReader;
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const MAIN: &str = "/xl/workbook.xml";
 const SHEET: &str = "/xl/worksheets/sheet1.xml";
 const UNUSED: &str = "/xl/media/unused.bin";
+const CALC_CHAIN: &str = "/xl/calcChain.xml";
+const CALC_CHAIN_CONTENT_TYPE: &str =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml";
+const CALC_CHAIN_REL_ID: &str = "rIdCalculationChain";
 static NEXT_SOURCE_ID: AtomicU64 = AtomicU64::new(1_000);
 
 struct VersionedSource {
@@ -486,6 +491,78 @@ fn changed_commit(editor: &SourceBackedEditor) -> litchi_xlsx::cell_values::Comm
     assert_eq!(commit.diagnostics().changed_cells(), 3);
     assert_eq!(commit.diagnostics().touched_worksheets(), 1);
     commit
+}
+
+fn zip_member(bytes: &[u8], member: &str) -> Vec<u8> {
+    ArchiveReader::new(bytes).unwrap().read(member).unwrap()
+}
+
+fn calculation_chain_target(package: &OpcPackage) -> Option<PackURI> {
+    package
+        .get_part(&PackURI::new(MAIN).unwrap())
+        .ok()?
+        .rels()
+        .iter()
+        .find_map(|relationship| {
+            if matches!(
+                relationship.reltype(),
+                rt::CALC_CHAIN | rt::STRICT_CALC_CHAIN
+            ) {
+                relationship.target_partname().ok()
+            } else {
+                None
+            }
+        })
+}
+
+fn has_calculation_chain(package: &OpcPackage) -> bool {
+    calculation_chain_target(package).is_some_and(|target| package.get_part(&target).is_ok())
+}
+
+fn scalar_formula_source() -> Vec<u8> {
+    let mut package = fixture_package(
+        format!(
+            r#"<worksheet xmlns="{SML}"><dimension ref="A1:B1"/><sheetData><row r="1"><c r="A1"><f>A2+1</f><v>2</v></c><c r="B1"><v>99</v></c></row></sheetData></worksheet>"#
+        ),
+        false,
+    );
+    package
+        .get_part_mut(&PackURI::new(MAIN).unwrap())
+        .unwrap()
+        .set_blob(
+            format!(
+                r#"<workbook xmlns="{SML}" xmlns:r="{REL}"><bookViews><workbookView/></bookViews><sheets><sheet name="Sheet1" sheetId="1" r:id="rIdSheet"/></sheets><calcPr calcId="123" calcMode="manual" fullCalcOnLoad="0" calcCompleted="1" forceFullCalc="0"/></workbook>"#
+            )
+            .into_bytes(),
+        );
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new(CALC_CHAIN).unwrap(),
+            CALC_CHAIN_CONTENT_TYPE.to_owned(),
+            format!(r#"<calcChain xmlns="{SML}"><c r="A1" i="1"/></calcChain>"#).into_bytes(),
+        )))
+        .unwrap();
+    package
+        .get_part_mut(&PackURI::new(MAIN).unwrap())
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            rt::CALC_CHAIN.to_owned(),
+            "calcChain.xml".to_owned(),
+            CALC_CHAIN_REL_ID.to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    PackageWriter::to_bytes(&package).unwrap()
+}
+
+fn date_source() -> Vec<u8> {
+    fixture(
+        format!(
+            r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1" t="d"><v>2025-01-01</v></c></row></sheetData></worksheet>"#
+        ),
+        false,
+    )
 }
 
 #[test]
@@ -1097,11 +1174,8 @@ fn signed_multi_sheet_noop_is_exact_and_changed_publication_refuses() {
 }
 
 #[test]
-fn formulas_mce_shared_strings_relationships_and_signed_changes_are_refused() {
+fn mce_shared_strings_relationships_and_signed_changes_are_refused() {
     for xml in [
-        format!(
-            r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><f>1+1</f><v>2</v></c></row></sheetData></worksheet>"#
-        ),
         format!(
             r#"<worksheet xmlns="{SML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><sheetData/><mc:AlternateContent/></worksheet>"#
         ),
@@ -1423,7 +1497,8 @@ fn managed_multi_sheet_batch_retains_each_selected_payload_and_streams_once() {
     let exact = part_len(&bytes, MAIN)
         + part_len(&bytes, SHEET)
         + part_len(&bytes, "/xl/worksheets/sheet2.xml");
-    let (budget, _cancellation_source, context) = managed_context(exact);
+    let publication_limit = exact + u64::try_from(bytes.len()).unwrap();
+    let (budget, _cancellation_source, context) = managed_context(publication_limit);
     let editor =
         SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             Arc::new(VersionedSource::new(bytes.clone())),
@@ -1498,7 +1573,8 @@ fn managed_stream_publication_works_and_inverse_materialization_is_explicit() {
     let workbook_bytes = part_len(&bytes, MAIN);
     let worksheet_bytes = part_len(&bytes, SHEET);
     let exact = workbook_bytes + worksheet_bytes;
-    let (budget, _cancellation_source, context) = managed_context(exact);
+    let publication_limit = exact + u64::try_from(bytes.len()).unwrap();
+    let (budget, _cancellation_source, context) = managed_context(publication_limit);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
         litchi_xlsx::ReadLimits::default(),
@@ -1517,7 +1593,7 @@ fn managed_stream_publication_works_and_inverse_materialization_is_explicit() {
     commit
         .patch()
         .inverse()
-        .apply_materialized(&mut replay, worksheet_bytes as usize)
+        .apply_materialized(&mut replay, exact as usize)
         .unwrap();
     assert_eq!(
         replay
@@ -1730,4 +1806,244 @@ fn managed_empty_multi_edit_iterator_reports_cancellation_before_invalid_batch()
     assert!(matches!(result, Err(Error::Package(OpcError::Cancelled))));
     drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn source_backed_date_edit_retains_date_semantics() {
+    let bytes = date_source();
+    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.set(address("A1"), Value::date("2026-08-14").unwrap())
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.changed());
+    assert!(matches!(
+        commit.snapshot().cell(address("A1")),
+        Some(Cell::Value(Value::Date(date))) if date.as_str() == "2026-08-14"
+    ));
+
+    let mut output = Vec::new();
+    editor
+        .publish_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    let xml = String::from_utf8(zip_member(&output, "xl/worksheets/sheet1.xml")).unwrap();
+    assert!(xml.contains(r#"r="A1" t="d""#));
+    assert!(xml.contains("2026-08-14"));
+}
+
+#[test]
+fn scalar_formula_replacement_drops_cache_invalidates_calculation_and_preserves_members() {
+    let bytes = scalar_formula_source();
+    let source_package = OpcPackage::from_bytes(&bytes).unwrap();
+    assert!(has_calculation_chain(&source_package));
+    let unused = source_package
+        .get_part(&PackURI::new(UNUSED).unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+
+    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.set_formula(address("A1"), Formula::new("A2+2").unwrap())
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.changed());
+    assert!(matches!(
+        commit.snapshot().cell(address("A1")),
+        Some(Cell::Formula(formula))
+            if formula.text() == "A2+2" && formula.cached().is_none()
+    ));
+
+    let mut output = Vec::new();
+    editor
+        .publish_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    let published = OpcPackage::from_bytes(&output).unwrap();
+    assert!(!has_calculation_chain(&published));
+    assert!(
+        published
+            .get_part(&PackURI::new(CALC_CHAIN).unwrap())
+            .is_err()
+    );
+    assert_eq!(
+        published
+            .get_part(&PackURI::new(UNUSED).unwrap())
+            .unwrap()
+            .blob(),
+        unused.as_slice(),
+    );
+
+    let workbook_xml = String::from_utf8(zip_member(&output, "xl/workbook.xml")).unwrap();
+    assert!(workbook_xml.contains(r#"calcId="0""#));
+    assert!(workbook_xml.contains(r#"fullCalcOnLoad="true""#));
+    assert!(workbook_xml.contains(r#"calcCompleted="false""#));
+    assert!(workbook_xml.contains(r#"forceFullCalc="true""#));
+    let sheet_xml = String::from_utf8(zip_member(&output, "xl/worksheets/sheet1.xml")).unwrap();
+    assert!(sheet_xml.contains("<f>A2+2</f>"));
+    assert!(!sheet_xml.contains("<v>2</v>"));
+    let content_types = String::from_utf8(zip_member(&output, "[Content_Types].xml")).unwrap();
+    assert!(!content_types.contains(CALC_CHAIN));
+    assert!(!content_types.contains(CALC_CHAIN_CONTENT_TYPE));
+}
+
+#[test]
+fn grouped_formula_edits_are_refused_without_staging() {
+    let cases = [
+        (
+            "array",
+            address("A1"),
+            format!(
+                r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><f t="array" ref="A1:B1">SUM(A1:A2)</f><v>2</v></c><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#
+            ),
+        ),
+        (
+            "data table",
+            address("A1"),
+            format!(
+                r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><f t="dataTable" ref="A1:B1">A1</f><v>2</v></c><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#
+            ),
+        ),
+        (
+            "shared",
+            address("B1"),
+            format!(
+                r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><f t="shared" si="0" ref="A1:B1">A1+1</f><v>2</v></c><c r="B1"><f t="shared" si="0"/><v>3</v></c></row></sheetData></worksheet>"#
+            ),
+        ),
+    ];
+
+    for (kind, target, xml) in cases {
+        let editor =
+            SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(fixture(xml, false))))
+                .unwrap();
+        let mut edit = editor.edit("Sheet1").unwrap();
+        assert!(
+            edit.set_formula(target, Formula::new("A1+9").unwrap())
+                .is_err(),
+            "{kind} formula must remain group-scoped"
+        );
+        assert!(edit.is_empty(), "{kind} refusal must be atomic");
+    }
+}
+
+#[test]
+fn formula_noop_is_byte_exact_and_retains_calculation_chain() {
+    let bytes = scalar_formula_source();
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let commit = editor.edit("Sheet1").unwrap().commit().unwrap();
+    assert!(!commit.changed());
+    assert!(commit.patch().is_empty());
+
+    let mut output = Vec::new();
+    editor
+        .publish_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, bytes);
+    assert!(has_calculation_chain(
+        &OpcPackage::from_bytes(&output).unwrap()
+    ));
+}
+
+#[test]
+fn formula_patch_inverse_restores_calculation_topology_and_formula_cache() {
+    let bytes = scalar_formula_source();
+    let original = OpcPackage::from_bytes(&bytes).unwrap();
+    let original_chain = original
+        .get_part(&PackURI::new(CALC_CHAIN).unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    let original_content_types = zip_member(&bytes, "[Content_Types].xml");
+    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.set_formula(address("A1"), Formula::new("A2+2").unwrap())
+        .unwrap();
+    let commit = edit.commit().unwrap();
+
+    let mut replay = original.clone();
+    commit.patch().apply(&mut replay).unwrap();
+    assert!(!has_calculation_chain(&replay));
+    assert!(replay.get_part(&PackURI::new(CALC_CHAIN).unwrap()).is_err());
+    let removed_content_types = PackageWriter::to_bytes(&replay).unwrap();
+    assert!(
+        !String::from_utf8(zip_member(&removed_content_types, "[Content_Types].xml"))
+            .unwrap()
+            .contains(CALC_CHAIN)
+    );
+
+    commit.patch().inverse().apply(&mut replay).unwrap();
+    assert!(has_calculation_chain(&replay));
+    assert_eq!(
+        replay
+            .get_part(&PackURI::new(CALC_CHAIN).unwrap())
+            .unwrap()
+            .blob(),
+        original_chain.as_slice(),
+    );
+    let restored = PackageWriter::to_bytes(&replay).unwrap();
+    assert_eq!(
+        zip_member(&restored, "[Content_Types].xml"),
+        original_content_types,
+    );
+    let snapshot = litchi_xlsx::cell_values::Snapshot::load_multi(&replay, "Sheet1").unwrap();
+    assert!(matches!(
+        snapshot.cell(address("A1")),
+        Some(Cell::Formula(formula))
+            if formula.text() == "A2+1" && formula.cached().is_some()
+    ));
+}
+
+#[test]
+fn formula_patch_refuses_another_calc_chain_inbound_edge_atomically() {
+    let mut source = OpcPackage::from_bytes(&scalar_formula_source()).unwrap();
+    source
+        .get_part_mut(&PackURI::new(UNUSED).unwrap())
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            "urn:litchi:test:calc-chain-alias".to_owned(),
+            "../CALCCHAIN.XML".to_owned(),
+            "rIdCalcChainAlias".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    let bytes = PackageWriter::to_bytes(&source).unwrap();
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.set_formula(address("A1"), Formula::new("A2+2").unwrap())
+        .unwrap();
+    let commit = edit.commit().unwrap();
+
+    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    assert!(commit.patch().apply(&mut replay).is_err());
+    assert!(has_calculation_chain(&replay));
+    assert!(
+        replay
+            .get_part(&PackURI::new(UNUSED).unwrap())
+            .unwrap()
+            .rels()
+            .get("rIdCalcChainAlias")
+            .is_some()
+    );
+}
+
+#[test]
+fn formula_publication_rejects_a_stale_source_before_output() {
+    let bytes = scalar_formula_source();
+    let source = Arc::new(VersionedSource::new(bytes));
+    let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.set_formula(address("A1"), Formula::new("A2+2").unwrap())
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    source.changed();
+
+    let mut output = Vec::new();
+    assert!(matches!(
+        editor.publish_commit_to_stream(&mut output, &commit),
+        Err(Error::Package(OpcError::SourceChanged { .. }))
+    ));
+    assert!(output.is_empty());
 }

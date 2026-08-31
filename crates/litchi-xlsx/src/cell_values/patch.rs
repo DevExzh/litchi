@@ -108,45 +108,14 @@ impl MultiPatch {
         if package.is_signed() {
             return Err(Error::Signed);
         }
-        let mut replacements = Vec::new();
-        replacements
-            .try_reserve_exact(self.after.len())
-            .map_err(|source| Error::Allocation {
-                resource: "multi-sheet patch replacement preflight",
-                source,
-            })?;
-        let mut materialized_bytes = 0usize;
-        for (_before, snapshot) in self
-            .before
-            .sheets()
-            .iter()
-            .zip(self.after.sheets())
-            .filter(|(before, after)| before.source_xml() != after.source_xml())
-        {
-            let blob = match maximum_bytes {
-                Some(maximum) => {
-                    let prior = materialized_bytes;
-                    materialized_bytes = prior
-                        .checked_add(snapshot.source_xml().len())
-                        .ok_or_else(|| {
-                            invalid("multi-sheet materialization size overflows usize")
-                        })?;
-                    if materialized_bytes > maximum {
-                        return Err(invalid(format!(
-                            "multi-sheet materialization exceeds the explicit bound {maximum} bytes"
-                        )));
-                    }
-                    snapshot.materialized_source_arc(maximum - prior)?
-                },
-                None => snapshot.source_arc()?,
-            };
-            replacements.push((snapshot.worksheet_part_name().clone(), blob));
-        }
         self.after.check_execution()?;
         let mut candidate = package.clone();
-        for (partname, blob) in replacements {
-            candidate.get_part_mut(&partname)?.set_blob_shared(blob);
-        }
+        MultiSnapshot::apply_owned_target(
+            &self.before,
+            &self.after,
+            &mut candidate,
+            maximum_bytes,
+        )?;
         let readback = MultiSnapshot::load_owned(
             &candidate,
             self.after.sheets().iter().map(Snapshot::sheet_position),
@@ -224,15 +193,9 @@ impl Patch {
         if package.is_signed() {
             return Err(Error::Signed);
         }
-        let blob = match maximum_bytes {
-            Some(maximum) => self.after.materialized_source_arc(maximum)?,
-            None => self.after.source_arc()?,
-        };
         self.after.check_execution()?;
         let mut candidate = package.clone();
-        candidate
-            .get_part_mut(self.before.worksheet_part_name())?
-            .set_blob_shared(blob);
+        Snapshot::apply_owned_target(&self.before, &self.after, &mut candidate, maximum_bytes)?;
         let result = Snapshot::load(&candidate, self.after.sheet_position())?;
         if !result.same_source(&self.after) {
             return Err(invalid("value-only patch readback differs from its target"));
