@@ -2620,3 +2620,13 @@ matrices rather than widening this proof to arbitrary worksheet rewrites.
 ## Change 0345: OPC source-backed reader ingress
 
 The public source-backed OPC reader has recorded bounded-ingress evidence: one input consumption, typed exact-maximum rejection with actual = maximum + 1 asserted for the overrun, zero ordinary cold payload loads during open, and one selected cold/successful load. Relative to compressed-plus-all-decompressed eager retention, it retains one compressed buffer plus indexed metadata and deferred selected payloads. ReadLimits and try_reserve_exact bound logical input/local admission work, not total RSS or aggregate concurrent opens. This is not a hotspot or optimization claim (performance_claim: none); no RSS or before/after latency was measured. The evidence came from 4/4 focused tests, including reader_ingress_retries_one_interrupted_read and reader_ingress_rejects_invalid_read_count_without_panicking, and four owner-library checks under one Cargo process/job on a dedicated disk target. Callers needing tighter host memory must provide a lower max_input_bytes, serialize opens, and account aggregate process memory externally. Arbitrary blocking Read cancellation is not provided, and no facade or iWork API is involved. See [Change 0345](changes/0345-opc-source-backed-reader-ingress.md).
+
+## Change 0346 update
+
+The current-head XLS control smoke and 40-block lock/fingerprint probe do not
+support a production `FileSource` lock substitution. `parking_lot` measures
+154.03 ns/call mean versus 155.47 for `std`, but the modeled whole-operation
+gain is only 0.36-0.40%. No candidate was applied, no XLS/CFB freshness fence
+changed, and `performance_claim: none`. Do not revive the unchanged 0279
+freshness session; the next XLS work must use a different measured design. See
+[Change 0346](changes/0346-file-source-lock-candidate-rejected.md).

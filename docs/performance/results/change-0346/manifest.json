@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "change": 346,
+  "artifact_root": "docs/performance/results/change-0346",
+  "status": "diagnostic control smoke retained; no production candidate applied",
+  "performance_claim": "none",
+  "head_revision": "3a2926f8a",
+  "control_binary": {
+    "bytes": 8565704,
+    "sha256": "e3a6744a0ebe720dbbd583ddd5f5d82fb2ca007f4e73c4dcf9667b82cc8b0fe4"
+  },
+  "corpus": {
+    "path": "test-data/ole/xls/ConditionalFormattingSamples.xls",
+    "bytes": 1402368,
+    "sha256": "d1942d857ffbd4d10ebca1745cd5d70c14af9d9f1388c91ed0a0800e31ad5ce7",
+    "workbook_stream_bytes": 1314225,
+    "workbook_stream_sha256": "99305abd97f40bfc2fa4c052701bbebc971c1feb12278e8b76ecfbaca777676f"
+  },
+  "protocol": {
+    "rust_toolchain": "1.95.0",
+    "profile": "release",
+    "cpu": 2,
+    "workers": 1,
+    "warmups": 3,
+    "samples": 50,
+    "selector_order": [
+      "file-source/open",
+      "file-source/list",
+      "file-source/one-cell",
+      "atomic-file/open",
+      "atomic-file/list",
+      "atomic-file/one-cell"
+    ],
+    "coordinates": {
+      "worksheet_index": 1,
+      "row": 1,
+      "column": 0
+    },
+    "serialized": true,
+    "fresh_child_per_sample": false,
+    "scope": "control-only diagnostic smoke"
+  },
+  "artifacts": [
+    {
+      "path": "control/atomic-file-list.json",
+      "bytes": 51543,
+      "sha256": "10380d0bd77b5a9fbe94730cb6018ccdff95f4c4803ff3446d02fa0fc51a00b9"
+    },
+    {
+      "path": "control/atomic-file-one-cell.json",
+      "bytes": 32903,
+      "sha256": "e124db26eea5c112b3e4759434d8ef5fb7375efc1ad0a50bb55f5da50be31274"
+    },
+    {
+      "path": "control/atomic-file-open.json",
+      "bytes": 31995,
+      "sha256": "ac190fec46a70dba32cb5fe9b957afc554c5309fff303315a78fd618b9b1cc6f"
+    },
+    {
+      "path": "control/file-source-list.json",
+      "bytes": 51646,
+      "sha256": "92c34a59b9f24f938817be3bb2146f67ba1920ec140d663bd4636d730fd8c54f"
+    },
+    {
+      "path": "control/file-source-one-cell.json",
+      "bytes": 32992,
+      "sha256": "a8faf5a5d8e5c3762be137a7cdef4db3010edde7e90fc6f21fe0d93a9236bea7"
+    },
+    {
+      "path": "control/file-source-open.json",
+      "bytes": 32106,
+      "sha256": "3296dbaa0a8ae8dae6125681825aa8070590cfb768340b2311853396b0032f14"
+    },
+    {
+      "path": "file-source-lock-probe.tsv",
+      "bytes": 1379,
+      "sha256": "4c0cfa2740497c447b3d4b890c2456a8d6fdbf00a356e6d8ffd3a102c581e24a"
+    }
+  ],
+  "reproduction_sources": [
+    "docs/performance/probes/0346-file-source-lock/Cargo.toml",
+    "docs/performance/probes/0346-file-source-lock/Cargo.lock",
+    "docs/performance/probes/0346-file-source-lock/src/main.rs"
+  ],
+  "self_hash": "excluded to avoid recursive identity"
+}

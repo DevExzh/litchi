@@ -2565,3 +2565,17 @@ ZIP patch, atomic-save and broader ODS CRUD claims remain open. See
 ## Change 0345: OPC source-backed reader ingress
 
 [Change 0345](changes/0345-opc-source-backed-reader-ingress.md) records structural evidence only (performance_claim: none): the public litchi-opc reader input was consumed once, an exact maximum-limit overrun returned the typed error with actual = maximum + 1 asserted, open performed zero cold ordinary-payload loads, and one selected part produced one cold successful load. Relative to compressed-plus-all-decompressed eager retention, this path retains one compressed buffer plus indexed metadata and deferred selected payloads. ReadLimits and try_reserve_exact bound logical input/local admission work, not total RSS or aggregate concurrent opens. Validation was 4/4 focused tests, including reader_ingress_retries_one_interrupted_read and reader_ingress_rejects_invalid_read_count_without_panicking, plus four owner-library checks, run with one Cargo process/job and a dedicated on-disk target. No RSS, allocation, or before/after latency claim is made; callers needing tighter host memory must provide a lower max_input_bytes, serialize opens, and account aggregate process memory externally. Arbitrary blocking Read cancellation remains limited, and the change adds no facade API or iWork path.
+
+## Change 0346: FileSource lock attribution
+
+Change 0346 retains a control-only six-selector XLS source attribution smoke
+at HEAD `3a2926f8a` (three warmups and 50 samples, CPU 2, one serialized
+worker) plus a standalone 40-block mutex/fingerprint probe. The control reports
+preserve exact logical reads, source-version counts, stable semantics and the
+fixed `ConditionalFormattingSamples.xls` identity. The probe reports 155.47
+ns/call mean for `std` and 154.03 ns/call for `parking_lot`; the modeled
+whole-operation gain is only 0.36-0.40%. No production candidate was applied,
+no XLS/CFB fence changed, and `performance_claim: none`. The evidence is
+diagnostic only; the next XLS line must target a different design. See
+[`0346`](changes/0346-file-source-lock-candidate-rejected.md) and
+[`results/change-0346`](results/change-0346/).

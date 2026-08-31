@@ -3588,3 +3588,18 @@ elimination is not presented as `ReadAt` or physical-I/O evidence. See
 ### Change 0345: OPC source-backed reader ingress
 
 Change 0345 is a structural evidence record for the public litchi-opc reader ingress, not a performance comparison (performance_claim: none). It consumes input once, returns a typed error for an input over the exact maximum with actual = maximum + 1 asserted, performs zero cold ordinary-payload loads at open, and performs one cold successful load for one selected part. Relative to compressed-plus-all-decompressed eager retention, the path retains one compressed buffer plus indexed metadata and deferred selected payloads. ReadLimits and try_reserve_exact bound logical input/local admission work, not total RSS or aggregate concurrent opens. Validation recorded 4/4 focused tests, including reader_ingress_retries_one_interrupted_read and reader_ingress_rejects_invalid_read_count_without_panicking, and four owner-library checks using one Cargo process/job and a dedicated disk target. RSS and before/after latency were not measured; callers needing tighter host memory must provide a lower max_input_bytes, serialize opens, and account aggregate process memory externally. Arbitrary blocking Read cancellation remains a limitation. There is no facade API change and no iWork coverage. See [Change 0345](changes/0345-opc-source-backed-reader-ingress.md).
+
+## Change 0346: rejected FileSource lock candidate
+
+Change 0346 records only a current-head control smoke and a standalone lock
+microbenchmark. Six `file-source`/`atomic-file` open, list and one-cell
+selectors ran with three warmups and 50 retained samples on CPU 2 using one
+serialized worker. The fixed XLS identity, exact logical counters, source
+stability and 16-sheet semantic projection were retained. A 40-block probe of
+200,000 metadata/fingerprint calls per block measured `std` at 155.47 ns/call
+mean and `parking_lot` at 154.03 ns/call mean; the projected whole-operation
+gain is only 0.36-0.40%. No production candidate was applied, no XLS/CFB
+freshness fence changed, and `performance_claim: none`. This is diagnostic
+evidence only; no latency, memory, allocation, physical-I/O or iWork claim
+follows. See [Change 0346](changes/0346-file-source-lock-candidate-rejected.md)
+and [the retained evidence](results/change-0346/).
