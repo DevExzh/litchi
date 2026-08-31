@@ -24,6 +24,24 @@ pub mod publication;
 mod semantic;
 mod zip;
 
+/// Transitional type-routing surface for the physical IWA substrate.
+///
+/// The migration host and focused format crates can import neutral archive
+/// values through this archive-owned path while the last direct dependency on
+/// `litchi-iwa-core` is retired. Every item is an exact re-export: this module
+/// introduces no wrapper, conversion, or second ownership boundary. It is
+/// hidden from generated API documentation because callers should generally
+/// use a concrete format package's semantic API instead.
+#[doc(hidden)]
+pub mod iwa {
+    pub use litchi_iwa_core::archive::{FieldObjectReferenceTransition, ObjectReferenceTransition};
+    pub use litchi_iwa_core::{
+        Archive, ArchiveInfo, ArchiveLimits, ArchiveObject, ArchiveReferenceOccurrence,
+        ArchiveReferencePolicy, ArchiveReferenceVisitor, Error, FieldInfo, FieldPath, FieldType,
+        LimitKind, MessageInfo, RawMessage, Result, SnappyLimits, SnappyStream, UnknownFieldRule,
+    };
+}
+
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use catalog::OwnedSourceCatalog;
