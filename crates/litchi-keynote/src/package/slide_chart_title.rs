@@ -668,6 +668,39 @@ pub(super) fn select_chart(
     })
 }
 
+/// Resolve every chart owned by one slide through the checked mutation graph.
+///
+/// The returned selections retain the same chart-drawable z-order used by
+/// [`select_chart`], but build the graph and ownership index only once. This
+/// is used by focused chart properties that need a complete per-slide view.
+pub(super) fn select_charts(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    mutation_guards: bool,
+) -> Result<Box<[ChartSelection]>, ChartTitleError> {
+    let slide_position = resolve_slide_position(package, slide_selector)?;
+    let graphs = chart_graphs(package, slide_position, mutation_guards)?;
+    let mut selections = Vec::new();
+    selections
+        .try_reserve_exact(graphs.len())
+        .map_err(|_error| ChartTitleError::Allocation {
+            amount: graphs.len(),
+        })?;
+    for (chart_position, graph) in graphs.into_iter().enumerate() {
+        selections.push(ChartSelection {
+            slide_position,
+            chart_position: Position::new(chart_position),
+            slide_identifier: graph.slide_identifier,
+            chart_identifier: graph.chart_identifier,
+            non_style_identifier: graph.non_style_identifier,
+            title: graph.title,
+            slide_component_name: graph.slide_component_name,
+            non_style_component_name: graph.non_style_component_name,
+        });
+    }
+    Ok(selections.into_boxed_slice())
+}
+
 /// Resolve a chart selector while sharing the caller's aggregate axis
 /// budget. The ordinary chart-title API intentionally keeps its historical
 /// local accounting; axis owners enter through this private path so every

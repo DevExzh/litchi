@@ -7096,3 +7096,27 @@ dependency edge is retired, the migration host remains, and no monolith-
 deletion claim is made. The documented topology remains 64 workspace packages,
 237 internal dependency declarations, 226 canonical edges, 11 ordered
 migration debts, and one migration host.
+
+## 2026-09-01 amendment: Keynote chart Arrange focused-owner slice (not a monolith-exit gate)
+
+The existing-chart Arrange slice gives `litchi-keynote` focused ownership of
+only the semantic `locked` and `constrain_proportions` flags. Its
+selector-first package surface uses `SlideSelector` and `ChartSelector`; raw
+native IDs are private. Exact-source patches, inverse restoration,
+stale/foreign/conflict refusal, locality checks, strict Buffa codec handling,
+candidate reopen, and semantic readback are required before publication.
+Because this metadata is non-rendering, the transaction preserves previews and
+does not invoke preview invalidation.
+
+This is separate from chart legend visibility, persisted chart sorting, and
+physical table `Sort Now`. It does not migrate chart data, series, geometry,
+titles, captions, legend layout, formulas, table rows, chart creation, or
+general chart graph mutation. The legacy host compatibility route remains.
+The focused owner has passed the integrated Apple Keynote
+open/save/close/reopen and Rust semantic-reread gate recorded in ADR 0008.
+
+None of the monolith-exit gates closes. No package or dependency edge is
+retired, no migration debt is removed, and `litchi-iwa` remains the migration
+host. This bounded owner transfer is not evidence of complete Keynote
+authoring, host independence, arbitrary-producer parity, native byte parity,
+or performance/RSS behavior.

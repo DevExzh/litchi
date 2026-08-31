@@ -363,6 +363,225 @@ IWA_KEYNOTE_CHART_LEGEND_LEGACY_CALL = re.compile(
     r"set_slide_chart_legend_visible)(?![A-Za-z0-9_])[ \t\r\n]*\("
 )
 
+# Wave121 moves the Keynote chart Arrange-panel state behind the focused
+# package owner.  Keep this seam separate from the shared chart arrangement
+# implementation used by Pages and Numbers: those formats still legitimately
+# use the legacy host adapter while Keynote's migration is staged.
+KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_SOURCE = KEYNOTE_SOURCE_ROOT / "chart.rs"
+KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_chart_arrangement.rs"
+)
+IWA_KEYNOTE_CHART_ARRANGEMENT_LISTING_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_charts.rs"
+)
+KEYNOTE_CHART_ARRANGEMENT_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_CHART_ARRANGEMENT_PACKAGE_MODULE = "slide_chart_arrangement"
+KEYNOTE_CHART_ARRANGEMENT_PACKAGE_METHODS = frozenset(
+    {
+        "slide_chart_arrangement",
+        "slide_chart_arrangements",
+        "edit_slide_chart_arrangement",
+        "apply_slide_chart_arrangement",
+    }
+)
+KEYNOTE_CHART_ARRANGEMENT_HOST_TYPED_METHODS = frozenset(
+    {
+        "slide_chart_arrangement_by_selector",
+        "set_slide_chart_arrangement_by_selector",
+    }
+)
+KEYNOTE_CHART_ARRANGEMENT_LISTING_METHOD = "slide_charts"
+KEYNOTE_CHART_ARRANGEMENT_LISTING_HELPER = "fill_focused_chart_arrangements"
+KEYNOTE_CHART_ARRANGEMENT_BATCH_HELPER = "focused_chart_arrangements"
+KEYNOTE_CHART_ARRANGEMENT_EDIT_METHODS = frozenset(
+    {"before", "after", "set", "set_locked", "set_constrain_proportions", "commit"}
+)
+KEYNOTE_CHART_ARRANGEMENT_CANONICAL_TYPES = frozenset(
+    {
+        "ChartArrangementCommit",
+        "ChartArrangementDiagnostics",
+        "ChartArrangementEdit",
+        "ChartArrangementError",
+        "ChartArrangementLimitKind",
+        "ChartArrangementPatch",
+    }
+)
+KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_TYPES = frozenset({"ChartArrangement"})
+KEYNOTE_CHART_ARRANGEMENT_SELECTOR_TYPES = frozenset(
+    {"ChartSelector", "SlideSelector"}
+)
+KEYNOTE_CHART_ARRANGEMENT_FLAT_ALIASES = frozenset(
+    {
+        "Arrangement",
+        "ArrangementCommit",
+        "ArrangementDiagnostics",
+        "ArrangementEdit",
+        "ArrangementError",
+        "ArrangementLimitKind",
+        "ArrangementPatch",
+        "ChartArrangementSnapshot",
+        "ChartArrangementWrite",
+    }
+)
+KEYNOTE_CHART_ARRANGEMENT_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "SnappyStream",
+        "SourceCatalog",
+        "ChartArrangementArchive",
+        "ChartArrangementSnapshot",
+        "ChartArrangementWrite",
+    }
+)
+KEYNOTE_CHART_ARRANGEMENT_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeLimit",
+        "DecodeOptions",
+        "DecodeReport",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "PreparedChartArrangementRewrite",
+        "RewriteExecutionLimits",
+        "RewriteExecutionRequirements",
+        "RewriteReport",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_CHART_ARRANGEMENT_PROTO_ORIGINS = frozenset(
+    {
+        "buffa",
+        "prost",
+        "prost_types",
+        "kn",
+        "tsch",
+        "tsp",
+        "tsd",
+        "litchi_iwa_protos",
+    }
+)
+KEYNOTE_CHART_ARRANGEMENT_PUBLIC_RAW_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|native_id|object_id|"
+    r"drawable_object_id|chart_object_id|component_id|member_id|archive_id|"
+    r"message_id|uuid|source_bytes|bytes)"
+    r"[ \t\r\n]*:[ \t\r\n]*(?:u64|u32|usize|i64|i32|&\s*\[\s*u8\s*\])"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+KEYNOTE_CHART_ARRANGEMENT_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|"
+    r"[A-Za-z_]*(?:object|drawable|chart|native|component|archive|message|"
+    r"resource|entry|metadata|package|uuid)[A-Za-z_]*(?:id|identifier))"
+    r"[ \t\r\n]*:[ \t\r\n]*u64\b"
+)
+KEYNOTE_CHART_ARRANGEMENT_LEGACY_METHODS = frozenset(
+    {"slide_chart_arrangement", "set_slide_chart_arrangement"}
+)
+KEYNOTE_CHART_ARRANGEMENT_LEGACY_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>slide_chart_arrangement|"
+    r"set_slide_chart_arrangement)(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+KEYNOTE_CHART_ARRANGEMENT_RAW_HELPER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:read_native_chart_arrangement|"
+    r"set_native_chart_arrangement|read_native_arrangement|"
+    r"set_native_arrangement|chart_arrangement|set_chart_arrangement|"
+    r"read_arrangement|raw_chart_arrangement|raw_arrangement|"
+    r"patch_chart_arrangement|patch_arrangement|RawChartArrangement|"
+    r"strict_optional_bool|singular_field|require_wire_type|chart_message|"
+    r"transform_length_delimited_field|patch_varint_field|parse_wire_fields|"
+    r"CHART_DRAWABLE_SUPER_FIELD|DRAWABLE_LOCKED_FIELD|"
+    r"DRAWABLE_ASPECT_RATIO_LOCKED_FIELD)(?![A-Za-z0-9_])"
+)
+KEYNOTE_CHART_ARRANGEMENT_HOST_WIRE_OWNERSHIP = re.compile(
+    r"\b(?:buffa|prost|prost_types|tsch|tsd|tsp|litchi_iwa_protos|"
+    r"Archive|ArchiveObject|ComponentCatalog|EntryEdit|ExactArtifacts|"
+    r"IWorkPackage|RawMessage|SnappyStream|SourceCatalog|"
+    r"DecodeError|DecodeLimit|DecodeOptions|WireError|WireView|"
+    r"WireFieldView|WireLimits|WireResourceLimit|"
+    r"decode_chart_arrangement(?:_with_report)?|"
+    r"prepare_chart_arrangement_rewrite|rewrite_chart_arrangement(?:_with_report)?|"
+    r"ChartArrangement(?:Snapshot|Write)|"
+    r"parse_wire_fields|patch_(?:nested_)?(?:varint|length_delimited)_field|"
+    r"append_(?:nested_)?(?:varint|length_delimited)_field|"
+    r"transform_length_delimited_field|decode_varint|encode_to_vec|"
+    r"replace_message(?:_preserving_header)?|update_archive|object_mut)(?![A-Za-z0-9_])"
+)
+KEYNOTE_CHART_ARRANGEMENT_HOST_WIRE_PATH = re.compile(
+    r"\b(?:crate|super|litchi_iwa|litchi_iwa_common)\s*::\s*"
+    r"(?:charts\s*::\s*arrangement|wire)\b"
+)
+KEYNOTE_CHART_ARRANGEMENT_MONOLITH_PATH = re.compile(
+    r"\b(?:crate|super|litchi_iwa)\s*::\s*charts\b"
+)
+IWA_KEYNOTE_CHART_ARRANGEMENT_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_charts" / "arrangement.rs"
+)
+KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/keynote_chart_arrangement_codec.rs"
+)
+KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+KEYNOTE_CHART_ARRANGEMENT_CODEC_MODULE = "keynote_chart_arrangement_codec"
+KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE = (
+    "buffa_keynote_chart_arrangement_generated"
+)
+KEYNOTE_CHART_ARRANGEMENT_CODEC_REQUIRED_APIS = (
+    "DecodeError",
+    "DecodeOptions",
+    "ChartArrangementSnapshot",
+    "ChartArrangementWrite",
+    "DecodeReport",
+    "RewriteReport",
+    "decode_chart_arrangement",
+    "decode_chart_arrangement_with_report",
+    "prepare_chart_arrangement_rewrite",
+    "rewrite_chart_arrangement",
+    "PreparedChartArrangementRewrite",
+    "RewriteExecutionRequirements",
+    "RewriteExecutionLimits",
+)
+KEYNOTE_CHART_ARRANGEMENT_CODEC_REQUIRED_MARKER_GROUPS = {
+    "lazy Buffa projection": (
+        KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE,
+        ("decode_lazy_view", "decode_view"),
+        "buffa",
+    ),
+    "strict canonical ingress": (
+        "preflight",
+        "duplicate",
+        ("noncanonical", "non-canonical"),
+    ),
+    "unknown/raw preservation": ("unknown", "raw", "extend_from_slice"),
+    "bounded prepared rewrite": (
+        "MAX_RECURSION_LIMIT",
+        "execution_requirements",
+        "execute",
+    ),
+    "arrangement fields": ("locked", "aspect_ratio", "constrain_proportions"),
+}
+KEYNOTE_CHART_ARRANGEMENT_CODEC_HIDDEN_MODULE = re.compile(
+    rf"(?m)#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+    rf"pub\s+mod\s+{re.escape(KEYNOTE_CHART_ARRANGEMENT_CODEC_MODULE)}\b"
+)
+KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_GENERATED_MODULE = re.compile(
+    rf"(?m)^\s*pub\s+mod\s+{re.escape(KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE)}\b"
+)
+
 KEYNOTE_CHART_CAPTION_LEGACY_CALL = re.compile(
     r"(?<![A-Za-z0-9_])(?:r#)?(?P<method>set_slide_chart_caption|"
     r"remove_slide_chart_caption)(?![A-Za-z0-9_])[ \t\r\n]*\("
@@ -28671,6 +28890,655 @@ def audit_iwa_keynote_chart_legend_source_topology(
     return sorted(set(violations))
 
 
+def _keynote_chart_arrangement_owner_present(root: Path) -> bool:
+    """Return whether the focused chart-arrangement owner is wired."""
+
+    owner_path = root / KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE
+    package_path = root / KEYNOTE_CHART_ARRANGEMENT_EXPORT_SOURCES[0]
+    package_source = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        )
+        if package_path.is_file()
+        else ""
+    )
+    return owner_path.is_file() and re.search(
+        rf"(?m)^(?:pub(?:[ \t]*\([^()]*\))?[ \t]+)?mod[ \t]+"
+        rf"{re.escape(KEYNOTE_CHART_ARRANGEMENT_PACKAGE_MODULE)}\s*;",
+        package_source,
+    ) is not None
+
+
+def _keynote_chart_arrangement_check_codec(root: Path) -> list[str]:
+    """Require a private, Buffa-backed chart-arrangement codec boundary."""
+
+    codec_path = root / KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE
+    public_path = root / KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE
+    violations: list[str] = []
+    if not codec_path.is_file():
+        return [
+            "focused litchi-keynote chart-arrangement codec source is missing: "
+            f"{KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}"
+        ]
+
+    raw_codec = codec_path.read_text(encoding="utf-8")
+    codec = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_codec))
+    codec_attributes = _mask_rust_non_code(raw_codec)
+
+    for api in KEYNOTE_CHART_ARRANGEMENT_CODEC_REQUIRED_APIS:
+        if re.search(
+            rf"\b(?:pub\s+)?(?:fn|struct|enum|type)\s+{re.escape(api)}\b",
+            codec,
+        ) is None:
+            violations.append(
+                "focused litchi-keynote chart-arrangement codec is missing strict API "
+                f"{api}: {KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}"
+            )
+
+    def has_marker(marker: str | tuple[str, ...]) -> bool:
+        if isinstance(marker, tuple):
+            return any(has_marker(item) for item in marker)
+        return marker in codec
+
+    for label, markers in KEYNOTE_CHART_ARRANGEMENT_CODEC_REQUIRED_MARKER_GROUPS.items():
+        if not all(has_marker(marker) for marker in markers):
+            violations.append(
+                "focused litchi-keynote chart-arrangement codec is missing "
+                f"{label} marker: {KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}"
+            )
+
+    if re.search(r"\b(?:prost|prost_types)\b", codec) is not None:
+        violations.append(
+            "focused litchi-keynote chart-arrangement codec must use Buffa rather "
+            f"than Prost: {KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}"
+        )
+    for declaration, line_number in _rust_public_declarations(codec):
+        if re.search(
+            rf"\b{re.escape(KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE)}\b"
+            r"|\bprojection\s*::",
+            declaration,
+        ):
+            violations.append(
+                "focused litchi-keynote chart-arrangement codec must not expose Buffa "
+                f"generated types: {KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}:{line_number}"
+            )
+
+    if not public_path.is_file():
+        violations.append(
+            "focused litchi-keynote chart-arrangement codec public module source is "
+            f"missing: {KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}"
+        )
+        return sorted(set(violations))
+
+    raw_public = public_path.read_text(encoding="utf-8")
+    public = _mask_rust_cfg_test_items(raw_public)
+    public_code = _mask_rust_non_code(public)
+    if KEYNOTE_CHART_ARRANGEMENT_CODEC_HIDDEN_MODULE.search(public_code) is None:
+        violations.append(
+            "focused litchi-keynote chart-arrangement codec module must be hidden: "
+            f"{KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}"
+        )
+    if re.search(
+        rf"(?m)^\s*mod\s+{re.escape(KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE)}\b",
+        public_code,
+    ) is None:
+        violations.append(
+            "focused litchi-keynote chart-arrangement codec is missing its private "
+            f"Buffa generated module: {KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}"
+        )
+    if KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_GENERATED_MODULE.search(public_code):
+        violations.append(
+            "focused litchi-keynote chart-arrangement codec generated module must "
+            f"remain private: {KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}"
+        )
+    if re.search(
+        rf"(?m)^\s*pub\s+use\b[^;\n]*"
+        rf"{re.escape(KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE)}\b",
+        public_code,
+    ) is not None:
+        violations.append(
+            "focused litchi-keynote chart-arrangement codec must not re-export Buffa "
+            f"generated types: {KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}"
+        )
+    if re.search(
+        r"(?m)#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]", codec_attributes
+    ) is None:
+        violations.append(
+            "focused litchi-keynote chart-arrangement codec is missing cfg(test) "
+            f"coverage: {KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}"
+        )
+    elif re.search(r"(?m)#\s*\[\s*test\s*\]", codec_attributes) is None:
+        violations.append(
+            "focused litchi-keynote chart-arrangement codec is missing #[test] "
+            f"coverage: {KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}"
+        )
+    return sorted(set(violations))
+
+
+def audit_keynote_chart_arrangement_codec_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require the focused chart-arrangement codec and private Buffa view."""
+
+    if not _keynote_chart_arrangement_owner_present(root):
+        return []
+    return _keynote_chart_arrangement_check_codec(root)
+
+
+def audit_keynote_chart_arrangement_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require a selector-first Keynote chart-arrangement package facade."""
+
+    if not _keynote_chart_arrangement_owner_present(root):
+        return []
+
+    owner_path = root / KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE
+    semantic_path = root / KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_SOURCE
+    selector_path = root / KEYNOTE_SOURCE_ROOT / "selector.rs"
+    package_path, lib_path = (
+        root / path for path in KEYNOTE_CHART_ARRANGEMENT_EXPORT_SOURCES
+    )
+    paths = (owner_path, semantic_path, selector_path, package_path, lib_path)
+    sources = {
+        path: _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        if path.is_file()
+        else ""
+        for path in paths
+    }
+    code = {path: _mask_rust_non_code(source) for path, source in sources.items()}
+    violations: list[str] = []
+
+    for path, label in (
+        (owner_path, "private package owner source"),
+        (semantic_path, "semantic source"),
+        (selector_path, "selector source"),
+        (package_path, "package export source"),
+        (lib_path, "crate export source"),
+    ):
+        if not path.is_file():
+            violations.append(
+                "focused litchi-keynote chart-arrangement facade is missing "
+                f"{label}: {path.relative_to(root)}"
+            )
+
+    package_code = code[package_path]
+    module_matches = list(
+        re.finditer(
+            rf"(?m)^(?P<indent>\s*)(?P<public>pub(?:\([^()]*\))?\s+)?"
+            rf"mod\s+{re.escape(KEYNOTE_CHART_ARRANGEMENT_PACKAGE_MODULE)}\s*;",
+            package_code,
+        )
+    )
+    if not module_matches:
+        violations.append(
+            "focused litchi-keynote chart-arrangement facade is missing private "
+            f"owner module: {KEYNOTE_CHART_ARRANGEMENT_EXPORT_SOURCES[0]}"
+        )
+    elif any(match.group("public") for match in module_matches):
+        line_number = package_code.count("\n", 0, module_matches[0].start()) + 1
+        violations.append(
+            "focused litchi-keynote chart-arrangement owner module must remain "
+            f"private: {KEYNOTE_CHART_ARRANGEMENT_EXPORT_SOURCES[0]}:{line_number}"
+        )
+
+    semantic_code = code[semantic_path]
+    if re.search(r"\bpub\s+struct\s+ChartArrangement\b", semantic_code) is None:
+        violations.append(
+            "focused litchi-keynote chart-arrangement semantic API is missing "
+            f"ChartArrangement: {KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_SOURCE}"
+        )
+    semantic_exports = _rust_canonical_exports(
+        sources[lib_path], KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_TYPES
+    )
+    for name in sorted(KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_TYPES - semantic_exports):
+        violations.append(
+            "focused litchi-keynote chart-arrangement semantic API is missing root "
+            f"export {name}: {KEYNOTE_CHART_ARRANGEMENT_EXPORT_SOURCES[1]}"
+        )
+    selector_exports = _rust_canonical_exports(
+        sources[lib_path], KEYNOTE_CHART_ARRANGEMENT_SELECTOR_TYPES
+    )
+    for name in sorted(KEYNOTE_CHART_ARRANGEMENT_SELECTOR_TYPES - selector_exports):
+        violations.append(
+            "focused litchi-keynote chart-arrangement public API is missing selector "
+            f"{name}: {KEYNOTE_CHART_ARRANGEMENT_EXPORT_SOURCES[1]}"
+        )
+
+    owner_methods = {
+        name: (declaration, line_number)
+        for name, declaration, line_number in _rust_public_methods_in_impl(
+            sources[owner_path], "Package"
+        )
+    }
+    for name in sorted(KEYNOTE_CHART_ARRANGEMENT_PACKAGE_METHODS):
+        record = owner_methods.get(name)
+        if record is None:
+            violations.append(
+                "focused litchi-keynote chart-arrangement Package method is missing "
+                f"{name}: {KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE}"
+            )
+            continue
+        declaration, line_number = record
+        if name == "apply_slide_chart_arrangement":
+            if re.search(r"\bChartArrangementPatch\b", declaration) is None:
+                violations.append(
+                    "focused litchi-keynote chart-arrangement apply method must accept "
+                    f"ChartArrangementPatch: {KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE}:"
+                    f"{line_number}"
+                )
+        elif name == "slide_chart_arrangements":
+            if re.search(r"\bSlideSelector\b", declaration) is None:
+                violations.append(
+                    "focused litchi-keynote chart-arrangement batch method must accept "
+                    f"selector-first SlideSelector: {KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE}:"
+                    f"{line_number}"
+                )
+            if re.search(r"\bChartArrangement\b", declaration) is None:
+                violations.append(
+                    "focused litchi-keynote chart-arrangement batch method must expose "
+                    f"ChartArrangement state: {KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE}:"
+                    f"{line_number}"
+                )
+        else:
+            for selector in sorted(KEYNOTE_CHART_ARRANGEMENT_SELECTOR_TYPES):
+                if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
+                    violations.append(
+                        "focused litchi-keynote chart-arrangement Package method "
+                        f"{name} must accept selector-first {selector}: "
+                        f"{KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE}:{line_number}"
+                    )
+            if (
+                name == "slide_chart_arrangement"
+                and re.search(r"\bChartArrangement\b", declaration) is None
+            ):
+                violations.append(
+                    "focused litchi-keynote chart-arrangement Package method must "
+                    f"expose ChartArrangement state: {name}: "
+                    f"{KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE}:{line_number}"
+                )
+        if re.search(r"\bu64\b", declaration):
+            violations.append(
+                "focused litchi-keynote chart-arrangement Package method must not "
+                f"expose u64: {name}: {KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE}:{line_number}"
+            )
+        raw_identifier = KEYNOTE_CHART_ARRANGEMENT_RAW_ID_PARAMETER.search(declaration)
+        if raw_identifier is not None:
+            violations.append(
+                "focused litchi-keynote chart-arrangement Package method exposes raw "
+                f"identifier {raw_identifier.group(0).strip()}: {name}: "
+                f"{KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE}:{line_number}"
+            )
+
+    edit_methods = {
+        name
+        for name, _declaration, _line_number in _rust_public_methods_in_impl(
+            sources[owner_path], "ChartArrangementEdit"
+        )
+    }
+    for name in sorted(KEYNOTE_CHART_ARRANGEMENT_EDIT_METHODS):
+        if name not in edit_methods:
+            violations.append(
+                "focused litchi-keynote chart-arrangement edit is missing "
+                f"{name}: {KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE}"
+            )
+
+    for name in sorted(KEYNOTE_CHART_ARRANGEMENT_CANONICAL_TYPES):
+        for path in (owner_path, package_path, lib_path):
+            if name not in _rust_canonical_exports(
+                sources[path], KEYNOTE_CHART_ARRANGEMENT_CANONICAL_TYPES
+            ):
+                violations.append(
+                    "focused litchi-keynote chart-arrangement public API is missing "
+                    f"canonical type {name}: {path.relative_to(root)}"
+                )
+    facade_names = (
+        KEYNOTE_CHART_ARRANGEMENT_CANONICAL_TYPES
+        | KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_TYPES
+        | KEYNOTE_CHART_ARRANGEMENT_SELECTOR_TYPES
+        | KEYNOTE_CHART_ARRANGEMENT_PACKAGE_METHODS
+        | KEYNOTE_CHART_ARRANGEMENT_FLAT_ALIASES
+    )
+    dedicated_sources = {owner_path, semantic_path, selector_path}
+    for path in paths:
+        dedicated = path in dedicated_sources
+        for declaration, line_number in _rust_public_declarations(sources[path]):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if path == semantic_path and not identifiers.intersection(
+                KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_TYPES
+                | KEYNOTE_CHART_ARRANGEMENT_FLAT_ALIASES
+            ):
+                continue
+            if path == selector_path and not identifiers.intersection(
+                KEYNOTE_CHART_ARRANGEMENT_SELECTOR_TYPES
+            ):
+                continue
+            if not dedicated and not identifiers.intersection(facade_names):
+                continue
+            for identifier in sorted(identifiers):
+                if identifier in KEYNOTE_CHART_ARRANGEMENT_PROTO_ORIGINS:
+                    reason = "protobuf type"
+                elif identifier in KEYNOTE_CHART_ARRANGEMENT_PHYSICAL_TYPES:
+                    reason = "archive/IWA type"
+                elif identifier == "wire" or identifier in KEYNOTE_CHART_ARRANGEMENT_WIRE_TYPES:
+                    reason = "wire type"
+                else:
+                    reason = _iwork_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-keynote chart-arrangement public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+                if identifier in KEYNOTE_CHART_ARRANGEMENT_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-keynote chart-arrangement public API retains "
+                        f"flat alias {identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                violations.append(
+                    "focused litchi-keynote chart-arrangement public API exposes raw "
+                    f"byte slice {byte_slice}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_CHART_ARRANGEMENT_PUBLIC_RAW_PARAMETER.finditer(
+                declaration
+            ):
+                violations.append(
+                    "focused litchi-keynote chart-arrangement public API exposes raw "
+                    f"parameter {match.group(0).strip()}: {path.relative_to(root)}:{line_number}"
+                )
+            if "pub use" in declaration and "*" in declaration:
+                violations.append(
+                    "focused litchi-keynote chart-arrangement public API retains a "
+                    f"glob re-export: {path.relative_to(root)}:{line_number}"
+                )
+            if KEYNOTE_CHART_ARRANGEMENT_MONOLITH_PATH.search(declaration):
+                violations.append(
+                    "focused litchi-keynote chart-arrangement public API retains a "
+                    f"monolith chart re-export: {path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def _keynote_chart_arrangement_focused_call_in_body(
+    body: str, *, include_batch: bool = False
+) -> bool:
+    """Recognize a focused Package chart-arrangement call in one host body."""
+
+    code = _mask_rust_non_code(body)
+    methods = (
+        r"slide_chart_arrangements"
+        if include_batch
+        else r"(?:slide_chart_arrangement|edit_slide_chart_arrangement|"
+        r"apply_slide_chart_arrangement)"
+    )
+    if re.search(
+        rf"\blitchi_keynote\s*::\s*Package\s*::[^;{{}}]*\.[ \t\r\n]*{methods}\s*\(",
+        code,
+    ):
+        return True
+    if re.search(
+        rf"\bfocused_[A-Za-z0-9_]*package\s*\([^;{{}}]*\)[ \t\r\n]*(?:\?[ \t\r\n]*)?\.[ \t\r\n]*{methods}\s*\(",
+        code,
+    ):
+        return True
+    bound_receivers = {
+        match.group("receiver")
+        for match in re.finditer(
+            r"\blet\s+(?:mut\s+)?(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)"
+            r"\s*=\s*(?:(?:Focused[A-Za-z0-9_]*Package|KeynotePackage|"
+            r"litchi_keynote\s*::\s*Package)\b|"
+            r"focused_[A-Za-z0-9_]*package\s*\([^;{}]*\))",
+            code,
+        )
+    }
+    return any(
+        re.search(
+            rf"\b{re.escape(receiver)}\s*(?:\?[ \t\r\n]*)?\.[ \t\r\n]*{methods}\s*\(",
+            code,
+        )
+        for receiver in bound_receivers
+    )
+
+
+def _keynote_chart_arrangement_function_bodies(
+    source: str,
+) -> dict[str, list[tuple[str, int]]]:
+    """Return production function bodies from the Keynote arrangement bridge."""
+
+    code = _mask_rust_non_code(source)
+    records: dict[str, list[tuple[str, int]]] = {}
+    for declaration in RUST_FUNCTION_DECLARATION.finditer(code):
+        opening = code.find("{", declaration.end())
+        if opening < 0:
+            continue
+        depth = 1
+        cursor = opening + 1
+        while cursor < len(code) and depth:
+            if code[cursor] == "{":
+                depth += 1
+            elif code[cursor] == "}":
+                depth -= 1
+            cursor += 1
+        if depth:
+            continue
+        records.setdefault(declaration.group(1), []).append(
+            (code[opening + 1 : cursor - 1], opening + 1)
+        )
+    return records
+
+
+def _keynote_chart_arrangement_deprecated_legacy_methods(
+    source: str,
+) -> frozenset[str]:
+    """Return raw-ID compatibility methods carrying a direct deprecation attr."""
+
+    code = _mask_rust_non_code(source)
+    declaration = re.compile(
+        r"(?<![A-Za-z0-9_#])pub(?:[ \t]*\([^()]*\))?[ \t\r\n]+fn[ \t\r\n]+"
+        r"(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    attributes = re.compile(r"#[ \t]*\[(?P<body>[^\]]*)\]")
+    deprecated: set[str] = set()
+    for match in declaration.finditer(code):
+        name = match.group("name")
+        if name not in KEYNOTE_CHART_ARRANGEMENT_LEGACY_METHODS:
+            continue
+        prefix = code[: match.start()]
+        for attribute in attributes.finditer(prefix):
+            # Only attributes in the contiguous item attribute block may
+            # describe this function.  This prevents a deprecated unrelated
+            # item from satisfying a later compatibility shell.
+            suffix = prefix[attribute.end() :]
+            if not re.fullmatch(
+                r"[ \t\r\n]*(?:#[ \t]*\[[^\]]*\][ \t\r\n]*)*",
+                suffix,
+            ):
+                continue
+            if re.match(r"[ \t\r\n]*deprecated\b", attribute.group("body")):
+                deprecated.add(name)
+                break
+    return frozenset(deprecated)
+
+
+def audit_iwa_keynote_chart_arrangement_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep Keynote chart Arrange compatibility code as a focused delegation."""
+
+    if not _keynote_chart_arrangement_owner_present(root):
+        return []
+    path = root / IWA_KEYNOTE_CHART_ARRANGEMENT_SOURCE
+    if not path.is_file():
+        return [
+            "litchi-iwa Keynote chart-arrangement bridge source is missing: "
+            f"{IWA_KEYNOTE_CHART_ARRANGEMENT_SOURCE}"
+        ]
+
+    production = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    code = _mask_rust_non_code(production)
+    violations: list[str] = []
+    relative = path.relative_to(root)
+    function_bodies = _keynote_chart_arrangement_function_bodies(production)
+    deprecated_legacy_methods = _keynote_chart_arrangement_deprecated_legacy_methods(
+        production
+    )
+
+    listing_path = root / IWA_KEYNOTE_CHART_ARRANGEMENT_LISTING_SOURCE
+    if not listing_path.is_file():
+        violations.append(
+            "litchi-iwa Keynote chart listing source is missing its focused chart-"
+            f"arrangement batch delegation: {IWA_KEYNOTE_CHART_ARRANGEMENT_LISTING_SOURCE}"
+        )
+    else:
+        listing = _mask_rust_cfg_test_items(
+            listing_path.read_text(encoding="utf-8")
+        )
+        listing_bodies = _keynote_chart_arrangement_function_bodies(listing)
+        listing_methods = listing_bodies.get(
+            KEYNOTE_CHART_ARRANGEMENT_LISTING_METHOD, []
+        )
+        if not listing_methods:
+            violations.append(
+                "litchi-iwa Keynote chart listing is missing its focused delegation "
+                f"method {KEYNOTE_CHART_ARRANGEMENT_LISTING_METHOD}: "
+                f"{IWA_KEYNOTE_CHART_ARRANGEMENT_LISTING_SOURCE}"
+            )
+        elif not any(
+            re.search(
+                rf"\b{re.escape(KEYNOTE_CHART_ARRANGEMENT_LISTING_HELPER)}\s*\(",
+                body,
+            )
+            or _keynote_chart_arrangement_focused_call_in_body(
+                body, include_batch=True
+            )
+            for body, _offset in listing_methods
+        ):
+            violations.append(
+                "litchi-iwa Keynote chart listing must delegate its arrangement "
+                f"values through {KEYNOTE_CHART_ARRANGEMENT_LISTING_HELPER}: "
+                f"{IWA_KEYNOTE_CHART_ARRANGEMENT_LISTING_SOURCE}"
+            )
+
+        batch_methods = function_bodies.get(
+            KEYNOTE_CHART_ARRANGEMENT_BATCH_HELPER, []
+        )
+        if not batch_methods or not any(
+            _keynote_chart_arrangement_focused_call_in_body(
+                body, include_batch=True
+            )
+            for body, _offset in batch_methods
+        ):
+            violations.append(
+                "litchi-iwa Keynote chart arrangement listing helper must delegate "
+                "to Package::slide_chart_arrangements: "
+                f"{IWA_KEYNOTE_CHART_ARRANGEMENT_SOURCE}"
+            )
+
+    for match in KEYNOTE_CHART_ARRANGEMENT_RAW_HELPER.finditer(code):
+        line_number = code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "litchi-iwa Keynote chart-arrangement host retains native wire helper "
+            f"{match.group(0)}: {relative}:{line_number}"
+        )
+    for match in KEYNOTE_CHART_ARRANGEMENT_HOST_WIRE_PATH.finditer(code):
+        line_number = code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "litchi-iwa Keynote chart-arrangement host retains native wire path "
+            f"{match.group(0)}: {relative}:{line_number}"
+        )
+    for match in KEYNOTE_CHART_ARRANGEMENT_HOST_WIRE_OWNERSHIP.finditer(code):
+        line_number = code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "litchi-iwa Keynote chart-arrangement host retains generated/wire "
+            f"ownership {match.group(0)}: {relative}:{line_number}"
+        )
+
+    focused_wrapper_names = {
+        name
+        for name in KEYNOTE_CHART_ARRANGEMENT_HOST_TYPED_METHODS
+        if any(
+            _keynote_chart_arrangement_focused_call_in_body(body)
+            for body, _offset in function_bodies.get(name, [])
+        )
+    }
+
+    def delegates_to_focused_package(body: str) -> bool:
+        if _keynote_chart_arrangement_focused_call_in_body(body):
+            return True
+        return any(
+            re.search(
+                rf"(?:\bself\s*\.\s*)?{re.escape(name)}\s*\(", body
+            )
+            for name in focused_wrapper_names
+        )
+
+    legacy_bodies = [
+        (name, body, offset)
+        for name in KEYNOTE_CHART_ARRANGEMENT_LEGACY_METHODS
+        for body, offset in function_bodies.get(name, [])
+    ]
+    if not legacy_bodies:
+        violations.append(
+            "litchi-iwa Keynote chart-arrangement host has no compatibility method "
+            f"to delegate: {relative}"
+        )
+    else:
+        for name, body, offset in legacy_bodies:
+            if name not in deprecated_legacy_methods:
+                line_number = production.count("\n", 0, offset) + 1
+                violations.append(
+                    "litchi-iwa Keynote chart-arrangement raw-ID compatibility "
+                    f"method must be deprecated {name}: {relative}:{line_number}"
+                )
+            if delegates_to_focused_package(body):
+                continue
+            line_number = production.count("\n", 0, offset) + 1
+            violations.append(
+                "litchi-iwa Keynote chart-arrangement compatibility method must "
+                f"delegate to focused Package: {relative}:{line_number}"
+            )
+
+    # Existing raw-ID methods are documented compatibility aliases.  Any new
+    # host method or public helper that introduces an archive identifier must
+    # fail closed instead of expanding the monolith surface.
+    for declaration, line_number in _rust_public_declarations(production):
+        function = RUST_FUNCTION_DECLARATION.search(declaration)
+        if function is None or function.group(1) in KEYNOTE_CHART_ARRANGEMENT_LEGACY_METHODS:
+            continue
+        raw_identifier = KEYNOTE_CHART_ARRANGEMENT_PUBLIC_RAW_PARAMETER.search(
+            declaration
+        ) or KEYNOTE_CHART_ARRANGEMENT_RAW_ID_PARAMETER.search(declaration)
+        if raw_identifier is None:
+            continue
+        violations.append(
+            "litchi-iwa Keynote chart-arrangement host introduces a raw identifier "
+            f"parameter {raw_identifier.group(0).strip()}: {relative}:{line_number}"
+        )
+
+    for declaration, line_number in _rust_public_declarations(production):
+        if KEYNOTE_CHART_ARRANGEMENT_MONOLITH_PATH.search(declaration):
+            violations.append(
+                "litchi-iwa Keynote chart-arrangement host must not publicly re-export "
+                f"the monolith chart model: {relative}:{line_number}"
+            )
+        owned_type = re.search(
+            r"\bpub\s+(?:struct|enum|type)\s+"
+            rf"(?:ChartArrangement|{'|'.join(sorted(KEYNOTE_CHART_ARRANGEMENT_CANONICAL_TYPES))})\b",
+            declaration,
+        )
+        if owned_type is not None:
+            violations.append(
+                "litchi-iwa Keynote chart-arrangement host must not own the focused "
+                f"transaction/API: {relative}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
 def _keynote_chart_axis_title_owner_present(root: Path) -> bool:
     """Return whether the Wave112 axis-title owner crossed its wiring seam."""
 
@@ -39009,6 +39877,9 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_chart_title_source_topology()
         + audit_keynote_chart_legend_visibility_facade_source_topology()
         + audit_iwa_keynote_chart_legend_source_topology()
+        + audit_keynote_chart_arrangement_facade_source_topology()
+        + audit_keynote_chart_arrangement_codec_source_topology()
+        + audit_iwa_keynote_chart_arrangement_source_topology()
         + audit_keynote_chart_axis_title_legacy_calls()
         + audit_iwa_keynote_chart_axis_title_source_topology()
         + audit_keynote_chart_axis_title_facade_source_topology()

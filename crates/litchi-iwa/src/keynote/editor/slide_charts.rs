@@ -72,9 +72,7 @@ use crate::charts::source::{
     require_creatable_kind, single_message_index, source_chart_objects, unregister_chart_styles,
     validate_chart_styles_registered,
 };
-use crate::charts::{
-    ChartArrangement, ChartData, Direction, DirectionKind, IWorkChartArchive, Kind,
-};
+use crate::charts::{ChartData, Direction, DirectionKind, IWorkChartArchive, Kind};
 use crate::data_reference_registry::{
     clone_component_data_references, remove_component_data_references_for_objects,
 };
@@ -83,7 +81,7 @@ use crate::shapes::{
     DrawableGeometry, DrawablePoint, DrawableSize, offset_drawable_geometry,
     remove_orphaned_image_asset,
 };
-use litchi_keynote::{ChartCatalog, ChartSelector, ChartSelectorError};
+use litchi_keynote::{ChartArrangement, ChartCatalog, ChartSelector, ChartSelectorError};
 use title::focused_chart_catalog;
 
 const KEYNOTE_THEME_MESSAGE_TYPE: u32 = 10;
@@ -110,9 +108,24 @@ pub struct RemovedKeynoteSlideChart {
 impl KeynoteEditor {
     /// List charts owned directly by one slide in z-order.
     pub fn slide_charts(&self, slide_index: usize) -> Result<Vec<KeynoteSlideChartInfo>> {
+        let (mut charts, chart_positions) = self.slide_charts_without_arrangements(slide_index)?;
+        arrangement::fill_focused_chart_arrangements(
+            self,
+            slide_index,
+            &mut charts,
+            &chart_positions,
+        )?;
+        Ok(charts)
+    }
+
+    fn slide_charts_without_arrangements(
+        &self,
+        slide_index: usize,
+    ) -> Result<(Vec<KeynoteSlideChartInfo>, Vec<usize>)> {
         let graph = ObjectGraph::read(self.package())?;
         let context = text_box_create::text_box_context(&graph, slide_index)?;
         let mut charts = Vec::new();
+        let mut chart_positions = Vec::new();
         for reference in context.slide.drawables_z_order {
             let messages = graph.objects.get(&reference.identifier).ok_or_else(|| {
                 Error::InvalidFormat(format!(
@@ -124,21 +137,22 @@ impl KeynoteEditor {
                 .iter()
                 .any(|message| message.type_ == CHART_MESSAGE_TYPE)
             {
-                charts.push(chart_graph(self, slide_index, reference.identifier)?.info);
+                let graph = chart_graph(self, slide_index, reference.identifier)?;
+                chart_positions.push(graph.chart_position);
+                charts.push(graph.info);
             }
         }
-        Ok(charts)
+        Ok((charts, chart_positions))
     }
 
     /// List the archive-free chart catalog owned directly by one slide.
     ///
-    /// The catalog contains only source order and visible native titles. Native
-    /// drawable identifiers and component names remain private to the IWA
-    /// adapter. Chart graph, title stand-in, ownership, and non-style guards
-    /// are all checked before the catalog is published.
+    /// The catalog contains only chart-drawable z-order and visible native
+    /// titles. Native drawable identifiers and component names remain private
+    /// to the IWA adapter. Chart graph, title stand-in, ownership, and
+    /// non-style guards are all checked before the catalog is published.
     pub fn slide_chart_catalog(&self, slide_index: usize) -> Result<ChartCatalog> {
-        let charts = self.slide_charts(slide_index)?;
-        self.slide_chart_catalog_from_charts(slide_index, &charts)
+        focused_chart_catalog(self, slide_index)
     }
 
     /// Build an independently editable chart directly from typed inline data.
@@ -237,7 +251,13 @@ impl KeynoteEditor {
             &archive_name,
             &ids.style_ids(),
         )?;
-        let created = chart_graph(&verified, slide_index, ids.drawable)?;
+        let mut created = chart_graph(&verified, slide_index, ids.drawable)?;
+        created.info.arrangement = arrangement::focused_chart_arrangement_at(
+            &verified,
+            slide_index,
+            created.chart_count,
+            created.chart_position,
+        )?;
         if created.info.kind != kind
             || created.info.direction != Direction::Rows
             || created.info.data != data
@@ -538,7 +558,13 @@ impl KeynoteEditor {
             &source.archive_name,
             &new_style_ids,
         )?;
-        let created = chart_graph(&verified, slide_index, new_drawable_id)?;
+        let mut created = chart_graph(&verified, slide_index, new_drawable_id)?;
+        created.info.arrangement = arrangement::focused_chart_arrangement_at(
+            &verified,
+            slide_index,
+            created.chart_count,
+            created.chart_position,
+        )?;
         let expected_object_ids = source
             .object_ids
             .iter()
@@ -573,7 +599,13 @@ impl KeynoteEditor {
         selector: ChartSelector<'_>,
     ) -> Result<RemovedKeynoteSlideChart> {
         let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
-        let source = chart_graph(self, slide_index, drawable_object_id)?;
+        let mut source = chart_graph(self, slide_index, drawable_object_id)?;
+        source.info.arrangement = arrangement::focused_chart_arrangement_at(
+            self,
+            slide_index,
+            source.chart_count,
+            source.chart_position,
+        )?;
         let style_ids =
             local_chart_style_ids(self.package(), &source.archive_name, &source.object_ids)?;
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
@@ -635,7 +667,8 @@ impl KeynoteEditor {
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
         if verified
-            .slide_charts(slide_index)?
+            .slide_charts_without_arrangements(slide_index)?
+            .0
             .iter()
             .any(|chart| chart.drawable_object_id == drawable_object_id)
         {
@@ -652,7 +685,7 @@ impl KeynoteEditor {
         slide_index: usize,
         selector: ChartSelector<'_>,
     ) -> Result<u64> {
-        let charts = self.slide_charts(slide_index)?;
+        let (charts, _chart_positions) = self.slide_charts_without_arrangements(slide_index)?;
         match selector {
             ChartSelector::Index(index) => charts
                 .get(index)
@@ -663,7 +696,7 @@ impl KeynoteEditor {
                     ))
                 }),
             ChartSelector::Name(name) => {
-                let catalog = self.slide_chart_catalog_from_charts(slide_index, &charts)?;
+                let catalog = focused_chart_catalog(self, slide_index)?;
                 let position = catalog
                     .select_position(name)
                     .map_err(|error| map_chart_selector_error(slide_index, error))?
@@ -682,14 +715,6 @@ impl KeynoteEditor {
                     })
             },
         }
-    }
-
-    fn slide_chart_catalog_from_charts(
-        &self,
-        slide_index: usize,
-        _charts: &[KeynoteSlideChartInfo],
-    ) -> Result<ChartCatalog> {
-        focused_chart_catalog(self, slide_index)
     }
 
     fn update_slide_chart(

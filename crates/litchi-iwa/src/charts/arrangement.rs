@@ -9,44 +9,12 @@ const CHART_DRAWABLE_SUPER_FIELD: u32 = 1;
 const DRAWABLE_LOCKED_FIELD: u32 = 5;
 const DRAWABLE_ASPECT_RATIO_LOCKED_FIELD: u32 = 7;
 
-/// Editable state exposed by the chart Arrange panel.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct ChartArrangement {
-    locked: bool,
-    constrain_proportions: bool,
-}
-
-impl ChartArrangement {
-    /// Construct chart Arrange-panel state.
-    pub const fn new(locked: bool, constrain_proportions: bool) -> Self {
-        Self {
-            locked,
-            constrain_proportions,
-        }
-    }
-
-    /// Return whether the chart is locked against interactive editing.
-    pub const fn locked(self) -> bool {
-        self.locked
-    }
-
-    /// Return whether interactive resizing preserves the chart's aspect ratio.
-    pub const fn constrain_proportions(self) -> bool {
-        self.constrain_proportions
-    }
-
-    /// Return this state with the requested interactive lock.
-    pub const fn with_locked(mut self, locked: bool) -> Self {
-        self.locked = locked;
-        self
-    }
-
-    /// Return this state with the requested aspect-ratio constraint.
-    pub const fn with_constrain_proportions(mut self, constrain_proportions: bool) -> Self {
-        self.constrain_proportions = constrain_proportions;
-        self
-    }
-}
+/// Archive-free Arrange-panel state shared by the legacy Pages/Numbers chart
+/// adapters and the focused Keynote package owner.
+///
+/// The wire-preserving helper below remains host-owned for Pages and Numbers;
+/// Keynote reads and writes route through `litchi_keynote::Package`.
+pub use litchi_keynote::ChartArrangement;
 
 /// Read one chart's effective Arrange-panel state.
 pub(crate) fn chart_arrangement(
@@ -207,20 +175,24 @@ fn chart_message(
 
 fn strict_optional_bool(data: &[u8], field_number: u32, label: &str) -> Result<Option<bool>> {
     let fields = parse_wire_fields(data)?;
-    let matches = fields
-        .iter()
-        .filter(|field| field.number() == field_number)
-        .collect::<Vec<_>>();
-    if matches.len() > 1 {
+    let mut field = None;
+    let mut count = 0;
+    for candidate in &fields {
+        if candidate.number() != field_number {
+            continue;
+        }
+        count += 1;
+        field = Some(candidate);
+    }
+    if count > 1 {
         return Err(Error::InvalidFormat(format!(
-            "{label} field occurs {} times",
-            matches.len()
+            "{label} field occurs {count} times"
         )));
     }
-    let Some(field) = matches.first().copied() else {
+    let Some(field) = field.copied() else {
         return Ok(None);
     };
-    require_wire_type(field, 0, label)?;
+    require_wire_type(&field, 0, label)?;
     let (value, length) = litchi_iwa_common::varint::decode_varint_from_bytes(
         &data[field.payload_start()..field.end()],
     )
@@ -244,17 +216,20 @@ fn singular_field<'a>(
     field_number: u32,
     label: &str,
 ) -> Result<&'a crate::wire::WireField> {
-    let matches = fields
-        .iter()
-        .filter(|field| field.number() == field_number)
-        .collect::<Vec<_>>();
-    if matches.len() != 1 {
-        return Err(Error::InvalidFormat(format!(
-            "{label} must occur exactly once, found {}",
-            matches.len()
-        )));
+    let mut match_field = None;
+    let mut count = 0;
+    for field in fields {
+        if field.number() == field_number {
+            count += 1;
+            match_field = Some(field);
+        }
     }
-    Ok(matches[0])
+    match (count, match_field) {
+        (1, Some(field)) => Ok(field),
+        (count, _) => Err(Error::InvalidFormat(format!(
+            "{label} must occur exactly once, found {count}"
+        ))),
+    }
 }
 
 fn require_wire_type(field: &crate::wire::WireField, expected: u8, label: &str) -> Result<()> {

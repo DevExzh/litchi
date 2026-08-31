@@ -1396,6 +1396,141 @@ def add_keynote_chart_axis_title_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_keynote_chart_arrangement_canonical_scaffold(root: Path) -> None:
+    """Install the focused chart Arrange owner and its private codec seam."""
+
+    semantic = root / boundaries.KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub use litchi_iwa_common::chart::axis::Axis;\n"
+        "pub struct ChartArrangement;\n",
+        encoding="utf-8",
+    )
+
+    selector = root / boundaries.KEYNOTE_SOURCE_ROOT / "selector.rs"
+    selector.parent.mkdir(parents=True, exist_ok=True)
+    selector.write_text(
+        "pub struct SlideSelector;\npub struct ChartSelector;\n",
+        encoding="utf-8",
+    )
+
+    owner = root / boundaries.KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_CHART_ARRANGEMENT_CANONICAL_TYPES
+        )
+        + "impl Package {\n"
+        + "    pub fn slide_chart_arrangement(&self, slide: SlideSelector, chart: ChartSelector) -> Result<ChartArrangement, ChartArrangementError> { let _ = (slide, chart); todo!() }\n"
+        + "    pub fn slide_chart_arrangements(&self, slide: SlideSelector) -> Result<Box<[ChartArrangement]>, ChartArrangementError> { let _ = slide; todo!() }\n"
+        + "    pub fn edit_slide_chart_arrangement(&self, slide: SlideSelector, chart: ChartSelector) -> Result<ChartArrangementEdit, ChartArrangementError> { let _ = (slide, chart); todo!() }\n"
+        + "    pub fn apply_slide_chart_arrangement(&self, patch: &ChartArrangementPatch) -> Result<ChartArrangementCommit, ChartArrangementError> { let _ = patch; todo!() }\n"
+        + "}\n"
+        + "impl ChartArrangementEdit {\n"
+        + "    pub fn before(&self) -> ChartArrangement { self.before }\n"
+        + "    pub fn after(&self) -> ChartArrangement { self.after }\n"
+        + "    pub fn set(self, arrangement: ChartArrangement) -> Self { let _ = arrangement; self }\n"
+        + "    pub fn set_locked(self, locked: bool) -> Self { let _ = locked; self }\n"
+        + "    pub fn set_constrain_proportions(self, constrain_proportions: bool) -> Self { let _ = constrain_proportions; self }\n"
+        + "    pub fn commit(self) -> Result<ChartArrangementCommit, ChartArrangementError> { todo!() }\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+
+    package = root / boundaries.KEYNOTE_CHART_ARRANGEMENT_EXPORT_SOURCES[0]
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_text(
+        "mod slide_chart_arrangement;\n"
+        "pub use slide_chart_arrangement::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_CHART_ARRANGEMENT_CANONICAL_TYPES))
+        + "};\n",
+        encoding="utf-8",
+    )
+    library = root / boundaries.KEYNOTE_CHART_ARRANGEMENT_EXPORT_SOURCES[1]
+    library.parent.mkdir(parents=True, exist_ok=True)
+    library.write_text(
+        "pub use chart::ChartArrangement;\n"
+        "pub use package::{"
+        + ", ".join(sorted(boundaries.KEYNOTE_CHART_ARRANGEMENT_CANONICAL_TYPES))
+        + "};\n"
+        "pub use selector::{ChartSelector, SlideSelector};\n",
+        encoding="utf-8",
+    )
+
+    codec = root / boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "use buffa::DecodeOptions as BuffaDecodeOptions;\n"
+        f"use crate::{boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE}::Projection;\n"
+        "pub struct DecodeError;\n"
+        "pub struct DecodeOptions;\n"
+        "pub struct ChartArrangementSnapshot;\n"
+        "pub struct ChartArrangementWrite;\n"
+        "pub struct DecodeReport;\n"
+        "pub struct RewriteReport;\n"
+        "pub struct PreparedChartArrangementRewrite;\n"
+        "pub struct RewriteExecutionRequirements;\n"
+        "pub struct RewriteExecutionLimits;\n"
+        "pub fn decode_chart_arrangement() {}\n"
+        "pub fn decode_chart_arrangement_with_report() {}\n"
+        "pub fn prepare_chart_arrangement_rewrite() {}\n"
+        "pub fn rewrite_chart_arrangement() {}\n"
+        "fn strict() {\n"
+        "    let _ = BuffaDecodeOptions::new().decode_lazy_view(bytes);\n"
+        "    preflight; duplicate; noncanonical; unknown; raw; extend_from_slice;\n"
+        "    MAX_RECURSION_LIMIT; execution_requirements; execute; locked;\n"
+        "    aspect_ratio; constrain_proportions;\n"
+        "}\n"
+        "impl PreparedChartArrangementRewrite { fn execution_requirements(self) -> RewriteExecutionRequirements { RewriteExecutionRequirements } fn execute(self) {} }\n"
+        "#[cfg(test)] mod tests { #[test] fn codec_round_trip() {} }\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE
+    codec_lib.parent.mkdir(parents=True, exist_ok=True)
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        f"pub mod {boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_MODULE};\n"
+        f"mod {boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE};\n",
+        encoding="utf-8",
+    )
+
+    host = root / boundaries.IWA_KEYNOTE_CHART_ARRANGEMENT_SOURCE
+    host.parent.mkdir(parents=True, exist_ok=True)
+    host.write_text(
+        "use litchi_keynote::{ChartArrangement, Package as FocusedKeynotePackage, SlideSelector};\n"
+        "impl KeynoteEditor {\n"
+        "    #[deprecated]\n"
+        "    pub fn slide_chart_arrangement(&self, slide_index: usize, drawable_object_id: u64) -> Result<ChartArrangement> {\n"
+        "        let package = FocusedKeynotePackage::from_bytes(bytes)?;\n"
+        "        package.slide_chart_arrangement(slide_selector, chart_selector)\n"
+        "    }\n"
+        "    #[deprecated]\n"
+        "    pub fn set_slide_chart_arrangement(&mut self, slide_index: usize, drawable_object_id: u64, arrangement: ChartArrangement) -> Result<()> {\n"
+        "        let package = FocusedKeynotePackage::from_bytes(bytes)?;\n"
+        "        package.edit_slide_chart_arrangement(slide_selector, chart_selector).set(arrangement).commit()\n"
+        "    }\n"
+        "}\n"
+        "fn focused_chart_arrangements(editor: &KeynoteEditor, slide_index: usize) -> Result<Box<[ChartArrangement]>> {\n"
+        "    let package = FocusedKeynotePackage::from_bytes(bytes)?;\n"
+        "    package.slide_chart_arrangements(SlideSelector::index(slide_index))\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    listing = root / boundaries.IWA_KEYNOTE_CHART_ARRANGEMENT_LISTING_SOURCE
+    listing.parent.mkdir(parents=True, exist_ok=True)
+    listing.write_text(
+        "impl KeynoteEditor {\n"
+        "    pub fn slide_charts(&self, slide_index: usize) -> Result<Vec<KeynoteSlideChartInfo>> {\n"
+        "        arrangement::fill_focused_chart_arrangements(self, slide_index, &mut charts, &positions)?;\n"
+        "        Ok(charts)\n"
+        "    }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+
 def add_keynote_chart_axis_value_settings_canonical_scaffold(root: Path) -> None:
     """Install a complete Wave114 aggregate value-axis boundary fixture."""
 
@@ -30396,6 +30531,290 @@ fn rewrite_movie_title_operation(
             self.assertEqual(
                 boundaries.audit_iwa_keynote_chart_legend_source_topology(root), []
             )
+
+    def test_keynote_chart_arrangement_facade_is_selector_first_and_private(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_arrangement_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE
+            owner_source = owner.read_text(encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_keynote_chart_arrangement_facade_source_topology(root),
+                [],
+            )
+
+            owner.write_text(
+                owner_source.replace(
+                    "    pub fn slide_chart_arrangements(&self, slide: SlideSelector) -> Result<Box<[ChartArrangement]>, ChartArrangementError> { let _ = slide; todo!() }\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_arrangement_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("method is missing slide_chart_arrangements" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                owner_source
+                + "pub fn raw_chart_arrangement(object_id: u64, bytes: &[u8]) {}\n"
+                + "pub use crate::charts::ChartArrangement;\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.KEYNOTE_CHART_ARRANGEMENT_EXPORT_SOURCES[0]
+            package.write_text(
+                package.read_text(encoding="utf-8").replace(
+                    "mod slide_chart_arrangement;",
+                    "pub mod slide_chart_arrangement;",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_arrangement_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("owner module must remain private" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("raw parameter" in item and "object_id" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("raw byte slice" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("monolith chart re-export" in item for item in violations),
+                violations,
+            )
+
+    def test_keynote_chart_arrangement_codec_requires_buffa_and_private_generated_types(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_arrangement_canonical_scaffold(root)
+            codec = root / boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8").replace(
+                    "use buffa::DecodeOptions as BuffaDecodeOptions;",
+                    "use prost::Message;",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_arrangement_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("must use Buffa" in item for item in violations), violations)
+
+            codec.write_text(
+                codec.read_text(encoding="utf-8").replace(
+                    "use prost::Message;",
+                    "use buffa::DecodeOptions as BuffaDecodeOptions;",
+                ),
+                encoding="utf-8",
+            )
+            codec.write_text(
+                codec.read_text(encoding="utf-8")
+                + "pub fn generated_leak() -> buffa_keynote_chart_arrangement_generated::Projection { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_arrangement_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must not expose Buffa generated types" in item for item in violations),
+                violations,
+            )
+
+            codec.write_text(
+                codec.read_text(encoding="utf-8").replace(
+                    "pub fn generated_leak() -> buffa_keynote_chart_arrangement_generated::Projection { todo!() }\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+            codec_lib = root / boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE
+            codec_lib.write_text(
+                codec_lib.read_text(encoding="utf-8").replace(
+                    f"mod {boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE};",
+                    f"pub mod {boundaries.KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE};",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_arrangement_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("generated module must remain private" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_keynote_chart_arrangement_requires_focused_delegate_and_no_native_wire(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_arrangement_canonical_scaffold(root)
+            host = root / boundaries.IWA_KEYNOTE_CHART_ARRANGEMENT_SOURCE
+            host.write_text(
+                "use crate::charts::arrangement::{\n"
+                "    chart_arrangement as read_native_arrangement,\n"
+                "    set_chart_arrangement as set_native_arrangement,\n"
+                "};\n"
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_chart_arrangement(&self, slide_index: usize, drawable_object_id: u64) -> Result<ChartArrangement> {\n"
+                "        read_native_arrangement(self.package(), drawable_object_id)\n"
+                "    }\n"
+                "    pub fn set_slide_chart_arrangement(&mut self, slide_index: usize, drawable_object_id: u64, arrangement: ChartArrangement) -> Result<()> {\n"
+                "        parse_wire_fields(bytes); set_native_arrangement(self.package(), drawable_object_id, arrangement)\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_chart_arrangement_source_topology(root)
+            self.assertTrue(any("native wire helper" in item for item in violations), violations)
+            self.assertTrue(any("must delegate to focused Package" in item for item in violations), violations)
+            self.assertTrue(
+                any("raw-ID compatibility method must be deprecated" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("must delegate to Package::slide_chart_arrangements" in item for item in violations),
+                violations,
+            )
+
+            host.write_text(
+                "use litchi_keynote::{ChartArrangement, Package as FocusedKeynotePackage, SlideSelector};\n"
+                "impl KeynoteEditor {\n"
+                "    #[deprecated]\n"
+                "    pub fn slide_chart_arrangement(&self, slide_index: usize, drawable_object_id: u64) -> Result<ChartArrangement> {\n"
+                "        let package = FocusedKeynotePackage::from_bytes(bytes)?;\n"
+                "        package.slide_chart_arrangement(slide_selector, chart_selector)\n"
+                "    }\n"
+                "    #[deprecated]\n"
+                "    pub fn set_slide_chart_arrangement(&mut self, slide_index: usize, drawable_object_id: u64, arrangement: ChartArrangement) -> Result<()> {\n"
+                "        let package = FocusedKeynotePackage::from_bytes(bytes)?;\n"
+                "        package.edit_slide_chart_arrangement(slide_selector, chart_selector).set(arrangement).commit()\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            host.write_text(
+                host.read_text(encoding="utf-8")
+                + "fn focused_chart_arrangements(editor: &KeynoteEditor, slide_index: usize) -> Result<Box<[ChartArrangement]>> {\n"
+                + "    let package = FocusedKeynotePackage::from_bytes(bytes)?;\n"
+                + "    package.slide_chart_arrangements(SlideSelector::index(slide_index))\n"
+                + "}\n",
+                encoding="utf-8",
+            )
+            listing = root / boundaries.IWA_KEYNOTE_CHART_ARRANGEMENT_LISTING_SOURCE
+            listing_source = listing.read_text(encoding="utf-8")
+            listing.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_charts(&self, slide_index: usize) -> Result<Vec<KeynoteSlideChartInfo>> {\n"
+                "        Ok(charts)\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_chart_arrangement_source_topology(root)
+            self.assertTrue(
+                any("must delegate its arrangement values" in item for item in violations),
+                violations,
+            )
+            listing.write_text(listing_source, encoding="utf-8")
+
+            batch_helper_source = host.read_text(encoding="utf-8")
+            host.write_text(
+                batch_helper_source.replace(
+                    "package.slide_chart_arrangements(SlideSelector::index(slide_index))",
+                    "package.slide_chart_arrangement(slide_selector, chart_selector)",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_chart_arrangement_source_topology(root)
+            self.assertTrue(
+                any("must delegate to Package::slide_chart_arrangements" in item for item in violations),
+                violations,
+            )
+            host.write_text(batch_helper_source, encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_chart_arrangement_source_topology(root),
+                [],
+            )
+
+            host.write_text(
+                "use litchi_keynote::{ChartSelector, Package as FocusedKeynotePackage, SlideSelector};\n"
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_chart_arrangement_by_selector(&self, slide_index: usize, selector: ChartSelector) -> Result<ChartArrangement> {\n"
+                "        focused_chart_arrangement_package(self)?.slide_chart_arrangement(SlideSelector::index(slide_index), selector)\n"
+                "    }\n"
+                "    pub fn set_slide_chart_arrangement_by_selector(&mut self, slide_index: usize, selector: ChartSelector, arrangement: ChartArrangement) -> Result<()> {\n"
+                "        let package = focused_chart_arrangement_package(self)?;\n"
+                "        package.edit_slide_chart_arrangement(SlideSelector::index(slide_index), selector).set(arrangement).commit()\n"
+                "    }\n"
+                "    #[deprecated]\n"
+                "    pub fn slide_chart_arrangement(&self, slide_index: usize, drawable_object_id: u64) -> Result<ChartArrangement> {\n"
+                "        let selector = chart_selector_for_drawable(self, slide_index, drawable_object_id)?;\n"
+                "        self.slide_chart_arrangement_by_selector(slide_index, selector)\n"
+                "    }\n"
+                "    #[deprecated]\n"
+                "    pub fn set_slide_chart_arrangement(&mut self, slide_index: usize, drawable_object_id: u64, arrangement: ChartArrangement) -> Result<()> {\n"
+                "        let selector = chart_selector_for_drawable(self, slide_index, drawable_object_id)?;\n"
+                "        self.set_slide_chart_arrangement_by_selector(slide_index, selector, arrangement)\n"
+                "    }\n"
+                "}\n"
+                "fn chart_selector_for_drawable(editor: &KeynoteEditor, slide_index: usize, drawable_object_id: u64) -> Result<ChartSelector<'static>> { let _ = (editor, slide_index, drawable_object_id); todo!() }\n"
+                "fn focused_chart_arrangement_package(editor: &KeynoteEditor) -> Result<FocusedKeynotePackage> { let _ = editor; todo!() }\n",
+                encoding="utf-8",
+            )
+            host.write_text(
+                host.read_text(encoding="utf-8")
+                + "fn focused_chart_arrangements(editor: &KeynoteEditor, slide_index: usize) -> Result<Box<[ChartArrangement]>> {\n"
+                + "    let package = focused_chart_arrangement_package(editor)?;\n"
+                + "    package.slide_chart_arrangements(SlideSelector::index(slide_index))\n"
+                + "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_chart_arrangement_source_topology(root),
+                [],
+            )
+
+            host.write_text(
+                host.read_text(encoding="utf-8")
+                + "pub fn chart_arrangement_by_id(&self, chart_id: u64) {}\n"
+                + "pub struct ChartArrangementEdit;\n"
+                + "pub use crate::charts::ChartArrangement;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_chart_arrangement_source_topology(root)
+            self.assertTrue(
+                any("introduces a raw identifier parameter" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("must not publicly re-export" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("must not own the focused transaction/API" in item for item in violations),
+                violations,
+            )
+
+    def test_keynote_chart_arrangement_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_chart_arrangement_facade_source_topology()",
+            "+ audit_keynote_chart_arrangement_codec_source_topology()",
+            "+ audit_iwa_keynote_chart_arrangement_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
 
     @staticmethod
     def _write_iwork_atomic_publication_fixture(

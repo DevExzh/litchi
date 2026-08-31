@@ -15165,3 +15165,70 @@ one migration host; no debt, edge, host, or monolith-exit claim is made by the
 focused owner transfer. This checkpoint does not claim full-workspace tests,
 arbitrary-producer parity, benchmark/RSS results, or complete Numbers table
 authoring ownership.
+
+## 2026-09-01 amendment: Keynote chart Arrange focused-owner verification
+
+The completed source slice covers only `locked` and `constrain_proportions` on
+an existing chart. The focused API is
+`litchi_keynote::Package::{slide_chart_arrangement,
+edit_slide_chart_arrangement, apply_slide_chart_arrangement}` with
+`SlideSelector` and `ChartSelector`; raw IDs remain private. Verification must
+cover exact-source no-op behavior, source-bound patch application,
+`Patch::inverse()` byte restoration, stale/foreign/ambiguous/conflicting
+source refusal before publication, strict typed/redacted failures, exact
+locality, preservation of unselected fields/members and previews, candidate
+reopen, and semantic readback of both flags. The transaction must not be
+counted as chart legend support or as persisted/physical sort support.
+
+The integrated evidence for this commit is:
+
+- `cargo test -p litchi-iwa-protos --locked --offline` passed 635 unit tests
+  plus its documentation tests; `cargo test -p litchi-keynote --test
+  slide_chart_arrangement --locked --offline --no-fail-fast` passed 17/17; and
+  the host compatibility regression
+  `scratch_presentation_supports_chart_arrangement_crud` passed 1/1;
+- `cargo check -p litchi-keynote --all-targets --locked --offline`, strict
+  Clippy for the focused library/example/test and projection library, and
+  strict `litchi-keynote` rustdoc all passed; the host library also checked;
+- malformed, duplicate, wrong-wire, noncanonical-boolean, graph-ambiguity,
+  aggregate batch-budget, exact execution-limit, output-limit, allocation,
+  retained-byte, and scratch-byte cases fail before publication. The
+  `keynote_chart_arrangement` cargo-fuzz target built and completed 64 bounded
+  libFuzzer runs over five deterministic seeds without a crash;
+- all 722 boundary-checker unit tests passed. The live arrangement ownership,
+  projection, facade, and retired-route audits are empty. The whole dirty-tree
+  checker reports exactly three unrelated violations from the pre-existing
+  untracked `crates/litchi-iwa/src/pages/editor/tables/lock.rs` draft; and
+- changed commits alter only `Index/Document.iwa`, one selected chart payload,
+  and its admitted scalar fields. Every other package member, unselected chart,
+  unknown field/group, and preview is byte-preserved. Exact no-ops share the
+  source, changed candidates reopen, and inverse application restores the
+  complete source bytes.
+
+Computer Use opened the exact Rust candidate in Apple Keynote without repair,
+recovery, or conversion UI. The retained native source was
+`/private/tmp/litchi-wave112.RZbsUR/native-resaved.key`; the disposable Rust
+candidate and semantic reread copy were
+`/private/tmp/litchi-chart-arrangement-native.oCZU4J/{candidate,verified}.key`.
+The source was 156,278 bytes with SHA-256
+`87db4dc036ece68c27144ab0303d54517b02dc433b839337b598fdd677788a8c`.
+Before native save, the candidate was 156,285 bytes with SHA-256
+`aadd87d36092b70b76fddcd820ee4eb24b27590627825d41bdd132067ddf6cd9`.
+After native save it was 156,299 bytes with SHA-256
+`6734055296913fdaa915e4ae0c9d69e96d903894f06426cf46289ff1940ac937`;
+the Rust reread copy had the same size and hash.
+
+Keynote rendered the original slide title, body, caption, two series, three
+quarters, and all six values. The chart was described as locked; its Arrange
+inspector exposed `Constrain proportions` with value 1 and enabled `Unlock`
+while `Lock` was disabled. Save and Close produced no dialog. Reopening the
+exact path again produced no repair UI and showed the same chart data and both
+Arrange states. The focused example then reread `locked=true` and
+`constrain_proportions=true` by both index and name selector and produced an
+exact no-op (`changed=false`, zero touched components, no full reparse).
+The disposable candidate directory was removed after verification.
+
+This evidence makes only focused native acceptance and does not claim
+arbitrary-producer parity, native byte parity, benchmark/RSS results,
+complete Keynote chart authoring, or closure of a migration debt, dependency
+edge, migration-host item, or monolith-deletion gate.

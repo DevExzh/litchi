@@ -3824,3 +3824,23 @@ packages, 237 internal dependency declarations, 226 canonical edges, 11
 ordered migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`,
 and one migration host remain. No package, edge, debt, host, or monolith-
 deletion gate is removed by this ownership transfer.
+
+## 2026-09-01 amendment: Keynote chart Arrange focused owner (topology unchanged)
+
+Existing-chart Arrange interaction state now has a focused semantic owner in
+`litchi-keynote`. The owner exposes `locked` and `constrain_proportions`
+through selector-first `Package` read/edit/apply operations using
+`SlideSelector` and `ChartSelector`; native drawable IDs and physical graph
+values remain private. The source-bound transaction performs exact-source
+patching, inverse/conflict checks, candidate reopen, semantic readback, and
+locality-preserving publication. Arrange flags are non-rendering, so previews
+are preserved and no preview invalidation route is added.
+
+The legacy `litchi-iwa` chart Arrange entry point remains a compatibility
+route. The focused owner has passed the integrated native Keynote gate recorded
+in ADR 0008. This slice is
+limited to existing charts and does not take ownership of chart legend
+visibility, persisted sort configuration, physical table `Sort Now`, chart
+data, geometry, or broader chart graph mutation. It adds no normal dependency
+edge, retires no migration debt, and removes no migration host or monolith
+gate. The authoritative topology remains unchanged.
