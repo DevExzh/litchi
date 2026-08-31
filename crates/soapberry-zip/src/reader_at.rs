@@ -19,6 +19,17 @@ pub(crate) fn validate_read_count(read: usize, requested: usize) -> io::Result<u
 
 /// Provides reading bytes at a specific offset
 ///
+/// When used by an archive or index reader, this trait represents a
+/// byte-stable view for the duration of the archive operation and, where the
+/// reader retains a proof or index, for that reader's lifetime. The source's
+/// contents, length, and offset mapping must not change during that period.
+/// A mutable or versioned source must fence a stable version for the operation
+/// or return an error instead of changing the view while it is being read.
+/// The archive does not provide snapshot semantics for a source that violates
+/// this contract; such a violation can produce a logical validation error.
+/// Implementations must also not re-enter the same archive while serving a
+/// read, because archive layout construction may be holding its proof state.
+///
 /// This trait is similar to [`std::io::Read`] but with an additional offset
 /// parameter that signals where the read should begin offset from the start of
 /// the data. This allows methods to not require a mutable reference to the
@@ -249,7 +260,10 @@ impl<T: ReaderAt> ReaderAt for &'_ mut T {
 impl ReaderAt for &[u8] {
     #[inline]
     fn read_at(&self, buf: &mut [u8], offset: u64) -> std::io::Result<usize> {
-        let skip = self.len().min(offset as usize);
+        let Ok(offset) = usize::try_from(offset) else {
+            return Ok(0);
+        };
+        let skip = self.len().min(offset);
         let data = &self[skip..];
         let len = data.len().min(buf.len());
         buf[..len].copy_from_slice(&data[..len]);
@@ -485,6 +499,28 @@ mod tests {
     fn test_byte_slice_implementation() {
         let data = TEST_DATA;
         test_reader_at_impl(data, data.len());
+    }
+
+    #[cfg(target_pointer_width = "32")]
+    #[test]
+    fn byte_slice_rejects_unrepresentable_offset_without_aliasing() {
+        let data = b"alias target";
+        let mut buffer = [0xa5_u8; 1];
+
+        assert_eq!(
+            data.as_slice().read_at(&mut buffer, 1_u64 << 32).unwrap(),
+            0
+        );
+        assert_eq!(buffer, [0xa5_u8; 1]);
+    }
+
+    #[test]
+    fn byte_slice_u64_max_offset_is_eof() {
+        let data = b"eof";
+        let mut buffer = [0xa5_u8; 1];
+
+        assert_eq!(data.as_slice().read_at(&mut buffer, u64::MAX).unwrap(), 0);
+        assert_eq!(buffer, [0xa5_u8; 1]);
     }
 
     #[test]

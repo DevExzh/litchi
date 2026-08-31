@@ -52,8 +52,8 @@ use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
 use std::num::{NonZeroU64, NonZeroUsize};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Condvar, Mutex};
 
 pub use crate::LimitResource;
 
@@ -80,9 +80,9 @@ pub struct ArchiveLimits {
     pub max_member_name_bytes: u64,
     /// Maximum aggregate central-directory metadata bytes.
     ///
-    /// This includes raw member names, extra fields, and file comments for all
-    /// entries, including directories. It is checked before name normalization
-    /// or ownership allocation.
+    /// This includes the fixed 46-byte central record, raw member names, extra
+    /// fields, and file comments for every entry, including directories. It is
+    /// checked before name normalization or ownership allocation.
     pub max_metadata_bytes: u64,
     /// Maximum declared compressed bytes for one non-directory entry.
     pub max_compressed_size: u64,
@@ -475,6 +475,9 @@ pub struct ArchiveReader<'data> {
     /// Every central entry's wayfinder, sorted by local-header offset. This
     /// is used only to prove non-overlap before publishing a borrowed slice.
     layout: Vec<BorrowedLayoutEntry>,
+    /// A successful strict local-layout proof. The slice source is immutable,
+    /// so the proof remains valid for the reader lifetime.
+    strict_layout_cache: StrictLayoutCache,
 }
 
 /// Zero-allocation iterator over an [`ArchiveReader`] file-name order.
@@ -512,6 +515,195 @@ struct BorrowedLayoutEntry {
     central_name: Vec<u8>,
 }
 
+#[derive(Debug, Clone)]
+enum IndexedLayoutName {
+    Entry(EntryId),
+    Directory(Vec<u8>),
+}
+
+#[derive(Debug, Clone)]
+struct IndexedLayoutEntry {
+    wayfinder: crate::ZipArchiveEntryWayfinder,
+    name: IndexedLayoutName,
+}
+
+#[derive(Debug)]
+struct StrictLayoutProof {
+    spans: Vec<crate::StrictEntryLayout>,
+    by_local_header: HashMap<u64, usize>,
+}
+
+impl StrictLayoutProof {
+    fn entry(
+        &self,
+        wayfinder: crate::ZipArchiveEntryWayfinder,
+    ) -> Result<crate::StrictEntryLayout, Error> {
+        let index = self
+            .by_local_header
+            .get(&wayfinder.local_header_offset())
+            .copied()
+            .ok_or_else(|| {
+                Error::from(ErrorKind::InvalidInput {
+                    msg: "strict layout proof has no target local header".to_string(),
+                })
+            })?;
+        let layout = self.spans.get(index).copied().ok_or_else(|| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: "strict layout proof target index is invalid".to_string(),
+            })
+        })?;
+        if layout.local_header_offset != wayfinder.local_header_offset() {
+            return Err(Error::from(ErrorKind::InvalidInput {
+                msg: "strict layout proof target offset does not match central metadata"
+                    .to_string(),
+            }));
+        }
+        Ok(layout)
+    }
+}
+
+#[derive(Debug)]
+enum StrictLayoutCacheState {
+    Empty,
+    Building { owner: std::thread::ThreadId },
+    Ready(StrictLayoutProof),
+}
+
+struct StrictLayoutCache {
+    state: Mutex<StrictLayoutCacheState>,
+    wake: Condvar,
+    #[cfg(test)]
+    build_count: std::sync::atomic::AtomicUsize,
+}
+
+impl StrictLayoutCache {
+    fn new() -> Self {
+        Self {
+            state: Mutex::new(StrictLayoutCacheState::Empty),
+            wake: Condvar::new(),
+            #[cfg(test)]
+            build_count: std::sync::atomic::AtomicUsize::new(0),
+        }
+    }
+
+    #[cfg(test)]
+    fn is_ready(&self) -> bool {
+        matches!(
+            &*lock_strict_layout_state(self),
+            StrictLayoutCacheState::Ready(_)
+        )
+    }
+
+    #[cfg(test)]
+    fn build_count(&self) -> usize {
+        self.build_count.load(Ordering::Acquire)
+    }
+}
+
+fn lock_strict_layout_state(
+    cache: &StrictLayoutCache,
+) -> std::sync::MutexGuard<'_, StrictLayoutCacheState> {
+    match cache.state.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
+struct StrictLayoutBuildGuard<'a> {
+    cache: &'a StrictLayoutCache,
+    owner: std::thread::ThreadId,
+    active: bool,
+}
+
+impl<'a> StrictLayoutBuildGuard<'a> {
+    fn new(cache: &'a StrictLayoutCache, owner: std::thread::ThreadId) -> Self {
+        Self {
+            cache,
+            owner,
+            active: true,
+        }
+    }
+}
+
+impl Drop for StrictLayoutBuildGuard<'_> {
+    fn drop(&mut self) {
+        if !self.active {
+            return;
+        }
+        let mut state = lock_strict_layout_state(self.cache);
+        if matches!(
+            &*state,
+            StrictLayoutCacheState::Building { owner } if *owner == self.owner
+        ) {
+            *state = StrictLayoutCacheState::Empty;
+            self.cache.wake.notify_all();
+        }
+    }
+}
+
+fn strict_layout_for_cached<Build>(
+    cache: &StrictLayoutCache,
+    target: crate::ZipArchiveEntryWayfinder,
+    build: Build,
+) -> Result<crate::StrictEntryLayout, Error>
+where
+    Build: FnOnce() -> Result<StrictLayoutProof, Error>,
+{
+    let owner = std::thread::current().id();
+    loop {
+        let mut state = lock_strict_layout_state(cache);
+        match &*state {
+            StrictLayoutCacheState::Ready(proof) => return proof.entry(target),
+            StrictLayoutCacheState::Empty => {
+                *state = StrictLayoutCacheState::Building { owner };
+                #[cfg(test)]
+                cache.build_count.fetch_add(1, Ordering::AcqRel);
+                drop(state);
+                break;
+            },
+            StrictLayoutCacheState::Building {
+                owner: building_owner,
+            } if *building_owner == owner => {
+                return Err(Error::from(ErrorKind::InvalidInput {
+                    msg: "strict layout proof build re-entered on its owning thread".to_string(),
+                }));
+            },
+            StrictLayoutCacheState::Building { .. } => {
+                state = match cache.wake.wait(state) {
+                    Ok(guard) => guard,
+                    Err(poisoned) => poisoned.into_inner(),
+                };
+                drop(state);
+            },
+        }
+    }
+
+    let mut build_guard = StrictLayoutBuildGuard::new(cache, owner);
+    let result = build();
+    let mut state = lock_strict_layout_state(cache);
+    let outcome = match result {
+        Ok(proof) => {
+            *state = StrictLayoutCacheState::Ready(proof);
+            cache.wake.notify_all();
+            match &*state {
+                StrictLayoutCacheState::Ready(proof) => proof.entry(target),
+                StrictLayoutCacheState::Empty | StrictLayoutCacheState::Building { .. } => {
+                    Err(Error::from(ErrorKind::InvalidInput {
+                        msg: "strict layout proof publication failed".to_string(),
+                    }))
+                },
+            }
+        },
+        Err(error) => {
+            *state = StrictLayoutCacheState::Empty;
+            cache.wake.notify_all();
+            Err(error)
+        },
+    };
+    build_guard.active = false;
+    outcome
+}
+
 /// Opaque identifier for one non-directory member in an [`IndexedArchive`].
 ///
 /// An ID is stable for the lifetime of the archive that produced it. Its
@@ -530,13 +722,20 @@ pub struct EntryId(usize);
 /// The type deliberately has no payload cache and never uses implicit global
 /// scheduling. Callers that opt into bounded local parallelism use
 /// [`Self::read_many_with_session`] or [`Self::read_all_with_session`].
+/// Strict sink reads cache their successful physical-layout proof; positional
+/// `ReaderAt` sources must remain byte-stable throughout construction and the
+/// archive's lifetime. `ReaderAt` callbacks must not re-enter this archive.
 pub struct IndexedArchive<R> {
     archive: ZipArchive<R>,
+    layout: Vec<IndexedLayoutEntry>,
     index: HashMap<String, EntryId>,
     entries: Vec<IndexedEntry>,
     directories: HashMap<String, Metadata>,
     order: Vec<EntryId>,
     has_encrypted_entries: bool,
+    /// A successful strict local-layout proof. The `ReaderAt` source must
+    /// remain byte-stable during construction and for this archive's lifetime.
+    strict_layout_cache: StrictLayoutCache,
 }
 
 /// Zero-allocation iterator over an [`IndexedArchive`] file-name order.
@@ -613,21 +812,56 @@ impl<'data> ArchiveReader<'data> {
     pub fn new_with_limits(data: &'data [u8], limits: ArchiveLimits) -> Result<Self, Error> {
         let archive = ZipArchive::from_slice(data)?;
 
-        // Build index for fast lookup
+        // Admit a bounded number of physical central records before retaining
+        // any raw name. The fixed record is part of the high-level metadata
+        // budget, and the central-directory byte span is an additional hard
+        // bound even when callers disable the configured budget.
+        let declared_entry_count = archive.entries_hint();
+        let declared_central_size = archive.central_directory_size();
+        let physical_bound = physical_entry_bound(
+            declared_central_size,
+            declared_entry_count,
+            limits.max_metadata_bytes,
+        )?;
+        let declared_entry_count = usize::try_from(declared_entry_count).map_err(|_| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: "ZIP central-directory entry count does not fit this platform".to_string(),
+            })
+        })?;
+        let file_bound = physical_bound.min(limits.max_files);
         let mut index = HashMap::new();
+        index.try_reserve(file_bound).map_err(|source| {
+            Error::from(ErrorKind::Allocation {
+                resource: "archive reader file index",
+                source,
+            })
+        })?;
         let mut directories = HashMap::new();
+        directories.try_reserve(physical_bound).map_err(|source| {
+            Error::from(ErrorKind::Allocation {
+                resource: "archive reader directory index",
+                source,
+            })
+        })?;
         let mut total_metadata_bytes = 0u64;
         let mut total_uncompressed_size = 0u64;
         let mut ordered_names = Vec::new();
+        ordered_names.try_reserve(file_bound).map_err(|source| {
+            Error::from(ErrorKind::Allocation {
+                resource: "archive reader physical order",
+                source,
+            })
+        })?;
         let mut layout = Vec::new();
+        layout.try_reserve(physical_bound).map_err(|source| {
+            Error::from(ErrorKind::Allocation {
+                resource: "archive reader physical layout",
+                source,
+            })
+        })?;
         for entry_result in archive.entries() {
             let entry = entry_result?;
             let path = entry.file_path();
-            let central_name = path.as_ref().to_vec();
-            layout.push(BorrowedLayoutEntry {
-                wayfinder: entry.wayfinder(),
-                central_name: central_name.clone(),
-            });
 
             let member_name_bytes = path.as_ref().len() as u64;
             if member_name_bytes > limits.max_member_name_bytes {
@@ -638,21 +872,45 @@ impl<'data> ArchiveReader<'data> {
                 ));
             }
 
-            let metadata_bytes = entry.metadata_size_hint();
-            total_metadata_bytes = total_metadata_bytes
+            let metadata_bytes = entry.metadata_size_hint().checked_add(46).ok_or_else(|| {
+                Error::from(ErrorKind::InvalidInput {
+                    msg: "archive central-directory metadata size overflows u64".to_string(),
+                })
+            })?;
+            let next_metadata_bytes = total_metadata_bytes
                 .checked_add(metadata_bytes)
                 .ok_or_else(|| {
                     Error::from(ErrorKind::InvalidInput {
                         msg: "archive central-directory metadata total overflows u64".to_string(),
                     })
                 })?;
-            if total_metadata_bytes > limits.max_metadata_bytes {
+            if next_metadata_bytes > limits.max_metadata_bytes {
+                return Err(limit_error(
+                    LimitResource::MetadataBytes,
+                    next_metadata_bytes,
+                    limits.max_metadata_bytes,
+                ));
+            }
+            total_metadata_bytes = next_metadata_bytes;
+            if layout.len() >= physical_bound {
+                if layout.len() >= declared_entry_count {
+                    return Err(Error::from(ErrorKind::InvalidInput {
+                        msg: "central directory contains more records than EOCD declares"
+                            .to_string(),
+                    }));
+                }
                 return Err(limit_error(
                     LimitResource::MetadataBytes,
                     total_metadata_bytes,
                     limits.max_metadata_bytes,
                 ));
             }
+            layout.try_reserve(1).map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "archive reader physical layout",
+                    source,
+                })
+            })?;
 
             let directory = entry.is_dir();
 
@@ -703,7 +961,7 @@ impl<'data> ArchiveReader<'data> {
                 }
             }
 
-            let (name, lossy_name) = normalized_member_name(path);
+            let (name, lossy_name) = normalized_member_name(path, "archive reader member key")?;
             let name = canonical_member_name(name);
 
             // Directories are never exposed or decompressed by this API. They
@@ -721,6 +979,18 @@ impl<'data> ArchiveReader<'data> {
                 if index.contains_key(&name) {
                     return Err(file_directory_collision_error(&name, lossy_name));
                 }
+                directories.try_reserve(1).map_err(|source| {
+                    Error::from(ErrorKind::Allocation {
+                        resource: "archive reader directory index",
+                        source,
+                    })
+                })?;
+                let central_name =
+                    clone_name_fallibly(path.as_ref(), "archive reader directory name")?;
+                layout.push(BorrowedLayoutEntry {
+                    wayfinder: entry.wayfinder(),
+                    central_name,
+                });
                 directories.insert(
                     name,
                     Metadata {
@@ -744,8 +1014,28 @@ impl<'data> ArchiveReader<'data> {
                     "duplicate normalized file names",
                 ));
             }
+            index.try_reserve(1).map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "archive reader file index",
+                    source,
+                })
+            })?;
+            ordered_names.try_reserve(1).map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "archive reader physical order",
+                    source,
+                })
+            })?;
+            let central_name = clone_name_fallibly(path.as_ref(), "archive reader member name")?;
+            let layout_name =
+                clone_name_fallibly(&central_name, "archive reader physical member name")?;
+            layout.push(BorrowedLayoutEntry {
+                wayfinder: entry.wayfinder(),
+                central_name: layout_name,
+            });
+            let index_name = clone_str_fallibly(&name, "archive reader file index key")?;
             index.insert(
-                name.clone(),
+                index_name,
                 EntryInfo {
                     wayfinder: entry.wayfinder(),
                     flags: entry.flags(),
@@ -758,7 +1048,7 @@ impl<'data> ArchiveReader<'data> {
         }
 
         ordered_names.sort_by_key(|(offset, _)| *offset);
-        let order = ordered_names.into_iter().map(|(_, name)| name).collect();
+        let order = collect_order_fallibly(ordered_names, "archive reader file order")?;
         layout.sort_unstable_by_key(|entry| entry.wayfinder.local_header_offset());
 
         Ok(Self {
@@ -767,6 +1057,7 @@ impl<'data> ArchiveReader<'data> {
             directories,
             order,
             layout,
+            strict_layout_cache: StrictLayoutCache::new(),
         })
     }
 
@@ -785,7 +1076,9 @@ impl<'data> ArchiveReader<'data> {
     /// Check if a file exists in the archive.
     #[inline]
     pub fn contains(&self, name: &str) -> bool {
-        let lookup = lookup_member_name(name);
+        let Ok(lookup) = lookup_member_name(name) else {
+            return false;
+        };
         !lookup.explicit_directory && self.index.contains_key(&lookup.name)
     }
 
@@ -794,7 +1087,7 @@ impl<'data> ArchiveReader<'data> {
     /// This performs only hash-map lookup over the central-directory index. It
     /// never reads, decompresses, verifies, or allocates member payload data.
     pub fn metadata(&self, name: &str) -> Result<Metadata, Error> {
-        let lookup = lookup_member_name(name);
+        let lookup = lookup_member_name(name)?;
         if !lookup.explicit_directory {
             if let Some(info) = self.index.get(&lookup.name) {
                 return Ok(Metadata {
@@ -822,7 +1115,7 @@ impl<'data> ArchiveReader<'data> {
     /// ODF encryption is applied to an already-deflated byte stream, so the
     /// enclosing ZIP entry must not perform another compression transform.
     pub fn is_stored(&self, name: &str) -> Result<bool, Error> {
-        let lookup = lookup_member_name(name);
+        let lookup = lookup_member_name(name)?;
         let info = self
             .index
             .get(&lookup.name)
@@ -846,7 +1139,7 @@ impl<'data> ArchiveReader<'data> {
         name: &str,
         accounting: &mut ZipOperationAccounting,
     ) -> Result<Vec<u8>, Error> {
-        let lookup = lookup_member_name(name);
+        let lookup = lookup_member_name(name)?;
 
         let info = self
             .index
@@ -986,7 +1279,7 @@ impl<'data> ArchiveReader<'data> {
         name: &str,
         _accounting: &mut ZipOperationAccounting,
     ) -> Result<Option<&'data [u8]>, Error> {
-        let lookup = lookup_member_name(name);
+        let lookup = lookup_member_name(name)?;
 
         let info = self
             .index
@@ -1051,6 +1344,84 @@ impl<'data> ArchiveReader<'data> {
         Ok(())
     }
 
+    fn build_strict_layout_proof(
+        &self,
+        target: crate::ZipArchiveEntryWayfinder,
+    ) -> Result<StrictLayoutProof, Error> {
+        self.archive.validate_borrowed_layout()?;
+        let mut spans = Vec::new();
+        spans
+            .try_reserve_exact(self.layout.len())
+            .map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "archive reader strict layout proof",
+                    source,
+                })
+            })?;
+        let mut by_local_header = HashMap::new();
+        by_local_header
+            .try_reserve(self.layout.len())
+            .map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "archive reader strict layout map",
+                    source,
+                })
+            })?;
+        let mut previous_end = None;
+        for layout_entry in &self.layout {
+            let span = self
+                .archive
+                .validate_strict_entry_layout(layout_entry.wayfinder, &layout_entry.central_name)?;
+            if previous_end.is_some_and(|previous_end| span.local_header_offset < previous_end) {
+                return Err(Error::from(ErrorKind::InvalidInput {
+                    msg: "strict streaming refuses overlapping ZIP local spans".to_string(),
+                }));
+            }
+            spans.try_reserve(1).map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "archive reader strict layout proof",
+                    source,
+                })
+            })?;
+            by_local_header.try_reserve(1).map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "archive reader strict layout map",
+                    source,
+                })
+            })?;
+            if by_local_header
+                .insert(span.local_header_offset, spans.len())
+                .is_some()
+            {
+                return Err(Error::from(ErrorKind::InvalidInput {
+                    msg: "strict streaming refuses duplicate ZIP local spans".to_string(),
+                }));
+            }
+            spans.push(span);
+            previous_end = Some(span.span_end);
+        }
+        if previous_end.is_some_and(|previous_end| previous_end > self.archive.directory_offset()) {
+            return Err(Error::from(ErrorKind::InvalidInput {
+                msg: "strict streaming local span extends into the central directory".to_string(),
+            }));
+        }
+        let proof = StrictLayoutProof {
+            spans,
+            by_local_header,
+        };
+        proof.entry(target)?;
+        Ok(proof)
+    }
+
+    fn strict_layout_for(
+        &self,
+        target: crate::ZipArchiveEntryWayfinder,
+    ) -> Result<crate::StrictEntryLayout, Error> {
+        strict_layout_for_cached(&self.strict_layout_cache, target, || {
+            self.build_strict_layout_proof(target)
+        })
+    }
+
     /// Decompress and verify one member directly into a caller-owned sink.
     ///
     /// The sink receives at most the declared uncompressed member size. A
@@ -1075,18 +1446,36 @@ impl<'data> ArchiveReader<'data> {
         sink: &mut W,
         accounting: &mut ZipOperationAccounting,
     ) -> Result<u64, Error> {
-        let lookup = lookup_member_name(name);
+        let lookup = lookup_member_name(name)?;
         let info = self
             .index
             .get(&lookup.name)
             .filter(|_| !lookup.explicit_directory)
             .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
 
-        let entry = self.archive.get_entry(info.wayfinder)?;
-        let verifier = entry.claim_verifier();
+        match info.compression_method {
+            CompressionMethod::Store | CompressionMethod::Deflate => {},
+            other => {
+                return Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
+                    other.as_id().as_u16(),
+                )));
+            },
+        }
+        self.archive.validate_strict_stream_target(info.wayfinder)?;
+        if info.compression_method == CompressionMethod::Store
+            && info.wayfinder.compressed_size_hint() != info.uncompressed_size
+        {
+            return Err(Error::from(ErrorKind::InvalidSize {
+                expected: info.uncompressed_size,
+                actual: info.wayfinder.compressed_size_hint(),
+            }));
+        }
+        let target_layout = self.strict_layout_for(info.wayfinder)?;
+        let verifier = target_layout.verifier;
+        let payload = self.archive.strict_payload(target_layout)?;
         match info.compression_method {
             CompressionMethod::Store => {
-                let mut source = CountingReader::new(entry.data());
+                let mut source = CountingReader::new(payload);
                 let result = stream_verified_with_accounting(
                     &mut source,
                     verifier,
@@ -1094,6 +1483,17 @@ impl<'data> ArchiveReader<'data> {
                     accounting,
                     AccountingReadKind::Stored,
                 );
+                let result = result.and_then(|bytes| {
+                    let consumed = source.count();
+                    let expected = info.wayfinder.compressed_size_hint();
+                    if consumed != expected {
+                        return Err(Error::from(ErrorKind::InvalidSize {
+                            expected,
+                            actual: consumed,
+                        }));
+                    }
+                    Ok(bytes)
+                });
                 let accounting_result = accounting.add_stored_payload_bytes_read(source.count());
                 match result {
                     Err(error) => {
@@ -1109,18 +1509,33 @@ impl<'data> ArchiveReader<'data> {
                 }
             },
             CompressionMethod::Deflate => {
-                let mut source = CountingReader::new(entry.data());
-                let mut decoder = DeflateDecoder::new(&mut source);
-                let result = stream_verified_with_accounting(
-                    &mut decoder,
-                    verifier,
-                    sink,
-                    accounting,
-                    AccountingReadKind::Deflate,
-                );
-                drop(decoder);
+                let (result, compressed_consumed, compressed_read) = {
+                    let mut source = CountingReader::new(payload);
+                    let mut decoder = DeflateDecoder::new(&mut source);
+                    let result = stream_verified_with_accounting(
+                        &mut decoder,
+                        verifier,
+                        sink,
+                        accounting,
+                        AccountingReadKind::Deflate,
+                    );
+                    let compressed_consumed = decoder.total_in();
+                    drop(decoder);
+                    let compressed_read = source.count();
+                    (result, compressed_consumed, compressed_read)
+                };
+                let result = result.and_then(|bytes| {
+                    let expected = info.wayfinder.compressed_size_hint();
+                    if compressed_consumed != expected {
+                        return Err(Error::from(ErrorKind::InvalidSize {
+                            expected,
+                            actual: compressed_consumed,
+                        }));
+                    }
+                    Ok(bytes)
+                });
                 let accounting_result =
-                    accounting.add_compressed_deflate_payload_bytes_read(source.count());
+                    accounting.add_compressed_deflate_payload_bytes_read(compressed_read);
                 match result {
                     Err(error) => {
                         // Keep the observed source count even when the stream failed.  The
@@ -1301,7 +1716,16 @@ where
         limits: ArchiveLimits,
         policy: ArchiveValidationPolicy,
     ) -> Result<Self, Error> {
-        let mut buffer = vec![0_u8; RECOMMENDED_BUFFER_SIZE];
+        let mut buffer = Vec::new();
+        buffer
+            .try_reserve_exact(RECOMMENDED_BUFFER_SIZE)
+            .map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "indexed archive locator scratch",
+                    source,
+                })
+            })?;
+        buffer.resize(RECOMMENDED_BUFFER_SIZE, 0);
         let archive = ZipLocator::new()
             .locate_in_reader(reader, &mut buffer, end_offset)
             .map_err(|(_reader, error)| error)?;
@@ -1339,19 +1763,71 @@ where
         limits: ArchiveLimits,
         policy: ArchiveValidationPolicy,
     ) -> Result<Self, Error> {
+        let declared_entry_count = archive.entries_hint();
+        let declared_central_size = archive.central_directory_size();
+        let physical_bound = physical_entry_bound(
+            declared_central_size,
+            declared_entry_count,
+            limits.max_metadata_bytes,
+        )?;
+        let declared_entry_count = usize::try_from(declared_entry_count).map_err(|_| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: "ZIP central-directory entry count does not fit this platform".to_string(),
+            })
+        })?;
+        let file_bound = physical_bound.min(limits.max_files);
         let mut index = HashMap::new();
+        index.try_reserve(file_bound).map_err(|source| {
+            Error::from(ErrorKind::Allocation {
+                resource: "indexed archive file index",
+                source,
+            })
+        })?;
         let mut entries = Vec::new();
+        entries.try_reserve(file_bound).map_err(|source| {
+            Error::from(ErrorKind::Allocation {
+                resource: "indexed archive entries",
+                source,
+            })
+        })?;
         let mut directories = HashMap::new();
+        directories.try_reserve(physical_bound).map_err(|source| {
+            Error::from(ErrorKind::Allocation {
+                resource: "indexed archive directory index",
+                source,
+            })
+        })?;
+        let mut layout = Vec::new();
+        layout.try_reserve(physical_bound).map_err(|source| {
+            Error::from(ErrorKind::Allocation {
+                resource: "indexed archive physical layout",
+                source,
+            })
+        })?;
         let mut ordered_entries = Vec::new();
+        ordered_entries.try_reserve(file_bound).map_err(|source| {
+            Error::from(ErrorKind::Allocation {
+                resource: "indexed archive physical order",
+                source,
+            })
+        })?;
         let mut total_metadata_bytes = 0_u64;
         let mut total_uncompressed_size = 0_u64;
         let mut strict_mimetype = None;
         let mut has_encrypted_entries = false;
-        let mut buffer = vec![0_u8; RECOMMENDED_BUFFER_SIZE];
+        let mut buffer = Vec::new();
+        buffer
+            .try_reserve_exact(RECOMMENDED_BUFFER_SIZE)
+            .map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "indexed archive central-directory scratch",
+                    source,
+                })
+            })?;
+        buffer.resize(RECOMMENDED_BUFFER_SIZE, 0);
 
         {
-            let mut central_entries =
-                archive.entries_with_metadata_limit(&mut buffer, limits.max_metadata_bytes);
+            let mut central_entries = archive.entries_with_metadata_limit(&mut buffer, u64::MAX);
             while let Some(entry) = central_entries.next_entry()? {
                 has_encrypted_entries |= entry.flags() & 1 != 0;
                 let path = entry.file_path();
@@ -1363,8 +1839,31 @@ where
                         limits.max_member_name_bytes,
                     ));
                 }
-
-                let metadata_bytes = entry.metadata_size_hint();
+                if layout.len() >= physical_bound {
+                    if layout.len() >= declared_entry_count {
+                        return Err(Error::from(ErrorKind::InvalidInput {
+                            msg: "central directory contains more records than EOCD declares"
+                                .to_string(),
+                        }));
+                    }
+                    let actual = total_metadata_bytes
+                        .checked_add(CENTRAL_FIXED_RECORD_BYTES)
+                        .unwrap_or(u64::MAX);
+                    return Err(limit_error(
+                        LimitResource::MetadataBytes,
+                        actual,
+                        limits.max_metadata_bytes,
+                    ));
+                }
+                let metadata_bytes = entry
+                    .metadata_size_hint()
+                    .checked_add(CENTRAL_FIXED_RECORD_BYTES)
+                    .ok_or_else(|| {
+                        Error::from(ErrorKind::InvalidInput {
+                            msg: "archive central-directory metadata size overflows u64"
+                                .to_string(),
+                        })
+                    })?;
                 total_metadata_bytes = total_metadata_bytes
                     .checked_add(metadata_bytes)
                     .ok_or_else(|| {
@@ -1380,11 +1879,19 @@ where
                         limits.max_metadata_bytes,
                     ));
                 }
+                layout.try_reserve(1).map_err(|source| {
+                    Error::from(ErrorKind::Allocation {
+                        resource: "indexed archive physical layout",
+                        source,
+                    })
+                })?;
 
                 let compressed_size = entry.compressed_size_hint();
                 let uncompressed_size = entry.uncompressed_size_hint();
                 let (name, lossy_name) = match policy {
-                    ArchiveValidationPolicy::Normalized => normalized_member_name(path),
+                    ArchiveValidationPolicy::Normalized => {
+                        normalized_member_name(path, "indexed archive member key")?
+                    },
                     ArchiveValidationPolicy::StrictPackage => (strict_member_name(path)?, false),
                 };
                 let name = canonical_member_name(name);
@@ -1400,6 +1907,18 @@ where
                     if index.contains_key(&name) {
                         return Err(file_directory_collision_error(&name, lossy_name));
                     }
+                    directories.try_reserve(1).map_err(|source| {
+                        Error::from(ErrorKind::Allocation {
+                            resource: "indexed archive directory index",
+                            source,
+                        })
+                    })?;
+                    let central_name =
+                        clone_name_fallibly(path.as_ref(), "indexed archive directory name")?;
+                    layout.push(IndexedLayoutEntry {
+                        wayfinder: entry.wayfinder(),
+                        name: IndexedLayoutName::Directory(central_name),
+                    });
                     directories.insert(
                         name,
                         Metadata {
@@ -1478,7 +1997,32 @@ where
                         "duplicate normalized file names",
                     ));
                 }
-                index.insert(name.clone(), entry_id);
+                index.try_reserve(1).map_err(|source| {
+                    Error::from(ErrorKind::Allocation {
+                        resource: "indexed archive file index",
+                        source,
+                    })
+                })?;
+                entries.try_reserve(1).map_err(|source| {
+                    Error::from(ErrorKind::Allocation {
+                        resource: "indexed archive entries",
+                        source,
+                    })
+                })?;
+                ordered_entries.try_reserve(1).map_err(|source| {
+                    Error::from(ErrorKind::Allocation {
+                        resource: "indexed archive physical order",
+                        source,
+                    })
+                })?;
+                let central_name =
+                    clone_name_fallibly(path.as_ref(), "indexed archive member name")?;
+                let index_name = clone_str_fallibly(&name, "indexed archive file index key")?;
+                layout.push(IndexedLayoutEntry {
+                    wayfinder: entry.wayfinder(),
+                    name: IndexedLayoutName::Entry(entry_id),
+                });
+                index.insert(index_name, entry_id);
                 ordered_entries.push((local_header_offset, entry_id));
                 entries.push(IndexedEntry {
                     name,
@@ -1487,7 +2031,7 @@ where
                         flags: entry.flags(),
                         compression_method: entry.compression_method(),
                         uncompressed_size,
-                        central_name: path.as_ref().to_vec(),
+                        central_name,
                     },
                 });
             }
@@ -1498,15 +2042,18 @@ where
         }
 
         ordered_entries.sort_unstable_by_key(|(offset, _)| *offset);
-        let order = ordered_entries.into_iter().map(|(_, id)| id).collect();
+        layout.sort_unstable_by_key(|entry| entry.wayfinder.local_header_offset());
+        let order = collect_order_fallibly(ordered_entries, "indexed archive file order")?;
 
         Ok(Self {
             archive,
+            layout,
             index,
             entries,
             directories,
             order,
             has_encrypted_entries,
+            strict_layout_cache: StrictLayoutCache::new(),
         })
     }
 
@@ -1553,7 +2100,9 @@ where
     /// Resolve a member name to its stable opaque entry ID.
     #[inline]
     pub fn entry_id(&self, name: &str) -> Option<EntryId> {
-        let lookup = lookup_member_name(name);
+        let Ok(lookup) = lookup_member_name(name) else {
+            return None;
+        };
         if lookup.explicit_directory {
             return None;
         }
@@ -1562,15 +2111,16 @@ where
 
     /// Return declared metadata for a member without payload access.
     pub fn metadata(&self, name: &str) -> Result<Metadata, Error> {
-        let lookup = lookup_member_name(name);
-        match self.entry_id(name) {
-            Some(id) => self.metadata_for(id),
-            None => self
-                .directories
-                .get(&lookup.name)
-                .copied()
-                .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name))),
+        let lookup = lookup_member_name(name)?;
+        if !lookup.explicit_directory {
+            if let Some(entry_id) = self.index.get(&lookup.name).copied() {
+                return self.metadata_for(entry_id);
+            }
         }
+        self.directories
+            .get(&lookup.name)
+            .copied()
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))
     }
 
     /// Return declared metadata for one indexed file entry.
@@ -1593,10 +2143,107 @@ where
 
     /// Whether an indexed file uses ZIP Store compression.
     pub fn is_stored(&self, name: &str) -> Result<bool, Error> {
+        let lookup = lookup_member_name(name)?;
         let entry_id = self
-            .entry_id(name)
-            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup_member_name(name).name)))?;
+            .index
+            .get(&lookup.name)
+            .filter(|_| !lookup.explicit_directory)
+            .copied()
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
         Ok(self.indexed_entry(entry_id)?.info.compression_method == CompressionMethod::Store)
+    }
+
+    fn build_strict_layout_proof(
+        &self,
+        target: crate::ZipArchiveEntryWayfinder,
+    ) -> Result<StrictLayoutProof, Error> {
+        let mut spans = Vec::new();
+        spans
+            .try_reserve_exact(self.layout.len())
+            .map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "indexed archive strict layout proof",
+                    source,
+                })
+            })?;
+        let mut by_local_header = HashMap::new();
+        by_local_header
+            .try_reserve(self.layout.len())
+            .map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "indexed archive strict layout map",
+                    source,
+                })
+            })?;
+        let mut previous_end = None;
+        for layout_entry in &self.layout {
+            let central_name = match &layout_entry.name {
+                IndexedLayoutName::Entry(entry_id) => {
+                    &self
+                        .entries
+                        .get(entry_id.0)
+                        .ok_or_else(|| {
+                            Error::from(ErrorKind::InvalidInput {
+                                msg: "indexed strict layout references an unknown entry"
+                                    .to_string(),
+                            })
+                        })?
+                        .info
+                        .central_name
+                },
+                IndexedLayoutName::Directory(name) => name,
+            };
+            let span = self
+                .archive
+                .validate_strict_entry_layout(layout_entry.wayfinder, central_name)?;
+            if previous_end.is_some_and(|previous_end| span.local_header_offset < previous_end) {
+                return Err(Error::from(ErrorKind::InvalidInput {
+                    msg: "strict streaming refuses overlapping ZIP local spans".to_string(),
+                }));
+            }
+            spans.try_reserve(1).map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "indexed archive strict layout proof",
+                    source,
+                })
+            })?;
+            by_local_header.try_reserve(1).map_err(|source| {
+                Error::from(ErrorKind::Allocation {
+                    resource: "indexed archive strict layout map",
+                    source,
+                })
+            })?;
+            if by_local_header
+                .insert(span.local_header_offset, spans.len())
+                .is_some()
+            {
+                return Err(Error::from(ErrorKind::InvalidInput {
+                    msg: "strict streaming refuses duplicate ZIP local spans".to_string(),
+                }));
+            }
+            spans.push(span);
+            previous_end = Some(span.span_end);
+        }
+        if previous_end.is_some_and(|previous_end| previous_end > self.archive.directory_offset()) {
+            return Err(Error::from(ErrorKind::InvalidInput {
+                msg: "strict streaming local span extends into the central directory".to_string(),
+            }));
+        }
+        let proof = StrictLayoutProof {
+            spans,
+            by_local_header,
+        };
+        proof.entry(target)?;
+        Ok(proof)
+    }
+
+    fn strict_layout_for(
+        &self,
+        target: crate::ZipArchiveEntryWayfinder,
+    ) -> Result<crate::StrictEntryLayout, Error> {
+        strict_layout_for_cached(&self.strict_layout_cache, target, || {
+            self.build_strict_layout_proof(target)
+        })
     }
 
     /// Read and verify one member by name.
@@ -1611,9 +2258,13 @@ where
         name: &str,
         accounting: &mut ZipOperationAccounting,
     ) -> Result<Vec<u8>, Error> {
+        let lookup = lookup_member_name(name)?;
         let entry_id = self
-            .entry_id(name)
-            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup_member_name(name).name)))?;
+            .index
+            .get(&lookup.name)
+            .filter(|_| !lookup.explicit_directory)
+            .copied()
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
         self.read_entry_with_accounting(entry_id, accounting)
     }
 
@@ -1742,11 +2393,32 @@ where
         accounting: &mut ZipOperationAccounting,
     ) -> Result<u64, Error> {
         let indexed = self.indexed_entry(entry_id)?;
-        let entry = self.archive.get_entry(indexed.info.wayfinder)?;
-        let verifier = entry.reader().claim_verifier()?;
+        match indexed.info.compression_method {
+            CompressionMethod::Store | CompressionMethod::Deflate => {},
+            other => {
+                return Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
+                    other.as_id().as_u16(),
+                )));
+            },
+        }
+        self.archive
+            .validate_strict_stream_target(indexed.info.wayfinder)?;
+        if indexed.info.compression_method == CompressionMethod::Store
+            && indexed.info.wayfinder.compressed_size_hint() != indexed.info.uncompressed_size
+        {
+            return Err(Error::from(ErrorKind::InvalidSize {
+                expected: indexed.info.uncompressed_size,
+                actual: indexed.info.wayfinder.compressed_size_hint(),
+            }));
+        }
+        let target_layout = self.strict_layout_for(indexed.info.wayfinder)?;
+        let verifier = target_layout.verifier;
+        let payload = self
+            .archive
+            .strict_payload_reader(indexed.info.wayfinder, target_layout);
         match indexed.info.compression_method {
             CompressionMethod::Store => {
-                let mut source = CountingReader::new(entry.reader());
+                let mut source = CountingReader::new(payload);
                 let result = stream_verified_with_accounting(
                     &mut source,
                     verifier,
@@ -1754,6 +2426,17 @@ where
                     accounting,
                     AccountingReadKind::Stored,
                 );
+                let result = result.and_then(|bytes| {
+                    let consumed = source.count();
+                    let expected = indexed.info.wayfinder.compressed_size_hint();
+                    if consumed != expected {
+                        return Err(Error::from(ErrorKind::InvalidSize {
+                            expected,
+                            actual: consumed,
+                        }));
+                    }
+                    Ok(bytes)
+                });
                 let accounting_result = accounting.add_stored_payload_bytes_read(source.count());
                 match result {
                     Err(error) => {
@@ -1767,18 +2450,33 @@ where
                 }
             },
             CompressionMethod::Deflate => {
-                let mut source = CountingReader::new(entry.reader());
-                let mut decoder = DeflateDecoder::new(&mut source);
-                let result = stream_verified_with_accounting(
-                    &mut decoder,
-                    verifier,
-                    sink,
-                    accounting,
-                    AccountingReadKind::Deflate,
-                );
-                drop(decoder);
+                let (result, compressed_consumed, compressed_read) = {
+                    let mut source = CountingReader::new(payload);
+                    let mut decoder = DeflateDecoder::new(&mut source);
+                    let result = stream_verified_with_accounting(
+                        &mut decoder,
+                        verifier,
+                        sink,
+                        accounting,
+                        AccountingReadKind::Deflate,
+                    );
+                    let compressed_consumed = decoder.total_in();
+                    drop(decoder);
+                    let compressed_read = source.count();
+                    (result, compressed_consumed, compressed_read)
+                };
+                let result = result.and_then(|bytes| {
+                    let expected = indexed.info.wayfinder.compressed_size_hint();
+                    if compressed_consumed != expected {
+                        return Err(Error::from(ErrorKind::InvalidSize {
+                            expected,
+                            actual: compressed_consumed,
+                        }));
+                    }
+                    Ok(bytes)
+                });
                 let accounting_result =
-                    accounting.add_compressed_deflate_payload_bytes_read(source.count());
+                    accounting.add_compressed_deflate_payload_bytes_read(compressed_read);
                 match result {
                     Err(error) => {
                         drop(accounting_result);
@@ -1814,9 +2512,13 @@ where
         sink: &mut W,
         accounting: &mut ZipOperationAccounting,
     ) -> Result<u64, Error> {
+        let lookup = lookup_member_name(name)?;
         let entry_id = self
-            .entry_id(name)
-            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup_member_name(name).name)))?;
+            .index
+            .get(&lookup.name)
+            .filter(|_| !lookup.explicit_directory)
+            .copied()
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
         self.read_entry_to_with_accounting(entry_id, sink, accounting)
     }
 
@@ -1895,34 +2597,66 @@ struct LookupMemberName {
     explicit_directory: bool,
 }
 
-fn normalized_member_name(path: ZipFilePath<RawPath<'_>>) -> (String, bool) {
-    match path.try_normalize() {
-        Ok(normalized) => (normalized.as_ref().to_string(), false),
+fn normalized_member_name(
+    path: ZipFilePath<RawPath<'_>>,
+    resource: &'static str,
+) -> Result<(String, bool), Error> {
+    match std::str::from_utf8(path.as_ref()) {
+        Ok(valid) => Ok((normalize_str_fallibly(valid, resource)?, false)),
         Err(_) => {
             // Keep the existing lossy-UTF-8 compatibility behavior, but apply
             // the same path normalization as valid UTF-8 names so a name
             // returned by `file_names()` is always a usable lookup key.
-            let lossy = String::from_utf8_lossy(path.as_ref());
-            let normalized = ZipFilePath::from_str(&lossy);
-            (normalized.as_str().to_string(), true)
+            let lossy = lossy_string_fallibly(path.as_ref(), resource)?;
+            Ok((normalize_str_fallibly(&lossy, resource)?, true))
         },
     }
 }
 
-fn canonical_member_name(name: String) -> String {
-    name.trim_end_matches('/').to_string()
+fn canonical_member_name(mut name: String) -> String {
+    let canonical_len = name.trim_end_matches('/').len();
+    name.truncate(canonical_len);
+    name
 }
 
-fn lookup_member_name(name: &str) -> LookupMemberName {
+fn normalize_str_fallibly(name: &str, resource: &'static str) -> Result<String, Error> {
+    let name = name.rfind(':').map_or(name, |offset| &name[offset + 1..]);
+    let mut normalized = String::new();
+    normalized
+        .try_reserve_exact(name.len())
+        .map_err(|source| Error::from(ErrorKind::Allocation { resource, source }))?;
+    for component in name.split(|character| character == '/' || character == '\\') {
+        if component.is_empty() || component == "." {
+            continue;
+        }
+        if component == ".." {
+            let last_separator = normalized.rfind('/');
+            normalized.truncate(last_separator.unwrap_or(0));
+            continue;
+        }
+        if !normalized.is_empty() {
+            normalized
+                .try_reserve(1)
+                .map_err(|source| Error::from(ErrorKind::Allocation { resource, source }))?;
+            normalized.push('/');
+        }
+        normalized
+            .try_reserve(component.len())
+            .map_err(|source| Error::from(ErrorKind::Allocation { resource, source }))?;
+        normalized.push_str(component);
+    }
+    Ok(normalized)
+}
+
+fn lookup_member_name(name: &str) -> Result<LookupMemberName, Error> {
     let explicit_directory = name
         .as_bytes()
         .last()
         .is_some_and(|byte| matches!(byte, b'/' | b'\\'));
-    let normalized = ZipFilePath::from_str(name);
-    LookupMemberName {
-        name: canonical_member_name(normalized.as_str().to_string()),
+    Ok(LookupMemberName {
+        name: canonical_member_name(normalize_str_fallibly(name, "archive lookup name")?),
         explicit_directory,
-    }
+    })
 }
 
 fn duplicate_member_error(name: &str, lossy_name: bool, kind: &str) -> Error {
@@ -1960,10 +2694,10 @@ fn strict_member_name(path: ZipFilePath<RawPath<'_>>) -> Result<String, Error> {
         }
         .into());
     }
-    let normalized = path.try_normalize().map_err(|_| ErrorKind::InvalidInput {
+    let raw_name = std::str::from_utf8(raw).map_err(|_| ErrorKind::InvalidInput {
         msg: "strict package archive contains a non-UTF-8 member name".to_string(),
     })?;
-    let normalized_name = normalized.as_str();
+    let normalized_name = normalize_str_fallibly(raw_name, "strict package member name")?;
     if normalized_name.is_empty() {
         return Err(ErrorKind::InvalidInput {
             msg: "strict package archive contains a member that normalizes to an empty name"
@@ -1983,7 +2717,7 @@ fn strict_member_name(path: ZipFilePath<RawPath<'_>>) -> Result<String, Error> {
         }
         .into());
     }
-    Ok(normalized_name.to_string())
+    Ok(normalized_name)
 }
 
 fn validate_strict_mimetype<R: ReaderAt>(
@@ -2005,8 +2739,19 @@ fn validate_strict_mimetype<R: ReaderAt>(
 
     let entry = archive.get_entry(wayfinder)?;
     let local = entry.local_header_fixed()?;
-    let mut variable =
-        vec![0_u8; usize::from(local.file_name_len) + usize::from(local.extra_field_len)];
+    let variable_length = usize::from(local.file_name_len)
+        .checked_add(usize::from(local.extra_field_len))
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    let mut variable = Vec::new();
+    variable
+        .try_reserve_exact(variable_length)
+        .map_err(|source| {
+            Error::from(ErrorKind::Allocation {
+                resource: "strict ZIP mimetype local metadata",
+                source,
+            })
+        })?;
+    variable.resize(variable_length, 0);
     let local_header = entry.local_header(&mut variable)?;
     if local_header.file_path().as_bytes() != b"mimetype"
         || local.flags != flags
@@ -2021,6 +2766,107 @@ fn validate_strict_mimetype<R: ReaderAt>(
         .into());
     }
     Ok(())
+}
+
+fn clone_name_fallibly(name: &[u8], resource: &'static str) -> Result<Vec<u8>, Error> {
+    let mut owned = Vec::new();
+    owned
+        .try_reserve_exact(name.len())
+        .map_err(|source| Error::from(ErrorKind::Allocation { resource, source }))?;
+    owned.extend_from_slice(name);
+    Ok(owned)
+}
+
+fn clone_str_fallibly(value: &str, resource: &'static str) -> Result<String, Error> {
+    let mut owned = String::new();
+    owned
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::from(ErrorKind::Allocation { resource, source }))?;
+    owned.push_str(value);
+    Ok(owned)
+}
+
+fn lossy_string_fallibly(bytes: &[u8], resource: &'static str) -> Result<String, Error> {
+    let mut owned = String::new();
+    owned
+        .try_reserve_exact(bytes.len())
+        .map_err(|source| Error::from(ErrorKind::Allocation { resource, source }))?;
+    let mut remaining = bytes;
+    while !remaining.is_empty() {
+        match std::str::from_utf8(remaining) {
+            Ok(valid) => {
+                owned.push_str(valid);
+                break;
+            },
+            Err(error) => {
+                let valid_up_to = error.valid_up_to();
+                if valid_up_to != 0 {
+                    let valid = remaining.get(..valid_up_to).ok_or_else(|| {
+                        Error::from(ErrorKind::InvalidInput {
+                            msg: "invalid UTF-8 replacement range".to_string(),
+                        })
+                    })?;
+                    let valid = std::str::from_utf8(valid).map_err(|_| {
+                        Error::from(ErrorKind::InvalidInput {
+                            msg: "invalid UTF-8 replacement range".to_string(),
+                        })
+                    })?;
+                    owned.push_str(valid);
+                }
+                let Some(invalid_len) = error.error_len() else {
+                    break;
+                };
+                let skip = valid_up_to.checked_add(invalid_len).ok_or_else(|| {
+                    Error::from(ErrorKind::InvalidInput {
+                        msg: "invalid UTF-8 replacement range overflows usize".to_string(),
+                    })
+                })?;
+                owned
+                    .try_reserve(3)
+                    .map_err(|source| Error::from(ErrorKind::Allocation { resource, source }))?;
+                owned.push('\u{fffd}');
+                remaining = remaining.get(skip..).ok_or_else(|| {
+                    Error::from(ErrorKind::InvalidInput {
+                        msg: "invalid UTF-8 replacement range".to_string(),
+                    })
+                })?;
+            },
+        }
+    }
+    Ok(owned)
+}
+
+fn collect_order_fallibly<T>(
+    ordered: Vec<(u64, T)>,
+    resource: &'static str,
+) -> Result<Vec<T>, Error> {
+    let mut order = Vec::new();
+    order
+        .try_reserve_exact(ordered.len())
+        .map_err(|source| Error::from(ErrorKind::Allocation { resource, source }))?;
+    for (_, item) in ordered {
+        order.push(item);
+    }
+    Ok(order)
+}
+
+const CENTRAL_FIXED_RECORD_BYTES: u64 = 46;
+fn physical_entry_bound(
+    central_directory_size: u64,
+    entry_count: u64,
+    max_metadata_bytes: u64,
+) -> Result<usize, Error> {
+    if entry_count > central_directory_size / CENTRAL_FIXED_RECORD_BYTES {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "EOCD entry count exceeds declared central-directory capacity".to_string(),
+        }));
+    }
+    let bound = entry_count.min(max_metadata_bytes / CENTRAL_FIXED_RECORD_BYTES);
+    usize::try_from(bound).map_err(|_| {
+        Error::from(ErrorKind::InvalidInput {
+            msg: "ZIP physical entry bound does not fit this platform".to_string(),
+        })
+    })
 }
 
 #[inline]
@@ -2135,6 +2981,11 @@ where
         }
     };
     if extra != 0 {
+        if matches!(accounting_kind, AccountingReadKind::Deflate) {
+            if let Ok(extra) = usize_to_u64(extra, "decompressed Deflate bytes produced") {
+                let _ = accounting.add_deflate_bytes_produced(extra);
+            }
+        }
         let actual = copied
             .checked_add(usize_to_u64(extra, "ZIP logical payload bytes probed")?)
             .ok_or_else(|| accounting_overflow("ZIP logical payload bytes probed"))?;
@@ -4329,7 +5180,7 @@ impl<'data> LazyArchiveReader<'data> {
                 self.cache_limits.max_flight_key_bytes(),
             ));
         }
-        let lookup = lookup_member_name(name);
+        let lookup = lookup_member_name(name)?;
         if lookup.explicit_directory {
             return Err(ErrorKind::FileNotFound(lookup.name).into());
         }
@@ -6151,6 +7002,27 @@ mod tests {
     }
 
     #[test]
+    fn prefixed_zip64_uses_locator_resolved_central_size() {
+        let source = include_bytes!("../assets/zip64.zip");
+        let mut bytes = vec![0xa5; 7];
+        bytes.extend_from_slice(source);
+
+        let archive = ZipArchive::from_slice(bytes.as_slice()).unwrap();
+        assert!(archive.is_zip64());
+        let central_end = archive
+            .directory_offset()
+            .checked_add(archive.central_directory_size())
+            .unwrap();
+        assert!(central_end <= archive.eocd_offset());
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        assert_eq!(
+            reader.read("README").unwrap(),
+            b"This small file is in ZIP64 format.\n"
+        );
+    }
+
+    #[test]
     fn indexed_read_to_reports_source_and_zero_progress_sink_errors() {
         let payload = vec![b'x'; STREAM_COPY_BUFFER_SIZE + 1];
         let mut writer = StreamingArchiveWriter::new();
@@ -6432,16 +7304,23 @@ mod tests {
         }]);
 
         let mut exact = ArchiveLimits::UNBOUNDED;
-        exact.max_metadata_bytes = 5;
+        exact.max_metadata_bytes = 5 + CENTRAL_FIXED_RECORD_BYTES;
         assert!(ArchiveReader::new_with_limits(&bytes, exact).is_ok());
+        assert!(indexed_archive_result(bytes.clone(), exact).is_ok());
 
         let mut over = exact;
-        over.max_metadata_bytes = 4;
+        over.max_metadata_bytes -= 1;
         assert_limit(
             ArchiveReader::new_with_limits(&bytes, over).unwrap_err(),
             LimitResource::MetadataBytes,
-            5,
-            4,
+            5 + CENTRAL_FIXED_RECORD_BYTES,
+            4 + CENTRAL_FIXED_RECORD_BYTES,
+        );
+        assert_limit(
+            indexed_archive_result(bytes, over).unwrap_err(),
+            LimitResource::MetadataBytes,
+            5 + CENTRAL_FIXED_RECORD_BYTES,
+            4 + CENTRAL_FIXED_RECORD_BYTES,
         );
     }
 
@@ -6473,7 +7352,7 @@ mod tests {
         assert_limit(
             indexed_archive_result(bytes, constrained).unwrap_err(),
             LimitResource::MetadataBytes,
-            metadata_bytes,
+            metadata_bytes + CENTRAL_FIXED_RECORD_BYTES,
             metadata_bytes - 1,
         );
     }
@@ -6671,7 +7550,7 @@ mod tests {
         let limits = ArchiveLimits {
             max_files: 0,
             max_member_name_bytes: 7,
-            max_metadata_bytes: 7,
+            max_metadata_bytes: 7 + CENTRAL_FIXED_RECORD_BYTES,
             max_compressed_size: 0,
             max_entry_size: 0,
             max_total_size: 0,
@@ -7355,7 +8234,7 @@ mod tests {
             FixtureEntry::stored("caf\u{e9}.txt".as_bytes(), b"utf8"),
             FixtureEntry::stored(b"\xffraw.bin", b"opaque"),
         ]);
-        let indexed = indexed_archive(bytes);
+        let indexed = indexed_archive(bytes.clone());
         let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
         let preservation = indexed.preservation_index(&mut scratch).unwrap();
         let names: Vec<_> = preservation
@@ -7500,6 +8379,877 @@ mod tests {
             assert_eq!(borrowed, payload);
             assert_eq!(borrowed.as_ptr(), physical.as_ptr());
             assert_eq!(borrowed.len(), physical.len());
+        }
+    }
+
+    #[test]
+    fn strict_read_to_rejects_target_metadata_before_sink() {
+        let payload = b"strict sink payload";
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("stored.bin", payload).unwrap();
+        let base = writer.finish_to_bytes().unwrap();
+        let local = local_header_offset_for_name(&base, b"stored.bin");
+        let central = central_header_offset_for_name(&base, b"stored.bin");
+
+        for mutation in 0..9 {
+            let mut bytes = base.clone();
+            match mutation {
+                0 => bytes[local + 30] ^= 1,
+                1 => bytes[local + 8..local + 10].copy_from_slice(&8u16.to_le_bytes()),
+                2 => bytes[local + 6..local + 8].copy_from_slice(&8u16.to_le_bytes()),
+                3 => bytes[local + 14..local + 18].copy_from_slice(&u32::MAX.to_le_bytes()),
+                4 => bytes[local + 18..local + 22].copy_from_slice(&1u32.to_le_bytes()),
+                5 => bytes[local + 22..local + 26].copy_from_slice(&1u32.to_le_bytes()),
+                6 => bytes[central + 16..central + 20].copy_from_slice(&u32::MAX.to_le_bytes()),
+                7 => bytes[central + 20..central + 24].copy_from_slice(&1u32.to_le_bytes()),
+                8 => bytes[central + 24..central + 28].copy_from_slice(&1u32.to_le_bytes()),
+                _ => unreachable!(),
+            }
+            let reader = ArchiveReader::new(&bytes).unwrap();
+            let mut sink = vec![0xA5];
+            let _error = reader.read_to("stored.bin", &mut sink).unwrap_err();
+            assert_eq!(sink, vec![0xA5], "mutation {mutation}");
+        }
+    }
+
+    #[test]
+    fn strict_read_to_rejects_target_encryption_but_ignores_unrelated_encryption() {
+        for deflated in [false, true] {
+            let payload = b"strict encrypted target";
+            let mut writer = StreamingArchiveWriter::new();
+            writer.write_stored("neighbor.bin", b"neighbor").unwrap();
+            if deflated {
+                writer.write_deflated("target.bin", payload).unwrap();
+            } else {
+                writer.write_stored("target.bin", payload).unwrap();
+            }
+            let base = writer.finish_to_bytes().unwrap();
+            let neighbor_local = local_header_offset_for_name(&base, b"neighbor.bin");
+            let neighbor_central = central_header_offset_for_name(&base, b"neighbor.bin");
+            let mut unrelated = base.clone();
+            unrelated[neighbor_local + 6..neighbor_local + 8].copy_from_slice(&1u16.to_le_bytes());
+            unrelated[neighbor_central + 8..neighbor_central + 10]
+                .copy_from_slice(&1u16.to_le_bytes());
+            let reader = ArchiveReader::new(&unrelated).unwrap();
+            let mut output = Vec::new();
+            assert_eq!(
+                reader.read_to("target.bin", &mut output).unwrap(),
+                payload.len() as u64
+            );
+            assert_eq!(output, payload);
+
+            let target_local = local_header_offset_for_name(&base, b"target.bin");
+            let target_central = central_header_offset_for_name(&base, b"target.bin");
+            for encrypted_flag in [1u16, 1 << 6] {
+                let mut encrypted = base.clone();
+                encrypted[target_local + 6..target_local + 8]
+                    .copy_from_slice(&encrypted_flag.to_le_bytes());
+                encrypted[target_central + 8..target_central + 10]
+                    .copy_from_slice(&encrypted_flag.to_le_bytes());
+                let reader = ArchiveReader::new(&encrypted).unwrap();
+                let mut sink = vec![0xA5];
+                let _error = reader.read_to("target.bin", &mut sink).unwrap_err();
+                assert_eq!(sink, vec![0xA5]);
+            }
+        }
+    }
+
+    #[test]
+    fn strict_read_to_accepts_prefix_and_rejects_span_intrusion_before_sink() {
+        let payload = b"strict prefix payload";
+        for signature in [false, true] {
+            let bytes = stored_descriptor_fixture_with_prefix(payload, signature, 17);
+            let reader = ArchiveReader::new(&bytes).unwrap();
+            let mut output = Vec::new();
+            assert_eq!(
+                reader.read_to("stored.bin", &mut output).unwrap(),
+                payload.len() as u64
+            );
+            assert_eq!(output, payload);
+        }
+
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("first.bin", b"first payload").unwrap();
+        writer.write_stored("target.bin", b"target").unwrap();
+        let base = writer.finish_to_bytes().unwrap();
+        let first_local = local_header_offset_for_name(&base, b"first.bin");
+        let first_central = central_header_offset_for_name(&base, b"first.bin");
+        let second_local = local_header_offset_for_name(&base, b"target.bin");
+        let name_len = usize::from(u16::from_le_bytes([
+            base[first_local + 26],
+            base[first_local + 27],
+        ]));
+        let extra_len = usize::from(u16::from_le_bytes([
+            base[first_local + 28],
+            base[first_local + 29],
+        ]));
+        let payload_offset = first_local + 30 + name_len + extra_len;
+        let declared = u32::try_from(second_local - payload_offset + 1).unwrap();
+        let mut overlap = base.clone();
+        overlap[first_local + 18..first_local + 22].copy_from_slice(&declared.to_le_bytes());
+        overlap[first_central + 20..first_central + 24].copy_from_slice(&declared.to_le_bytes());
+        let reader = ArchiveReader::new(&overlap).unwrap();
+        let mut sink = vec![0xA5];
+        let _error = reader.read_to("target.bin", &mut sink).unwrap_err();
+        assert_eq!(sink, vec![0xA5]);
+
+        let target_local = local_header_offset_for_name(&base, b"target.bin");
+        let target_central = central_header_offset_for_name(&base, b"target.bin");
+        let target_name_len = usize::from(u16::from_le_bytes([
+            base[target_local + 26],
+            base[target_local + 27],
+        ]));
+        let target_extra_len = usize::from(u16::from_le_bytes([
+            base[target_local + 28],
+            base[target_local + 29],
+        ]));
+        let target_payload = target_local + 30 + target_name_len + target_extra_len;
+        let central_start = central_header_offset_for_name(&base, b"first.bin");
+        let declared = u32::try_from(central_start - target_payload + 1).unwrap();
+        let mut intrusion = base;
+        intrusion[target_local + 18..target_local + 22].copy_from_slice(&declared.to_le_bytes());
+        intrusion[target_central + 20..target_central + 24]
+            .copy_from_slice(&declared.to_le_bytes());
+        intrusion[target_local + 22..target_local + 26].copy_from_slice(&declared.to_le_bytes());
+        intrusion[target_central + 24..target_central + 28]
+            .copy_from_slice(&declared.to_le_bytes());
+        let reader = ArchiveReader::new(&intrusion).unwrap();
+        let mut sink = vec![0xA5];
+        let _error = reader.read_to("target.bin", &mut sink).unwrap_err();
+        assert_eq!(sink, vec![0xA5]);
+    }
+
+    #[test]
+    fn strict_read_to_rejects_deflate_trailing_bytes_after_sink_prefix() {
+        let payload = b"strict deflate payload";
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_deflated_sized("deflated.bin", payload)
+            .unwrap();
+        let mut bytes = writer.finish_to_bytes().unwrap();
+        let local = local_header_offset_for_name(&bytes, b"deflated.bin");
+        let central = central_header_offset_for_name(&bytes, b"deflated.bin");
+        assert!(!local_member_has_data_descriptor(&bytes, b"deflated.bin"));
+        let compressed = u32::from_le_bytes(bytes[local + 18..local + 22].try_into().unwrap());
+        let junk = [0xA5, 0x5A, 0xC3];
+        let eocd = bytes.len() - 22;
+        bytes.splice(central..central, junk);
+        let shifted_central = central + junk.len();
+        let declared = compressed
+            .checked_add(u32::try_from(junk.len()).unwrap())
+            .unwrap();
+        bytes[local + 18..local + 22].copy_from_slice(&declared.to_le_bytes());
+        bytes[shifted_central + 20..shifted_central + 24].copy_from_slice(&declared.to_le_bytes());
+        let shifted_eocd = eocd + junk.len();
+        bytes[shifted_eocd + 16..shifted_eocd + 20]
+            .copy_from_slice(&u32::try_from(shifted_central).unwrap().to_le_bytes());
+
+        {
+            let reader = ArchiveReader::new(&bytes).unwrap();
+            let mut sink = b"prefix".to_vec();
+            let error = reader.read_to("deflated.bin", &mut sink).unwrap_err();
+            assert!(matches!(error.kind(), ErrorKind::InvalidSize { .. }));
+            assert!(sink.starts_with(b"prefix"));
+            assert!(sink.len() >= b"prefix".len() + payload.len());
+        }
+
+        let indexed = indexed_archive(bytes);
+        let entry_id = indexed.entry_id("deflated.bin").unwrap();
+        let mut accounting = ZipOperationAccounting::default();
+        let mut indexed_sink = b"prefix".to_vec();
+        let error = indexed
+            .read_entry_to_with_accounting(entry_id, &mut indexed_sink, &mut accounting)
+            .unwrap_err();
+        match error.kind() {
+            ErrorKind::InvalidSize { expected, actual } => {
+                assert_eq!(*expected, u64::from(declared));
+                assert_eq!(*actual, u64::from(compressed));
+            },
+            other => panic!("expected indexed total_in size error, got {other:?}"),
+        }
+        assert!(indexed_sink.starts_with(b"prefix"));
+        assert!(indexed_sink.len() >= b"prefix".len() + payload.len());
+        assert_eq!(accounting.deflate_bytes_produced(), payload.len() as u64);
+        assert_eq!(accounting.deflate_bytes_accepted(), payload.len() as u64);
+    }
+
+    #[test]
+    fn indexed_read_entry_to_with_accounting_uses_strict_preflight() {
+        let payload = b"indexed strict payload";
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("stored.bin", payload).unwrap();
+        writer.write_deflated("deflated.bin", payload).unwrap();
+        let indexed = indexed_archive(writer.finish_to_bytes().unwrap());
+        for name in ["stored.bin", "deflated.bin"] {
+            let entry_id = indexed.entry_id(name).unwrap();
+            let mut accounting = ZipOperationAccounting::default();
+            let mut sink = Vec::new();
+            assert_eq!(
+                indexed
+                    .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+                    .unwrap(),
+                payload.len() as u64
+            );
+            assert_eq!(sink, payload);
+        }
+
+        for signature in [false, true] {
+            let indexed = indexed_archive(stored_descriptor_fixture(payload, signature));
+            let entry_id = indexed.entry_id("stored.bin").unwrap();
+            let mut accounting = ZipOperationAccounting::default();
+            let mut sink = Vec::new();
+            assert_eq!(
+                indexed
+                    .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+                    .unwrap(),
+                payload.len() as u64
+            );
+            assert_eq!(sink, payload);
+        }
+        for signature in [false, true] {
+            for (field_offset, checksum) in [(0usize, true), (4, false), (8, false)] {
+                let mut bytes = stored_descriptor_fixture(payload, signature);
+                let descriptor = descriptor_start(payload, signature);
+                let value = if checksum { 0 } else { u32::MAX };
+                let field_start = descriptor + field_offset;
+                bytes[field_start..field_start + 4].copy_from_slice(&value.to_le_bytes());
+                let indexed = indexed_archive(bytes);
+                let entry_id = indexed.entry_id("stored.bin").unwrap();
+                let mut accounting = ZipOperationAccounting::default();
+                let mut sink = vec![0xA5];
+                let error = indexed
+                    .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+                    .unwrap_err();
+                if checksum {
+                    assert!(matches!(error.kind(), ErrorKind::InvalidChecksum { .. }));
+                } else {
+                    assert!(matches!(error.kind(), ErrorKind::InvalidSize { .. }));
+                }
+                assert_eq!(sink, vec![0xA5]);
+                assert_eq!(accounting, ZipOperationAccounting::default());
+            }
+        }
+        let indexed = indexed_archive(stored_descriptor_fixture_with_prefix(payload, true, 13));
+        let entry_id = indexed.entry_id("stored.bin").unwrap();
+        let mut accounting = ZipOperationAccounting::default();
+        let mut sink = Vec::new();
+        assert_eq!(
+            indexed
+                .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+                .unwrap(),
+            payload.len() as u64
+        );
+        assert_eq!(sink, payload);
+
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("neighbor.bin", b"neighbor").unwrap();
+        writer.write_deflated("target.bin", payload).unwrap();
+        let base = writer.finish_to_bytes().unwrap();
+        let neighbor_local = local_header_offset_for_name(&base, b"neighbor.bin");
+        let neighbor_central = central_header_offset_for_name(&base, b"neighbor.bin");
+        let target_id = {
+            let mut unrelated = base.clone();
+            unrelated[neighbor_local + 6..neighbor_local + 8].copy_from_slice(&1u16.to_le_bytes());
+            unrelated[neighbor_central + 8..neighbor_central + 10]
+                .copy_from_slice(&1u16.to_le_bytes());
+            indexed_archive(unrelated).entry_id("target.bin").unwrap()
+        };
+        let mut unrelated = base.clone();
+        unrelated[neighbor_local + 6..neighbor_local + 8].copy_from_slice(&1u16.to_le_bytes());
+        unrelated[neighbor_central + 8..neighbor_central + 10].copy_from_slice(&1u16.to_le_bytes());
+        let indexed = indexed_archive(unrelated);
+        let mut accounting = ZipOperationAccounting::default();
+        let mut sink = Vec::new();
+        assert_eq!(
+            indexed
+                .read_entry_to_with_accounting(target_id, &mut sink, &mut accounting)
+                .unwrap(),
+            payload.len() as u64
+        );
+        assert_eq!(sink, payload);
+
+        let target_local = local_header_offset_for_name(&base, b"target.bin");
+        let target_central = central_header_offset_for_name(&base, b"target.bin");
+        for encrypted_flag in [1u16, 1 << 6] {
+            let mut encrypted = base.clone();
+            encrypted[target_local + 6..target_local + 8]
+                .copy_from_slice(&encrypted_flag.to_le_bytes());
+            encrypted[target_central + 8..target_central + 10]
+                .copy_from_slice(&encrypted_flag.to_le_bytes());
+            let indexed = indexed_archive(encrypted);
+            let entry_id = indexed.entry_id("target.bin").unwrap();
+            let mut accounting = ZipOperationAccounting::default();
+            let mut sink = vec![0xA5];
+            let error = indexed
+                .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+                .unwrap_err();
+            assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+            assert_eq!(sink, vec![0xA5]);
+            assert_eq!(accounting, ZipOperationAccounting::default());
+        }
+
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("zero-crc.bin", payload).unwrap();
+        let mut zero_crc = writer.finish_to_bytes().unwrap();
+        let zero_local = local_header_offset_for_name(&zero_crc, b"zero-crc.bin");
+        let zero_central = central_header_offset_for_name(&zero_crc, b"zero-crc.bin");
+        let zero_name_len = usize::from(u16::from_le_bytes([
+            zero_crc[zero_local + 26],
+            zero_crc[zero_local + 27],
+        ]));
+        let zero_extra_len = usize::from(u16::from_le_bytes([
+            zero_crc[zero_local + 28],
+            zero_crc[zero_local + 29],
+        ]));
+        let zero_payload = zero_local + 30 + zero_name_len + zero_extra_len;
+        zero_crc[zero_local + 14..zero_local + 18].copy_from_slice(&0u32.to_le_bytes());
+        zero_crc[zero_central + 16..zero_central + 20].copy_from_slice(&0u32.to_le_bytes());
+        zero_crc[zero_payload] ^= 0x80;
+        let indexed = indexed_archive(zero_crc);
+        let entry_id = indexed.entry_id("zero-crc.bin").unwrap();
+        let mut accounting = ZipOperationAccounting::default();
+        let mut sink = Vec::new();
+        let error = indexed
+            .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidChecksum { .. }));
+        assert_eq!(sink.len(), payload.len());
+        assert!(accounting.stored_payload_bytes_read() > 0);
+        assert_eq!(indexed.read("zero-crc.bin").unwrap().len(), payload.len());
+
+        let indexed = indexed_archive(include_bytes!("../assets/zip64.zip").to_vec());
+        let entry_id = indexed.entry_id("README").unwrap();
+        let mut accounting = ZipOperationAccounting::default();
+        let mut sink = Vec::new();
+        assert!(
+            indexed
+                .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+                .is_ok()
+        );
+        assert_eq!(sink, b"This small file is in ZIP64 format.\n");
+
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("unresolved.bin", payload).unwrap();
+        let mut unresolved = writer.finish_to_bytes().unwrap();
+        let unresolved_central = central_header_offset_for_name(&unresolved, b"unresolved.bin");
+        unresolved[unresolved_central + 42..unresolved_central + 46]
+            .copy_from_slice(&u32::MAX.to_le_bytes());
+        let indexed = indexed_archive(unresolved);
+        let entry_id = indexed.entry_id("unresolved.bin").unwrap();
+        let mut accounting = ZipOperationAccounting::default();
+        let mut sink = vec![0xA5];
+        let error = indexed
+            .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+        assert_eq!(sink, vec![0xA5]);
+        assert_eq!(accounting, ZipOperationAccounting::default());
+
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("first.bin", b"first payload").unwrap();
+        writer.write_stored("target.bin", b"target").unwrap();
+        let base = writer.finish_to_bytes().unwrap();
+        let first_local = local_header_offset_for_name(&base, b"first.bin");
+        let first_central = central_header_offset_for_name(&base, b"first.bin");
+        let target_local = local_header_offset_for_name(&base, b"target.bin");
+        let first_name_len = usize::from(u16::from_le_bytes([
+            base[first_local + 26],
+            base[first_local + 27],
+        ]));
+        let first_extra_len = usize::from(u16::from_le_bytes([
+            base[first_local + 28],
+            base[first_local + 29],
+        ]));
+        let first_payload = first_local + 30 + first_name_len + first_extra_len;
+        let declared = u32::try_from(target_local - first_payload + 1).unwrap();
+        let mut overlap = base.clone();
+        overlap[first_local + 18..first_local + 22].copy_from_slice(&declared.to_le_bytes());
+        overlap[first_central + 20..first_central + 24].copy_from_slice(&declared.to_le_bytes());
+        let indexed = indexed_archive(overlap);
+        let entry_id = indexed.entry_id("target.bin").unwrap();
+        let mut accounting = ZipOperationAccounting::default();
+        let mut sink = vec![0xA5];
+        let error = indexed
+            .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+        assert_eq!(sink, vec![0xA5]);
+        assert_eq!(accounting, ZipOperationAccounting::default());
+
+        let target_central = central_header_offset_for_name(&base, b"target.bin");
+        let target_name_len = usize::from(u16::from_le_bytes([
+            base[target_local + 26],
+            base[target_local + 27],
+        ]));
+        let target_extra_len = usize::from(u16::from_le_bytes([
+            base[target_local + 28],
+            base[target_local + 29],
+        ]));
+        let target_payload = target_local + 30 + target_name_len + target_extra_len;
+        let declared = u32::try_from(target_central - target_payload + 1).unwrap();
+        let mut intrusion = base.clone();
+        intrusion[target_local + 18..target_local + 22].copy_from_slice(&declared.to_le_bytes());
+        intrusion[target_local + 22..target_local + 26].copy_from_slice(&declared.to_le_bytes());
+        intrusion[target_central + 20..target_central + 24]
+            .copy_from_slice(&declared.to_le_bytes());
+        intrusion[target_central + 24..target_central + 28]
+            .copy_from_slice(&declared.to_le_bytes());
+        let indexed = indexed_archive(intrusion);
+        let entry_id = indexed.entry_id("target.bin").unwrap();
+        let mut accounting = ZipOperationAccounting::default();
+        let mut sink = vec![0xA5];
+        let error = indexed
+            .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::Eof));
+        assert_eq!(sink, vec![0xA5]);
+        assert_eq!(accounting, ZipOperationAccounting::default());
+    }
+
+    #[test]
+    fn indexed_strict_preflight_rejects_local_central_mismatches() {
+        let payload = b"indexed metadata mismatch payload";
+        for deflated in [false, true] {
+            let mut writer = StreamingArchiveWriter::new();
+            if deflated {
+                writer.write_deflated_sized("member.bin", payload).unwrap();
+            } else {
+                writer.write_stored("member.bin", payload).unwrap();
+            }
+            let base = writer.finish_to_bytes().unwrap();
+            assert!(!local_member_has_data_descriptor(&base, b"member.bin"));
+            let local = local_header_offset_for_name(&base, b"member.bin");
+            let central = central_header_offset_for_name(&base, b"member.bin");
+            let crc = crate::crc32(payload);
+            let local_compressed =
+                u32::from_le_bytes(base[local + 18..local + 22].try_into().unwrap());
+            let central_compressed =
+                u32::from_le_bytes(base[central + 20..central + 24].try_into().unwrap());
+            let local_uncompressed =
+                u32::from_le_bytes(base[local + 22..local + 26].try_into().unwrap());
+            let central_uncompressed =
+                u32::from_le_bytes(base[central + 24..central + 28].try_into().unwrap());
+
+            for mutation in 0..9 {
+                let mut bytes = base.clone();
+                match mutation {
+                    0 => bytes[local + 30] ^= 1,
+                    1 => bytes[local + 8..local + 10]
+                        .copy_from_slice(&(if deflated { 0u16 } else { 8u16 }).to_le_bytes()),
+                    2 => bytes[local + 6..local + 8].copy_from_slice(&8u16.to_le_bytes()),
+                    3 => bytes[local + 14..local + 18]
+                        .copy_from_slice(&crc.wrapping_add(1).to_le_bytes()),
+                    4 => bytes[central + 16..central + 20]
+                        .copy_from_slice(&crc.wrapping_add(1).to_le_bytes()),
+                    5 => bytes[local + 18..local + 22]
+                        .copy_from_slice(&local_compressed.wrapping_add(1).to_le_bytes()),
+                    6 => bytes[central + 20..central + 24]
+                        .copy_from_slice(&central_compressed.wrapping_add(1).to_le_bytes()),
+                    7 => bytes[local + 22..local + 26]
+                        .copy_from_slice(&local_uncompressed.wrapping_add(1).to_le_bytes()),
+                    8 => bytes[central + 24..central + 28]
+                        .copy_from_slice(&central_uncompressed.wrapping_add(1).to_le_bytes()),
+                    _ => unreachable!(),
+                }
+
+                let indexed = indexed_archive(bytes);
+                let entry_id = indexed.entry_id("member.bin").unwrap();
+                let mut sink = vec![0xA5];
+                let mut accounting = ZipOperationAccounting::default();
+                let error = indexed
+                    .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+                    .unwrap_err();
+                if mutation <= 2 {
+                    assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+                } else if mutation <= 4 {
+                    assert!(matches!(error.kind(), ErrorKind::InvalidChecksum { .. }));
+                } else {
+                    assert!(matches!(error.kind(), ErrorKind::InvalidSize { .. }));
+                }
+                assert_eq!(sink, vec![0xA5]);
+                assert_eq!(accounting, ZipOperationAccounting::default());
+            }
+        }
+    }
+
+    #[test]
+    fn indexed_strict_stream_validates_tiny_zip64_descriptors_and_resolution() {
+        let payload = b"z";
+        let size = u64::try_from(payload.len()).unwrap();
+        for signature in [false, true] {
+            let bytes = zip64_descriptor_fixture(payload, signature);
+            let indexed = indexed_archive_result(bytes.clone(), ArchiveLimits::UNBOUNDED).unwrap();
+            let entry_id = indexed.entry_id("zip64.bin").unwrap();
+            let mut sink = Vec::new();
+            let mut accounting = ZipOperationAccounting::default();
+            assert_eq!(
+                indexed
+                    .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+                    .unwrap(),
+                size
+            );
+            assert_eq!(sink, payload);
+
+            let descriptor = zip64_descriptor_start(&bytes, payload.len());
+            let crc_offset = if signature { 4 } else { 0 };
+            let compressed_offset = if signature { 8 } else { 4 };
+            let uncompressed_offset = if signature { 16 } else { 12 };
+            for (offset, checksum) in [
+                (crc_offset, true),
+                (compressed_offset, false),
+                (uncompressed_offset, false),
+            ] {
+                let mut corrupt = bytes.clone();
+                let field_start = descriptor + offset;
+                if checksum {
+                    corrupt[field_start..field_start + 4].copy_from_slice(&0u32.to_le_bytes());
+                } else {
+                    corrupt[field_start..field_start + 8].copy_from_slice(&u64::MAX.to_le_bytes());
+                }
+                let indexed = indexed_archive_result(corrupt, ArchiveLimits::UNBOUNDED).unwrap();
+                let entry_id = indexed.entry_id("zip64.bin").unwrap();
+                let mut sink = vec![0xA5];
+                let mut accounting = ZipOperationAccounting::default();
+                let error = indexed
+                    .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+                    .unwrap_err();
+                if checksum {
+                    assert!(matches!(error.kind(), ErrorKind::InvalidChecksum { .. }));
+                } else {
+                    assert!(matches!(error.kind(), ErrorKind::InvalidSize { .. }));
+                }
+                assert_eq!(sink, vec![0xA5]);
+                assert_eq!(accounting, ZipOperationAccounting::default());
+            }
+        }
+
+        let central_missing_extra =
+            zip64_descriptor_fixture_with_central_sizes(payload, false, &[], u32::MAX, u32::MAX);
+        let unresolved_compressed = zip64_descriptor_fixture_with_central_sizes(
+            payload,
+            false,
+            &[],
+            u32::MAX,
+            u32::try_from(payload.len()).unwrap(),
+        );
+        let unresolved_uncompressed = zip64_descriptor_fixture_with_central_sizes(
+            payload,
+            false,
+            &[],
+            u32::try_from(payload.len()).unwrap(),
+            u32::MAX,
+        );
+        for bytes in [
+            central_missing_extra,
+            unresolved_compressed,
+            unresolved_uncompressed,
+        ] {
+            let error = indexed_strict_error(bytes);
+            assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+        }
+
+        let mut truncated_local_extra = zip64_descriptor_fixture(payload, false);
+        let local = local_header_offset_for_name(&truncated_local_extra, b"zip64.bin");
+        truncated_local_extra[local + 28..local + 30].copy_from_slice(&8u16.to_le_bytes());
+        let error = indexed_strict_error(truncated_local_extra);
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+
+        let mut unresolved_offset = zip64_descriptor_fixture(payload, false);
+        let central = central_header_offset_for_name(&unresolved_offset, b"zip64.bin");
+        unresolved_offset[central + 42..central + 46].copy_from_slice(&u32::MAX.to_le_bytes());
+        let error = indexed_strict_error(unresolved_offset);
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+
+        let mut unresolved_disk = zip64_descriptor_fixture(payload, false);
+        let central = central_header_offset_for_name(&unresolved_disk, b"zip64.bin");
+        unresolved_disk[central + 34..central + 36].copy_from_slice(&u16::MAX.to_le_bytes());
+        let error = indexed_strict_error(unresolved_disk);
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+    }
+
+    #[test]
+    fn indexed_archive_bounds_directory_metadata_before_layout_publication() {
+        let empty = indexed_archive_result(
+            fixture(&[]),
+            ArchiveLimits {
+                max_metadata_bytes: 0,
+                ..ArchiveLimits::UNBOUNDED
+            },
+        )
+        .unwrap();
+        assert_eq!(empty.len(), 0);
+
+        let one = fixture(&[FixtureEntry {
+            name: b"folder/",
+            extra: b"xy",
+            comment: b"z",
+            compressed_size: 0,
+            uncompressed_size: 0,
+            data: b"",
+        }]);
+        let one_metadata = CENTRAL_FIXED_RECORD_BYTES + 7 + 2 + 1;
+        let one_limits = ArchiveLimits {
+            max_files: 0,
+            max_member_name_bytes: 7,
+            max_metadata_bytes: one_metadata,
+            max_compressed_size: 0,
+            max_entry_size: 0,
+            max_total_size: 0,
+        };
+        let indexed = indexed_archive_result(one.clone(), one_limits).unwrap();
+        assert_eq!(indexed.len(), 0);
+        assert!(indexed.metadata("folder/").unwrap().is_directory());
+
+        let mut one_over = one_limits;
+        one_over.max_metadata_bytes -= 1;
+        assert_limit(
+            indexed_archive_result(one, one_over).unwrap_err(),
+            LimitResource::MetadataBytes,
+            one_metadata,
+            one_metadata - 1,
+        );
+
+        let multiple = fixture(&[
+            FixtureEntry {
+                name: b"a/",
+                extra: b"123",
+                comment: b"q",
+                compressed_size: 0,
+                uncompressed_size: 0,
+                data: b"",
+            },
+            FixtureEntry {
+                name: b"bb/",
+                extra: b"xy",
+                comment: b"z",
+                compressed_size: 0,
+                uncompressed_size: 0,
+                data: b"",
+            },
+        ]);
+        let multiple_metadata = 2 * (CENTRAL_FIXED_RECORD_BYTES + 6);
+        let multiple_limits = ArchiveLimits {
+            max_files: 0,
+            max_member_name_bytes: 3,
+            max_metadata_bytes: multiple_metadata,
+            max_compressed_size: 0,
+            max_entry_size: 0,
+            max_total_size: 0,
+        };
+        let indexed = indexed_archive_result(multiple.clone(), multiple_limits).unwrap();
+        assert_eq!(indexed.len(), 0);
+        assert!(indexed.metadata("a/").unwrap().is_directory());
+        assert!(indexed.metadata("bb/").unwrap().is_directory());
+
+        let mut multiple_over = multiple_limits;
+        multiple_over.max_metadata_bytes -= 1;
+        assert_limit(
+            indexed_archive_result(multiple, multiple_over).unwrap_err(),
+            LimitResource::MetadataBytes,
+            multiple_metadata,
+            multiple_metadata - 1,
+        );
+    }
+
+    #[test]
+    fn indexed_strict_zero_crc_handles_store_deflate_and_empty_members() {
+        let payload = b"indexed nonempty zero CRC payload";
+        let actual_crc = crate::crc32(payload);
+        let indexed = indexed_archive(skipped_crc_fixture(payload));
+
+        for name in ["stored.bin", "deflated.bin"] {
+            let entry_id = indexed.entry_id(name).unwrap();
+            let mut sink = Vec::new();
+            let mut accounting = ZipOperationAccounting::default();
+            let error = indexed
+                .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+                .unwrap_err();
+            assert_zero_crc_checksum(error, actual_crc);
+            assert_eq!(sink, payload);
+            assert_eq!(indexed.read(name).unwrap(), payload);
+        }
+
+        for name in ["empty-stored.bin", "empty-deflated.bin"] {
+            let entry_id = indexed.entry_id(name).unwrap();
+            let mut sink = Vec::new();
+            let mut accounting = ZipOperationAccounting::default();
+            assert_eq!(
+                indexed
+                    .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+                    .unwrap(),
+                0
+            );
+            assert!(sink.is_empty());
+            assert!(indexed.read(name).unwrap().is_empty());
+        }
+    }
+
+    #[test]
+    fn indexed_strict_layout_accepts_prefix_and_gaps_and_rejects_store_deflate_spans() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("stored.bin", b"stored").unwrap();
+        writer
+            .write_deflated_sized("deflated.bin", b"deflated")
+            .unwrap();
+        let base = writer.finish_to_bytes().unwrap();
+        let central = central_header_offset_for_name(&base, b"stored.bin");
+        let eocd = base.len() - 22;
+
+        let prefix_len = 7usize;
+        let mut prefixed = vec![0xA5; prefix_len];
+        prefixed.extend_from_slice(&base);
+        for name in [b"stored.bin".as_slice(), b"deflated.bin".as_slice()] {
+            let central_offset = central_header_offset_for_name(&prefixed, name);
+            let old_local = u32::from_le_bytes(
+                prefixed[central_offset + 42..central_offset + 46]
+                    .try_into()
+                    .unwrap(),
+            );
+            let shifted_local = old_local
+                .checked_add(u32::try_from(prefix_len).unwrap())
+                .unwrap();
+            prefixed[central_offset + 42..central_offset + 46]
+                .copy_from_slice(&shifted_local.to_le_bytes());
+        }
+        let prefixed_eocd = eocd + prefix_len;
+        prefixed[prefixed_eocd + 16..prefixed_eocd + 20]
+            .copy_from_slice(&u32::try_from(central + prefix_len).unwrap().to_le_bytes());
+        let indexed = indexed_archive(prefixed);
+        for (name, expected) in [
+            ("stored.bin", b"stored".as_slice()),
+            ("deflated.bin", b"deflated".as_slice()),
+        ] {
+            let entry_id = indexed.entry_id(name).unwrap();
+            let mut sink = Vec::new();
+            assert_eq!(
+                indexed.read_entry_to(entry_id, &mut sink).unwrap(),
+                expected.len() as u64
+            );
+            assert_eq!(sink, expected);
+        }
+
+        let second_local = local_header_offset_for_name(&base, b"deflated.bin");
+        let gap_len = 11usize;
+        let mut gapped = base.clone();
+        gapped.splice(second_local..second_local, vec![0x5A; gap_len]);
+        let shifted_central = central + gap_len;
+        let shifted_second_central = central_header_offset_for_name(&gapped, b"deflated.bin");
+        let shifted_second_local = second_local + gap_len;
+        gapped[shifted_second_central + 42..shifted_second_central + 46]
+            .copy_from_slice(&u32::try_from(shifted_second_local).unwrap().to_le_bytes());
+        let shifted_eocd = eocd + gap_len;
+        gapped[shifted_eocd + 16..shifted_eocd + 20]
+            .copy_from_slice(&u32::try_from(shifted_central).unwrap().to_le_bytes());
+        let indexed = indexed_archive(gapped);
+        for (name, expected) in [
+            ("stored.bin", b"stored".as_slice()),
+            ("deflated.bin", b"deflated".as_slice()),
+        ] {
+            let entry_id = indexed.entry_id(name).unwrap();
+            let mut sink = Vec::new();
+            assert_eq!(
+                indexed.read_entry_to(entry_id, &mut sink).unwrap(),
+                expected.len() as u64
+            );
+            assert_eq!(sink, expected);
+        }
+
+        for first_deflated in [false, true] {
+            for target_deflated in [false, true] {
+                let mut writer = StreamingArchiveWriter::new();
+                if first_deflated {
+                    writer
+                        .write_deflated_sized("first.bin", b"first payload")
+                        .unwrap();
+                } else {
+                    writer.write_stored("first.bin", b"first payload").unwrap();
+                }
+                if target_deflated {
+                    writer
+                        .write_deflated_sized("target.bin", b"target payload")
+                        .unwrap();
+                } else {
+                    writer
+                        .write_stored("target.bin", b"target payload")
+                        .unwrap();
+                }
+                let base = writer.finish_to_bytes().unwrap();
+                let first_local = local_header_offset_for_name(&base, b"first.bin");
+                let first_central = central_header_offset_for_name(&base, b"first.bin");
+                let target_local = local_header_offset_for_name(&base, b"target.bin");
+                let name_len = usize::from(u16::from_le_bytes(
+                    base[first_local + 26..first_local + 28].try_into().unwrap(),
+                ));
+                let extra_len = usize::from(u16::from_le_bytes(
+                    base[first_local + 28..first_local + 30].try_into().unwrap(),
+                ));
+                let first_payload = first_local + 30 + name_len + extra_len;
+                let declared = u32::try_from(target_local - first_payload + 1).unwrap();
+                let mut overlap = base.clone();
+                overlap[first_local + 18..first_local + 22]
+                    .copy_from_slice(&declared.to_le_bytes());
+                overlap[first_central + 20..first_central + 24]
+                    .copy_from_slice(&declared.to_le_bytes());
+                let indexed = indexed_archive(overlap);
+                let entry_id = indexed.entry_id("target.bin").unwrap();
+                let mut sink = vec![0xA5];
+                let mut accounting = ZipOperationAccounting::default();
+                let error = indexed
+                    .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+                    .unwrap_err();
+                assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+                assert_eq!(sink, vec![0xA5]);
+                assert_eq!(accounting, ZipOperationAccounting::default());
+            }
+        }
+
+        for target_deflated in [false, true] {
+            let mut writer = StreamingArchiveWriter::new();
+            writer.write_stored("first.bin", b"first payload").unwrap();
+            if target_deflated {
+                writer
+                    .write_deflated_sized("target.bin", b"target payload")
+                    .unwrap();
+            } else {
+                writer
+                    .write_stored("target.bin", b"target payload")
+                    .unwrap();
+            }
+            let base = writer.finish_to_bytes().unwrap();
+            let target_local = local_header_offset_for_name(&base, b"target.bin");
+            let target_central = central_header_offset_for_name(&base, b"target.bin");
+            let target_name_len = usize::from(u16::from_le_bytes([
+                base[target_local + 26],
+                base[target_local + 27],
+            ]));
+            let target_extra_len = usize::from(u16::from_le_bytes([
+                base[target_local + 28],
+                base[target_local + 29],
+            ]));
+            let target_payload = target_local + 30 + target_name_len + target_extra_len;
+            let central_start = central_header_offset_for_name(&base, b"first.bin");
+            let declared = u32::try_from(central_start - target_payload + 1).unwrap();
+            let mut intrusion = base.clone();
+            intrusion[target_local + 18..target_local + 22]
+                .copy_from_slice(&declared.to_le_bytes());
+            intrusion[target_central + 20..target_central + 24]
+                .copy_from_slice(&declared.to_le_bytes());
+            if !target_deflated {
+                intrusion[target_local + 22..target_local + 26]
+                    .copy_from_slice(&declared.to_le_bytes());
+                intrusion[target_central + 24..target_central + 28]
+                    .copy_from_slice(&declared.to_le_bytes());
+            }
+            let indexed = indexed_archive(intrusion);
+            let entry_id = indexed.entry_id("target.bin").unwrap();
+            let mut sink = vec![0xA5];
+            let mut accounting = ZipOperationAccounting::default();
+            let error = indexed
+                .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+                .unwrap_err();
+            assert!(matches!(error.kind(), ErrorKind::Eof));
+            assert_eq!(sink, vec![0xA5]);
+            assert_eq!(accounting, ZipOperationAccounting::default());
         }
     }
 
@@ -8046,6 +9796,121 @@ mod tests {
             .expect("central member header")
     }
 
+    #[test]
+    fn indexed_strict_streams_reuse_the_bounded_layout_path() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("stored.bin", b"abc").unwrap();
+        writer.write_deflated("deflated.bin", b"xyz").unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let indexed = indexed_archive(bytes);
+        let stored = indexed.entry_id("stored.bin").unwrap();
+        let deflated = indexed.entry_id("deflated.bin").unwrap();
+
+        let mut stored_sink = Vec::new();
+        let mut stored_accounting = ZipOperationAccounting::default();
+        assert_eq!(
+            indexed
+                .read_entry_to_with_accounting(stored, &mut stored_sink, &mut stored_accounting,)
+                .unwrap(),
+            3
+        );
+        assert_eq!(stored_sink, b"abc");
+        assert_eq!(stored_accounting.stored_payload_bytes_read(), 3);
+        assert_eq!(stored_accounting.stored_payload_bytes_accepted(), 3);
+        assert_eq!(stored_accounting.compressed_deflate_payload_bytes_read(), 0);
+        assert_eq!(stored_accounting.deflate_bytes_produced(), 0);
+        assert_eq!(stored_accounting.deflate_bytes_accepted(), 0);
+        assert!(indexed.strict_layout_cache.is_ready());
+
+        let mut repeated_stored_sink = Vec::new();
+        let mut repeated_stored_accounting = ZipOperationAccounting::default();
+        assert_eq!(
+            indexed
+                .read_entry_to_with_accounting(
+                    stored,
+                    &mut repeated_stored_sink,
+                    &mut repeated_stored_accounting,
+                )
+                .unwrap(),
+            3
+        );
+        assert_eq!(repeated_stored_sink, b"abc");
+        assert_eq!(repeated_stored_accounting.stored_payload_bytes_read(), 3);
+        assert_eq!(
+            repeated_stored_accounting.stored_payload_bytes_accepted(),
+            3
+        );
+
+        let mut deflated_sink = Vec::new();
+        let mut deflated_accounting = ZipOperationAccounting::default();
+        assert_eq!(
+            indexed
+                .read_entry_to_with_accounting(
+                    deflated,
+                    &mut deflated_sink,
+                    &mut deflated_accounting,
+                )
+                .unwrap(),
+            3
+        );
+        assert_eq!(deflated_sink, b"xyz");
+        let deflated_metadata = indexed.metadata_for(deflated).unwrap();
+        assert_eq!(
+            deflated_accounting.compressed_deflate_payload_bytes_read(),
+            deflated_metadata.compressed_size()
+        );
+        assert_eq!(deflated_accounting.deflate_bytes_produced(), 3);
+        assert_eq!(deflated_accounting.deflate_bytes_accepted(), 3);
+        assert_eq!(deflated_accounting.stored_payload_bytes_read(), 0);
+        assert_eq!(deflated_accounting.stored_payload_bytes_accepted(), 0);
+        assert!(indexed.strict_layout_cache.is_ready());
+    }
+
+    #[test]
+    fn indexed_strict_first_read_uses_one_single_flight_builder() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("stored.bin", b"abc").unwrap();
+        let indexed = Arc::new(indexed_archive(writer.finish_to_bytes().unwrap()));
+        let entry_id = indexed.entry_id("stored.bin").unwrap();
+        let barrier = Arc::new(std::sync::Barrier::new(4));
+        let mut joins = Vec::new();
+        for _ in 0..4 {
+            let indexed = Arc::clone(&indexed);
+            let barrier = Arc::clone(&barrier);
+            joins.push(std::thread::spawn(move || {
+                barrier.wait();
+                let mut sink = Vec::new();
+                indexed.read_entry_to(entry_id, &mut sink).unwrap();
+                sink
+            }));
+        }
+        for join in joins {
+            assert_eq!(join.join().unwrap(), b"abc");
+        }
+        assert_eq!(indexed.strict_layout_cache.build_count(), 1);
+    }
+
+    #[test]
+    fn rejects_inflated_entry_count_before_reserving_across_central_gap() {
+        let mut bytes = fixture(&[FixtureEntry::stored(b"a", b"data")]);
+        let eocd_offset = bytes.len() - 22;
+        let gap = 4096;
+        bytes.splice(eocd_offset..eocd_offset, vec![0xa5; gap]);
+        let eocd_offset = eocd_offset + gap;
+        bytes[eocd_offset + 8..eocd_offset + 10].copy_from_slice(&1000u16.to_le_bytes());
+        bytes[eocd_offset + 10..eocd_offset + 12].copy_from_slice(&1000u16.to_le_bytes());
+
+        let error = ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED)
+            .err()
+            .expect("inflated EOCD count must be rejected");
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+
+        let error = indexed_archive_result(bytes, ArchiveLimits::UNBOUNDED)
+            .err()
+            .expect("inflated EOCD count must be rejected");
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+    }
+
     fn indexed_archive(bytes: Vec<u8>) -> IndexedArchive<std::io::Cursor<Vec<u8>>> {
         indexed_archive_result(bytes, ArchiveLimits::default()).expect("valid indexed archive")
     }
@@ -8309,6 +10174,111 @@ mod tests {
         push_u32(&mut archive, central_directory_offset);
         push_u16(&mut archive, 0);
         archive
+    }
+
+    fn indexed_strict_error(bytes: Vec<u8>) -> Error {
+        match indexed_archive_result(bytes, ArchiveLimits::UNBOUNDED) {
+            Err(error) => error,
+            Ok(indexed) => {
+                let entry_id = indexed.entry_id("zip64.bin").unwrap();
+                let mut sink = vec![0xA5];
+                let mut accounting = ZipOperationAccounting::default();
+                let error = indexed
+                    .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
+                    .unwrap_err();
+                assert_eq!(sink, vec![0xA5]);
+                assert_eq!(accounting, ZipOperationAccounting::default());
+                error
+            },
+        }
+    }
+
+    fn zip64_descriptor_fixture(payload: &[u8], signature: bool) -> Vec<u8> {
+        let extra = zip64_sizes(
+            u64::try_from(payload.len()).unwrap(),
+            u64::try_from(payload.len()).unwrap(),
+        );
+        zip64_descriptor_fixture_with_central_sizes(payload, signature, &extra, u32::MAX, u32::MAX)
+    }
+
+    fn zip64_descriptor_fixture_with_central_sizes(
+        payload: &[u8],
+        signature: bool,
+        central_extra: &[u8],
+        central_compressed_size: u32,
+        central_uncompressed_size: u32,
+    ) -> Vec<u8> {
+        let name = b"zip64.bin";
+        let size = u64::try_from(payload.len()).unwrap();
+        let crc = crate::crc32(payload);
+        let local_extra = zip64_sizes(size, size);
+        let mut archive = Vec::new();
+
+        push_u32(&mut archive, 0x0403_4b50);
+        push_u16(&mut archive, 45);
+        push_u16(&mut archive, 0x08);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        push_u32(&mut archive, 0);
+        push_u32(&mut archive, u32::MAX);
+        push_u32(&mut archive, u32::MAX);
+        push_u16(&mut archive, u16::try_from(name.len()).unwrap());
+        push_u16(&mut archive, u16::try_from(local_extra.len()).unwrap());
+        archive.extend_from_slice(name);
+        archive.extend_from_slice(&local_extra);
+        archive.extend_from_slice(payload);
+        if signature {
+            push_u32(&mut archive, 0x0807_4b50);
+        }
+        push_u32(&mut archive, crc);
+        archive.extend_from_slice(&size.to_le_bytes());
+        archive.extend_from_slice(&size.to_le_bytes());
+
+        let central_directory_offset = u32::try_from(archive.len()).unwrap();
+        let mut central = Vec::new();
+        push_u32(&mut central, 0x0201_4b50);
+        push_u16(&mut central, 45);
+        push_u16(&mut central, 45);
+        push_u16(&mut central, 0x08);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u32(&mut central, crc);
+        push_u32(&mut central, central_compressed_size);
+        push_u32(&mut central, central_uncompressed_size);
+        push_u16(&mut central, u16::try_from(name.len()).unwrap());
+        push_u16(&mut central, u16::try_from(central_extra.len()).unwrap());
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u32(&mut central, 0);
+        push_u32(&mut central, 0);
+        central.extend_from_slice(name);
+        central.extend_from_slice(central_extra);
+        let central_size = u32::try_from(central.len()).unwrap();
+        archive.extend_from_slice(&central);
+
+        push_u32(&mut archive, 0x0605_4b50);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 1);
+        push_u16(&mut archive, 1);
+        push_u32(&mut archive, central_size);
+        push_u32(&mut archive, central_directory_offset);
+        push_u16(&mut archive, 0);
+        archive
+    }
+
+    fn zip64_descriptor_start(archive: &[u8], payload_len: usize) -> usize {
+        let local = local_header_offset_for_name(archive, b"zip64.bin");
+        let name_len = usize::from(u16::from_le_bytes(
+            archive[local + 26..local + 28].try_into().unwrap(),
+        ));
+        let extra_len = usize::from(u16::from_le_bytes(
+            archive[local + 28..local + 30].try_into().unwrap(),
+        ));
+        local + 30 + name_len + extra_len + payload_len
     }
 
     fn zip64_sizes(uncompressed_size: u64, compressed_size: u64) -> Vec<u8> {

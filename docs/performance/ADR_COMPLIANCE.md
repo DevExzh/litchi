@@ -1,5 +1,31 @@
 # Performance optimization ADR-compliance matrix
 
+## Indexed-stream validation (change 0351)
+
+The low-level indexed stream proof remains within the ZIP/OPC ownership
+boundary: strict sink validation preflights encryption, method, single-disk
+ZIP64 provenance, complete local/central metadata and descriptor agreement,
+all physical spans, and overlap/central-intrusion refusal. The locator checks
+classic/ZIP64 counts, offsets, record length/adjacency, short buffers, ZIP64
+resolution, fallible retention bounds, retryable immutable-source single-flight,
+and `ReaderAt` byte stability. Store uses an exact range; Deflate uses exact
+`total_in`; strict CRC-zero applies only to bounded sink paths, while ordinary
+owned and borrowed fallback compatibility remains. One 16 KiB scratch buffer
+per active member is a local bound excluding source/index, sink/output, cache,
+process memory, and concurrency. The rejected compressor/zlib `~65%` premise
+has no artifact support. Final evidence is `315/315` soapberry-zip and `13/13`
+litchi-opc operation accounting under serialized constrained execution.
+`performance_claim: none`; no latency, throughput, RSS, allocation, syscall,
+physical-I/O, decompression, concurrency, selector, artifact, or whole-GOAL
+claim.
+
+The final successful package/scenario-scoped commands, not workspace-wide, are
+recorded in [Change 0351](changes/0351-indexed-stream-validation.md): `cargo
+fmt --package soapberry-zip -- --check`; `cargo test -p soapberry-zip --lib --
+--test-threads=1` => `315/315`; and `cargo test -p litchi-opc --test
+operation_accounting -- --test-threads=1` => `13/13`, with the record's exact
+`ulimit`, target, serialized job/thread, and debug/incremental environment.
+
 ## Verified-streaming hardening (change 0350)
 
 The low-level verified streaming boundary now validates overreported reads

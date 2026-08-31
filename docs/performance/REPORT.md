@@ -340,6 +340,32 @@ allocation, RSS, decompression, physical-I/O, or producer claim.
 
 Crate-scoped formatting evidence: `cargo fmt --package soapberry-zip --package litchi-opc -- --check` passed after formatting.
 
+## Indexed-stream validation (change 0351)
+
+Change 0351 records correctness/resource hardening only
+(`performance_claim: none`). The compressor/zlib premise and any `~65%`
+residual-zlib interpretation are rejected; existing `read_to*` is already a
+fixed-buffer verifier. Strict sink validation covers encryption, supported
+method, resolved single-disk ZIP64 provenance, complete local/central raw
+metadata and ZIP32/ZIP64 descriptor agreement, all physical spans, and
+overlap/central-intrusion refusal. Locator checks counts, offsets, adjacency,
+short buffers, ZIP64 metadata, fallible retention bounds, retryable
+single-flight layout proof, and `ReaderAt` byte stability. Store uses its exact
+range, Deflate exact `total_in`, and strict CRC-zero is limited to sink paths;
+owned/borrowed fallback compatibility remains. The bounded statement is one
+16 KiB scratch buffer for one active member, excluding source/index,
+sink/output, cache, process memory, and concurrency. Final evidence is
+`315/315` soapberry-zip and `13/13` litchi-opc operation accounting under
+serialized constrained execution. No performance, selector, raw artifact,
+claim-registry, or broader GOAL-completion claim is made.
+
+The final successful package/scenario-scoped commands, not workspace-wide, are
+recorded in [Change 0351](changes/0351-indexed-stream-validation.md): `cargo
+fmt --package soapberry-zip -- --check`; `cargo test -p soapberry-zip --lib --
+--test-threads=1` => `315/315`; and `cargo test -p litchi-opc --test
+operation_accounting -- --test-threads=1` => `13/13`, with the record's exact
+`ulimit`, target, serialized job/thread, and debug/incremental environment.
+
 ## Verified-streaming hardening (change 0350)
 
 Change 0350 records correctness/resource hardening only
