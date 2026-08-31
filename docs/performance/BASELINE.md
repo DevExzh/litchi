@@ -1,5 +1,22 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Latest verified-streaming hardening result (change 0350)
+
+Change 0350 is correctness/resource hardening only (`performance_claim: none`).
+It adds shared overreported-read validation across `ReaderAt` loops, ZIP
+verification, streaming, and the OPC `BorrowedReaderAt` boundary, with checked
+offsets/counters. Strict CRC equality is limited to bounded sink `read_to*` /
+`read_entry_to*`; ordinary owned reads retain zero-CRC compatibility, while a
+borrowed nonempty zero-CRC member returns `None` for owned fallback. Deflate
+extra output reports `InvalidSize` before accounting overflow. The bounded
+statement is one fixed-size scratch buffer for one active member, excluding
+caller source/archive/index, sink/output, cache, and aggregate process memory.
+Final evidence is fmt success, `soapberry-zip` `287/287`, and filtered
+`litchi-opc` `4/4` with `261` filtered, serialized with one job/thread,
+incremental/debug disabled, one disk target, and an 8 GiB limit. No latency,
+throughput, RSS, allocation, syscall, decompression, or concurrency claim is
+made.
+
 ## Latest PhysPkgReader stored-Part borrow result (change 0349)
 
 Crate-scoped formatting evidence: `cargo fmt --package soapberry-zip --package litchi-opc -- --check` passed after formatting.

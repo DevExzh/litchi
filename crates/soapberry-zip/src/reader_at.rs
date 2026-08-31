@@ -1,11 +1,21 @@
 use crate::errors::{Error, ErrorKind};
-use std::io::Read;
+use std::io::{self, Read};
 use std::ops::Range;
 #[cfg(unix)]
 use std::os::unix::fs::FileExt;
 #[cfg(windows)]
 use std::os::windows::fs::FileExt;
 use std::{rc::Rc, sync::Arc};
+
+pub(crate) fn validate_read_count(read: usize, requested: usize) -> io::Result<usize> {
+    if read <= requested {
+        return Ok(read);
+    }
+    Err(io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!("reader returned {read} bytes for a {requested}-byte read"),
+    ))
+}
 
 /// Provides reading bytes at a specific offset
 ///
@@ -26,14 +36,29 @@ pub trait ReaderAt {
     fn read_exact_at(&self, buf: &mut [u8], offset: u64) -> std::io::Result<()> {
         let mut read = 0;
         while read < buf.len() {
-            let latest = self.read_at(&mut buf[read..], offset + (read as u64))?;
+            let read_offset = offset
+                .checked_add(u64::try_from(read).map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidData, "ReaderAt offset overflows u64")
+                })?)
+                .ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidData, "ReaderAt offset overflows u64")
+                })?;
+            let latest = validate_read_count(
+                self.read_at(&mut buf[read..], read_offset)?,
+                buf.len() - read,
+            )?;
             if latest == 0 {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::UnexpectedEof,
+                return Err(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
                     "failed to fill whole buffer",
                 ));
             }
-            read += latest;
+            read = read.checked_add(latest).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "ReaderAt read count overflows usize",
+                )
+            })?;
         }
         Ok(())
     }
@@ -61,11 +86,26 @@ impl<T: ReaderAt> ReaderAtExt for T {
         size = size.min(buffer.len());
         let mut pos = 0;
         while pos < size {
-            let read = self.read_at(&mut buffer[pos..], offset + pos as u64)?;
+            let read_offset = offset
+                .checked_add(u64::try_from(pos).map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidData, "ReaderAt offset overflows u64")
+                })?)
+                .ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidData, "ReaderAt offset overflows u64")
+                })?;
+            let read = validate_read_count(
+                self.read_at(&mut buffer[pos..], read_offset)?,
+                buffer.len() - pos,
+            )?;
             if read == 0 {
                 return Ok(pos);
             }
-            pos += read;
+            pos = pos.checked_add(read).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "ReaderAt read count overflows usize",
+                )
+            })?;
         }
         Ok(pos)
     }
@@ -329,7 +369,7 @@ impl<R> RangeReader<R> {
     /// signalling the end of the stream.
     #[inline]
     pub fn remaining(&self) -> u64 {
-        self.end_offset - self.offset
+        self.end_offset.saturating_sub(self.offset)
     }
 
     /// Returns the end offset of the range.
@@ -356,9 +396,27 @@ where
     R: ReaderAt,
 {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let read_size = buf.len().min(self.remaining() as usize);
-        let read = self.archive.read_at(&mut buf[..read_size], self.offset)?;
-        self.offset += read as u64;
+        let read_size = buf
+            .len()
+            .min(usize::try_from(self.remaining()).unwrap_or(usize::MAX));
+        let read = validate_read_count(
+            self.archive.read_at(&mut buf[..read_size], self.offset)?,
+            read_size,
+        )?;
+        self.offset = self
+            .offset
+            .checked_add(u64::try_from(read).map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "RangeReader offset overflows u64",
+                )
+            })?)
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "RangeReader offset overflows u64",
+                )
+            })?;
         Ok(read)
     }
 }
@@ -366,7 +424,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
+    use std::io::{self, Cursor, Read};
 
     const TEST_DATA: &[u8] = b"Hello, World! This is test data for ReaderAt implementations.";
 
@@ -529,5 +587,39 @@ mod tests {
         let mut buf3 = [0u8; 10];
         let read3 = reader3.read(&mut buf3).unwrap();
         assert_eq!(read3, 0); // No data to read
+    }
+
+    #[derive(Debug)]
+    struct OverreportingReaderAt;
+
+    impl ReaderAt for OverreportingReaderAt {
+        fn read_at(&self, buffer: &mut [u8], _offset: u64) -> io::Result<usize> {
+            Ok(buffer.len().saturating_add(1))
+        }
+    }
+
+    #[test]
+    fn reader_at_wrappers_reject_overreported_reads_without_panicking() {
+        let reader = OverreportingReaderAt;
+        let mut buffer = [0u8; 4];
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            reader.read_exact_at(&mut buffer, 0)
+        }))
+        .expect("read_exact_at must not panic");
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidData);
+
+        let reader = OverreportingReaderAt;
+        let buffer_len = buffer.len();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            reader.try_read_at_least_at(&mut buffer, buffer_len, 0)
+        }))
+        .expect("try_read_at_least_at must not panic");
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidData);
+
+        let mut range = RangeReader::new(OverreportingReaderAt, 0..4);
+        let result =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| range.read(&mut buffer)))
+                .expect("RangeReader::read must not panic");
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidData);
     }
 }

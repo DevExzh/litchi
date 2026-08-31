@@ -1,5 +1,20 @@
 # Performance optimization ADR-compliance matrix
 
+## Verified-streaming hardening (change 0350)
+
+The low-level verified streaming boundary now validates overreported reads
+across `ReaderAt` loops, ZIP verification, streaming, and the OPC
+`BorrowedReaderAt` adapter, checking offsets and counters before use. Bounded
+sink `read_to*` / `read_entry_to*` paths require strict CRC equality; ordinary
+owned reads preserve zero-CRC compatibility, borrowed nonempty zero-CRC returns
+`None` for owned fallback, and Deflate extra output retains `InvalidSize`
+precedence. This is one fixed-size scratch buffer per active member, not a
+total process-memory bound. Final serialized evidence was fmt success,
+`287/287` soapberry-zip, and `4/4` litchi-opc with `261` filtered, using one
+job/thread, disabled incremental/debug compilation, one disk target, and an
+8 GiB limit. `performance_claim: none`; no latency, throughput, RSS,
+allocation, syscall, decompression, or concurrency claim.
+
 ## PhysPkgReader stored-Part borrowed consumer (change 0349)
 
 Crate-scoped formatting evidence: `cargo fmt --package soapberry-zip --package litchi-opc -- --check` passed after formatting.

@@ -39,6 +39,7 @@ use crate::accounting::{
 };
 use crate::crc::crc32_chunk;
 use crate::path::{RawPath, ZipFilePath};
+use crate::reader_at::validate_read_count;
 use crate::{
     CompressionMethod, Error, ErrorKind, PreservationIndex, RECOMMENDED_BUFFER_SIZE, ReaderAt,
     ZipArchive, ZipArchiveWriter, ZipLocator, ZipOperationAccounting, ZipSliceArchive,
@@ -1021,7 +1022,7 @@ impl<'data> ArchiveReader<'data> {
             return Ok(None);
         }
         let actual_crc = crate::crc32(data);
-        verification.valid(ZipVerification {
+        verification.valid_strict(ZipVerification {
             crc: actual_crc,
             uncompressed_size: usize_to_u64(data.len(), "stored ZIP bytes")?,
         })?;
@@ -2066,7 +2067,7 @@ where
             .min(buffer.len());
         let read = loop {
             match reader.read(&mut buffer[..request]) {
-                Ok(read) => break read,
+                Ok(read) => break validate_read_count(read, request)?,
                 Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
                 Err(error) => return Err(error.into()),
             }
@@ -2115,7 +2116,9 @@ where
                     accounting.add_deflate_bytes_accepted(written_u64)?;
                 },
             }
-            accepted += written;
+            accepted = accepted
+                .checked_add(written)
+                .ok_or_else(|| accounting_overflow("decompressed ZIP bytes accepted"))?;
         }
         crc = crc32_chunk(&buffer[..read], crc);
         copied = copied
@@ -2126,20 +2129,15 @@ where
     let mut probe = [0_u8; 1];
     let extra = loop {
         match reader.read(&mut probe) {
-            Ok(extra) => break extra,
+            Ok(extra) => break validate_read_count(extra, probe.len())?,
             Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(error) => return Err(error.into()),
         }
     };
     if extra != 0 {
-        if matches!(accounting_kind, AccountingReadKind::Deflate) {
-            accounting.add_deflate_bytes_produced(usize_to_u64(
-                extra,
-                "decompressed Deflate bytes produced",
-            )?)?;
-        }
-        let actual =
-            copied.saturating_add(usize_to_u64(extra, "ZIP logical payload bytes probed")?);
+        let actual = copied
+            .checked_add(usize_to_u64(extra, "ZIP logical payload bytes probed")?)
+            .ok_or_else(|| accounting_overflow("ZIP logical payload bytes probed"))?;
         return Err(ErrorKind::InvalidSize {
             expected: expected_size,
             actual,
@@ -2147,7 +2145,7 @@ where
         .into());
     }
 
-    verifier.valid(ZipVerification {
+    verifier.valid_strict(ZipVerification {
         crc,
         uncompressed_size: copied,
     })?;
@@ -4641,6 +4639,7 @@ const _: () = {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Crc32Option;
     use std::io::{self, Cursor};
 
     #[derive(Debug)]
@@ -4822,6 +4821,15 @@ mod tests {
     }
 
     #[derive(Debug)]
+    struct OverreportingReader;
+
+    impl Read for OverreportingReader {
+        fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+            Ok(buffer.len().saturating_add(1))
+        }
+    }
+
+    #[derive(Debug)]
     struct InterruptingWriter {
         bytes: Vec<u8>,
         interrupted: bool,
@@ -4890,6 +4898,62 @@ mod tests {
         assert_eq!(sink.bytes, payload);
         assert_eq!(accounting.deflate_bytes_produced(), payload.len() as u64);
         assert_eq!(accounting.deflate_bytes_accepted(), payload.len() as u64);
+    }
+
+    #[test]
+    fn accounted_stream_rejects_source_overreport_without_progress() {
+        let mut source = OverreportingReader;
+        let mut sink = Vec::new();
+        let mut accounting = ZipOperationAccounting::default();
+        let error = stream_verified_with_accounting(
+            &mut source,
+            ZipVerification {
+                crc: 1,
+                uncompressed_size: 1,
+            },
+            &mut sink,
+            &mut accounting,
+            AccountingReadKind::Stored,
+        )
+        .unwrap_err();
+        match error.kind() {
+            ErrorKind::IO(error) | ErrorKind::Io(error) => {
+                assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+            },
+            other => panic!("expected invalid read-count error, got {other:?}"),
+        }
+        assert!(sink.is_empty());
+        assert_eq!(accounting.stored_payload_bytes_accepted(), 0);
+        assert_eq!(accounting.stored_payload_bytes_read(), 0);
+    }
+
+    #[test]
+    fn deflate_overrun_keeps_size_error_before_accounting_overflow() {
+        let mut source = ScriptedReader::new([ReadStep::Bytes(vec![b'x'])]);
+        let mut sink = Vec::new();
+        let mut accounting = ZipOperationAccounting::default();
+        accounting.add_deflate_bytes_produced(u64::MAX).unwrap();
+
+        let error = stream_verified_with_accounting(
+            &mut source,
+            ZipVerification {
+                crc: 0,
+                uncompressed_size: 0,
+            },
+            &mut sink,
+            &mut accounting,
+            AccountingReadKind::Deflate,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::InvalidSize {
+                expected: 0,
+                actual: 1
+            }
+        ));
+        assert_eq!(accounting.deflate_bytes_produced(), u64::MAX);
+        assert!(sink.is_empty());
     }
 
     #[test]
@@ -7650,6 +7714,72 @@ mod tests {
     }
 
     #[test]
+    fn strict_verified_paths_reject_nonempty_zero_crc_and_accept_empty() {
+        let payload = b"nonempty zero CRC payload";
+        assert_ne!(crate::crc32(payload), 0);
+        let bytes = skipped_crc_fixture(payload);
+        let actual_crc = crate::crc32(payload);
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        let mut stored_output = Vec::new();
+        let error = reader
+            .read_to("stored.bin", &mut stored_output)
+            .unwrap_err();
+        assert_zero_crc_checksum(error, actual_crc);
+        assert_eq!(stored_output, payload);
+
+        let mut deflated_output = Vec::new();
+        let error = reader
+            .read_to("deflated.bin", &mut deflated_output)
+            .unwrap_err();
+        assert_zero_crc_checksum(error, actual_crc);
+        assert_eq!(deflated_output, payload);
+
+        let mut accounted_output = Vec::new();
+        let mut accounting = ZipOperationAccounting::default();
+        let error = reader
+            .read_to_with_accounting("stored.bin", &mut accounted_output, &mut accounting)
+            .unwrap_err();
+        assert_zero_crc_checksum(error, actual_crc);
+        assert_eq!(accounted_output, payload);
+
+        assert_eq!(reader.read("stored.bin").unwrap(), payload);
+        let mut owned_accounting = ZipOperationAccounting::default();
+        assert_eq!(
+            reader
+                .read_with_accounting("deflated.bin", &mut owned_accounting)
+                .unwrap(),
+            payload
+        );
+
+        let indexed = indexed_archive(bytes.clone());
+        assert_eq!(indexed.read("deflated.bin").unwrap(), payload);
+        let indexed_id = indexed.entry_id("deflated.bin").unwrap();
+        let mut indexed_output = Vec::new();
+        let error = indexed
+            .read_entry_to(indexed_id, &mut indexed_output)
+            .unwrap_err();
+        assert_zero_crc_checksum(error, actual_crc);
+        assert_eq!(indexed_output, payload);
+
+        let lazy = LazyArchiveReader::new(&bytes).unwrap();
+        let mut lazy_output = Vec::new();
+        let mut lazy_accounting = ZipOperationAccounting::default();
+        let error = lazy
+            .read_to_with_accounting("deflated.bin", &mut lazy_output, &mut lazy_accounting)
+            .unwrap_err();
+        assert_zero_crc_checksum(error, actual_crc);
+        assert_eq!(lazy_output, payload);
+        assert_eq!(lazy.cache_size(), 0);
+
+        for name in ["empty-stored.bin", "empty-deflated.bin"] {
+            let mut output = Vec::new();
+            assert_eq!(reader.read_to(name, &mut output).unwrap(), 0);
+            assert!(output.is_empty());
+        }
+    }
+
+    #[test]
     fn borrowed_store_rejects_payload_corruption_with_a_nonzero_crc() {
         let payload = b"nonzero CRC payload";
         let mut writer = StreamingArchiveWriter::new();
@@ -7979,6 +8109,78 @@ mod tests {
             },
             other => panic!("expected limit error, got {other:?}"),
         }
+    }
+
+    fn assert_zero_crc_checksum(error: Error, actual_crc: u32) {
+        match error.kind() {
+            ErrorKind::InvalidChecksum { expected, actual } => {
+                assert_eq!(*expected, 0);
+                assert_eq!(*actual, actual_crc);
+            },
+            other => panic!("expected zero-CRC checksum error, got {other:?}"),
+        }
+    }
+
+    fn skipped_crc_fixture(payload: &[u8]) -> Vec<u8> {
+        fn write_entry<W: Write>(
+            archive: &mut ZipArchiveWriter<W>,
+            name: &str,
+            compression_method: CompressionMethod,
+            payload: &[u8],
+        ) {
+            let (mut entry, config) = archive
+                .new_file(name)
+                .compression_method(compression_method)
+                .crc32(Crc32Option::Skip)
+                .start()
+                .unwrap();
+            match compression_method {
+                CompressionMethod::Store => {
+                    let mut writer = config.wrap(&mut entry);
+                    writer.write_all(payload).unwrap();
+                    let (_, descriptor) = writer.finish().unwrap();
+                    entry.finish(descriptor).unwrap();
+                },
+                CompressionMethod::Deflate => {
+                    let encoder = DeflateEncoder::new(&mut entry, Compression::default());
+                    let mut writer = config.wrap(encoder);
+                    writer.write_all(payload).unwrap();
+                    let (encoder, descriptor) = writer.finish().unwrap();
+                    encoder.finish().unwrap();
+                    entry.finish(descriptor).unwrap();
+                },
+                _ => unreachable!("test fixture uses only Store and Deflate"),
+            }
+        }
+
+        let mut output = Cursor::new(Vec::new());
+        let mut archive = ZipArchiveWriter::new(&mut output);
+        write_entry(
+            &mut archive,
+            "stored.bin",
+            CompressionMethod::Store,
+            payload,
+        );
+        write_entry(
+            &mut archive,
+            "deflated.bin",
+            CompressionMethod::Deflate,
+            payload,
+        );
+        write_entry(
+            &mut archive,
+            "empty-stored.bin",
+            CompressionMethod::Store,
+            b"",
+        );
+        write_entry(
+            &mut archive,
+            "empty-deflated.bin",
+            CompressionMethod::Deflate,
+            b"",
+        );
+        archive.finish().unwrap();
+        output.into_inner()
     }
 
     #[derive(Clone, Copy)]

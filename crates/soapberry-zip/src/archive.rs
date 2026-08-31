@@ -6,7 +6,9 @@ use crate::mode::{
     msdos_mode_to_file_mode, unix_mode_to_file_mode,
 };
 use crate::path::{RawPath, ZipFilePath};
-use crate::reader_at::{FileReader, MutexReader, RangeReader, ReaderAt, ReaderAtExt};
+use crate::reader_at::{
+    FileReader, MutexReader, RangeReader, ReaderAt, ReaderAtExt, validate_read_count,
+};
 use crate::time::{ZipDateTimeKind, extract_best_timestamp};
 use crate::utils::{le_u16, le_u32, le_u64};
 use crate::{EndOfCentralDirectory, EndOfCentralDirectoryRecordFixed, ZipLocator};
@@ -718,8 +720,9 @@ impl<'a> ZipSliceEntry<'a> {
         self.verifier
     }
 
-    /// Returns a reader that wraps a decompressor and verify the size and CRC
-    /// of the decompressed data once finished.
+    /// Returns a reader that checks the declared size and, when supplied, CRC
+    /// of the decompressed data once finished. A declared CRC of zero is
+    /// treated as unavailable by the compatibility verifier.
     pub fn verifying_reader<D>(&self, reader: D) -> ZipSliceVerifier<D>
     where
         D: std::io::Read,
@@ -790,7 +793,8 @@ impl<'a> ZipSliceEntry<'a> {
     }
 }
 
-/// Verifies the wrapped reader returns the expected CRC and uncompressed size
+/// Checks the wrapped reader returns the expected size and, when supplied, CRC.
+/// A declared CRC of zero is treated as unavailable.
 #[derive(Debug, Clone)]
 pub struct ZipSliceVerifier<D> {
     reader: D,
@@ -811,9 +815,20 @@ where
     D: std::io::Read,
 {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let read = self.reader.read(buf)?;
+        let read = validate_read_count(self.reader.read(buf)?, buf.len())?;
         self.crc = crc32_chunk(&buf[..read], self.crc);
-        self.size += read as u64;
+        let read_u64 = u64::try_from(read).map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "ZIP verifier read count overflows u64",
+            )
+        })?;
+        self.size = self.size.checked_add(read_u64).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "ZIP verifier size overflows u64",
+            )
+        })?;
 
         if read == 0 || self.size >= self.verifier.size() {
             self.verifier
@@ -1204,8 +1219,9 @@ where
         }
     }
 
-    /// Returns a reader that wraps a decompressor and verify the size and CRC
-    /// of the decompressed data once finished.
+    /// Returns a reader that checks the declared size and, when supplied, CRC
+    /// of the decompressed data once finished. A declared CRC of zero is
+    /// treated as unavailable by the compatibility verifier.
     pub fn verifying_reader<D>(&self, reader: D) -> ZipVerifier<D, &'archive R>
     where
         D: std::io::Read,
@@ -1371,6 +1387,14 @@ impl ZipVerification {
     /// This function will return an error if the size or CRC does not match
     /// the expected values.
     pub fn valid(&self, rhs: ZipVerification) -> Result<(), Error> {
+        self.valid_with_crc_policy(rhs, false)
+    }
+
+    pub(crate) fn valid_strict(&self, rhs: ZipVerification) -> Result<(), Error> {
+        self.valid_with_crc_policy(rhs, true)
+    }
+
+    fn valid_with_crc_policy(&self, rhs: ZipVerification, require_crc: bool) -> Result<(), Error> {
         if self.size() != rhs.size() {
             return Err(Error::from(ErrorKind::InvalidSize {
                 expected: self.size(),
@@ -1379,7 +1403,7 @@ impl ZipVerification {
         }
 
         // If the CRC is 0, then it is not verified.
-        if self.crc() != 0 && self.crc() != rhs.crc() {
+        if (require_crc || self.crc() != 0) && self.crc() != rhs.crc() {
             return Err(Error::from(ErrorKind::InvalidChecksum {
                 expected: self.crc(),
                 actual: rhs.crc(),
@@ -1414,9 +1438,20 @@ where
     Reader: ReaderAt,
 {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let read = self.reader.read(buf)?;
+        let read = validate_read_count(self.reader.read(buf)?, buf.len())?;
         self.crc = crc32_chunk(&buf[..read], self.crc);
-        self.size += read as u64;
+        let read_u64 = u64::try_from(read).map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "ZIP verifier read count overflows u64",
+            )
+        })?;
+        self.size = self.size.checked_add(read_u64).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "ZIP verifier size overflows u64",
+            )
+        })?;
 
         if read == 0 || self.size >= self.wayfinder.uncompressed_size_hint() {
             let expected_crc = if self.wayfinder.has_data_descriptor {
@@ -2728,7 +2763,16 @@ impl ZipFileHeaderFixed {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
+    use std::io::{self, Cursor, Read};
+
+    #[derive(Debug)]
+    struct OverreportingReader;
+
+    impl Read for OverreportingReader {
+        fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+            Ok(buffer.len().saturating_add(1))
+        }
+    }
 
     #[test]
     pub fn blank_zip_archive() {
@@ -2786,6 +2830,77 @@ mod tests {
             ZipArchive::from_seekable(Cursor::new(data), &mut buf),
             Err(error) if matches!(error.kind(), ErrorKind::InvalidEndOfCentralDirectory)
         ));
+    }
+
+    #[test]
+    fn verifier_wrappers_reject_overreported_reads_without_panicking() {
+        let bytes = std::fs::read("assets/test.zip").unwrap();
+        let slice_archive = ZipArchive::from_slice(bytes.clone()).unwrap();
+        let mut slice_entries = slice_archive.entries();
+        let wayfinder = slice_entries.next_entry().unwrap().unwrap().wayfinder();
+        let slice_entry = slice_archive.get_entry(wayfinder).unwrap();
+        let mut slice_verifier = slice_entry.verifying_reader(OverreportingReader);
+        let mut output = [0u8; 1];
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            slice_verifier.read(&mut output)
+        }))
+        .expect("slice verifier must not panic");
+        let error = result.unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+
+        let mut scratch = vec![0u8; RECOMMENDED_BUFFER_SIZE];
+        let archive = ZipArchive::from_seekable(Cursor::new(bytes), &mut scratch).unwrap();
+        let mut entries = archive.entries(&mut scratch);
+        let wayfinder = entries.next_entry().unwrap().unwrap().wayfinder();
+        let entry = archive.get_entry(wayfinder).unwrap();
+        let mut verifier = entry.verifying_reader(OverreportingReader);
+        let result =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| verifier.read(&mut output)))
+                .expect("seekable verifier must not panic");
+        let error = result.unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn strict_verification_compares_a_zero_crc() {
+        let expected = ZipVerification {
+            crc: 0,
+            uncompressed_size: 3,
+        };
+        assert!(
+            expected
+                .valid(ZipVerification {
+                    crc: 7,
+                    uncompressed_size: 3,
+                })
+                .is_ok()
+        );
+        assert!(matches!(
+            expected.valid_strict(ZipVerification {
+                crc: 7,
+                uncompressed_size: 3,
+            }),
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidChecksum { .. })
+        ));
+        assert!(
+            expected
+                .valid_strict(ZipVerification {
+                    crc: 0,
+                    uncompressed_size: 3,
+                })
+                .is_ok()
+        );
+        assert!(
+            (ZipVerification {
+                crc: 0,
+                uncompressed_size: 0,
+            })
+            .valid_strict(ZipVerification {
+                crc: 0,
+                uncompressed_size: 0,
+            })
+            .is_ok()
+        );
     }
 
     #[test]
