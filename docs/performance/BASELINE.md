@@ -2561,3 +2561,7 @@ is 73.59%/73.16% lower, but candidate mean drift is 5.86%, p95 drift reaches
 or decompression. Allocation/RSS, cache-temperature, real-producer, durable
 ZIP patch, atomic-save and broader ODS CRUD claims remain open. See
 [`0177`](changes/0177-ods-source-cell-release-evidence.md).
+
+## Change 0345: OPC source-backed reader ingress
+
+[Change 0345](changes/0345-opc-source-backed-reader-ingress.md) records structural evidence only (performance_claim: none): the public litchi-opc reader input was consumed once, an exact maximum-limit overrun returned the typed error with actual = maximum + 1 asserted, open performed zero cold ordinary-payload loads, and one selected part produced one cold successful load. Relative to compressed-plus-all-decompressed eager retention, this path retains one compressed buffer plus indexed metadata and deferred selected payloads. ReadLimits and try_reserve_exact bound logical input/local admission work, not total RSS or aggregate concurrent opens. Validation was 4/4 focused tests, including reader_ingress_retries_one_interrupted_read and reader_ingress_rejects_invalid_read_count_without_panicking, plus four owner-library checks, run with one Cargo process/job and a dedicated on-disk target. No RSS, allocation, or before/after latency claim is made; callers needing tighter host memory must provide a lower max_input_bytes, serialize opens, and account aggregate process memory externally. Arbitrary blocking Read cancellation remains limited, and the change adds no facade API or iWork path.

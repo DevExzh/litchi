@@ -13,6 +13,7 @@ use crate::members::{NonPartMember, PartNameIndex};
 use crate::package::OpcPackage;
 use crate::packuri::{PACKAGE_URI, PackURI};
 use crate::part::PartFactory;
+use crate::phys_pkg::read_limited;
 use crate::pkgreader::{
     PackageReader, SerializedRelationship, SourceCatalog, ValidationCatalogError,
     ValidationCatalogPhase, is_xml_id,
@@ -31,7 +32,7 @@ use soapberry_zip::ReaderAt as ZipReaderAt;
 use soapberry_zip::ZipOperationAccounting as LowLevelZipOperationAccounting;
 use soapberry_zip::office::{EntryId, IndexedArchive};
 use std::collections::HashMap;
-use std::io::Write;
+use std::io::{Read, Write};
 #[cfg(any(unix, windows))]
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -3027,6 +3028,28 @@ impl SourceBackedPackage {
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
         Self::from_read_at_with_limits(Arc::new(FileSource::open(path)?), limits)
+    }
+
+    /// Open a source-backed package from a sequential reader with the standard
+    /// bounded read policy.
+    ///
+    /// The reader is consumed once into an owned byte vector, which is moved
+    /// into the source-backed positional owner without copying its bytes.
+    /// Opening validates only the ZIP catalog, content types, and relationships;
+    /// ordinary part payloads remain deferred until a [`PartView::data`] request.
+    pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
+        Self::from_reader_with_limits(reader, ReadLimits::default())
+    }
+
+    /// Open a source-backed package from a sequential reader with an explicit
+    /// bounded read policy.
+    ///
+    /// The reader is consumed once, with `limits.max_input_bytes()` enforced
+    /// during ingestion. The resulting byte vector is moved into the existing
+    /// owned source without a second copy. Ordinary part payloads remain
+    /// deferred until a [`PartView::data`] request.
+    pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
+        Self::from_vec_with_limits(read_limited(reader, limits)?, limits)
     }
 
     /// Open a source-backed package with the standard bounded read policy.
