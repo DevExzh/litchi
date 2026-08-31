@@ -29,7 +29,6 @@ mod graph;
 mod hidden_axes;
 mod sort;
 mod storage;
-mod title;
 mod topology;
 
 use super::keynote_object_catalog::{KeynoteObjectCatalog, map_catalog_error};
@@ -42,7 +41,6 @@ use litchi_iwa_common::comment::Comment;
 use litchi_numbers::table::merge::Region;
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 use storage::{remove_objects, set_table_geometry_in_package, set_uniform_table_dimensions};
-pub use title::KeynoteTableTitleSettings;
 
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_MODEL_MESSAGE_TYPES: &[u32] = &[6_000, 6_001];

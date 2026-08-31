@@ -58,11 +58,10 @@ pub use editor::{
     KeynoteTableCellTextDecorations, KeynoteTableCellTextFont, KeynoteTableCellTextLigatures,
     KeynoteTableCellTextOutline, KeynoteTableCellTextScript, KeynoteTableCellTextShadow,
     KeynoteTableCellTextStyle, KeynoteTableCellUpdate, KeynoteTableCellValue,
-    KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTablePoints,
-    KeynoteTableTitleSettings, Kind, MovieKind, Opaque, RemovedKeynoteSlideAudio,
-    RemovedKeynoteSlideChart, RemovedKeynoteSlideImage, RemovedKeynoteSlideMovie,
-    RemovedKeynoteSlideShape, RemovedKeynoteSlideTable, RemovedKeynoteTextBox, RgbColorSpace, Rgba,
-    Stop,
+    KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTablePoints, Kind, MovieKind, Opaque,
+    RemovedKeynoteSlideAudio, RemovedKeynoteSlideChart, RemovedKeynoteSlideImage,
+    RemovedKeynoteSlideMovie, RemovedKeynoteSlideShape, RemovedKeynoteSlideTable,
+    RemovedKeynoteTextBox, RgbColorSpace, Rgba, Stop,
 };
 pub use litchi_keynote::Seconds;
 pub use litchi_keynote::build::{AnimationType, Build};

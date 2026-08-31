@@ -2,7 +2,6 @@ use std::env;
 
 use litchi_iwa::keynote::{
     KeynoteDocumentBuilder, KeynoteEditor, KeynoteTableCellUpdate, KeynoteTableCellValue,
-    KeynoteTableTitleSettings,
 };
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_keynote::slide::table::dimension::{Dimension, Size};
@@ -12,6 +11,7 @@ use litchi_keynote::slide::table::formula::{
 use litchi_keynote::slide::table::headers::{
     Count as KeynoteHeaderCount, Settings as KeynoteHeaderSettings,
 };
+use litchi_keynote::slide::table::title::Settings as TableTitleSettings;
 use litchi_numbers::table::topology::{ColumnInsertion, RowInsertion};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -62,10 +62,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         },
     )?;
-    editor = set_focused_keynote_table_title(
-        editor,
-        KeynoteTableTitleSettings::new(Some(true), Some(true)),
-    )?;
+    editor =
+        set_focused_keynote_table_title(editor, TableTitleSettings::new(Some(true), Some(true)))?;
     for (column, width) in [440.0, 390.0, 390.0].into_iter().enumerate() {
         editor = set_focused_keynote_table_dimension(
             editor,
@@ -175,7 +173,7 @@ fn set_focused_keynote_table_dimension(
 
 fn set_focused_keynote_table_title(
     editor: KeynoteEditor,
-    settings: KeynoteTableTitleSettings,
+    settings: TableTitleSettings,
 ) -> Result<KeynoteEditor, Box<dyn std::error::Error>> {
     let package = litchi_keynote::Package::from_bytes(&editor.to_bytes()?)?;
     let commit = package
