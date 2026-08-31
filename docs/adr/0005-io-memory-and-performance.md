@@ -1943,3 +1943,26 @@ internal dependency declarations, 226 canonical edges, and 11 ordered
 migration debts with orders `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, with
 one migration host. Debt 005 is removed; debt 002, the relevant host/edge, and
 the remaining host logic stay open.
+
+## 2026-08-31 amendment: Wave120 bounded TableDataList text projection
+
+Wave120 removes the generic text registry's eager generated-Prost construction
+for root and segmented Numbers `TableDataList` payloads (message types 6005,
+6201, and 6011). The adapter now uses the existing strict
+`numbers_table_cell_storage_codec`: a handwritten bounded traversal validates
+the source and forces the private Buffa lazy projection for parity while the
+original archive bytes remain authoritative.
+
+The adapter stages only non-empty borrowed strings, copies them with fallible
+reservations, and publishes the owned vector only after the complete decode
+succeeds. Decode options impose finite input-byte, field, work, nesting,
+reference, and aggregate-text ceilings; resource failures cross the adapter as
+typed common limits where that vocabulary exists. Focused tests cover root and
+segment parity, ownership after source mutation, malformed/truncated input,
+duplicate and wrong-wire fields, invalid UTF-8, budget refusal, and private
+prefix non-publication.
+
+This removes two eager production decoder calls from one private extraction
+path. It is not a latency, throughput, allocation-count, or whole-graph memory
+claim. Other host editor paths still use generated Prost values, and no public
+API, dependency edge, ordered migration debt, or monolith-deletion gate changes.

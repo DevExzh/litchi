@@ -6995,3 +6995,27 @@ internal dependency declarations, 226 canonical edges, and 11 ordered
 migration debts with orders `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, with
 one migration host. Debt 005 is removed; debt 002, the relevant host/edge, and
 the remaining host logic stay open.
+
+## 2026-08-31 amendment: Wave120 TableDataList text decoder migration
+
+Wave120 removes the private generic text registry's eager
+`tst::TableDataList::decode` and `tst::TableDataListSegment::decode` production
+routes for message types 6005, 6201, and 6011. The compatibility adapter now
+uses the existing generated-free `numbers_table_cell_storage_codec`. Its strict
+handwritten traversal owns canonical wire validation and aggregate accounting;
+its private Buffa lazy views are forced only as parity oracles, and the archive
+payload remains the preservation and rewrite authority.
+
+Only non-empty string fields cross this boundary. They are copied into a
+fallibly reserved private stage and become visible through the existing neutral
+text trait only after the complete root or segment passes finite byte, field,
+work, nesting, reference, and text limits. Focused tests prove root and segment
+parity, owned lifetime, hostile-wire refusal, budget refusal, and absence of
+partial publication after a late failure. A source guard keeps both eager
+generated decoder calls out of production.
+
+This advances generated-decoder retirement inside the migration host; it does
+not move the generic text registry into a concrete format owner. Other
+TableDataList editor/mutation consumers still use generated values, so no
+dependency edge, ordered migration debt, host-exit item, or monolith-deletion
+gate closes in Wave120. The post-Wave119 topology inventory remains unchanged.
