@@ -64,8 +64,10 @@ formula groups, or claim general support for external-link formulas.
 - `CARGO_BUILD_JOBS=1 cargo fmt --package litchi-xlsx`: passed.
 - `CARGO_TARGET_DIR=/dev/shm/litchi-0337-target CARGO_BUILD_JOBS=1 cargo check
   -p litchi-xlsx --lib`: passed.
-- `CARGO_TARGET_DIR=/dev/shm/litchi-0337-target CARGO_BUILD_JOBS=1 cargo test
-  -p litchi-xlsx --test source_backed_cell_values`: passed, 39 tests.
+- `CARGO_TARGET_DIR=/home/zhuhe/CodeProjects/.cargo-targets/litchi-0337-target
+  CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 cargo test
+  -p litchi-xlsx --test source_backed_cell_values -- --test-threads=1`: passed,
+  40 tests after final review hardening.
 - The focused suite covers direct dates, scalar-formula cache removal,
   `calcPr` invalidation, calculation-chain topology removal/restoration,
   semantic no-op byte identity, grouped-formula refusal, stale-source
@@ -76,15 +78,15 @@ formula groups, or claim general support for external-link formulas.
   calculation-chain Part while another package or Part relationship still
   targeted it. The patch now refuses any additional inbound relationship,
   including ASCII-case-equivalent Part names, before mutating its candidate.
-  A focused atomic-refusal regression was added and source-reviewed after the
-  OOM cleanup; it was formatted but not executed.
+  The focused atomic-refusal regression passed in the serialized run above.
 - The broad XLSX `--lib --tests` gate did not complete before the host OOMed
   and was deliberately not restarted. Clippy and rustdoc were also omitted to
   avoid another high-memory crate-wide build. This record does not claim those
   gates passed.
 - The 8.7 GiB isolated target was removed after validation. `/dev/shm` fell
   from 8.8 GiB used to 53 MiB, leaving 16 GiB free; the root filesystem had
-  135 GiB free.
+  135 GiB free. The later disk-backed validation target was also removed
+  immediately after the 40-test run.
 
 ## Performance claims
 
