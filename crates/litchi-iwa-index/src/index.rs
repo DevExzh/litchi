@@ -510,7 +510,8 @@ impl ObjectIndex {
     /// # Errors
     ///
     /// Returns [`FragmentTraversalError::LimitExceeded`] when the fragment is
-    /// larger than `limit`.
+    /// larger than `limit`, or [`FragmentTraversalError::MissingObject`] when
+    /// the fragment's immutable object catalog is inconsistent.
     #[must_use = "the bounded fragment query result must be checked"]
     pub fn fragment_objects_bounded(
         &self,
@@ -521,11 +522,31 @@ impl ObjectIndex {
             return Ok(None);
         };
 
-        Ok(Some(object_ids.iter().filter_map(|object_id| {
-            self.objects
+        // The fragment/object table is derived from the same object catalog
+        // during `IndexBuilder::build`, so a missing record indicates a
+        // broken immutable snapshot rather than a normal lookup miss. Check
+        // the complete slice before publishing an iterator to preserve the
+        // complete-or-refused contract and avoid silently dropping records.
+        for &object_id in object_ids {
+            if self
+                .objects
+                .binary_search_by_key(&object_id, ObjectRecord::id)
+                .is_err()
+            {
+                return Err(FragmentTraversalError::MissingObject { fragment });
+            }
+        }
+
+        Ok(Some(object_ids.iter().map(|object_id| {
+            let position = self
+                .objects
                 .binary_search_by_key(object_id, ObjectRecord::id)
-                .ok()
-                .and_then(|position| self.objects.get(position))
+                .unwrap_or_else(|_| {
+                    unreachable!(
+                        "fragment object catalog was validated before iterator publication"
+                    )
+                });
+            &self.objects[position]
         })))
     }
 
@@ -615,7 +636,7 @@ mod tests {
     use super::*;
     use crate::{
         ByteSpan, ByteSpanError, FragmentIdError, FragmentTraversalError, FragmentTraversalLimit,
-        ReferenceError,
+        ReferenceError, SemanticIndex, SemanticLimits,
     };
 
     fn fragment(value: u32) -> FragmentId {
@@ -1116,6 +1137,31 @@ mod tests {
                 observed: 1,
                 maximum: 0,
             }) if actual == populated
+        ));
+    }
+
+    #[test]
+    fn semantic_fragment_traversal_reports_missing_object_invariant() {
+        let fragment_id = fragment(1);
+        let missing_object = object(9);
+        let index = ObjectIndex {
+            objects: Box::default(),
+            fragments: vec![FragmentEntry {
+                id: fragment_id,
+                object_range: 0..1,
+            }]
+            .into_boxed_slice(),
+            fragment_object_ids: vec![missing_object].into_boxed_slice(),
+            graph: ReferenceGraph::new().snapshot(),
+        };
+        let view = SemanticIndex::new(&index, SemanticLimits::new(0, 0, 0))
+            .expect("empty object and reference catalogs fit the view");
+
+        assert!(matches!(
+            view.fragment_objects_bounded(fragment_id, FragmentTraversalLimit::new(1)),
+            Err(FragmentTraversalError::MissingObject {
+                fragment: actual_fragment,
+            }) if actual_fragment == fragment_id
         ));
     }
 

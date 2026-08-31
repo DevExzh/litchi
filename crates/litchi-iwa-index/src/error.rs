@@ -14,6 +14,16 @@ pub enum FragmentTraversalError {
         /// The caller-supplied maximum number of records to visit.
         maximum: usize,
     },
+    /// A fragment catalog entry refers to an object that is absent from the
+    /// immutable object-record catalog.
+    ///
+    /// This indicates an internal index invariant violation. The fragment
+    /// query fails before yielding any records rather than silently returning
+    /// a partial view.
+    MissingObject {
+        /// The adapter-local fragment whose catalog is inconsistent.
+        fragment: FragmentId,
+    },
 }
 
 impl fmt::Display for FragmentTraversalError {
@@ -26,6 +36,10 @@ impl fmt::Display for FragmentTraversalError {
             } => write!(
                 formatter,
                 "fragment {fragment:?} contains {observed} records, exceeding traversal limit {maximum}"
+            ),
+            Self::MissingObject { fragment } => write!(
+                formatter,
+                "fragment {fragment:?} refers to an object missing from the index"
             ),
         }
     }
