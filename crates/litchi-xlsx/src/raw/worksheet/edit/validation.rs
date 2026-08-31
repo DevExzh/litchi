@@ -10,7 +10,9 @@ use super::model::{
     WidthEffect,
 };
 use crate::column::Assignments;
-use crate::error::{ColumnEditBlock, DefaultsEditBlock, EditBlock, Error, Result, RowEditBlock};
+use crate::error::{
+    ColumnEditBlock, DefaultsEditBlock, EditBlock, Error, Result, RowEditBlock, invalid,
+};
 pub(super) fn plan_sets_descent(plan: &Plan) -> bool {
     plan.rows
         .values()
@@ -118,6 +120,7 @@ pub(super) fn validate_actions(
     sheet: &str,
     actions: &BTreeMap<Address, Action>,
 ) -> Result<()> {
+    validate_shared_formula_actions(layout, actions)?;
     for (address, action) in actions {
         let blocked = if layout.protected {
             Some(EditBlock::ProtectedSheet)
@@ -128,10 +131,11 @@ pub(super) fn validate_actions(
                 .any(|range| range.contains(*address))
         {
             Some(EditBlock::DataValidation)
-        } else if layout
-            .formula_ranges
-            .iter()
-            .any(|range| range.contains(*address))
+        } else if !matches!(action.payload(), Some(Payload::SharedFormula { .. }))
+            && layout
+                .formula_ranges
+                .iter()
+                .any(|range| range.contains(*address))
         {
             Some(EditBlock::GroupFormula)
         } else if layout
@@ -157,6 +161,84 @@ pub(super) fn validate_actions(
         }
         if let Some(Payload::SharedString { text, .. }) = action.payload() {
             crate::Content::Value(crate::Value::Text(text.clone())).validate_for_write()?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_shared_formula_actions(
+    layout: &Layout,
+    actions: &BTreeMap<Address, Action>,
+) -> Result<()> {
+    for (address, action) in actions {
+        let Some(Payload::SharedFormula {
+            index,
+            reference,
+            formula,
+        }) = action.payload()
+        else {
+            continue;
+        };
+        let group = layout
+            .shared_formulas
+            .iter()
+            .find(|group| group.index == *index)
+            .ok_or_else(|| invalid(format!("no validated shared formula group for si={index}")))?;
+        if !group.members.iter().any(|member| member == address) {
+            return Err(invalid(format!(
+                "shared formula action at {address} is outside si={index}"
+            )));
+        }
+        if reference.as_ref() != group.reference.as_ref() {
+            return Err(invalid(format!(
+                "shared formula action at {address} does not use the exact ref for si={index}"
+            )));
+        }
+        if let Some(formula) = formula {
+            crate::Content::Formula(formula.clone()).validate_for_write()?;
+        }
+    }
+    for group in &*layout.shared_formulas {
+        let has_shared_action = group.members.iter().any(|member| {
+            actions
+                .get(member)
+                .and_then(|action| action.payload())
+                .is_some_and(|payload| matches!(payload, Payload::SharedFormula { .. }))
+        });
+        if !has_shared_action {
+            continue;
+        }
+        for member in &group.members {
+            let Some(Payload::SharedFormula {
+                index,
+                reference,
+                formula,
+            }) = actions.get(member).and_then(|action| action.payload())
+            else {
+                return Err(invalid(format!(
+                    "shared formula actions do not cover every member of si={}",
+                    group.index
+                )));
+            };
+            if *index != group.index || reference.as_ref() != group.reference.as_ref() {
+                return Err(invalid(format!(
+                    "shared formula actions disagree on si={} or ref",
+                    group.index
+                )));
+            }
+            if *member == group.origin {
+                if formula.is_none() {
+                    return Err(invalid(format!(
+                        "shared formula si={} origin requires a formula",
+                        group.index
+                    )));
+                }
+            } else if formula.is_some() {
+                return Err(invalid(format!(
+                    "shared formula si={} follower must not contain a formula",
+                    group.index
+                )));
+            }
         }
     }
     Ok(())

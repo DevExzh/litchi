@@ -13,7 +13,7 @@ use super::super::X14;
 use super::super::wire::{column_range, is_mce_name, position, tag};
 use super::model::{
     CellSlot, ColumnSlot, ColumnsSlot, DefaultsSlot, DimensionTag, Layout, MergeCellsSlot,
-    MergeSlot, RootSlot, RowSlot, SheetData, Span, Tag,
+    MergeSlot, RootSlot, RowSlot, SharedFormulaGroup, SheetData, Span, Tag,
 };
 use crate::error::{Result, invalid};
 use crate::raw::namespace::is_spreadsheetml_name;
@@ -53,6 +53,7 @@ struct PendingCell {
     tag: Tag,
     primary: Vec<Span>,
     mce_payload: bool,
+    formula_index: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -154,6 +155,10 @@ struct FormulaStorage {
     kind: Box<str>,
     index: Option<u32>,
     range: Option<SelectionRange>,
+    reference: Option<Box<str>>,
+    supported_attributes: bool,
+    has_text: bool,
+    has_expression: bool,
 }
 
 #[derive(Debug, Default)]
@@ -259,7 +264,13 @@ fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
                 scanner.finish(frame, event_start, event_end)?;
             },
             Event::Text(value) => {
-                if stack.last().is_some_and(|frame| {
+                if stack
+                    .last()
+                    .is_some_and(|frame| frame.kind == FrameKind::Primary)
+                {
+                    let text = value.decode().map_err(|error| invalid(error.to_string()))?;
+                    scanner.mark_formula_text(&text);
+                } else if stack.last().is_some_and(|frame| {
                     matches!(frame.kind, FrameKind::MergeCells | FrameKind::Merge)
                 }) && !value
                     .decode()
@@ -270,8 +281,26 @@ fn scan_with_limit(content: &[u8], max_events: usize) -> Result<Layout> {
                     scanner.mark_merge_payload();
                 }
             },
-            Event::CData(_) | Event::GeneralRef(_) => {
-                if stack.last().is_some_and(|frame| {
+            Event::CData(value) => {
+                if stack
+                    .last()
+                    .is_some_and(|frame| frame.kind == FrameKind::Primary)
+                {
+                    let text = value.decode().map_err(|error| invalid(error.to_string()))?;
+                    scanner.mark_formula_text(&text);
+                } else if stack.last().is_some_and(|frame| {
+                    matches!(frame.kind, FrameKind::MergeCells | FrameKind::Merge)
+                }) {
+                    scanner.mark_merge_payload();
+                }
+            },
+            Event::GeneralRef(_) => {
+                if stack
+                    .last()
+                    .is_some_and(|frame| frame.kind == FrameKind::Primary)
+                {
+                    scanner.mark_formula_reference();
+                } else if stack.last().is_some_and(|frame| {
                     matches!(frame.kind, FrameKind::MergeCells | FrameKind::Merge)
                 }) {
                     scanner.mark_merge_payload();
@@ -430,7 +459,12 @@ impl Scanner {
             )
         {
             if element.name().local_name().as_ref() == b"f" {
+                if let Some(cell) = self.cell.as_mut() {
+                    cell.formula_index = None;
+                }
                 self.scan_formula(element, decoder)?;
+            } else if let Some(cell) = self.cell.as_mut() {
+                cell.formula_index = None;
             }
             return Ok(FrameKind::Primary);
         }
@@ -644,7 +678,12 @@ impl Scanner {
             )
         {
             if element.name().local_name().as_ref() == b"f" {
+                if let Some(cell) = self.cell.as_mut() {
+                    cell.formula_index = None;
+                }
                 self.scan_formula(element, decoder)?;
+            } else if let Some(cell) = self.cell.as_mut() {
+                cell.formula_index = None;
             }
             self.cell
                 .as_mut()
@@ -783,14 +822,15 @@ impl Scanner {
                 });
             },
             FrameKind::Primary => {
-                self.cell
+                let cell = self
+                    .cell
                     .as_mut()
-                    .ok_or_else(|| invalid("cell payload closed outside a cell"))?
-                    .primary
-                    .push(Span {
-                        start: frame.start,
-                        end,
-                    });
+                    .ok_or_else(|| invalid("cell payload closed outside a cell"))?;
+                cell.primary.push(Span {
+                    start: frame.start,
+                    end,
+                });
+                cell.formula_index = None;
             },
             FrameKind::Cell => {
                 let cell = self
@@ -923,6 +963,7 @@ impl Scanner {
             tag: tag(element, decoder)?,
             primary: Vec::new(),
             mce_payload: false,
+            formula_index: None,
         });
         Ok(())
     }
@@ -961,29 +1002,68 @@ impl Scanner {
     fn scan_formula(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
         let kind = unqualified_attribute_value(element, b"t", decoder)?
             .unwrap_or_else(|| "normal".to_owned());
-        if !matches!(kind.as_str(), "shared" | "array" | "dataTable") {
-            return Ok(());
-        }
         let address = self
             .cell
             .as_ref()
             .ok_or_else(|| invalid("formula outside edit cell"))?
             .address;
-        let range = unqualified_attribute_value(element, b"ref", decoder)?
-            .map(|value| SelectionRange::cell_or_area(&value))
+        let is_ranged = matches!(kind.as_str(), "shared" | "array" | "dataTable");
+        let supported_attributes =
+            kind != "shared" || shared_formula_attributes_supported(element)?;
+        let reference = if is_ranged {
+            unqualified_attribute_value(element, b"ref", decoder)?
+        } else {
+            None
+        };
+        let range = reference
+            .as_deref()
+            .map(SelectionRange::cell_or_area)
             .transpose()?;
         let index = if kind == "shared" {
             optional_u32(element, b"si", decoder, "shared formula index")?
         } else {
             None
         };
+        let formula_index = self.formulas.len();
         self.formulas.push(FormulaStorage {
             address,
             kind: kind.into_boxed_str(),
             index,
             range,
+            reference: reference.map(Into::into),
+            supported_attributes,
+            has_text: false,
+            has_expression: false,
         });
+        self.cell
+            .as_mut()
+            .ok_or_else(|| invalid("formula outside edit cell"))?
+            .formula_index = Some(formula_index);
         Ok(())
+    }
+
+    fn mark_formula_text(&mut self, text: &str) {
+        let Some(index) = self.cell.as_ref().and_then(|cell| cell.formula_index) else {
+            return;
+        };
+        if let Some(formula) = self.formulas.get_mut(index) {
+            if !text.is_empty() {
+                formula.has_text = true;
+            }
+            if !text.trim().is_empty() {
+                formula.has_expression = true;
+            }
+        }
+    }
+
+    fn mark_formula_reference(&mut self) {
+        let Some(index) = self.cell.as_ref().and_then(|cell| cell.formula_index) else {
+            return;
+        };
+        if let Some(formula) = self.formulas.get_mut(index) {
+            formula.has_text = true;
+            formula.has_expression = true;
+        }
     }
 
     fn ensure_merge_cells_slot(&self) -> Result<()> {
@@ -1169,6 +1249,7 @@ impl Scanner {
                 "worksheet dimension must precede sheetData during cell edits",
             ));
         }
+        let shared_formulas = shared_formula_groups(&self.formulas, &sheet_data)?;
         let mut formula_ranges = Vec::new();
         let mut shared = HashMap::<u32, SelectionRange>::new();
         for formula in &self.formulas {
@@ -1183,7 +1264,7 @@ impl Scanner {
                 },
                 "shared" => {
                     if let (Some(index), Some(range)) = (formula.index, formula.range) {
-                        shared.insert(index, range);
+                        shared.entry(index).or_insert(range);
                     }
                 },
                 _ => {},
@@ -1238,10 +1319,189 @@ impl Scanner {
             validations: self.validations.into_boxed_slice(),
             extended_validation: self.extended_validation,
             formula_ranges: formula_ranges.into_boxed_slice(),
+            shared_formulas: shared_formulas.into_boxed_slice(),
             defaults_compatibility: self.defaults_compatibility,
             merge_cells: self.merge_cells,
             merge_insertion,
             merge_compatibility: self.merge_compatibility,
         })
     }
+}
+
+const MAX_SHARED_FORMULA_MEMBERS: u32 = 256;
+
+fn shared_formula_attributes_supported(element: &BytesStart<'_>) -> Result<bool> {
+    let mut seen_t = false;
+    let mut seen_ref = false;
+    let mut seen_si = false;
+    for attribute in element.attributes() {
+        let attribute = attribute.map_err(|error| invalid(error.to_string()))?;
+        if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
+            continue;
+        }
+        let seen = match attribute.key.as_ref() {
+            b"t" => &mut seen_t,
+            b"ref" => &mut seen_ref,
+            b"si" => &mut seen_si,
+            _ => return Ok(false),
+        };
+        if *seen {
+            return Ok(false);
+        }
+        *seen = true;
+    }
+    Ok(true)
+}
+
+fn shared_formula_groups(
+    formulas: &[FormulaStorage],
+    sheet_data: &SheetData,
+) -> Result<Vec<SharedFormulaGroup>> {
+    let mut by_index = HashMap::<u32, Vec<usize>>::new();
+    for (formula_index, formula) in formulas.iter().enumerate() {
+        if formula.kind.as_ref() == "shared" {
+            let Some(index) = formula.index else {
+                continue;
+            };
+            by_index.entry(index).or_default().push(formula_index);
+        }
+    }
+    let mut groups = Vec::new();
+    groups
+        .try_reserve_exact(by_index.len())
+        .map_err(|source| allocation("shared formula groups", source))?;
+    'group: for (index, member_indices) in by_index {
+        if member_indices
+            .iter()
+            .any(|&formula_index| !formulas[formula_index].supported_attributes)
+        {
+            continue;
+        }
+        let mut master_index = None;
+        for &formula_index in &member_indices {
+            if formulas[formula_index].reference.is_some() {
+                if master_index.replace(formula_index).is_some() {
+                    continue 'group;
+                }
+            }
+        }
+        let Some(master_index) = master_index else {
+            continue;
+        };
+        let master = &formulas[master_index];
+        if !master.has_expression {
+            continue;
+        }
+        let Some(range) = master.range else {
+            continue;
+        };
+        if !range.starts_at(master.address) {
+            continue;
+        }
+        let Some(rows) = range
+            .last_row
+            .checked_sub(range.first_row)
+            .and_then(|value| value.checked_add(1))
+        else {
+            continue;
+        };
+        let Some(columns) = range
+            .last_column
+            .checked_sub(range.first_column)
+            .and_then(|value| value.checked_add(1))
+        else {
+            continue;
+        };
+        let Some(member_count) = rows.checked_mul(columns) else {
+            continue;
+        };
+        if member_count > MAX_SHARED_FORMULA_MEMBERS {
+            continue;
+        }
+        if member_indices
+            .iter()
+            .any(|&formula_index| !range.contains(formulas[formula_index].address))
+        {
+            continue;
+        }
+        let member_count = usize::try_from(member_count)
+            .map_err(|_| invalid("shared formula member count does not fit usize"))?;
+        let mut members = Vec::new();
+        members
+            .try_reserve_exact(member_count)
+            .map_err(|source| allocation("shared formula members", source))?;
+        for row in range.first_row..=range.last_row {
+            for column in range.first_column..=range.last_column {
+                let Ok(address) = Address::at(row, column) else {
+                    continue 'group;
+                };
+                let mut matching = None;
+                let mut matches = 0usize;
+                for &formula_index in &member_indices {
+                    if formulas[formula_index].address == address {
+                        matches += 1;
+                        matching = Some(formula_index);
+                    }
+                }
+                if matches != 1 {
+                    continue 'group;
+                }
+                let Some(formula_index) = matching else {
+                    continue 'group;
+                };
+                let formula = &formulas[formula_index];
+                let formula_count = formulas
+                    .iter()
+                    .filter(|candidate| candidate.address == address)
+                    .count();
+                if formula_count != 1 {
+                    continue 'group;
+                }
+                if address == master.address {
+                    if formula_index != master_index {
+                        continue 'group;
+                    }
+                } else if formula.has_text || formula.reference.is_some() {
+                    continue 'group;
+                }
+                let Some(cell) = cell_slot(sheet_data, address) else {
+                    continue 'group;
+                };
+                if cell.mce_payload {
+                    continue 'group;
+                }
+                if cell
+                    .tag
+                    .attributes
+                    .iter()
+                    .any(|attribute| matches!(attribute.name.as_ref(), "cm" | "vm"))
+                {
+                    continue 'group;
+                }
+                members.push(address);
+            }
+        }
+        let Some(reference) = master.reference.as_deref() else {
+            continue;
+        };
+        groups.push(SharedFormulaGroup {
+            index,
+            reference: reference.into(),
+            origin: master.address,
+            members: members.into_boxed_slice(),
+        });
+    }
+    Ok(groups)
+}
+
+fn cell_slot(sheet_data: &SheetData, address: Address) -> Option<&CellSlot> {
+    let row = sheet_data
+        .rows
+        .binary_search_by_key(&(address.row().get() + 1), |row| row.number)
+        .ok()
+        .and_then(|index| sheet_data.rows.get(index))?;
+    row.cells
+        .binary_search_by_key(&address, |cell| cell.address)
+        .ok()
+        .and_then(|index| row.cells.get(index))
 }

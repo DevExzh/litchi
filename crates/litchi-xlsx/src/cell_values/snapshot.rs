@@ -10,8 +10,9 @@ use litchi_opc::{
     SourceBackedPackage, SourceLineage, SourceRelationshipTarget, SourceTopologyPlan, TargetMode,
 };
 
-use crate::cell::{Cell, Store, Value};
+use crate::cell::{Cell, SharedFormulaStorage, Store, Value};
 use crate::error::{EditBlock, Error, Result, allocation, invalid};
+use crate::formula::Kind;
 use crate::source_payload::SourcePayload;
 use crate::workbook::source::validate_sheet_graph;
 use crate::{Selector, WorksheetKind, raw};
@@ -52,6 +53,13 @@ pub struct Snapshot {
     sheet_position: usize,
     cells: Arc<Store>,
     source: SourceState,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SharedFormulaGroup {
+    pub(crate) storage: SharedFormulaStorage,
+    pub(crate) master: litchi_sheet::Cell,
+    pub(crate) members: Box<[litchi_sheet::Cell]>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -765,6 +773,115 @@ impl Snapshot {
 
     pub(super) fn editable_cell(&self, address: litchi_sheet::Cell) -> Option<&Cell> {
         self.cell(address)
+    }
+
+    pub(crate) fn shared_formula_group(
+        &self,
+        address: litchi_sheet::Cell,
+        maximum_members: usize,
+    ) -> Result<SharedFormulaGroup> {
+        let entry = self.cells.entry(address).ok_or_else(|| {
+            invalid(format!(
+                "shared formula selector '{address}' has no existing cell owner"
+            ))
+        })?;
+        let Some(storage) = entry.shared_formula.as_ref() else {
+            return Err(self.edit_blocked(address));
+        };
+        if !storage.master || storage.range.start() != address {
+            return Err(Error::EditBlocked {
+                sheet: self.sheet_name().to_owned(),
+                address,
+                reason: EditBlock::GroupFormula,
+            });
+        }
+        if !matches!(&entry.cell, Cell::Formula(formula) if matches!(formula.kind(), Kind::Scalar))
+            || entry.cell_metadata.is_some()
+            || entry.value_metadata.is_some()
+        {
+            return Err(invalid(
+                "shared formula group contains a non-scalar or metadata cell",
+            ));
+        }
+
+        let rows = usize::try_from(storage.range.rows())
+            .map_err(|_| invalid("shared formula range row count overflows usize"))?;
+        let columns = usize::try_from(storage.range.columns())
+            .map_err(|_| invalid("shared formula range column count overflows usize"))?;
+        let area = rows
+            .checked_mul(columns)
+            .ok_or_else(|| invalid("shared formula range area overflows usize"))?;
+        if area > maximum_members {
+            return Err(invalid(format!(
+                "shared formula group exceeds the bounded {maximum_members}-cell edit limit"
+            )));
+        }
+
+        let mut members = Vec::new();
+        members
+            .try_reserve_exact(area)
+            .map_err(|source| allocation("shared formula group members", source))?;
+        let start = storage.range.start();
+        let (end_row, end_column) = storage.range.end();
+        for row in start.row().get()..end_row {
+            for column in start.column().get()..end_column {
+                let member = litchi_sheet::Cell::at(row, column)
+                    .map_err(|_| invalid("shared formula range contains an invalid cell"))?;
+                let member_entry = self.cells.entry(member).ok_or_else(|| {
+                    invalid(format!("shared formula group is missing cell '{member}'"))
+                })?;
+                let Some(member_storage) = member_entry.shared_formula.as_ref() else {
+                    return Err(invalid(format!(
+                        "shared formula group cell '{member}' has no shared storage"
+                    )));
+                };
+                if member_storage.index != storage.index
+                    || member_storage.range != storage.range
+                    || member_storage.reference != storage.reference
+                {
+                    return Err(invalid(
+                        "shared formula group members do not share exact storage metadata",
+                    ));
+                }
+                if member_storage.master != (member == start)
+                    || !matches!(
+                        &member_entry.cell,
+                        Cell::Formula(formula) if matches!(formula.kind(), Kind::Scalar)
+                    )
+                    || member_entry.cell_metadata.is_some()
+                    || member_entry.value_metadata.is_some()
+                {
+                    return Err(invalid(
+                        "shared formula group contains a non-scalar or metadata cell",
+                    ));
+                }
+                members.push(member);
+            }
+        }
+
+        for member_entry in self.cells.entries() {
+            let Some(member_storage) = member_entry.shared_formula.as_ref() else {
+                continue;
+            };
+            if member_storage.index != storage.index {
+                continue;
+            }
+            if member_storage.range != storage.range
+                || member_storage.reference != storage.reference
+                || !storage.range.contains(member_entry.address)
+                || member_storage.master != (member_entry.address == start)
+            {
+                return Err(invalid(
+                    "shared formula group contains an outsider or mismatched storage metadata",
+                ));
+            }
+        }
+
+        Ok(SharedFormulaGroup {
+            storage: storage.clone(),
+            master: start,
+            members: members.into_boxed_slice(),
+        })
     }
 
     pub(super) fn edit_blocked(&self, address: litchi_sheet::Cell) -> Error {

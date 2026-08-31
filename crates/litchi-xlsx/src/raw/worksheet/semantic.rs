@@ -7,8 +7,10 @@ use super::super::strings::decode_spreadsheet_text;
 use super::model::{
     MAX_CELL_CHARACTERS, RawCell, RawFormula, RawFormulaKind, SharedMaster, SharedMember,
 };
-use crate::cell::{Cell, Date, ErrorValue, Number, Stored, Text, Unknown, Value};
-use crate::error::{Result, invalid};
+use crate::cell::{
+    Cell, Date, ErrorValue, Number, SharedFormulaStorage, Stored, Text, Unknown, Value,
+};
+use crate::error::{Result, allocation, invalid};
 use crate::formula::{Cache, Formula, Kind};
 use litchi_sheet::{Cell as Address, Rect};
 
@@ -91,9 +93,19 @@ pub(super) fn materialize(raw: RawCell, strings: Option<&[Text]>) -> Result<Stor
         shared_string,
         inline_rich: raw.inline_rich,
         formula_range,
+        shared_formula: raw.shared_formula,
         cell_metadata: raw.cell_metadata,
         value_metadata: raw.value_metadata,
     })
+}
+
+fn boxed_str(value: &str, context: &'static str) -> Result<Box<str>> {
+    let mut copied = String::new();
+    copied
+        .try_reserve(value.len())
+        .map_err(|source| allocation(context, source))?;
+    copied.push_str(value);
+    Ok(copied.into_boxed_str())
 }
 
 fn formula_range_rect(range: FormulaRange) -> Result<Rect> {
@@ -195,6 +207,7 @@ pub(super) fn resolve_shared_formulas(cells: &mut [RawCell]) -> Result<()> {
             )));
         }
         let range = FormulaRange::parse(range_text)?;
+        let rect = formula_range_rect(range)?;
         if (member.row, member.column) != (range.first_row, range.first_column) {
             return Err(invalid(format!(
                 "shared formula master at ({}, {}) is not first in '{range_text}'",
@@ -208,6 +221,8 @@ pub(super) fn resolve_shared_formulas(cells: &mut [RawCell]) -> Result<()> {
                     row: member.row,
                     column: member.column,
                     range,
+                    rect,
+                    reference: boxed_str(range_text, "shared formula reference")?,
                     text: member.text.clone(),
                 },
             )
@@ -255,6 +270,12 @@ pub(super) fn resolve_shared_formulas(cells: &mut [RawCell]) -> Result<()> {
             .get_mut(member.cell_index)
             .ok_or_else(|| invalid("shared formula membership lost its cell"))?;
         cell.formula_range = Some(master.range);
+        cell.shared_formula = Some(SharedFormulaStorage {
+            index: member.index,
+            range: master.rect,
+            reference: boxed_str(&master.reference, "shared formula reference")?,
+            master: is_master,
+        });
         let formula = cell
             .formula
             .as_mut()

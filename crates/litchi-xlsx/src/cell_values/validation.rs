@@ -264,10 +264,7 @@ fn validate_attributes(owner: XmlOwner, element: &BytesStart<'_>, local: &[u8]) 
         let attribute = attribute
             .map_err(|error| invalid(format!("invalid value-only XML attribute: {error}")))?;
         let name = attribute.key.as_ref();
-        if name == b"xmlns" {
-            continue;
-        }
-        if name == b"xmlns:r" && matches!(owner, XmlOwner::Workbook) && local == b"workbook" {
+        if name == b"xmlns" || name.starts_with(b"xmlns:") {
             continue;
         }
         if name == b"r:id" && matches!(owner, XmlOwner::Workbook) && local == b"sheet" {

@@ -7,6 +7,7 @@ use litchi_sheet::{COLUMNS, Cell as Address, Column, ROWS, Rect, Row};
 use crate::cell::{Content, Text};
 use crate::column::Width;
 use crate::error::{Result, invalid};
+use crate::formula::Formula;
 use crate::layout::{self, Descent};
 use crate::outline::Outline;
 use crate::row::Height;
@@ -18,6 +19,13 @@ pub(crate) enum Payload {
     SharedString {
         index: usize,
         text: Text,
+    },
+    /// Replace one member of an already validated SpreadsheetML shared
+    /// formula group.  A formula is present only for the group's origin.
+    SharedFormula {
+        index: u32,
+        reference: Box<str>,
+        formula: Option<Formula>,
     },
     /// Ensure an explicit empty cell record exists.
     Clear,
@@ -48,6 +56,21 @@ impl Action {
     pub(crate) fn set(content: Content) -> Self {
         Self::Update {
             payload: Some(Payload::Set(content)),
+            style: None,
+        }
+    }
+
+    pub(crate) fn set_shared_formula(
+        index: u32,
+        reference: impl Into<Box<str>>,
+        formula: Option<Formula>,
+    ) -> Self {
+        Self::Update {
+            payload: Some(Payload::SharedFormula {
+                index,
+                reference: reference.into(),
+                formula,
+            }),
             style: None,
         }
     }

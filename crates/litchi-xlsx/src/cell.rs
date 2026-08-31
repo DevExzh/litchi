@@ -66,6 +66,14 @@ impl fmt::Debug for SharedStringKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SharedFormulaStorage {
+    pub(crate) index: u32,
+    pub(crate) range: Rect,
+    pub(crate) reference: Box<str>,
+    pub(crate) master: bool,
+}
+
 /// The stored state of one cell record.
 ///
 /// Absence is represented by `Option<Cell>` at lookup sites, so it cannot be
@@ -620,6 +628,7 @@ pub(crate) struct Stored {
     // member. Range-aware transfers use this provenance to refuse copying
     // through an owner whose anchor is outside the selected rectangle.
     pub(crate) formula_range: Option<Rect>,
+    pub(crate) shared_formula: Option<SharedFormulaStorage>,
     #[allow(
         dead_code,
         reason = "the cached column supports internal sparse-cell indexing"
@@ -962,6 +971,7 @@ mod tests {
                 shared_string: None,
                 inline_rich: false,
                 formula_range: None,
+                shared_formula: None,
                 cell_metadata: None,
                 value_metadata: None,
             })
