@@ -101,6 +101,14 @@ IWA_RAW_MODULE_DECLARATION = re.compile(
     r"^[ \t]*pub(?:\([^()]*\))?[ \t\r\n]+mod[ \t\r\n]+(?:r#)?raw\b",
     re.MULTILINE,
 )
+IWA_CORE_SOURCE_ROOT = Path("crates/litchi-iwa/src")
+IWA_CORE_EXAMPLE_SOURCE_ROOT = Path("crates/litchi-iwa/examples")
+# The legacy host no longer owns a normal Cargo edge to ``litchi-iwa-core``.
+# Keep its Rust source from bypassing that boundary with a direct crate path;
+# archive-owned re-exports remain the only supported compatibility route.
+IWA_DIRECT_CORE_PATH = re.compile(
+    r"(?<![A-Za-z0-9_])litchi_iwa_core(?![A-Za-z0-9_])"
+)
 # The umbrella's iWork examples are semantic-reader examples. Keep the
 # compatibility host's old editor examples from becoming an accidental
 # recommendation for callers, even though the legacy crate itself remains
@@ -11219,6 +11227,35 @@ def audit_iwa_raw_facade_source_topology(root: Path = ROOT) -> list[str]:
             "litchi-iwa raw facade must remain deprecated: "
             f"{IWA_FACADE_SOURCE}:{line_number}"
         )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_direct_core_path_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep the migration host off the retired direct IWA-core path.
+
+    ``litchi-iwa-archive`` owns the compatibility re-exports needed by the
+    legacy host. Scanning the host's production source and examples catches a
+    direct path even when Cargo metadata is temporarily stale. Comments,
+    literals, and individual ``cfg(test)`` items are masked so fixtures do
+    not weaken the production ratchet or create false positives.
+    """
+
+    violations: list[str] = []
+    for source_root in (IWA_CORE_SOURCE_ROOT, IWA_CORE_EXAMPLE_SOURCE_ROOT):
+        absolute_root = root / source_root
+        if not absolute_root.is_dir():
+            continue
+        for path in sorted(absolute_root.rglob("*.rs")):
+            raw_source = path.read_text(encoding="utf-8")
+            production_source = _mask_rust_cfg_test_items(raw_source)
+            source = _mask_rust_non_code(production_source)
+            for match in IWA_DIRECT_CORE_PATH.finditer(source):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "litchi-iwa production source directly references "
+                    f"litchi_iwa_core: {path.relative_to(root)}:{line_number}"
+                )
 
     return sorted(set(violations))
 
@@ -38426,6 +38463,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_litchi_semantic_facade_source_topology()
         + audit_iwork_example_source_topology()
         + audit_iwa_keynote_source_topology()
+        + audit_iwa_direct_core_path_source_topology()
         + audit_iwa_legacy_method_deprecation_source_topology()
         + audit_iwa_keynote_slide_info_source_topology()
         + audit_iwa_keynote_slide_text_info_source_topology()

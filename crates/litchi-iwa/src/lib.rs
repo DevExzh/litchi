@@ -218,18 +218,22 @@ pub use text::{
 };
 pub(crate) use theme::{IWorkThemeArchive, IWorkThemeExtensions};
 
-/// Error types for iWork parsing
+/// Error types for iWork parsing.
+///
+/// The inner error remains the exact bounded IWA error owned by
+/// [`litchi_iwa_archive::iwa`]; this compatibility wrapper keeps the
+/// established host-level error name and its shared allocation semantics.
 #[derive(Debug, Clone)]
-pub struct IwaCoreError(Arc<litchi_iwa_core::Error>);
+pub struct IwaCoreError(Arc<litchi_iwa_archive::iwa::Error>);
 
-impl AsRef<litchi_iwa_core::Error> for IwaCoreError {
-    fn as_ref(&self) -> &litchi_iwa_core::Error {
+impl AsRef<litchi_iwa_archive::iwa::Error> for IwaCoreError {
+    fn as_ref(&self) -> &litchi_iwa_archive::iwa::Error {
         self.0.as_ref()
     }
 }
 
-impl From<litchi_iwa_core::Error> for IwaCoreError {
-    fn from(error: litchi_iwa_core::Error) -> Self {
+impl From<litchi_iwa_archive::iwa::Error> for IwaCoreError {
+    fn from(error: litchi_iwa_archive::iwa::Error) -> Self {
         Self(Arc::new(error))
     }
 }
@@ -333,8 +337,8 @@ impl Error {
 /// Result type alias
 pub type Result<T> = std::result::Result<T, Error>;
 
-impl From<litchi_iwa_core::Error> for Error {
-    fn from(error: litchi_iwa_core::Error) -> Self {
+impl From<litchi_iwa_archive::iwa::Error> for Error {
+    fn from(error: litchi_iwa_archive::iwa::Error) -> Self {
         Self::IwaCore(error.into())
     }
 }

@@ -3,7 +3,7 @@ use std::env;
 
 #[allow(deprecated)]
 use litchi_iwa::raw::package::IWorkPackage;
-use litchi_iwa_core::ArchiveObject;
+use litchi_iwa_archive::iwa::ArchiveObject;
 use litchi_iwa_protos::tp::{
     DocumentArchive, SectionArchive, SectionTemplateArchive, SettingsArchive,
 };

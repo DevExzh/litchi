@@ -6,6 +6,8 @@ use std::path::{Component, Path};
 use std::sync::Arc;
 
 use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits};
+#[cfg(test)]
+use crate::archive::{CoreError, CoreLimitKind};
 use crate::snappy::{SnappyLimits, SnappyStream};
 use crate::{Error, Result};
 use litchi_core::ReadAt;
@@ -1578,8 +1580,8 @@ mod tests {
             Error::IwaCore(core)
                 if matches!(
                     core.as_ref(),
-                    litchi_iwa_core::Error::Limit {
-                        kind: litchi_iwa_core::LimitKind::SnappyChunkBytes,
+                    CoreError::Limit {
+                        kind: CoreLimitKind::SnappyChunkBytes,
                         ..
                     }
                 )
@@ -1617,8 +1619,8 @@ mod tests {
             Error::IwaCore(core)
                 if matches!(
                     core.as_ref(),
-                    litchi_iwa_core::Error::Limit {
-                        kind: litchi_iwa_core::LimitKind::SnappyChunkBytes,
+                    CoreError::Limit {
+                        kind: CoreLimitKind::SnappyChunkBytes,
                         ..
                     }
                 )

@@ -1,13 +1,13 @@
 //! Native caption CRUD for Pages body charts.
 
 use super::*;
+use crate::archive::{FieldObjectReferenceTransition, ObjectReferenceTransition};
 use crate::charts::caption_edge::{chart_caption_identifier, rewrite_chart_caption_identifier};
 use crate::image_caption::{
     CaptionObjectIds, CaptionThemeStyle, DrawableCaptionKind, DrawableCaptionSlot, caption_objects,
     drawable_caption_slot, standin_caption_object,
 };
 use crate::package::PackageLimits;
-use litchi_iwa_core::archive::{FieldObjectReferenceTransition, ObjectReferenceTransition};
 
 impl PagesEditor {
     /// Read the native caption attached to one body chart.

@@ -19,6 +19,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits, ArchiveObject, extract_text};
+#[cfg(test)]
+use crate::archive::{CoreError, CoreLimitKind};
 use crate::snappy::SnappyStream;
 use crate::{Error, Result};
 use plist::Value;
@@ -1795,8 +1797,8 @@ mod tests {
             Error::IwaCore(core)
                 if matches!(
                     core.as_ref(),
-                    litchi_iwa_core::Error::Limit {
-                        kind: litchi_iwa_core::LimitKind::SnappyChunkBytes,
+                    CoreError::Limit {
+                        kind: CoreLimitKind::SnappyChunkBytes,
                         ..
                     }
                 )
@@ -1857,8 +1859,8 @@ mod tests {
             Error::IwaCore(core)
                 if matches!(
                     core.as_ref(),
-                    litchi_iwa_core::Error::Limit {
-                        kind: litchi_iwa_core::LimitKind::SnappyChunkBytes,
+                    CoreError::Limit {
+                        kind: CoreLimitKind::SnappyChunkBytes,
                         ..
                     }
                 )

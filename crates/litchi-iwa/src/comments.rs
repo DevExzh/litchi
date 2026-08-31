@@ -8,9 +8,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use litchi_iwa_common::comment::{
     AuthorId, Comment, DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId, Uuid,
 };
-use litchi_iwa_core::{
-    ArchiveReferenceOccurrence, ArchiveReferencePolicy, ArchiveReferenceVisitor,
-};
 use litchi_iwa_protos::comment_storage_codec;
 use litchi_iwa_protos::package_metadata_codec::{
     DataReferenceOwnerDescriptor, ExternalReferenceDescriptor, ObjectUuidDescriptor,
@@ -20,7 +17,10 @@ use prost::Message;
 
 use crate::application::Application;
 use crate::application_detection::detect;
-use crate::archive::{ArchiveObject, FieldInfo, FieldPath, RawMessage, UnknownFieldRule};
+use crate::archive::{
+    ArchiveObject, ArchiveReferenceOccurrence, ArchiveReferencePolicy, ArchiveReferenceVisitor,
+    CoreResult, FieldInfo, FieldPath, RawMessage, UnknownFieldRule,
+};
 use crate::package_metadata::{
     PACKAGE_METADATA_ENTRY, PACKAGE_METADATA_MESSAGE_TYPE, add_component_external_reference,
     advance_package_save_token_for_components, component_identifier_for_entry,
@@ -2657,10 +2657,7 @@ struct CommentArchiveReferenceVisitor {
 }
 
 impl ArchiveReferenceVisitor for CommentArchiveReferenceVisitor {
-    fn visit_reference(
-        &mut self,
-        occurrence: ArchiveReferenceOccurrence,
-    ) -> litchi_iwa_core::Result<()> {
+    fn visit_reference(&mut self, occurrence: ArchiveReferenceOccurrence) -> CoreResult<()> {
         self.referenced |= occurrence.referenced_identifier == self.identifier;
         Ok(())
     }
