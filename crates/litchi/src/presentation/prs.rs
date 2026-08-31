@@ -523,6 +523,59 @@ impl Presentation {
         }
     }
 
+    #[cfg(feature = "pptx")]
+    fn map_source_opc_error(error: crate::opc::OpcError) -> Error {
+        match error {
+            crate::opc::OpcError::SourceChanged { expected, actual } => Error::SourceChanged {
+                expected,
+                observed: actual,
+            },
+            crate::opc::OpcError::ReadLimit {
+                resource,
+                actual,
+                maximum,
+            } => Error::ResourceLimit(litchi_core::ResourceLimit {
+                resource: Self::map_opc_read_resource(resource),
+                observed: actual,
+                limit: maximum,
+                scope: format!("OPC {resource}").into(),
+            }),
+            other => other.into(),
+        }
+    }
+
+    #[cfg(feature = "pptx")]
+    fn map_opc_read_resource(resource: crate::opc::ReadResource) -> litchi_core::Resource {
+        match resource {
+            crate::opc::ReadResource::InputBytes
+            | crate::opc::ReadResource::ArchiveMemberNameBytes
+            | crate::opc::ReadResource::ArchiveMetadataBytes
+            | crate::opc::ReadResource::ArchiveCompressedBytes
+            | crate::opc::ReadResource::ArchiveEntryBytes
+            | crate::opc::ReadResource::ArchiveTotalBytes
+            | crate::opc::ReadResource::PartBytes
+            | crate::opc::ReadResource::TotalPartBytes
+            | crate::opc::ReadResource::ContentTypesBytes
+            | crate::opc::ReadResource::RelationshipXmlBytes
+            | crate::opc::ReadResource::TotalRelationshipXmlBytes
+            | crate::opc::ReadResource::XmlAttributeBytes
+            | crate::opc::ReadResource::RelationshipTargetBytes => {
+                litchi_core::Resource::InputBytes
+            },
+            crate::opc::ReadResource::ArchiveMembers
+            | crate::opc::ReadResource::Parts
+            | crate::opc::ReadResource::ContentTypeMappings
+            | crate::opc::ReadResource::RelationshipParts
+            | crate::opc::ReadResource::RelationshipsPerPart
+            | crate::opc::ReadResource::TotalRelationships
+            | crate::opc::ReadResource::RelationshipGraphNodes => litchi_core::Resource::Objects,
+            crate::opc::ReadResource::XmlEvents
+            | crate::opc::ReadResource::TotalRelationshipXmlEvents => litchi_core::Resource::Work,
+            crate::opc::ReadResource::XmlDepth => litchi_core::Resource::Depth,
+            _ => litchi_core::Resource::Work,
+        }
+    }
+
     /// Open a presentation with an explicit PPTX/OPC resource policy.
     ///
     /// The policy applies to OOXML-suffixed paths and ZIP-magic candidates.
@@ -540,7 +593,9 @@ impl Presentation {
                 limits,
             )
             .map_err(|error| match error {
-                crate::detection_smart::detected::PptxSourcePathError::Opc(error) => error.into(),
+                crate::detection_smart::detected::PptxSourcePathError::Opc(error) => {
+                    Self::map_source_opc_error(error)
+                },
                 crate::detection_smart::detected::PptxSourcePathError::Pptx(error) => {
                     crate::map_ooxml_error(error)
                 },
@@ -714,6 +769,19 @@ impl Presentation {
     /// policy. The policy is consulted only while probing an OOXML ZIP candidate.
     #[cfg(feature = "pptx")]
     pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: crate::pptx::ReadLimits) -> Result<Self> {
+        #[cfg(feature = "odp")]
+        let bytes = match crate::detection_smart::detected::detect_prepared_odp_with_limits(
+            bytes, limits,
+        ) {
+            Ok(Ok(prepared)) => {
+                return Self::from_detected(DetectedFormat::Odp(
+                    prepared.into_package().into_inner(),
+                ));
+            },
+            Ok(Err(bytes)) => bytes,
+            Err(error) => return Err(Self::map_source_opc_error(error.error)),
+        };
+
         let bytes =
             match crate::detection_smart::detected::detect_presentation_source_bytes(bytes, limits)
             {
@@ -1145,10 +1213,7 @@ impl Presentation {
             },
             #[cfg(feature = "ppt")]
             PresentationImpl::Ppt(presentation) => {
-                let Some(slide) = presentation
-                    .slide_at(position)
-                    .map_err(Error::from)?
-                else {
+                let Some(slide) = presentation.slide_at(position).map_err(Error::from)? else {
                     return Ok(None);
                 };
                 let text = slide.text().map_err(Error::from)?.to_string();
@@ -1957,8 +2022,8 @@ mod source_pptx_path_tests {
             .expect("temporary PPTX output");
         package.save(output.path()).expect("save edited PPTX");
         let output_bytes = std::fs::read(output.path()).expect("read edited PPTX");
-        let eager_package = crate::opc::OpcPackage::from_bytes(&output_bytes)
-            .expect("reopen edited OPC package");
+        let eager_package =
+            crate::opc::OpcPackage::from_bytes(&output_bytes).expect("reopen edited OPC package");
         let presentation = Presentation::from_detected(
             crate::detection_smart::DetectedFormat::Pptx(eager_package),
         )

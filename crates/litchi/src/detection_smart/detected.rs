@@ -134,45 +134,129 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
     detect_format_smart_without_ooxml(bytes)
 }
 
-/// Prepare an ODS package for the unified spreadsheet facade without changing
-/// the public [`DetectedFormat`] enum's legacy byte payload.
-///
-/// This is deliberately an internal handoff: callers that use
-/// [`detect_format_smart`] continue to receive `DetectedFormat::Ods(Vec<u8>)`.
-/// The unified facade uses this fast path only after the local ODF MIME entry
-/// identifies ODS. When ODF wins, the accepted package's one ODF
-/// `OwnedPackage` index is transferred to the typed ODS owner without a
-/// second ODF semantic index scan. Other formats return their original bytes
-/// for the ordinary detector. In builds with any OOXML probe feature enabled,
-/// a cheap central-directory catalog check gates the same bounded OOXML probe
-/// as smart detection: only a proven canonical catalog without the reserved
-/// member skips it; uncertain catalogs continue through the probe. This
-/// preserves OOXML-first precedence for valid OOXML/ODF polyglots while
-/// avoiding an unrelated OPC scan for ordinary ODF packages; the probe is an
-/// independent OPC scan and is not counted as an ODF index.
-#[cfg(feature = "ods")]
+/// Error retaining the input for the legacy byte-backed ODF handoff while
+/// allowing checked callers to propagate the typed OPC probe failure.
+#[cfg(all(
+    any(feature = "ods", feature = "odp"),
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+))]
+pub(crate) struct PreparedOdfProbeError {
+    pub(crate) error: crate::opc::OpcError,
+    pub(crate) bytes: Vec<u8>,
+}
+
+#[cfg(all(
+    any(feature = "ods", feature = "odp"),
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+))]
+fn prepared_odf_ooxml_probe(
+    bytes: &[u8],
+    limits: crate::opc::ReadLimits,
+) -> std::result::Result<bool, crate::opc::OpcError> {
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+    {
+        let catalog = litchi_odf_common::detect::packaged_has_ooxml_catalog(bytes);
+        if catalog == Some(false) {
+            return Ok(false);
+        }
+        return try_ooxml_probe_wins(bytes, limits);
+    }
+    #[cfg(not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")))]
+    {
+        let _ = (bytes, limits);
+        Ok(false)
+    }
+}
+
+#[cfg(all(
+    any(feature = "ods", feature = "odp"),
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+))]
+fn hard_prepared_odf_probe_error(error: &crate::opc::OpcError) -> bool {
+    hard_ooxml_probe_error(error)
+}
+
+#[cfg(all(
+    any(feature = "ods", feature = "odp"),
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+))]
+fn detect_prepared_odf_with_limits(
+    bytes: Vec<u8>,
+    expected: litchi_core::detection::FileFormat,
+    limits: crate::opc::ReadLimits,
+) -> std::result::Result<
+    std::result::Result<litchi_odf_common::PreparedPackage, Vec<u8>>,
+    PreparedOdfProbeError,
+> {
+    if litchi_odf_common::detect::packaged_mime(&bytes) != Some(expected) {
+        return Ok(Err(bytes));
+    }
+    match prepared_odf_ooxml_probe(&bytes, limits) {
+        Ok(true) => return Ok(Err(bytes)),
+        Ok(false) => {},
+        Err(error) if hard_prepared_odf_probe_error(&error) => {
+            return Err(PreparedOdfProbeError { error, bytes });
+        },
+        Err(_) => {},
+    }
+    let prepared = match litchi_odf_common::detect::prepared_or_original(bytes) {
+        Ok(prepared) => prepared,
+        Err(bytes) => return Ok(Err(bytes)),
+    };
+    if prepared.format() == expected {
+        Ok(Ok(prepared))
+    } else {
+        Ok(Err(prepared.into_package().into_inner()))
+    }
+}
+
+/// Checked ODS preparation for the unified spreadsheet facade.
+#[cfg(all(
+    feature = "ods",
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+))]
+pub(crate) fn detect_prepared_ods_with_limits(
+    bytes: Vec<u8>,
+    limits: crate::opc::ReadLimits,
+) -> std::result::Result<
+    std::result::Result<litchi_odf_common::PreparedPackage, Vec<u8>>,
+    PreparedOdfProbeError,
+> {
+    detect_prepared_odf_with_limits(bytes, litchi_core::detection::FileFormat::Ods, limits)
+}
+
+/// Prepare an ODS package for the legacy byte-backed handoff. Probe errors are
+/// collapsed to the historical byte fallback by this compatibility wrapper.
+#[cfg(all(
+    feature = "ods",
+    any(
+        test,
+        not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))
+    )
+))]
 pub(crate) fn detect_prepared_ods(
     bytes: Vec<u8>,
 ) -> std::result::Result<litchi_odf_common::PreparedPackage, Vec<u8>> {
-    use litchi_core::detection::FileFormat;
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+    {
+        return match detect_prepared_ods_with_limits(bytes, crate::opc::ReadLimits::default()) {
+            Ok(result) => result,
+            Err(error) => Err(error.bytes),
+        };
+    }
+    #[cfg(not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")))]
+    {
+        use litchi_core::detection::FileFormat;
 
-    if litchi_odf_common::detect::packaged_mime(&bytes) != Some(FileFormat::Ods) {
-        return Err(bytes);
-    }
-    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-    let catalog = litchi_odf_common::detect::packaged_has_ooxml_catalog_with_limits(
-        &bytes,
-        super::catalog_probe_limits(crate::opc::ReadLimits::default()),
-    );
-    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-    if catalog != Some(false) && ooxml_probe_wins(&bytes) {
-        return Err(bytes);
-    }
-    let prepared = litchi_odf_common::detect::prepared_or_original(bytes)?;
-    if prepared.format() == FileFormat::Ods {
-        Ok(prepared)
-    } else {
-        Err(prepared.into_package().into_inner())
+        if litchi_odf_common::detect::packaged_mime(&bytes) != Some(FileFormat::Ods) {
+            return Err(bytes);
+        }
+        let prepared = litchi_odf_common::detect::prepared_or_original(bytes)?;
+        if prepared.format() == FileFormat::Ods {
+            Ok(prepared)
+        } else {
+            Err(prepared.into_package().into_inner())
+        }
     }
 }
 
@@ -243,7 +327,18 @@ pub(crate) fn detect_workbook_source_bytes_with_limits(
         return WorkbookSourceBytesDetection::Fallback(reclaim_source_bytes(shared));
     };
 
-    match crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(&package) {
+    let format =
+        match crate::detection_smart::ooxml::try_detect_ooxml_format_from_source_backed_package(
+            &package,
+        ) {
+            Ok(format) => format,
+            Err(_) => {
+                drop(package);
+                drop(source);
+                return WorkbookSourceBytesDetection::Fallback(reclaim_source_bytes(shared));
+            },
+        };
+    match format {
         #[cfg(feature = "xlsx")]
         Some(litchi_core::detection::FileFormat::Xlsx) => {
             WorkbookSourceBytesDetection::Xlsx(package)
@@ -317,19 +412,29 @@ pub(crate) fn detect_docx_source_bytes(
     let shared = Arc::new(bytes);
     let source: Arc<dyn ReadAt> = Arc::new(litchi_core::OwnedSource::from_arc(Arc::clone(&shared)));
     #[cfg(feature = "odt")]
-    let source_version = match source.version() {
-        Ok(version) => version,
-        Err(error) => {
-            return DocxSourceBytesDetection::OpcError(crate::opc::OpcError::IoError(error));
-        },
-    };
-    #[cfg(feature = "odt")]
     let is_odt_mime = match litchi_odf_common::detect::packaged_mime_read_at(source.as_ref()) {
         Ok(format) => format == Some(litchi_core::detection::FileFormat::Odt),
         Err(error) => {
             return DocxSourceBytesDetection::OpcError(odf_probe_error_to_opc(error));
         },
     };
+    #[cfg(feature = "odt")]
+    let ordinary_odt = if is_odt_mime {
+        match litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at(source.as_ref()) {
+            Ok(Some(false)) => true,
+            Ok(_) => false,
+            Err(error) => {
+                return DocxSourceBytesDetection::OpcError(odf_probe_error_to_opc(error));
+            },
+        }
+    } else {
+        false
+    };
+    #[cfg(feature = "odt")]
+    if ordinary_odt {
+        drop(source);
+        return DocxSourceBytesDetection::Fallback(reclaim_docx_source_bytes(shared));
+    }
     let package_result =
         crate::opc::SourceBackedPackage::from_read_at_with_limits(Arc::clone(&source), limits);
     let package = match package_result {
@@ -342,22 +447,7 @@ pub(crate) fn detect_docx_source_bytes(
                     return DocxSourceBytesDetection::Fallback(reclaim_docx_source_bytes(shared));
                 }
                 if hard_docx_source_bytes_probe_error(&error) {
-                    match odt_source_ooxml_probe_wins(
-                        &source,
-                        source_version,
-                        crate::opc::ReadLimits::default(),
-                    ) {
-                        Ok(false) => {
-                            drop(source);
-                            return DocxSourceBytesDetection::Fallback(reclaim_docx_source_bytes(
-                                shared,
-                            ));
-                        },
-                        Ok(true) => return DocxSourceBytesDetection::OpcError(error),
-                        Err(probe_error) => {
-                            return DocxSourceBytesDetection::OpcError(probe_error);
-                        },
-                    }
+                    return DocxSourceBytesDetection::OpcError(error);
                 }
                 return DocxSourceBytesDetection::OpcError(error);
             }
@@ -369,9 +459,14 @@ pub(crate) fn detect_docx_source_bytes(
         },
     };
 
-    if crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(&package)
-        == Some(litchi_core::detection::FileFormat::Docx)
-    {
+    let format =
+        match crate::detection_smart::ooxml::try_detect_ooxml_format_from_source_backed_package(
+            &package,
+        ) {
+            Ok(format) => format,
+            Err(error) => return DocxSourceBytesDetection::OpcError(error),
+        };
+    if format == Some(litchi_core::detection::FileFormat::Docx) {
         return match crate::docx::source_backed::Package::from_source_backed_package(package) {
             Ok(document) => DocxSourceBytesDetection::Docx(document),
             Err(error) => DocxSourceBytesDetection::DocxError(error),
@@ -388,19 +483,26 @@ fn reclaim_docx_source_bytes(shared: std::sync::Arc<Vec<u8>>) -> Vec<u8> {
     std::sync::Arc::try_unwrap(shared).unwrap_or_else(|shared| shared.as_ref().clone())
 }
 
-#[cfg(feature = "docx")]
-fn hard_docx_source_bytes_probe_error(error: &crate::opc::OpcError) -> bool {
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+fn hard_ooxml_probe_error(error: &crate::opc::OpcError) -> bool {
     matches!(
         error,
         crate::opc::OpcError::InvalidReadLimit { .. }
             | crate::opc::OpcError::ReadLimit { .. }
             | crate::opc::OpcError::Cancelled
             | crate::opc::OpcError::Execution(_)
+            | crate::opc::OpcError::ParallelRead(_)
+            | crate::opc::OpcError::UnsupportedExecutionAffinity
             | crate::opc::OpcError::IoError(_)
             | crate::opc::OpcError::SourceChanged { .. }
             | crate::opc::OpcError::Allocation { .. }
             | crate::opc::OpcError::CollectionAllocation { .. }
     )
+}
+
+#[cfg(feature = "docx")]
+fn hard_docx_source_bytes_probe_error(error: &crate::opc::OpcError) -> bool {
+    hard_ooxml_probe_error(error)
 }
 
 #[cfg(all(
@@ -473,9 +575,19 @@ pub(crate) fn detect_presentation_source_bytes(
         ));
     };
 
-    if crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(&package)
-        == Some(litchi_core::detection::FileFormat::Pptx)
-    {
+    let format =
+        match crate::detection_smart::ooxml::try_detect_ooxml_format_from_source_backed_package(
+            &package,
+        ) {
+            Ok(format) => format,
+            Err(_) => {
+                drop(package);
+                return PresentationSourceBytesDetection::Fallback(
+                    reclaim_presentation_source_bytes(shared),
+                );
+            },
+        };
+    if format == Some(litchi_core::detection::FileFormat::Pptx) {
         return match crate::pptx::SourceBackedPresentation::from_source_backed_package(package) {
             Ok(presentation) => PresentationSourceBytesDetection::Pptx(presentation),
             Err(error) => PresentationSourceBytesDetection::PptxError(error),
@@ -536,12 +648,8 @@ pub(crate) enum WorkbookSourcePathDetection {
         workbook: crate::xls::SourceBackedWorkbook,
         cfb: std::sync::Arc<litchi_cfb::SharedOleFile>,
     },
-    /// A recognized OOXML family whose owner is enabled in this build,
-    /// together with bytes read from the same pinned filesystem source.
-    OtherOoxml {
-        format: litchi_core::detection::FileFormat,
-        bytes: Vec<u8>,
-    },
+    /// A recognized OOXML family whose owner is enabled in this build.
+    OtherOoxml(litchi_core::detection::FileFormat),
     /// A recognized OOXML family whose owner is disabled in this build.
     DisabledOtherOoxml(litchi_core::detection::FileFormat),
     /// A non-ODS source retained from the same pinned filesystem source for
@@ -561,7 +669,27 @@ pub(crate) enum WorkbookSourcePathDetection {
 pub(crate) fn detect_workbook_source_path(
     path: &std::path::Path,
 ) -> std::result::Result<WorkbookSourcePathDetection, Box<dyn std::error::Error + Send + Sync>> {
-    detect_workbook_source_path_with_limits(path, crate::opc::ReadLimits::default())
+    #[cfg(feature = "opc")]
+    {
+        detect_workbook_source_path_with_limits(path, crate::opc::ReadLimits::default())
+    }
+
+    #[cfg(not(feature = "opc"))]
+    {
+        use litchi_core::ReadAt;
+        use std::sync::Arc;
+
+        let source: Arc<dyn ReadAt> = Arc::new(litchi_core::FileSource::open(path)?);
+        let source_version = source.version()?;
+
+        #[cfg(feature = "ods")]
+        let is_ods = litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())?
+            == Some(litchi_core::detection::FileFormat::Ods);
+        #[cfg(not(feature = "ods"))]
+        let is_ods = false;
+
+        finish_non_ooxml_workbook_source(source, source_version, is_ods)
+    }
 }
 
 /// Open a filesystem workbook through one positional source-backed owner with
@@ -570,6 +698,7 @@ pub(crate) fn detect_workbook_source_path(
 /// workbook facade.
 #[cfg(all(
     any(feature = "ods", feature = "xlsx", feature = "xls", feature = "xlsb"),
+    feature = "opc",
     any(unix, windows)
 ))]
 pub(crate) fn detect_workbook_source_path_with_limits(
@@ -593,10 +722,8 @@ pub(crate) fn detect_workbook_source_path_with_limits(
         any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
     ))]
     let ordinary_ods = is_ods
-        && litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at_with_limits(
-            source.as_ref(),
-            super::catalog_probe_limits(limits),
-        )? == Some(false);
+        && litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at(source.as_ref())?
+            == Some(false);
     #[cfg(all(
         not(feature = "ods"),
         any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
@@ -620,7 +747,7 @@ pub(crate) fn detect_workbook_source_path_with_limits(
                 limits,
             ) {
                 Ok(package) => Some(package),
-                Err(error) if !is_ods && hard_workbook_ooxml_probe_error(&error) => {
+                Err(error) if hard_workbook_ooxml_probe_error(&error) => {
                     return Err(Box::new(error));
                 },
                 Err(_) => {
@@ -633,11 +760,12 @@ pub(crate) fn detect_workbook_source_path_with_limits(
         };
 
         if let Some(package) = source_package {
-            let Some(format) =
-                crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(
+            let format =
+                crate::detection_smart::ooxml::try_detect_ooxml_format_from_source_backed_package(
                     &package,
                 )
-            else {
+                .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)?;
+            let Some(format) = format else {
                 ensure_path_source_current(source.as_ref(), source_version)?;
                 return finish_non_ooxml_workbook_source(source, source_version, is_ods);
             };
@@ -693,10 +821,7 @@ pub(crate) fn detect_workbook_source_path_with_limits(
                 _ => false,
             };
             return if enabled {
-                Ok(WorkbookSourcePathDetection::OtherOoxml {
-                    format,
-                    bytes: read_path_source_bytes(source.as_ref(), source_version)?,
-                })
+                Ok(WorkbookSourcePathDetection::OtherOoxml(format))
             } else {
                 ensure_path_source_current(source.as_ref(), source_version)?;
                 Ok(WorkbookSourcePathDetection::DisabledOtherOoxml(format))
@@ -713,17 +838,7 @@ pub(crate) fn detect_workbook_source_path_with_limits(
     any(unix, windows)
 ))]
 fn hard_workbook_ooxml_probe_error(error: &crate::opc::OpcError) -> bool {
-    matches!(
-        error,
-        crate::opc::OpcError::InvalidReadLimit { .. }
-            | crate::opc::OpcError::ReadLimit { .. }
-            | crate::opc::OpcError::Cancelled
-            | crate::opc::OpcError::Execution(_)
-            | crate::opc::OpcError::IoError(_)
-            | crate::opc::OpcError::SourceChanged { .. }
-            | crate::opc::OpcError::Allocation { .. }
-            | crate::opc::OpcError::CollectionAllocation { .. }
-    )
+    hard_ooxml_probe_error(error)
 }
 
 #[cfg(all(
@@ -941,38 +1056,47 @@ fn read_path_source_bytes(
     Ok(bytes)
 }
 
-/// Prepare an ODP package for the unified presentation facade while keeping
-/// the public smart-detection enum source-compatible. As with ODS, a cheap
-/// central-directory catalog check gates the bounded OOXML probe when any
-/// OOXML probe feature is enabled, so OOXML-first polyglot precedence remains
-/// unchanged, including for a recognized OOXML leaf whose own facade feature
-/// is disabled. Only a proven canonical catalog without the reserved member
-/// skips that probe; uncertain catalogs still reach it. When ODF wins, the
-/// prepared ODF index transfers to the typed ODP owner without a second ODF
-/// semantic index scan.
+/// Checked ODP preparation for the unified presentation facade.
+#[cfg(all(
+    feature = "odp",
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+))]
+pub(crate) fn detect_prepared_odp_with_limits(
+    bytes: Vec<u8>,
+    limits: crate::opc::ReadLimits,
+) -> std::result::Result<
+    std::result::Result<litchi_odf_common::PreparedPackage, Vec<u8>>,
+    PreparedOdfProbeError,
+> {
+    detect_prepared_odf_with_limits(bytes, litchi_core::detection::FileFormat::Odp, limits)
+}
+
+/// Prepare an ODP package for the legacy byte-backed handoff. Probe errors are
+/// collapsed to the historical byte fallback by this compatibility wrapper.
 #[cfg(feature = "odp")]
 pub(crate) fn detect_prepared_odp(
     bytes: Vec<u8>,
 ) -> std::result::Result<litchi_odf_common::PreparedPackage, Vec<u8>> {
-    use litchi_core::detection::FileFormat;
+    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+    {
+        return match detect_prepared_odp_with_limits(bytes, crate::opc::ReadLimits::default()) {
+            Ok(result) => result,
+            Err(error) => Err(error.bytes),
+        };
+    }
+    #[cfg(not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")))]
+    {
+        use litchi_core::detection::FileFormat;
 
-    if litchi_odf_common::detect::packaged_mime(&bytes) != Some(FileFormat::Odp) {
-        return Err(bytes);
-    }
-    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-    let catalog = litchi_odf_common::detect::packaged_has_ooxml_catalog_with_limits(
-        &bytes,
-        super::catalog_probe_limits(crate::opc::ReadLimits::default()),
-    );
-    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-    if catalog != Some(false) && ooxml_probe_wins(&bytes) {
-        return Err(bytes);
-    }
-    let prepared = litchi_odf_common::detect::prepared_or_original(bytes)?;
-    if prepared.format() == FileFormat::Odp {
-        Ok(prepared)
-    } else {
-        Err(prepared.into_package().into_inner())
+        if litchi_odf_common::detect::packaged_mime(&bytes) != Some(FileFormat::Odp) {
+            return Err(bytes);
+        }
+        let prepared = litchi_odf_common::detect::prepared_or_original(bytes)?;
+        if prepared.format() == FileFormat::Odp {
+            Ok(prepared)
+        } else {
+            Err(prepared.into_package().into_inner())
+        }
     }
 }
 
@@ -980,18 +1104,14 @@ pub(crate) fn detect_prepared_odp(
     any(feature = "ods", feature = "odp"),
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
 ))]
-fn ooxml_probe_wins(bytes: &[u8]) -> bool {
+fn try_ooxml_probe_wins(
+    bytes: &[u8],
+    limits: crate::opc::ReadLimits,
+) -> std::result::Result<bool, crate::opc::OpcError> {
     #[cfg(test)]
     super::record_opc_probe();
-    let Ok(package) =
-        crate::opc::OpcPackage::from_bytes_with_limits(bytes, crate::opc::ReadLimits::default())
-    else {
-        return false;
-    };
-    // Mirror the ordinary smart detector: recognition of any OOXML family
-    // wins the precedence decision, even when its leaf feature is disabled
-    // and the ordinary detector consequently returns `None` for that owner.
-    crate::detection_smart::ooxml::detect_ooxml_format_from_package(&package).is_some()
+    crate::detection_smart::ooxml::try_detect_zip_format_with_limits(bytes, limits)
+        .map(|format| format.is_some())
 }
 
 #[cfg(not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")))]
@@ -1089,8 +1209,11 @@ fn detect_format_smart_without_ooxml(bytes: Vec<u8>) -> Option<DetectedFormat> {
 /// Detect a format while applying an explicit OPC resource policy to an OOXML
 /// ZIP candidate.
 ///
-/// The policy is used only when the input is an OOXML package. OLE, RTF, ODF,
-/// and iWork detection retains its existing format-specific behavior.
+/// The policy is used when a ZIP candidate must be ruled in or out as OOXML.
+/// OLE, RTF, ODF, and iWork detection retains its existing format-specific
+/// behavior after the ODF detector proves an ordinary package under its own
+/// finite policy. ODF-marked packages with a present or uncertain OOXML
+/// catalog fail closed on hard OPC policy errors.
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 pub fn detect_format_smart_with_limits(
     bytes: Vec<u8>,
@@ -1158,11 +1281,13 @@ pub fn detect_format_smart_with_limits(
             any(feature = "odt", feature = "ods", feature = "odp"),
             any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
         ))]
-        let normal_odf = litchi_odf_common::detect::packaged_mime(&bytes).is_some()
-            && litchi_odf_common::detect::packaged_has_ooxml_catalog_with_limits(
-                &bytes,
-                super::catalog_probe_limits(limits),
-            ) == Some(false);
+        let odf_mime = litchi_odf_common::detect::packaged_mime(&bytes);
+        #[cfg(all(
+            any(feature = "odt", feature = "ods", feature = "odp"),
+            any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+        ))]
+        let normal_odf = odf_mime.is_some()
+            && litchi_odf_common::detect::packaged_has_ooxml_catalog(&bytes) == Some(false);
         #[cfg(all(
             not(any(feature = "odt", feature = "ods", feature = "odp")),
             any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
@@ -1174,21 +1299,26 @@ pub fn detect_format_smart_with_limits(
         if !normal_odf {
             #[cfg(test)]
             super::record_opc_probe();
-            if let Ok(package) = crate::opc::OpcPackage::from_bytes_with_limits(&bytes, limits)
-                && let Some(format) =
-                    crate::detection_smart::ooxml::detect_ooxml_format_from_package(&package)
-            {
-                return match format {
-                    #[cfg(feature = "docx")]
-                    FileFormat::Docx => Some(DetectedFormat::Docx(package)),
-                    #[cfg(feature = "pptx")]
-                    FileFormat::Pptx => Some(DetectedFormat::Pptx(package)),
-                    #[cfg(feature = "xlsx")]
-                    FileFormat::Xlsx => Some(DetectedFormat::Xlsx(package)),
-                    #[cfg(feature = "xlsb")]
-                    FileFormat::Xlsb => Some(DetectedFormat::Xlsb(package)),
-                    _ => None,
-                };
+            match crate::opc::OpcPackage::from_bytes_with_limits(&bytes, limits) {
+                Ok(package) => {
+                    if let Some(format) =
+                        crate::detection_smart::ooxml::detect_ooxml_format_from_package(&package)
+                    {
+                        return match format {
+                            #[cfg(feature = "docx")]
+                            FileFormat::Docx => Some(DetectedFormat::Docx(package)),
+                            #[cfg(feature = "pptx")]
+                            FileFormat::Pptx => Some(DetectedFormat::Pptx(package)),
+                            #[cfg(feature = "xlsx")]
+                            FileFormat::Xlsx => Some(DetectedFormat::Xlsx(package)),
+                            #[cfg(feature = "xlsb")]
+                            FileFormat::Xlsb => Some(DetectedFormat::Xlsb(package)),
+                            _ => None,
+                        };
+                    }
+                },
+                Err(error) if hard_ooxml_probe_error(&error) => return None,
+                Err(_) => {},
             }
         }
 
@@ -1269,6 +1399,20 @@ pub(crate) fn detect_ooxml_path_with_limits(
     }
 
     let input_bytes = file.metadata()?.len();
+    #[cfg(all(not(any(unix, windows)), any(feature = "odt", feature = "odp")))]
+    if ooxml_extension && input_bytes > limits.max_input_bytes() {
+        return Err(crate::opc::OpcError::ReadLimit {
+            resource: crate::opc::ReadResource::InputBytes,
+            actual: input_bytes,
+            maximum: limits.max_input_bytes(),
+        });
+    }
+
+    #[cfg(all(not(any(unix, windows)), any(feature = "odt", feature = "odp")))]
+    if ordinary_odf_path_candidate(&mut file)? {
+        return Ok(None);
+    }
+
     if input_bytes > limits.max_input_bytes() {
         return Err(crate::opc::OpcError::ReadLimit {
             resource: crate::opc::ReadResource::InputBytes,
@@ -1298,6 +1442,32 @@ pub(crate) fn detect_ooxml_path_with_limits(
             }
         },
     }
+}
+
+#[cfg(all(
+    not(any(unix, windows)),
+    any(feature = "docx", feature = "pptx"),
+    any(feature = "odt", feature = "odp")
+))]
+fn ordinary_odf_path_candidate(file: &mut std::fs::File) -> crate::opc::Result<bool> {
+    use std::io::{Read, Seek, SeekFrom};
+
+    file.seek(SeekFrom::Start(0))?;
+    let mut prefix = [0_u8; 512];
+    let prefix_len = file.read(&mut prefix)?;
+    let format = litchi_odf_common::detect::packaged_mime(&prefix[..prefix_len]);
+    let enabled_odf = match format {
+        #[cfg(feature = "odt")]
+        Some(litchi_core::detection::FileFormat::Odt) => true,
+        #[cfg(feature = "odp")]
+        Some(litchi_core::detection::FileFormat::Odp) => true,
+        _ => false,
+    };
+    if !enabled_odf {
+        return Ok(false);
+    }
+    file.seek(SeekFrom::Start(0))?;
+    Ok(litchi_odf_common::detect::packaged_has_ooxml_catalog_from_reader(file) == Some(false))
 }
 
 /// Result of the private source-backed PPTX path probe.
@@ -1368,6 +1538,20 @@ fn odf_probe_error_to_opc(error: litchi_core::Error) -> crate::opc::OpcError {
         litchi_core::Error::Allocation { resource, source } => {
             crate::opc::OpcError::Allocation { resource, source }
         },
+        litchi_core::Error::ResourceLimit(limit) => {
+            if matches!(&limit.resource, litchi_core::Resource::InputBytes) {
+                crate::opc::OpcError::ReadLimit {
+                    resource: crate::opc::ReadResource::InputBytes,
+                    actual: limit.observed,
+                    maximum: limit.limit,
+                }
+            } else {
+                crate::opc::OpcError::ZipError(format!(
+                    "ODF resource limit for {:?}: observed {}, maximum {}",
+                    limit.resource, limit.observed, limit.limit
+                ))
+            }
+        },
         error => crate::opc::OpcError::ZipError(error.to_string()),
     }
 }
@@ -1393,11 +1577,6 @@ pub(crate) fn detect_docx_source_path_with_limits(
             .map_err(crate::opc::OpcError::IoError)
             .map_err(DocxSourcePathError::Opc)?,
     );
-    #[cfg(feature = "odt")]
-    let source_version = source
-        .version()
-        .map_err(crate::opc::OpcError::IoError)
-        .map_err(DocxSourcePathError::Opc)?;
     let mut signature = [0_u8; 4];
     let read = source
         .read_at(0, &mut signature)
@@ -1412,12 +1591,6 @@ pub(crate) fn detect_docx_source_path_with_limits(
         return Ok(None);
     }
 
-    #[cfg(feature = "odt")]
-    let is_odt_mime = litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())
-        .map_err(odf_probe_error_to_opc)
-        .map_err(DocxSourcePathError::Opc)?
-        == Some(litchi_core::detection::FileFormat::Odt);
-
     // Match the eager path's candidate policy: arbitrary non-ZIP inputs have
     // already returned `None`; every remaining candidate is checked against
     // the bounded input-byte policy before an OOXML suffix receives its typed
@@ -1427,18 +1600,6 @@ pub(crate) fn detect_docx_source_path_with_limits(
         .map_err(crate::opc::OpcError::IoError)
         .map_err(DocxSourcePathError::Opc)?;
     if input_bytes > limits.max_input_bytes() {
-        #[cfg(feature = "odt")]
-        if is_odt_mime {
-            match odt_source_ooxml_probe_wins(
-                &source,
-                source_version,
-                crate::opc::ReadLimits::default(),
-            ) {
-                Ok(false) => return Ok(None),
-                Ok(true) => {},
-                Err(error) => return Err(DocxSourcePathError::Opc(error)),
-            }
-        }
         return Err(DocxSourcePathError::Opc(crate::opc::OpcError::ReadLimit {
             resource: crate::opc::ReadResource::InputBytes,
             actual: input_bytes,
@@ -1459,22 +1620,7 @@ pub(crate) fn detect_docx_source_path_with_limits(
         limits,
     ) {
         Ok(package) => package,
-        Err(error @ crate::opc::OpcError::ReadLimit { .. })
-        | Err(error @ crate::opc::OpcError::Allocation { .. }) => {
-            #[cfg(feature = "odt")]
-            if is_odt_mime {
-                match odt_source_ooxml_probe_wins(
-                    &source,
-                    source_version,
-                    crate::opc::ReadLimits::default(),
-                ) {
-                    Ok(false) => return Ok(None),
-                    Ok(true) => {},
-                    Err(probe_error) => {
-                        return Err(DocxSourcePathError::Opc(probe_error));
-                    },
-                }
-            }
+        Err(error) if hard_docx_source_bytes_probe_error(&error) => {
             return Err(DocxSourcePathError::Opc(error));
         },
         Err(error) if ooxml_extension => return Err(DocxSourcePathError::Opc(error)),
@@ -1488,9 +1634,10 @@ pub(crate) fn detect_docx_source_path_with_limits(
         },
     };
 
-    let Some(format) =
-        crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(&package)
-    else {
+    let format =
+        crate::detection_smart::ooxml::try_detect_ooxml_format_from_source_backed_package(&package)
+            .map_err(DocxSourcePathError::Opc)?;
+    let Some(format) = format else {
         return Ok(None);
     };
     if format != litchi_core::detection::FileFormat::Docx {
@@ -1535,8 +1682,20 @@ pub(crate) struct OdtSourcePathCandidate {
 
 #[cfg(all(feature = "odt", any(unix, windows)))]
 impl OdtSourcePathCandidate {
-    pub(crate) fn has_ooxml_catalog(&self) -> litchi_core::Result<bool> {
-        self.package.has_file("[Content_Types].xml")
+    pub(crate) fn ooxml_catalog_state(&self) -> litchi_core::Result<Option<bool>> {
+        let source = self.package.source_arc();
+        let state = litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at(source.as_ref())?;
+        #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+        {
+            let observed = self.package.source_version()?;
+            if observed != self.source_version {
+                return Err(litchi_core::Error::SourceChanged {
+                    expected: self.source_version,
+                    observed,
+                });
+            }
+        }
+        Ok(state)
     }
 
     pub(crate) fn into_document(self) -> litchi_core::Result<litchi_odt::SourceBackedDocument> {
@@ -1565,7 +1724,7 @@ impl OdtSourcePathCandidate {
     }
 }
 
-#[cfg(all(feature = "odt", any(unix, windows)))]
+#[cfg(all(feature = "odt", not(feature = "docx"), any(unix, windows)))]
 pub(crate) fn detect_odt_source_path(
     path: &std::path::Path,
 ) -> litchi_core::Result<Option<OdtSourcePathCandidate>> {
@@ -1574,6 +1733,40 @@ pub(crate) fn detect_odt_source_path(
 
     let source: Arc<dyn ReadAt> = Arc::new(litchi_core::FileSource::open(path)?);
     let source_version = source.version()?;
+    detect_odt_source(source, source_version)
+}
+
+#[cfg(all(feature = "odt", feature = "docx", any(unix, windows)))]
+pub(crate) fn detect_odt_source_path_with_limits(
+    path: &std::path::Path,
+    limits: crate::opc::ReadLimits,
+) -> litchi_core::Result<Option<OdtSourcePathCandidate>> {
+    use litchi_core::ReadAt;
+    use std::sync::Arc;
+
+    let source: Arc<dyn ReadAt> = Arc::new(litchi_core::FileSource::open(path)?);
+    let source_version = source.version()?;
+    if has_ooxml_extension(path) {
+        let input_bytes = source.len()?;
+        if input_bytes > limits.max_input_bytes() {
+            return Err(litchi_core::Error::ResourceLimit(
+                litchi_core::ResourceLimit {
+                    resource: litchi_core::Resource::InputBytes,
+                    observed: input_bytes,
+                    limit: limits.max_input_bytes(),
+                    scope: "OOXML-suffixed document input".into(),
+                },
+            ));
+        }
+    }
+    detect_odt_source(source, source_version)
+}
+
+#[cfg(all(feature = "odt", any(unix, windows)))]
+fn detect_odt_source(
+    source: std::sync::Arc<dyn litchi_core::ReadAt>,
+    source_version: litchi_core::SourceVersion,
+) -> litchi_core::Result<Option<OdtSourcePathCandidate>> {
     let mut signature = [0_u8; 4];
     let read = source.read_at(0, &mut signature)?;
     let zip_magic = read == signature.len()
@@ -1592,9 +1785,19 @@ pub(crate) fn detect_odt_source_path(
         return Ok(None);
     }
 
-    let package = litchi_odf_common::core::SourceBackedPackage::from_read_at(source)?;
+    let package =
+        litchi_odf_common::core::SourceBackedPackage::from_read_at(std::sync::Arc::clone(&source))?;
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-    let source_version = package.source_version()?;
+    {
+        ensure_odt_source_current(source.as_ref(), source_version)?;
+        let package_source_version = package.source_version()?;
+        if package_source_version != source_version {
+            return Err(litchi_core::Error::SourceChanged {
+                expected: source_version,
+                observed: package_source_version,
+            });
+        }
+    }
     Ok(Some(OdtSourcePathCandidate {
         package,
         #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
@@ -1637,7 +1840,9 @@ fn ensure_odt_source_current(
 
 #[cfg(all(
     feature = "odt",
-    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+    any(feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    not(feature = "docx"),
+    any(unix, windows)
 ))]
 fn odt_source_ooxml_probe_wins(
     source: &std::sync::Arc<dyn litchi_core::ReadAt>,
@@ -1654,9 +1859,10 @@ fn odt_source_ooxml_probe_wins(
         Err(error) if missing_ooxml_content_types_error(&error) => return Ok(false),
         Err(error) => return Err(error),
     };
-    let wins =
-        crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(&package)
-            .is_some();
+    let wins = crate::detection_smart::ooxml::try_detect_ooxml_format_from_source_backed_package(
+        &package,
+    )?
+    .is_some();
     let actual = source.version().map_err(crate::opc::OpcError::IoError)?;
     if actual != expected {
         return Err(crate::opc::OpcError::SourceChanged { expected, actual });
@@ -1680,21 +1886,11 @@ pub(crate) fn detect_docx_from_odt_source_candidate_with_limits(
         .map_err(crate::opc::OpcError::IoError)
         .map_err(DocxSourcePathError::Opc)?;
     if input_bytes > limits.max_input_bytes() {
-        match odt_source_ooxml_probe_wins(
-            &source,
-            candidate.source_version,
-            crate::opc::ReadLimits::default(),
-        ) {
-            Ok(false) => return Ok(None),
-            Ok(true) => {
-                return Err(DocxSourcePathError::Opc(crate::opc::OpcError::ReadLimit {
-                    resource: crate::opc::ReadResource::InputBytes,
-                    actual: input_bytes,
-                    maximum: limits.max_input_bytes(),
-                }));
-            },
-            Err(error) => return Err(DocxSourcePathError::Opc(error)),
-        }
+        return Err(DocxSourcePathError::Opc(crate::opc::OpcError::ReadLimit {
+            resource: crate::opc::ReadResource::InputBytes,
+            actual: input_bytes,
+            maximum: limits.max_input_bytes(),
+        }));
     }
 
     #[cfg(test)]
@@ -1704,24 +1900,22 @@ pub(crate) fn detect_docx_from_odt_source_candidate_with_limits(
         limits,
     ) {
         Ok(package) => package,
-        Err(error @ crate::opc::OpcError::ReadLimit { .. })
-        | Err(error @ crate::opc::OpcError::Allocation { .. }) => {
-            match odt_source_ooxml_probe_wins(
-                &source,
-                candidate.source_version,
-                crate::opc::ReadLimits::default(),
-            ) {
-                Ok(false) => return Ok(None),
-                Ok(true) => return Err(DocxSourcePathError::Opc(error)),
-                Err(probe_error) => return Err(DocxSourcePathError::Opc(probe_error)),
-            }
+        Err(error) if missing_ooxml_content_types_error(&error) => {
+            candidate
+                .ensure_current_opc()
+                .map_err(DocxSourcePathError::Opc)?;
+            return Ok(None);
+        },
+        Err(error) if hard_docx_source_bytes_probe_error(&error) => {
+            return Err(DocxSourcePathError::Opc(error));
         },
         Err(error) => return Err(DocxSourcePathError::Opc(error)),
     };
 
-    let Some(format) =
-        crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(&package)
-    else {
+    let format =
+        crate::detection_smart::ooxml::try_detect_ooxml_format_from_source_backed_package(&package)
+            .map_err(DocxSourcePathError::Opc)?;
+    let Some(format) = format else {
         candidate
             .ensure_current_opc()
             .map_err(DocxSourcePathError::Opc)?;
@@ -1792,15 +1986,14 @@ pub(crate) fn detect_pptx_source_path_with_limits(
         return Ok(None);
     }
 
-    // Match the eager path's candidate policy: arbitrary non-ZIP inputs have
-    // already returned `None`; every remaining candidate is checked against
-    // the bounded input-byte policy before an OOXML suffix receives its typed
-    // ZIP-magic refusal.
+    // OOXML-suffixed paths apply the caller's policy before any lower-family
+    // handoff. Native ODP paths may first prove that no OOXML catalog exists
+    // under the ODF detector's own finite policy.
     let input_bytes = source
         .len()
         .map_err(crate::opc::OpcError::IoError)
         .map_err(PptxSourcePathError::Opc)?;
-    if input_bytes > limits.max_input_bytes() {
+    if ooxml_extension && input_bytes > limits.max_input_bytes() {
         return Err(PptxSourcePathError::Opc(crate::opc::OpcError::ReadLimit {
             resource: crate::opc::ReadResource::InputBytes,
             actual: input_bytes,
@@ -1809,25 +2002,28 @@ pub(crate) fn detect_pptx_source_path_with_limits(
     }
 
     #[cfg(feature = "odp")]
-    let ordinary_odp = if !ooxml_extension {
+    let ordinary_odp = {
         let odp_mime = litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())
             .map_err(odf_probe_error_to_opc)
             .map_err(PptxSourcePathError::Opc)?;
         odp_mime == Some(litchi_core::FileFormat::Odp)
-            && litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at_with_limits(
-                source.as_ref(),
-                super::catalog_probe_limits(limits),
-            )
-            .map_err(odf_probe_error_to_opc)
-            .map_err(PptxSourcePathError::Opc)?
+            && litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at(source.as_ref())
+                .map_err(odf_probe_error_to_opc)
+                .map_err(PptxSourcePathError::Opc)?
                 == Some(false)
-    } else {
-        false
     };
     #[cfg(not(feature = "odp"))]
     let ordinary_odp = false;
     if ordinary_odp {
         return Ok(None);
+    }
+
+    if input_bytes > limits.max_input_bytes() {
+        return Err(PptxSourcePathError::Opc(crate::opc::OpcError::ReadLimit {
+            resource: crate::opc::ReadResource::InputBytes,
+            actual: input_bytes,
+            maximum: limits.max_input_bytes(),
+        }));
     }
 
     if !zip_magic {
@@ -1840,8 +2036,7 @@ pub(crate) fn detect_pptx_source_path_with_limits(
     super::record_opc_probe();
     let package = match crate::opc::SourceBackedPackage::from_read_at_with_limits(source, limits) {
         Ok(package) => package,
-        Err(error @ crate::opc::OpcError::ReadLimit { .. })
-        | Err(error @ crate::opc::OpcError::Allocation { .. }) => {
+        Err(error) if hard_ooxml_probe_error(&error) => {
             return Err(PptxSourcePathError::Opc(error));
         },
         Err(error) if ooxml_extension => return Err(PptxSourcePathError::Opc(error)),
@@ -1855,9 +2050,10 @@ pub(crate) fn detect_pptx_source_path_with_limits(
         },
     };
 
-    let Some(format) =
-        crate::detection_smart::ooxml::detect_ooxml_format_from_source_backed_package(&package)
-    else {
+    let format =
+        crate::detection_smart::ooxml::try_detect_ooxml_format_from_source_backed_package(&package)
+            .map_err(PptxSourcePathError::Opc)?;
+    let Some(format) = format else {
         return Ok(None);
     };
     if format != litchi_core::detection::FileFormat::Pptx {
@@ -2077,7 +2273,7 @@ mod short_signature_tests {
             detect_format_smart_with_limits(ordinary.clone(), limits),
             Some(super::DetectedFormat::Ods(_))
         ));
-        assert_eq!(super::super::opc_probe_count(), 1);
+        assert_eq!(super::super::opc_probe_count(), 0);
         assert!(super::detect_prepared_ods(ordinary).is_ok());
 
         let mut writer = litchi_odf_common::core::PackageWriter::new();
