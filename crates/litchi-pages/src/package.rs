@@ -15,6 +15,7 @@ pub(crate) mod document_settings;
 mod footnote_text;
 mod header_footer_text;
 mod page_layout;
+mod save;
 pub(crate) mod section_background;
 mod section_name;
 mod section_pagination;
@@ -95,6 +96,7 @@ pub use page_layout::{
     PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError, PageLayoutLimitKind,
     PageLayoutPatch,
 };
+pub use save::SaveError;
 pub use section_name::{
     SectionNameCommit, SectionNameDiagnostics, SectionNameEdit, SectionNameError,
     SectionNameLimitKind, SectionNamePatch,
@@ -620,6 +622,26 @@ impl Package {
             }
         }
         Ok(())
+    }
+
+    /// Durably save this exact immutable package artifact to a filesystem
+    /// path.
+    ///
+    /// The artifact is written to a private sibling temporary file, flushed
+    /// and synchronized, then atomically replaces the destination. Existing
+    /// ordinary regular-file permissions are preserved where supported; Unix
+    /// set-user-ID and set-group-ID bits are cleared. The containing directory
+    /// is synchronized where the platform supports it. The destination is left
+    /// untouched when staging fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SaveError::Write`] when the package cannot be written to the
+    /// staging file, or [`SaveError::Publication`] when the destination cannot
+    /// be safely replaced. A publication error may report that replacement
+    /// already committed through [`SaveError::was_committed`].
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SaveError> {
+        save::save(self, path)
     }
 
     /// Render all native Pages text through the immutable semantic snapshot.

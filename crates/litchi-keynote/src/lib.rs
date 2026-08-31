@@ -336,7 +336,7 @@ pub use package::{
     ChartTitleCommit, ChartTitleDiagnostics, ChartTitleEdit, ChartTitleError, ChartTitleLimitKind,
     ChartTitlePatch, Commit, Diagnostics, Edit, EditError, Limits, MAX_OBJECTS, MAX_REFERENCES,
     MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package, Patch,
-    PayloadLimitKind, ReadError, ReadOptions, SemanticLimitKind, SemanticLimits,
+    PayloadLimitKind, ReadError, ReadOptions, SaveError, SemanticLimitKind, SemanticLimits,
     SemanticLimitsError, SemanticPath, SlideBackgroundCommit, SlideBackgroundDiagnostics,
     SlideBackgroundEdit, SlideBackgroundError, SlideBackgroundLimitKind, SlideBackgroundPatch,
     SlideMovieCaptionCommit, SlideMovieCaptionDiagnostics, SlideMovieCaptionEdit,

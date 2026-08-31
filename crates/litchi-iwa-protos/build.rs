@@ -128,6 +128,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         proto_directory,
         buffa_projection_directory,
     )?;
+    enforce_movie_playback_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_keynote_movie_geometry_projection_provenance(
         proto_directory,
         buffa_projection_directory,
@@ -379,6 +380,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .reflect_mode(buffa_build::ReflectMode::Off)
         .idiomatic_field_names(true)
         .compile()?;
+    enforce_movie_playback_projection_budget(&buffa_movie_playback_out_directory)?;
 
     // Keynote movie geometry keeps only the drawable/geometry envelope in the
     // generated lazy view. Point and Size remain opaque bytes so the strict
@@ -2516,6 +2518,104 @@ required .LitchiIwaProjection.DrawableArchive super = 1;\n\
     {
         return Err(
             "derived Keynote movie-caption projection/router drifted from canonical TSD MovieArchive title/caption fields, exposed repeated storage, or introduced generated/production encoding"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_movie_playback_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const CANONICAL_FIELDS: [&str; 7] = [
+        "required .TSD.DrawableArchive super = 1;",
+        "optional float startTime = 3;",
+        "optional float endTime = 4;",
+        "optional float posterTime = 5;",
+        "optional uint32 loopOptionAsInteger = 6 [deprecated = true];",
+        "optional float volume = 7;",
+        "optional .TSD.MovieArchive.MovieLoopOption loop_option = 24 [default = None];",
+    ];
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\n\
+package LitchiIwaProjection;\n\
+message MoviePlaybackArchive {\n\
+required bytes super = 1;\n\
+optional float start_time = 3;\n\
+optional float end_time = 4;\n\
+optional float poster_time = 5;\n\
+optional uint32 loop_option_as_integer = 6;\n\
+optional float volume = 7;\n\
+optional int32 loop_option = 24;\n\
+}";
+    const EXPECTED_PROJECTION_DIGEST: &str =
+        "b42ebea4039c7bee3d049de00b2b7a997b6c8e5d18851aa8c6a916eb9a7986f5";
+    const ROUTER_DECLARATIONS: [&str; 14] = [
+        "const SUPER_FIELD: u32 = 1;",
+        "const START_FIELD: u32 = 3;",
+        "const END_FIELD: u32 = 4;",
+        "const POSTER_FIELD: u32 = 5;",
+        "const LEGACY_LOOP_FIELD: u32 = 6;",
+        "const VOLUME_FIELD: u32 = 7;",
+        "const MODERN_LOOP_FIELD: u32 = 24;",
+        "const MAX_RECURSION: u32 = 64;",
+        "pub fn decode_movie_playback(",
+        "pub fn decode_movie_playback_with_report(",
+        "pub fn prepare_movie_playback_rewrite<'source>(",
+        "pub fn rewrite_movie_playback(",
+        "fn force_buffa(",
+        "decode_lazy_view(source)",
+    ];
+    const PRIVATE_MODULE_DECLARATION: &str = "mod buffa_movie_playback_generated {";
+    const PRIVATE_MODULE_PATH: &str =
+        "\"/buffa-movie-playback/iwa_movie_playback_buffa_protos.rs\"";
+
+    let tsd = fs::read_to_string(proto_directory.join("TSDArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSDMoviePlaybackArchive.proto"))?;
+    let normalize = |source: &str| {
+        source
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let codec = fs::read_to_string("src/movie_playback_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    let Some(movie) = proto_message_block(&tsd, "MovieArchive") else {
+        return Err("movie playback provenance lost the canonical MovieArchive message".into());
+    };
+    let projection_digest = sha256_hex(&projection);
+    if !CANONICAL_FIELDS
+        .iter()
+        .all(|declaration| proto_field(movie, declaration) == 1)
+        || normalize(&projection) != normalize(PROJECTION_SCHEMA)
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || projection_digest != EXPECTED_PROJECTION_DIGEST
+        || !ROUTER_DECLARATIONS
+            .iter()
+            .all(|declaration| production_codec.matches(declaration).count() == 1)
+        || !has_exact_private_module_declaration(&lib, PRIVATE_MODULE_DECLARATION)
+        || lib.matches(PRIVATE_MODULE_PATH).count() != 1
+        || FORBIDDEN_PROST_CODEC_MARKERS
+            .iter()
+            .any(|fragment| production_codec.contains(fragment))
+        || FORBIDDEN_BUFFA_OWNERSHIP_MARKERS
+            .iter()
+            .any(|fragment| production_codec.contains(fragment))
+        || production_codec.contains("RepeatedView")
+        || production_codec.contains("LazyRepeatedView")
+        || production_codec.contains("prost")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "movie playback projection/router drifted from canonical TSD MovieArchive fields, lost its private lazy-view boundary, introduced repeated storage, or added production encoding"
                 .into(),
         );
     }
@@ -6495,6 +6595,67 @@ fn enforce_keynote_movie_caption_projection_budget(directory: &Path) -> Result<(
     {
         return Err(format!(
             "Keynote movie-caption projection generated {files} files/{bytes} bytes/{repeated} RepeatedView mentions/{lazy_repeated} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_movie_playback_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: [&str; 5] = [
+        "LitchiIwaProjection.mod.rs",
+        "TSDMoviePlaybackArchive.__lazy_view.rs",
+        "TSDMoviePlaybackArchive.__view.rs",
+        "TSDMoviePlaybackArchive.rs",
+        "iwa_movie_playback_buffa_protos.rs",
+    ];
+    const EXPECTED_GENERATED_BYTES: u64 = 41_472;
+    const EXPECTED_DIGEST: &str =
+        "2f56eff9ac98cbe17057abc7144873df14958ea2d6c8c038bddd8bfd9f0880ec";
+
+    let mut entries = fs::read_dir(directory)?
+        .map(|result| result.map(|entry| (entry.file_name(), entry.path(), entry.file_type())))
+        .collect::<Result<Vec<_>, _>>()?;
+    entries.sort_by(|left, right| left.0.cmp(&right.0));
+    let mut files = Vec::new();
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    let mut digest = Sha256::new();
+    for (file_name, path, file_type_result) in entries {
+        if !file_type_result?.is_file() {
+            continue;
+        }
+        let name = file_name
+            .into_string()
+            .map_err(|_name| "movie playback projection generated a non-UTF-8 filename")?;
+        let generated = fs::read(path)?;
+        let text = std::str::from_utf8(&generated)?;
+        bytes = bytes
+            .checked_add(u64::try_from(generated.len())?)
+            .ok_or("movie playback generated-byte count overflow")?;
+        repeated_views = repeated_views
+            .checked_add(text.matches("RepeatedView").count())
+            .ok_or("movie playback repeated-view count overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(text.matches("LazyRepeatedView").count())
+            .ok_or("movie playback lazy-repeated-view count overflow")?;
+        digest.update(generated);
+        files.push(name);
+    }
+    let aggregate_digest = digest
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    if files.as_slice() != EXPECTED_FILES
+        || bytes != EXPECTED_GENERATED_BYTES
+        || repeated_views != 0
+        || lazy_repeated_views != 0
+        || aggregate_digest != EXPECTED_DIGEST
+    {
+        return Err(format!(
+            "movie playback projection generated {files:?}/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions/digest {aggregate_digest}; expected exactly {EXPECTED_FILES:?}/{EXPECTED_GENERATED_BYTES} bytes/zero repeated views/digest {EXPECTED_DIGEST}"
         )
         .into());
     }

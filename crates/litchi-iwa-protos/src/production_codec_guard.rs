@@ -368,9 +368,14 @@ mod tests {
             "keynote_movie_caption",
             include_str!("keynote_movie_caption_codec.rs"),
         ),
+        ("movie_playback", include_str!("movie_playback_codec.rs")),
         (
             "keynote_movie_geometry",
             include_str!("keynote_movie_geometry_codec.rs"),
+        ),
+        (
+            "keynote_chart_legend",
+            include_str!("keynote_chart_legend_codec.rs"),
         ),
         (
             "keynote_chart_title",

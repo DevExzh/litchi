@@ -20,6 +20,7 @@ mod limits;
 mod logical;
 pub mod package;
 mod package_state;
+pub mod publication;
 mod semantic;
 mod zip;
 

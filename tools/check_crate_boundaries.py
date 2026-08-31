@@ -8322,6 +8322,44 @@ PAGES_PACKAGE_OUTPUT_FORBIDDEN_NAMES = frozenset(
 )
 PAGES_PACKAGE_OUTPUT_METHOD = "write_to"
 PAGES_PACKAGE_OUTPUT_ERROR = "WriteError"
+
+# Wave118 centralizes failure-atomic iWork package publication in the archive
+# crate.  Keep the owner and the three concrete package boundaries explicit so
+# a format crate cannot quietly grow a second tempfile/rename/sync policy.  The
+# owner module is intentionally public: the focused format crates and the
+# compatibility host call its typed publication seam directly.
+IWORK_ARCHIVE_PUBLICATION_FILE = Path(
+    "crates/litchi-iwa-archive/src/publication.rs"
+)
+IWORK_ARCHIVE_PUBLICATION_MODULE_SOURCE = Path("crates/litchi-iwa-archive/src/lib.rs")
+IWORK_ARCHIVE_PUBLICATION_MODULE = "publication"
+IWORK_ARCHIVE_PUBLICATION_ERROR = "Error"
+IWORK_ARCHIVE_PUBLICATION_HELPER = "replace_with"
+
+IWORK_FOCUSED_PACKAGE_SOURCE_ROOTS = (
+    ("litchi-pages", Path("crates/litchi-pages/src")),
+    ("litchi-numbers", Path("crates/litchi-numbers/src")),
+    ("litchi-keynote", Path("crates/litchi-keynote/src")),
+)
+IWORK_FOCUSED_PACKAGE_SOURCES = tuple(
+    source_root / "package.rs"
+    for _name, source_root in IWORK_FOCUSED_PACKAGE_SOURCE_ROOTS
+)
+IWORK_FOCUSED_PACKAGE_SAVE_SOURCES = tuple(
+    source_root / "package" / "save.rs"
+    for _name, source_root in IWORK_FOCUSED_PACKAGE_SOURCE_ROOTS
+)
+IWORK_FOCUSED_PACKAGE_EXPORT_SOURCES = tuple(
+    source_root / "lib.rs"
+    for _name, source_root in IWORK_FOCUSED_PACKAGE_SOURCE_ROOTS
+)
+IWORK_LEGACY_PACKAGE_SOURCE = Path("crates/litchi-iwa/src/package.rs")
+
+# Short aliases keep callers of the boundary checker aligned with the
+# migration language used in the ADRs while the explicit names above remain
+# the canonical inventory.
+IWORK_ARCHIVE_PUBLICATION_SOURCE = IWORK_ARCHIVE_PUBLICATION_FILE
+IWORK_PACKAGE_SAVE_SOURCES = IWORK_FOCUSED_PACKAGE_SAVE_SOURCES
 CARGO_SECTION_HEADER = re.compile(r"^[ \t]*\[([^\]]+)\][ \t]*(?:#.*)?$")
 CARGO_PROST_DEPENDENCY = re.compile(
     r"^[ \t]*(?:prost|\"prost\")(?:[ \t]*\.[ \t]*workspace)?[ \t]*="
@@ -27245,6 +27283,320 @@ def audit_numbers_names_package_no_eager_prost_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwork_atomic_publication(root: Path = ROOT) -> list[str]:
+    """Enforce the single durable publication boundary for iWork packages.
+
+    The archive crate owns the physical temporary-file, replacement, and
+    durability policy.  The three focused package crates retain their
+    streaming Package::write_to method and expose a typed SaveError; their
+    Package::save methods may either call the archive helper directly or
+    delegate through a private package::save helper.  The legacy litchi-iwa
+    package is allowed to remain a compatibility host, but may only call
+    through to the archive owner.
+
+    This audit is dormant until the archive owner/module is introduced.  That
+    keeps an older checkout useful while making the migration ratchet fail
+    closed as soon as either half of the new boundary appears.
+    """
+
+    def production_source(path: Path) -> str:
+        if not path.is_file():
+            return ""
+        return _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+
+    publication_path = root / IWORK_ARCHIVE_PUBLICATION_FILE
+    publication_mod_path = root / Path(
+        "crates/litchi-iwa-archive/src/publication/mod.rs"
+    )
+    owner_path = (
+        publication_path
+        if publication_path.is_file()
+        else publication_mod_path
+        if publication_mod_path.is_file()
+        else None
+    )
+    module_path = root / IWORK_ARCHIVE_PUBLICATION_MODULE_SOURCE
+    module_source = production_source(module_path)
+    module_code = _mask_rust_non_code(module_source)
+    module_pattern = re.compile(
+        rf"(?m)^[ \t]*(?:pub(?:[ \t\r\n]*\([^()]*\))?[ \t\r\n]+)?"
+        rf"mod[ \t\r\n]+(?:r#)?{re.escape(IWORK_ARCHIVE_PUBLICATION_MODULE)}\b"
+    )
+    public_module_pattern = re.compile(
+        rf"(?m)^[ \t]*pub(?![ \t\r\n]*\([^()]*\))[ \t\r\n]+mod"
+        rf"[ \t\r\n]+(?:r#)?{re.escape(IWORK_ARCHIVE_PUBLICATION_MODULE)}\b"
+    )
+    has_module = module_pattern.search(module_code) is not None
+
+    # Do not make the historical checkout fail until the new source/module
+    # seam starts landing.  Once either appears, all required pieces are
+    # checked, including a missing sibling owner or module declaration.
+    if owner_path is None and not has_module:
+        return []
+
+    violations: list[str] = []
+    if owner_path is None:
+        violations.append(
+            "iWork archive publication owner source is missing: "
+            f"{IWORK_ARCHIVE_PUBLICATION_FILE}"
+        )
+    if not has_module:
+        violations.append(
+            "iWork archive publication module is missing from the archive crate: "
+            f"{IWORK_ARCHIVE_PUBLICATION_MODULE_SOURCE}"
+        )
+    elif public_module_pattern.search(module_code) is None:
+        violations.append(
+            "iWork archive publication module must be public for focused package "
+            "save call-through: "
+            f"{IWORK_ARCHIVE_PUBLICATION_MODULE_SOURCE}"
+        )
+
+    if owner_path is not None:
+        owner_source = production_source(owner_path)
+        owner_code = _mask_rust_non_code(owner_source)
+        public_error = re.compile(
+            rf"(?m)^[ \t]*pub(?![ \t\r\n]*\([^()]*\))[ \t\r\n]+"
+            rf"(?:struct|enum|type)[ \t\r\n]+"
+            rf"(?:r#)?{re.escape(IWORK_ARCHIVE_PUBLICATION_ERROR)}\b"
+        )
+        if public_error.search(owner_code) is None:
+            violations.append(
+                "iWork archive publication owner is missing public typed "
+                f"{IWORK_ARCHIVE_PUBLICATION_ERROR}: "
+                f"{IWORK_ARCHIVE_PUBLICATION_FILE}"
+            )
+        public_helper = re.compile(
+            rf"(?m)^[ \t]*pub(?![ \t\r\n]*\([^()]*\))[ \t\r\n]+fn"
+            rf"[ \t\r\n]+(?:r#)?{re.escape(IWORK_ARCHIVE_PUBLICATION_HELPER)}\b"
+        )
+        if public_helper.search(owner_code) is None:
+            violations.append(
+                "iWork archive publication owner is missing public "
+                f"{IWORK_ARCHIVE_PUBLICATION_HELPER} helper: "
+                f"{IWORK_ARCHIVE_PUBLICATION_FILE}"
+            )
+
+    publication_call = re.compile(
+        rf"(?<![A-Za-z0-9_#])(?:r#)?{re.escape(IWORK_ARCHIVE_PUBLICATION_HELPER)}"
+        r"[ \t\r\n]*(?:::?[ \t\r\n]*<[^;{}()]*>)?"
+        r"[ \t\r\n]*\("
+    )
+    publication_path_reference = re.compile(
+        rf"(?<![A-Za-z0-9_#])(?:r#)?(?:litchi_iwa_archive|crate)"
+        rf"[ \t\r\n]*::[ \t\r\n]*(?:r#)?"
+        rf"{re.escape(IWORK_ARCHIVE_PUBLICATION_MODULE)}\b"
+        rf"|(?<![A-Za-z0-9_#])(?:r#)?"
+        rf"{re.escape(IWORK_ARCHIVE_PUBLICATION_MODULE)}"
+        rf"[ \t\r\n]*::[ \t\r\n]*(?:r#)?"
+        rf"(?:{re.escape(IWORK_ARCHIVE_PUBLICATION_HELPER)}\b|"
+        rf"\{{[^;}}]*\b{re.escape(IWORK_ARCHIVE_PUBLICATION_HELPER)}\b)"
+    )
+
+    def routes_through_publication(source: str) -> bool:
+        code = _mask_rust_non_code(source)
+        if publication_call.search(code) is None:
+            return False
+        if publication_path_reference.search(code) is not None:
+            return True
+        # Tiny boundary fixtures sometimes omit imports because the owner
+        # module itself is supplied by the fixture.  Treat an unqualified
+        # helper call as the intended seam unless the concrete crate defines
+        # a competing helper with the same name.
+        local_helper = re.compile(
+            rf"(?m)^[ \t]*(?:pub(?:[ \t\r\n]*\([^()]*\))?[ \t\r\n]+)?fn"
+            rf"[ \t\r\n]+(?:r#)?{re.escape(IWORK_ARCHIVE_PUBLICATION_HELPER)}\b"
+        )
+        return local_helper.search(code) is None
+
+    forbidden_publication_patterns = (
+        (
+            "NamedTempFile/tempfile builder",
+            re.compile(
+                r"(?<![A-Za-z0-9_#])(?:NamedTempFile|tempfile[ \t\r\n]*::"
+                r"[ \t\r\n]*(?:Builder|tempfile_in))\b"
+            ),
+        ),
+        (
+            "fs::rename",
+            re.compile(
+                r"(?<![A-Za-z0-9_#])(?:std[ \t\r\n]*::[ \t\r\n]*)?"
+                r"fs[ \t\r\n]*::[ \t\r\n]*(?:rename\b|"
+                r"\{[^}]*\brename\b[^}]*\})"
+                r"|(?<![A-Za-z0-9_#])rename[ \t\r\n]*\("
+            ),
+        ),
+        (
+            "sync publication",
+            re.compile(
+                r"(?<![A-Za-z0-9_#])(?:[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*\."
+                r"[ \t\r\n]*)?sync_(?:all|data)[ \t\r\n]*\("
+            ),
+        ),
+        (
+            "persist publication",
+            re.compile(
+                r"(?<![A-Za-z0-9_#])(?:[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*\."
+                r"[ \t\r\n]*)?persist(?:_noclobber|_in)?"
+                r"[ \t\r\n]*\("
+            ),
+        ),
+    )
+
+    def report_forbidden(path: Path, label: str, code: str) -> None:
+        relative = path.relative_to(root)
+        for description, pattern in forbidden_publication_patterns:
+            for match in pattern.finditer(code):
+                line_number = code.count("\n", 0, match.start()) + 1
+                label_prefix = (
+                    "legacy litchi-iwa package"
+                    if label == "legacy"
+                    else f"focused {label}"
+                )
+                violations.append(
+                    f"{label_prefix} production source recreates direct "
+                    f"{description} publication: {relative}:{line_number}"
+                )
+
+    for package_name, source_root in IWORK_FOCUSED_PACKAGE_SOURCE_ROOTS:
+        absolute_root = root / source_root
+        if not absolute_root.is_dir():
+            violations.append(
+                f"focused {package_name} package source root is missing: "
+                f"{source_root}"
+            )
+            continue
+
+        production_sources: list[str] = []
+        for path in sorted(absolute_root.rglob("*.rs")):
+            source = production_source(path)
+            production_sources.append(source)
+            report_forbidden(path, package_name, _mask_rust_non_code(source))
+        package_source = "\n".join(production_sources)
+
+        methods = _rust_public_methods_in_impl(package_source, "Package")
+        saves = [
+            (declaration, line_number)
+            for name, declaration, line_number in methods
+            if name == "save"
+        ]
+        writes = [
+            (declaration, line_number)
+            for name, declaration, line_number in methods
+            if name == "write_to"
+        ]
+        if not saves:
+            violations.append(
+                f"focused {package_name} Package::save is missing a production "
+                f"method: {source_root / 'package.rs'}"
+            )
+        else:
+            if not any("SaveError" in declaration for declaration, _ in saves):
+                violations.append(
+                    f"focused {package_name} Package::save must return typed "
+                    f"SaveError: {source_root / 'package.rs'}:{saves[0][1]}"
+                )
+            method_body = _rust_any_function_body(package_source, "save")
+            direct_route = (
+                method_body is not None
+                and publication_call.search(_mask_rust_non_code(method_body))
+                is not None
+                and routes_through_publication(package_source)
+            )
+            helper_route = (
+                method_body is not None
+                and re.search(
+                    r"\b(?:save|publish|publication)[ \t\r\n]*::[ \t\r\n]*"
+                    r"(?:save|publish|replace_with)\b",
+                    _mask_rust_non_code(method_body),
+                )
+                is not None
+                and routes_through_publication(package_source)
+            )
+            if not (direct_route or helper_route):
+                violations.append(
+                    f"focused {package_name} Package::save must route through "
+                    f"litchi-iwa-archive::{IWORK_ARCHIVE_PUBLICATION_MODULE}::"
+                    f"{IWORK_ARCHIVE_PUBLICATION_HELPER}: "
+                    f"{source_root / 'package.rs'}:{saves[0][1]}"
+                )
+
+        if not writes:
+            violations.append(
+                f"focused {package_name} Package::write_to must be preserved as a "
+                f"production method: {source_root / 'package.rs'}"
+            )
+        elif not any("WriteError" in declaration for declaration, _ in writes):
+            violations.append(
+                f"focused {package_name} Package::write_to must retain its "
+                f"WriteError surface: {source_root / 'package.rs'}:{writes[0][1]}"
+            )
+
+        public_save_error = any(
+            re.search(
+                r"\bpub(?![ \t\r\n]*\([^()]*\))[ \t\r\n]+"
+                r"(?:struct|enum|type)[ \t\r\n]+(?:r#)?SaveError\b",
+                declaration,
+            )
+            is not None
+            for declaration, _line_number in _rust_public_declarations(package_source)
+        )
+        if not public_save_error:
+            violations.append(
+                f"focused {package_name} package is missing public SaveError: "
+                f"{source_root / 'package.rs'}"
+            )
+
+        library_path = root / (source_root / "lib.rs")
+        library_source = production_source(library_path)
+        if "SaveError" not in _rust_canonical_exports(
+            library_source, frozenset({"SaveError"})
+        ):
+            violations.append(
+                f"focused {package_name} package is missing root SaveError export: "
+                f"{source_root / 'lib.rs'}"
+            )
+
+    legacy_path = root / IWORK_LEGACY_PACKAGE_SOURCE
+    if legacy_path.is_file():
+        legacy_source = production_source(legacy_path)
+        report_forbidden(legacy_path, "legacy", _mask_rust_non_code(legacy_source))
+        legacy_methods = _rust_public_methods_in_impl(legacy_source, "IWorkPackage")
+        legacy_saves = [
+            (declaration, line_number)
+            for name, declaration, line_number in legacy_methods
+            if name == "save"
+        ]
+        if not legacy_saves:
+            violations.append(
+                "legacy litchi-iwa IWorkPackage::save is missing a production "
+                f"method: {IWORK_LEGACY_PACKAGE_SOURCE}"
+            )
+        else:
+            legacy_method_body = _rust_any_function_body(legacy_source, "save")
+            legacy_routes = (
+                legacy_method_body is not None
+                and publication_call.search(
+                    _mask_rust_non_code(legacy_method_body)
+                )
+                is not None
+                and routes_through_publication(
+                    (legacy_method_body or "") + "\n" + legacy_source
+                )
+            )
+            if (
+                not legacy_routes
+            ):
+                violations.append(
+                    "legacy litchi-iwa IWorkPackage::save must route through "
+                    f"litchi-iwa-archive::{IWORK_ARCHIVE_PUBLICATION_MODULE}::"
+                    f"{IWORK_ARCHIVE_PUBLICATION_HELPER}: "
+                    f"{IWORK_LEGACY_PACKAGE_SOURCE}:{legacy_saves[0][1]}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_pages_package_output_api_source_topology(root: Path = ROOT) -> list[str]:
     """Enforce the focused Pages package output boundary.
 
@@ -38200,6 +38552,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_pages_document_source_topology()
         + audit_pages_document_public_api()
         + audit_pages_package_output_api_source_topology()
+        + audit_iwork_atomic_publication()
         + audit_pages_package_no_eager_prost_source_topology()
         + audit_iwa_pages_footnote_text_source_topology()
         + audit_pages_footnote_text_facade_source_topology()

@@ -248,7 +248,7 @@ pub use package::{
 pub use package::{
     Error as PackageError, Limits as PackageLimits, MAX_OBJECTS, MAX_REFERENCES, Package,
     PayloadLimitKind as PackagePayloadLimitKind, ReadOptions as PackageReadOptions,
-    ResourceError as PackageResourceError, Result as PackageResult, SemanticLimitKind,
+    ResourceError as PackageResourceError, Result as PackageResult, SaveError, SemanticLimitKind,
     SemanticLimits as PackageSemanticLimits, SemanticLimitsError as PackageSemanticLimitsError,
     SemanticPath as PackageSemanticPath, TableLockCommit, TableLockDiagnostics, TableLockEdit,
     TableLockError, TableLockLimitKind, TableLockPatch, WriteError,

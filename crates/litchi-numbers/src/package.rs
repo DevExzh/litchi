@@ -35,6 +35,7 @@ mod limits;
 mod metadata;
 /// Exact-source sheet and table name transactions.
 pub(crate) mod names;
+mod save;
 #[allow(
     dead_code,
     reason = "Decoded sheets expose only the construction path used at package ingress."
@@ -92,6 +93,7 @@ pub use limits::{
 };
 /// Physical ingress ceilings for a parsed Numbers package.
 pub use litchi_iwa_archive::Limits;
+pub use save::SaveError;
 pub use table_lock::{
     TableLockCommit, TableLockDiagnostics, TableLockEdit, TableLockError, TableLockLimitKind,
     TableLockPatch,
@@ -726,6 +728,26 @@ impl Package {
             }
         }
         Ok(())
+    }
+
+    /// Durably save this exact immutable package artifact to a filesystem
+    /// path.
+    ///
+    /// The artifact is written to a private sibling temporary file, flushed
+    /// and synchronized, then atomically replaces the destination. Existing
+    /// ordinary regular-file permissions are preserved where supported; Unix
+    /// set-user-ID and set-group-ID bits are cleared. The containing directory
+    /// is synchronized where the platform supports it. The destination is
+    /// left untouched when staging fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SaveError::Write`] when the package cannot be written to the
+    /// staging file, or [`SaveError::Publication`] when the destination
+    /// cannot be safely replaced. A publication error may report that
+    /// replacement already committed through [`SaveError::was_committed`].
+    pub fn save(&self, path: impl AsRef<Path>) -> std::result::Result<(), SaveError> {
+        save::save(self, path)
     }
 
     /// Borrow decoded semantic sheets in stable source order.

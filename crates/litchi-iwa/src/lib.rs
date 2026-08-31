@@ -305,6 +305,31 @@ pub enum Error {
     ParseError(String),
 }
 
+impl Error {
+    /// Borrow a non-validation publication failure retained by a legacy save.
+    ///
+    /// The focused Pages, Numbers, and Keynote crates expose their own typed
+    /// save errors directly. This accessor preserves the same committed-state
+    /// information for callers that still use [`raw::package::IWorkPackage`].
+    /// Destination-shape failures retain the legacy [`Error::Bundle`]
+    /// categorization and therefore return `None` here.
+    #[must_use]
+    pub fn publication_error(&self) -> Option<&litchi_iwa_archive::publication::Error> {
+        match self {
+            Self::Io(error) => error.get_ref().and_then(|source| source.downcast_ref()),
+            _ => None,
+        }
+    }
+
+    /// Return whether a legacy package save replaced its destination before
+    /// reporting a post-replacement permission or durability failure.
+    #[must_use]
+    pub fn publication_was_committed(&self) -> bool {
+        self.publication_error()
+            .is_some_and(litchi_iwa_archive::publication::Error::was_committed)
+    }
+}
+
 /// Result type alias
 pub type Result<T> = std::result::Result<T, Error>;
 

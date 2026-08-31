@@ -118,7 +118,9 @@ pub use package::{
     HeaderFooterTextCommit, HeaderFooterTextDiagnostics, HeaderFooterTextEdit,
     HeaderFooterTextError, HeaderFooterTextLimitKind, HeaderFooterTextPatch,
 };
-pub use package::{Limits, MAX_OBJECTS, Package, PackageError, PackageResult, Stats, WriteError};
+pub use package::{
+    Limits, MAX_OBJECTS, Package, PackageError, PackageResult, SaveError, Stats, WriteError,
+};
 pub use package::{
     PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError, PageLayoutLimitKind,
     PageLayoutPatch,
