@@ -1,11 +1,9 @@
 //! Mutable iWork ZIP package with entry-order preservation.
 
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Component, Path};
 use std::sync::Arc;
-
-use tempfile::NamedTempFile;
 
 use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits};
 use crate::snappy::{SnappyLimits, SnappyStream};
@@ -47,6 +45,28 @@ fn cache_error(error: GetOrInsertError) -> Error {
         return Error::ParseError(shared.to_string());
     }
     Error::Archive(format!("IWA archive cache lookup failed: {error}"))
+}
+
+impl From<litchi_iwa_archive::publication::Error> for Error {
+    fn from(error: litchi_iwa_archive::publication::Error) -> Self {
+        use litchi_iwa_archive::publication::DestinationKind;
+
+        if let Some(destination_kind) = error.destination_kind() {
+            let message = match destination_kind {
+                DestinationKind::MissingFilename => "iWork package destination must name a file",
+                DestinationKind::Symlink => "iWork package destination must not be a symbolic link",
+                DestinationKind::ReparsePoint => {
+                    "iWork package destination must not be a Windows reparse point"
+                },
+                DestinationKind::NonRegular => "iWork package destination is not a regular file",
+                _ => "iWork package destination is invalid",
+            };
+            return Error::Bundle(message.to_owned());
+        }
+
+        let kind = error.io_error_kind().unwrap_or(std::io::ErrorKind::Other);
+        Error::Io(std::io::Error::new(kind, error))
+    }
 }
 
 fn clone_error(error: &Error) -> Error {
@@ -899,46 +919,9 @@ impl IWorkPackage {
     /// Atomically save the package to a regular file in the destination
     /// directory without buffering the complete ZIP in memory.
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let path = path.as_ref();
-        let parent = path
-            .parent()
-            .filter(|parent| !parent.as_os_str().is_empty())
-            .unwrap_or_else(|| Path::new("."));
-
-        let existing = match fs::symlink_metadata(path) {
-            Ok(metadata) if metadata.file_type().is_symlink() => {
-                return Err(Error::Bundle(
-                    "iWork package destination must not be a symbolic link".to_owned(),
-                ));
-            },
-            Ok(metadata) if metadata.is_file() => Some(metadata),
-            Ok(_) => {
-                return Err(Error::Bundle(
-                    "iWork package destination is not a regular file".to_owned(),
-                ));
-            },
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-            Err(error) => return Err(error.into()),
-        };
-
-        let mut temporary = NamedTempFile::new_in(parent)?;
-        self.write_to(temporary.as_file_mut())?;
-
-        // Apply the existing mode after writing: a read-only destination must
-        // not make the temporary file unwritable while the ZIP is finalized.
-        if let Some(metadata) = existing {
-            fs::set_permissions(temporary.path(), metadata.permissions())?;
-        }
-        temporary.as_file_mut().sync_all()?;
-        temporary
-            .persist(path)
-            .map_err(|error| Error::Io(error.error))?;
-
-        // Make the rename durable on filesystems that support directory sync.
-        if let Ok(directory) = File::open(parent) {
-            directory.sync_all()?;
-        }
-        Ok(())
+        litchi_iwa_archive::publication::replace_with(path.as_ref(), |temporary| {
+            self.write_to(temporary)
+        })
     }
 
     fn validate_entry_update(&self, position: Option<usize>, data: &[u8]) -> Result<()> {
@@ -2321,6 +2304,32 @@ mod tests {
             IWorkPackage::open(&destination).unwrap().entry("Data/a"),
             Some(&b"new"[..])
         );
+        Ok(())
+    }
+
+    #[test]
+    fn save_retains_a_typed_redacted_publication_failure() -> std::io::Result<()> {
+        const SECRET: &str = "private-legacy-publication-path";
+
+        let directory = tempfile::tempdir()?;
+        let destination = directory.path().join(SECRET).join("document.pages");
+        let error = IWorkPackage::new().save(&destination).unwrap_err();
+        let publication = error
+            .publication_error()
+            .expect("legacy I/O error should retain the publication source");
+
+        assert_eq!(
+            publication.stage(),
+            litchi_iwa_archive::publication::Stage::ResolveParent
+        );
+        assert_eq!(
+            publication.io_error_kind(),
+            Some(std::io::ErrorKind::NotFound)
+        );
+        assert!(!publication.was_committed());
+        assert!(!error.publication_was_committed());
+        assert!(!format!("{error:?}").contains(SECRET));
+        assert!(!error.to_string().contains(SECRET));
         Ok(())
     }
 

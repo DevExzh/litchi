@@ -31,8 +31,9 @@ stores; absence yields a typed resource error.
 
 Ordinary save creates a fresh artifact. Filesystem replacement uses a sibling
 temporary artifact, validation/finalization, flush/fsync as supported, and atomic
-replacement. Cancellation leaves the destination untouched and removes the
-temporary artifact. Caller-owned non-atomic sinks report incomplete output and
+replacement. Cancellation leaves the destination untouched and performs
+best-effort identity-aware cleanup of the temporary artifact. Caller-owned
+non-atomic sinks report incomplete output and
 bytes written.
 
 Every finalized document supports a sequential non-seekable sink by planning
@@ -1799,3 +1800,113 @@ production dependency edge or normal Prost owner changes by this record.
 Wave117 adds only a private Buffa projection schema/module under the existing
 `litchi-iwa-protos` owner; generated values remain private to the package
 implementation.
+
+## 2026-08-31 amendment: Wave118 archive-owned durable publication resource record
+
+Wave118 makes `litchi-iwa-archive` the owner of the reusable durable
+filesystem-publication boundary. The helper validates the destination before
+invoking its one-shot writer callback, rejects symbolic-link and non-regular
+destinations, captures permissions from an existing regular file, and creates
+the staging file as a private sibling in the destination directory. The
+callback writes only to that staging file. A callback, stream, validation, or
+allocation error before replacement is returned through the typed save error;
+the helper does not replace the destination. Best-effort cleanup is
+identity-aware: it removes the private temporary only while its pathname is
+still proved to name this operation's staging file, and otherwise disarms
+cleanup rather than unlinking an entry whose identity is uncertain. The same
+rule applies to pre-replacement permission hardening, flush, file-sync,
+revalidation, and replacement failures.
+
+Each immutable focused `Package::save` invokes `Package::write_to` once with
+the staging `File`; it does not first materialize `to_bytes` or add a second
+complete package-sized buffer/copy. The publication sequence is callback/write,
+restoration of private Unix staging mode `0600`, `File::flush`, staging-file
+`sync_all`, final destination and staging-path identity revalidation, and
+`persist` for same-directory atomic replacement. Only after replacement does
+the helper apply the existing destination's current ordinary permissions
+through the still-open published file descriptor, synchronize that published
+file when permissions were applied, and synchronize the parent directory where
+supported. New Unix destinations remain mode `0600`; inherited Unix
+set-user-ID and set-group-ID bits are cleared. Replacement is the publication
+commit point. A post-replacement permission or published-file synchronization
+failure, or a parent-sync failure other than Unix `InvalidInput`/`Unsupported`,
+is represented by the opaque archive publication `Error` as an explicit
+committed error; those two parent-sync kinds mean the capability is unavailable
+and return success. Callers use
+`was_committed()`/`is_committed()` and the typed stage and I/O accessors to
+learn that replacement already committed, so blind retry is unsafe. This is an
+exact streaming and allocation-shape contract, not a zero-copy, package-wide
+peak-memory, RSS, latency, throughput, or broad performance result.
+
+The focused durable entry points are
+`litchi-pages::Package::save`, `litchi-numbers::Package::save`, and
+`litchi-keynote::Package::save`. Each delegates to the single archive-owned
+publication operation. `litchi-iwa::IWorkPackage::save` and
+`litchi-iwa::Snapshot::save` remain compatibility host routes through that
+same operation and must not retain a parallel temporary/rename
+implementation. These save methods publish the already validated exact
+artifact; they add no semantic selection, mutation, candidate construction,
+reopen/readback, or locality work. The archive owns the filesystem sink,
+permission transfer, synchronization, and replacement.
+`Package::write_to` remains an exact caller-owned streaming sink and is not by
+itself a durable-save claim. The read-only umbrella `litchi` iWork facade does
+not introduce a fourth save API.
+
+The public save wrappers distinguish staging/write failure from filesystem
+publication failure and expose typed accessors, including whether replacement
+committed. Their default `Display`/`Debug` forms are content-free and redact
+destination and temporary paths, package bytes, and lower-layer diagnostic
+text. The publication `Error::source()` and `Error::io_error()` accessors can
+still expose the original operating-system error and its text to a caller
+that requests it; that diagnostic escape hatch is intentional. The existing
+typed streaming error still reports only the conforming byte offset and I/O
+kind. Windows receives the best-supported same-directory atomic replacement
+and file synchronization, but no stronger parent-durability or POSIX-rename
+guarantee is claimed. Other targets fail before the writer runs.
+Existing/current permission transfer is also platform-specific: Unix mode
+bits with set-user-ID/set-group-ID clearing are the narrow contract, while
+Windows reparse points are rejected and broader Windows metadata/ACL behavior
+is not portable. Unix `InvalidInput` and `Unsupported` parent-sync results are
+accepted as an unavailable capability; other post-replacement permission,
+file-sync, or parent-sync failures remain typed committed errors. The contract
+assumes a trusted, caller-controlled parent and
+ordinary local-filesystem rename/sync semantics; network and userspace
+filesystems, concurrent same-identity pathname replacement, and platform
+metadata can weaken identity, atomicity, cleanup, or crash-durability
+guarantees. Platform-specific refusal and post-replace durability failures
+remain typed rather than being presented as an ordinary pre-publication error.
+
+The Wave118 playback side keeps the existing private Keynote
+`movie_playback_codec` Buffa build ratchet: strict raw-wire validation runs
+before the borrowed private Buffa projection, generated owned views and
+production Prost/generated decode or encode paths remain excluded, and raw
+source bytes remain the preservation authority. The selector-first playback
+surface stays archive-free; this ratchet is a scoped codec/build boundary and
+does not claim native playback behavior or a format-owner exit.
+
+Scoped verification records 18/18 archive publication tests; 7/7 focused save
+tests in each of Pages, Numbers, and Keynote; the four legacy-host save tests;
+the 17-case production-codec guard; and the 7 movie-codec, 3 provenance,
+1 focused-codec, 10 generated-output, and 2 encoder ratchets. Strict focused
+Clippy and rustdoc gates passed, as did the 705-case boundary-policy suite; the
+live checker still reports only the three pre-existing untracked Pages
+table-lock findings.
+
+Computer Use opened the Rust-produced artifacts without repair, observed their
+markers, saved, closed, and reopened them with the markers intact. Pages moved
+from 96,417 bytes/SHA-256
+`21107bc9323fba6f1589152454c0b0b0cc8e239313c6a369bc4a891116601b42`
+to the native-normalized 96,413 bytes/SHA-256
+`93b904b95251c8160c71fb3e34cb169f66aff91ac85a70274c07b7942567273c`;
+Numbers moved from 136,357 bytes/
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`
+to 136,023 bytes/
+`8072f6c00c2e530867581104510e2f0eb08821a8a11b2a1158b540182bedfba1`;
+Keynote moved from 500,058 bytes/
+`3a3d07476b45b6e543bcfba75fe38a245434176dcb3565e34570b817708b9f42`
+to 500,021 bytes/
+`9c8dd8e80ce843d8376ffa90a9904a15f041f71fe436752700a0a7fd3b76c99f`.
+Each focused API then reopened and republished its native-normalized artifact
+byte-for-byte. These are disposable correctness/interop artifacts, not CI
+fixtures, and no latency, throughput, allocation, RSS, or broader performance
+claim follows.

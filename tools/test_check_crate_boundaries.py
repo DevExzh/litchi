@@ -30025,6 +30025,452 @@ fn rewrite_movie_title_operation(
                 boundaries.audit_iwa_keynote_chart_legend_source_topology(root), []
             )
 
+    @staticmethod
+    def _write_iwork_atomic_publication_fixture(
+        root: Path,
+        *,
+        archive_source: str | None = None,
+        archive_lib_source: str | None = None,
+        package_sources: dict[str, str] | None = None,
+        save_sources: dict[str, str] | None = None,
+        lib_sources: dict[str, str] | None = None,
+        host_source: str | None = None,
+    ) -> None:
+        """Install the smallest complete Wave118 publication topology.
+
+        The checker intentionally walks source-shaped fixtures rather than
+        importing the Rust crates.  Keep this fixture aligned with the real
+        ownership split: the archive owns the physical publication primitive,
+        each focused package owns its typed ``SaveError`` adapter, and the
+        legacy host is only a call-through.
+        """
+
+        archive_path = root / boundaries.IWORK_ARCHIVE_PUBLICATION_FILE
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        if archive_source is not None:
+            archive_path.write_text(archive_source, encoding="utf-8")
+
+        archive_lib = root / boundaries.IWORK_ARCHIVE_PUBLICATION_MODULE_SOURCE
+        archive_lib.parent.mkdir(parents=True, exist_ok=True)
+        archive_lib.write_text(
+            archive_lib_source
+            if archive_lib_source is not None
+            else "pub mod publication;\n",
+            encoding="utf-8",
+        )
+
+        default_archive_source = (
+            "use std::fs::{self, File};\n"
+            "use std::io::Write;\n"
+            "use tempfile::NamedTempFile;\n"
+            "pub enum Error { InvalidDestination, Io, Committed }\n"
+            "pub fn replace_with<E>(path: &std::path::Path, "
+            "write: impl FnOnce(&mut File) -> Result<(), E>) -> Result<(), E> "
+            "where E: From<Error> {\n"
+            "    let temporary = NamedTempFile::new_in(path.parent().unwrap());\n"
+            "    temporary.as_file().sync_all().unwrap();\n"
+            "    let _ = temporary.persist(path);\n"
+            "    let _ = fs::rename(path, path);\n"
+            "    let _ = write;\n"
+            "    todo!()\n"
+            "}\n"
+        )
+        if archive_source is None:
+            archive_path.write_text(default_archive_source, encoding="utf-8")
+
+        package_sources = package_sources or {}
+        save_sources = save_sources or {}
+        lib_sources = lib_sources or {}
+        focused = {
+            crate_name.removeprefix("litchi-"): paths
+            for (crate_name, _source_root), paths in zip(
+                boundaries.IWORK_FOCUSED_PACKAGE_SOURCE_ROOTS,
+                zip(
+                    boundaries.IWORK_FOCUSED_PACKAGE_SOURCES,
+                    boundaries.IWORK_FOCUSED_PACKAGE_SAVE_SOURCES,
+                    boundaries.IWORK_FOCUSED_PACKAGE_EXPORT_SOURCES,
+                ),
+            )
+        }
+        for crate_name, (package_path, save_path, lib_path) in focused.items():
+            package_path = root / package_path
+            save_path = root / save_path
+            lib_path = root / lib_path
+            package_path.parent.mkdir(parents=True, exist_ok=True)
+            package_path.write_text(
+                package_sources.get(
+                    crate_name,
+                    "mod save;\n"
+                    "pub use save::SaveError;\n"
+                    "impl Package {\n"
+                    "    pub fn write_to<W: Write + ?Sized>(&self, sink: &mut W) "
+                    "-> Result<(), WriteError> { todo!() }\n"
+                    "    pub fn save(&self, path: impl AsRef<Path>) "
+                    "-> Result<(), SaveError> { save::save(self, path) }\n"
+                    "}\n",
+                ),
+                encoding="utf-8",
+            )
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            save_path.write_text(
+                save_sources.get(
+                    crate_name,
+                    "use std::path::Path;\n"
+                    "use litchi_iwa_archive::publication::replace_with;\n"
+                    "pub enum SaveError { Write(WriteError), Publication(PublicationError) }\n"
+                    "pub(super) fn save(package: &Package, path: impl AsRef<Path>) "
+                    "-> Result<(), SaveError> {\n"
+                    "    replace_with(path.as_ref(), |temporary| "
+                    "package.write_to(temporary).map_err(SaveError::Write))\n"
+                    "}\n",
+                ),
+                encoding="utf-8",
+            )
+            lib_path.parent.mkdir(parents=True, exist_ok=True)
+            lib_path.write_text(
+                lib_sources.get(crate_name, "pub use package::{Package, SaveError};\n"),
+                encoding="utf-8",
+            )
+
+        host_path = root / boundaries.IWORK_LEGACY_PACKAGE_SOURCE
+        host_path.parent.mkdir(parents=True, exist_ok=True)
+        host_path.write_text(
+            host_source
+            if host_source is not None
+            else (
+                "use std::path::Path;\n"
+                "use litchi_iwa_archive::publication::replace_with;\n"
+                "impl IWorkPackage {\n"
+                "    pub fn write_to<W: Write>(&self, sink: W) -> Result<()> { todo!() }\n"
+                "    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {\n"
+                "        replace_with(path.as_ref(), |temporary| self.write_to(temporary))\n"
+                "    }\n"
+                "}\n"
+                "impl Snapshot {\n"
+                "    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {\n"
+                "        self.edit().save(path)\n"
+                "    }\n"
+                "}\n"
+            ),
+            encoding="utf-8",
+        )
+
+    def test_iwork_atomic_publication_inventory_and_main_dispatch(self) -> None:
+        self.assertEqual(
+            boundaries.IWORK_ARCHIVE_PUBLICATION_FILE,
+            Path("crates/litchi-iwa-archive/src/publication.rs"),
+        )
+        self.assertIn(
+            "+ audit_iwork_atomic_publication()",
+            inspect.getsource(boundaries.main),
+        )
+
+    def test_iwork_atomic_publication_rejects_missing_owner(self) -> None:
+        """A focused API cannot activate without its archive owner source."""
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive_path = root / boundaries.IWORK_ARCHIVE_PUBLICATION_FILE
+            self._write_iwork_atomic_publication_fixture(root)
+            archive_path.unlink()
+
+            violations = boundaries.audit_iwork_atomic_publication(root)
+            self.assertTrue(violations, violations)
+            self.assertTrue(
+                any("owner source is missing" in item for item in violations),
+                violations,
+            )
+
+    def test_iwork_atomic_publication_rejects_missing_owner_module(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_iwork_atomic_publication_fixture(root)
+            (root / boundaries.IWORK_ARCHIVE_PUBLICATION_MODULE_SOURCE).write_text(
+                "// publication module was accidentally dropped\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwork_atomic_publication(root)
+            self.assertTrue(violations, violations)
+            self.assertTrue(
+                any(
+                    "publication" in item.lower()
+                    and ("module" in item.lower() or "owner" in item.lower())
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_iwork_atomic_publication_rejects_wrong_focused_and_host_routing(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_iwork_atomic_publication_fixture(
+                root,
+                package_sources={
+                    "numbers": (
+                        "mod save;\n"
+                        "pub use save::SaveError;\n"
+                        "impl Package {\n"
+                        "    pub fn write_to<W: Write + ?Sized>(&self, sink: &mut W) "
+                        "-> Result<(), WriteError> { todo!() }\n"
+                        "    pub fn save(&self, path: impl AsRef<Path>) "
+                        "-> Result<(), SaveError> { self.write_to(path) }\n"
+                        "}\n"
+                    )
+                },
+                save_sources={
+                    "numbers": (
+                        "use std::path::Path;\n"
+                        "use litchi_iwa_archive::publication::replace_with;\n"
+                        "pub enum SaveError { Write(WriteError), Publication(PublicationError) }\n"
+                        "pub(super) fn publish(package: &Package, path: impl AsRef<Path>) "
+                        "-> Result<(), SaveError> {\n"
+                        "    replace_with(path.as_ref(), |temporary| "
+                        "package.write_to(temporary).map_err(SaveError::Write))\n"
+                        "}\n"
+                    )
+                },
+                host_source=(
+                    "use std::path::Path;\n"
+                    "use tempfile::NamedTempFile;\n"
+                    "impl IWorkPackage {\n"
+                    "    pub fn write_to<W: Write>(&self, sink: W) -> Result<()> { todo!() }\n"
+                    "    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {\n"
+                    "        let _temporary = NamedTempFile::new_in(path.as_ref().parent().unwrap());\n"
+                    "        self.write_to(path)\n"
+                    "    }\n"
+                    "}\n"
+                ),
+            )
+
+            violations = boundaries.audit_iwork_atomic_publication(root)
+            self.assertTrue(violations, violations)
+            self.assertTrue(
+                any(
+                    "crates/litchi-numbers/src/package.rs" in item
+                    and "route" in item.lower()
+                    for item in violations
+                ),
+                violations,
+            )
+            self.assertTrue(
+                any(
+                    "crates/litchi-iwa/src/package.rs" in item
+                    and "direct" in item.lower()
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_iwork_atomic_publication_rejects_legacy_file_create_route(self) -> None:
+        """Legacy save must call the archive owner even without old temp APIs."""
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_iwork_atomic_publication_fixture(
+                root,
+                host_source=(
+                    "use std::fs::File;\n"
+                    "use std::path::Path;\n"
+                    "impl IWorkPackage {\n"
+                    "    pub fn write_to<W: Write>(&self, sink: W) -> Result<()> { todo!() }\n"
+                    "    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {\n"
+                    "        let file = File::create(path)?;\n"
+                    "        self.write_to(file)\n"
+                    "    }\n"
+                    "}\n"
+                ),
+            )
+
+            violations = boundaries.audit_iwork_atomic_publication(root)
+            self.assertTrue(violations, violations)
+            self.assertTrue(
+                any(
+                    "crates/litchi-iwa/src/package.rs" in item
+                    and (
+                        "route" in item.lower()
+                        or "publication" in item.lower()
+                        or "archive" in item.lower()
+                    )
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_iwork_atomic_publication_rejects_direct_filesystem_duplication(self) -> None:
+        cases = (
+            (
+                "pages",
+                "tempfile::NamedTempFile::new()",
+                "crates/litchi-pages/src/package/save.rs",
+            ),
+            (
+                "numbers",
+                "std::fs::rename(source, destination)",
+                "crates/litchi-numbers/src/package/save.rs",
+            ),
+            (
+                "keynote",
+                "temporary.as_file_mut().sync_all()?",
+                "crates/litchi-keynote/src/package/save.rs",
+            ),
+        )
+        for crate_name, marker, expected_path in cases:
+            with self.subTest(crate=crate_name, marker=marker):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    self._write_iwork_atomic_publication_fixture(
+                        root,
+                        save_sources={
+                            crate_name: (
+                                "use std::path::Path;\n"
+                                "use litchi_iwa_archive::publication::replace_with;\n"
+                                "pub enum SaveError { Write, Publication }\n"
+                                "pub(super) fn save(package: &Package, path: impl AsRef<Path>) "
+                                "-> Result<(), SaveError> {\n"
+                                f"    {marker};\n"
+                                "    replace_with(path.as_ref(), |temporary| "
+                                "package.write_to(temporary).map_err(SaveError::Write))\n"
+                                "}\n"
+                            )
+                        },
+                    )
+
+                    violations = boundaries.audit_iwork_atomic_publication(root)
+                    self.assertTrue(violations, violations)
+                    self.assertTrue(
+                        any(expected_path in item for item in violations),
+                        violations,
+                    )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_iwork_atomic_publication_fixture(
+                root,
+                host_source=(
+                    "use std::path::Path;\n"
+                    "use tempfile::NamedTempFile;\n"
+                    "impl IWorkPackage {\n"
+                    "    pub fn write_to<W: Write>(&self, sink: W) -> Result<()> { todo!() }\n"
+                    "    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {\n"
+                    "        let temporary = NamedTempFile::new_in(path.as_ref().parent().unwrap());\n"
+                    "        temporary.as_file_mut().sync_all()?;\n"
+                    "        temporary.persist(path).map_err(|error| error.error)?;\n"
+                    "        std::fs::rename(path.as_ref(), path.as_ref())?;\n"
+                    "        Ok(())\n"
+                    "    }\n"
+                    "}\n"
+                ),
+            )
+            violations = boundaries.audit_iwork_atomic_publication(root)
+            self.assertTrue(violations, violations)
+            self.assertTrue(
+                any("crates/litchi-iwa/src/package.rs" in item for item in violations),
+                violations,
+            )
+
+    def test_iwork_atomic_publication_requires_save_error_export_and_methods(self) -> None:
+        cases = (
+            (
+                "missing focused SaveError",
+                "pages",
+                "package",
+                "mod save;\n"
+                "impl Package {\n"
+                "    pub fn write_to<W: Write + ?Sized>(&self, sink: &mut W) -> Result<(), WriteError> { todo!() }\n"
+                "    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SaveError> { save::save(self, path) }\n"
+                "}\n",
+                "SaveError",
+            ),
+            (
+                "missing root SaveError export",
+                "numbers",
+                "lib",
+                "pub use package::Package;\n",
+                "root",
+            ),
+            (
+                "absent Package::save",
+                "keynote",
+                "package",
+                "mod save;\npub use save::SaveError;\nimpl Package { pub fn write_to<W: Write + ?Sized>(&self, sink: &mut W) -> Result<(), WriteError> { todo!() } }\n",
+                "save",
+            ),
+        )
+        for label, crate_name, source_kind, replacement, expected in cases:
+            with self.subTest(case=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    overrides = (
+                        {crate_name: replacement}
+                        if source_kind == "package"
+                        else {}
+                    )
+                    lib_overrides = (
+                        {crate_name: replacement}
+                        if source_kind == "lib"
+                        else {}
+                    )
+                    self._write_iwork_atomic_publication_fixture(
+                        root,
+                        package_sources=overrides,
+                        save_sources=(
+                            {
+                                crate_name: (
+                                    "use std::path::Path;\n"
+                                    "use litchi_iwa_archive::publication::replace_with;\n"
+                                    "enum SaveError { Write, Publication }\n"
+                                    "pub(super) fn save(package: &Package, path: impl AsRef<Path>) -> Result<(), SaveError> {\n"
+                                    "    replace_with(path.as_ref(), |temporary| package.write_to(temporary))\n"
+                                    "}\n"
+                                )
+                            }
+                            if label == "missing focused SaveError"
+                            else {}
+                        ),
+                        lib_sources=lib_overrides,
+                    )
+                    violations = boundaries.audit_iwork_atomic_publication(root)
+                    self.assertTrue(violations, violations)
+                    self.assertTrue(
+                        any(expected.lower() in item.lower() for item in violations),
+                        (label, violations),
+                    )
+
+    def test_iwork_atomic_publication_masks_comments_strings_and_cfg_test_decoys(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_iwork_atomic_publication_fixture(
+                root,
+                package_sources={
+                    "pages": (
+                        "mod save;\n"
+                        "pub use save::SaveError;\n"
+                        "impl Package {\n"
+                        "    pub fn write_to<W: Write + ?Sized>(&self, sink: &mut W) "
+                        "-> Result<(), WriteError> { todo!() }\n"
+                        "    pub fn save(&self, path: impl AsRef<Path>) "
+                        "-> Result<(), SaveError> { save::save(self, path) }\n"
+                        "}\n"
+                        "// tempfile::NamedTempFile::new(); std::fs::rename(a, b); sync_all(); persist();\n"
+                        "const DECOY: &str = \"tempfile::NamedTempFile std::fs::rename sync_all persist\";\n"
+                        "#[cfg(test)]\n"
+                        "fn fixture() { tempfile::NamedTempFile::new(); std::fs::rename(a, b); }\n"
+                    ),
+                },
+            )
+            self.assertEqual(boundaries.audit_iwork_atomic_publication(root), [])
+
+    def test_iwork_atomic_publication_accepts_valid_archive_owned_route(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_iwork_atomic_publication_fixture(root)
+            self.assertEqual(boundaries.audit_iwork_atomic_publication(root), [])
+
 
 if __name__ == "__main__":
     unittest.main()

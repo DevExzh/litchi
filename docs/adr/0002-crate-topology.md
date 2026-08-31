@@ -4244,3 +4244,50 @@ dependency declarations (167 required normal, 60 optional normal, and 11
 development), 226 canonical edges, and 12 ordered migration debts. Debt 014
 and the `litchi-iwa -> litchi-keynote` edge remain open, as do the migration
 host and the IWA monolith deletion gate.
+
+## 2026-08-31 amendment: Wave118 durable publication and movie-playback Buffa guard
+
+Wave118 makes `litchi-iwa-archive::publication::replace_with` the owner of
+durable filesystem publication. It stages beside the destination, flushes and
+synchronizes the temporary file, revalidates destination and temporary-file
+identity, and performs same-directory replacement. Existing ordinary
+permissions are applied only after replacement through the published file
+descriptor, which is synchronized before parent-directory synchronization is
+attempted where supported. Unix staging stays `0600`, new destinations remain
+`0600`, and inherited set-user-ID/set-group-ID bits are cleared. A
+post-replacement permission or file-sync failure, or a parent-sync failure
+other than Unix `InvalidInput`/`Unsupported`, is reported as committed; those
+two parent-sync kinds mean the capability is unavailable and return success.
+Temporary cleanup is best-effort and
+identity-aware. Its internally opaque, typed publication error is
+content-redacted by default while retaining stable stage, destination, and
+committed-state classifiers. The contract assumes a caller-controlled/trusted
+parent and local filesystem rename/synchronization semantics; network or
+userspace filesystems may be weaker, and Windows has no strict directory-sync
+or portable permission-preservation promise.
+
+`litchi-pages::Package::save`, `litchi-numbers::Package::save`, and
+`litchi-keynote::Package::save` use this archive-owned boundary. The legacy
+`litchi-iwa::IWorkPackage::save` path routes through it as well. Package owners
+retain semantic and candidate-validation responsibilities; durable replacement
+remains below them.
+
+The missing movie-playback Buffa ratchet is closed only as a guard: strict raw
+scanning remains the semantic and preservation authority, while the private
+generated Buffa lazy projection is forced after strict preflight to cross-check
+the selected scalar playback fields. Generated values, native identifiers,
+and archive state remain private to the adapter; no movie format-owner exit is
+claimed.
+
+Computer Use opened each Rust-produced Pages, Numbers, and Keynote artifact
+without repair, saved, closed, and reopened its semantic markers. Their
+native-normalized sizes/SHA-256 values are respectively 96,413/
+`93b904b95251c8160c71fb3e34cb169f66aff91ac85a70274c07b7942567273c`,
+136,023/`8072f6c00c2e530867581104510e2f0eb08821a8a11b2a1158b540182bedfba1`,
+and 500,021/`9c8dd8e80ce843d8376ffa90a9904a15f041f71fe436752700a0a7fd3b76c99f`;
+each focused API reopened and republished those bytes exactly. The
+authoritative topology remains 64 workspace packages, 238 internal
+dependency declarations, 226 canonical edges, and 12 ordered migration debts
+`[1, 2, 4, 5, 8, 10, 12, 13, 14, 15, 16, 17]`, with one migration host. Wave118
+claims no dependency-edge or ordered-debt closure, including debt 014 and the
+`litchi-iwa -> litchi-keynote` edge, and no IWA monolith deletion gate is closed.

@@ -8,6 +8,7 @@ mod chart_axis_support;
 mod edit;
 mod limits;
 mod rendering_invalidation;
+mod save;
 pub(crate) mod show_settings;
 mod slide_background;
 mod slide_chart_axis_title;
@@ -83,6 +84,7 @@ pub use limits::{
     MAX_OBJECTS, MAX_REFERENCES, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES,
     ReadOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsError,
 };
+pub use save::SaveError;
 pub use slide_background::{
     SlideBackgroundCommit, SlideBackgroundDiagnostics, SlideBackgroundEdit, SlideBackgroundError,
     SlideBackgroundLimitKind, SlideBackgroundPatch,
@@ -818,6 +820,25 @@ impl Package {
             }
         }
         Ok(())
+    }
+
+    /// Durably save this exact immutable package artifact to a filesystem path.
+    ///
+    /// The artifact is written to a private sibling temporary file, flushed
+    /// and synchronized, then atomically replaces the destination. Existing
+    /// ordinary regular-file permissions are preserved where supported; Unix
+    /// set-user-ID and set-group-ID bits are cleared. The containing directory
+    /// is synchronized where the platform supports it. The destination is left
+    /// untouched when staging fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SaveError::Write`] when the package cannot be written to the
+    /// staging file, or [`SaveError::Publication`] when the destination cannot
+    /// be safely replaced. A publication error may report that replacement
+    /// already committed through [`SaveError::was_committed`].
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), SaveError> {
+        save::save(self, path)
     }
 
     /// Return the checked physical limits used when this package was parsed.

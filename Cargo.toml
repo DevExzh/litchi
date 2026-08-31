@@ -165,6 +165,7 @@ roaring       = "0"
 rowan         = "0.16"
 rsa           = { version = "0.9", features = ["sha1", "sha2"] }
 ryu           = "1.0"
+same-file     = "1.0.6"
 serde         = { version = "1", features = ["derive"] }
 serde-saphyr  = "0"
 serde_json    = "1"
