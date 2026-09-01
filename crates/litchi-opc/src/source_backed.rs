@@ -32,7 +32,7 @@ use soapberry_zip::ReaderAt as ZipReaderAt;
 use soapberry_zip::ZipOperationAccounting as LowLevelZipOperationAccounting;
 use soapberry_zip::office::{EntryId, IndexedArchive};
 use std::collections::HashMap;
-use std::io::{Read, Write};
+use std::io::{BufRead, Read, Write};
 #[cfg(any(unix, windows))]
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -1050,6 +1050,31 @@ struct SourceReader {
     snapshot: SourceSnapshot,
 }
 
+/// Typed marker used while a positional source reports a version change
+/// through the `std::io::Read` boundary owned by the ZIP substrate.
+///
+/// The low-level callback reader intentionally reports transport failures as
+/// `io::Error`. Keeping the source versions in the error's source chain lets
+/// this crate restore its typed [`OpcError::SourceChanged`] variant instead
+/// of reducing the failure to a diagnostic string.
+#[derive(Debug)]
+struct SourceChangedIoError {
+    expected: SourceVersion,
+    actual: SourceVersion,
+}
+
+impl std::fmt::Display for SourceChangedIoError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "source-backed OPC source changed from {:?} to {:?}",
+            self.expected, self.actual
+        )
+    }
+}
+
+impl std::error::Error for SourceChangedIoError {}
+
 impl ZipReaderAt for SourceReader {
     fn read_at(&self, output: &mut [u8], offset: u64) -> std::io::Result<usize> {
         let result = read_source_at_with_context(
@@ -1062,6 +1087,9 @@ impl ZipReaderAt for SourceReader {
         result.map_err(|error| match error {
             OpcError::Cancelled => execution_io_error(ExecutionError::Cancelled),
             OpcError::Execution(error) => execution_io_error(error),
+            OpcError::SourceChanged { expected, actual } => {
+                std::io::Error::other(SourceChangedIoError { expected, actual })
+            },
             OpcError::IoError(error) => error,
             error => std::io::Error::other(error.to_string()),
         })
@@ -1207,9 +1235,10 @@ impl SourceSnapshot {
         if actual == self.version {
             Ok(())
         } else {
-            Err(std::io::Error::other(
-                "source-backed OPC source changed during publication",
-            ))
+            Err(std::io::Error::other(SourceChangedIoError {
+                expected: self.version,
+                actual,
+            }))
         }
     }
 
@@ -1513,6 +1542,129 @@ struct CatalogPart {
     entry_id: EntryId,
 }
 
+/// Failure from a callback-scoped, verified decoded OPC Part read.
+///
+/// The ZIP/archive or source-transport failure is primary. If the callback
+/// had already returned an error, it is retained in `callback_error` so a
+/// caller can diagnose both failures without parsing display text. A callback
+/// error is returned directly only when the complete Part was drained and
+/// verified successfully.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum VerifiedDecodedReaderError<E> {
+    /// OPC validation, source, execution, or transport failure.
+    Opc {
+        /// Primary OPC failure.
+        error: OpcError,
+        /// Callback failure observed before the primary OPC failure.
+        callback_error: Option<E>,
+    },
+    /// The callback failed after OPC verification completed successfully.
+    Callback(E),
+}
+
+impl<E> VerifiedDecodedReaderError<E> {
+    /// Returns the primary OPC failure, when present.
+    #[must_use]
+    pub fn opc(&self) -> Option<&OpcError> {
+        match self {
+            Self::Opc { error, .. } => Some(error),
+            Self::Callback(_) => None,
+        }
+    }
+
+    /// Alias for [`Self::opc`].
+    #[must_use]
+    pub fn opc_error(&self) -> Option<&OpcError> {
+        self.opc()
+    }
+
+    /// Alias for [`Self::opc`] using the conventional `error` name.
+    #[must_use]
+    pub fn error(&self) -> Option<&OpcError> {
+        self.opc()
+    }
+
+    /// Returns the callback failure, including one retained by a primary OPC
+    /// failure.
+    #[must_use]
+    pub fn callback(&self) -> Option<&E> {
+        match self {
+            Self::Opc { callback_error, .. } => callback_error.as_ref(),
+            Self::Callback(error) => Some(error),
+        }
+    }
+
+    /// Alias for [`Self::callback`].
+    #[must_use]
+    pub fn callback_error(&self) -> Option<&E> {
+        self.callback()
+    }
+
+    /// Extracts the primary OPC failure, if present.
+    pub fn into_opc(self) -> Option<OpcError> {
+        match self {
+            Self::Opc { error, .. } => Some(error),
+            Self::Callback(_) => None,
+        }
+    }
+
+    /// Alias for [`Self::into_opc`].
+    pub fn into_opc_error(self) -> Option<OpcError> {
+        self.into_opc()
+    }
+
+    /// Alias for [`Self::into_opc`].
+    pub fn into_error(self) -> Option<OpcError> {
+        self.into_opc()
+    }
+
+    /// Extracts the callback failure, if one was returned.
+    pub fn into_callback(self) -> Option<E> {
+        match self {
+            Self::Opc { callback_error, .. } => callback_error,
+            Self::Callback(error) => Some(error),
+        }
+    }
+
+    /// Alias for [`Self::into_callback`].
+    pub fn into_callback_error(self) -> Option<E> {
+        self.into_callback()
+    }
+}
+
+impl<E: std::fmt::Display> std::fmt::Display for VerifiedDecodedReaderError<E> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Opc {
+                error,
+                callback_error,
+            } => match callback_error {
+                Some(callback_error) => write!(
+                    formatter,
+                    "verified OPC decoded reader failed: {error} (callback also failed: {callback_error})"
+                ),
+                None => write!(formatter, "verified OPC decoded reader failed: {error}"),
+            },
+            Self::Callback(error) => {
+                write!(
+                    formatter,
+                    "verified OPC decoded reader callback failed: {error}"
+                )
+            },
+        }
+    }
+}
+
+impl<E: std::error::Error + 'static> std::error::Error for VerifiedDecodedReaderError<E> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Opc { error, .. } => Some(error),
+            Self::Callback(error) => Some(error),
+        }
+    }
+}
+
 /// Immutable metadata and deferred payload access for one OPC package part.
 #[derive(Clone, Copy)]
 pub struct PartView<'package> {
@@ -1592,6 +1744,45 @@ impl<'package> PartView<'package> {
             .read_part_with_accounting(self.index, Some(accounting))
     }
 
+    /// Run a callback against this Part's verified decoded payload without
+    /// materializing or retaining the payload in the Part cache.
+    ///
+    /// The callback receives a fixed-buffer [`BufRead`] view. It may return a
+    /// valid prefix early; the reader still drains and verifies the complete
+    /// Part before returning success. Callback errors are returned directly
+    /// only after successful archive finalization. A callback panic unwinds
+    /// normally, and the temporary execution reservation is released by RAII.
+    pub fn with_verified_decoded_reader<T, E, F>(
+        &self,
+        callback: F,
+    ) -> std::result::Result<T, VerifiedDecodedReaderError<E>>
+    where
+        F: for<'reader> FnOnce(&'reader mut dyn BufRead) -> std::result::Result<T, E>,
+    {
+        self.package
+            .with_verified_decoded_reader(self.index, callback, None)
+    }
+
+    /// Run a callback against this Part's verified decoded payload while
+    /// recording the low-level ZIP work in `accounting`.
+    ///
+    /// No `PartData` or cache entry is created. The callback's accepted bytes,
+    /// decoded bytes produced, and physical source traversal are accounted for
+    /// by the ZIP substrate, including bytes drained after an early callback
+    /// return. A callback error is retained when archive verification or source
+    /// transport becomes the primary failure.
+    pub fn with_verified_decoded_reader_with_accounting<T, E, F>(
+        &self,
+        callback: F,
+        accounting: &mut OpcOperationAccounting,
+    ) -> std::result::Result<T, VerifiedDecodedReaderError<E>>
+    where
+        F: for<'reader> FnOnce(&'reader mut dyn BufRead) -> std::result::Result<T, E>,
+    {
+        self.package
+            .with_verified_decoded_reader(self.index, callback, Some(accounting))
+    }
+
     /// Streams this part's decoded payload into `sink` without materializing or caching it.
     ///
     /// This bypasses the part cache, including warm entries and single-flight
@@ -1633,6 +1824,126 @@ impl<'package> PartView<'package> {
 }
 
 impl SourceBackedPackage {
+    fn with_verified_decoded_reader<T, E, F>(
+        &self,
+        index: usize,
+        callback: F,
+        mut accounting: Option<&mut OpcOperationAccounting>,
+    ) -> std::result::Result<T, VerifiedDecodedReaderError<E>>
+    where
+        F: for<'reader> FnOnce(&'reader mut dyn BufRead) -> std::result::Result<T, E>,
+    {
+        let opc_error = |error| VerifiedDecodedReaderError::Opc {
+            error,
+            callback_error: None,
+        };
+
+        self.source.ensure_current().map_err(opc_error)?;
+        self.cache
+            .check_context()
+            .map_err(map_execution_error)
+            .map_err(opc_error)?;
+
+        let part = self
+            .parts
+            .get(index)
+            .ok_or_else(|| opc_error(OpcError::PartNotFound(index.to_string())))?;
+        let entry_id = part.entry_id;
+        let declared_bytes = self
+            .archive
+            .metadata_for(entry_id)
+            .map_err(map_preservation_error)
+            .map_err(opc_error)?
+            .uncompressed_size();
+
+        let limit_result = self.limits.check(
+            ReadResource::PartBytes,
+            declared_bytes,
+            self.limits.max_part_bytes(),
+        );
+        self.source.ensure_current().map_err(opc_error)?;
+        self.cache
+            .check_context()
+            .map_err(map_execution_error)
+            .map_err(opc_error)?;
+        limit_result.map_err(opc_error)?;
+
+        if let Some(context) = self.source.context.as_ref() {
+            let work_result = context
+                .consume(Resource::Work, declared_bytes)
+                .map_err(map_execution_error);
+            self.source.ensure_current().map_err(opc_error)?;
+            self.cache
+                .check_context()
+                .map_err(map_execution_error)
+                .map_err(opc_error)?;
+            work_result.map_err(opc_error)?;
+        }
+
+        // The low-level reader owns its fixed 16 KiB byte buffer. This
+        // reservation accounts for that bounded callback-scoped working set
+        // without reserving the declared decoded payload or creating a cache
+        // entry. It is deliberately held through verification finalization.
+        let _memory_reservation = match self.source.context.as_ref() {
+            Some(context) => Some(
+                context
+                    .reserve(
+                        Resource::Memory,
+                        soapberry_zip::office::VERIFIED_ENTRY_READER_BUFFER_SIZE as u64,
+                    )
+                    .map_err(map_execution_error)
+                    .map_err(opc_error)?,
+            ),
+            None => None,
+        };
+
+        self.source.ensure_current().map_err(opc_error)?;
+        self.cache
+            .check_context()
+            .map_err(map_execution_error)
+            .map_err(opc_error)?;
+        self.source.monitor_publication();
+
+        let mut zip_accounting = LowLevelZipOperationAccounting::default();
+        let result = match accounting.as_deref_mut() {
+            Some(_) => self.archive.with_verified_entry_reader_with_accounting(
+                entry_id,
+                callback,
+                &mut zip_accounting,
+            ),
+            None => self.archive.with_verified_entry_reader(entry_id, callback),
+        }
+        .map_err(map_verified_decoded_reader_error);
+        let result = match accounting {
+            Some(accounting) => match accounting.merge_zip(&zip_accounting) {
+                Ok(()) => result,
+                Err(error) => match result {
+                    Err(existing @ VerifiedDecodedReaderError::Opc { .. }) => Err(existing),
+                    Err(existing @ VerifiedDecodedReaderError::Callback(_)) => Err(existing),
+                    Ok(_) => Err(VerifiedDecodedReaderError::Opc {
+                        error,
+                        callback_error: None,
+                    }),
+                },
+            },
+            None => result,
+        };
+
+        // A source change or cooperative cancellation observed after the
+        // low-level verifier returns remains authoritative. If the callback
+        // also failed, retain it as the secondary diagnostic rather than
+        // losing it while promoting the OPC error to primary.
+        let final_error = self
+            .source
+            .ensure_current()
+            .err()
+            .or_else(|| self.cache.check_context().err().map(map_execution_error));
+        match final_error {
+            Some(error) => Err(with_verified_primary_error(result, error)),
+            None => result,
+        }
+    }
+
     fn stream_part_to<W: Write>(
         &self,
         index: usize,
@@ -7264,6 +7575,58 @@ fn map_preservation_error(error: soapberry_zip::Error) -> OpcError {
     OpcError::from(error)
 }
 
+fn map_verified_decoded_reader_error<E>(
+    error: soapberry_zip::office::VerifiedEntryReaderError<E>,
+) -> VerifiedDecodedReaderError<E> {
+    match error {
+        soapberry_zip::office::VerifiedEntryReaderError::Archive {
+            error,
+            callback_error,
+        } => VerifiedDecodedReaderError::Opc {
+            error: map_preservation_error(error),
+            callback_error,
+        },
+        soapberry_zip::office::VerifiedEntryReaderError::Transport {
+            error,
+            callback_error,
+        } => VerifiedDecodedReaderError::Opc {
+            error: map_io_error(error),
+            callback_error,
+        },
+        soapberry_zip::office::VerifiedEntryReaderError::Callback(error) => {
+            VerifiedDecodedReaderError::Callback(error)
+        },
+        _ => VerifiedDecodedReaderError::Opc {
+            error: OpcError::ZipError("unrecognized verified ZIP entry-reader failure".to_string()),
+            callback_error: None,
+        },
+    }
+}
+
+fn with_verified_primary_error<T, E>(
+    result: std::result::Result<T, VerifiedDecodedReaderError<E>>,
+    error: OpcError,
+) -> VerifiedDecodedReaderError<E> {
+    match result {
+        Ok(_) => VerifiedDecodedReaderError::Opc {
+            error,
+            callback_error: None,
+        },
+        Err(VerifiedDecodedReaderError::Opc { callback_error, .. }) => {
+            VerifiedDecodedReaderError::Opc {
+                error,
+                callback_error,
+            }
+        },
+        Err(VerifiedDecodedReaderError::Callback(callback_error)) => {
+            VerifiedDecodedReaderError::Opc {
+                error,
+                callback_error: Some(callback_error),
+            }
+        },
+    }
+}
+
 fn accounting_overflow(counter: &'static str) -> OpcError {
     OpcError::OperationAccountingOverflow { counter }
 }
@@ -7292,6 +7655,15 @@ fn record_input_reservation_failure(snapshot: &SourceSnapshot) {
 }
 
 fn map_io_error(error: std::io::Error) -> OpcError {
+    if let Some(source) = error
+        .get_ref()
+        .and_then(|source| source.downcast_ref::<SourceChangedIoError>())
+    {
+        return OpcError::SourceChanged {
+            expected: source.expected,
+            actual: source.actual,
+        };
+    }
     crate::error::map_io_error(error)
 }
 
@@ -13049,5 +13421,265 @@ mod selected_part_stream_api_tests {
         let mut accounting = OpcOperationAccounting::default();
         assert!(accounting.add_output_bytes_accepted(u64::MAX).is_ok());
         assert!(accounting.add_output_bytes_accepted(1).is_err());
+    }
+}
+
+#[cfg(test)]
+mod callback_scoped_verified_reader_tests {
+    use super::{
+        OpcError, OpcOperationAccounting, ReadLimits, Resource, SourceBackedPackage, SourceVersion,
+        VerifiedDecodedReaderError,
+    };
+    use litchi_core::{
+        Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
+    };
+    use std::io;
+    use std::num::{NonZeroU64, NonZeroUsize};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
+    const PAYLOAD: &[u8] = b"callback-scoped verified payload";
+
+    fn archive_bytes(payload: &[u8]) -> Vec<u8> {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored(
+                "_rels/.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer.write_stored("word/document.xml", payload).unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
+    fn package() -> SourceBackedPackage {
+        SourceBackedPackage::from_vec(archive_bytes(PAYLOAD)).unwrap()
+    }
+
+    fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
+        let budget = Budget::root(
+            "callback-scoped-reader-test",
+            Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (cancellation_source, cancellation) = CancellationSource::pair();
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroU64::new(memory.max(1)).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+        (budget, cancellation_source, context)
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct CallbackFailure;
+
+    impl std::fmt::Display for CallbackFailure {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str("callback failure")
+        }
+    }
+
+    impl std::error::Error for CallbackFailure {}
+
+    #[derive(Debug)]
+    struct ChangingSource {
+        bytes: Arc<Vec<u8>>,
+        trigger_offset: u64,
+        armed: AtomicBool,
+        revision: AtomicU64,
+    }
+
+    impl ChangingSource {
+        fn new(bytes: Vec<u8>, trigger_offset: u64) -> Self {
+            Self {
+                bytes: Arc::new(bytes),
+                trigger_offset,
+                armed: AtomicBool::new(false),
+                revision: AtomicU64::new(0),
+            }
+        }
+    }
+
+    impl ReadAt for ChangingSource {
+        fn len(&self) -> io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let offset = usize::try_from(offset).map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidInput, "source offset overflows usize")
+            })?;
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            if (offset as u64) == self.trigger_offset && self.armed.swap(false, Ordering::SeqCst) {
+                self.revision.fetch_add(1, Ordering::SeqCst);
+            }
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            Ok(SourceVersion::new(
+                0xCBAC_0001,
+                self.revision.load(Ordering::SeqCst),
+            ))
+        }
+    }
+
+    #[test]
+    fn verified_reader_does_not_admit_payload_to_part_cache() {
+        let package = package();
+        let part = package
+            .part(&super::PackURI::new("/word/document.xml").unwrap())
+            .unwrap();
+        let result = part
+            .with_verified_decoded_reader(|reader| {
+                let mut bytes = Vec::new();
+                reader.read_to_end(&mut bytes)?;
+                Ok::<_, io::Error>(bytes)
+            })
+            .unwrap();
+
+        assert_eq!(result, PAYLOAD);
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.cold_loads, 0);
+        assert_eq!(diagnostics.retained_entries, 0);
+    }
+
+    #[test]
+    fn verified_reader_returns_custom_callback_error_after_verification() {
+        let package = package();
+        let part = package
+            .part(&super::PackURI::new("/word/document.xml").unwrap())
+            .unwrap();
+        let error = part
+            .with_verified_decoded_reader(|reader| {
+                let mut bytes = [0; 7];
+                reader.read_exact(&mut bytes).map_err(|_| CallbackFailure)?;
+                Err::<(), _>(CallbackFailure)
+            })
+            .unwrap_err();
+
+        assert!(matches!(error, VerifiedDecodedReaderError::Callback(_)));
+        assert!(error.opc_error().is_none());
+        assert!(matches!(error.callback(), Some(&CallbackFailure)));
+    }
+
+    #[test]
+    fn verified_reader_preserves_typed_source_change_transport_error() {
+        let bytes = archive_bytes(PAYLOAD);
+        let trigger_offset = bytes
+            .windows(PAYLOAD.len())
+            .position(|candidate| candidate == PAYLOAD)
+            .unwrap() as u64;
+        let source = Arc::new(ChangingSource::new(bytes, trigger_offset));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        source.armed.store(true, Ordering::SeqCst);
+        let part = package
+            .part(&super::PackURI::new("/word/document.xml").unwrap())
+            .unwrap();
+        let error = part
+            .with_verified_decoded_reader(|reader| {
+                let mut bytes = Vec::new();
+                reader.read_to_end(&mut bytes)
+            })
+            .unwrap_err();
+
+        assert!(matches!(
+            error.opc_error(),
+            Some(OpcError::SourceChanged { .. })
+        ));
+        assert!(error.callback_error().is_some());
+    }
+
+    #[test]
+    fn verified_reader_checks_cancellation_before_callback_and_releases_memory() {
+        let (budget, cancellation_source, context) = managed_context(16 * 1024);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(OwnedSource::new(archive_bytes(PAYLOAD))),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        cancellation_source.cancel();
+        let part = package
+            .part(&super::PackURI::new("/word/document.xml").unwrap())
+            .unwrap();
+        let error = part
+            .with_verified_decoded_reader(|_| Ok::<_, io::Error>(()))
+            .unwrap_err();
+
+        assert!(matches!(error.opc_error(), Some(OpcError::Cancelled)));
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn verified_reader_enforces_part_limit_before_callback() {
+        let mut package = package();
+        package.limits = ReadLimits::builder()
+            .max_part_bytes((PAYLOAD.len() - 1) as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        let part = package
+            .part(&super::PackURI::new("/word/document.xml").unwrap())
+            .unwrap();
+        let error = part
+            .with_verified_decoded_reader(|_| Ok::<_, io::Error>(()))
+            .unwrap_err();
+
+        assert!(matches!(
+            error.opc_error(),
+            Some(OpcError::ReadLimit {
+                resource: super::ReadResource::PartBytes,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn verified_reader_managed_accounting_is_precise_and_not_cached() {
+        let (budget, _cancellation_source, context) = managed_context(16 * 1024);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(OwnedSource::new(archive_bytes(PAYLOAD))),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let part = package
+            .part(&super::PackURI::new("/word/document.xml").unwrap())
+            .unwrap();
+        let mut accounting = OpcOperationAccounting::default();
+        let result = part
+            .with_verified_decoded_reader_with_accounting(
+                |reader| {
+                    let mut bytes = Vec::new();
+                    reader.read_to_end(&mut bytes)?;
+                    Ok::<_, io::Error>(bytes)
+                },
+                &mut accounting,
+            )
+            .unwrap();
+
+        assert_eq!(result, PAYLOAD);
+        assert_eq!(accounting.stored_payload_bytes_read(), PAYLOAD.len() as u64);
+        assert_eq!(
+            accounting.stored_payload_bytes_accepted(),
+            PAYLOAD.len() as u64
+        );
+        assert_eq!(budget.used(Resource::Memory), 0);
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.retained_entries, 0);
     }
 }

@@ -50,7 +50,7 @@ use flate2::read::DeflateDecoder;
 use flate2::write::DeflateEncoder;
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
-use std::io::{Read, Write};
+use std::io::{self, BufRead, Read, Write};
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -795,6 +795,466 @@ impl Metadata {
     #[inline]
     pub const fn is_directory(&self) -> bool {
         self.directory
+    }
+}
+
+/// Fixed scratch capacity used by [`IndexedArchive::with_verified_entry_reader`].
+///
+/// The callback reader never allocates a payload-sized buffer.  A callback may
+/// retain only the bytes returned for the current `fill_buf` call, and the
+/// lifetime of those bytes is scoped to the callback invocation.
+pub const VERIFIED_ENTRY_READER_BUFFER_SIZE: usize = 16 * 1024;
+
+/// Failure from a callback-scoped, verified indexed-entry read.
+///
+/// Archive and transport failures are primary: when the callback has already
+/// returned an error, that error is retained in the `callback_error` field of those
+/// variants.  A callback failure is returned directly only after the complete
+/// entry has been drained and verified successfully.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum VerifiedEntryReaderError<E> {
+    /// The entry failed ZIP layout, size, checksum, or other archive checks.
+    Archive {
+        /// Primary archive failure.
+        error: Error,
+        /// Callback failure observed before archive finalization failed.
+        callback_error: Option<E>,
+    },
+    /// The positional source or decompressor returned an I/O failure.
+    Transport {
+        /// Primary transport failure.
+        error: io::Error,
+        /// Callback failure observed before transport finalization failed.
+        callback_error: Option<E>,
+    },
+    /// The callback failed after archive verification completed successfully.
+    Callback(E),
+}
+
+impl<E> VerifiedEntryReaderError<E> {
+    /// Returns the primary archive failure, when this is an archive failure.
+    #[must_use]
+    pub fn archive(&self) -> Option<&Error> {
+        match self {
+            Self::Archive { error, .. } => Some(error),
+            Self::Transport { .. } | Self::Callback(_) => None,
+        }
+    }
+
+    /// Returns the primary transport failure, when this is a transport failure.
+    #[must_use]
+    pub fn transport(&self) -> Option<&io::Error> {
+        match self {
+            Self::Transport { error, .. } => Some(error),
+            Self::Archive { .. } | Self::Callback(_) => None,
+        }
+    }
+
+    /// Returns the callback failure, including a secondary failure retained by
+    /// an archive or transport primary error.
+    #[must_use]
+    pub fn callback(&self) -> Option<&E> {
+        match self {
+            Self::Archive { callback_error, .. } | Self::Transport { callback_error, .. } => {
+                callback_error.as_ref()
+            },
+            Self::Callback(error) => Some(error),
+        }
+    }
+
+    /// Alias for [`Self::archive`].
+    #[must_use]
+    pub fn archive_error(&self) -> Option<&Error> {
+        self.archive()
+    }
+
+    /// Alias for [`Self::transport`].
+    #[must_use]
+    pub fn transport_error(&self) -> Option<&io::Error> {
+        self.transport()
+    }
+
+    /// Alias for [`Self::callback`].
+    #[must_use]
+    pub fn callback_error(&self) -> Option<&E> {
+        self.callback()
+    }
+
+    /// Extracts the callback error, if one was retained.
+    pub fn into_callback(self) -> Option<E> {
+        match self {
+            Self::Archive { callback_error, .. } | Self::Transport { callback_error, .. } => {
+                callback_error
+            },
+            Self::Callback(error) => Some(error),
+        }
+    }
+
+    /// Alias for [`Self::into_callback`].
+    pub fn into_callback_error(self) -> Option<E> {
+        self.into_callback()
+    }
+}
+
+impl<E: std::fmt::Display> std::fmt::Display for VerifiedEntryReaderError<E> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Archive {
+                error,
+                callback_error,
+            } => match callback_error {
+                Some(callback) => write!(
+                    formatter,
+                    "verified ZIP archive failed: {error} (callback also failed: {callback})"
+                ),
+                None => write!(formatter, "verified ZIP archive failed: {error}"),
+            },
+            Self::Transport {
+                error,
+                callback_error,
+            } => match callback_error {
+                Some(callback) => write!(
+                    formatter,
+                    "verified ZIP transport failed: {error} (callback also failed: {callback})"
+                ),
+                None => write!(formatter, "verified ZIP transport failed: {error}"),
+            },
+            Self::Callback(error) => write!(formatter, "verified ZIP callback failed: {error}"),
+        }
+    }
+}
+
+impl<E: std::error::Error + 'static> std::error::Error for VerifiedEntryReaderError<E> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Archive { error, .. } => Some(error),
+            Self::Transport { error, .. } => Some(error),
+            Self::Callback(error) => Some(error),
+        }
+    }
+}
+
+#[derive(Debug)]
+enum VerifiedReaderFailure {
+    Archive(Error),
+    Transport(io::Error),
+    Accounting(Error),
+}
+
+impl VerifiedReaderFailure {
+    fn as_io_error(&self) -> io::Error {
+        match self {
+            Self::Archive(error) | Self::Accounting(error) => {
+                io::Error::new(io::ErrorKind::InvalidData, error.to_string())
+            },
+            Self::Transport(error) => io::Error::new(error.kind(), error.to_string()),
+        }
+    }
+
+    fn into_public<E>(self, callback: Option<E>) -> VerifiedEntryReaderError<E> {
+        match self {
+            Self::Archive(error) => VerifiedEntryReaderError::Archive {
+                error,
+                callback_error: callback,
+            },
+            Self::Transport(error) => VerifiedEntryReaderError::Transport {
+                error,
+                callback_error: callback,
+            },
+            Self::Accounting(error) => VerifiedEntryReaderError::Archive {
+                error,
+                callback_error: callback,
+            },
+        }
+    }
+}
+
+/// A fixed-buffer reader that defers archive failures until the caller's
+/// callback has returned.  The callback can therefore inspect a valid prefix,
+/// while the owner still drains and verifies the complete member afterward.
+struct VerifiedEntryBufReader<'accounting, D> {
+    reader: D,
+    expected: ZipVerification,
+    accounting: Option<&'accounting mut ZipOperationAccounting>,
+    accounting_kind: AccountingReadKind,
+    buffer: [u8; VERIFIED_ENTRY_READER_BUFFER_SIZE],
+    start: usize,
+    end: usize,
+    produced: u64,
+    crc: u32,
+    eof: bool,
+    problem: Option<VerifiedReaderFailure>,
+}
+
+impl<'accounting, D> VerifiedEntryBufReader<'accounting, D> {
+    fn new(
+        reader: D,
+        expected: ZipVerification,
+        accounting: Option<&'accounting mut ZipOperationAccounting>,
+        accounting_kind: AccountingReadKind,
+    ) -> Self {
+        Self {
+            reader,
+            expected,
+            accounting,
+            accounting_kind,
+            buffer: [0; VERIFIED_ENTRY_READER_BUFFER_SIZE],
+            start: 0,
+            end: 0,
+            produced: 0,
+            crc: 0,
+            eof: false,
+            problem: None,
+        }
+    }
+
+    fn set_problem(&mut self, problem: VerifiedReaderFailure) {
+        if self.problem.is_none() {
+            self.problem = Some(problem);
+        }
+    }
+
+    fn problem_io(&self) -> io::Error {
+        self.problem.as_ref().map_or_else(
+            || io::Error::other("verified ZIP reader failed without a diagnostic"),
+            VerifiedReaderFailure::as_io_error,
+        )
+    }
+
+    fn record_produced(&mut self, read: usize) -> Result<(), ()> {
+        if !matches!(self.accounting_kind, AccountingReadKind::Deflate) {
+            return Ok(());
+        }
+        let bytes = match usize_to_u64(read, "decompressed Deflate bytes produced") {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                self.set_problem(VerifiedReaderFailure::Accounting(error));
+                return Err(());
+            },
+        };
+        let result = match self.accounting.as_mut() {
+            Some(accounting) => accounting.add_deflate_bytes_produced(bytes),
+            None => Ok(()),
+        };
+        if let Err(error) = result {
+            self.set_problem(VerifiedReaderFailure::Accounting(error));
+            return Err(());
+        }
+        Ok(())
+    }
+
+    fn record_accepted(&mut self, accepted: usize) -> Result<(), ()> {
+        if accepted == 0 {
+            return Ok(());
+        }
+        let bytes = match usize_to_u64(accepted, "decompressed ZIP bytes accepted") {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                self.set_problem(VerifiedReaderFailure::Accounting(error));
+                return Err(());
+            },
+        };
+        let result = match self.accounting.as_mut() {
+            Some(accounting) => match self.accounting_kind {
+                AccountingReadKind::Stored => accounting.add_stored_payload_bytes_accepted(bytes),
+                AccountingReadKind::Deflate => accounting.add_deflate_bytes_accepted(bytes),
+            },
+            None => Ok(()),
+        };
+        if let Err(error) = result {
+            self.set_problem(VerifiedReaderFailure::Accounting(error));
+            return Err(());
+        }
+        Ok(())
+    }
+
+    fn fill_buf_internal(&mut self) -> io::Result<&[u8]>
+    where
+        D: Read,
+    {
+        if self.start < self.end {
+            return Ok(&self.buffer[self.start..self.end]);
+        }
+        self.start = 0;
+        self.end = 0;
+        if self.problem.is_some() {
+            return Err(self.problem_io());
+        }
+        if self.eof {
+            return Ok(&[]);
+        }
+
+        let remaining = self.expected.size().saturating_sub(self.produced);
+        let request = usize::try_from(remaining.saturating_add(1))
+            .unwrap_or(VERIFIED_ENTRY_READER_BUFFER_SIZE)
+            .min(VERIFIED_ENTRY_READER_BUFFER_SIZE);
+        let read = match read_with_interrupt_budget(&mut self.reader, &mut self.buffer[..request]) {
+            Ok(read) => read,
+            Err(error) => {
+                self.set_problem(VerifiedReaderFailure::Transport(error));
+                return Err(self.problem_io());
+            },
+        };
+        if read == 0 {
+            self.eof = true;
+            if self.produced != self.expected.size() {
+                self.set_problem(VerifiedReaderFailure::Archive(
+                    ErrorKind::InvalidSize {
+                        expected: self.expected.size(),
+                        actual: self.produced,
+                    }
+                    .into(),
+                ));
+                return Err(self.problem_io());
+            }
+            return Ok(&[]);
+        }
+
+        let read_u64 = match u64::try_from(read) {
+            Ok(read_u64) => read_u64,
+            Err(_) => {
+                self.set_problem(VerifiedReaderFailure::Transport(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "verified ZIP reader output count overflows u64",
+                )));
+                return Err(self.problem_io());
+            },
+        };
+        let produced = match self.produced.checked_add(read_u64) {
+            Some(produced) => produced,
+            None => {
+                self.set_problem(VerifiedReaderFailure::Transport(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "verified ZIP reader output count overflows u64",
+                )));
+                return Err(self.problem_io());
+            },
+        };
+        self.produced = produced;
+        self.crc = crc32_chunk(&self.buffer[..read], self.crc);
+        if self.record_produced(read).is_err() {
+            return Err(self.problem_io());
+        }
+        if produced > self.expected.size() {
+            self.set_problem(VerifiedReaderFailure::Archive(
+                ErrorKind::InvalidSize {
+                    expected: self.expected.size(),
+                    actual: produced,
+                }
+                .into(),
+            ));
+        }
+        let visible = usize::try_from(remaining).unwrap_or(read).min(read);
+        self.end = visible;
+        if visible == 0 && self.problem.is_some() {
+            return Err(self.problem_io());
+        }
+        Ok(&self.buffer[..visible])
+    }
+
+    fn finish(&mut self) -> Result<(), VerifiedReaderFailure>
+    where
+        D: Read,
+    {
+        loop {
+            if let Some(problem) = self.problem.take() {
+                return Err(problem);
+            }
+            let empty = match self.fill_buf_internal() {
+                Ok(buffer) => buffer.is_empty(),
+                Err(_) => {
+                    return Err(self.problem.take().unwrap_or_else(|| {
+                        VerifiedReaderFailure::Transport(io::Error::other(
+                            "verified ZIP reader failed without a diagnostic",
+                        ))
+                    }));
+                },
+            };
+            if empty {
+                break;
+            }
+            self.start = self.end;
+        }
+        self.expected
+            .valid_strict(ZipVerification {
+                crc: self.crc,
+                uncompressed_size: self.produced,
+            })
+            .map_err(VerifiedReaderFailure::Archive)
+    }
+}
+
+impl<D: Read> Read for VerifiedEntryBufReader<'_, D> {
+    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        if output.is_empty() {
+            return Ok(0);
+        }
+        let amount = {
+            let available = self.fill_buf_internal()?;
+            let amount = available.len().min(output.len());
+            output[..amount].copy_from_slice(&available[..amount]);
+            amount
+        };
+        self.consume(amount);
+        Ok(amount)
+    }
+}
+
+impl<D: Read> BufRead for VerifiedEntryBufReader<'_, D> {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        self.fill_buf_internal()
+    }
+
+    fn consume(&mut self, amount: usize) {
+        let available = self.end.saturating_sub(self.start);
+        if amount > available {
+            self.set_problem(VerifiedReaderFailure::Archive(
+                ErrorKind::InvalidInput {
+                    msg: format!(
+                        "verified ZIP reader consumed {amount} bytes with only {available} buffered"
+                    ),
+                }
+                .into(),
+            ));
+            return;
+        }
+        if self.record_accepted(amount).is_err() {
+            return;
+        }
+        self.start += amount;
+    }
+}
+
+fn read_with_interrupt_budget<R: Read>(reader: &mut R, buffer: &mut [u8]) -> io::Result<usize> {
+    const MAX_INTERRUPTED_RETRIES: usize = 8;
+    let mut retries = 0;
+    loop {
+        match reader.read(buffer) {
+            Ok(read) => return validate_read_count(read, buffer.len()),
+            Err(error)
+                if error.kind() == io::ErrorKind::Interrupted
+                    && retries < MAX_INTERRUPTED_RETRIES =>
+            {
+                retries += 1;
+            },
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+fn complete_verified_callback<T, E>(
+    callback: Result<T, E>,
+    verification: Result<(), VerifiedReaderFailure>,
+) -> Result<T, VerifiedEntryReaderError<E>> {
+    match (verification, callback) {
+        (Ok(()), Ok(value)) => Ok(value),
+        (Ok(()), Err(error)) => Err(VerifiedEntryReaderError::Callback(error)),
+        (Err(failure), Ok(_)) => Err(failure.into_public(None)),
+        (Err(VerifiedReaderFailure::Accounting(_)), Err(error)) => {
+            Err(VerifiedEntryReaderError::Callback(error))
+        },
+        (Err(failure), Err(error)) => Err(failure.into_public(Some(error))),
     }
 }
 
@@ -2266,6 +2726,209 @@ where
             .copied()
             .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
         self.read_entry_with_accounting(entry_id, accounting)
+    }
+
+    /// Run a callback against one verified indexed member without retaining
+    /// the complete decoded payload.
+    ///
+    /// The callback receives a fixed-buffer [`BufRead`] view. It may return a
+    /// valid prefix early; the reader then drains and verifies the remainder
+    /// before returning success. A callback panic unwinds normally and does
+    /// not trigger a drain. Callback errors are returned only after successful
+    /// archive finalization.
+    pub fn with_verified_entry_reader<T, E, F>(
+        &self,
+        entry_id: EntryId,
+        callback: F,
+    ) -> Result<T, VerifiedEntryReaderError<E>>
+    where
+        F: for<'reader> FnOnce(&'reader mut dyn BufRead) -> Result<T, E>,
+    {
+        let mut accounting = ZipOperationAccounting::default();
+        self.with_verified_entry_reader_with_accounting(entry_id, callback, &mut accounting)
+    }
+
+    /// Run a callback against one verified indexed member while recording
+    /// decoded bytes produced, callback-accepted bytes, and physical source
+    /// traversal in `accounting`.
+    ///
+    /// The callback receives a fixed-buffer [`BufRead`] view. Any bytes read
+    /// after the callback stops are drained for verification and are counted
+    /// as produced/source bytes but not as callback-accepted bytes.
+    pub fn with_verified_entry_reader_with_accounting<T, E, F>(
+        &self,
+        entry_id: EntryId,
+        callback: F,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<T, VerifiedEntryReaderError<E>>
+    where
+        F: for<'reader> FnOnce(&'reader mut dyn BufRead) -> Result<T, E>,
+    {
+        let indexed = match self.indexed_entry(entry_id) {
+            Ok(indexed) => indexed,
+            Err(source) => {
+                return Err(VerifiedEntryReaderError::Archive {
+                    error: source,
+                    callback_error: None,
+                });
+            },
+        };
+        let wayfinder = indexed.info.wayfinder;
+        let compression_method = indexed.info.compression_method;
+        match compression_method {
+            CompressionMethod::Store | CompressionMethod::Deflate => {},
+            other => {
+                return Err(VerifiedEntryReaderError::Archive {
+                    error: ErrorKind::UnsupportedCompressionMethod(other.as_id().as_u16()).into(),
+                    callback_error: None,
+                });
+            },
+        }
+        if let Err(source) = self.archive.validate_strict_stream_target(wayfinder) {
+            return Err(VerifiedEntryReaderError::Archive {
+                error: source,
+                callback_error: None,
+            });
+        }
+        if compression_method == CompressionMethod::Store
+            && wayfinder.compressed_size_hint() != wayfinder.uncompressed_size_hint()
+        {
+            return Err(VerifiedEntryReaderError::Archive {
+                error: ErrorKind::InvalidSize {
+                    expected: wayfinder.uncompressed_size_hint(),
+                    actual: wayfinder.compressed_size_hint(),
+                }
+                .into(),
+                callback_error: None,
+            });
+        }
+        let target_layout = match self.strict_layout_for(wayfinder) {
+            Ok(layout) => layout,
+            Err(source) => {
+                return Err(VerifiedEntryReaderError::Archive {
+                    error: source,
+                    callback_error: None,
+                });
+            },
+        };
+        let payload = self.archive.strict_payload_reader(wayfinder, target_layout);
+        let mut callback = Some(callback);
+
+        match compression_method {
+            CompressionMethod::Store => {
+                let callback = match callback.take() {
+                    Some(callback) => callback,
+                    None => {
+                        return Err(VerifiedEntryReaderError::Archive {
+                            error: ErrorKind::InvalidInput {
+                                msg: "verified ZIP callback was consumed before dispatch"
+                                    .to_string(),
+                            }
+                            .into(),
+                            callback_error: None,
+                        });
+                    },
+                };
+                let mut source = CountingReader::new(payload);
+                let (callback_result, finalization) = {
+                    let mut reader = VerifiedEntryBufReader::new(
+                        &mut source,
+                        target_layout.verifier,
+                        Some(accounting),
+                        AccountingReadKind::Stored,
+                    );
+                    let callback_result = callback(&mut reader);
+                    let finalization = reader.finish();
+                    (callback_result, finalization)
+                };
+                let compressed_consumed = source.count();
+                let accounting_result = accounting
+                    .add_stored_payload_bytes_read(compressed_consumed)
+                    .map_err(VerifiedReaderFailure::Accounting);
+                let verification = match finalization {
+                    Err(failure) => Err(failure),
+                    Ok(()) => {
+                        if compressed_consumed != wayfinder.compressed_size_hint() {
+                            Err(VerifiedReaderFailure::Archive(
+                                ErrorKind::InvalidSize {
+                                    expected: wayfinder.compressed_size_hint(),
+                                    actual: compressed_consumed,
+                                }
+                                .into(),
+                            ))
+                        } else {
+                            accounting_result
+                        }
+                    },
+                };
+                complete_verified_callback(callback_result, verification)
+            },
+            CompressionMethod::Deflate => {
+                let callback = match callback.take() {
+                    Some(callback) => callback,
+                    None => {
+                        return Err(VerifiedEntryReaderError::Archive {
+                            error: ErrorKind::InvalidInput {
+                                msg: "verified ZIP callback was consumed before dispatch"
+                                    .to_string(),
+                            }
+                            .into(),
+                            callback_error: None,
+                        });
+                    },
+                };
+                let mut source = CountingReader::new(payload);
+                let (callback_result, finalization, compressed_consumed, compressed_read) = {
+                    let mut decoder = DeflateDecoder::new(&mut source);
+                    let (callback_result, finalization) = {
+                        let mut reader = VerifiedEntryBufReader::new(
+                            &mut decoder,
+                            target_layout.verifier,
+                            Some(accounting),
+                            AccountingReadKind::Deflate,
+                        );
+                        let callback_result = callback(&mut reader);
+                        let finalization = reader.finish();
+                        (callback_result, finalization)
+                    };
+                    let compressed_consumed = decoder.total_in();
+                    drop(decoder);
+                    (
+                        callback_result,
+                        finalization,
+                        compressed_consumed,
+                        source.count(),
+                    )
+                };
+                let accounting_result = accounting
+                    .add_compressed_deflate_payload_bytes_read(compressed_read)
+                    .map_err(VerifiedReaderFailure::Accounting);
+                let verification = match finalization {
+                    Err(failure) => Err(failure),
+                    Ok(()) => {
+                        if compressed_consumed != wayfinder.compressed_size_hint() {
+                            Err(VerifiedReaderFailure::Archive(
+                                ErrorKind::InvalidSize {
+                                    expected: wayfinder.compressed_size_hint(),
+                                    actual: compressed_consumed,
+                                }
+                                .into(),
+                            ))
+                        } else {
+                            accounting_result
+                        }
+                    },
+                };
+                complete_verified_callback(callback_result, verification)
+            },
+            _ => Err(VerifiedEntryReaderError::Archive {
+                error: ErrorKind::InvalidInput {
+                    msg: "unsupported verified ZIP compression dispatch".to_string(),
+                }
+                .into(),
+                callback_error: None,
+            }),
+        }
     }
 
     /// Read and verify one member by its stable opaque entry ID.
@@ -10373,5 +11036,138 @@ mod tests {
                 && &archive[offset + 30..name_end] == wanted_name
                 && u16::from_le_bytes([archive[offset + 6], archive[offset + 7]]) & 0x08 != 0
         })
+    }
+
+    #[test]
+    fn callback_scoped_reader_streams_store_and_deflate_with_fixed_reads() {
+        let payload = vec![b'x'; VERIFIED_ENTRY_READER_BUFFER_SIZE * 2 + 37];
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("stored.bin", &payload).unwrap();
+        writer.write_deflated("deflated.bin", &payload).unwrap();
+        let indexed = indexed_archive(writer.finish_to_bytes().unwrap());
+
+        for name in ["stored.bin", "deflated.bin"] {
+            let entry_id = indexed.entry_id(name).unwrap();
+            let mut accounting = ZipOperationAccounting::default();
+            let decoded = indexed
+                .with_verified_entry_reader_with_accounting(
+                    entry_id,
+                    |reader| {
+                        let mut decoded = Vec::new();
+                        reader.read_to_end(&mut decoded).map(|_| decoded)
+                    },
+                    &mut accounting,
+                )
+                .unwrap();
+            assert_eq!(decoded, payload);
+            if name == "stored.bin" {
+                assert_eq!(accounting.stored_payload_bytes_read(), payload.len() as u64);
+                assert_eq!(
+                    accounting.stored_payload_bytes_accepted(),
+                    payload.len() as u64
+                );
+            } else {
+                assert_eq!(accounting.deflate_bytes_produced(), payload.len() as u64);
+                assert_eq!(accounting.deflate_bytes_accepted(), payload.len() as u64);
+                assert!(accounting.compressed_deflate_payload_bytes_read() > 0);
+            }
+        }
+    }
+
+    #[test]
+    fn callback_scoped_reader_drains_after_prefix_and_callback_error() {
+        let payload = b"callback prefix and drain payload";
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_deflated("payload.bin", payload).unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let indexed = indexed_archive(bytes.clone());
+        let entry_id = indexed.entry_id("payload.bin").unwrap();
+        let mut accounting = ZipOperationAccounting::default();
+        let prefix = indexed
+            .with_verified_entry_reader_with_accounting(
+                entry_id,
+                |reader| {
+                    let mut prefix = [0; 7];
+                    reader.read_exact(&mut prefix)?;
+                    Ok::<_, io::Error>(prefix.to_vec())
+                },
+                &mut accounting,
+            )
+            .unwrap();
+        assert_eq!(prefix, &payload[..7]);
+        assert_eq!(accounting.deflate_bytes_produced(), payload.len() as u64);
+        assert_eq!(accounting.deflate_bytes_accepted(), 7);
+
+        let indexed = indexed_archive(bytes);
+        let entry_id = indexed.entry_id("payload.bin").unwrap();
+        let callback_error = io::Error::other("callback stopped");
+        let error = indexed
+            .with_verified_entry_reader(entry_id, |_reader| {
+                Err::<(), _>(io::Error::other(callback_error.to_string()))
+            })
+            .unwrap_err();
+        assert!(error.archive().is_none());
+        assert!(error.transport().is_none());
+        assert!(matches!(error, VerifiedEntryReaderError::Callback(_)));
+        assert!(error.callback().is_some());
+    }
+
+    #[test]
+    fn callback_scoped_reader_retains_callback_error_on_archive_failure() {
+        let payload = b"callback secondary error payload";
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_deflated_sized("payload.bin", payload).unwrap();
+        let mut bytes = writer.finish_to_bytes().unwrap();
+        let local = local_header_offset_for_name(&bytes, b"payload.bin");
+        let central = central_header_offset_for_name(&bytes, b"payload.bin");
+        bytes[local + 14..local + 18].copy_from_slice(&0_u32.to_le_bytes());
+        bytes[central + 16..central + 20].copy_from_slice(&0_u32.to_le_bytes());
+        let indexed = indexed_archive(bytes);
+        let entry_id = indexed.entry_id("payload.bin").unwrap();
+        let error = indexed
+            .with_verified_entry_reader(entry_id, |_reader| {
+                Err::<(), _>(io::Error::other("callback secondary"))
+            })
+            .unwrap_err();
+        assert!(
+            matches!(error.archive(), Some(error) if matches!(error.kind(), ErrorKind::InvalidChecksum { .. }))
+        );
+        assert!(error.callback().is_some());
+    }
+
+    #[test]
+    fn callback_scoped_reader_defers_invalid_consume_and_retries_interrupts() {
+        let payload = b"deferred consume payload";
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("payload.bin", payload).unwrap();
+        let indexed = indexed_archive(writer.finish_to_bytes().unwrap());
+        let entry_id = indexed.entry_id("payload.bin").unwrap();
+        let error = indexed
+            .with_verified_entry_reader(entry_id, |reader| {
+                let _ = reader.fill_buf()?;
+                reader.consume(usize::MAX);
+                Ok::<_, io::Error>(())
+            })
+            .unwrap_err();
+        assert!(matches!(
+            error.archive(),
+            Some(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
+        ));
+
+        let mut source =
+            ScriptedReader::new([ReadStep::Interrupted, ReadStep::Bytes(payload.to_vec())]);
+        let mut reader = VerifiedEntryBufReader::new(
+            &mut source,
+            ZipVerification {
+                crc: crate::crc32(payload),
+                uncompressed_size: payload.len() as u64,
+            },
+            None,
+            AccountingReadKind::Stored,
+        );
+        let mut output = Vec::new();
+        reader.read_to_end(&mut output).unwrap();
+        reader.finish().unwrap();
+        assert_eq!(output, payload);
     }
 }

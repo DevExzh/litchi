@@ -2871,3 +2871,21 @@ The target peak/final observed footprint was 1.9 GiB, host availability was
 approximately 14 GiB with 132 GiB disk free, and swap was exhausted. No
 latency, RSS, allocation, physical-I/O, or OOM-prevention claim follows.
 The XLS freshness optimization queue remains open.
+
+## Change 0359 update
+
+Change 0359 implements the bounded transport foundation for the selected-cell
+XLSX hotspot. `soapberry-zip` and `litchi-opc` now provide callback-scoped
+verified decoded readers with fixed 16 KiB decoder scratch, finite interrupted
+read retries, drain-to-EOF size/CRC/compressed-consumption verification, typed
+callback-secondary errors, source/cancellation fences, and no `PartData` or
+payload-cache admission. Archive-wide strict-layout proof allocation is
+pre-existing indexed state and is not included in the 16 KiB scratch claim.
+
+Serial validation passed ZIP `4/4` focused and `319/319` library tests, plus
+OPC `6/6` focused, `277/277` library, `13/13` accounting integration, and
+`6/6` source-reader integration. The on-disk target was 381 MiB; no parallel
+build ran. This foundation does not yet replace XLSX worksheet/store
+materialization. Streaming MCE/x14ac, full-EOF worksheet semantics, bounded
+shared-string/style lookup, and measurement remain open. See [Change 0359](changes/0359-callback-scoped-verified-decoded-readers.md);
+`performance_claim: none`.
