@@ -3757,3 +3757,35 @@ no latency, RSS, allocation, or copy claim; stored OOXML corpus
 representativeness is weak. The raw
 `get_entry_borrowed` accessor remains an unverified compressed slice requiring
 a verifier. See [Change 0348](changes/0348-stored-zip-borrow-validation.md).
+
+## Change 0355: PPTX source-probe fallback admission
+
+Change 0355 records a correctness and ownership boundary, not a performance
+comparison (`performance_claim: none`). The private PPTX bytes probe returns
+typed `OpcError` outcomes and terminal `OtherOoxml`/`DisabledOtherOoxml`
+classifier outcomes. Only genuine non-ZIP, short-input, or missing
+`[Content_Types].xml` results admit compatibility fallback and reclaim the
+original `Vec` allocation. Hard ZIP, OPC, and classifier errors do not eager
+retry PPTX or ODP. Public `DetectedFormat` and eager behavior are unchanged,
+and the ordinary proven ODP native-owner handoff/reparse remains.
+
+Path `FileSource` captures `SourceVersion`, preflights the caller's exact
+`max_input_bytes`, and uses a same-source bounded `Bytes` fallback rather than
+pathname re-open or unbounded `fs::read`. Semantic conversion failure
+rechecks freshness first; `Presentation` consumes retained bytes with exact
+limits. Regression coverage includes input/part limits, typed malformed-ZIP
+errors, missing-manifest allocation preservation, wrong-family/polyglot
+precedence, extensionless bounded paths, reserved-namespace parity, and
+existing freshness/cancellation checks.
+
+Under `ulimit -v 8388608`, one Cargo job, disabled incremental/debug
+compilation, and one disk target, `cargo check -p litchi
+--no-default-features --features pptx` passed, the combined
+`pptx,odp` library test passed `48/48` with one test thread, and
+`cargo fmt --package litchi` passed. The final target size was 674 MiB; host
+availability was approximately 15 GiB and swap was already exhausted, with
+no additional pressure or OOM observed. These observations do not support a
+speed, RSS, or OOM-prevention claim. DOCX extensionless/freshness, non-Unix
+eager arbitration/input limits, ODT helper defaults, ODP prepared-package
+reparse, the public eager smart API, and selected-part materialization remain
+residual scope.

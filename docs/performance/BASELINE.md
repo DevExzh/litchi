@@ -2734,3 +2734,32 @@ formatting. `performance_claim: none`: no latency, RSS, allocation, or bytes-cop
 stored OOXML corpus representativeness remains weak. The low-level raw
 `get_entry_borrowed` accessor remains unverified and requires a verifier. See
 [Change 0348](changes/0348-stored-zip-borrow-validation.md).
+
+## Change 0355: PPTX source-probe fallback admission
+
+Change 0355 is correctness and ownership evidence only
+(`performance_claim: none`). The private PPTX bytes probe now returns typed
+`OpcError` outcomes and terminal `OtherOoxml`/`DisabledOtherOoxml` classifier
+outcomes. Only genuine non-ZIP, short-input, or missing `[Content_Types].xml`
+inputs enter the compatibility fallback and reclaim the original `Vec`
+allocation; hard ZIP, OPC, and classifier errors do not eagerly retry PPTX or
+ODP. The public `DetectedFormat` and eager path are unchanged, as is the
+ordinary proven ODP native-owner handoff/reparse.
+
+Path `FileSource` captures `SourceVersion`, preflights the caller's exact
+`max_input_bytes`, and uses a same-source bounded `Bytes` fallback instead of
+pathname re-open or unbounded `fs::read`. Semantic conversion failure
+rechecks freshness first, and `Presentation` consumes retained bytes under
+the exact input and part limits. Input/part-limit, malformed-ZIP typed-error,
+missing-manifest allocation, wrong-family/polyglot precedence, extensionless
+bounded-path, reserved-namespace, and freshness/cancellation regressions
+remain covered.
+
+With an 8 GiB virtual-memory ceiling, one Cargo job, disabled incremental and
+debug compilation, and one disk target, `cargo check -p litchi
+--no-default-features --features pptx`, the combined `pptx,odp` library test
+(`48/48`), and `cargo fmt --package litchi` passed. The final target was 674
+MiB with approximately 15 GiB host availability and saturated swap; no
+additional pressure or OOM was observed. No speed, RSS, or OOM-prevention
+claim follows. DOCX, non-Unix, ODT, ODP prepared-package, public eager-smart,
+and selected-part materialization seams remain open.

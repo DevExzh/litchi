@@ -2766,3 +2766,31 @@ one test thread, and an 8 GiB process ceiling. Downstream
 `performance_claim: none`:
 no latency/RSS/copy claim, stored OOXML representativeness is weak, and
 concurrency is unchanged. See [Change 0348](changes/0348-stored-zip-borrow-validation.md).
+
+## Change 0355: PPTX source-probe fallback admission
+
+Change 0355 records a correctness and ownership boundary
+(`performance_claim: none`). The private PPTX bytes probe now returns typed
+`OpcError` outcomes and terminal `OtherOoxml`/`DisabledOtherOoxml` classifier
+outcomes. Only genuine non-ZIP, short-input, or missing `[Content_Types].xml`
+inputs admit compatibility fallback and reclaim the original `Vec`
+allocation. Hard ZIP, OPC, and classifier errors do not eagerly retry PPTX or
+ODP. Public `DetectedFormat` and eager behavior are unchanged, and the
+ordinary proven ODP native-owner handoff/reparse remains.
+
+Path `FileSource` captures `SourceVersion`, preflights the caller's exact
+`max_input_bytes`, and uses a same-source bounded `Bytes` fallback instead of
+pathname re-open or unbounded `fs::read`. Semantic conversion failure
+rechecks freshness first; `Presentation` consumes retained bytes with exact
+limits. Input/part-limit, malformed-ZIP, missing-manifest allocation,
+wrong-family/polyglot precedence, extensionless bounded path,
+reserved-namespace, and freshness/cancellation regressions remain covered.
+
+The constrained validation used an 8 GiB virtual-memory ceiling, one Cargo
+job, disabled incremental/debug compilation, and one disk target. The PPTX
+check passed, the combined PPTX/ODP library test passed `48/48` with one test
+thread, and formatting passed. The final target was 674 MiB with
+approximately 15 GiB host availability and saturated swap; no additional
+pressure or OOM was observed. No speed, RSS, or OOM-prevention claim follows.
+DOCX/non-Unix/ODT/ODP prepared-package/public eager-smart/selected-part
+materialization seams remain open.

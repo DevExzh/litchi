@@ -108,7 +108,7 @@ pub struct Presentation {
     pub(super) cached_metadata: OnceLock<Option<litchi_core::Metadata>>,
 }
 
-#[cfg(feature = "odp")]
+#[cfg(all(feature = "odp", any(unix, windows)))]
 fn map_odp_error(error: Error, operation: &str) -> Error {
     match error {
         source_changed @ Error::SourceChanged { .. } => source_changed,
@@ -597,7 +597,7 @@ impl Presentation {
                     Self::map_source_opc_error(error)
                 },
                 crate::detection_smart::detected::PptxSourcePathError::Pptx(error) => {
-                    crate::map_ooxml_error(error)
+                    map_pptx_catalog_error(error)
                 },
             })?
         {
@@ -621,6 +621,9 @@ impl Presentation {
                     let _ = format;
                     return Err(Error::NotOfficeFile);
                 },
+                crate::detection_smart::detected::PptxSourcePathDetection::Bytes(bytes) => {
+                    return Self::from_bytes_with_limits(bytes, limits);
+                },
             }
         }
 
@@ -642,8 +645,15 @@ impl Presentation {
             return Ok(presentation);
         }
 
+        #[cfg(any(unix, windows))]
+        let bytes = crate::detection_smart::detected::read_presentation_path_bytes_with_limits(
+            path.as_ref(),
+            limits.max_input_bytes(),
+        )
+        .map_err(Self::map_source_opc_error)?;
+        #[cfg(not(any(unix, windows)))]
         let bytes = std::fs::read(path.as_ref())?;
-        Self::from_bytes(bytes)
+        Self::from_bytes_with_limits(bytes, limits)
     }
 
     /// Create a Presentation from a byte buffer.
@@ -790,7 +800,25 @@ impl Presentation {
                 ) => return Self::from_source_backed_pptx(presentation),
                 crate::detection_smart::detected::PresentationSourceBytesDetection::PptxError(
                     error,
-                ) => return Err(crate::map_ooxml_error(error)),
+                ) => return Err(map_pptx_catalog_error(error)),
+                crate::detection_smart::detected::PresentationSourceBytesDetection::OpcError(
+                    error,
+                ) => return Err(Self::map_source_opc_error(error)),
+                crate::detection_smart::detected::PresentationSourceBytesDetection::OtherOoxml(
+                    format,
+                ) => {
+                    let _ = format;
+                    return Err(Error::InvalidFormat(
+                        "Detected format is not a presentation format or feature not enabled"
+                            .to_owned(),
+                    ));
+                },
+                crate::detection_smart::detected::PresentationSourceBytesDetection::DisabledOtherOoxml(
+                    format,
+                ) => {
+                    let _ = format;
+                    return Err(Error::NotOfficeFile);
+                },
                 crate::detection_smart::detected::PresentationSourceBytesDetection::Fallback(
                     bytes,
                 ) => bytes,
@@ -2145,6 +2173,30 @@ mod source_pptx_path_tests {
     }
 
     #[test]
+    fn extensionless_path_source_routes_to_private_owner() {
+        let bytes = corrupt_unselected_slide_package();
+        let temporary = tempfile::NamedTempFile::new().expect("temporary extensionless PPTX path");
+        std::fs::write(temporary.path(), &bytes).expect("write extensionless PPTX");
+
+        let detected = crate::detection_smart::detected::detect_pptx_source_path_with_limits(
+            temporary.path(),
+            crate::pptx::ReadLimits::default(),
+        )
+        .expect("extensionless source-backed private detector")
+        .expect("extensionless PPTX source owner");
+        assert!(matches!(
+            detected,
+            crate::detection_smart::detected::PptxSourcePathDetection::Pptx(_)
+        ));
+
+        let presentation = Presentation::open(temporary.path()).expect("extensionless PPTX");
+        assert!(matches!(
+            &presentation.inner,
+            PresentationImpl::PptxSource(_)
+        ));
+    }
+
+    #[test]
     fn bytes_source_routes_to_private_owner_and_caches_selected_payloads() {
         let bytes = corrupt_unselected_slide_package();
         let presentation = Presentation::from_bytes(bytes).expect("source-backed PPTX bytes");
@@ -2221,15 +2273,25 @@ mod source_pptx_path_tests {
             .build()
             .expect("valid input limit");
 
+        crate::detection_smart::reset_opc_probe_count();
         let error = match Presentation::from_bytes_with_limits(bytes, limits) {
             Ok(_) => panic!("input limit must reject the PPTX"),
             Err(error) => error,
         };
-        assert!(matches!(error, litchi_core::Error::NotOfficeFile));
+        assert!(matches!(
+            error,
+            litchi_core::Error::ResourceLimit(limit)
+                if limit.resource == litchi_core::Resource::InputBytes
+                    && limit.observed == u64::try_from(corrupt_unselected_slide_package().len()).unwrap()
+                    && limit.limit == u64::try_from(corrupt_unselected_slide_package().len() - 1).unwrap()
+        ));
+        // The bounded private constructor is attempted once; the typed error
+        // must not trigger a second eager probe.
+        assert_eq!(crate::detection_smart::opc_probe_count(), 1);
     }
 
     #[test]
-    fn source_text_matches_bytes_text_without_name_projection() {
+    fn source_text_rejects_reserved_namespace_prefix_consistently() {
         let bytes = late_reserved_namespace_slide_package();
         let eager = Presentation::from_detected(crate::detection_smart::DetectedFormat::Pptx(
             crate::opc::OpcPackage::from_bytes(&bytes).expect("eager OPC control"),
@@ -2245,14 +2307,18 @@ mod source_pptx_path_tests {
         assert!(matches!(&source.inner, PresentationImpl::PptxSource(_)));
         let bytes_presentation = Presentation::from_bytes(bytes).expect("bytes PPTX control");
 
-        assert_eq!(
-            source.text().expect("source text"),
-            bytes_presentation.text().expect("bytes text")
-        );
-        assert_eq!(
-            source.text().expect("source text replay"),
-            eager.text().expect("eager text")
-        );
+        let source_error = source
+            .text()
+            .expect_err("reserved XML prefix must be rejected by source parsing");
+        let bytes_error = bytes_presentation
+            .text()
+            .expect_err("reserved XML prefix must be rejected by byte parsing");
+        let eager_error = eager
+            .text()
+            .expect_err("reserved XML prefix must be rejected by eager parsing");
+        assert!(matches!(source_error, litchi_core::Error::InvalidFormat(_)));
+        assert!(matches!(bytes_error, litchi_core::Error::InvalidFormat(_)));
+        assert!(matches!(eager_error, litchi_core::Error::InvalidFormat(_)));
         assert!(source.slide(0).is_err());
         assert!(eager.slide(0).is_err());
     }
@@ -2328,7 +2394,7 @@ mod source_pptx_path_tests {
     }
 
     #[test]
-    fn oversized_arbitrary_non_zip_still_returns_none_before_limits() {
+    fn oversized_arbitrary_non_zip_refuses_before_fallback_allocation() {
         let temporary = tempfile::NamedTempFile::new().expect("temporary arbitrary input");
         std::fs::write(temporary.path(), vec![b'x'; 4096]).expect("write arbitrary input");
         let limits = crate::pptx::ReadLimits::builder()
@@ -2337,18 +2403,35 @@ mod source_pptx_path_tests {
             .build()
             .expect("valid input limit");
 
-        let detected = crate::detection_smart::detected::detect_pptx_source_path_with_limits(
+        let detected = match crate::detection_smart::detected::detect_pptx_source_path_with_limits(
             temporary.path(),
             limits,
-        )
-        .expect("arbitrary non-ZIP probe");
-        assert!(detected.is_none());
+        ) {
+            Ok(_) => panic!("oversized arbitrary input must stop before fallback allocation"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            detected,
+            crate::detection_smart::detected::PptxSourcePathError::Opc(
+                crate::opc::OpcError::ReadLimit {
+                    resource: crate::opc::ReadResource::InputBytes,
+                    actual: 4096,
+                    maximum: 1,
+                }
+            )
+        ));
 
         let error = match Presentation::open_with_limits(temporary.path(), limits) {
             Ok(_) => panic!("arbitrary input must not become a presentation"),
             Err(error) => error,
         };
-        assert_eq!(error.to_string(), "Not a valid Office file");
+        assert!(matches!(
+            error,
+            litchi_core::Error::ResourceLimit(limit)
+                if limit.resource == litchi_core::Resource::InputBytes
+                    && limit.observed == 4096
+                    && limit.limit == 1
+        ));
     }
 
     #[test]
@@ -2390,6 +2473,79 @@ mod source_pptx_path_tests {
                 crate::opc::OpcError::ReadLimit {
                     resource: crate::opc::ReadResource::InputBytes,
                     ..
+                }
+            )
+        ));
+    }
+
+    #[test]
+    fn malformed_pptx_path_returns_typed_opc_error_without_fallback() {
+        let temporary = tempfile::Builder::new()
+            .suffix(".pptx")
+            .tempfile()
+            .expect("temporary malformed PPTX path");
+        std::fs::write(temporary.path(), b"PK\x03\x04malformed").expect("write malformed PPTX");
+
+        let error = match crate::detection_smart::detected::detect_pptx_source_path_with_limits(
+            temporary.path(),
+            crate::pptx::ReadLimits::default(),
+        ) {
+            Ok(_) => panic!("malformed OOXML-suffixed ZIP must remain typed"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            crate::detection_smart::detected::PptxSourcePathError::Opc(
+                crate::opc::OpcError::ZipError(_)
+            )
+        ));
+    }
+
+    #[test]
+    fn path_part_limit_returns_typed_opc_error_with_exact_bounds() {
+        use std::io::Write;
+
+        let mut output = std::io::Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(&mut output);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        writer.start_file("[Content_Types].xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="txt" ContentType="text/plain"/></Types>"#,
+            )
+            .unwrap();
+        writer.start_file("one.txt", options).unwrap();
+        writer.write_all(b"one").unwrap();
+        writer.start_file("two.txt", options).unwrap();
+        writer.write_all(b"two").unwrap();
+        writer.finish().unwrap();
+
+        let temporary = tempfile::Builder::new()
+            .suffix(".pptx")
+            .tempfile()
+            .expect("temporary part-limited PPTX path");
+        std::fs::write(temporary.path(), output.into_inner()).expect("write part-limited ZIP");
+        let limits = crate::pptx::ReadLimits::builder()
+            .max_parts(1)
+            .expect("test part limit")
+            .build()
+            .expect("consistent test limits");
+
+        let error = match crate::detection_smart::detected::detect_pptx_source_path_with_limits(
+            temporary.path(),
+            limits,
+        ) {
+            Ok(_) => panic!("part limit must stop the source-backed path probe"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            crate::detection_smart::detected::PptxSourcePathError::Opc(
+                crate::opc::OpcError::ReadLimit {
+                    resource: crate::opc::ReadResource::Parts,
+                    actual: 2,
+                    maximum: 1,
                 }
             )
         ));
@@ -2439,14 +2595,20 @@ mod source_pptx_path_tests {
             .tempfile()
             .expect("temporary unknown ZIP path");
         std::fs::write(unknown_path.path(), output.into_inner()).expect("write unknown ZIP");
+        let detected = crate::detection_smart::detected::detect_pptx_source_path_with_limits(
+            unknown_path.path(),
+            crate::pptx::ReadLimits::default(),
+        )
+        .expect("extensionless ZIP fallback probe")
+        .expect("same-source fallback bytes");
+        assert!(matches!(
+            detected,
+            crate::detection_smart::detected::PptxSourcePathDetection::Bytes(_)
+        ));
         let error = match Presentation::open(unknown_path.path()) {
             Ok(_) => panic!("unknown ZIP must remain unsupported"),
             Err(error) => error,
         };
-        assert!(
-            error
-                .to_string()
-                .contains("ZIP input is not a supported Office package")
-        );
+        assert!(matches!(error, litchi_core::Error::NotOfficeFile));
     }
 }
