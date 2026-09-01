@@ -1682,7 +1682,7 @@ impl SourceBackedPackage {
 
         let source_error = self.source.ensure_current().err();
         let execution_error = self.cache.check_context().err().map(map_execution_error);
-        let operation_error = read_result.err().map(Into::into);
+        let operation_error = read_result.err().map(map_preservation_error);
         let accounting_error = accounting.map(|value| {
             let mut error = value.merge_zip(&zip_accounting).err();
             if let Err(output_error) = value.add_output_bytes_accepted(accepted)
@@ -2927,29 +2927,49 @@ impl SourceBackedPackage {
         snapshot
             .ensure_current()
             .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
-        let archive = IndexedArchive::from_reader_with_limits(
+        let archive = match IndexedArchive::from_reader_with_limits(
             SourceReader {
                 snapshot: snapshot.clone(),
             },
             length,
             limits.zip_limits(),
-        )
-        .map_err(OpcError::from)
-        .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+        ) {
+            Ok(archive) => archive,
+            Err(error) => {
+                let mapped = map_preservation_error(error);
+                if matches!(mapped, OpcError::Cancelled | OpcError::Execution(_)) {
+                    return Err(phase(ValidationCatalogPhase::Ingress, mapped));
+                }
+                snapshot
+                    .ensure_current()
+                    .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+                return Err(phase(ValidationCatalogPhase::Ingress, mapped));
+            },
+        };
         snapshot
             .ensure_current()
             .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+        let catalog = match PackageReader::source_catalog_for_validation(&archive, limits) {
+            Ok(catalog) => catalog,
+            Err(ValidationCatalogError {
+                phase: stage,
+                error,
+            }) => {
+                if matches!(error, OpcError::Cancelled | OpcError::Execution(_)) {
+                    return Err(phase(stage, error));
+                }
+                snapshot
+                    .ensure_current()
+                    .map_err(|error| phase(stage, error))?;
+                return Err(phase(stage, error));
+            },
+        };
         let SourceCatalog {
             pkg_srels,
             parts,
             non_part_members,
             content_types_member,
-        } = PackageReader::source_catalog_for_validation(&archive, limits).map_err(
-            |ValidationCatalogError {
-                 phase: stage,
-                 error,
-             }| phase(stage, error),
-        )?;
+        } = catalog;
         snapshot
             .ensure_current()
             .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
@@ -3192,7 +3212,14 @@ impl SourceBackedPackage {
             limits.zip_limits(),
         ) {
             Ok(archive) => archive,
-            Err(error) => return Err(map_preservation_error(error)),
+            Err(error) => {
+                let mapped = map_preservation_error(error);
+                if matches!(mapped, OpcError::Cancelled | OpcError::Execution(_)) {
+                    return Err(mapped);
+                }
+                snapshot.ensure_current()?;
+                return Err(mapped);
+            },
         };
         snapshot.ensure_current()?;
         if let Some(context) = context.as_ref() {
@@ -3219,15 +3246,23 @@ impl SourceBackedPackage {
         } else {
             None
         };
+        let catalog = match PackageReader::source_catalog(&archive, limits) {
+            Ok(catalog) => catalog,
+            Err(error) => {
+                let mapped = map_source_backed_error(error);
+                if matches!(mapped, OpcError::Cancelled | OpcError::Execution(_)) {
+                    return Err(mapped);
+                }
+                snapshot.ensure_current()?;
+                return Err(mapped);
+            },
+        };
         let SourceCatalog {
             pkg_srels,
             parts,
             non_part_members,
             content_types_member,
-        } = match PackageReader::source_catalog(&archive, limits) {
-            Ok(catalog) => catalog,
-            Err(error) => return Err(map_source_backed_error(error)),
-        };
+        } = catalog;
         snapshot.ensure_current()?;
         if let Some(context) = context.as_ref() {
             context.check().map_err(map_execution_error)?;
@@ -6032,12 +6067,19 @@ impl SourceBackedPackage {
         {
             Ok(index) => index,
             Err(error) => {
+                let unsupported = matches!(
+                    error.kind(),
+                    soapberry_zip::ErrorKind::UnsupportedPreservation { .. }
+                );
                 let mapped = map_preservation_error(error);
                 if matches!(mapped, OpcError::Cancelled | OpcError::Execution(_)) {
                     return Err(mapped);
                 }
                 self.source.ensure_current()?;
-                return Err(overlay_unavailable(mapped.to_string()));
+                if unsupported {
+                    return Err(overlay_unavailable(mapped.to_string()));
+                }
+                return Err(mapped);
             },
         };
         self.source.ensure_current()?;
@@ -7207,12 +7249,19 @@ fn overlay_unavailable(reason: impl Into<String>) -> OpcError {
 }
 
 fn map_preservation_error(error: soapberry_zip::Error) -> OpcError {
-    match error.into_kind() {
-        soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => {
-            map_io_error(error)
-        },
-        kind => OpcError::ZipError(kind.to_string()),
+    let is_io = matches!(
+        error.kind(),
+        soapberry_zip::ErrorKind::IO(_) | soapberry_zip::ErrorKind::Io(_)
+    );
+    if is_io {
+        return match error.into_kind() {
+            soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => {
+                map_io_error(error)
+            },
+            _ => unreachable!("the previously inspected ZIP error was not I/O"),
+        };
     }
+    OpcError::from(error)
 }
 
 fn accounting_overflow(counter: &'static str) -> OpcError {
@@ -7858,6 +7907,46 @@ mod tests {
         }
     }
 
+    struct CatalogReadFailureSource {
+        bytes: Vec<u8>,
+        fail_offset: usize,
+    }
+
+    impl CatalogReadFailureSource {
+        fn new(bytes: Vec<u8>, fail_offset: usize) -> Self {
+            Self { bytes, fail_offset }
+        }
+    }
+
+    impl ReadAt for CatalogReadFailureSource {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            let offset = usize::try_from(offset).map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "offset too large")
+            })?;
+            let end = offset.saturating_add(output.len());
+            if offset <= self.fail_offset && self.fail_offset < end {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::BrokenPipe,
+                    "catalog-stage read failed",
+                ));
+            }
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(94, 0))
+        }
+    }
+
     struct OverReportingSink {
         calls: usize,
         accepted: usize,
@@ -8183,6 +8272,69 @@ mod tests {
             writer.write_stored("scratch.bin", b"not a part").unwrap();
         }
         writer.finish_to_bytes().unwrap()
+    }
+
+    #[test]
+    fn validation_archive_index_preserves_raw_source_io_errors() {
+        let source = Arc::new(OverReportingSource::new(archive_bytes(
+            root_relationships(),
+            b"validation ingress",
+            false,
+        )));
+        source.overreport.store(true, Ordering::SeqCst);
+
+        let error =
+            match SourceBackedPackage::from_read_at_for_validation(source, ReadLimits::default()) {
+                Ok(_) => panic!("over-reported source reads must fail archive indexing"),
+                Err(error) => error,
+            };
+        assert_eq!(error.phase, ValidationCatalogPhase::Ingress);
+        assert!(matches!(
+            error.error,
+            OpcError::IoError(error) if error.kind() == std::io::ErrorKind::InvalidData
+        ));
+    }
+
+    #[test]
+    fn validation_catalog_preserves_raw_source_io_errors() {
+        let bytes = archive_bytes(root_relationships(), b"validation catalog", false);
+        let marker = b"<Types xmlns=\"";
+        let fail_offset = bytes
+            .windows(marker.len())
+            .position(|window| window == marker)
+            .expect("the content-types marker must be present in the fixture");
+        let source = Arc::new(CatalogReadFailureSource::new(bytes, fail_offset));
+
+        let error =
+            match SourceBackedPackage::from_read_at_for_validation(source, ReadLimits::default()) {
+                Ok(_) => panic!("the catalog-stage source read must fail"),
+                Err(error) => error,
+            };
+        assert_eq!(error.phase, ValidationCatalogPhase::Catalog);
+        assert!(matches!(
+            error.error,
+            OpcError::IoError(error) if error.kind() == std::io::ErrorKind::BrokenPipe
+        ));
+    }
+
+    #[test]
+    fn normal_open_catalog_preserves_raw_source_io_errors() {
+        let bytes = archive_bytes(root_relationships(), b"normal catalog", false);
+        let marker = b"<Types xmlns=\"";
+        let fail_offset = bytes
+            .windows(marker.len())
+            .position(|window| window == marker)
+            .expect("the content-types marker must be present in the fixture");
+        let source = Arc::new(CatalogReadFailureSource::new(bytes, fail_offset));
+
+        let error = match SourceBackedPackage::from_read_at(source) {
+            Ok(_) => panic!("the catalog-stage source read must fail"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            OpcError::IoError(error) if error.kind() == std::io::ErrorKind::BrokenPipe
+        ));
     }
 
     #[test]
@@ -12203,6 +12355,59 @@ mod tests {
             Err(OpcError::SourceBackedOverlayUnavailable { .. })
         ));
         assert!(output.is_empty());
+    }
+
+    #[test]
+    fn preservation_index_propagates_typed_limit_allocation_and_io_errors() {
+        let mut package =
+            SourceBackedPackage::from_vec(archive_bytes(root_relationships(), b"<before/>", true))
+                .unwrap();
+        package.limits = ReadLimits::builder()
+            .max_archive_metadata_bytes(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        let mut output = Vec::new();
+        assert!(matches!(
+            package.write_changed_overlays_with_appended(&mut output, &[], Vec::new()),
+            Err(OpcError::ReadLimit {
+                resource: ReadResource::ArchiveMetadataBytes,
+                maximum: 1,
+                ..
+            })
+        ));
+        assert!(output.is_empty());
+
+        let source = Arc::new(OverReportingSource::new(archive_bytes(
+            root_relationships(),
+            b"<before/>",
+            true,
+        )));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        source.overreport.store(true, Ordering::SeqCst);
+        output.clear();
+        assert!(matches!(
+            package.write_changed_overlays_with_appended(&mut output, &[], Vec::new()),
+            Err(OpcError::IoError(error))
+                if error.kind() == std::io::ErrorKind::InvalidData
+        ));
+        assert!(output.is_empty());
+
+        let source = Vec::<u8>::new()
+            .try_reserve_exact(usize::MAX)
+            .expect_err("the test allocation must fail without allocating");
+        assert!(matches!(
+            map_preservation_error(soapberry_zip::Error::from(
+                soapberry_zip::ErrorKind::Allocation {
+                    resource: "preservation-index test allocation",
+                    source,
+                },
+            )),
+            OpcError::Allocation {
+                resource: "preservation-index test allocation",
+                ..
+            }
+        ));
     }
 
     #[test]

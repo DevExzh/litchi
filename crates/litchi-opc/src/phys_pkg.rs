@@ -515,10 +515,14 @@ impl<'data> PhysPkgReader<'data> {
             names.push(name);
         }
         let reservation = self.reserve_declared_parts(&declared)?;
-        let results = names
-            .iter()
-            .map(|name| (*name, self.archive.read(name)))
-            .collect::<Vec<_>>();
+        let mut results = Vec::new();
+        if let Err(error) = reserve_parallel_results(&mut results, names.len()) {
+            self.release_declared_parts(reservation);
+            return Err(error);
+        }
+        for name in &names {
+            results.push((*name, self.archive.read(name)));
+        }
         let mut materialized = Vec::new();
         if let Err(source) = materialized.try_reserve(results.len()) {
             self.release_declared_parts(reservation);
@@ -1391,6 +1395,15 @@ fn map_streaming_failure(failure: soapberry_zip::office::StreamingArchiveFailure
     }
 }
 
+fn reserve_parallel_results<T>(results: &mut Vec<T>, count: usize) -> Result<()> {
+    results
+        .try_reserve(count)
+        .map_err(|source| OpcError::Allocation {
+            resource: "OPC parallel part results",
+            source,
+        })
+}
+
 fn validate_part_name(
     part_names: &PartNameSet,
     candidate: &PackURI,
@@ -1825,7 +1838,10 @@ mod tests {
             Err(OpcError::IncompleteOutput { written, source }) => {
                 assert!(written > 0);
                 assert!(written < 128);
-                assert!(matches!(*source, OpcError::ZipError(_)));
+                assert!(matches!(
+                    *source,
+                    OpcError::IoError(error) if error.kind() == std::io::ErrorKind::Other
+                ));
             },
             Ok(_) => panic!("partial output unexpectedly finished"),
             Err(other) => panic!("unexpected partial output error: {other:?}"),
@@ -2016,6 +2032,19 @@ mod tests {
                 maximum: 1,
             })
         ));
+    }
+
+    #[test]
+    fn parallel_result_reservation_rejects_capacity_overflow_without_allocating() {
+        let mut results = Vec::<u8>::new();
+        assert!(matches!(
+            reserve_parallel_results(&mut results, usize::MAX),
+            Err(OpcError::Allocation {
+                resource: "OPC parallel part results",
+                ..
+            })
+        ));
+        assert!(results.is_empty());
     }
 
     #[test]

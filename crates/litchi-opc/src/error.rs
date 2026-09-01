@@ -236,16 +236,10 @@ pub enum OpcError {
 
 impl From<soapberry_zip::Error> for OpcError {
     fn from(err: soapberry_zip::Error) -> Self {
-        match err.kind() {
+        match err.into_kind() {
             soapberry_zip::ErrorKind::Cancelled => Self::Cancelled,
             soapberry_zip::ErrorKind::IO(error) | soapberry_zip::ErrorKind::Io(error) => {
-                if let Some(execution) = error
-                    .get_ref()
-                    .and_then(|source| source.downcast_ref::<ExecutionIoError>())
-                {
-                    return execution_to_opc_error(execution.0.clone());
-                }
-                Self::ZipError(err.to_string())
+                map_io_error(error)
             },
             soapberry_zip::ErrorKind::LimitExceeded {
                 resource,
@@ -266,10 +260,13 @@ impl From<soapberry_zip::Error> for OpcError {
                     soapberry_zip::LimitResource::EntrySize => ReadResource::ArchiveEntryBytes,
                     soapberry_zip::LimitResource::TotalSize => ReadResource::ArchiveTotalBytes,
                 },
-                actual: *actual,
-                maximum: *maximum,
+                actual,
+                maximum,
             },
-            _ => Self::ZipError(err.to_string()),
+            soapberry_zip::ErrorKind::Allocation { resource, source } => {
+                Self::Allocation { resource, source }
+            },
+            kind => Self::ZipError(kind.to_string()),
         }
     }
 }
@@ -426,5 +423,24 @@ mod tests {
             litchi_core::ExecutionError::Cancelled,
         )));
         assert!(matches!(OpcError::from(error), OpcError::Cancelled));
+    }
+
+    #[test]
+    fn allocation_zip_errors_remain_typed() {
+        let source = Vec::<u8>::new()
+            .try_reserve_exact(usize::MAX)
+            .expect_err("the test allocation must fail without allocating");
+        let error = soapberry_zip::Error::from(soapberry_zip::ErrorKind::Allocation {
+            resource: "test allocation",
+            source,
+        });
+
+        assert!(matches!(
+            OpcError::from(error),
+            OpcError::Allocation {
+                resource: "test allocation",
+                ..
+            }
+        ));
     }
 }

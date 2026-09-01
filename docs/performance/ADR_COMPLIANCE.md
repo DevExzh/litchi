@@ -418,3 +418,20 @@ RSS, allocation, physical-I/O, or broad XLSX claim follows.
 
 | Stored ZIP borrowed validation | Private `soapberry-zip` immutable-slice Store validation; no generic `ReadAt` or remote/file borrowing edge | Complete local/central metadata, descriptor CRC/size forms, local ZIP64-extra provenance, encryption/overlap/duplicate safety, and strict nonempty zero-CRC refusal; pointer identity and existing fallbacks remain | Validated Store payloads borrow without cache/materialization charge; ZIP64 EOCD, Deflate, and positional sources remain owned/streaming; concurrency unchanged | `focused borrowed 10/10; full soapberry-zip lib 280/280` under `CARGO_BUILD_JOBS=1`, `test-threads=1`, and an 8 GiB process ceiling; downstream `litchi-opc borrowed 12/12`, not the full suite; package format check passed; raw `get_entry_borrowed` remains unverified and requires a verifier | [Change 0348](changes/0348-stored-zip-borrow-validation.md) | Correctness only; `performance_claim: none`; no latency/RSS/copy claim; stored OOXML representativeness is weak |
 | PPTX source-probe error and fallback admission | Private `litchi` PPTX bytes probe and `FileSource` path fallback; no public detector/type or dependency edge | Typed `OpcError` plus terminal `OtherOoxml`/`DisabledOtherOoxml`; exact `SourceVersion`, caller `max_input_bytes`, part limits, freshness, and cancellation semantics remain | Genuine non-ZIP/short/missing `[Content_Types].xml` fallback reclaims the original `Vec`; same-source bounded `Bytes` replaces pathname re-open/unbounded `fs::read`; hard ZIP/OPC/classifier outcomes do not eager/retry PPTX or ODP | Input/part-limit, malformed-ZIP, missing-manifest ownership, wrong-family/polyglot precedence, extensionless bounded path, reserved-namespace, freshness/cancellation regressions; public `DetectedFormat`/eager and ordinary ODP native-owner handoff remain | [Change 0355](changes/0355-pptx-source-probe-fallback.md), `litchi` `pptx` check, combined `pptx,odp` lib tests `48/48`, formatter under a constrained one-target run | Correctness/ownership only; `performance_claim: none`; no speed/RSS/OOM-prevention claim; DOCX/non-Unix/ODT/ODP/public eager/selected-part residuals remain |
+## Change 0356 compliance update
+
+Change 0356 remains within the accepted topology and public-layer boundaries:
+DOCX source ownership stays in `litchi`, OPC error/resource ownership stays in
+`litchi-opc`/`soapberry-zip`, and no public archive type, physical identifier,
+runtime handle, lock, executor, source generic, or `DetectedFormat` change is
+introduced. The single-source path and final length fence preserve ADR 0003
+freshness and failure atomicity; typed limits, allocation, I/O, cancellation,
+and execution precedence preserve the panic-free and bounded-ingress rules.
+Terminal wrong-family outcomes and lossless `OtherOoxml` preservation follow
+the lossless/unsupported-content policy, while `UnsupportedPreservation` is the
+only overlay-unavailable translation. No dependency edge, unsafe high-level
+code, or ADR exception/supersession is required. Validation and residuals are
+recorded in [Change 0356](changes/0356-docx-source-path-and-opc-errors.md);
+`performance_claim: none`. The caller-sized physical result buffer uses typed
+fallible reservation and releases the part reservation on admission failure;
+this is correctness/resource safety only, with no performance or OOM claim.

@@ -2794,3 +2794,22 @@ approximately 15 GiB host availability and saturated swap; no additional
 pressure or OOM was observed. No speed, RSS, or OOM-prevention claim follows.
 DOCX/non-Unix/ODT/ODP prepared-package/public eager-smart/selected-part
 materialization seams remain open.
+## Change 0356 update
+
+Change 0356 closes the DOCX path-ingress and OPC typed-error hotspot for the
+implemented scope. One `FileSource`/`SourceVersion` now spans ODT arbitration,
+DOCX ownership, and bounded fallback on Unix and Windows; portable fallback is
+length-checked and freshness-checked, and no pathname reopen or unbounded
+`fs::read` remains. DOCX `OtherOoxml`/`DisabledOtherOoxml` are terminal, while
+only genuine missing-manifest/no-match probes reclaim the fallback allocation.
+The OPC boundary types allocation, six limit resources, raw I/O, and preserves
+cancellation/execution/source freshness ordering across archive, catalog,
+selected-stream, and preservation-index paths. Caller-sized physical result
+buffers use typed fallible reservation and release the part reservation on
+admission failure; this is correctness/resource safety only, with no
+performance or OOM claim. `performance_claim: none`.
+
+Residual hotspots are the eager public smart detector, the neutral 2 GiB
+materializing fallback, non-Unix ODT policy differences, lower-family probe
+input-limit behavior, ordinary ODT limits, `parts_by_name` casing, and
+selected-Part materialization. Evidence is recorded in [Change 0356](changes/0356-docx-source-path-and-opc-errors.md).

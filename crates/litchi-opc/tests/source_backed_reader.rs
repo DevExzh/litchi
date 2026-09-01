@@ -6,8 +6,13 @@
 
 //! Sequential-reader ingress tests for the lazy source-backed OPC package.
 
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
+use litchi_core::{OwnedSource, ReadAt};
 use litchi_opc::{OpcError, PackURI, ReadLimits, ReadResource, SourceBackedPackage};
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -212,5 +217,186 @@ fn reader_ingress_rejects_invalid_read_count_without_panicking() {
     assert!(matches!(
         error,
         OpcError::IoError(error) if error.kind() == io::ErrorKind::InvalidData
+    ));
+}
+
+fn assert_index_limit_is_typed_for_both_sources(
+    source: &[u8],
+    limits: ReadLimits,
+    expected: ReadResource,
+    expected_actual: u64,
+    expected_maximum: u64,
+) {
+    let from_vec = match SourceBackedPackage::from_vec_with_limits(source.to_vec(), limits) {
+        Ok(_) => panic!("the vec source must exceed {expected:?}"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        from_vec,
+        OpcError::ReadLimit {
+            resource,
+            actual,
+            maximum,
+        } if resource == expected && actual == expected_actual && maximum == expected_maximum
+    ));
+
+    let from_read_at = match SourceBackedPackage::from_read_at_with_limits(
+        Arc::new(OwnedSource::new(source.to_vec())),
+        limits,
+    ) {
+        Ok(_) => panic!("the read-at source must exceed {expected:?}"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        from_read_at,
+        OpcError::ReadLimit {
+            resource,
+            actual,
+            maximum,
+        } if resource == expected && actual == expected_actual && maximum == expected_maximum
+    ));
+}
+
+#[test]
+fn indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress() {
+    let source = archive_bytes();
+    let member_limits = ReadLimits::builder()
+        .max_archive_members(1)
+        .unwrap()
+        .max_parts(1)
+        .unwrap()
+        .max_relationship_parts(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let profiles = [
+        (member_limits, ReadResource::ArchiveMembers, 2, 1),
+        (
+            ReadLimits::builder()
+                .max_archive_metadata_bytes(1)
+                .unwrap()
+                .build()
+                .unwrap(),
+            ReadResource::ArchiveMetadataBytes,
+            46,
+            1,
+        ),
+        (
+            ReadLimits::builder()
+                .max_archive_member_name_bytes(1)
+                .unwrap()
+                .build()
+                .unwrap(),
+            ReadResource::ArchiveMemberNameBytes,
+            19,
+            1,
+        ),
+        (
+            ReadLimits::builder()
+                .max_archive_compressed_bytes(1)
+                .unwrap()
+                .build()
+                .unwrap(),
+            ReadResource::ArchiveCompressedBytes,
+            383,
+            1,
+        ),
+        (
+            ReadLimits::builder()
+                .max_archive_entry_bytes(1)
+                .unwrap()
+                .build()
+                .unwrap(),
+            ReadResource::ArchiveEntryBytes,
+            383,
+            1,
+        ),
+        (
+            ReadLimits::builder()
+                .max_archive_total_bytes(1)
+                .unwrap()
+                .build()
+                .unwrap(),
+            ReadResource::ArchiveTotalBytes,
+            383,
+            1,
+        ),
+    ];
+
+    for (limits, expected, expected_actual, expected_maximum) in profiles {
+        assert_index_limit_is_typed_for_both_sources(
+            &source,
+            limits,
+            expected,
+            expected_actual,
+            expected_maximum,
+        );
+    }
+}
+
+struct ToggleReadAt {
+    source: OwnedSource,
+    fail: Arc<AtomicBool>,
+}
+
+impl ReadAt for ToggleReadAt {
+    fn len(&self) -> io::Result<u64> {
+        self.source.len()
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        if self.fail.load(Ordering::Acquire) {
+            return Err(io::Error::new(
+                io::ErrorKind::BrokenPipe,
+                "injected source read failure",
+            ));
+        }
+        self.source.read_at(offset, output)
+    }
+
+    fn version(&self) -> io::Result<litchi_core::SourceVersion> {
+        self.source.version()
+    }
+}
+
+struct FailingSink;
+
+impl Write for FailingSink {
+    fn write(&mut self, _bytes: &[u8]) -> io::Result<usize> {
+        Err(io::Error::new(
+            io::ErrorKind::BrokenPipe,
+            "injected sink write failure",
+        ))
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn stream_to_keeps_raw_source_and_sink_io_errors_typed() {
+    let fail = Arc::new(AtomicBool::new(false));
+    let package = SourceBackedPackage::from_read_at(Arc::new(ToggleReadAt {
+        source: OwnedSource::new(archive_bytes()),
+        fail: Arc::clone(&fail),
+    }))
+    .unwrap();
+    fail.store(true, Ordering::Release);
+    let part = package.part(&pack(DOCUMENT_URI)).unwrap();
+    let mut output = Vec::new();
+    let error = part.stream_to(&mut output).unwrap_err();
+    assert!(matches!(
+        error,
+        OpcError::IoError(error) if error.kind() == io::ErrorKind::BrokenPipe
+    ));
+
+    let package = SourceBackedPackage::from_vec(archive_bytes()).unwrap();
+    let part = package.part(&pack(DOCUMENT_URI)).unwrap();
+    let mut sink = FailingSink;
+    let error = part.stream_to(&mut sink).unwrap_err();
+    assert!(matches!(
+        error,
+        OpcError::IoError(error) if error.kind() == io::ErrorKind::BrokenPipe
     ));
 }

@@ -1,5 +1,39 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Latest DOCX source-path ingress and OPC error result (change 0356)
+
+Change 0356 makes Unix and Windows `Document` path ingress single-source:
+one `FileSource` and one `SourceVersion` cover ODT MIME/catalog arbitration,
+DOCX source ownership, and the bounded `Bytes` fallback. Pathname reopen and
+unbounded `fs::read` are removed; portable fallback uses checked file length,
+one reserve, fixed `read_exact`, and a final handle-length freshness check.
+Caller DOCX `ReadLimits` apply to ZIP/known-OOXML candidates, while the neutral
+generic fallback has a finite 2 GiB ceiling and still materializes its bytes.
+DOCX terminally preserves `OtherOoxml`/`DisabledOtherOoxml`, genuine
+missing-manifest/no-match reclaims the original allocation, and a valid DOCX
+wins over an ODT MIME hint with a missing or malformed ODF manifest. Ordinary
+ODT retains its separate native-owner policy.
+
+The OPC prerequisite types allocation, all six `LimitExceeded` resources, and
+raw I/O errors. Archive-index, normal/validation catalogs (including validation
+phase), selected streams, and preservation-index paths retain cancellation,
+execution, and source-freshness precedence; only `UnsupportedPreservation`
+becomes overlay-unavailable. Public APIs and `DetectedFormat` are unchanged.
+Evidence is exact-limit/source-sink-validation-I/O, polyglot, extensionless,
+wrong-family, neutral-fallback, and freshness regression coverage, plus
+`litchi-opc` `source_backed_reader` `6/6`, OPC lib `271/271`, combined DOCX/ODT
+facade `90/90`, and serial DOCX/ODT/PPTX/XLSX/XLS feature checks under the
+constrained one-target/one-job environment. The target reached 1009 MiB with
+approximately 14-15 GiB host availability and exhausted swap; no OOM occurred.
+This is correctness/ownership evidence only (`performance_claim: none`), with
+no speed, RSS, or OOM-prevention claim. The caller-sized physical result buffer
+uses typed fallible reservation and releases the part reservation on admission
+failure; this is correctness/resource safety evidence only. Public eager smart
+detection, neutral
+2 GiB materialization, non-Unix ODT policy differences, lower-family probe
+limits, ordinary ODT limits, `parts_by_name` casing, and selected-Part
+materialization remain open. See [Change 0356](changes/0356-docx-source-path-and-opc-errors.md).
+
 ## Latest XLSB source-ingress hard-probe result (change 0354)
 
 Change 0354 separates recoverable private XLSB source probes from hard
