@@ -1,5 +1,34 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0364 compliance update
+
+Change 0364 keeps selected-cell dependency resolution in the owning
+`litchi-xlsx` semantic path and reuses the existing OPC verified-reader
+boundary. The scan tracks maximum shared-string and direct cell-style
+references across all cells plus the target SST index. Cold plain selected SST
+and direct `c@s` values stream canonical `sharedStrings` then `styles`
+sequentially without publishing `Store`, worksheet `PartData`, a full text
+`Vec`, a style `Catalog`, or semantic dependency-cache state. Warm semantic
+caches no longer rematerialize evicted `PartData`; no public signature
+changes.
+
+Each dependency reader reaches XML EOF and CRC, size, source, and cancellation
+fences before a value or fallback is returned. Invalid, missing, or
+out-of-range references and unsupported or oversize parts use established
+eager diagnostics only after readers close. Rich, phonetic, extension, and
+foreign SST entries, row or column styles, merges, shared, array, and
+data-table formulas remain eager fallbacks. The final cell source and
+cancellation fence runs even when parsing returns an error, preserving error
+precedence and freshness boundaries.
+
+This introduces no public archive handle, dependency edge, or low-level
+reader surface. Focused validation passed `28/28`, library validation passed
+`856/856`, and scoped Clippy passed apart from the known unrelated pre-existing
+`hyperlinks` `useless_asref` issue. Quick-XML and current-item allocations are
+bounded only by documented limits; no latency, RSS, OOM, or fixed-memory claim
+follows. See [Change 0364](changes/0364-xlsx-selected-cell-dependency-streaming.md);
+`performance_claim: none`.
+
 ## Change 0363 compliance update
 
 Change 0363 keeps selected-cell routing in the owning XLSX semantic path and
