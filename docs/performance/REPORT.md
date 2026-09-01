@@ -3850,3 +3850,31 @@ Presentation aggregate `Vec`/`join`, portable same-size identity, native PPT
 probe-time mutation coverage, the `Current User` plus `Workbook` OLE
 classifier inconsistency, applicable prepared ODP reparsing,
 `parts_by_name` case lookup, and selected-Part materialization.
+
+## Change 0358: rejected XLS worksheet span batching
+
+Change 0358 is a rejected and reverted XLS source experiment
+(`performance_claim: none`). The candidate batched consecutive stateless
+worksheet payload reads into 64 KiB/1,024-item spans without a CFB API change.
+Correctness while present passed the Python driver `15/15`, span `9/9`,
+`source_backed` `46/46`, `litchi-xls` `1021/1021`, CFB cursor `7/7`, and
+fragmentation `9/9` checks. The serial six-selector A1/B1/B2/A2 run retained
+12,000 samples from 24/24 groups under 20 warmups per fresh child, one child
+at a time, CPU 2, a 2 GiB child cap, no retries, and one Cargo build lane.
+
+The candidate changed one-cell counters by `+316` read bytes, `-79` reads,
+and `-158` version calls; claim-bearing p50/mean deltas were
+`+4.984845886382849%`/`+4.771328093073383%` and
+`+5.785582423178705%`/`+5.78027327071032%` for A1 -> B1 and A2 -> B2.
+Exactly five predeclared p99 gates failed: FileSource/list A1 -> A2
+`+6.59542478684531%`, FileSource/list A2 -> B2 `-6.916640348285569%`,
+FileSource/one-cell B1 -> B2 `+8.748517200474495%`, AtomicFile/one-cell
+A1 -> A2 `-5.699947129465672%`, and AtomicFile/one-cell B1 -> B2
+`+6.439283716879541%`. No gate narrowing or rerun was performed; production
+and candidate tests were reverted. The approximately 7.4M evidence is
+retained under [Change 0358](changes/0358-xls-worksheet-span-batching-rejected.md).
+
+The target's peak/final observed footprint was 1.9 GiB; host availability was
+approximately 14 GiB with 132 GiB disk free and exhausted swap. No parallel
+build or OOM-prevention claim follows. XLS freshness optimization remains
+open.

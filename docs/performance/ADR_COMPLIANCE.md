@@ -466,3 +466,24 @@ public detector, materializing neutral fallback, flat ODF MIME decode,
 infallible Presentation aggregation, portable identity, native PPT mutation
 coverage, Current User/Workbook classifier mismatch, prepared ODP reparse,
 OPC case lookup, and selected-Part materialization remain residual.
+
+## Change 0358 compliance update
+
+Change 0358 was rejected and reverted, so it introduces no retained production
+API, dependency edge, public-layer change, or performance claim. The candidate
+used a private stateless XLS worksheet-span driver with 64 KiB/1,024-item
+bounds and no CFB API; its source-backed correctness checks and all 24 ABBA
+groups passed their child, schema, oracle, source, and identity gates. The
+unqualified predeclared p99 stability gate failed exactly five comparisons,
+so no gate narrowing or rerun was used and the production/tests were reverted.
+This preserves the ADR 0003 freshness and failure-atomicity boundary and keeps
+the XLS source ownership topology unchanged.
+
+The retained evidence and resource observations are recorded in [Change 0358](changes/0358-xls-worksheet-span-batching-rejected.md);
+`performance_claim: none`. Collection used one child at a time, CPU 2, a 2
+GiB child cap, no retries, one Cargo build lane, and an on-disk target. The
+target peak/final observed footprint was 1.9 GiB with approximately 14 GiB
+host availability, 132 GiB disk free, and exhausted swap. No parallel build,
+latency, RSS, allocation, physical-I/O, or OOM-prevention claim follows. XLS
+freshness optimization remains an open hotspot, while the bounded serial ABBA
+driver is retained as evidence infrastructure.
