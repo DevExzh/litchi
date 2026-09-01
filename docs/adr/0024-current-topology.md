@@ -3913,3 +3913,23 @@ migration host or monolith-deletion gate. The authoritative inventory remains
 edges, 11 ordered migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15,
 16, 17]`, and one migration host. Operation-specific native Currency E3/E4
 evidence is recorded in ADR 0008; it closes no topology or deletion gate.
+
+## 2026-09-01 amendment: Numbers existing-cell Scientific-format owner (topology unchanged)
+
+The current worktree adds a focused Scientific-format owner in
+`litchi-numbers`: an archive-free `Scientific` value, selector-first
+existing-cell read/edit/apply transactions, a private type-259 strict codec,
+and a private package adapter for BNC/format-list/refcount rewrites. Native
+identifiers, generated messages, Buffa views, archive members, and raw bytes
+remain below the public boundary. The deprecated `litchi-iwa` Scientific
+methods are compatibility delegates; source-built packages may retain the
+generic route, while exact-source owner failures remain fail-closed.
+
+This is an ownership seam in the existing package graph only. It adds no
+workspace package, dependency declaration, canonical edge, or ordered-debt
+retirement; it removes no migration host and changes no monolith-deletion
+gate. The authoritative inventory remains 64 workspace packages, 237 internal
+dependency declarations, 226 canonical edges, 11 ordered migration debts with
+IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. Build,
+test/fuzz, native-validation, and final hash evidence are pending and tracked
+in ADR 0008; no topology fact is inferred from source visibility.

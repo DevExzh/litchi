@@ -3539,3 +3539,35 @@ a compatibility delegate for admitted exact graphs; source-built packages may
 retain the generic route. Operation-specific native acceptance/save/reopen
 evidence is recorded in ADR 0008; this owner is not a general-format or
 monolith-exit claim.
+
+## 2026-09-01 amendment: Numbers existing-cell Scientific-format semantic owner
+
+`litchi_numbers::cell::data_format::Scientific` is the archive-free semantic
+value for the focused Scientific display family. It carries only a checked
+fixed decimal-place count; the native Scientific family supplies the
+minus-sign negative presentation and does not expose a thousands-separator
+choice. `Option<Scientific>` keeps inherited/automatic absence distinct from
+an explicit fixed format. The public value introduces no format-list key, BNC
+flag, native identifier, protobuf/Buffa message, archive path, or raw-wire
+alias.
+
+`Package::{table_cell_scientific_format,
+edit_table_cell_scientific_format, apply_table_cell_scientific_format}` is
+selector-first and existing-cell-only. Callers provide a `SheetSelector`, a
+sheet-scoped `TableSelector`, and a checked `CellPosition`; the package
+resolves those selectors against the immutable source before invoking its
+private native adapter. The transaction vocabulary exposes typed diagnostics,
+patches, inverses, limits, and refusal errors while retaining native type 259,
+format-list identity, BNC storage, wire framing, and package reassembly below
+the semantic boundary.
+
+Scientific is a distinct family even though its four scalar fields share the
+private decimal wire envelope used by Number and Percentage. The adapter
+requires fixed precision, the native minus-sign style, and a hidden thousands
+separator, and refuses Number, Percentage, Currency, controls, dates,
+durations, text, and other families rather than silently converting them. It
+does not create cells or author values, formulas, styles, or table structure.
+The legacy editor remains a compatibility delegate; source-built packages may
+retain its generic route, while exact-source owner failures remain fail-closed.
+Native, fuzz, and test evidence is not implied by this semantic contract and is
+tracked separately in ADR 0008.

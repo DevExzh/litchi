@@ -1765,3 +1765,39 @@ generic route. The operation-specific native Numbers acceptance/save/reopen
 evidence and strict no-op reread are recorded in ADR 0008. This slice does not
 create cells, author values/formulas, mutate general styles or table topology,
 or provide durable/composable patch history.
+
+## 2026-09-01 amendment: Numbers existing-cell Scientific-format transactions
+
+The focused Numbers owner applies the snapshot/edit/patch contract to the
+explicit fixed-precision `Scientific` format of one existing table cell. The
+archive-free value is `litchi_numbers::cell::data_format::Scientific`; its
+native contract fixes the negative style to the minus-sign form and hides the
+thousands separator. `None` at the cell-format boundary means inherited or
+automatic formatting, while an explicit value always carries a checked fixed
+decimal-place count. A semantic `SheetSelector`, sheet-scoped `TableSelector`,
+and checked `CellPosition` resolve the cell before physical planning; native
+format-list keys, BNC records, archive members, generated messages, and raw
+bytes remain below the package boundary.
+
+The public surface is existing-object-only:
+`Package::{table_cell_scientific_format, edit_table_cell_scientific_format,
+apply_table_cell_scientific_format}`. An edit is bound to one immutable exact
+source snapshot. Exact no-ops share the source without candidate publication;
+changed edits validate the native type-259 payload, strict Scientific wire
+shape, format-list identity and refcount closure, then apply copy-on-write,
+reopen the candidate, read back the same selector, and publish atomically. The
+patch is source-authorized and reversible; stale, foreign, replayed,
+wrong-family, malformed, locked, over-budget, ambiguous, or locality-failing
+sources are rejected before publication.
+
+The private Scientific codec uses a nominal type-259 snapshot/write/prepared
+plan over the shared decimal wire scanner and writer. Unknown extension spans,
+unselected fields, scalar cell data, metadata, previews, and unrelated archive
+members remain source-authoritative. The deprecated
+`litchi_iwa::NumbersEditor` route is only a compatibility delegate for admitted
+exact graphs; source-built compatibility packages may retain the generic route,
+but an exact-source owner rejection cannot escape to it. This contract does
+not create cells, author values or formulas, convert Number/Percentage/Currency
+or other display families, mutate styles or table topology, or add durable or
+composable patch history. Verification and evidence status are tracked in ADR
+0008.

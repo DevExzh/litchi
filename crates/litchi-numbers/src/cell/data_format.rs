@@ -16,6 +16,8 @@ pub mod numeral_system;
 /// Percentage display values and exact-source transactions for existing cells.
 pub mod percentage;
 pub mod pop_up_menu;
+/// Scientific-notation display values and selector-first transactions for existing cells.
+pub mod scientific;
 
 pub use control::{CellControl, NotCellControl, Slider, Stepper};
 pub use currency::{Currency, CurrencyCode, CurrencyStyle};
@@ -24,10 +26,11 @@ pub use date_time::DateTime;
 pub use duration::Duration;
 pub use number::{
     DecimalPlaces, FixedDecimalPlaces, Fraction, FractionAccuracy, NegativeStyle, Number,
-    Percentage, Scientific, ThousandsSeparator,
+    Percentage, ThousandsSeparator,
 };
 pub use numeral_system::NumeralSystem;
 pub use pop_up_menu::PopUpMenu;
+pub use scientific::Scientific;
 
 macro_rules! data_format_from {
     ($type:ty, $variant:ident) => {

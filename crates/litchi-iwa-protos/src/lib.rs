@@ -1671,6 +1671,12 @@ pub mod numbers_table_cell_percentage_format_codec;
 #[doc(hidden)]
 pub mod numbers_table_cell_currency_format_codec;
 
+/// Neutral strict native-scientific `FormatStructArchive` projection and
+/// measured source-preserving rewrite. The four scalar fields use the shared
+/// private Number/Percentage Buffa projection.
+#[doc(hidden)]
+pub mod numbers_table_cell_scientific_format_codec;
+
 /// Format-neutral spelling for the Numbers interactive-cell control seam.
 #[doc(hidden)]
 pub mod table_cell_control_codec {

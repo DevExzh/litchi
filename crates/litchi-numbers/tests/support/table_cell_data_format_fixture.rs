@@ -74,17 +74,19 @@ pub(crate) const SECOND_CELL: (usize, usize) = (0, 1);
 
 /// Native format families represented by the deterministic fixture.
 ///
-/// Number and Percentage share the BNC decimal-cell kind.  Currency uses the
-/// alternate-number BNC kind and can additionally carry a secondary generic
-/// format-list reference.  Their native family discriminator lives in the
-/// format-list payload, so keeping that discriminator explicit in the fixture
-/// prevents tests from accidentally treating one family as another merely
-/// because the cell wire shape is otherwise similar.
+/// Number, Percentage, and Scientific share the BNC decimal-cell kind.
+/// Currency uses the alternate-number BNC kind and can additionally carry a
+/// secondary generic format-list reference.  Their native family
+/// discriminator lives in the format-list payload, so keeping that
+/// discriminator explicit in the fixture prevents tests from accidentally
+/// treating one family as another merely because the cell wire shape is
+/// otherwise similar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum FormatFamily {
     Number,
     Currency,
     Percentage,
+    Scientific,
 }
 
 impl FormatFamily {
@@ -94,6 +96,7 @@ impl FormatFamily {
             Self::Number => NATIVE_NUMBER_FORMAT_TYPE,
             Self::Currency => NATIVE_CURRENCY_FORMAT_TYPE,
             Self::Percentage => NATIVE_PERCENTAGE_FORMAT_TYPE,
+            Self::Scientific => NATIVE_SCIENTIFIC_FORMAT_TYPE,
         }
     }
 }
@@ -104,6 +107,8 @@ pub(crate) const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;
 pub(crate) const NATIVE_CURRENCY_FORMAT_TYPE: u32 = 257;
 /// Native Percentage format-list discriminator.
 pub(crate) const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
+/// Native Scientific format-list discriminator.
+pub(crate) const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
 
 /// Whether the two cells initially share their format-list entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -145,9 +150,9 @@ pub(crate) enum Corruption {
 /// The result is deterministic: object order, member order, unknown fields,
 /// extensions, preview bytes, and the unrelated member are all fixed.  `Shared`
 /// gives both cells a Number format with key one and refcount two;
-/// [`synthetic_package_for`] selects the corresponding Currency or Percentage
-/// family.  `Unshared` gives the second cell a Percentage format with key two
-/// and two refcount-one entries.
+/// [`synthetic_package_for`] selects the corresponding Currency, Percentage,
+/// or Scientific family.  `Unshared` gives the second cell a Percentage
+/// format with key two and two refcount-one entries.
 pub(crate) fn synthetic_package(sharing: FormatSharing) -> FixtureResult<Vec<u8>> {
     synthetic_package_for(FormatFamily::Number, sharing)
 }
@@ -524,7 +529,9 @@ fn tile_object(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<Ar
 fn tile_payload(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<tst::Tile> {
     let first_kind = match family {
         FormatFamily::Currency => CellDataFormatKind::Currency,
-        FormatFamily::Number | FormatFamily::Percentage => CellDataFormatKind::NumberOrPercentage,
+        FormatFamily::Number | FormatFamily::Percentage | FormatFamily::Scientific => {
+            CellDataFormatKind::NumberOrPercentage
+        },
     };
     let first = formatted_cell(FIRST_FORMAT_KEY, first_kind, 1234.5)?;
     let second_key = match sharing {
@@ -577,6 +584,9 @@ fn sidecar_object(family: FormatFamily, sharing: FormatSharing) -> FixtureResult
             true,
             false,
         )],
+        (FormatFamily::Scientific, FormatSharing::Shared) => {
+            vec![scientific_format_entry(FIRST_FORMAT_KEY, 2)]
+        },
         (FormatFamily::Currency, FormatSharing::Unshared) => vec![
             format_entry(FIRST_FORMAT_KEY, 1, NATIVE_NUMBER_FORMAT_TYPE, 2, 2, true),
             format_entry(
@@ -688,6 +698,13 @@ fn currency_format_entry(
         }),
         ..Default::default()
     }
+}
+
+fn scientific_format_entry(key: u32, refcount: u32) -> tst::table_data_list::ListEntry {
+    // Scientific is encoded in the same native FormatStructArchive envelope
+    // as Number/Percentage, but its decimal options are canonical: fixed
+    // precision, minus-sign negatives, and no thousands separator.
+    format_entry(key, refcount, NATIVE_SCIENTIFIC_FORMAT_TYPE, 2, 0, false)
 }
 
 fn add_unknown_extension_to_format_payload(source: &[u8]) -> FixtureResult<Vec<u8>> {

@@ -1,8 +1,9 @@
 //! Private native owner for focused decimal display-format transactions.
 //!
-//! Number and Percentage cells use the same BNC decimal cell kind and the same
-//! format-list graph.  This module keeps that graph surgery in one route while
-//! retaining a typed family boundary at every codec and semantic conversion.
+//! Number, Percentage, and Scientific cells use the same BNC decimal cell kind
+//! and the same format-list graph. This module keeps that graph surgery in one
+//! route while retaining a typed family boundary at every codec and semantic
+//! conversion.
 //! It intentionally exposes no native identifiers or arbitrary format-type
 //! input to the package API.
 
@@ -11,6 +12,7 @@ use litchi_iwa_protos::{
     numbers_table_cell_currency_format_codec as currency_codec,
     numbers_table_cell_number_format_codec as number_codec,
     numbers_table_cell_percentage_format_codec as percentage_codec,
+    numbers_table_cell_scientific_format_codec as scientific_codec,
     numbers_table_cell_storage_codec as storage_codec,
 };
 use litchi_numbers_wire::{BncCell, NumericCellType};
@@ -23,12 +25,14 @@ use super::{
 };
 use crate::cell::data_format::currency::{Currency, CurrencyCode, CurrencyStyle};
 use crate::cell::data_format::number::{
-    DecimalPlaces, FixedDecimalPlaces, NegativeStyle, Number, Percentage, ThousandsSeparator,
+    DecimalPlaces, FixedDecimalPlaces, NegativeStyle, Number, Percentage, Scientific,
+    ThousandsSeparator,
 };
 
 const NUMBER_FORMAT_TYPE: u32 = number_codec::NATIVE_NUMBER_FORMAT_TYPE;
 const CURRENCY_FORMAT_TYPE: u32 = currency_codec::NATIVE_CURRENCY_FORMAT_TYPE;
 const PERCENTAGE_FORMAT_TYPE: u32 = percentage_codec::NATIVE_PERCENTAGE_FORMAT_TYPE;
+const SCIENTIFIC_FORMAT_TYPE: u32 = scientific_codec::NATIVE_SCIENTIFIC_FORMAT_TYPE;
 
 /// The only display families admitted by the focused decimal owner.
 ///
@@ -40,6 +44,7 @@ pub(super) enum DisplayFormatFamily {
     Number,
     Currency,
     Percentage,
+    Scientific,
 }
 
 impl DisplayFormatFamily {
@@ -48,6 +53,7 @@ impl DisplayFormatFamily {
             Self::Number => NUMBER_FORMAT_TYPE,
             Self::Currency => CURRENCY_FORMAT_TYPE,
             Self::Percentage => PERCENTAGE_FORMAT_TYPE,
+            Self::Scientific => SCIENTIFIC_FORMAT_TYPE,
         }
     }
 }
@@ -103,11 +109,25 @@ impl From<Error> for CurrencyFormatReadError {
     }
 }
 
+/// Typed native failure returned to the Scientific package facade.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ScientificFormatReadError {
+    WrongFormatFamily,
+    Native(Error),
+}
+
+impl From<Error> for ScientificFormatReadError {
+    fn from(error: Error) -> Self {
+        Self::Native(error)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NativeDisplayValue {
     Number(Number),
     Currency(Currency),
     Percentage(Percentage),
+    Scientific(Scientific),
 }
 
 impl NativeDisplayValue {
@@ -116,6 +136,7 @@ impl NativeDisplayValue {
             Self::Number(_) => DisplayFormatFamily::Number,
             Self::Currency(_) => DisplayFormatFamily::Currency,
             Self::Percentage(_) => DisplayFormatFamily::Percentage,
+            Self::Scientific(_) => DisplayFormatFamily::Scientific,
         }
     }
 
@@ -135,6 +156,11 @@ impl NativeDisplayValue {
                 value.decimal_places(),
                 value.negative_style(),
                 value.thousands_separator(),
+            ),
+            Self::Scientific(value) => (
+                DecimalPlaces::Fixed(value.decimal_places()),
+                NegativeStyle::MinusSign,
+                ThousandsSeparator::Hidden,
             ),
         }
     }
@@ -199,6 +225,19 @@ impl NativeDisplayValue {
                 negative_style,
                 thousands_separator,
             )),
+            DisplayFormatFamily::Scientific => {
+                let DecimalPlaces::Fixed(decimal_places) = decimal_places else {
+                    return Err(Error::InvalidSource { path });
+                };
+                if native_negative_style(negative_style)
+                    != scientific_codec::NATIVE_SCIENTIFIC_NEGATIVE_STYLE
+                    || (matches!(thousands_separator, ThousandsSeparator::Shown))
+                        != scientific_codec::NATIVE_SCIENTIFIC_SHOW_THOUSANDS_SEPARATOR
+                {
+                    return Err(Error::InvalidSource { path });
+                }
+                NativeDisplayValue::Scientific(Scientific::new(decimal_places))
+            },
         };
         Ok(value)
     }
@@ -208,7 +247,30 @@ fn rewrite_display_cell_metadata(
     source: &[u8],
     desired_identifier: Option<u32>,
     path: Path,
+    budget: &mut TransactionBudget,
 ) -> Result<Vec<u8>, Error> {
+    let output_limit = source
+        .len()
+        .checked_add(8)
+        .ok_or(Error::InvalidSource { path })?;
+    let owned_cell_bytes = source
+        .len()
+        .checked_add(output_limit)
+        .ok_or(Error::InvalidSource { path })?;
+    let work = output_limit
+        .checked_mul(2)
+        .and_then(|amount| amount.checked_add(source.len()))
+        .ok_or(Error::InvalidSource { path })?;
+    let allocations = litchi_numbers_wire::MAX_OWNED_BNC_PARSE_ALLOCATIONS
+        .checked_mul(2)
+        // One encoded output and the two ordinary decimal metadata buffers.
+        .and_then(|amount| amount.checked_add(3))
+        .ok_or(Error::InvalidSource { path })?;
+    budget.charge_allocations(allocations, path)?;
+    budget.charge_scratch_bytes(owned_cell_bytes, path)?;
+    budget.charge_retained_bytes(output_limit, path)?;
+    budget.charge_transaction_work(work, path)?;
+
     let mut cell = BncCell::parse(source).map_err(|_| Error::InvalidSource { path })?;
     let source_value = cell.stored_value();
     let source_cache = cell
@@ -217,10 +279,6 @@ fn rewrite_display_cell_metadata(
     let source_numeric_type = cell.numeric_cell_type();
     cell.set_number_or_percentage_format_identifier_preserving_value(desired_identifier)
         .map_err(|_| Error::InvalidSource { path })?;
-    let output_limit = source
-        .len()
-        .checked_add(8)
-        .ok_or(Error::InvalidSource { path })?;
     let output = cell
         .try_encode_with_limit(output_limit)
         .map_err(|error| match error {
@@ -379,17 +437,27 @@ fn currency_cell_type_matches_value(cell: &BncCell, formatted: bool) -> bool {
     }
 }
 
-/// Reserve the private vectors used by the Currency tile patcher before it
+fn scientific_cell_type_matches_value(cell: &BncCell) -> bool {
+    match cell.stored_value() {
+        litchi_numbers_wire::StoredValue::Empty => cell.numeric_cell_type().is_none(),
+        litchi_numbers_wire::StoredValue::Number | litchi_numbers_wire::StoredValue::Formula(_) => {
+            cell.numeric_cell_type() == Some(NumericCellType::Number)
+        },
+        _ => false,
+    }
+}
+
+/// Reserve the private vectors used by the display-format tile patcher before it
 /// enters the allocator.
 ///
 /// `patch_tile_cell` is intentionally shared with the older control owners,
-/// so it cannot borrow the operation ledger itself.  Currency edits still
+/// so it cannot borrow the operation ledger itself. Display-format edits still
 /// need to account for its nested tile/row/buffer candidates before the first
 /// `Vec` is materialized.  The bound includes the source tile, replacement,
 /// and the three length-delimited framing layers; the scratch reservation is
 /// deliberately conservative for the simultaneously-live row and buffer
 /// candidates, while retained bytes cover the returned tile candidate.
-fn charge_currency_tile_patch_budget(
+fn charge_display_tile_patch_budget(
     tile_payload_len: usize,
     replacement_len: usize,
     budget: &mut TransactionBudget,
@@ -435,6 +503,7 @@ pub(super) fn read_number_format_with_budget(
         Ok(Some(NativeDisplayValue::Number(value))) => Ok(Some(value)),
         Ok(Some(NativeDisplayValue::Currency(_)))
         | Ok(Some(NativeDisplayValue::Percentage(_)))
+        | Ok(Some(NativeDisplayValue::Scientific(_)))
         | Err(DisplayReadError::WrongFormatFamily) => Err(NumberFormatReadError::WrongFormatFamily),
         Err(DisplayReadError::Native(error)) => Err(NumberFormatReadError::Native(error)),
     }
@@ -469,6 +538,7 @@ pub(super) fn read_currency_format_with_budget(
         Ok(Some(NativeDisplayValue::Currency(value))) => Ok(Some(value)),
         Ok(Some(NativeDisplayValue::Number(_)))
         | Ok(Some(NativeDisplayValue::Percentage(_)))
+        | Ok(Some(NativeDisplayValue::Scientific(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(CurrencyFormatReadError::WrongFormatFamily)
         },
@@ -505,10 +575,48 @@ pub(super) fn read_percentage_format_with_budget(
         Ok(Some(NativeDisplayValue::Percentage(value))) => Ok(Some(value)),
         Ok(Some(NativeDisplayValue::Number(_)))
         | Ok(Some(NativeDisplayValue::Currency(_)))
+        | Ok(Some(NativeDisplayValue::Scientific(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(PercentageFormatReadError::WrongFormatFamily)
         },
         Err(DisplayReadError::Native(error)) => Err(PercentageFormatReadError::Native(error)),
+    }
+}
+
+/// Read one existing Scientific format with a fresh transaction ledger.
+pub(super) fn read_scientific_format(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+) -> Result<Option<Scientific>, ScientificFormatReadError> {
+    let mut budget = TransactionBudget::for_cell_control(source);
+    read_scientific_format_with_budget(source, target, path, &mut budget)
+}
+
+/// Read one existing Scientific format against a caller-owned transaction
+/// ledger.
+pub(super) fn read_scientific_format_with_budget(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Option<Scientific>, ScientificFormatReadError> {
+    match read_display_format_with_budget(
+        DisplayFormatFamily::Scientific,
+        source,
+        target,
+        path,
+        budget,
+    ) {
+        Ok(None) => Ok(None),
+        Ok(Some(NativeDisplayValue::Scientific(value))) => Ok(Some(value)),
+        Ok(Some(NativeDisplayValue::Number(_)))
+        | Ok(Some(NativeDisplayValue::Currency(_)))
+        | Ok(Some(NativeDisplayValue::Percentage(_)))
+        | Err(DisplayReadError::WrongFormatFamily) => {
+            Err(ScientificFormatReadError::WrongFormatFamily)
+        },
+        Err(DisplayReadError::Native(error)) => Err(ScientificFormatReadError::Native(error)),
     }
 }
 
@@ -568,6 +676,27 @@ pub(super) fn rewrite_percentage_format(
         target,
         before.copied().map(NativeDisplayValue::Percentage),
         after.copied().map(NativeDisplayValue::Percentage),
+        path,
+        budget,
+    )
+}
+
+/// Rewrite one ordinary Scientific cell without manufacturing a CellSpec
+/// graph.
+pub(super) fn rewrite_scientific_format(
+    source: &Package,
+    target: CellTarget,
+    before: Option<&Scientific>,
+    after: Option<&Scientific>,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<native::NativeControlOutput, Error> {
+    rewrite_display_format(
+        DisplayFormatFamily::Scientific,
+        source,
+        target,
+        before.copied().map(NativeDisplayValue::Scientific),
+        after.copied().map(NativeDisplayValue::Scientific),
         path,
         budget,
     )
@@ -667,15 +796,22 @@ fn read_display_format_with_budget(
     let secondary_identifier = cell.secondary_format_identifier();
     match (family, cell.cell_format_kind()) {
         (
-            DisplayFormatFamily::Number | DisplayFormatFamily::Percentage,
+            DisplayFormatFamily::Number
+            | DisplayFormatFamily::Percentage
+            | DisplayFormatFamily::Scientific,
             Some(litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND),
         ) => {
-            if secondary_identifier.is_some() {
+            if secondary_identifier.is_some() || !cell.has_only_decimal_format_metadata() {
                 return Err(DisplayReadError::WrongFormatFamily);
             }
             if explicit_flags != 0 && explicit_flags != litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT
             {
                 return Err(DisplayReadError::WrongFormatFamily);
+            }
+            if family == DisplayFormatFamily::Scientific
+                && !scientific_cell_type_matches_value(&cell)
+            {
+                return Err(Error::InvalidSource { path }.into());
             }
         },
         (DisplayFormatFamily::Currency, Some(litchi_numbers_wire::CURRENCY_CELL_FORMAT_KIND)) => {
@@ -923,13 +1059,18 @@ fn rewrite_display_format(
     let explicit_flags = cell.explicit_format_flags();
     match (family, old_format, cell.cell_format_kind()) {
         (
-            DisplayFormatFamily::Number | DisplayFormatFamily::Percentage,
+            DisplayFormatFamily::Number
+            | DisplayFormatFamily::Percentage
+            | DisplayFormatFamily::Scientific,
             Some(identifier),
             Some(litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND),
         ) if identifier != 0 => {
             if old_secondary.is_some()
+                || !cell.has_only_decimal_format_metadata()
                 || (explicit_flags != 0
                     && explicit_flags != litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT)
+                || (family == DisplayFormatFamily::Scientific
+                    && !scientific_cell_type_matches_value(&cell))
             {
                 return Err(Error::UnsupportedDependency { path });
             }
@@ -1067,9 +1208,9 @@ fn rewrite_display_format(
             DisplayFormatFamily::Currency => {
                 litchi_numbers_wire::explicit_currency_format_flags(old_secondary.is_some())
             },
-            DisplayFormatFamily::Number | DisplayFormatFamily::Percentage => {
-                litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT
-            },
+            DisplayFormatFamily::Number
+            | DisplayFormatFamily::Percentage
+            | DisplayFormatFamily::Scientific => litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT,
         };
         if explicit_flags == expected_explicit {
             if before != Some(current) {
@@ -1131,23 +1272,16 @@ fn rewrite_display_format(
         if family == DisplayFormatFamily::Currency {
             rewrite_currency_cell_metadata(cell_source, Some(key), path, budget)?
         } else {
-            rewrite_display_cell_metadata(cell_source, Some(key), path)?
+            rewrite_display_cell_metadata(cell_source, Some(key), path, budget)?
         }
     } else {
         if family == DisplayFormatFamily::Currency {
             rewrite_currency_cell_metadata(cell_source, None, path, budget)?
         } else {
-            rewrite_display_cell_metadata(cell_source, None, path)?
+            rewrite_display_cell_metadata(cell_source, None, path, budget)?
         }
     };
-    if family == DisplayFormatFamily::Currency {
-        charge_currency_tile_patch_budget(
-            tile_payload.len(),
-            replacement_cell.len(),
-            budget,
-            path,
-        )?;
-    }
+    charge_display_tile_patch_budget(tile_payload.len(), replacement_cell.len(), budget, path)?;
     let patched_tile = popup_native::patch_tile_cell(
         &tile_payload,
         target.position.row(),
@@ -1390,6 +1524,26 @@ fn decode_display_payload(
             )?;
             Ok(value)
         },
+        DisplayFormatFamily::Scientific => {
+            let (snapshot, report) =
+                match scientific_codec::decode_scientific_format_with_report(source, options) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return Err(classify_decode_failure(family, source, budget, path, error));
+                    },
+                };
+            native::charge_control_decode_report(budget, report, path)?;
+            let value = NativeDisplayValue::from_parts(
+                family,
+                snapshot.decimal_places(),
+                snapshot.negative_style(),
+                snapshot.show_thousands_separator(),
+                None,
+                None,
+                path,
+            )?;
+            Ok(value)
+        },
     }
 }
 
@@ -1402,8 +1556,9 @@ fn classify_decode_failure(
 ) -> DisplayReadError {
     // The family-specific strict decoder intentionally rejects the sibling
     // discriminator. Probe with the broader strict projection only after a
-    // failure, so successful Number/Percentage reads retain their existing
-    // resource accounting. A malformed payload remains a native error.
+    // failure, so successful Number/Percentage/Scientific reads retain their
+    // existing resource accounting. A malformed payload remains a native
+    // error.
     let Ok((broad, report)) = control_codec::decode_control_format_with_report(
         source,
         native::control_codec_options(source.len(), budget),
@@ -1480,6 +1635,20 @@ fn prepare_display_rewrite(
             .map_err(|error| native::map_control_error(error, path))?;
             execute_percentage_rewrite(prepared, budget, path)
         },
+        DisplayFormatFamily::Scientific => {
+            let NativeDisplayValue::Scientific(value) = value else {
+                return Err(Error::UnsupportedDependency { path });
+            };
+            let prepared = scientific_codec::prepare_scientific_format_rewrite(
+                source,
+                scientific_codec::ScientificFormatWrite::new(u32::from(
+                    value.decimal_places().value(),
+                )),
+                options,
+            )
+            .map_err(|error| native::map_control_error(error, path))?;
+            execute_scientific_rewrite(prepared, budget, path)
+        },
     }
 }
 
@@ -1541,6 +1710,19 @@ fn prepare_display_append(
             .map_err(|error| native::map_control_error(error, path))?;
             execute_percentage_append(prepared, budget, path)
         },
+        DisplayFormatFamily::Scientific => {
+            let NativeDisplayValue::Scientific(value) = value else {
+                return Err(Error::UnsupportedDependency { path });
+            };
+            let prepared = scientific_codec::prepare_scientific_format_write(
+                scientific_codec::ScientificFormatWrite::new(u32::from(
+                    value.decimal_places().value(),
+                )),
+                options,
+            )
+            .map_err(|error| native::map_control_error(error, path))?;
+            execute_scientific_append(prepared, budget, path)
+        },
     }
 }
 
@@ -1590,6 +1772,22 @@ fn execute_percentage_rewrite(
     Ok(output.into_bytes())
 }
 
+fn execute_scientific_rewrite(
+    prepared: scientific_codec::PreparedScientificFormatRewrite<'_>,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let requirements = prepared.execution_requirements();
+    native::charge_control_requirements(budget, requirements, path)?;
+    let output = prepared
+        .execute(scientific_codec::RewriteExecutionLimits::exact(
+            requirements,
+        ))
+        .map_err(|error| native::map_control_error(error, path))?;
+    native::verify_control_report(output.report(), requirements, path)?;
+    Ok(output.into_bytes())
+}
+
 fn execute_currency_rewrite(
     prepared: currency_codec::PreparedCurrencyFormatRewrite<'_>,
     budget: &mut TransactionBudget,
@@ -1627,6 +1825,22 @@ fn execute_percentage_append(
     native::charge_control_requirements(budget, requirements, path)?;
     let output = prepared
         .execute(percentage_codec::RewriteExecutionLimits::exact(
+            requirements,
+        ))
+        .map_err(|error| native::map_control_error(error, path))?;
+    native::verify_control_report(output.report(), requirements, path)?;
+    Ok(output.into_bytes())
+}
+
+fn execute_scientific_append(
+    prepared: scientific_codec::PreparedScientificFormatWrite,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let requirements = prepared.execution_requirements();
+    native::charge_control_requirements(budget, requirements, path)?;
+    let output = prepared
+        .execute(scientific_codec::RewriteExecutionLimits::exact(
             requirements,
         ))
         .map_err(|error| native::map_control_error(error, path))?;
