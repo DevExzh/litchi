@@ -1,5 +1,27 @@
 # Performance hotspot inventory
 
+## XLSX source-worksheet selected-cell routing boundary (change 0363)
+
+Change 0363 is a correctness/ownership integration, not a measured hotspot
+(`performance_claim: none`). Cold `SourceWorksheet::cell` uses
+`PartView::with_verified_decoded_reader` and the raw selected-worksheet
+scanner only for eligible simple scalar worksheets, without publishing full
+worksheet `PartData`, `Store`, or cache state; repeated cold queries rescan.
+Warm `Store` queries retain the existing fast path. Every `NotEligible` result
+falls back to the eager store only after verified-reader return and
+CRC/size/source/context checks complete, preserving merge, shared-string,
+style, shared-formula, and rich-inline semantics. Source/cancellation/ZIP
+errors remain primary, and final outer fences run before the value. Zero,
+unrepresentable, and greater-than-2-GiB declared parts retain existing eager
+behavior by bypassing the scanner. Public signatures, `cells`, `visit`, and
+`stored_extent` are unchanged.
+
+Focused/source/library evidence is `7/7`, `16/16`, and `828/828`; scoped Clippy
+passed apart from the known unrelated pre-existing `hyperlinks` `useless_asref`
+issue. Single-job capped validation observed no OOM as a protocol fact only.
+No latency, RSS, fixed-memory, OOM-safety, or dependency-streaming claim
+follows.
+
 ## XLSX selected-worksheet raw scan boundary (change 0362)
 
 Change 0362 is a correctness-only raw capability, not a measured hotspot
