@@ -1167,7 +1167,9 @@ fn format_reference(cell: &BncCell) -> Result<CellFormatReference> {
                 secondary: None,
             })
         },
-        (bnc::EXPLICIT_CURRENCY_FORMAT, Some(bnc::CURRENCY_CELL_FORMAT_KIND), Some(identifier)) => {
+        (explicit, Some(bnc::CURRENCY_CELL_FORMAT_KIND), Some(identifier))
+            if explicit == bnc::explicit_currency_format_flags(secondary.is_some()) =>
+        {
             Ok(CellFormatReference::Explicit {
                 identifier,
                 secondary,

@@ -7179,3 +7179,32 @@ canonical edges, and debt IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`.
 Native acceptance and exact quality/fuzz evidence are recorded separately in
 ADR 0008; this is not evidence of complete Numbers authoring, host independence,
 arbitrary-producer parity, native byte parity, or performance/RSS behavior.
+
+## 2026-09-01 amendment: Numbers existing-cell Currency-format focused-owner slice (not a monolith-exit gate)
+
+The focused Numbers package now owns the explicit Currency format of one
+existing table cell through archive-free `Currency` values and selector-first
+read/edit/apply transactions. The owner covers checked currency code, decimal,
+negative, thousands-separator, and Standard/Accounting settings. Its exact
+source patch/inverse contract validates native type `257`, alternate-number BNC
+storage, optional secondary Number references, strict wire/Buffa preflight,
+bounded staging, candidate reopen/readback, copy-on-write/refcounts, and
+physical ZIP locality. Native IDs, list keys, BNC records, generated messages,
+archive members, and raw bytes remain private.
+
+The deprecated host methods are compatibility delegates. They may use the
+generic path only for synthetic source-built packages; an exact package cannot
+escape the focused owner after a structural, budget, lock, locality, or
+wrong-family rejection. This slice remains limited to existing Currency
+display metadata and does not transfer Number/Percentage-adjacent generic
+formatting, other display/control families, values/formulas, styles, table
+topology, or package creation.
+
+None of the six monolith-exit gates closes. No package, dependency edge, or
+ordered migration debt is retired, `litchi-iwa` remains the one migration host,
+and the authoritative topology stays at 64 packages, 237 internal dependency
+declarations, 226 canonical edges, and debt IDs `[1, 2, 4, 8, 10, 12, 13, 14,
+15, 16, 17]`. In particular, no ADR 0028 deletion gate closes. Native Currency
+acceptance and exact test/fuzz evidence remain operation-specific and are
+tracked separately in ADR 0008. The Currency candidate's native E3/E4 evidence
+is recorded there, but it closes no monolith-exit gate.

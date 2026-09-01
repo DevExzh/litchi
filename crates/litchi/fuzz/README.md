@@ -209,6 +209,18 @@ readback, and changed-versus-no-op diagnostics. It uses only
 `corpus/numbers_table_cell_percentage_format/` are small inputs, not native
 package bytes.
 
+`numbers_table_cell_currency_format` is the focused selector-first Currency
+format lifecycle target. It replays bounded command bytes against a
+source-built Currency graph and a real Number source, covering name/index
+selectors, no-op/set/clear/reset, strict wrong-family refusal, locked and
+malformed ownership, exact patch apply/inverse/stale conflicts, copy-on-write
+format-list refcounts, bounded ingress/semantic/transaction limits, and
+secondary Currency/generic format ownership, and candidate scalar and
+exact-byte invariants. The target uses only archive-free Currency values and
+public `Package` operations for the transaction boundary;
+the checked-in recipes under `corpus/numbers_table_cell_currency_format/` are
+small command inputs rather than native package copies.
+
 `numbers_table_cell_control` is the unified selector-first cell-control
 lifecycle target. It drives Checkbox, StarRating, Slider, Stepper, and
 Pop-Up Menu values through `Package::{table_cell_control_format,
@@ -707,6 +719,15 @@ seeds:
 ```sh
 cargo +nightly fuzz run numbers_table_cell_percentage_format \
   corpus/numbers_table_cell_percentage_format -- \
+  -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Numbers table-cell Currency-format target with its command
+seeds:
+
+```sh
+cargo +nightly fuzz run numbers_table_cell_currency_format \
+  corpus/numbers_table_cell_currency_format -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 

@@ -3563,6 +3563,107 @@ fn source_built_percentage_format_keeps_legacy_host_compatibility() {
 }
 
 #[test]
+#[allow(deprecated)]
+fn focused_currency_format_round_trips_through_legacy_host_bridge() {
+    let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/numbers/basic.numbers");
+    let mut setup = NumbersEditor::open(fixture).unwrap();
+    let table_id = setup.tables().unwrap()[0].object_id;
+    let initial = litchi_numbers::cell::data_format::currency::Currency::new(
+        litchi_numbers::cell::data_format::currency::CurrencyCode::USD,
+        litchi_numbers::cell::data_format::currency::DecimalPlaces::fixed(2).unwrap(),
+        litchi_numbers::cell::data_format::currency::NegativeStyle::MinusSign,
+        litchi_numbers::cell::data_format::currency::ThousandsSeparator::Shown,
+        litchi_numbers::cell::data_format::currency::CurrencyStyle::Standard,
+    );
+    setup
+        .set_table_cell_data_format(table_id, 2, 1, DataFormat::Currency(initial))
+        .unwrap();
+
+    // Reopening the legacy-written bytes restores exact-source provenance, so
+    // the dedicated host methods below must take the focused owner route.
+    let mut editor = NumbersEditor::from_bytes(&setup.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        editor.table_cell_currency_format(table_id, 2, 1).unwrap(),
+        Some(initial)
+    );
+    let format = litchi_numbers::cell::data_format::currency::Currency::new(
+        litchi_numbers::cell::data_format::currency::CurrencyCode::EUR,
+        litchi_numbers::cell::data_format::currency::DecimalPlaces::fixed(3).unwrap(),
+        litchi_numbers::cell::data_format::currency::NegativeStyle::RedParentheses,
+        litchi_numbers::cell::data_format::currency::ThousandsSeparator::Hidden,
+        litchi_numbers::cell::data_format::currency::CurrencyStyle::Accounting,
+    );
+
+    editor
+        .set_table_cell_currency_format(table_id, 2, 1, format)
+        .unwrap();
+    assert_eq!(
+        editor.table_cell_currency_format(table_id, 2, 1).unwrap(),
+        Some(format)
+    );
+
+    assert!(
+        editor
+            .reset_table_cell_currency_format(table_id, 2, 1)
+            .unwrap()
+    );
+    assert_eq!(
+        editor.table_cell_currency_format(table_id, 2, 1).unwrap(),
+        None
+    );
+}
+
+#[test]
+#[allow(deprecated)]
+fn source_built_currency_format_keeps_legacy_host_compatibility() {
+    let mut editor = NumbersDocumentBuilder::new()
+        .table_name("Currencies")
+        .table_dimensions(3, 3)
+        .build()
+        .unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    let number = litchi_numbers::cell::data_format::number::Number::new(
+        litchi_numbers::cell::data_format::number::DecimalPlaces::fixed(1).unwrap(),
+        litchi_numbers::cell::data_format::number::NegativeStyle::MinusSign,
+        litchi_numbers::cell::data_format::number::ThousandsSeparator::Hidden,
+    );
+    let format = litchi_numbers::cell::data_format::currency::Currency::new(
+        litchi_numbers::cell::data_format::currency::CurrencyCode::USD,
+        litchi_numbers::cell::data_format::currency::DecimalPlaces::fixed(2).unwrap(),
+        litchi_numbers::cell::data_format::currency::NegativeStyle::Parentheses,
+        litchi_numbers::cell::data_format::currency::ThousandsSeparator::Shown,
+        litchi_numbers::cell::data_format::currency::CurrencyStyle::Accounting,
+    );
+
+    editor
+        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Number(number))
+        .unwrap();
+    editor
+        .set_table_cell_currency_format(table_id, 1, 1, format)
+        .unwrap();
+    assert_eq!(
+        editor.table_cell_currency_format(table_id, 1, 1).unwrap(),
+        Some(format)
+    );
+
+    let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened.table_cell_currency_format(table_id, 1, 1).unwrap(),
+        Some(format)
+    );
+    assert!(
+        reopened
+            .reset_table_cell_currency_format(table_id, 1, 1)
+            .unwrap()
+    );
+    assert_eq!(
+        reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
+        DataFormat::Automatic
+    );
+}
+
+#[test]
 fn builder_empty_table_accepts_focused_commit_apply_and_inverse() {
     fn bytes(package: &FocusedNumbersPackage) -> Vec<u8> {
         let mut output = Vec::new();

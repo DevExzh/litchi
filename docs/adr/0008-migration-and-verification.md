@@ -15345,3 +15345,66 @@ This is recorded as native validation evidence for the disposable probe, not as
 a broad Numbers compatibility or performance claim. The focused matrix keeps
 Percentage below formal E3/E4 promotion until this evidence is attached to a
 frozen committed fixture/ledger; no other display-format family is covered.
+
+## 2026-09-01 amendment: Numbers existing-cell Currency-format focused-owner verification record
+
+The focused Currency owner adds a selector-first existing-cell transaction for
+the native Currency family. Its source-level verification scope includes
+automatic versus explicit formats, currency-code/domain validation, all
+supported decimal/negative/thousands-separator/style combinations, selector and
+family-boundary refusal, alternate-number BNC routing with optional secondary
+Number references, copy-on-write/refcount reuse and culling, unknown-field and
+physical-locality preservation, exact no-op/inverse/stale-patch behavior,
+malformed-wire/graph refusal, locks, resource limits, candidate reopen/readback,
+concurrency, and fuzz-target coverage.
+
+The focused `litchi-iwa-protos` Currency codec filter passed 4/4 cases, and the
+`litchi-numbers-wire` library test run passed 32/32. After native BNC flag
+handling became shape-dependent, the latest locked/offline package integration
+run passed 22/22 cases, including
+`currency_does_not_reuse_a_number_entry_for_a_currency_payload` and
+`currency_primary_and_secondary_refs_are_preserved_then_culled_atomically`.
+Plain no-secondary Currency records use native BNC flag `0x0802`; a Currency
+record carrying a secondary Number ID uses `0x0803` (`0x0802 |
+EXPLICIT_DECIMAL_FORMAT`, with `EXPLICIT_DECIMAL_FORMAT = 0x0001`). Standard
+versus Accounting does not choose this flag. These deterministic results are
+kept separate from the native evidence below. The
+bounded Currency fuzz targets remain a separate robustness check and do not
+broaden the native interoperability claim.
+
+Computer Use validated the operation in Numbers 14.4 (7043.0.93). The native
+Standard source was a clean ZIP with B3 scalar `42`, CNY, fixed two decimal
+places, minus negatives, hidden thousands separator, and Standard style; its
+136,767-byte SHA-256 is
+`4032f78b452e4a1abbd4d30b1001eeb778326911c2da524fc5577d3706a55e47`. Plain
+native Currency records use BNC flag `0x0802` for both Standard and
+Accounting styles; a secondary Number reference adds `EXPLICIT_DECIMAL_FORMAT`
+(`0x0001`), yielding `0x0803`. Standard versus Accounting does not choose this
+flag. The record has kind `2`, a live primary reference, and the
+`AlternateNumber` representation. Accounting does not change the plain
+record's flag.
+
+The Rust candidate changed the cell to USD, fixed two decimal places, red
+parentheses, shown thousands separator, and Accounting style. It reported
+`changed=true`, `touched_components=2`, and `full_reparse=true`; its
+136,767-byte SHA-256 is
+`de0ed8670f1c15783b3b6dcb22a49cb1ffc4d91d5ef8e6926c852f04889b6a9a`. Its
+inverse restored the source exactly (matching SHA-256 and `cmp`). Numbers
+opened the candidate without repair, recovery, or conversion UI. B2 retained
+its text, B3 displayed `$ 42.00`, the actual value remained `$42`, and the
+inspector showed Currency/USD/two decimals/parentheses/thousands enabled/
+Accounting enabled.
+
+Numbers saved the candidate, then closed and reopened it without a prompt; the
+same settings, scalar, and text were preserved. The 136,660-byte native-resaved
+artifact has SHA-256
+`473887c4edb7606ceac94c8c89885964f2643fc4d98046a0770a467b752b8567`. A strict
+Rust no-op reread of that native-resaved artifact reported
+`changed=false`, `touched_components=0`, and `full_reparse=false`; output
+comparison was exact and retained the same SHA-256.
+
+These facts establish operation-specific native E3/E4 evidence for the stated
+existing-cell Currency scenario, not broad Numbers formatting, arbitrary-
+producer parity, native byte parity, or package-wide performance/RSS behavior.
+The Currency slice closes no package, dependency declaration, canonical edge,
+ordered migration debt, migration host, or ADR 0028 deletion gate.

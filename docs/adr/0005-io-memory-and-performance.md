@@ -2058,3 +2058,31 @@ selector equivalence. These are bounded correctness claims only: this record
 makes no peak-RSS, allocation-count, latency, throughput, zero-copy, or
 package-wide performance claim and does not extend ownership to other data
 format families.
+
+## 2026-09-01 amendment: Numbers existing-cell Currency-format resource record
+
+Currency uses the shared bounded decimal graph owner with a nominal strict
+type-257 codec. The operation validates the alternate-number BNC shape, the
+optional secondary generic Number reference, format-list identity, refcounts,
+wire field domains, duplicate/cardinality rules, UTF-8/code constraints,
+length-delimited framing, nesting, and work before constructing its borrowed
+Buffa lazy parity view. Buffa is inspection/parity only; a generated owned
+message or normal-Prost whole-message re-encoding is never the preservation
+authority.
+
+The operation-local budget covers package input/output, physical entries,
+decoded payload objects/messages/references, wire bytes/fields/nesting/work,
+retained and scratch bytes, compressed output, staging allocations, and total
+transaction work. Checked cursor/size arithmetic and fallible reservation
+guard publication. Exact no-ops do not construct a candidate; changed edits
+use copy-on-write, preserve unknown/unselected bytes, strictly reopen and read
+back the selected semantic value, and compare complete physical locality for
+unselected members. Limit, malformed, allocation, lock, dependency,
+candidate-verification, or locality failures leave the source unchanged.
+
+These are bounded correctness and refusal claims, not a peak-RSS,
+allocation-count, latency, throughput, zero-copy, or whole-package memory
+claim. The focused Currency owner does not transfer Buffa or package-resource
+ownership for other display/control families, cell values/formulas, styles, or
+table topology; its operation-specific native E3/E4 evidence is recorded in
+ADR 0008 and does not establish a package-wide performance claim.

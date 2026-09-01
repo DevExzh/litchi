@@ -3479,7 +3479,7 @@ This owner is deliberately narrower than `DataFormat`. It covers only an
 existing cell's decimal `Number` state and its explicit-to-automatic reset.
 It does not silently convert another display/control family, create a cell,
 author a value or formula, or expose general formatting or style mutation.
-Currency, percentage, scientific, fraction, numeral-system, date/time,
+Percentage, scientific, fraction, numeral-system, date/time,
 duration, custom, text, checkbox, rating, slider, stepper, and pop-up-menu
 owners retain their existing contracts until each receives its own complete
 selector, wire, transaction, locality, and native gate.
@@ -3511,3 +3511,31 @@ formulas, general styles, or table structure. The legacy editor remains a
 deprecated compatibility delegate, and every exact-source rejection stays
 fail-closed; only synthetic source-built packages may use the generic legacy
 format route.
+
+## 2026-09-01 amendment: Numbers existing-cell Currency-format semantic owner
+
+`litchi_numbers::cell::data_format::Currency` is the archive-free semantic
+value for the focused Currency display-format family. It exposes a checked
+three-letter currency code, `DecimalPlaces`, `NegativeStyle`,
+`ThousandsSeparator`, and `CurrencyStyle` (`Standard` or `Accounting`) without
+format-list keys, BNC flags, native identifiers, protobuf/Buffa messages,
+archive paths, or raw IDs. The compact value is independent at the public
+family boundary even though the private native decimal graph is shared with
+Number and Percentage.
+
+`Package::{table_cell_currency_format, edit_table_cell_currency_format,
+apply_table_cell_currency_format}` is selector-first and existing-cell-only.
+Callers provide a `SheetSelector`, a sheet-scoped `TableSelector`, and a
+checked `CellPosition`; `None` is inherited/no-explicit Currency and explicit
+automatic decimals remain a real `Some(Currency)` value. The transaction
+surface exposes typed diagnostics, patches, inverses, limits, and refusal
+errors while keeping native list identity, BNC records, optional secondary
+Number references, and wire framing private.
+
+Currency does not silently convert Number, Percentage, controls, dates,
+durations, text, or another display family, and it does not create cells or
+author values, formulas, styles, or table structure. The legacy editor is only
+a compatibility delegate for admitted exact graphs; source-built packages may
+retain the generic route. Operation-specific native acceptance/save/reopen
+evidence is recorded in ADR 0008; this owner is not a general-format or
+monolith-exit claim.

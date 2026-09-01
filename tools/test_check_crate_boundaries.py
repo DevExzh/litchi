@@ -1426,6 +1426,230 @@ def add_percentage_format_selector_context_host(
     )
 
 
+def add_numbers_table_cell_currency_format_canonical_scaffold(
+    root: Path,
+    *,
+    include_shared_core: bool = False,
+) -> None:
+    """Create a complete selector-first Currency-format boundary fixture."""
+
+    add_numbers_table_cell_percentage_format_canonical_scaffold(
+        root, include_shared_core=include_shared_core
+    )
+
+    semantic = root / boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub struct Currency;\n"
+        "pub struct CurrencyCode;\n"
+        "pub enum CurrencyStyle { Standard, Accounting }\n"
+        "pub mod transaction;\n",
+        encoding="utf-8",
+    )
+    transaction = root / boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_TRANSACTION_SOURCE
+    transaction.parent.mkdir(parents=True, exist_ok=True)
+    transaction.write_text(
+        "pub use crate::package::table_cell_currency_format::{"
+        + ", ".join(boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_TRANSACTION_TYPES)
+        + "};\n",
+        encoding="utf-8",
+    )
+
+    owner = root / boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "use super::table_cell_display_format_native as native;\n"
+        + "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_TRANSACTION_TYPES
+        )
+        + "fn existing_cell_resolution() {}\n"
+        + "fn format_table_refcount_reference_entry_closure() {}\n"
+        + "fn exact_source_inverse_no_op_patch() {}\n"
+        + "fn candidate_reopen_readback_locality_same_content() {}\n"
+        + "fn budget_preflight_bounded_allocation_limit() {}\n"
+        + "fn unsupported_ambiguous_cross_component_fail_closed() {}\n"
+        + "fn shared_core_route() { native::read_currency_format_with_budget(); native::rewrite_currency_format(); }\n"
+        + "impl Package {\n"
+        + "pub fn table_cell_currency_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Option<Currency>, Error> { shared_core_route(); todo!() }\n"
+        + "pub fn edit_table_cell_currency_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Edit, Error> { shared_core_route(); todo!() }\n"
+        + "pub fn apply_table_cell_currency_format(&self, patch: &Patch) -> Result<Commit, Error> { shared_core_route(); todo!() }\n"
+        + "}\n"
+        + "impl Edit {\n"
+        + "pub fn before(&self) -> Option<Currency> { None }\n"
+        + "pub fn after(&self) -> Option<Currency> { None }\n"
+        + "pub fn set(self, value: Currency) -> Self { let _ = value; self }\n"
+        + "pub fn clear(self) -> Self { self }\n"
+        + "pub fn reset(self) -> Self { self.clear() }\n"
+        + "pub fn commit(self) -> Result<Commit, Error> { todo!() }\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+
+    package_export = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_EXPORT_SOURCES[1]
+    package_export.write_text(
+        package_export.read_text(encoding="utf-8")
+        + "pub(crate) mod table_cell_currency_format;\n",
+        encoding="utf-8",
+    )
+    data_format_export = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_EXPORT_SOURCES[2]
+    data_format_export.write_text(
+        data_format_export.read_text(encoding="utf-8")
+        + "pub mod currency;\n"
+        + "pub use currency::Currency;\n",
+        encoding="utf-8",
+    )
+
+    codec = root / boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "use buffa::DecodeOptions;\n"
+        "pub const NATIVE_CURRENCY_FORMAT_TYPE: u32 = 257;\n"
+        "pub type CurrencyFormatSnapshot<'source> = ();\n"
+        "pub type CurrencyFormatWrite = ();\n"
+        "pub type PreparedCurrencyFormatRewrite<'source> = ();\n"
+        "pub struct RewriteExecutionRequirements;\n"
+        "pub struct RewriteExecutionLimits;\n"
+        "pub fn decode_currency_format_with_report() {\n"
+        "    let format_type = NATIVE_CURRENCY_FORMAT_TYPE;\n"
+        "    if format_type != expected_format_type { return; }\n"
+        "    preflight; let _ = DecodeOptions::new().decode_lazy_view(bytes);\n"
+        "    duplicate; noncanonical; unknown; raw; extend_from_slice;\n"
+        "    currency_code; style; accounting; decimal_places; negative_style; thousands_separator;\n"
+        "    format_table; registry; refcount; reference; entry;\n"
+        "}\n"
+        "pub fn prepare_currency_format_rewrite() {}\n"
+        "pub fn canonical_currency_format() { currency_code; style; decimal_places; negative_style; thousands_separator; }\n"
+        "pub fn rewrite_currency_format() { MAX_RECURSION_LIMIT; execution_requirements; execute; }\n"
+        "fn strict_projection() { buffa_numbers_table_cell_currency_format_generated; }\n"
+        "#[cfg(test)]\nmod tests { #[test] fn currency_format_round_trip_and_hostile_wire() {} }\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_CODEC_PUBLIC_SOURCE
+    codec_lib.write_text(
+        codec_lib.read_text(encoding="utf-8")
+        + "#[doc(hidden)]\n"
+        f"pub mod {boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_CODEC_MODULE};\n"
+        f"mod {boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_CODEC_GENERATED_MODULE};\n",
+        encoding="utf-8",
+    )
+
+    integration = root / boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_INTEGRATION_SOURCE
+    integration.parent.mkdir(parents=True, exist_ok=True)
+    integration.write_text(
+        "#[test]\n"
+        "fn currency_format_read_explicit_Currency_and_automatic_Option() { explicit Currency; automatic Option; read; }\n"
+        "fn set_reset_transaction() { edit_table_cell_currency_format; set; clear; reset; automatic; }\n"
+        "fn currency_code_and_accounting_style_roundtrip() { CurrencyCode; CurrencyStyle; currency_code; accounting; style; }\n"
+        "fn exact_no_op_and_inverse_restore_bytes() { no_op; unchanged; inverse; byte_for_byte; }\n"
+        "fn conflict_fail_closed() { stale; foreign; ambiguous; conflict; unsupported; malformed; }\n"
+        "fn selector_locality_reopen_readback() { SheetSelector; TableSelector; CellPosition; locality; reopen; readback; }\n",
+        encoding="utf-8",
+    )
+    for fuzz_path in (
+        boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_CODEC_FUZZ_SOURCE,
+        boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_FUZZ_SOURCE,
+    ):
+        absolute = root / fuzz_path
+        absolute.parent.mkdir(parents=True, exist_ok=True)
+        absolute.write_text(
+            "#![no_main]\nuse libfuzzer_sys::fuzz_target;\n"
+            "fuzz_target!(|data: &[u8]| { let _ = data; });\n",
+            encoding="utf-8",
+        )
+    for corpus in (
+        boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_CODEC_FUZZ_CORPUS,
+        boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_FUZZ_CORPUS,
+    ):
+        absolute = root / corpus
+        absolute.mkdir(parents=True, exist_ok=True)
+        (absolute / "canonical_currency_type_257.seed").write_bytes(b"currency")
+
+    example = root / boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_EXAMPLE
+    example.parent.mkdir(parents=True, exist_ok=True)
+    example.write_text(
+        "fn main() { package.edit_table_cell_currency_format(); }\n",
+        encoding="utf-8",
+    )
+    host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_SOURCE[0]
+    host.write_text(
+        host.read_text(encoding="utf-8")
+        + "\n"
+        + "impl NumbersEditor {\n"
+        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
+        + "pub fn table_cell_currency_format(&self, table_id: u64, row: usize, column: usize) -> Result<Option<Currency>> {\n"
+        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
+        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
+        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
+        + "    package.table_cell_currency_format(sheet, table, position)\n"
+        + "}\n"
+        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
+        + "pub fn set_table_cell_currency_format(&mut self, table_id: u64, row: usize, column: usize, format: Currency) -> Result<()> {\n"
+        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
+        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
+        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
+        + "    package.edit_table_cell_currency_format(sheet, table, position).set(format).commit()\n"
+        + "}\n"
+        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
+        + "pub fn reset_table_cell_currency_format(&mut self, table_id: u64, row: usize, column: usize) -> Result<bool> {\n"
+        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
+        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
+        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
+        + "    package.edit_table_cell_currency_format(sheet, table, position).clear().commit()\n"
+        + "}\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+
+
+def add_currency_format_selector_context_host(
+    root: Path,
+    *,
+    typed_location: bool,
+) -> None:
+    """Replace the Currency host with a helper-only selector route fixture."""
+
+    host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_SOURCE[0]
+    selector_fields = (
+        "sheet: litchi_numbers::SheetSelector<'static>, "
+        "table: litchi_numbers::TableSelector<'static>, "
+        "position: litchi_numbers::table::CellPosition,"
+        if typed_location
+        else "sheet: usize, table: usize, position: usize,"
+    )
+    host.write_text(
+        "use litchi_numbers::Package as FocusedNumbersPackage;\n"
+        "enum FocusedCurrencyFormatLocation {\n"
+        "    Owner { "
+        + selector_fields
+        + " source: FocusedNumbersPackage },\n"
+        "}\n"
+        "fn focused_currency_format_location() -> Result<FocusedCurrencyFormatLocation> {\n"
+        "    let source = FocusedNumbersPackage::from_bytes(bytes)?;\n"
+        "    Ok(FocusedCurrencyFormatLocation::Owner { source, sheet, table, position })\n"
+        "}\n"
+        "fn focused_currency_format() -> Result<Option<Currency>> {\n"
+        "    let location = focused_currency_format_location()?;\n"
+        "    let FocusedCurrencyFormatLocation::Owner { source, sheet, table, position } = location else { return Err(Unsupported); };\n"
+        "    source.table_cell_currency_format(sheet, table, position)\n"
+        "}\n"
+        "fn commit_focused_currency_format() -> Result<()> {\n"
+        "    let location = focused_currency_format_location()?;\n"
+        "    let FocusedCurrencyFormatLocation::Owner { source, sheet, table, position } = location else { return Err(Unsupported); };\n"
+        "    source.edit_table_cell_currency_format(sheet, table, position).set(format).commit()\n"
+        "}\n"
+        "impl NumbersEditor {\n"
+        "#[deprecated(note = \"legacy compatibility shell\")]\n"
+        "pub fn table_cell_currency_format(&self, table_id: u64, row: usize, column: usize) -> Result<Option<Currency>> { focused_currency_format() }\n"
+        "#[deprecated(note = \"legacy compatibility shell\")]\n"
+        "pub fn set_table_cell_currency_format(&mut self, table_id: u64, row: usize, column: usize, format: Currency) -> Result<()> { commit_focused_currency_format() }\n"
+        "#[deprecated(note = \"legacy compatibility shell\")]\n"
+        "pub fn reset_table_cell_currency_format(&mut self, table_id: u64, row: usize, column: usize) -> Result<bool> { commit_focused_currency_format() }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+
 def complete_numbers_table_cell_control_popup_split_scaffold(root: Path) -> None:
     """Upgrade the Wave85 fixture to the positive Wave90 popup contract."""
 
@@ -31761,6 +31985,280 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
+    def test_numbers_table_cell_currency_format_positive_contract_and_shared_core(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_currency_format_canonical_scaffold(
+                root, include_shared_core=True
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_currency_format_codec_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_currency_format_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_currency_format_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_display_format_shared_core_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_currency_format_codec_rejects_missing_strict_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_currency_format_canonical_scaffold(root)
+            codec = root / boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_CODEC_SOURCE
+            complete = codec.read_text(encoding="utf-8")
+            for marker, expected in (
+                ("preflight; ", "strict canonical ingress"),
+                ("duplicate; ", "strict canonical ingress"),
+                ("unknown; raw; extend_from_slice;", "unknown/raw preservation"),
+                ("MAX_RECURSION_LIMIT; ", "bounded prepared rewrite"),
+                (
+                    "currency_code; style; accounting; decimal_places; negative_style; thousands_separator;",
+                    "currency format fields",
+                ),
+                ("format_table; registry; refcount; reference; entry;", "registry/refcount closure"),
+            ):
+                with self.subTest(marker=marker):
+                    missing = complete.replace(marker, "")
+                    if expected == "currency format fields":
+                        for field in (
+                            "currency_code",
+                            "style",
+                            "decimal_places",
+                            "negative_style",
+                            "thousands_separator",
+                        ):
+                            missing = missing.replace(field, "")
+                    codec.write_text(missing, encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_currency_format_codec_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing strict {expected} marker" in item
+                            for item in violations
+                        ),
+                        (expected, violations),
+                    )
+
+            codec.write_text(
+                complete.replace(
+                    "NATIVE_CURRENCY_FORMAT_TYPE: u32 = 257",
+                    "NATIVE_CURRENCY_FORMAT_TYPE: u32 = 256",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_currency_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("native type 257" in item for item in violations), violations)
+
+            codec.write_text(
+                complete.replace("preflight; let _ =", "let _ ="),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_currency_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("preflight wire before" in item for item in violations), violations)
+
+            codec.write_text(complete + "use prost::Message;\n", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_currency_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("Prost production path" in item for item in violations), violations)
+
+    def test_numbers_table_cell_currency_format_facade_rejects_raw_aliases_and_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_currency_format_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type CurrencyFormatEdit = Edit;\n"
+                + "pub type CurrencyCommit = Commit;\n"
+                + "pub fn raw_currency_format(table_id: TableId, row: usize, "
+                "source_bytes: Vec<u8>, view: WireView, archive: Archive) {}\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_EXPORT_SOURCES[1]
+            package.write_text(
+                "pub mod table_cell_currency_format;\n"
+                "pub use table_cell_currency_format::*;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_currency_format_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "retains flat alias CurrencyFormatEdit",
+                "retains flat alias CurrencyCommit",
+                "typed raw identifier parameter table_id: TableId",
+                "raw identifier/coordinate parameter row: usize",
+                "opaque raw byte container source_bytes: Vec<u8>",
+                "wire type WireView",
+                "archive/IWA type Archive",
+                "raw helper raw_currency_format",
+                "exposes its package owner module",
+                "retains root aliases via glob",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_numbers_table_cell_currency_format_requires_selectors_and_quality_evidence(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_currency_format_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "SheetSelector<'sheet>", "MissingSheetSelector<'sheet>"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_currency_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must accept selector-first SheetSelector" in item for item in violations),
+                violations,
+            )
+
+            add_numbers_table_cell_currency_format_canonical_scaffold(root)
+            (root / boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_EXAMPLE).unlink()
+            violations = boundaries.audit_numbers_table_cell_currency_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("missing example" in item for item in violations), violations)
+
+            add_numbers_table_cell_currency_format_canonical_scaffold(root)
+            fuzz_target = root / boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_FUZZ_SOURCE
+            fuzz_target.write_text("// fuzz_target! decoy\n", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_currency_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("missing fuzz_target! harness" in item for item in violations), violations)
+
+            add_numbers_table_cell_currency_format_canonical_scaffold(root)
+            corpus = root / boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_CODEC_FUZZ_CORPUS
+            for path in corpus.iterdir():
+                path.unlink()
+            violations = boundaries.audit_numbers_table_cell_currency_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("corpus must be nonempty" in item for item in violations), violations)
+
+    def test_iwa_numbers_table_cell_currency_format_requires_deprecated_selector_route(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_currency_format_canonical_scaffold(root)
+            add_currency_format_selector_context_host(root, typed_location=True)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_currency_format_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            add_currency_format_selector_context_host(root, typed_location=False)
+            violations = boundaries.audit_iwa_numbers_table_cell_currency_format_source_topology(
+                root
+            )
+            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+                self.assertTrue(
+                    any(
+                        "missing selector-first" in item and selector in item
+                        for item in violations
+                    ),
+                    (selector, violations),
+                )
+
+            host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_SOURCE[0]
+            complete = host.read_text(encoding="utf-8")
+            host.write_text(
+                complete.replace(
+                    "#[deprecated(note = \"legacy compatibility shell\")]\n",
+                    "",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_currency_format_source_topology(
+                root
+            )
+            self.assertTrue(any("must remain deprecated" in item for item in violations), violations)
+
+            host.write_text(
+                complete.replace(
+                    "source.table_cell_currency_format(sheet, table, position)",
+                    "self.table_cell_currency_format(table_id, row, column)",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_currency_format_source_topology(
+                root
+            )
+            self.assertTrue(any("must delegate to focused Package" in item for item in violations), violations)
+
+    def test_numbers_table_cell_currency_format_shared_core_rejects_duplicate_writer(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_currency_format_canonical_scaffold(
+                root, include_shared_core=True
+            )
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CURRENCY_FORMAT_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "fn rewrite_currency_format() {}\n",
+                encoding="utf-8",
+            )
+            core = root / boundaries.NUMBERS_TABLE_CELL_DISPLAY_FORMAT_NATIVE_SOURCE
+            core.write_text(
+                core.read_text(encoding="utf-8")
+                + "fn rewrite_currency_format() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_display_format_shared_core_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("duplicate implementations rewrite_currency_format" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("must not define a local scanner/writer rewrite_currency_format" in item for item in violations),
+                violations,
+            )
+
     def test_numbers_table_cell_percentage_format_facade_rejects_spoofed_leaks(
         self,
     ) -> None:
@@ -32277,6 +32775,9 @@ fn rewrite_movie_title_operation(
             "audit_numbers_table_cell_percentage_format_codec_source_topology",
             "audit_numbers_table_cell_percentage_format_facade_source_topology",
             "audit_iwa_numbers_table_cell_percentage_format_source_topology",
+            "audit_numbers_table_cell_currency_format_codec_source_topology",
+            "audit_numbers_table_cell_currency_format_facade_source_topology",
+            "audit_iwa_numbers_table_cell_currency_format_source_topology",
             "audit_numbers_table_cell_display_format_shared_core_source_topology",
         ):
             self.assertIn(f"+ {audit}()", main_source)
@@ -32293,6 +32794,9 @@ fn rewrite_movie_title_operation(
             "audit_numbers_table_cell_percentage_format_codec_source_topology",
             "audit_numbers_table_cell_percentage_format_facade_source_topology",
             "audit_iwa_numbers_table_cell_percentage_format_source_topology",
+            "audit_numbers_table_cell_currency_format_codec_source_topology",
+            "audit_numbers_table_cell_currency_format_facade_source_topology",
+            "audit_iwa_numbers_table_cell_currency_format_source_topology",
             "audit_numbers_table_cell_display_format_shared_core_source_topology",
         )
         focused_calls: list[str] = []

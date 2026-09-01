@@ -74,14 +74,16 @@ pub(crate) const SECOND_CELL: (usize, usize) = (0, 1);
 
 /// Native format families represented by the deterministic fixture.
 ///
-/// Number and Percentage share the BNC decimal-cell kind.  Their native
-/// family discriminator lives in the format-list payload, so keeping that
-/// discriminator explicit in the fixture prevents tests from accidentally
-/// treating a Percentage as a Number merely because the cell wire shape is
-/// identical.
+/// Number and Percentage share the BNC decimal-cell kind.  Currency uses the
+/// alternate-number BNC kind and can additionally carry a secondary generic
+/// format-list reference.  Their native family discriminator lives in the
+/// format-list payload, so keeping that discriminator explicit in the fixture
+/// prevents tests from accidentally treating one family as another merely
+/// because the cell wire shape is otherwise similar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum FormatFamily {
     Number,
+    Currency,
     Percentage,
 }
 
@@ -90,6 +92,7 @@ impl FormatFamily {
     pub(crate) const fn native_type(self) -> u32 {
         match self {
             Self::Number => NATIVE_NUMBER_FORMAT_TYPE,
+            Self::Currency => NATIVE_CURRENCY_FORMAT_TYPE,
             Self::Percentage => NATIVE_PERCENTAGE_FORMAT_TYPE,
         }
     }
@@ -97,6 +100,8 @@ impl FormatFamily {
 
 /// Native Number format-list discriminator.
 pub(crate) const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;
+/// Native Currency format-list discriminator.
+pub(crate) const NATIVE_CURRENCY_FORMAT_TYPE: u32 = 257;
 /// Native Percentage format-list discriminator.
 pub(crate) const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
 
@@ -139,9 +144,10 @@ pub(crate) enum Corruption {
 ///
 /// The result is deterministic: object order, member order, unknown fields,
 /// extensions, preview bytes, and the unrelated member are all fixed.  `Shared`
-/// gives both cells a Number format with key one and refcount two; `Unshared`
-/// gives the second cell a Percentage format with key two and two refcount-one
-/// entries.
+/// gives both cells a Number format with key one and refcount two;
+/// [`synthetic_package_for`] selects the corresponding Currency or Percentage
+/// family.  `Unshared` gives the second cell a Percentage format with key two
+/// and two refcount-one entries.
 pub(crate) fn synthetic_package(sharing: FormatSharing) -> FixtureResult<Vec<u8>> {
     synthetic_package_for(FormatFamily::Number, sharing)
 }
@@ -160,7 +166,7 @@ pub(crate) fn synthetic_package_for(
     let sheet = sheet_object()?;
     let table_info = table_info_object()?;
     let model = table_model_object()?;
-    let tile = tile_object(sharing)?;
+    let tile = tile_object(family, sharing)?;
     let sidecars = sidecar_object(family, sharing)?;
 
     let document_member = compressed(vec![document, sheet])?;
@@ -195,6 +201,89 @@ pub(crate) fn synthetic_package_for(
         ],
         Limits::default(),
     )?)
+}
+
+/// Build a Currency fixture whose selected cell carries both native
+/// Currency metadata and the optional generic secondary format identifier.
+///
+/// The secondary identifier is deliberately a Number entry.  The sibling
+/// remains on the original Currency entry, which makes it possible to prove
+/// that a Currency transition decrements/culls both selected references while
+/// leaving an unrelated live entry untouched.
+pub(crate) fn currency_secondary_package() -> FixtureResult<Vec<u8>> {
+    let source = synthetic_package_for(FormatFamily::Currency, FormatSharing::Shared)?;
+    let source = rewrite_tile_cells(&source, |cells| {
+        let first = cells
+            .first_mut()
+            .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
+        *first = currency_secondary_cell()?;
+        Ok(())
+    })?;
+    rewrite_format_list(&source, |list| {
+        let original = list
+            .entries
+            .iter_mut()
+            .find(|entry| entry.key == FIRST_FORMAT_KEY)
+            .ok_or_else(|| io::Error::other("format fixture Currency entry is missing"))?;
+        original.refcount = 1;
+        list.entries.push(format_entry(
+            SECOND_FORMAT_KEY,
+            1,
+            NATIVE_NUMBER_FORMAT_TYPE,
+            2,
+            2,
+            true,
+        ));
+        list.entries
+            .push(currency_format_entry(4, 1, "USD", 2, 2, true, false));
+        Ok(())
+    })
+}
+
+/// Rewrite only the optional generic secondary identifier on the selected
+/// Currency cell.  The BNC field layout is private to the wire crate, so keep
+/// this deliberately narrow raw fixture primitive beside the fixture that
+/// owns the native bytes.
+pub(crate) fn rewrite_currency_secondary_identifier(
+    source: &[u8],
+    identifier: u32,
+) -> FixtureResult<Vec<u8>> {
+    rewrite_tile_cells(source, |cells| {
+        let first = cells
+            .first_mut()
+            .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
+        let parsed = BncCell::parse(first)?;
+        if parsed.secondary_format_identifier().is_none() {
+            return Err(io::Error::other("format fixture secondary identifier is missing").into());
+        }
+        // BNC v5 stores the decimal scalar first, then kind, generic
+        // secondary id, and Currency primary id for this exact mask.
+        if first.len() < 40 {
+            return Err(io::Error::other("format fixture Currency cell is truncated").into());
+        }
+        first[32..36].copy_from_slice(&identifier.to_le_bytes());
+        Ok(())
+    })
+}
+
+fn currency_secondary_cell() -> FixtureResult<Vec<u8>> {
+    // This is a native alternate-number cell captured by the wire codec's
+    // own fixture: format id 4 is Currency and generic id 2 is secondary.
+    // Keeping the bytes literal ensures the optional-field shape itself is
+    // exercised instead of being synthesized by a higher-level setter that
+    // would erase one of the two identifiers.
+    let bytes = vec![
+        0x05, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x03, 0x08, 0x01, 0x70, 0x00, 0x00, 0x39, 0x30, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3a, 0xb0, 0x02, 0x00,
+        0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,
+    ];
+    let cell = BncCell::parse(&bytes).map_err(|error| {
+        io::Error::other(format!("invalid Currency secondary fixture: {error}"))
+    })?;
+    if cell.format_identifier() != Some(4) || cell.secondary_format_identifier() != Some(2) {
+        return Err(io::Error::other("Currency secondary fixture identifiers are invalid").into());
+    }
+    Ok(bytes)
 }
 
 /// Build one of the controlled malformed graphs from the shared baseline.
@@ -425,26 +514,27 @@ fn table_model_payload() -> FixtureResult<tst::TableModelArchive> {
     })
 }
 
-fn tile_object(sharing: FormatSharing) -> FixtureResult<ArchiveObject> {
-    let payload = tile_payload(sharing)?.encode_to_vec();
+fn tile_object(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<ArchiveObject> {
+    let payload = tile_payload(family, sharing)?.encode_to_vec();
     let mut object = object(TILE_ID, TILE_TYPE, payload)?;
     object.archive_info.message_infos[0].data_references = vec![0x70_01, 0x70_02];
     Ok(object)
 }
 
-fn tile_payload(sharing: FormatSharing) -> FixtureResult<tst::Tile> {
-    let first = formatted_cell(
-        FIRST_FORMAT_KEY,
-        CellDataFormatKind::NumberOrPercentage,
-        1234.5,
-    )?;
+fn tile_payload(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<tst::Tile> {
+    let first_kind = match family {
+        FormatFamily::Currency => CellDataFormatKind::Currency,
+        FormatFamily::Number | FormatFamily::Percentage => CellDataFormatKind::NumberOrPercentage,
+    };
+    let first = formatted_cell(FIRST_FORMAT_KEY, first_kind, 1234.5)?;
     let second_key = match sharing {
         FormatSharing::Shared => FIRST_FORMAT_KEY,
         FormatSharing::Unshared => SECOND_FORMAT_KEY,
     };
-    let second_kind = match sharing {
-        FormatSharing::Shared => CellDataFormatKind::NumberOrPercentage,
-        FormatSharing::Unshared => CellDataFormatKind::NumberOrPercentage,
+    let second_kind = match (family, sharing) {
+        (FormatFamily::Currency, FormatSharing::Shared) => CellDataFormatKind::Currency,
+        (_, FormatSharing::Shared) => CellDataFormatKind::NumberOrPercentage,
+        (_, FormatSharing::Unshared) => CellDataFormatKind::NumberOrPercentage,
     };
     let second = formatted_cell(second_key, second_kind, 0.25)?;
     let (storage, offsets) = pack_row(&[first, second])?;
@@ -477,8 +567,28 @@ fn formatted_cell(format_key: u32, kind: CellDataFormatKind, value: f64) -> Fixt
 }
 
 fn sidecar_object(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<ArchiveObject> {
-    let format_entries = match sharing {
-        FormatSharing::Shared => vec![format_entry(
+    let format_entries = match (family, sharing) {
+        (FormatFamily::Currency, FormatSharing::Shared) => vec![currency_format_entry(
+            FIRST_FORMAT_KEY,
+            2,
+            "USD",
+            2,
+            2,
+            true,
+            false,
+        )],
+        (FormatFamily::Currency, FormatSharing::Unshared) => vec![
+            format_entry(FIRST_FORMAT_KEY, 1, NATIVE_NUMBER_FORMAT_TYPE, 2, 2, true),
+            format_entry(
+                SECOND_FORMAT_KEY,
+                1,
+                NATIVE_PERCENTAGE_FORMAT_TYPE,
+                1,
+                0,
+                false,
+            ),
+        ],
+        (_, FormatSharing::Shared) => vec![format_entry(
             FIRST_FORMAT_KEY,
             2,
             family.native_type(),
@@ -486,7 +596,7 @@ fn sidecar_object(family: FormatFamily, sharing: FormatSharing) -> FixtureResult
             2,
             true,
         )],
-        FormatSharing::Unshared => vec![
+        (_, FormatSharing::Unshared) => vec![
             format_entry(FIRST_FORMAT_KEY, 1, NATIVE_NUMBER_FORMAT_TYPE, 2, 2, true),
             format_entry(
                 SECOND_FORMAT_KEY,
@@ -549,6 +659,31 @@ fn format_entry(
             decimal_places: Some(decimal_places),
             negative_style: Some(negative_style),
             show_thousands_separator: Some(show_thousands_separator),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+fn currency_format_entry(
+    key: u32,
+    refcount: u32,
+    currency_code: &str,
+    decimal_places: u32,
+    negative_style: u32,
+    show_thousands_separator: bool,
+    use_accounting_style: bool,
+) -> tst::table_data_list::ListEntry {
+    tst::table_data_list::ListEntry {
+        key,
+        refcount,
+        format: Some(tsk::FormatStructArchive {
+            format_type: Some(NATIVE_CURRENCY_FORMAT_TYPE),
+            decimal_places: Some(decimal_places),
+            negative_style: Some(negative_style),
+            show_thousands_separator: Some(show_thousands_separator),
+            currency_code: Some(currency_code.to_owned()),
+            use_accounting_style: Some(use_accounting_style),
             ..Default::default()
         }),
         ..Default::default()
@@ -762,6 +897,18 @@ fn rewrite_format_list(
         mutate(&mut list)?;
         Ok(list.encode_to_vec())
     })
+}
+
+/// Rewrite the selected format list for focused integration fixtures.
+///
+/// This narrow test-only seam lets a package test construct a valid graph
+/// with a deliberately stale, missing, or wrong-family secondary reference
+/// without exposing the archive mutation machinery to production callers.
+pub(crate) fn rewrite_format_list_payload_for_test(
+    source: &[u8],
+    mutate: impl FnOnce(&mut tst::TableDataList) -> FixtureResult,
+) -> FixtureResult<Vec<u8>> {
+    rewrite_format_list(source, mutate)
 }
 
 /// Return the current BNC format-list message payload.

@@ -67,6 +67,11 @@ declarations, 226 canonical edges, 11 ordered migration debts, and one migration
 topology facts, not evidence that the concrete format owners or the monolith deletion gate are
 complete.
 
+The Numbers matrix now records bounded existing-cell Number, Percentage, and Currency display
+format owners. Currency support is operation-specific and remains separate from generic display
+format or rich-style support; suite-wide/native general-format acceptance and the ADR 0028
+deletion gate remain open.
+
 For XLSB sparklines, the detailed XLSB matrix records the strict, bounded Worksheet-ABNF support
 for [MS-XLSB] §2.1.7.62 and records §2.4.228-230, §2.4.581-583, and §2.4.806. The common
 `SparklineType`, `AxisType`, and `EmptyCells` enums belong to `litchi-sheet`; XLSB owns the

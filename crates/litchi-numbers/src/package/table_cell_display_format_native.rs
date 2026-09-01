@@ -8,11 +8,12 @@
 
 use litchi_iwa_protos::{
     numbers_table_cell_control_codec as control_codec,
+    numbers_table_cell_currency_format_codec as currency_codec,
     numbers_table_cell_number_format_codec as number_codec,
     numbers_table_cell_percentage_format_codec as percentage_codec,
     numbers_table_cell_storage_codec as storage_codec,
 };
-use litchi_numbers_wire::BncCell;
+use litchi_numbers_wire::{BncCell, NumericCellType};
 
 use super::table_cell_control_native as native;
 use super::{
@@ -20,11 +21,13 @@ use super::{
     table_cell_pop_up_menu::{CellTarget, Error, Path, TransactionBudget},
     table_cell_pop_up_menu_native as popup_native,
 };
+use crate::cell::data_format::currency::{Currency, CurrencyCode, CurrencyStyle};
 use crate::cell::data_format::number::{
     DecimalPlaces, FixedDecimalPlaces, NegativeStyle, Number, Percentage, ThousandsSeparator,
 };
 
 const NUMBER_FORMAT_TYPE: u32 = number_codec::NATIVE_NUMBER_FORMAT_TYPE;
+const CURRENCY_FORMAT_TYPE: u32 = currency_codec::NATIVE_CURRENCY_FORMAT_TYPE;
 const PERCENTAGE_FORMAT_TYPE: u32 = percentage_codec::NATIVE_PERCENTAGE_FORMAT_TYPE;
 
 /// The only display families admitted by the focused decimal owner.
@@ -35,6 +38,7 @@ const PERCENTAGE_FORMAT_TYPE: u32 = percentage_codec::NATIVE_PERCENTAGE_FORMAT_T
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum DisplayFormatFamily {
     Number,
+    Currency,
     Percentage,
 }
 
@@ -42,6 +46,7 @@ impl DisplayFormatFamily {
     const fn native_type(self) -> u32 {
         match self {
             Self::Number => NUMBER_FORMAT_TYPE,
+            Self::Currency => CURRENCY_FORMAT_TYPE,
             Self::Percentage => PERCENTAGE_FORMAT_TYPE,
         }
     }
@@ -85,9 +90,23 @@ impl From<Error> for PercentageFormatReadError {
     }
 }
 
+/// Typed native failure returned to the Currency package facade.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum CurrencyFormatReadError {
+    WrongFormatFamily,
+    Native(Error),
+}
+
+impl From<Error> for CurrencyFormatReadError {
+    fn from(error: Error) -> Self {
+        Self::Native(error)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NativeDisplayValue {
     Number(Number),
+    Currency(Currency),
     Percentage(Percentage),
 }
 
@@ -95,6 +114,7 @@ impl NativeDisplayValue {
     const fn family(self) -> DisplayFormatFamily {
         match self {
             Self::Number(_) => DisplayFormatFamily::Number,
+            Self::Currency(_) => DisplayFormatFamily::Currency,
             Self::Percentage(_) => DisplayFormatFamily::Percentage,
         }
     }
@@ -102,6 +122,11 @@ impl NativeDisplayValue {
     const fn decimal_parts(self) -> (DecimalPlaces, NegativeStyle, ThousandsSeparator) {
         match self {
             Self::Number(value) => (
+                value.decimal_places(),
+                value.negative_style(),
+                value.thousands_separator(),
+            ),
+            Self::Currency(value) => (
                 value.decimal_places(),
                 value.negative_style(),
                 value.thousands_separator(),
@@ -119,6 +144,8 @@ impl NativeDisplayValue {
         decimal_places: u32,
         negative_style: u32,
         show_thousands_separator: bool,
+        currency_code: Option<&str>,
+        use_accounting_style: Option<bool>,
         path: Path,
     ) -> Result<Self, Error> {
         let decimal_places = if decimal_places == 253 {
@@ -149,6 +176,24 @@ impl NativeDisplayValue {
                 negative_style,
                 thousands_separator,
             )),
+            DisplayFormatFamily::Currency => {
+                let code = currency_code
+                    .ok_or(Error::InvalidSource { path })
+                    .and_then(|code| {
+                        CurrencyCode::new(code).map_err(|_| Error::InvalidSource { path })
+                    })?;
+                let style = match use_accounting_style.ok_or(Error::InvalidSource { path })? {
+                    true => CurrencyStyle::Accounting,
+                    false => CurrencyStyle::Standard,
+                };
+                NativeDisplayValue::Currency(Currency::new(
+                    code,
+                    decimal_places,
+                    negative_style,
+                    thousands_separator,
+                    style,
+                ))
+            },
             DisplayFormatFamily::Percentage => NativeDisplayValue::Percentage(Percentage::new(
                 decimal_places,
                 negative_style,
@@ -169,6 +214,7 @@ fn rewrite_display_cell_metadata(
     let source_cache = cell
         .cached_scalar()
         .map_err(|_| Error::InvalidSource { path })?;
+    let source_numeric_type = cell.numeric_cell_type();
     cell.set_number_or_percentage_format_identifier_preserving_value(desired_identifier)
         .map_err(|_| Error::InvalidSource { path })?;
     let output_limit = source
@@ -192,6 +238,7 @@ fn rewrite_display_cell_metadata(
     verify_display_cell_metadata(
         source_value,
         source_cache,
+        source_numeric_type,
         &candidate_cell,
         desired_identifier,
     )?;
@@ -201,6 +248,7 @@ fn rewrite_display_cell_metadata(
 fn verify_display_cell_metadata(
     source_value: litchi_numbers_wire::StoredValue,
     source_cache: Option<litchi_numbers_wire::CachedScalar>,
+    source_numeric_type: Option<NumericCellType>,
     candidate_cell: &BncCell,
     desired_identifier: Option<u32>,
 ) -> Result<(), Error> {
@@ -212,6 +260,7 @@ fn verify_display_cell_metadata(
         return Err(Error::Verification);
     }
     if candidate_cell.explicit_format_flags() != expected_explicit
+        || candidate_cell.numeric_cell_type() != source_numeric_type
         || candidate_cell.cell_format_kind()
             != desired_identifier.map(|_| litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND)
         || candidate_cell.format_identifier() != desired_identifier
@@ -220,6 +269,146 @@ fn verify_display_cell_metadata(
     {
         return Err(Error::Verification);
     }
+    Ok(())
+}
+
+fn rewrite_currency_cell_metadata(
+    source: &[u8],
+    desired_identifier: Option<u32>,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<u8>, Error> {
+    let output_limit = source
+        .len()
+        .checked_add(12)
+        .ok_or(Error::InvalidSource { path })?;
+    let owned_cell_bytes = source
+        .len()
+        .checked_add(output_limit)
+        .ok_or(Error::InvalidSource { path })?;
+    let work = output_limit
+        .checked_mul(2)
+        .and_then(|amount| amount.checked_add(source.len()))
+        .ok_or(Error::InvalidSource { path })?;
+    let allocations = litchi_numbers_wire::MAX_OWNED_BNC_PARSE_ALLOCATIONS
+        .checked_mul(2)
+        // One encoded output plus the three small format-field buffers that
+        // the Currency mutation can materialize.
+        .and_then(|amount| amount.checked_add(4))
+        .ok_or(Error::InvalidSource { path })?;
+    budget.charge_allocations(allocations, path)?;
+    budget.charge_scratch_bytes(owned_cell_bytes, path)?;
+    budget.charge_retained_bytes(output_limit, path)?;
+    budget.charge_transaction_work(work, path)?;
+
+    let mut cell = BncCell::parse(source).map_err(|_| Error::InvalidSource { path })?;
+    let source_value = cell.stored_value();
+    let source_cache = cell
+        .cached_scalar()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let source_secondary = cell.secondary_format_identifier();
+    cell.set_currency_format_identifier_preserving_value(desired_identifier)
+        .map_err(|_| Error::InvalidSource { path })?;
+    let output = cell
+        .try_encode_with_limit(output_limit)
+        .map_err(|error| match error {
+            litchi_numbers_wire::Error::Allocation { requested } => Error::Allocation {
+                amount: requested,
+                path,
+            },
+            litchi_numbers_wire::Error::InvalidFormat(_)
+            | litchi_numbers_wire::Error::ParseError(_)
+            | litchi_numbers_wire::Error::OutputLimitExceeded { .. } => {
+                Error::InvalidSource { path }
+            },
+        })?;
+    let candidate_cell = BncCell::parse(&output).map_err(|_| Error::Verification)?;
+    verify_currency_cell_metadata(
+        source_value,
+        source_cache,
+        source_secondary,
+        &candidate_cell,
+        desired_identifier,
+    )?;
+    Ok(output)
+}
+
+fn verify_currency_cell_metadata(
+    source_value: litchi_numbers_wire::StoredValue,
+    source_cache: Option<litchi_numbers_wire::CachedScalar>,
+    source_secondary: Option<u32>,
+    candidate_cell: &BncCell,
+    desired_identifier: Option<u32>,
+) -> Result<(), Error> {
+    let expected_secondary = desired_identifier.and(source_secondary);
+    let expected_explicit = desired_identifier.map_or(0, |_| {
+        litchi_numbers_wire::explicit_currency_format_flags(expected_secondary.is_some())
+    });
+    if source_value != candidate_cell.stored_value()
+        || candidate_cell.cached_scalar().ok() != Some(source_cache)
+    {
+        return Err(Error::Verification);
+    }
+    if candidate_cell.explicit_format_flags() != expected_explicit
+        || !currency_cell_type_matches_value(candidate_cell, desired_identifier.is_some())
+        || candidate_cell.cell_format_kind()
+            != desired_identifier.map(|_| litchi_numbers_wire::CURRENCY_CELL_FORMAT_KIND)
+        || candidate_cell.format_identifier() != desired_identifier
+        || candidate_cell.secondary_format_identifier() != expected_secondary
+        || candidate_cell.control_cell_spec_identifier().is_some()
+    {
+        return Err(Error::Verification);
+    }
+    Ok(())
+}
+
+fn currency_cell_type_matches_value(cell: &BncCell, formatted: bool) -> bool {
+    match cell.stored_value() {
+        // Numbers can attach display metadata to an otherwise empty cell.
+        // That shape has no numeric cell type and must remain empty through a
+        // metadata-only set or clear operation.
+        litchi_numbers_wire::StoredValue::Empty => cell.numeric_cell_type().is_none(),
+        _ => {
+            cell.numeric_cell_type()
+                == Some(if formatted {
+                    NumericCellType::AlternateNumber
+                } else {
+                    NumericCellType::Number
+                })
+        },
+    }
+}
+
+/// Reserve the private vectors used by the Currency tile patcher before it
+/// enters the allocator.
+///
+/// `patch_tile_cell` is intentionally shared with the older control owners,
+/// so it cannot borrow the operation ledger itself.  Currency edits still
+/// need to account for its nested tile/row/buffer candidates before the first
+/// `Vec` is materialized.  The bound includes the source tile, replacement,
+/// and the three length-delimited framing layers; the scratch reservation is
+/// deliberately conservative for the simultaneously-live row and buffer
+/// candidates, while retained bytes cover the returned tile candidate.
+fn charge_currency_tile_patch_budget(
+    tile_payload_len: usize,
+    replacement_len: usize,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<(), Error> {
+    let candidate_bound = tile_payload_len
+        .checked_add(replacement_len)
+        .and_then(|length| length.checked_add(32))
+        .ok_or(Error::InvalidSource { path })?;
+    let scratch_bound = candidate_bound
+        .checked_mul(3)
+        .ok_or(Error::InvalidSource { path })?;
+    let work_bound = candidate_bound
+        .checked_add(scratch_bound)
+        .ok_or(Error::InvalidSource { path })?;
+    budget.charge_allocations(5, path)?;
+    budget.charge_scratch_bytes(scratch_bound, path)?;
+    budget.charge_retained_bytes(candidate_bound, path)?;
+    budget.charge_transaction_work(work_bound, path)?;
     Ok(())
 }
 
@@ -244,10 +433,46 @@ pub(super) fn read_number_format_with_budget(
     {
         Ok(None) => Ok(None),
         Ok(Some(NativeDisplayValue::Number(value))) => Ok(Some(value)),
-        Ok(Some(NativeDisplayValue::Percentage(_))) | Err(DisplayReadError::WrongFormatFamily) => {
-            Err(NumberFormatReadError::WrongFormatFamily)
-        },
+        Ok(Some(NativeDisplayValue::Currency(_)))
+        | Ok(Some(NativeDisplayValue::Percentage(_)))
+        | Err(DisplayReadError::WrongFormatFamily) => Err(NumberFormatReadError::WrongFormatFamily),
         Err(DisplayReadError::Native(error)) => Err(NumberFormatReadError::Native(error)),
+    }
+}
+
+/// Read one existing Currency format with a fresh transaction ledger.
+pub(super) fn read_currency_format(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+) -> Result<Option<Currency>, CurrencyFormatReadError> {
+    let mut budget = TransactionBudget::for_cell_control(source);
+    read_currency_format_with_budget(source, target, path, &mut budget)
+}
+
+/// Read one existing Currency format against a caller-owned transaction
+/// ledger.
+pub(super) fn read_currency_format_with_budget(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Option<Currency>, CurrencyFormatReadError> {
+    match read_display_format_with_budget(
+        DisplayFormatFamily::Currency,
+        source,
+        target,
+        path,
+        budget,
+    ) {
+        Ok(None) => Ok(None),
+        Ok(Some(NativeDisplayValue::Currency(value))) => Ok(Some(value)),
+        Ok(Some(NativeDisplayValue::Number(_)))
+        | Ok(Some(NativeDisplayValue::Percentage(_)))
+        | Err(DisplayReadError::WrongFormatFamily) => {
+            Err(CurrencyFormatReadError::WrongFormatFamily)
+        },
+        Err(DisplayReadError::Native(error)) => Err(CurrencyFormatReadError::Native(error)),
     }
 }
 
@@ -278,7 +503,9 @@ pub(super) fn read_percentage_format_with_budget(
     ) {
         Ok(None) => Ok(None),
         Ok(Some(NativeDisplayValue::Percentage(value))) => Ok(Some(value)),
-        Ok(Some(NativeDisplayValue::Number(_))) | Err(DisplayReadError::WrongFormatFamily) => {
+        Ok(Some(NativeDisplayValue::Number(_)))
+        | Ok(Some(NativeDisplayValue::Currency(_)))
+        | Err(DisplayReadError::WrongFormatFamily) => {
             Err(PercentageFormatReadError::WrongFormatFamily)
         },
         Err(DisplayReadError::Native(error)) => Err(PercentageFormatReadError::Native(error)),
@@ -300,6 +527,26 @@ pub(super) fn rewrite_number_format(
         target,
         before.copied().map(NativeDisplayValue::Number),
         after.copied().map(NativeDisplayValue::Number),
+        path,
+        budget,
+    )
+}
+
+/// Rewrite one ordinary Currency cell without manufacturing a CellSpec graph.
+pub(super) fn rewrite_currency_format(
+    source: &Package,
+    target: CellTarget,
+    before: Option<&Currency>,
+    after: Option<&Currency>,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<native::NativeControlOutput, Error> {
+    rewrite_display_format(
+        DisplayFormatFamily::Currency,
+        source,
+        target,
+        before.copied().map(NativeDisplayValue::Currency),
+        after.copied().map(NativeDisplayValue::Currency),
         path,
         budget,
     )
@@ -416,24 +663,40 @@ fn read_display_format_with_budget(
     if cell.control_cell_spec_identifier().is_some() {
         return Err(DisplayReadError::WrongFormatFamily);
     }
-    match cell.cell_format_kind() {
-        Some(litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND) => {},
-        Some(_) => return Err(DisplayReadError::WrongFormatFamily),
-        None if format_identifier.is_some() || cell.explicit_format_flags() != 0 => {
+    let explicit_flags = cell.explicit_format_flags();
+    let secondary_identifier = cell.secondary_format_identifier();
+    match (family, cell.cell_format_kind()) {
+        (
+            DisplayFormatFamily::Number | DisplayFormatFamily::Percentage,
+            Some(litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND),
+        ) => {
+            if secondary_identifier.is_some() {
+                return Err(DisplayReadError::WrongFormatFamily);
+            }
+            if explicit_flags != 0 && explicit_flags != litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT
+            {
+                return Err(DisplayReadError::WrongFormatFamily);
+            }
+        },
+        (DisplayFormatFamily::Currency, Some(litchi_numbers_wire::CURRENCY_CELL_FORMAT_KIND)) => {
+            let expected_explicit =
+                litchi_numbers_wire::explicit_currency_format_flags(secondary_identifier.is_some());
+            if explicit_flags != 0 && explicit_flags != expected_explicit
+                || secondary_identifier.is_some_and(|identifier| identifier == 0)
+                || !currency_cell_type_matches_value(&cell, true)
+            {
+                return Err(Error::InvalidSource { path }.into());
+            }
+        },
+        (_, Some(_)) => return Err(DisplayReadError::WrongFormatFamily),
+        (_, None) if format_identifier.is_some() || explicit_flags != 0 => {
             return Err(DisplayReadError::WrongFormatFamily);
         },
-        None => return Ok(None),
+        (_, None) => return Ok(None),
     }
     let format_identifier = format_identifier
         .filter(|identifier| *identifier != 0)
         .ok_or(Error::InvalidSource { path })?;
-    if cell.secondary_format_identifier().is_some() {
-        return Err(DisplayReadError::WrongFormatFamily);
-    }
-    let explicit_flags = cell.explicit_format_flags();
-    if explicit_flags != 0 && explicit_flags != litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT {
-        return Err(DisplayReadError::WrongFormatFamily);
-    }
 
     let format_table_identifier = store
         .format_table()
@@ -517,6 +780,25 @@ fn read_display_format_with_budget(
         .ok_or(Error::InvalidSource { path })?;
     if entry.ref_count == 0 || !entry.is_format {
         return Err(Error::InvalidSource { path }.into());
+    }
+    if let Some(secondary_identifier) = secondary_identifier {
+        let secondary_entry = format_facts
+            .entries
+            .iter()
+            .find(|entry| entry.key == secondary_identifier)
+            .ok_or(Error::InvalidSource { path })?;
+        if secondary_entry.ref_count == 0 || !secondary_entry.is_format {
+            return Err(Error::InvalidSource { path }.into());
+        }
+        let (secondary, report) = number_codec::decode_number_format_with_report(
+            &secondary_entry.payload,
+            native::control_codec_options(secondary_entry.payload.len(), budget),
+        )
+        .map_err(|error| native::map_control_error(error, path))?;
+        native::charge_control_decode_report(budget, report, path)?;
+        if secondary.format_type() != NUMBER_FORMAT_TYPE {
+            return Err(Error::InvalidSource { path }.into());
+        }
     }
     let value = decode_display_payload(family, &entry.payload, budget, path)?;
     if explicit_flags == 0 {
@@ -634,24 +916,42 @@ fn rewrite_display_format(
     .map_err(|_| Error::InvalidSource { path })?;
     let cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
     let old_format = cell.format_identifier();
+    let old_secondary = cell.secondary_format_identifier();
     if cell.control_cell_spec_identifier().is_some() {
         return Err(Error::UnsupportedDependency { path });
     }
-    match (old_format, cell.cell_format_kind()) {
-        (Some(identifier), Some(litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND))
-            if identifier != 0 => {},
-        (None, None) => {},
-        _ => return Err(Error::UnsupportedDependency { path }),
-    }
-    if old_format.is_some() && cell.secondary_format_identifier().is_some() {
-        return Err(Error::UnsupportedDependency { path });
-    }
     let explicit_flags = cell.explicit_format_flags();
-    if explicit_flags != 0 && explicit_flags != litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT {
-        return Err(Error::UnsupportedDependency { path });
-    }
-    if old_format.is_none() && explicit_flags != 0 {
-        return Err(Error::InvalidSource { path });
+    match (family, old_format, cell.cell_format_kind()) {
+        (
+            DisplayFormatFamily::Number | DisplayFormatFamily::Percentage,
+            Some(identifier),
+            Some(litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND),
+        ) if identifier != 0 => {
+            if old_secondary.is_some()
+                || (explicit_flags != 0
+                    && explicit_flags != litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT)
+            {
+                return Err(Error::UnsupportedDependency { path });
+            }
+        },
+        (DisplayFormatFamily::Currency, Some(identifier), Some(kind))
+            if identifier != 0 && kind == litchi_numbers_wire::CURRENCY_CELL_FORMAT_KIND =>
+        {
+            let expected_explicit =
+                litchi_numbers_wire::explicit_currency_format_flags(old_secondary.is_some());
+            if explicit_flags != 0 && explicit_flags != expected_explicit
+                || old_secondary.is_some_and(|identifier| identifier == 0)
+                || !currency_cell_type_matches_value(&cell, true)
+            {
+                return Err(Error::UnsupportedDependency { path });
+            }
+        },
+        (_, None, None)
+            if explicit_flags == 0
+                && old_secondary.is_none()
+                && (family != DisplayFormatFamily::Currency
+                    || currency_cell_type_matches_value(&cell, false)) => {},
+        _ => return Err(Error::UnsupportedDependency { path }),
     }
     let format_table_identifier = store
         .format_table()
@@ -730,6 +1030,28 @@ fn rewrite_display_format(
         path,
     )?;
 
+    if family == DisplayFormatFamily::Currency {
+        if let Some(secondary_identifier) = old_secondary {
+            let secondary_entry = format_facts
+                .entries
+                .iter()
+                .find(|entry| entry.key == secondary_identifier)
+                .ok_or(Error::InvalidSource { path })?;
+            if secondary_entry.ref_count == 0 || !secondary_entry.is_format {
+                return Err(Error::InvalidSource { path });
+            }
+            let (secondary, report) = number_codec::decode_number_format_with_report(
+                &secondary_entry.payload,
+                native::control_codec_options(secondary_entry.payload.len(), budget),
+            )
+            .map_err(|error| native::map_control_error(error, path))?;
+            native::charge_control_decode_report(budget, report, path)?;
+            if secondary.format_type() != NUMBER_FORMAT_TYPE {
+                return Err(Error::InvalidSource { path });
+            }
+        }
+    }
+
     if let Some(old_key) = old_format {
         let entry = format_facts
             .entries
@@ -741,7 +1063,15 @@ fn rewrite_display_format(
         }
         let current = decode_display_payload(family, &entry.payload, budget, path)
             .map_err(|error| display_read_error_to_write_error(error, path))?;
-        if explicit_flags == litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT {
+        let expected_explicit = match family {
+            DisplayFormatFamily::Currency => {
+                litchi_numbers_wire::explicit_currency_format_flags(old_secondary.is_some())
+            },
+            DisplayFormatFamily::Number | DisplayFormatFamily::Percentage => {
+                litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT
+            },
+        };
+        if explicit_flags == expected_explicit {
             if before != Some(current) {
                 return Err(Error::PatchConflict);
             }
@@ -776,7 +1106,7 @@ fn rewrite_display_format(
         )?),
         (None, _) => None,
     };
-    let (new_format, new_format_key) = native::mutate_list(
+    let (mut new_format, new_format_key) = native::mutate_list(
         &format_payload,
         old_format,
         desired_payload.as_deref(),
@@ -784,12 +1114,40 @@ fn rewrite_display_format(
         budget,
         path,
     )?;
+    if family == DisplayFormatFamily::Currency && after.is_none() {
+        if let Some(secondary_identifier) = old_secondary {
+            (new_format, _) = native::mutate_list(
+                &new_format,
+                Some(secondary_identifier),
+                None,
+                true,
+                budget,
+                path,
+            )?;
+        }
+    }
     let replacement_cell = if after.is_some() {
         let key = new_format_key.ok_or(Error::InvalidSource { path })?;
-        rewrite_display_cell_metadata(cell_source, Some(key), path)?
+        if family == DisplayFormatFamily::Currency {
+            rewrite_currency_cell_metadata(cell_source, Some(key), path, budget)?
+        } else {
+            rewrite_display_cell_metadata(cell_source, Some(key), path)?
+        }
     } else {
-        rewrite_display_cell_metadata(cell_source, None, path)?
+        if family == DisplayFormatFamily::Currency {
+            rewrite_currency_cell_metadata(cell_source, None, path, budget)?
+        } else {
+            rewrite_display_cell_metadata(cell_source, None, path)?
+        }
     };
+    if family == DisplayFormatFamily::Currency {
+        charge_currency_tile_patch_budget(
+            tile_payload.len(),
+            replacement_cell.len(),
+            budget,
+            path,
+        )?;
+    }
     let patched_tile = popup_native::patch_tile_cell(
         &tile_payload,
         target.position.row(),
@@ -971,6 +1329,43 @@ fn decode_display_payload(
                 snapshot.decimal_places(),
                 snapshot.negative_style(),
                 snapshot.show_thousands_separator(),
+                None,
+                None,
+                path,
+            )?;
+            Ok(value)
+        },
+        DisplayFormatFamily::Currency => {
+            let (snapshot, report) =
+                match currency_codec::decode_currency_format_with_report(source, options) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return Err(classify_decode_failure(family, source, budget, path, error));
+                    },
+                };
+            native::charge_control_decode_report(budget, report, path)?;
+            let decimal_places = snapshot
+                .decimal_places()
+                .ok_or(Error::InvalidSource { path })?;
+            let currency_code = snapshot
+                .currency_code()
+                .ok_or(Error::InvalidSource { path })?;
+            let negative_style = snapshot
+                .negative_style()
+                .ok_or(Error::InvalidSource { path })?;
+            let show_thousands_separator = snapshot
+                .show_thousands_separator()
+                .ok_or(Error::InvalidSource { path })?;
+            let use_accounting_style = snapshot
+                .use_accounting_style()
+                .ok_or(Error::InvalidSource { path })?;
+            let value = NativeDisplayValue::from_parts(
+                family,
+                decimal_places,
+                negative_style,
+                show_thousands_separator,
+                Some(currency_code),
+                Some(use_accounting_style),
                 path,
             )?;
             Ok(value)
@@ -989,6 +1384,8 @@ fn decode_display_payload(
                 snapshot.decimal_places(),
                 snapshot.negative_style(),
                 snapshot.show_thousands_separator(),
+                None,
+                None,
                 path,
             )?;
             Ok(value)
@@ -1048,6 +1445,25 @@ fn prepare_display_rewrite(
             .map_err(|error| native::map_control_error(error, path))?;
             execute_number_rewrite(prepared, budget, path)
         },
+        DisplayFormatFamily::Currency => {
+            let NativeDisplayValue::Currency(value) = value else {
+                return Err(Error::UnsupportedDependency { path });
+            };
+            let code = value.code();
+            let prepared = currency_codec::prepare_currency_format_rewrite(
+                source,
+                currency_codec::CurrencyFormatWrite::new(
+                    code.as_str(),
+                    native_decimal_places(value.decimal_places()),
+                    native_negative_style(value.negative_style()),
+                    matches!(value.thousands_separator(), ThousandsSeparator::Shown),
+                    matches!(value.style(), CurrencyStyle::Accounting),
+                ),
+                options,
+            )
+            .map_err(|error| native::map_control_error(error, path))?;
+            execute_currency_rewrite(prepared, budget, path)
+        },
         DisplayFormatFamily::Percentage => {
             let NativeDisplayValue::Percentage(_) = value else {
                 return Err(Error::UnsupportedDependency { path });
@@ -1091,6 +1507,24 @@ fn prepare_display_append(
             )
             .map_err(|error| native::map_control_error(error, path))?;
             execute_number_append(prepared, budget, path)
+        },
+        DisplayFormatFamily::Currency => {
+            let NativeDisplayValue::Currency(value) = value else {
+                return Err(Error::UnsupportedDependency { path });
+            };
+            let code = value.code();
+            let prepared = currency_codec::prepare_currency_format_write(
+                currency_codec::CurrencyFormatWrite::new(
+                    code.as_str(),
+                    native_decimal_places(value.decimal_places()),
+                    native_negative_style(value.negative_style()),
+                    matches!(value.thousands_separator(), ThousandsSeparator::Shown),
+                    matches!(value.style(), CurrencyStyle::Accounting),
+                ),
+                options,
+            )
+            .map_err(|error| native::map_control_error(error, path))?;
+            execute_currency_append(prepared, budget, path)
         },
         DisplayFormatFamily::Percentage => {
             let NativeDisplayValue::Percentage(_) = value else {
@@ -1156,6 +1590,20 @@ fn execute_percentage_rewrite(
     Ok(output.into_bytes())
 }
 
+fn execute_currency_rewrite(
+    prepared: currency_codec::PreparedCurrencyFormatRewrite<'_>,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let requirements = prepared.execution_requirements();
+    native::charge_control_requirements(budget, requirements, path)?;
+    let output = prepared
+        .execute(currency_codec::RewriteExecutionLimits::exact(requirements))
+        .map_err(|error| native::map_control_error(error, path))?;
+    native::verify_control_report(output.report(), requirements, path)?;
+    Ok(output.into_bytes())
+}
+
 fn execute_number_append(
     prepared: number_codec::PreparedNumberFormatWrite,
     budget: &mut TransactionBudget,
@@ -1181,6 +1629,20 @@ fn execute_percentage_append(
         .execute(percentage_codec::RewriteExecutionLimits::exact(
             requirements,
         ))
+        .map_err(|error| native::map_control_error(error, path))?;
+    native::verify_control_report(output.report(), requirements, path)?;
+    Ok(output.into_bytes())
+}
+
+fn execute_currency_append(
+    prepared: currency_codec::PreparedCurrencyFormatWrite<'_>,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let requirements = prepared.execution_requirements();
+    native::charge_control_requirements(budget, requirements, path)?;
+    let output = prepared
+        .execute(currency_codec::RewriteExecutionLimits::exact(requirements))
         .map_err(|error| native::map_control_error(error, path))?;
     native::verify_control_report(output.report(), requirements, path)?;
     Ok(output.into_bytes())

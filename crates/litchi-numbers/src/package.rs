@@ -50,6 +50,7 @@ mod table;
 pub(crate) mod table_appearance;
 pub(crate) mod table_cell_control;
 pub(crate) mod table_cell_control_native;
+pub(crate) mod table_cell_currency_format;
 pub(crate) mod table_cell_display_format_native;
 pub(crate) mod table_cell_edit;
 pub(crate) mod table_cell_number_format;

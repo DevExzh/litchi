@@ -1,7 +1,8 @@
 # iWork Feature-Matrix Audit
 
 > Source audit starting at committed `b6e6ada83` (2026-09-01) and including the focused
-> Percentage-format slice completed from that baseline. This document records the rationale and
+> Percentage-format slice plus the current Currency-format owner work from that baseline. This
+> document records the rationale and
 > cross-suite gaps behind the three authoritative app matrices and does not replace them.
 
 ## Matrix state
@@ -25,7 +26,12 @@ The rows below are a conservative source-capability inventory, not a green test 
 The focused Percentage owner gate is green at the synthetic/codec level. A disposable native
 Numbers open/save/close/reopen probe plus a strict Rust semantic no-op readback is recorded in
 [ADR 0008](adr/0008-migration-and-verification.md#2026-09-01-amendment-numbers-existing-cell-percentage-format-native-validation-record),
-but formal native evidence promotion remains pending until the artifact and ledger are frozen.
+but formal native evidence promotion remains pending until the artifact and ledger are frozen. The
+focused Currency owner and codec are now source-visible with the focused codec filter green
+(4/4), the `litchi-numbers-wire` library is green at 32/32, and the latest package target is green
+at 22/22 after native BNC flag handling became shape-dependent. The operation-specific native Numbers candidate opened cleanly and
+survived native save/close/reopen with strict Rust no-op reread; exact hashes and settings are
+recorded in ADR 0008. This is operation-specific E3/E4 evidence, not a broad-format claim.
 Exact current and historical results are recorded in [IWORK_PROGRESS_AUDIT.md](IWORK_PROGRESS_AUDIT.md#current-worktree-verification).
 
 ## Shared IWA capabilities
@@ -110,7 +116,8 @@ Primary references: [package boundary](../crates/litchi-keynote/src/package.rs#L
 | Table settings | 🟡 | ✅ | 🟡 | Appearance, dimensions, headers/freeze/repeat, lock, title, and persisted sort configuration; no physical sort |
 | Cell controls/pop-up menus | 🟡 | 🟡 | 🟡 | Checkbox/star/slider/stepper/pop-up only, under strict graph profiles |
 | Existing-cell Number/Percentage display formats | 🟡 | ✅ | 🟡 | Selector-first existing-cell Number and Percentage read/set/reset operations preserve the scalar value and unrelated bytes. Number has operation-specific native evidence; Percentage focused/synthetic coverage is green, and ADR 0008 records a disposable native Numbers open/save/close/reopen plus strict Rust semantic no-op readback. The artifact/ledger is not frozen, so Percentage E3/E4 remain pending. See the [Numbers matrix](../crates/litchi-numbers/docs/FEATURE_MATRIX.md#cells-formulas-controls-and-annotations). |
-| Other generic display formats and rich styles | ❌ | ❌ | ❌ | Outside the focused Number/Percentage operations above, no general package getter or formatting transaction is exposed; currency, date, duration, text, custom, and rich-style families remain unsupported at this owner boundary. |
+| Existing-cell Currency display formats | 🟡 | ✅ | 🟡 | Selector-first existing-cell Currency read/set/clear/reset operations expose checked currency code, decimal, negative, thousands-separator, and Standard/Accounting settings while preserving the scalar value and unrelated bytes. The focused codec filter passes 4/4, the `litchi-numbers-wire` library passes 32/32, and the latest package target passes 22/22 after native BNC flag handling became shape-dependent: plain no-secondary Currency uses `0x0802`, while a Currency record carrying a secondary Number ID uses `0x0803` (`0x0802 | EXPLICIT_DECIMAL_FORMAT`, with `EXPLICIT_DECIMAL_FORMAT = 0x0001`). Standard versus Accounting does not choose this flag. ADR 0008 records operation-specific E3/E4 evidence: a clean native open, native save/close/reopen with the same scalar/settings/text, strict Rust no-op reread, exact inverse restoration, and exact candidate/native-resaved hashes. Bounded fuzz evidence remains separately scoped; no broad-format or deletion-gate claim is made. See the [Numbers matrix](../crates/litchi-numbers/docs/FEATURE_MATRIX.md#cells-formulas-controls-and-annotations). |
+| Other generic display formats and rich styles | ❌ | ❌ | ❌ | Outside the focused Number/Percentage/Currency operations above, no general package getter or formatting transaction is exposed; date, duration, text, custom, and rich-style families remain unsupported at this owner boundary. |
 | Cell comments/replies | 🟡 | 🟡 | 🟡 | Text-only, strict rooted/co-located ownership; no broad threads, authors, mentions, or attachments; current integration tests are red |
 | Charts/shapes/text boxes/media | ❌ | ❌ | ❌ | No focused semantic/package owner |
 | Filters/categories/groups/pivots | ❌ | ❌ | ❌ | Detection/refusal or schema presence only; no semantic CRUD |
@@ -154,8 +161,11 @@ Every supported read/write cell should name its focused API owner, executable te
 The existing-cell Percentage row currently has green focused/synthetic evidence and a disposable
 native Numbers probe recorded in ADR 0008. The probe includes strict semantic no-op readback of the
 native-resaved artifact, but it must remain below formal E3/E4 promotion until that evidence is
-attached to a frozen fixture/ledger. The checked native Number fixture only proves family-boundary
-behavior and does not promote Percentage native support.
+attached to a frozen fixture/ledger. The focused Currency row has source-visible owner/codec/tests
+and operation-specific native E3/E4 evidence recorded in ADR 0008, including exact
+candidate/native-resaved hashes and strict no-op reread. The checked native Number fixture only
+proves family-boundary behavior and does not promote Percentage native support; Currency evidence
+does not generalize beyond its stated existing-cell operation.
 
 ## Matrix maintenance requirements
 

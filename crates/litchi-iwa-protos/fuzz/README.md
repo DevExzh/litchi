@@ -91,6 +91,53 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
   -timeout=10 -rss_limit_mb=2048
 ```
 
+## Numbers Currency cell-format codec
+
+`numbers_table_cell_currency_format_codec` exercises the strict Currency
+variant of the borrowed `FormatStructArchive` seam. It covers native format
+type 257 with standard and accounting styles, automatic and fixed decimal
+places, validated three-letter currency codes, source-preserving rewrites,
+canonical appends, and exact scalar/report resource parity. Fixed recipes
+keep invalid code, style, decimal, and Boolean domains hot, together with
+missing-each-selected-field, duplicate, non-canonical, wrong-wire, truncated,
+malformed-group, and Number/Percentage cross-family refusals.
+
+Unknown scalar, length-delimited, and balanced-group spans are interleaved
+with selected fields, repeated, and checked by parsed wire order and exact
+multiplicity after every rewrite. The target accepts raw inputs up to 64 KiB
+and uses 128 KiB output, 16,384 fields, 512 KiB of aggregate work, and nesting
+depth 64. Corpus entries are small hand-authored `hex:` wire recipes; they
+are not copied native package bytes.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check numbers_table_cell_currency_format_codec
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build output
+outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-currency-format-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+cp corpus/numbers_table_cell_currency_format_codec/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  numbers_table_cell_currency_format_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
 ## Numbers formula-archive codec
 
 `numbers_formula_archive` sends one bounded, caller-owned

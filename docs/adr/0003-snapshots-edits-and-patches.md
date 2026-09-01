@@ -1732,3 +1732,36 @@ only source-built compatibility packages retain the generic route. This does
 not own Number, currency, scientific, fraction, numeral-system, date/time,
 duration, custom, text, or interactive-control formats, nor cell values,
 formulas, styles, table topology, or multi-edit patch composition.
+
+## 2026-09-01 amendment: Numbers existing-cell Currency-format transactions
+
+The focused Numbers owner now applies the same source-bound transaction contract
+to an existing cell's explicit `Currency` format. The archive-free value keeps
+the checked currency code, decimal-place policy, negative-value presentation,
+thousands-separator policy, and Standard/Accounting style. `None` means the
+cell has no explicit Currency format; an explicit automatic-decimal format is
+represented by `Some(Currency { decimal_places: Automatic, .. })`. The public
+surface is `Package::{table_cell_currency_format,
+edit_table_cell_currency_format, apply_table_cell_currency_format}` and accepts
+only semantic sheet/table selectors and a checked cell position.
+
+The transaction is existing-object-only and bound to one immutable exact
+package snapshot. Exact no-ops share the source. Changed edits validate the
+alternate-number BNC family, native type `257`, the optional secondary generic
+Number reference, full reference census, and refcount closure before applying
+copy-on-write. Commits expose content-free diagnostics, an exact-source patch,
+and an inverse; stale, foreign, replayed, wrong-family, malformed,
+over-budget, locked, or ambiguous sources fail before publication. Candidate
+reopening, selector-equivalent semantic readback, and physical ZIP-member
+locality are required before publication.
+
+The private Currency codec performs strict handwritten wire preflight before a
+borrowed Buffa lazy view. Unknown extension spans, unselected fields, scalar
+cell data, metadata, previews, and unrelated members remain source-authoritative.
+The deprecated `litchi_iwa::NumbersEditor` route delegates admitted exact
+graphs to this owner and cannot use a generic fallback after an exact-source
+rejection; only source-built compatibility packages retain the historical
+generic route. The operation-specific native Numbers acceptance/save/reopen
+evidence and strict no-op reread are recorded in ADR 0008. This slice does not
+create cells, author values/formulas, mutate general styles or table topology,
+or provide durable/composable patch history.
