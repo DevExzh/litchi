@@ -487,3 +487,23 @@ host availability, 132 GiB disk free, and exhausted swap. No parallel build,
 latency, RSS, allocation, physical-I/O, or OOM-prevention claim follows. XLS
 freshness optimization remains an open hotspot, while the bounded serial ABBA
 driver is retained as evidence infrastructure.
+
+## Change 0359 compliance update
+
+Change 0359 adds callback-scoped verified decoded readers at the owning ZIP and
+OPC layers. The HRTB reader cannot escape its callback; Store and Deflate paths
+drain and verify exact size, CRC, and compressed consumption before returning
+success. OPC applies source, cancellation, part, work, and managed-memory
+fences without materializing `PartData` or admitting the payload to its cache.
+Typed callback errors remain available when a higher-priority source or
+archive error wins. This preserves the low-level ownership boundary and the
+panic-free public API rules.
+
+The fixed 16 KiB statement covers decoder scratch, not the pre-existing
+archive-wide strict-layout proof. Validation was serial and crate-scoped:
+ZIP `4/4` focused and `319/319` library; OPC `6/6` focused, `277/277` library,
+`13/13` accounting integration, and `6/6` source-reader integration. The
+on-disk target was 381 MiB with approximately 14 GiB host availability, 134
+GiB disk free, and exhausted swap. See [Change 0359](changes/0359-callback-scoped-verified-decoded-readers.md).
+No speed, RSS, allocation, constant-memory, or OOM-prevention claim follows;
+`performance_claim: none`.

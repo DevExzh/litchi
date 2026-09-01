@@ -3878,3 +3878,27 @@ The target's peak/final observed footprint was 1.9 GiB; host availability was
 approximately 14 GiB with 132 GiB disk free and exhausted swap. No parallel
 build or OOM-prevention claim follows. XLS freshness optimization remains
 open.
+
+## Change 0359: callback-scoped verified decoded readers
+
+Change 0359 adds an HRTB callback boundary for verified Store and Deflate
+decoded reads in `soapberry-zip`, then exposes it through `litchi-opc::PartView`.
+The reader uses fixed 16 KiB decoder scratch, finite interrupted-read retries,
+deferred invalid-`consume` errors, and drain-to-EOF verification of exact size,
+CRC, and compressed consumption. Archive or transport failures retain a typed
+callback error as secondary; callback errors outrank accounting-only failures.
+
+The OPC wrapper applies part limits, declared work, managed scratch, source
+version, and execution/cancellation fences. It bypasses `PartData`, payload
+cache admission, and declared-payload memory reservation. The pre-existing
+archive-wide strict-layout proof is explicitly outside the fixed-scratch
+claim.
+
+Serial validation passed ZIP `4/4` focused and `319/319` library tests; OPC
+passed `6/6` focused, `277/277` library, `13/13` accounting integration, and
+`6/6` source-reader integration. The one on-disk target was 381 MiB with
+approximately 14 GiB host availability, 134 GiB disk free, and exhausted swap.
+No parallel build ran. The current XLSX selected-cell path remains unchanged
+and still materializes its worksheet/store; streaming MCE/x14ac and semantic
+scanning are later work. See [Change 0359](changes/0359-callback-scoped-verified-decoded-readers.md);
+`performance_claim: none`.

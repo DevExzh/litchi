@@ -95,6 +95,24 @@ correctness/resource evidence only, not latency, RSS, allocation, physical-I/O,
 or OOM-prevention evidence. XLS freshness optimization remains open; the
 serial ABBA driver is reusable evidence infrastructure.
 
+## Latest verified decoded-reader foundation (change 0359)
+
+Change 0359 adds callback-scoped verified Store/Deflate readers to
+`soapberry-zip` and `litchi-opc`. The callback reader uses fixed 16 KiB decoder
+scratch, cannot escape its HRTB scope, and is drained through exact size, CRC,
+and compressed-consumption verification after an ordinary callback return.
+The OPC wrapper preserves source/cancellation/error precedence, charges part
+work and managed scratch, and bypasses `PartData` and payload-cache admission.
+The pre-existing archive-wide strict-layout proof is explicitly outside the
+fixed-scratch claim.
+
+Serial correctness evidence is ZIP `4/4` focused and `319/319` library; OPC
+`6/6` focused, `277/277` library, `13/13` accounting integration, and `6/6`
+source-reader integration. The single on-disk target was 381 MiB with
+approximately 14 GiB host availability, 134 GiB disk free, and exhausted swap.
+No performance baseline changed. See [Change 0359](changes/0359-callback-scoped-verified-decoded-readers.md);
+`performance_claim: none`.
+
 ## Latest XLSB source-ingress hard-probe result (change 0354)
 
 Change 0354 separates recoverable private XLSB source probes from hard

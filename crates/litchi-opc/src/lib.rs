@@ -76,6 +76,6 @@ pub use source_backed::{
     PartData, PartView, SourceArtifact, SourceArtifactFingerprint, SourceBackedPackage,
     SourceCacheCounterDelta, SourceCacheDiagnostics, SourceCacheDiagnosticsError,
     SourceCacheLimitError, SourceCacheLimits, SourceLineage, SourceRelationshipTarget,
-    SourceTopologyPlan,
+    SourceTopologyPlan, VerifiedDecodedReaderError,
 };
 pub use validation::{validate_read_at, validate_read_at_with_limits};
