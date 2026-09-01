@@ -67,6 +67,34 @@ ODF MIME decode before strict bounding, infallible Presentation aggregate
 prepared ODP reparse, OPC case lookup, and selected-Part materialization
 remain open.
 
+## Latest rejected XLS worksheet span result (change 0358)
+
+Change 0358 tested a stateless worksheet payload-span candidate bounded by 64
+KiB and 1,024 consecutive payloads, with no CFB API. Correctness passed while
+the candidate was present: Python driver `15/15`, span `9/9`, `source_backed`
+`46/46`, `litchi-xls` library `1021/1021`, CFB cursor `7/7`, and fragmentation
+`9/9`. A serial six-selector A1/B1/B2/A2 ABBA retained 12,000 samples across
+24 groups with 20 warmups per fresh child, one child at a time, CPU 2, a 2 GiB
+child cap, no retries, one Cargo build lane, and an on-disk target.
+
+One-cell counters changed by `+316` read bytes, `-79` reads, and `-158`
+version calls. Claim-bearing p50/mean deltas were
+`+4.984845886382849%`/`+4.771328093073383%` and
+`+5.785582423178705%`/`+5.78027327071032%` in the two A-to-B legs. Exactly
+five p99 gates failed: FileSource/list A1 -> A2 `+6.59542478684531%`,
+FileSource/list A2 -> B2 `-6.916640348285569%`, FileSource/one-cell B1 -> B2
+`+8.748517200474495%`, AtomicFile/one-cell A1 -> A2 `-5.699947129465672%`,
+and AtomicFile/one-cell B1 -> B2 `+6.439283716879541%`. The candidate and
+tests were reverted without narrowing or rerunning the gate. Evidence is
+retained in [Change 0358](changes/0358-xls-worksheet-span-batching-rejected.md);
+`performance_claim: none`.
+
+The target peak/final observed footprint was 1.9 GiB with approximately 14 GiB
+host availability, 132 GiB disk free, and exhausted swap. This is rejected
+correctness/resource evidence only, not latency, RSS, allocation, physical-I/O,
+or OOM-prevention evidence. XLS freshness optimization remains open; the
+serial ABBA driver is reusable evidence infrastructure.
+
 ## Latest XLSB source-ingress hard-probe result (change 0354)
 
 Change 0354 separates recoverable private XLSB source probes from hard

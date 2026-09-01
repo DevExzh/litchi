@@ -1,0 +1,11 @@
+change: 0358-xls-source-span-abba
+verdict: rejected
+samples: 500
+groups: 24/24
+gates_passed: False
+failures: 5
+- same_side gate failed for file-source/list A1->A2 p99: observed 6.59542478684531, threshold 5%
+- candidate_tail gate failed for file-source/list A2->B2 p99: observed -6.916640348285569, threshold -5%
+- same_side gate failed for file-source/one-cell B1->B2 p99: observed 8.748517200474495, threshold 5%
+- same_side gate failed for atomic-file/one-cell A1->A2 p99: observed -5.699947129465672, threshold 5%
+- same_side gate failed for atomic-file/one-cell B1->B2 p99: observed 6.439283716879541, threshold 5%

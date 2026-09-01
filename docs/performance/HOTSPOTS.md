@@ -2844,3 +2844,30 @@ Presentation aggregate `Vec`/`join`, portable same-size identity, native PPT
 probe-time mutation coverage, `Current User` plus `Workbook` OLE classifier
 inconsistency, applicable prepared ODP reparsing, OPC case lookup, and
 selected-Part materialization. Evidence is recorded in [Change 0357](changes/0357-workbook-presentation-two-ceiling-policy.md).
+
+## Change 0358 update
+
+Change 0358 is a rejected and reverted XLS worksheet-span hotspot experiment.
+The candidate used stateless 64 KiB/1,024-item consecutive payload spans and
+no CFB API. Correctness passed while present (`15/15` Python driver, `9/9`
+span, `46/46` source-backed, `1021/1021` litchi-xls, `7/7` CFB cursor, and
+`9/9` fragmentation). The serial six-selector ABBA retained 12,000 samples
+across all 24 groups with 20 warmups per fresh child, one child at a time, CPU
+2, a 2 GiB child cap, no retries, and one Cargo build lane.
+
+The mechanism changed one-cell work by `+316` read bytes, `-79` reads, and
+`-158` version calls, while the claim-bearing A1 -> B1 and A2 -> B2 p50/mean
+deltas were `+4.984845886382849%`/`+4.771328093073383%` and
+`+5.785582423178705%`/`+5.78027327071032%`. Exactly five p99 gates failed:
+FileSource/list A1 -> A2 `+6.59542478684531%`, FileSource/list A2 -> B2
+`-6.916640348285569%`, FileSource/one-cell B1 -> B2 `+8.748517200474495%`,
+AtomicFile/one-cell A1 -> A2 `-5.699947129465672%`, and AtomicFile/one-cell
+B1 -> B2 `+6.439283716879541%`. No gate narrowing or rerun was made; production
+and candidate tests were reverted. The approximately 7.4M evidence is
+retained in [Change 0358](changes/0358-xls-worksheet-span-batching-rejected.md)
+and the OOM-bounded serial driver is reusable evidence infrastructure.
+
+The target peak/final observed footprint was 1.9 GiB, host availability was
+approximately 14 GiB with 132 GiB disk free, and swap was exhausted. No
+latency, RSS, allocation, physical-I/O, or OOM-prevention claim follows.
+The XLS freshness optimization queue remains open.
