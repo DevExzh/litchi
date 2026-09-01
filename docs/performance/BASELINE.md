@@ -113,6 +113,22 @@ approximately 14 GiB host availability, 134 GiB disk free, and exhausted swap.
 No performance baseline changed. See [Change 0359](changes/0359-callback-scoped-verified-decoded-readers.md);
 `performance_claim: none`.
 
+## Latest bounded streaming MCE foundation (change 0360)
+
+Change 0360 adds independent raw and selected-semantic callback observers to
+`litchi-ooxml-common::mce`. The parser validates every branch to EOF and applies
+finite event, raw-event-byte, attribute, context, name, and existing MCE
+structural ceilings without creating a normalized document buffer. Split UTF-8
+BOM handling, finite interrupted retries, typed deferred consume errors, and
+callback-secondary error retention are part of the contract.
+
+Serial validation passed `11/11` focused streaming tests, `223/223` library
+tests, and `1/1` existing markup-compatibility integration test. The one
+on-disk target was 267 MiB with approximately 14 GiB host availability, 134 GiB
+disk free, and exhausted swap. This does not change a performance baseline and
+does not establish fixed-memory or OOM safety. See [Change 0360](changes/0360-bounded-streaming-mce-events.md);
+`performance_claim: none`.
+
 ## Latest XLSB source-ingress hard-probe result (change 0354)
 
 Change 0354 separates recoverable private XLSB source probes from hard

@@ -2889,3 +2889,20 @@ build ran. This foundation does not yet replace XLSX worksheet/store
 materialization. Streaming MCE/x14ac, full-EOF worksheet semantics, bounded
 shared-string/style lookup, and measurement remain open. See [Change 0359](changes/0359-callback-scoped-verified-decoded-readers.md);
 `performance_claim: none`.
+
+## Change 0360 update
+
+Change 0360 removes the next architectural blocker for selected-cell XLSX
+streaming by adding a bounded MCE event processor. Raw observers see inactive
+branch elements needed for later x14ac marker checks, while active observers
+receive only selected semantic events. The parser reaches EOF after callback
+errors and applies finite token, event, attribute, context, namespace, depth,
+choice, and name bounds without building a normalized document.
+
+Focused `11/11`, library `223/223`, and existing integration `1/1` tests passed
+in one serial build lane. The target was 267 MiB; no parallel build ran. This
+is bounded streaming rather than fixed-memory or OOM-safe processing because
+quick-XML internals, decoded values, collection overhead, and callback-owned
+state remain outside the strict byte estimate. XLSX x14ac/worksheet consumers
+and selected-cell scanning remain open. See [Change 0360](changes/0360-bounded-streaming-mce-events.md);
+`performance_claim: none`.

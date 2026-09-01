@@ -507,3 +507,22 @@ on-disk target was 381 MiB with approximately 14 GiB host availability, 134
 GiB disk free, and exhausted swap. See [Change 0359](changes/0359-callback-scoped-verified-decoded-readers.md).
 No speed, RSS, allocation, constant-memory, or OOM-prevention claim follows;
 `performance_claim: none`.
+
+## Change 0360 compliance update
+
+Change 0360 adds a callback-scoped streaming MCE event processor in the owning
+`litchi-ooxml-common` crate while leaving the legacy byte-buffer API unchanged.
+HRTB raw and active event views cannot escape their callbacks. The processor
+retains namespace, directive, AlternateContent, inactive-branch, and opaque
+extension semantics, continues to EOF after callback errors, and retains typed
+secondary errors. The new stream contract also makes end-name, root/tail,
+declaration, hidden-reference, and AlternateContent CDATA validation explicit.
+
+Finite event, raw-event-byte, attribute, context, name, depth, choice, and
+directive ceilings support bounded streaming, but quick-XML internal state,
+decoded allocations, container overhead, and callback allocations preclude a
+fixed-memory or OOM-safety claim. Serial validation passed `11/11` focused,
+`223/223` library, and `1/1` existing integration tests. The single on-disk
+target was 267 MiB with approximately 14 GiB host availability, 134 GiB disk
+free, and exhausted swap. See [Change 0360](changes/0360-bounded-streaming-mce-events.md);
+`performance_claim: none`.
