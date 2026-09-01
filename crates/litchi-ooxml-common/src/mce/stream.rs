@@ -492,37 +492,84 @@ impl fmt::Display for InterruptedRetriesExceeded {
 
 impl std::error::Error for InterruptedRetriesExceeded {}
 
-#[derive(Default)]
-struct FillState {
-    interrupted: usize,
+const INTERRUPTED_RETRY_BUFFER_SIZE: usize = 8 * 1024;
+
+struct InterruptedRetryReader<'a> {
+    input: &'a mut dyn BufRead,
+    buffer: [u8; INTERRUPTED_RETRY_BUFFER_SIZE],
+    position: usize,
+    length: usize,
+    invalid_consume: bool,
 }
 
-impl FillState {
-    fn fill_buf<'a>(&mut self, input: &'a mut dyn BufRead) -> io::Result<&'a [u8]> {
-        match input.fill_buf() {
-            Ok(available) => {
-                self.interrupted = 0;
-                Ok(available)
-            },
-            Err(error)
-                if error.kind() == io::ErrorKind::Interrupted
-                    && self.interrupted < MAX_INTERRUPTED_RETRIES =>
-            {
-                self.interrupted += 1;
-                Err(error)
-            },
-            Err(error) if error.kind() == io::ErrorKind::Interrupted => {
-                self.interrupted = 0;
-                Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    InterruptedRetriesExceeded,
-                ))
-            },
-            Err(error) => {
-                self.interrupted = 0;
-                Err(error)
-            },
+impl<'a> InterruptedRetryReader<'a> {
+    fn new(input: &'a mut dyn BufRead) -> Self {
+        Self {
+            input,
+            buffer: [0; INTERRUPTED_RETRY_BUFFER_SIZE],
+            position: 0,
+            length: 0,
+            invalid_consume: false,
         }
+    }
+}
+
+impl Read for InterruptedRetryReader<'_> {
+    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        if output.is_empty() {
+            return Ok(0);
+        }
+        let available = self.fill_buf()?;
+        let amount = available.len().min(output.len());
+        output[..amount].copy_from_slice(&available[..amount]);
+        self.consume(amount);
+        Ok(amount)
+    }
+}
+
+impl BufRead for InterruptedRetryReader<'_> {
+    fn fill_buf(&mut self) -> io::Result<&[u8]> {
+        if self.invalid_consume {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                InvalidMeterConsume,
+            ));
+        }
+        if self.position == self.length {
+            self.position = 0;
+            self.length = 0;
+            let mut interrupted = 0;
+            loop {
+                match self.input.read(&mut self.buffer) {
+                    Ok(length) => {
+                        self.length = length;
+                        break;
+                    },
+                    Err(error)
+                        if error.kind() == io::ErrorKind::Interrupted
+                            && interrupted < MAX_INTERRUPTED_RETRIES =>
+                    {
+                        interrupted += 1;
+                    },
+                    Err(error) if error.kind() == io::ErrorKind::Interrupted => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            InterruptedRetriesExceeded,
+                        ));
+                    },
+                    Err(error) => return Err(error),
+                }
+            }
+        }
+        Ok(&self.buffer[self.position..self.length])
+    }
+
+    fn consume(&mut self, amount: usize) {
+        if amount > self.length.saturating_sub(self.position) {
+            self.invalid_consume = true;
+            return;
+        }
+        self.position += amount;
     }
 }
 
@@ -532,10 +579,15 @@ impl FillState {
 #[non_exhaustive]
 pub enum StreamError<RawE, ActiveE> {
     /// The input reader or event meter failed. Callback errors, if any, are
-    /// retained in the same value.
+    /// retained in the same value. During raw-only recovery this is primary
+    /// over the retained MCE error, which is available through
+    /// [`Self::prior_mce_error`].
     Input {
         /// Primary input failure.
         error: io::Error,
+        /// Earlier semantic MCE failure retained when recovery later found
+        /// an input failure.
+        prior_mce_error: Option<Error>,
         /// First raw observer failure.
         raw_error: Option<RawE>,
         /// First active observer failure.
@@ -545,6 +597,9 @@ pub enum StreamError<RawE, ActiveE> {
     Mce {
         /// Primary MCE/XML failure.
         error: Error,
+        /// Earlier semantic MCE failure retained when a later raw structural
+        /// failure was promoted to primary.
+        prior_mce_error: Option<Error>,
         /// First raw observer failure.
         raw_error: Option<RawE>,
         /// First active observer failure.
@@ -578,6 +633,20 @@ impl<RawE, ActiveE> StreamError<RawE, ActiveE> {
             Self::Input { active_error, .. }
             | Self::Mce { active_error, .. }
             | Self::Callback { active_error, .. } => active_error.as_ref(),
+        }
+    }
+
+    /// Return an earlier MCE failure retained during raw-only recovery.
+    #[must_use]
+    pub fn prior_mce_error(&self) -> Option<&Error> {
+        match self {
+            Self::Input {
+                prior_mce_error, ..
+            }
+            | Self::Mce {
+                prior_mce_error, ..
+            } => prior_mce_error.as_ref(),
+            Self::Callback { .. } => None,
         }
     }
 
@@ -617,23 +686,27 @@ impl<RawE: fmt::Display, ActiveE: fmt::Display> fmt::Display for StreamError<Raw
         match self {
             Self::Input {
                 error,
+                prior_mce_error,
                 raw_error,
                 active_error,
             } => write_primary_with_callbacks(
                 f,
                 "MCE stream input error",
                 error,
+                prior_mce_error.as_ref(),
                 raw_error.as_ref(),
                 active_error.as_ref(),
             ),
             Self::Mce {
                 error,
+                prior_mce_error,
                 raw_error,
                 active_error,
             } => write_primary_with_callbacks(
                 f,
                 "MCE stream validation error",
                 error,
+                prior_mce_error.as_ref(),
                 raw_error.as_ref(),
                 active_error.as_ref(),
             ),
@@ -658,10 +731,14 @@ fn write_primary_with_callbacks<T: fmt::Display, RawE: fmt::Display, ActiveE: fm
     f: &mut fmt::Formatter<'_>,
     label: &str,
     primary: &T,
+    prior_mce_error: Option<&Error>,
     raw_error: Option<&RawE>,
     active_error: Option<&ActiveE>,
 ) -> fmt::Result {
     write!(f, "{label}: {primary}")?;
+    if let Some(error) = prior_mce_error {
+        write!(f, " (prior MCE: {})", prior_mce_kind(error))?;
+    }
     if let Some(error) = raw_error {
         write!(f, " (raw observer: {error})")?;
     }
@@ -669,6 +746,16 @@ fn write_primary_with_callbacks<T: fmt::Display, RawE: fmt::Display, ActiveE: fm
         write!(f, " (active observer: {error})")?;
     }
     Ok(())
+}
+
+fn prior_mce_kind(error: &Error) -> &'static str {
+    match error {
+        Error::NonConformant(_) => "non-conformant",
+        Error::MustUnderstand(_) => "must-understand",
+        Error::LimitExceeded(_) => "limit-exceeded",
+        Error::Allocation { .. } => "allocation",
+        Error::Xml(_) => "xml",
+    }
 }
 
 impl<RawE: std::error::Error + 'static, ActiveE: std::error::Error + 'static> std::error::Error
@@ -714,6 +801,14 @@ where
 /// Active observers run only for visible selected events.  Each observer is
 /// independently disabled after its first error; parsing and validation still
 /// continue to EOF so a later XML/MCE error remains the primary failure.
+/// After a recoverable semantic MCE error, active processing is disabled and
+/// the same input is drained through the bounded raw validator so raw
+/// observers still see subsequent elements.  If that drain encounters a
+/// transport I/O error, [`StreamError::Input`] is primary and retains the
+/// first semantic failure in [`StreamError::prior_mce_error`].
+/// Recovery is limited to `NonConformant` and `MustUnderstand` failures after
+/// the current raw event has been committed; XML/tokenization, allocation,
+/// limit, and input failures terminate without draining.
 /// The streaming conformance layer additionally requires one document root,
 /// rejects non-whitespace text outside that root, and checks end-tag names;
 /// callers must not assume byte-for-byte parity with the legacy normalizer for
@@ -738,11 +833,13 @@ where
 {
     limits.validate().map_err(|error| StreamError::Mce {
         error,
+        prior_mce_error: None,
         raw_error: None,
         active_error: None,
     })?;
 
-    let mut prefix_reader = PrefixReader::new(input);
+    let mut retry_reader = InterruptedRetryReader::new(input);
+    let mut prefix_reader = PrefixReader::new(&mut retry_reader);
     if let Err(error) = prefix_reader.initialize() {
         if error
             .get_ref()
@@ -751,12 +848,14 @@ where
         {
             return Err(StreamError::Mce {
                 error: limit("input Interrupted retries"),
+                prior_mce_error: None,
                 raw_error: None,
                 active_error: None,
             });
         }
         return Err(StreamError::Input {
             error,
+            prior_mce_error: None,
             raw_error: None,
             active_error: None,
         });
@@ -765,6 +864,7 @@ where
     if prefix_bytes > limits.processing.max_input_bytes {
         return Err(StreamError::Mce {
             error: limit("input bytes"),
+            prior_mce_error: None,
             raw_error: None,
             active_error: None,
         });
@@ -789,6 +889,7 @@ where
                 resource: "MCE stream event buffer",
                 source,
             },
+            prior_mce_error: None,
             raw_error: None,
             active_error: None,
         })?;
@@ -798,117 +899,201 @@ where
     let mut active_error = None;
     let mut raw_enabled = true;
     let mut active_enabled = true;
+    let mut recovering = false;
+    let mut recovery_error = None;
 
     loop {
+        state.raw_state_valid = false;
         reader.get_mut().begin_event();
         let decoder = reader.decoder();
         let event = match reader.read_event_into(&mut event_buffer) {
             Ok(event) => event,
             Err(error) => {
                 let failure = stream_error_from_quick_xml(error, raw_error, active_error);
+                if recovering {
+                    return match failure {
+                        StreamError::Input {
+                            error,
+                            raw_error,
+                            active_error,
+                            ..
+                        } => Err(StreamError::Input {
+                            error,
+                            prior_mce_error: recovery_error.take(),
+                            raw_error,
+                            active_error,
+                        }),
+                        StreamError::Mce {
+                            error,
+                            raw_error,
+                            active_error,
+                            ..
+                        } => Err(StreamError::Mce {
+                            error,
+                            prior_mce_error: recovery_error.take(),
+                            raw_error,
+                            active_error,
+                        }),
+                        StreamError::Callback {
+                            raw_error,
+                            active_error,
+                        } => Err(StreamError::Mce {
+                            error: recovery_error
+                                .take()
+                                .unwrap_or_else(|| bad("stream recovery failure")),
+                            prior_mce_error: None,
+                            raw_error,
+                            active_error,
+                        }),
+                    };
+                }
                 return Err(failure);
             },
         };
+        let is_eof = matches!(&event, Event::Eof);
 
         if !matches!(&event, &Event::Eof | &Event::DocType(_) | &Event::PI(_)) {
             if let Err(error) = state.count_event() {
+                if recovering {
+                    return Err(StreamError::Mce {
+                        error,
+                        prior_mce_error: recovery_error.take(),
+                        raw_error,
+                        active_error,
+                    });
+                }
                 return Err(StreamError::Mce {
                     error,
+                    prior_mce_error: None,
                     raw_error,
                     active_error,
                 });
             }
         }
 
-        let result = match event {
-            Event::Start(element) => state.start(
-                &element,
-                decoder,
-                false,
-                &mut raw,
-                &mut raw_enabled,
-                &mut raw_error,
-                &mut active,
-                &mut active_enabled,
-                &mut active_error,
-            ),
-            Event::Empty(element) => state.start(
-                &element,
-                decoder,
-                true,
-                &mut raw,
-                &mut raw_enabled,
-                &mut raw_error,
-                &mut active,
-                &mut active_enabled,
-                &mut active_error,
-            ),
-            Event::End(element) => state.end(
-                &element,
-                &mut active,
-                &mut active_enabled,
-                &mut active_error,
-            ),
-            Event::Text(text) => match text.decode().map_err(xml_error) {
-                Ok(decoded) => state.text(
-                    text.as_ref(),
-                    decoded,
-                    TextKind::Text,
+        let result = if recovering {
+            state.raw_event(event, decoder, &mut raw, &mut raw_enabled, &mut raw_error)
+        } else {
+            match event {
+                Event::Start(element) => state.start(
+                    &element,
+                    decoder,
+                    false,
+                    &mut raw,
+                    &mut raw_enabled,
+                    &mut raw_error,
                     &mut active,
                     &mut active_enabled,
                     &mut active_error,
                 ),
-                Err(error) => Err(error),
-            },
-            Event::CData(text) => match text.decode().map_err(xml_error) {
-                Ok(decoded) => state.text(
-                    text.as_ref(),
-                    decoded,
-                    TextKind::CData,
+                Event::Empty(element) => state.start(
+                    &element,
+                    decoder,
+                    true,
+                    &mut raw,
+                    &mut raw_enabled,
+                    &mut raw_error,
                     &mut active,
                     &mut active_enabled,
                     &mut active_error,
                 ),
-                Err(error) => Err(error),
-            },
-            Event::Comment(text) => match text.decode().map_err(xml_error) {
-                Ok(decoded) => state.text(
-                    text.as_ref(),
-                    decoded,
-                    TextKind::Comment,
+                Event::End(element) => state.end(
+                    &element,
                     &mut active,
                     &mut active_enabled,
                     &mut active_error,
                 ),
-                Err(error) => Err(error),
-            },
-            Event::Decl(decl) => state.decl(
-                decl.as_ref(),
-                &mut active,
-                &mut active_enabled,
-                &mut active_error,
-            ),
-            Event::GeneralRef(reference) => state.reference(
-                &reference,
-                &mut active,
-                &mut active_enabled,
-                &mut active_error,
-            ),
-            Event::DocType(_) | Event::PI(_) => {
-                Err(bad("DTD and processing instructions are rejected"))
-            },
-            Event::Eof => state.eof(),
+                Event::Text(text) => match text.decode().map_err(xml_error) {
+                    Ok(decoded) => state.text(
+                        text.as_ref(),
+                        decoded,
+                        TextKind::Text,
+                        &mut active,
+                        &mut active_enabled,
+                        &mut active_error,
+                    ),
+                    Err(error) => Err(error),
+                },
+                Event::CData(text) => match text.decode().map_err(xml_error) {
+                    Ok(decoded) => state.text(
+                        text.as_ref(),
+                        decoded,
+                        TextKind::CData,
+                        &mut active,
+                        &mut active_enabled,
+                        &mut active_error,
+                    ),
+                    Err(error) => Err(error),
+                },
+                Event::Comment(text) => match text.decode().map_err(xml_error) {
+                    Ok(decoded) => state.text(
+                        text.as_ref(),
+                        decoded,
+                        TextKind::Comment,
+                        &mut active,
+                        &mut active_enabled,
+                        &mut active_error,
+                    ),
+                    Err(error) => Err(error),
+                },
+                Event::Decl(decl) => state.decl(
+                    decl.as_ref(),
+                    &mut active,
+                    &mut active_enabled,
+                    &mut active_error,
+                ),
+                Event::GeneralRef(reference) => state.reference(
+                    &reference,
+                    &mut active,
+                    &mut active_enabled,
+                    &mut active_error,
+                ),
+                Event::DocType(_) | Event::PI(_) => {
+                    Err(bad("DTD and processing instructions are rejected"))
+                },
+                Event::Eof => state.eof(),
+            }
         };
 
         event_buffer.clear();
         reader.get_mut().finish_event();
 
         if let Err(error) = result {
+            if !recovering && state.can_recover(&error) && !is_eof {
+                recovery_error = Some(error);
+                recovering = true;
+                active_enabled = false;
+                state.stack.clear();
+                state.stack.shrink_to_fit();
+                continue;
+            }
+            if recovering {
+                return Err(StreamError::Mce {
+                    error,
+                    prior_mce_error: recovery_error.take(),
+                    raw_error,
+                    active_error,
+                });
+            }
             return Err(StreamError::Mce {
                 error,
+                prior_mce_error: None,
                 raw_error,
                 active_error,
             });
+        }
+        if recovering {
+            if is_eof {
+                return Err(StreamError::Mce {
+                    error: recovery_error
+                        .take()
+                        .unwrap_or_else(|| bad("stream recovery failure")),
+                    prior_mce_error: None,
+                    raw_error,
+                    active_error,
+                });
+            }
+            continue;
         }
         if state.finished {
             return finish_callbacks(raw_error, active_error, state.report.clone());
@@ -958,6 +1143,7 @@ fn stream_error_from_quick_xml<RawE, ActiveE>(
             {
                 return StreamError::Mce {
                     error: limit("input Interrupted retries"),
+                    prior_mce_error: None,
                     raw_error,
                     active_error,
                 };
@@ -969,6 +1155,7 @@ fn stream_error_from_quick_xml<RawE, ActiveE>(
             {
                 return StreamError::Mce {
                     error: limit("stream event bytes"),
+                    prior_mce_error: None,
                     raw_error,
                     active_error,
                 };
@@ -980,6 +1167,7 @@ fn stream_error_from_quick_xml<RawE, ActiveE>(
             {
                 return StreamError::Mce {
                     error: limit("input bytes"),
+                    prior_mce_error: None,
                     raw_error,
                     active_error,
                 };
@@ -991,19 +1179,22 @@ fn stream_error_from_quick_xml<RawE, ActiveE>(
             {
                 return StreamError::Mce {
                     error: bad("invalid event meter consume"),
+                    prior_mce_error: None,
                     raw_error,
                     active_error,
                 };
             }
             StreamError::Input {
                 error: Arc::try_unwrap(error)
-                    .unwrap_or_else(|error| io::Error::other(error.to_string())),
+                    .unwrap_or_else(|error| io::Error::new(error.kind(), error)),
+                prior_mce_error: None,
                 raw_error,
                 active_error,
             }
         },
         error => StreamError::Mce {
             error: Error::Xml(error.to_string()),
+            prior_mce_error: None,
             raw_error,
             active_error,
         },
@@ -1039,26 +1230,14 @@ impl<'a> PrefixReader<'a> {
         if self.initialized {
             return Ok(());
         }
-        let mut fill_state = FillState::default();
         while self.prefix_len < self.prefix.len() {
-            let amount = loop {
-                match EventMeter::source_fill_buf(self.input, &mut fill_state) {
-                    Ok(available) => {
-                        if available.is_empty() {
-                            break None;
-                        }
-                        let amount = (self.prefix.len() - self.prefix_len).min(available.len());
-                        self.prefix[self.prefix_len..self.prefix_len + amount]
-                            .copy_from_slice(&available[..amount]);
-                        break Some(amount);
-                    },
-                    Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
-                    Err(error) => return Err(error),
-                }
-            };
-            let Some(amount) = amount else {
+            let available = self.input.fill_buf()?;
+            if available.is_empty() {
                 break;
-            };
+            }
+            let amount = (self.prefix.len() - self.prefix_len).min(available.len());
+            self.prefix[self.prefix_len..self.prefix_len + amount]
+                .copy_from_slice(&available[..amount]);
             self.prefix_len += amount;
             self.consumed += amount;
             self.input.consume(amount);
@@ -1144,7 +1323,6 @@ struct EventMeter<'a> {
     precharged_replay: usize,
     exposed_remaining: usize,
     invalid_consume: bool,
-    fill_state: FillState,
 }
 
 impl<'a> EventMeter<'a> {
@@ -1164,7 +1342,6 @@ impl<'a> EventMeter<'a> {
             precharged_replay,
             exposed_remaining: 0,
             invalid_consume: false,
-            fill_state: FillState::default(),
         }
     }
 
@@ -1180,13 +1357,6 @@ impl<'a> EventMeter<'a> {
 
     fn remaining(&self) -> usize {
         self.event_limit.saturating_sub(self.event_bytes)
-    }
-
-    fn source_fill_buf<'b>(
-        input: &'b mut dyn BufRead,
-        state: &mut FillState,
-    ) -> io::Result<&'b [u8]> {
-        state.fill_buf(input)
     }
 }
 
@@ -1215,7 +1385,7 @@ impl BufRead for EventMeter<'_> {
             .total_limit
             .saturating_sub(self.total_bytes)
             .saturating_add(self.precharged_replay);
-        let available = Self::source_fill_buf(self.input, &mut self.fill_state)?;
+        let available = self.input.fill_buf()?;
         if available.is_empty() {
             self.exposed_remaining = 0;
             return Ok(available);
@@ -1458,9 +1628,18 @@ struct Frame {
     expanded_name: Name,
 }
 
+struct RawFrame {
+    ns: Namespaces,
+    context_bytes: usize,
+    qualified_name: String,
+    opaque: bool,
+    alternate_content: bool,
+}
+
 struct ElementData<'a> {
     qualified_name: Cow<'a, [u8]>,
     expanded_name: Name,
+    namespace: Namespaces,
     attrs: Vec<RawAttribute<'a>>,
 }
 
@@ -1468,9 +1647,14 @@ struct Processor<'a> {
     capabilities: &'a Capabilities,
     limits: &'a StreamLimits,
     stack: Vec<Frame>,
+    raw_stack: Vec<RawFrame>,
     root_seen: bool,
+    raw_root_seen: bool,
     prolog_started: bool,
     declaration_seen: bool,
+    raw_prolog_started: bool,
+    raw_declaration_seen: bool,
+    raw_state_valid: bool,
     finished: bool,
     report: StreamReport,
 }
@@ -1481,9 +1665,14 @@ impl<'a> Processor<'a> {
             capabilities,
             limits,
             stack: Vec::new(),
+            raw_stack: Vec::new(),
             root_seen: false,
+            raw_root_seen: false,
             prolog_started: false,
             declaration_seen: false,
+            raw_prolog_started: false,
+            raw_declaration_seen: false,
+            raw_state_valid: false,
             finished: false,
             report: StreamReport::default(),
         }
@@ -1499,6 +1688,10 @@ impl<'a> Processor<'a> {
             return Err(limit("stream event count"));
         }
         Ok(())
+    }
+
+    fn can_recover(&self, error: &Error) -> bool {
+        self.raw_state_valid && matches!(error, Error::NonConformant(_) | Error::MustUnderstand(_))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1518,11 +1711,15 @@ impl<'a> Processor<'a> {
         Raw: for<'b> FnMut(RawElement<'b>) -> Result<(), RawE>,
         Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<(), ActiveE>,
     {
-        if self.stack.len() >= self.limits.processing.max_depth {
+        if self.raw_stack.len() >= self.limits.processing.max_depth {
             return Err(limit("depth"));
         }
         self.prolog_started = true;
-        let data = self.parse_element(element, decoder)?;
+        let raw_parent = self
+            .raw_stack
+            .last()
+            .map_or_else(Namespaces::root, |frame| frame.ns.clone());
+        let data = self.parse_element(element, decoder, &raw_parent)?;
         if *raw_enabled {
             let raw = RawElement {
                 kind: if empty {
@@ -1543,6 +1740,10 @@ impl<'a> Processor<'a> {
                 *raw_enabled = false;
             }
         }
+
+        validate_duplicate_attributes(&data.attrs, self.limits)?;
+        self.raw_start_commit(&data, empty)?;
+        self.raw_state_valid = true;
 
         let parent_active = self.stack.last().is_none_or(|frame| frame.active);
         let mut context = self
@@ -1762,7 +1963,7 @@ impl<'a> Processor<'a> {
 
     fn close_start(
         &mut self,
-        context: Context,
+        mut context: Context,
         mode: Mode,
         active: bool,
         data: ElementData<'_>,
@@ -1779,6 +1980,20 @@ impl<'a> Processor<'a> {
                 return Err(bad("empty AlternateContent"));
             }
             return Ok(());
+        }
+        let retained_name_bytes = data
+            .qualified_name
+            .as_ref()
+            .len()
+            .checked_add(data.expanded_name.namespace.len())
+            .and_then(|bytes| bytes.checked_add(data.expanded_name.local_name.len()))
+            .ok_or_else(|| limit("stream context bytes"))?;
+        context.bytes = context
+            .bytes
+            .checked_add(retained_name_bytes)
+            .ok_or_else(|| limit("stream context bytes"))?;
+        if context.bytes > self.limits.max_context_bytes {
+            return Err(limit("stream context bytes"));
         }
         reserve_vec(&mut self.stack, 1, "MCE stream element stack")?;
         let qualified_name = {
@@ -1805,6 +2020,8 @@ impl<'a> Processor<'a> {
     where
         Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<(), ActiveE>,
     {
+        self.raw_end(element)?;
+        self.raw_state_valid = true;
         let frame = self.stack.last().ok_or_else(|| bad("unexpected end"))?;
         let end_name = element.name();
         let end_name = end_name.as_ref();
@@ -1846,6 +2063,8 @@ impl<'a> Processor<'a> {
     where
         Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<(), ActiveE>,
     {
+        self.raw_text(raw, kind)?;
+        self.raw_state_valid = true;
         self.prolog_started = true;
         if self.stack.is_empty() {
             if matches!(kind, TextKind::CData) {
@@ -1907,6 +2126,8 @@ impl<'a> Processor<'a> {
     where
         Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<(), ActiveE>,
     {
+        self.raw_decl(declaration)?;
+        self.raw_state_valid = true;
         if self.declaration_seen || self.prolog_started || self.root_seen || !self.stack.is_empty()
         {
             return Err(bad("late XML declaration"));
@@ -1936,6 +2157,8 @@ impl<'a> Processor<'a> {
     where
         Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<(), ActiveE>,
     {
+        self.raw_reference(reference)?;
+        self.raw_state_valid = true;
         if self.stack.is_empty() {
             return Err(bad("reference outside document root"));
         }
@@ -1967,6 +2190,8 @@ impl<'a> Processor<'a> {
     }
 
     fn eof(&mut self) -> Result<(), Error> {
+        self.raw_eof()?;
+        self.raw_state_valid = true;
         if !self.stack.is_empty() {
             return Err(bad("unterminated XML"));
         }
@@ -1977,22 +2202,241 @@ impl<'a> Processor<'a> {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn raw_start<RawE, Raw>(
+        &mut self,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+        empty: bool,
+        raw_callback: &mut Raw,
+        raw_enabled: &mut bool,
+        raw_error: &mut Option<RawE>,
+    ) -> Result<(), Error>
+    where
+        Raw: for<'b> FnMut(RawElement<'b>) -> Result<(), RawE>,
+    {
+        if self.raw_stack.len() >= self.limits.processing.max_depth {
+            return Err(limit("depth"));
+        }
+        let raw_parent = self
+            .raw_stack
+            .last()
+            .map_or_else(Namespaces::root, |frame| frame.ns.clone());
+        let data = self.parse_element(element, decoder, &raw_parent)?;
+        if *raw_enabled {
+            let raw = RawElement {
+                kind: if empty {
+                    RawElementKind::Empty
+                } else {
+                    RawElementKind::Start
+                },
+                qualified_name: Cow::Borrowed(data.qualified_name.as_ref()),
+                expanded_name: clone_bounded_name(
+                    &data.expanded_name,
+                    self.limits,
+                    "MCE stream raw expanded element name",
+                )?,
+                attributes: clone_raw_attributes(&data.attrs, self.limits)?,
+            };
+            if let Err(error) = raw_callback(raw) {
+                *raw_error = Some(error);
+                *raw_enabled = false;
+            }
+        }
+        validate_duplicate_attributes(&data.attrs, self.limits)?;
+        self.raw_start_commit(&data, empty)
+    }
+
+    fn raw_start_commit(&mut self, data: &ElementData<'_>, empty: bool) -> Result<(), Error> {
+        self.raw_prolog_started = true;
+        if self.raw_stack.is_empty() {
+            if self.raw_root_seen {
+                return Err(bad("multiple roots"));
+            }
+            self.raw_root_seen = true;
+        }
+        let parent_context_bytes = self.raw_stack.last().map_or(0, |frame| frame.context_bytes);
+        let parent_namespace_bytes = self.raw_stack.last().map_or(0, |frame| frame.ns.bytes);
+        let namespace_delta = data
+            .namespace
+            .bytes
+            .checked_sub(parent_namespace_bytes)
+            .ok_or_else(|| limit("stream context bytes"))?;
+        let inherited_opaque = self.raw_stack.last().is_some_and(|frame| frame.opaque);
+        let directive_bytes = if inherited_opaque {
+            0
+        } else {
+            raw_directive_bytes(&data.attrs, &data.expanded_name, self.limits)?
+        };
+        let frame_name_bytes = data.qualified_name.as_ref().len();
+        let context_bytes = parent_context_bytes
+            .checked_add(namespace_delta)
+            .and_then(|bytes| bytes.checked_add(directive_bytes))
+            .and_then(|bytes| bytes.checked_add(frame_name_bytes))
+            .ok_or_else(|| limit("stream context bytes"))?;
+        if context_bytes > self.limits.max_context_bytes {
+            return Err(limit("stream context bytes"));
+        }
+        if empty {
+            return Ok(());
+        }
+        reserve_vec(&mut self.raw_stack, 1, "MCE stream raw element stack")?;
+        let qualified_name = str::from_utf8(data.qualified_name.as_ref()).map_err(xml_error)?;
+        let qualified_name =
+            clone_bounded_string(qualified_name, self.limits, "MCE stream raw frame name")?;
+        let current_opaque =
+            inherited_opaque || self.capabilities.extensions.contains(&data.expanded_name);
+        let alternate_content = !current_opaque
+            && data.expanded_name.namespace == NAMESPACE
+            && data.expanded_name.local_name == "AlternateContent";
+        self.raw_stack.push(RawFrame {
+            ns: data.namespace.clone(),
+            context_bytes,
+            qualified_name,
+            opaque: current_opaque,
+            alternate_content,
+        });
+        Ok(())
+    }
+
+    fn raw_end(&mut self, element: &BytesEnd<'_>) -> Result<(), Error> {
+        let frame = self.raw_stack.last().ok_or_else(|| bad("unexpected end"))?;
+        let end_name = element.name();
+        let end_name = end_name.as_ref();
+        check_name_bytes(end_name, self.limits)?;
+        let found = str::from_utf8(end_name).map_err(xml_error)?;
+        if found != frame.qualified_name {
+            return Err(bad("mismatched end tag"));
+        }
+        self.raw_stack.pop();
+        Ok(())
+    }
+
+    fn raw_text(&mut self, raw: &[u8], kind: TextKind) -> Result<(), Error> {
+        self.raw_prolog_started = true;
+        if self.raw_stack.is_empty() {
+            if matches!(kind, TextKind::CData) {
+                return Err(bad("CDATA outside document root"));
+            }
+            if matches!(kind, TextKind::Comment) {
+                return Ok(());
+            }
+            if !raw.iter().all(|byte| byte.is_ascii_whitespace()) {
+                return Err(bad("text outside document root"));
+            }
+            return Ok(());
+        }
+        if self.raw_stack.last().is_some_and(|frame| {
+            frame.alternate_content
+                && (matches!(kind, TextKind::CData)
+                    || (matches!(kind, TextKind::Text)
+                        && !raw.iter().all(|byte| byte.is_ascii_whitespace())))
+        }) {
+            return Err(bad("invalid content directly inside AlternateContent"));
+        }
+        Ok(())
+    }
+
+    fn raw_decl(&mut self, declaration: &[u8]) -> Result<(), Error> {
+        let _ = declaration;
+        if self.raw_declaration_seen
+            || self.raw_prolog_started
+            || self.raw_root_seen
+            || !self.raw_stack.is_empty()
+        {
+            return Err(bad("late XML declaration"));
+        }
+        self.raw_declaration_seen = true;
+        self.raw_prolog_started = true;
+        Ok(())
+    }
+
+    fn raw_reference(&mut self, reference: &quick_xml::events::BytesRef<'_>) -> Result<(), Error> {
+        if self.raw_stack.is_empty() {
+            return Err(bad("reference outside document root"));
+        }
+        if self
+            .raw_stack
+            .last()
+            .is_some_and(|frame| frame.alternate_content)
+        {
+            return Err(bad("general reference directly inside AlternateContent"));
+        }
+        self.raw_prolog_started = true;
+        check_name_bytes(reference.as_ref(), self.limits)?;
+        let char_ref = reference.resolve_char_ref().map_err(xml_error)?;
+        let name = reference.decode().map_err(xml_error)?;
+        if !matches!(name.as_ref(), "amp" | "lt" | "gt" | "apos" | "quot") && char_ref.is_none() {
+            return Err(bad("custom entity"));
+        }
+        Ok(())
+    }
+
+    fn raw_eof(&mut self) -> Result<(), Error> {
+        if !self.raw_stack.is_empty() {
+            return Err(bad("unterminated XML"));
+        }
+        if !self.raw_root_seen {
+            return Err(bad("missing document root"));
+        }
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn raw_event<RawE, Raw>(
+        &mut self,
+        event: Event<'_>,
+        decoder: Decoder,
+        raw_callback: &mut Raw,
+        raw_enabled: &mut bool,
+        raw_error: &mut Option<RawE>,
+    ) -> Result<(), Error>
+    where
+        Raw: for<'b> FnMut(RawElement<'b>) -> Result<(), RawE>,
+    {
+        match event {
+            Event::Start(element) => self.raw_start(
+                &element,
+                decoder,
+                false,
+                raw_callback,
+                raw_enabled,
+                raw_error,
+            ),
+            Event::Empty(element) => self.raw_start(
+                &element,
+                decoder,
+                true,
+                raw_callback,
+                raw_enabled,
+                raw_error,
+            ),
+            Event::End(element) => self.raw_end(&element),
+            Event::Text(text) => self.raw_text(text.as_ref(), TextKind::Text),
+            Event::CData(text) => self.raw_text(text.as_ref(), TextKind::CData),
+            Event::Comment(text) => self.raw_text(text.as_ref(), TextKind::Comment),
+            Event::Decl(declaration) => self.raw_decl(declaration.as_ref()),
+            Event::GeneralRef(reference) => self.raw_reference(&reference),
+            Event::DocType(_) | Event::PI(_) => {
+                Err(bad("DTD and processing instructions are rejected"))
+            },
+            Event::Eof => self.raw_eof(),
+        }
+    }
+
     fn parse_element<'b>(
         &mut self,
         element: &BytesStart<'b>,
         decoder: Decoder,
+        parent_ns: &Namespaces,
     ) -> Result<ElementData<'b>, Error> {
         let element_name = element.name();
         let qualified_name = element_name.as_ref();
         check_name_bytes(qualified_name, self.limits)?;
         let qualified = str::from_utf8(qualified_name).map_err(xml_error)?;
-        let parent = self
-            .stack
-            .last()
-            .map_or_else(Context::root, |frame| frame.ctx.clone());
         let mut preliminary = Vec::new();
         let mut attr_bytes = 0usize;
-        for attribute in element.attributes().with_checks(true) {
+        for attribute in element.attributes().with_checks(false) {
             let attribute = attribute.map_err(xml_error)?;
             check_name_bytes(attribute.key.as_ref(), self.limits)?;
             attr_bytes = attr_bytes
@@ -2032,24 +2476,13 @@ impl<'a> Processor<'a> {
             });
         }
         let local = local_namespaces(&preliminary, self.limits)?;
-        let namespace = parent.ns.with_local(local, self.limits)?;
+        let namespace = parent_ns.with_local(local, self.limits)?;
         let expanded_name = expand(qualified, &namespace, true, self.limits)?;
         check_expanded_name(&expanded_name, self.limits)?;
-        let mut seen = HashSet::new();
-        try_reserve_set(&mut seen, preliminary.len(), "MCE stream attributes")?;
         for attribute in &mut preliminary {
             attribute.expanded_name =
                 expand_attribute(attribute.qualified_name.as_ref(), &namespace, self.limits)?;
             check_expanded_name(&attribute.expanded_name, self.limits)?;
-            if !is_namespace_attribute(attribute.qualified_name.as_ref())
-                && !seen.insert(clone_bounded_name(
-                    &attribute.expanded_name,
-                    self.limits,
-                    "MCE stream duplicate attribute name",
-                )?)
-            {
-                return Err(bad("duplicate attribute"));
-            }
         }
         Ok(ElementData {
             qualified_name: clone_bounded_bytes(
@@ -2058,9 +2491,67 @@ impl<'a> Processor<'a> {
                 "MCE stream element name",
             )?,
             expanded_name,
+            namespace,
             attrs: preliminary,
         })
     }
+}
+
+fn raw_directive_bytes(
+    attrs: &[RawAttribute<'_>],
+    element_name: &Name,
+    limits: &StreamLimits,
+) -> Result<usize, Error> {
+    let mut bytes = 0usize;
+    let mut tokens = 0usize;
+    for attribute in attrs {
+        if is_namespace_attribute(attribute.qualified_name.as_ref()) {
+            continue;
+        }
+        let is_requires = element_name.namespace == NAMESPACE
+            && element_name.local_name == "Choice"
+            && attribute.expanded_name.namespace.is_empty()
+            && semantic_attr_name(attribute) == b"Requires";
+        if attribute.expanded_name.namespace != NAMESPACE && !is_requires {
+            continue;
+        }
+        let value = attribute.decoded_value.as_ref();
+        bytes = bytes
+            .checked_add(value.len())
+            .and_then(|value_bytes| value_bytes.checked_add(1))
+            .ok_or_else(|| limit("stream context bytes"))?;
+        for token in value.split_whitespace() {
+            tokens = tokens
+                .checked_add(1)
+                .ok_or_else(|| limit("directive tokens"))?;
+            if tokens > limits.processing.max_directive_tokens {
+                return Err(limit("directive tokens"));
+            }
+            check_name_bytes(token.as_bytes(), limits)?;
+        }
+    }
+    Ok(bytes)
+}
+
+fn validate_duplicate_attributes(
+    attrs: &[RawAttribute<'_>],
+    limits: &StreamLimits,
+) -> Result<(), Error> {
+    let mut seen = HashSet::new();
+    try_reserve_set(&mut seen, attrs.len(), "MCE stream attributes")?;
+    for attribute in attrs {
+        if is_namespace_attribute(attribute.qualified_name.as_ref()) {
+            continue;
+        }
+        if !seen.insert(clone_bounded_name(
+            &attribute.expanded_name,
+            limits,
+            "MCE stream duplicate attribute name",
+        )?) {
+            return Err(bad("duplicate attribute"));
+        }
+    }
+    Ok(())
 }
 
 impl<'a> SemanticEvent<'a> {

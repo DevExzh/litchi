@@ -2906,3 +2906,23 @@ quick-XML internals, decoded values, collection overhead, and callback-owned
 state remain outside the strict byte estimate. XLSX x14ac/worksheet consumers
 and selected-cell scanning remain open. See [Change 0360](changes/0360-bounded-streaming-mce-events.md);
 `performance_claim: none`.
+
+## Change 0361 update
+
+Change 0361 implements the bounded streaming x14ac raw and active observer
+foundation in `litchi-xlsx`. The MCE raw observer sees ordinary and alias
+duplicates before generic duplicate validation. Semantic `NonConformant` or
+`MustUnderstand` results can use raw-only one-pass recovery; a later XML,
+input, or limit error becomes primary while the typed prior semantic error is
+retained. The MCE and `AlternateContent` x14ac byte-compatibility branch now
+streams while the plain fast path remains unchanged.
+
+The branch uses a fixed 8 KiB `InterruptedRetryReader`, at most eight
+interrupted-read retries, and the existing bounded stream limits. MCE recovery
+`7/7`, raw attributes `4/4`, x14ac focused `12/12`, worksheet `35/35`,
+`litchi-ooxml-common` library `234/234`, and `litchi-xlsx` library `813/813`
+tests passed. x14ac `capture_rows=true` can retain a `BTreeMap` up to
+configured `ROWS`; quick-XML and observer allocations remain outside the
+fixed input-buffer claim. This is not selected-cell or full-worksheet
+streaming and makes no latency, RSS, or OOM-safety claim. See [Change 0361](changes/0361-bounded-streaming-x14ac-observers.md);
+`performance_claim: none`.

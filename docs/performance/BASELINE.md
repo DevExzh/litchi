@@ -113,6 +113,27 @@ approximately 14 GiB host availability, 134 GiB disk free, and exhausted swap.
 No performance baseline changed. See [Change 0359](changes/0359-callback-scoped-verified-decoded-readers.md);
 `performance_claim: none`.
 
+## Latest bounded streaming x14ac observer foundation (change 0361)
+
+Change 0361 adds the bounded streaming x14ac raw and active observer
+foundation to `litchi-xlsx`. The MCE raw observer sees ordinary and alias
+duplicates before generic duplicate validation. After semantic
+`NonConformant` or `MustUnderstand`, raw-only one-pass recovery retains a
+typed prior semantic error when a later XML, input, or limit failure becomes
+primary. The MCE and `AlternateContent` x14ac byte-compatibility branch now
+streams while the plain fast path remains unchanged.
+
+Input uses a fixed 8 KiB `InterruptedRetryReader` with at most eight
+interrupted-read retries and the existing bounded stream limits. Validation
+passed MCE recovery `7/7`, raw attributes `4/4`, x14ac focused `12/12`,
+worksheet `35/35`, `litchi-ooxml-common` library `234/234`, and `litchi-xlsx`
+library `813/813`. No performance baseline changed. x14ac `capture_rows=true`
+can retain a `BTreeMap` up to configured `ROWS`; quick-XML and observer
+allocations are outside the fixed input-buffer claim. This is not selected-cell
+or full-worksheet streaming and makes no latency, RSS, or OOM-safety claim.
+See [Change 0361](changes/0361-bounded-streaming-x14ac-observers.md);
+`performance_claim: none`.
+
 ## Latest bounded streaming MCE foundation (change 0360)
 
 Change 0360 adds independent raw and selected-semantic callback observers to

@@ -833,6 +833,7 @@ mod streaming_0360_tests {
                 error: Error::Xml(_) | Error::NonConformant(_),
                 raw_error: Some(raw),
                 active_error: Some(active),
+                ..
             } => {
                 assert_eq!(raw, "raw callback");
                 assert_eq!(active, "active callback");
@@ -852,6 +853,7 @@ mod streaming_0360_tests {
                 error: Error::NonConformant(_),
                 raw_error: Some(raw),
                 active_error: Some(active),
+                ..
             } => {
                 assert_eq!(raw, "raw callback");
                 assert_eq!(active, "active callback");
@@ -1116,5 +1118,682 @@ mod streaming_0360_tests {
         assert_eq!(report.preserved_elements, 1);
         assert_eq!(report.preserved_attributes, 1);
         assert_eq!(report.ignored_elements, 2);
+    }
+}
+#[cfg(test)]
+mod streaming_0361_raw_attribute_tests {
+    use super::super::{
+        Capabilities, Error,
+        stream::{
+            StreamError, StreamLimits, StreamReport,
+            process_markup_compatibility_stream_with_observers,
+        },
+    };
+    use std::io::{BufRead, Cursor};
+
+    type AttributeSnapshot = (String, Vec<u8>, String, String);
+
+    fn streaming_0361_raw_attributes(
+        input: &mut dyn BufRead,
+        limits: &StreamLimits,
+    ) -> (
+        Vec<AttributeSnapshot>,
+        Result<StreamReport, StreamError<&'static str, &'static str>>,
+    ) {
+        let mut attributes = Vec::new();
+        let result = process_markup_compatibility_stream_with_observers(
+            input,
+            &Capabilities::new(),
+            limits,
+            |element| {
+                attributes.extend(element.attrs().iter().map(|attribute| {
+                    (
+                        String::from_utf8_lossy(attribute.name()).into_owned(),
+                        attribute.value().to_vec(),
+                        attribute.expanded_name.namespace.clone(),
+                        attribute.expanded_name.local_name.clone(),
+                    )
+                }));
+                Ok::<(), &'static str>(())
+            },
+            |_| Ok::<(), &'static str>(()),
+        );
+        (attributes, result)
+    }
+
+    #[test]
+    fn streaming_0361_duplicate_ordinary_attributes_are_raw_before_primary_error() {
+        let mut input = Cursor::new(br#"<r value="one" value="two"/>"#);
+        let (attributes, result) =
+            streaming_0361_raw_attributes(&mut input, &StreamLimits::default());
+
+        assert_eq!(
+            attributes,
+            vec![
+                (
+                    "value".to_owned(),
+                    b"one".to_vec(),
+                    String::new(),
+                    "value".to_owned()
+                ),
+                (
+                    "value".to_owned(),
+                    b"two".to_vec(),
+                    String::new(),
+                    "value".to_owned()
+                ),
+            ]
+        );
+        match result {
+            Err(StreamError::Mce {
+                error: Error::NonConformant(message),
+                raw_error: None,
+                active_error: None,
+                ..
+            }) => assert_eq!(message, "duplicate attribute"),
+            _ => panic!("expected duplicate attribute validation after raw delivery"),
+        }
+    }
+
+    #[test]
+    fn streaming_0361_alias_attributes_are_raw_before_expanded_duplicate_error() {
+        let mut input = Cursor::new(
+            br#"<r xmlns:a="urn:shared" xmlns:b="urn:shared" a:value="one" b:value="two"/>"#,
+        );
+        let (attributes, result) =
+            streaming_0361_raw_attributes(&mut input, &StreamLimits::default());
+        let aliases: Vec<_> = attributes
+            .iter()
+            .filter(|(name, _, _, _)| name == "a:value" || name == "b:value")
+            .collect();
+
+        assert_eq!(aliases.len(), 2);
+        assert_eq!(aliases[0].0, "a:value");
+        assert_eq!(aliases[0].1, b"one");
+        assert_eq!(aliases[0].2, "urn:shared");
+        assert_eq!(aliases[0].3, "value");
+        assert_eq!(aliases[1].0, "b:value");
+        assert_eq!(aliases[1].1, b"two");
+        assert_eq!(aliases[1].2, "urn:shared");
+        assert_eq!(aliases[1].3, "value");
+        assert!(matches!(
+            result,
+            Err(StreamError::Mce {
+                error: Error::NonConformant(message),
+                raw_error: None,
+                active_error: None,
+                ..
+            }) if message == "duplicate attribute"
+        ));
+    }
+
+    #[test]
+    fn streaming_0361_raw_callback_error_is_secondary_to_duplicate_error() {
+        let mut input = Cursor::new(br#"<r value="one" value="two"/>"#);
+        let result = process_markup_compatibility_stream_with_observers(
+            &mut input,
+            &Capabilities::new(),
+            &StreamLimits::default(),
+            |_| Err::<(), &'static str>("raw sentinel"),
+            |_| Ok::<(), &'static str>(()),
+        );
+
+        assert!(matches!(
+            result,
+            Err(StreamError::Mce {
+                error: Error::NonConformant(message),
+                raw_error: Some("raw sentinel"),
+                active_error: None,
+                ..
+            }) if message == "duplicate attribute"
+        ));
+    }
+
+    fn streaming_0361_assert_no_raw_delivery(xml: &[u8], limits: StreamLimits) {
+        let mut input = Cursor::new(xml);
+        let (attributes, result) = streaming_0361_raw_attributes(&mut input, &limits);
+        assert!(
+            attributes.is_empty(),
+            "raw callback observed: {attributes:?}"
+        );
+        assert!(result.is_err(), "malformed or bounded input was accepted");
+    }
+
+    #[test]
+    fn streaming_0361_namespace_syntax_and_limits_fail_before_raw_delivery() {
+        streaming_0361_assert_no_raw_delivery(
+            br#"<r xmlns:a="urn:one" xmlns:a="urn:two"/>"#,
+            StreamLimits::default(),
+        );
+        streaming_0361_assert_no_raw_delivery(
+            br#"<r value="one" value="two/>"#,
+            StreamLimits::default(),
+        );
+
+        streaming_0361_assert_no_raw_delivery(
+            br#"<r first="1" second="2"/>"#,
+            StreamLimits {
+                max_attributes_per_event: 1,
+                ..StreamLimits::default()
+            },
+        );
+        streaming_0361_assert_no_raw_delivery(
+            br#"<root/>"#,
+            StreamLimits {
+                max_name_bytes: 3,
+                ..StreamLimits::default()
+            },
+        );
+        streaming_0361_assert_no_raw_delivery(
+            br#"<r value="123"/>"#,
+            StreamLimits {
+                max_attribute_bytes_per_event: 3,
+                ..StreamLimits::default()
+            },
+        );
+
+        let mut input = Cursor::new(br#"<r xmlns:a="urn:one" xmlns:a="urn:two"/>"#);
+        let (attributes, result) =
+            streaming_0361_raw_attributes(&mut input, &StreamLimits::default());
+        assert!(attributes.is_empty());
+        assert!(matches!(
+            result,
+            Err(StreamError::Mce {
+                error: Error::NonConformant(_),
+                ..
+            })
+        ));
+    }
+}
+
+#[cfg(test)]
+mod streaming_0361_raw_recovery_tests {
+    use super::super::{
+        Capabilities, Error, Name,
+        stream::{
+            RawElement, SemanticEvent, StreamError, StreamLimits,
+            process_markup_compatibility_stream_with_observers,
+        },
+    };
+    use std::{
+        cell::Cell,
+        io::{self, BufRead, Cursor, Read},
+    };
+
+    const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+
+    fn streaming_0361_recovery_raw_name(element: &RawElement<'_>) -> String {
+        String::from_utf8_lossy(element.name()).into_owned()
+    }
+
+    fn streaming_0361_recovery_source() -> String {
+        format!(
+            r#"<r xmlns:mc="{MC}"><mc:AlternateContent><mc:Choice Requires="missing"><bad/></mc:Choice></mc:AlternateContent><later></wrong></r>"#
+        )
+    }
+
+    fn streaming_0361_recovery_input_source() -> String {
+        format!(
+            r#"<r xmlns:mc="{MC}"><mc:AlternateContent><mc:Choice Requires="missing"><bad/></mc:Choice></mc:AlternateContent><later/><sentinel/></r>"#
+        )
+    }
+
+    struct Streaming0361RecoveryOneByte {
+        bytes: Vec<u8>,
+        position: usize,
+    }
+
+    impl Streaming0361RecoveryOneByte {
+        fn new(bytes: &[u8]) -> Self {
+            Self {
+                bytes: bytes.to_vec(),
+                position: 0,
+            }
+        }
+    }
+
+    impl Read for Streaming0361RecoveryOneByte {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            if output.is_empty() || self.position == self.bytes.len() {
+                return Ok(0);
+            }
+            output[0] = self.bytes[self.position];
+            self.position += 1;
+            Ok(1)
+        }
+    }
+
+    impl BufRead for Streaming0361RecoveryOneByte {
+        fn fill_buf(&mut self) -> io::Result<&[u8]> {
+            if self.position == self.bytes.len() {
+                Ok(&[])
+            } else {
+                Ok(&self.bytes[self.position..self.position + 1])
+            }
+        }
+
+        fn consume(&mut self, amount: usize) {
+            self.position = self.position.saturating_add(amount).min(self.bytes.len());
+        }
+    }
+
+    struct Streaming0361RecoveryInterruptedInput {
+        bytes: Vec<u8>,
+        position: usize,
+        interrupted: usize,
+    }
+
+    impl Streaming0361RecoveryInterruptedInput {
+        fn new(bytes: &[u8]) -> Self {
+            Self {
+                bytes: bytes.to_vec(),
+                position: 0,
+                interrupted: 0,
+            }
+        }
+    }
+
+    impl Read for Streaming0361RecoveryInterruptedInput {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            let available = self.fill_buf()?;
+            let amount = available.len().min(output.len());
+            output[..amount].copy_from_slice(&available[..amount]);
+            self.consume(amount);
+            Ok(amount)
+        }
+    }
+
+    impl BufRead for Streaming0361RecoveryInterruptedInput {
+        fn fill_buf(&mut self) -> io::Result<&[u8]> {
+            if self.position < self.bytes.len() {
+                return Ok(&self.bytes[self.position..]);
+            }
+            if self.interrupted < 8 {
+                self.interrupted += 1;
+                return Err(io::Error::new(io::ErrorKind::Interrupted, "retry"));
+            }
+            Err(io::Error::other("streaming 0361 injected input"))
+        }
+
+        fn consume(&mut self, amount: usize) {
+            self.position = self.position.saturating_add(amount).min(self.bytes.len());
+        }
+    }
+
+    #[test]
+    fn streaming_0361_raw_recovers_after_semantic_failure_and_wins_secondary() {
+        let xml = streaming_0361_recovery_source();
+        let semantic_failed = Cell::new(false);
+        let mut raw_names = Vec::new();
+        let mut active_names = Vec::new();
+        let mut raw_sentinel_calls = 0;
+        let mut active_after_failure = 0;
+        let mut input = Cursor::new(xml.as_bytes());
+        let result = process_markup_compatibility_stream_with_observers(
+            &mut input,
+            &Capabilities::new(),
+            &StreamLimits::default(),
+            |element| {
+                let name = streaming_0361_recovery_raw_name(&element);
+                if name == "mc:Choice" {
+                    semantic_failed.set(true);
+                }
+                raw_names.push(name.clone());
+                if name == "later" {
+                    raw_sentinel_calls += 1;
+                    Err::<(), &'static str>("raw sentinel")
+                } else {
+                    Ok::<(), &'static str>(())
+                }
+            },
+            |event| {
+                if semantic_failed.get() {
+                    active_after_failure += 1;
+                } else if let SemanticEvent::Start(element) = event {
+                    active_names.push(format!("start:{}", String::from_utf8_lossy(element.name())));
+                } else {
+                    active_names.push("other".to_owned());
+                }
+                Ok::<(), &'static str>(())
+            },
+        );
+
+        assert!(raw_names.iter().any(|name| name == "later"));
+        assert_eq!(raw_sentinel_calls, 1);
+        assert_eq!(active_names, vec!["start:r"]);
+        assert_eq!(active_after_failure, 0);
+        let error = result.unwrap_err();
+        assert!(matches!(
+            error.prior_mce_error(),
+            Some(Error::NonConformant(message)) if message == "unbound Requires prefix"
+        ));
+        assert!(matches!(
+            error.mce_error(),
+            Some(Error::Xml(_) | Error::NonConformant(_))
+        ));
+        match error {
+            StreamError::Mce {
+                error: Error::Xml(_) | Error::NonConformant(_),
+                prior_mce_error: Some(Error::NonConformant(message)),
+                raw_error: Some("raw sentinel"),
+                active_error: None,
+                ..
+            } => assert_eq!(message, "unbound Requires prefix"),
+            _ => panic!("expected semantic failure with retained raw sentinel"),
+        }
+    }
+
+    #[test]
+    fn streaming_0361_one_byte_recovery_resolves_nested_namespaces_and_pops_scopes() {
+        let xml = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:p="urn:outer"><mc:AlternateContent><mc:Choice Requires="missing"><bad/></mc:Choice></mc:AlternateContent><scope xmlns:p="urn:inner"><p:inside/></scope><p:outside/><later></wrong></r>"#
+        );
+        let semantic_failed = Cell::new(false);
+        let mut expanded = Vec::new();
+        let mut active_after_failure = 0;
+        let mut input = Streaming0361RecoveryOneByte::new(xml.as_bytes());
+        let result = process_markup_compatibility_stream_with_observers(
+            &mut input,
+            &Capabilities::new(),
+            &StreamLimits::default(),
+            |element| {
+                let name = streaming_0361_recovery_raw_name(&element);
+                if name == "mc:Choice" {
+                    semantic_failed.set(true);
+                }
+                let is_sentinel = name == "p:outside";
+                if name == "p:inside" || is_sentinel {
+                    expanded.push((
+                        name,
+                        element.expanded_name.namespace.clone(),
+                        element.expanded_name.local_name.clone(),
+                    ));
+                }
+                if is_sentinel {
+                    return Err::<(), &'static str>("raw sentinel");
+                }
+                Ok::<(), &'static str>(())
+            },
+            |_| {
+                if semantic_failed.get() {
+                    active_after_failure += 1;
+                }
+                Ok::<(), &'static str>(())
+            },
+        );
+
+        assert_eq!(
+            expanded,
+            vec![
+                (
+                    "p:inside".to_owned(),
+                    "urn:inner".to_owned(),
+                    "inside".to_owned(),
+                ),
+                (
+                    "p:outside".to_owned(),
+                    "urn:outer".to_owned(),
+                    "outside".to_owned(),
+                ),
+            ]
+        );
+        assert_eq!(active_after_failure, 0);
+        let error = result.unwrap_err();
+        assert!(matches!(
+            error.prior_mce_error(),
+            Some(Error::NonConformant(message)) if message == "unbound Requires prefix"
+        ));
+        assert!(matches!(
+            error.mce_error(),
+            Some(Error::Xml(_) | Error::NonConformant(_))
+        ));
+        assert!(matches!(
+            error,
+            StreamError::Mce {
+                error: Error::Xml(_) | Error::NonConformant(_),
+                prior_mce_error: Some(Error::NonConformant(message)),
+                raw_error: Some("raw sentinel"),
+                active_error: None,
+                ..
+            } if message == "unbound Requires prefix"
+        ));
+    }
+
+    #[test]
+    fn streaming_0361_input_failure_after_recovery_retains_raw_error() {
+        let xml = streaming_0361_recovery_input_source();
+        let semantic_failed = Cell::new(false);
+        let mut input = Streaming0361RecoveryInterruptedInput::new(xml.as_bytes());
+        let result = process_markup_compatibility_stream_with_observers(
+            &mut input,
+            &Capabilities::new(),
+            &StreamLimits::default(),
+            |element| {
+                if streaming_0361_recovery_raw_name(&element) == "mc:Choice" {
+                    semantic_failed.set(true);
+                }
+                if streaming_0361_recovery_raw_name(&element) == "sentinel" {
+                    Err::<(), &'static str>("raw sentinel")
+                } else {
+                    Ok::<(), &'static str>(())
+                }
+            },
+            |_| {
+                if semantic_failed.get() {
+                    panic!("active callback invoked after semantic failure");
+                }
+                Ok::<(), &'static str>(())
+            },
+        );
+
+        let error = result.unwrap_err();
+        assert!(matches!(
+            error.prior_mce_error(),
+            Some(Error::NonConformant(message)) if message == "unbound Requires prefix"
+        ));
+        match error {
+            StreamError::Input {
+                error,
+                prior_mce_error: Some(Error::NonConformant(message)),
+                raw_error: Some("raw sentinel"),
+                active_error: None,
+                ..
+            } => {
+                assert_eq!(message, "unbound Requires prefix");
+                assert_eq!(error.to_string(), "streaming 0361 injected input");
+            },
+            _ => panic!("expected injected input failure with retained raw error"),
+        }
+    }
+
+    #[test]
+    fn streaming_0361_semantic_failure_without_later_errors_is_not_a_report() {
+        let xml = format!(
+            r#"<r xmlns:mc="{MC}"><mc:AlternateContent><mc:Choice Requires="missing"/></mc:AlternateContent></r>"#
+        );
+        let mut input = Cursor::new(xml.as_bytes());
+        let result = process_markup_compatibility_stream_with_observers(
+            &mut input,
+            &Capabilities::new(),
+            &StreamLimits::default(),
+            |_| Ok::<(), &'static str>(()),
+            |_| Ok::<(), &'static str>(()),
+        );
+
+        let error = result.unwrap_err();
+        assert!(error.prior_mce_error().is_none());
+        match error {
+            StreamError::Mce {
+                error: Error::NonConformant(message),
+                prior_mce_error: None,
+                raw_error: None,
+                active_error: None,
+                ..
+            } => assert_eq!(message, "unbound Requires prefix"),
+            _ => panic!("expected original semantic MCE failure, not a report"),
+        }
+    }
+
+    #[test]
+    fn streaming_0361_opaque_extension_emits_lexical_mce_content() {
+        let mut capabilities = Capabilities::new();
+        capabilities.preserve_extension_element(Name {
+            namespace: "urn:ext".to_owned(),
+            local_name: "opaque".to_owned(),
+        });
+        let xml = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:ext="urn:ext" mc:Ignorable="ext"><ext:opaque><mc:AlternateContent>plain<![CDATA[cdata]]></mc:AlternateContent></ext:opaque></r>"#
+        );
+        let mut elements = Vec::new();
+        let mut text = Vec::new();
+        let mut cdata = Vec::new();
+        let mut input = Cursor::new(xml.as_bytes());
+        let report =
+            process_markup_compatibility_stream_with_observers(
+                &mut input,
+                &capabilities,
+                &StreamLimits::default(),
+                |_| Ok::<(), &'static str>(()),
+                |event| {
+                    match &event {
+                        SemanticEvent::Start(element) => elements
+                            .push(format!("start:{}", String::from_utf8_lossy(element.name()))),
+                        SemanticEvent::Empty(element) => elements
+                            .push(format!("empty:{}", String::from_utf8_lossy(element.name()))),
+                        SemanticEvent::End(element) => elements
+                            .push(format!("end:{}", String::from_utf8_lossy(element.name()))),
+                        SemanticEvent::Text(value) => text.push(value.text().to_owned()),
+                        SemanticEvent::CData(value) => cdata.push(value.text().to_owned()),
+                        SemanticEvent::Comment(_)
+                        | SemanticEvent::Decl(_)
+                        | SemanticEvent::GeneralRef(_) => {},
+                    }
+                    Ok::<(), &'static str>(())
+                },
+            )
+            .unwrap();
+
+        assert!(elements.iter().any(|event| event == "start:ext:opaque"));
+        assert!(
+            elements
+                .iter()
+                .any(|event| event == "start:mc:AlternateContent")
+        );
+        assert!(
+            elements
+                .iter()
+                .any(|event| event == "end:mc:AlternateContent")
+        );
+        assert_eq!(text, vec!["plain"]);
+        assert_eq!(cdata, vec!["cdata"]);
+        assert_eq!(report.alternate_content_count, 0);
+        assert_eq!(report.ignored_elements, 0);
+    }
+
+    #[test]
+    fn streaming_0361_opaque_extension_survives_recovery_state() {
+        let mut capabilities = Capabilities::new();
+        capabilities.preserve_extension_element(Name {
+            namespace: "urn:ext".to_owned(),
+            local_name: "opaque".to_owned(),
+        });
+        let xml = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:ext="urn:ext" mc:Ignorable="ext"><mc:AlternateContent><mc:Choice Requires="missing"/></mc:AlternateContent><ext:opaque><mc:AlternateContent>plain<![CDATA[cdata]]></mc:AlternateContent></ext:opaque></r>"#
+        );
+        let semantic_failed = Cell::new(false);
+        let mut raw_names = Vec::new();
+        let mut active_after_failure = 0;
+        let mut input = Cursor::new(xml.as_bytes());
+        let result = process_markup_compatibility_stream_with_observers(
+            &mut input,
+            &capabilities,
+            &StreamLimits::default(),
+            |element| {
+                let name = streaming_0361_recovery_raw_name(&element);
+                if name == "mc:Choice" {
+                    semantic_failed.set(true);
+                }
+                raw_names.push(name);
+                Ok::<(), &'static str>(())
+            },
+            |_| {
+                if semantic_failed.get() {
+                    active_after_failure += 1;
+                }
+                Ok::<(), &'static str>(())
+            },
+        );
+
+        assert!(raw_names.iter().any(|name| name == "ext:opaque"));
+        assert!(raw_names.iter().any(|name| name == "mc:AlternateContent"));
+        assert_eq!(active_after_failure, 0);
+        assert!(matches!(
+            result,
+            Err(StreamError::Mce {
+                error: Error::NonConformant(message),
+                prior_mce_error: None,
+                raw_error: None,
+                active_error: None,
+                ..
+            }) if message == "unbound Requires prefix"
+        ));
+    }
+
+    #[test]
+    fn streaming_0361_deep_expanded_names_have_exact_context_bound() {
+        let depth = 3;
+        let mut xml = String::from("<root>");
+        let mut expected_context_bytes = "root".len() * 2;
+        let mut names = Vec::new();
+        for index in 0..depth {
+            let prefix = format!("very_long_prefix_{index}");
+            let namespace = format!("urn:very-long-namespace-{index}");
+            let local_name = format!("very_long_element_name_{index}");
+            let qualified_name = format!("{prefix}:{local_name}");
+            expected_context_bytes += prefix.len() + namespace.len() + 2;
+            expected_context_bytes += qualified_name.len() + namespace.len() + local_name.len();
+            xml.push_str(&format!(
+                r#"<{qualified_name} xmlns:{prefix}="{namespace}">"#
+            ));
+            names.push(qualified_name);
+        }
+        xml.push_str("<leaf/>");
+        for qualified_name in names.iter().rev() {
+            xml.push_str(&format!("</{qualified_name}>"));
+        }
+        xml.push_str("</root>");
+
+        let exact = StreamLimits {
+            max_context_bytes: expected_context_bytes,
+            ..StreamLimits::default()
+        };
+        let mut input = Cursor::new(xml.as_bytes());
+        process_markup_compatibility_stream_with_observers(
+            &mut input,
+            &Capabilities::new(),
+            &exact,
+            |_| Ok::<(), &'static str>(()),
+            |_| Ok::<(), &'static str>(()),
+        )
+        .unwrap();
+
+        let under = StreamLimits {
+            max_context_bytes: expected_context_bytes - 1,
+            ..exact
+        };
+        let mut input = Cursor::new(xml.as_bytes());
+        assert!(matches!(
+            process_markup_compatibility_stream_with_observers(
+                &mut input,
+                &Capabilities::new(),
+                &under,
+                |_| Ok::<(), &'static str>(()),
+                |_| Ok::<(), &'static str>(()),
+            ),
+            Err(StreamError::Mce {
+                error: Error::LimitExceeded(message),
+                ..
+            }) if message.contains("stream context bytes")
+        ));
     }
 }
