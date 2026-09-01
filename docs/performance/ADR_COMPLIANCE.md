@@ -1,5 +1,25 @@
 # Performance optimization ADR-compliance matrix
 
+## XLSB source-ingress hard-probe boundary (change 0354)
+
+Change 0354 keeps XLSB semantics in `litchi-xlsb`, source/path admission in
+the existing owner/facade boundary, and fallback storage bounded by the
+caller's exact input limit. Recoverable non-ZIP/no-match/missing-manifest
+probes retain compatibility fallback; hard ZIP/OPC/classifier failures are a
+typed `OpcError` and do not trigger an eager `Workbook::from_bytes` retry.
+The catalog is dropped before fallback and retained `Bytes` is moved without a
+clone, preserving pointer/capacity ownership. Known non-XLSB variants return
+`NotOfficeFile` without pathname reopen. No archive type, physical identifier,
+runtime handle, lock, unsafe storage, or dependency edge is added; explicit
+eager APIs, public smart detection, and the positive non-ZIP fallback remain
+unchanged. Serial evidence is private filter `7/7` within XLSB lib `51/51`,
+facade `23/23`, and successful `xlsx`/`xlsx,xlsb` checks under one job/thread,
+disabled incremental/debug compilation, one disk target, and an 8 GiB limit.
+The 564 MiB target and approximately 14 GiB post-run available memory with
+saturated swap are not resource bounds. `performance_claim: none`; no
+latency, RSS, OOM, constant-memory, allocation, physical-I/O, or broad XLSB
+claim is made.
+
 ## XLSB source-backed fallback admission boundary (change 0353)
 
 Change 0353 keeps XLSB ownership in `litchi-xlsb` and facade admission/routing

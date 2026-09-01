@@ -1,5 +1,24 @@
 # Performance hotspot inventory
 
+## XLSB source-ingress hard-probe boundary (change 0354)
+
+Change 0354 is correctness/admission closure, not a measured hotspot
+(`performance_claim: none`). Private XLSB source ingress keeps non-ZIP,
+no-match, and missing-manifest outcomes on the compatibility fallback, while
+hard ZIP/OPC/classifier failures return `OpcError` without an eager
+`Workbook::from_bytes` retry. Path `FileSource` enforces the caller's exact
+input limit before fallback allocation, drops the catalog first, and moves
+retained `Bytes` without a clone, preserving pointer/capacity ownership;
+known non-XLSB variants return `NotOfficeFile` without pathname reopen.
+Evidence is private filter `7/7` within XLSB lib `51/51`, XLSB facade `23/23`,
+and successful `xlsx`/`xlsx,xlsb` checks under serial 8 GiB-constrained
+execution. The 564 MiB target and approximately 14 GiB post-run available
+memory with saturated swap are observations only. No latency, RSS, OOM,
+constant-memory, allocation, physical-I/O, or broad XLSB claim follows.
+Explicit eager/public smart detection and the positive non-ZIP fallback remain
+unchanged; PPTX hard-probe fallback and full selected worksheet materialization
+remain outside this slice.
+
 ## XLSB source-backed fallback admission boundary (change 0353)
 
 Change 0353 is correctness/admission closure, not a measured hotspot

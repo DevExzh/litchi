@@ -1,5 +1,26 @@
 # Performance program phase report
 
+## XLSB source-ingress hard-probe boundary (change 0354)
+
+Change 0354 closes a private XLSB source-ingress admission boundary. Non-ZIP,
+no-match, and missing-manifest probes retain the compatibility fallback, but
+hard ZIP/OPC/classifier failures return typed `OpcError`; `Workbook::from_bytes`
+does not retry hard failures through an eager full-workbook parse. Path
+`FileSource` preflights the caller's exact `max_input_bytes`, applies that limit
+to fallback reading, drops the catalog before fallback, and moves retained
+`Bytes` into the owned source without cloning its pointer/capacity. Known
+non-XLSB detector variants return `NotOfficeFile` without pathname reopen.
+Explicit eager APIs, public smart detection, and the positive non-ZIP
+compatibility fallback remain unchanged. Evidence is the private source-
+ingress filter `7/7` (included in `litchi-xlsb` lib `51/51`), XLSB facade
+`23/23`, and successful XLSX-only and XLSX+XLSB checks under serialized
+8 GiB-constrained execution. The target reached 564 MiB and post-run
+available memory was approximately 14 GiB with swap saturated. These are
+correctness/resource observations only (`performance_claim: none`), not
+latency, RSS, OOM, or constant-memory evidence. PPTX hard-probe fallback,
+public eager/portable fallback separation, finer constructor ZIP mapping, and
+full selected worksheet materialization remain open.
+
 ## XLSB source-backed fallback admission boundary (change 0353)
 
 Change 0353 closes the post-admission fallback boundary for dynamic/source-

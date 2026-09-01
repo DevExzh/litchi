@@ -253,20 +253,51 @@ pub fn open_xlsb_workbook_dyn_with_limits<P: AsRef<std::path::Path>>(
         any(unix, windows)
     ))]
     {
-        if let crate::detection_smart::detected::WorkbookSourcePathDetection::Xlsb {
-            workbook,
-            ..
-        } = crate::detection_smart::detected::detect_workbook_source_path_with_limits(
+        match crate::detection_smart::detected::detect_workbook_source_path_with_limits(
             path.as_ref(),
             limits,
         )? {
-            let workbook = super::adapters::XlsbWorkbook::from_source_backed(workbook)?;
-            return Ok(Box::new(workbook));
+            crate::detection_smart::detected::WorkbookSourcePathDetection::Xlsb {
+                workbook,
+                ..
+            } => {
+                let workbook = super::adapters::XlsbWorkbook::from_source_backed(workbook)?;
+                return Ok(Box::new(workbook));
+            },
+            crate::detection_smart::detected::WorkbookSourcePathDetection::Bytes(bytes) => {
+                return open_xlsb_workbook_from_owned_bytes_dyn_with_limits(bytes, limits);
+            },
+            #[cfg(feature = "xlsx")]
+            crate::detection_smart::detected::WorkbookSourcePathDetection::Xlsx { .. } => {
+                return Err(Box::new(litchi_core::Error::NotOfficeFile));
+            },
+            #[cfg(feature = "ods")]
+            crate::detection_smart::detected::WorkbookSourcePathDetection::Ods(_) => {
+                return Err(Box::new(litchi_core::Error::NotOfficeFile));
+            },
+            #[cfg(feature = "xls")]
+            crate::detection_smart::detected::WorkbookSourcePathDetection::Xls { .. } => {
+                return Err(Box::new(litchi_core::Error::NotOfficeFile));
+            },
+            crate::detection_smart::detected::WorkbookSourcePathDetection::OtherOoxml(_)
+            | crate::detection_smart::detected::WorkbookSourcePathDetection::DisabledOtherOoxml(
+                _,
+            ) => {
+                return Err(Box::new(litchi_core::Error::NotOfficeFile));
+            },
         }
     }
 
-    let workbook = open_xlsb_workbook_with_limits(path, limits)?;
-    Ok(Box::new(workbook))
+    #[cfg(not(all(
+        any(feature = "xlsx", feature = "ods", feature = "xls", feature = "xlsb"),
+        any(unix, windows)
+    )))]
+    {
+        // The portable fallback has no bounded source handoff and necessarily
+        // reopens the pathname, so it may observe a later source version.
+        let workbook = open_xlsb_workbook_with_limits(path, limits)?;
+        Ok(Box::new(workbook))
+    }
 }
 
 /// Open an XLSB workbook as a trait object from bytes.
@@ -292,6 +323,19 @@ pub fn open_xlsb_workbook_from_bytes_dyn_with_limits(
         limits,
     )
     .map_err(crate::map_ooxml_error)?;
+    let workbook = super::adapters::XlsbWorkbook::from_source_backed(workbook)?;
+    Ok(Box::new(workbook))
+}
+
+#[cfg(all(feature = "xlsb", any(unix, windows)))]
+fn open_xlsb_workbook_from_owned_bytes_dyn_with_limits(
+    bytes: Vec<u8>,
+    limits: crate::xlsb::ReadLimits,
+) -> Result<Box<dyn WorkbookTrait>> {
+    let source: std::sync::Arc<dyn litchi_core::ReadAt> =
+        std::sync::Arc::new(litchi_core::OwnedSource::new(bytes));
+    let workbook = crate::xlsb::SourceBackedWorkbook::from_read_at_with_limits(source, limits)
+        .map_err(crate::map_ooxml_error)?;
     let workbook = super::adapters::XlsbWorkbook::from_source_backed(workbook)?;
     Ok(Box::new(workbook))
 }
