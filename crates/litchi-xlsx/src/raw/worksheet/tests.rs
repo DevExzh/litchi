@@ -546,3 +546,550 @@ fn numeric_sheets_do_not_load_an_unneeded_shared_string_table() {
         Some(Cell::Value(Value::Number(number))) if number.as_str() == "7"
     ));
 }
+
+mod streaming_0361_tests {
+    use std::io::{self, BufRead, Cursor, Read};
+
+    use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
+    use litchi_sheet::ROWS;
+
+    use super::super::{x14ac, x14ac::Values};
+
+    const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+    const S: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    const X14AC: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac";
+
+    fn worksheet(body: &str) -> String {
+        format!(
+            r#"<worksheet xmlns="{S}" xmlns:mc="{MC}" xmlns:x14ac="{X14AC}" mc:Ignorable="x14ac">{body}</worksheet>"#
+        )
+    }
+
+    fn choices_capabilities() -> Capabilities {
+        let mut capabilities = Capabilities::default();
+        capabilities.understand_namespace(X14AC);
+        capabilities
+    }
+
+    fn signature(values: &Values) -> (Option<f64>, Vec<(u32, f64)>) {
+        (
+            values.defaults.map(|value| value.get()),
+            values
+                .rows
+                .iter()
+                .map(|(&row, &value)| (row, value.get()))
+                .collect(),
+        )
+    }
+
+    fn stream_reader<R: BufRead>(
+        reader: &mut R,
+        capabilities: &Capabilities,
+        limits: &StreamLimits,
+        capture_rows: bool,
+    ) -> x14ac::StreamResult<Values> {
+        x14ac::capture_stream(reader, capabilities, limits, capture_rows)
+    }
+
+    fn stream(
+        xml: &[u8],
+        capabilities: &Capabilities,
+        limits: &StreamLimits,
+        capture_rows: bool,
+    ) -> x14ac::StreamResult<Values> {
+        let mut reader = Cursor::new(xml);
+        stream_reader(&mut reader, capabilities, limits, capture_rows)
+    }
+
+    fn default_stream(xml: &[u8], capture_rows: bool) -> x14ac::StreamResult<Values> {
+        stream(
+            xml,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            capture_rows,
+        )
+    }
+
+    #[test]
+    fn streaming_0361_captures_start_and_empty_structural_events() {
+        let xml = worksheet(
+            r#"<sheetFormatPr x14ac:dyDescent="0.2"></sheetFormatPr><sheetData><row r="2" x14ac:dyDescent="0.3"></row><row r="3" x14ac:dyDescent="0.4"/></sheetData>"#,
+        );
+        let values = default_stream(xml.as_bytes(), true).expect("valid extension stream");
+
+        assert_eq!(signature(&values), (Some(0.2), vec![(2, 0.3), (3, 0.4)]));
+    }
+
+    #[test]
+    fn streaming_0361_focused_defaults_skip_malformed_rows_but_keep_raw_guards() {
+        let malformed_rows = worksheet(
+            r#"<sheetFormatPr x14ac:dyDescent="0.2"/><sheetData><row r="0" x14ac:dyDescent="-1"/><row r="not-a-row" x14ac:dyDescent="NaN"/></sheetData>"#,
+        );
+        let values = x14ac::capture_stream_defaults(
+            &mut Cursor::new(malformed_rows.as_bytes()),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+        )
+        .expect("focused defaults must not parse row values")
+        .expect("default descent");
+        assert_eq!(values.get(), 0.2);
+
+        let reserved = worksheet(
+            r#"<sheetFormatPr x14ac:dyDescent="0.2"/><sheetData><row r="0" litchi_x14ac_dyDescent="0.3"/></sheetData>"#,
+        );
+        assert!(
+            x14ac::capture_stream_defaults(
+                &mut Cursor::new(reserved.as_bytes()),
+                &Capabilities::default(),
+                &StreamLimits::default(),
+            )
+            .is_err()
+        );
+
+        let duplicate = worksheet(&format!(
+            r#"<sheetFormatPr x14ac:dyDescent="0.2"/><sheetData><row r="0" x14ac:dyDescent="-1" xmlns:a="{X14AC}" a:dyDescent="NaN"/></sheetData>"#
+        ));
+        assert!(
+            x14ac::capture_stream_defaults(
+                &mut Cursor::new(duplicate.as_bytes()),
+                &Capabilities::default(),
+                &StreamLimits::default(),
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn streaming_0361_selects_supported_choice_or_fallback_and_ignores_inactive_bad_values() {
+        let xml = format!(
+            r#"<worksheet xmlns="{S}" xmlns:mc="{MC}" xmlns:x14ac="{X14AC}" mc:Ignorable="x14ac"><mc:AlternateContent><mc:Choice Requires="x14ac"><sheetFormatPr x14ac:dyDescent="NaN"/><sheetData><row r="0" x14ac:dyDescent="-1"/></sheetData></mc:Choice><mc:Fallback><sheetFormatPr x14ac:dyDescent="0.25"/><sheetData><row r="2" x14ac:dyDescent="0.35"/></sheetData></mc:Fallback></mc:AlternateContent></worksheet>"#
+        );
+
+        let fallback = default_stream(xml.as_bytes(), true).expect("fallback branch");
+        assert_eq!(signature(&fallback), (Some(0.25), vec![(2, 0.35)]));
+
+        let choice_xml = format!(
+            r#"<worksheet xmlns="{S}" xmlns:mc="{MC}" xmlns:x14ac="{X14AC}" mc:Ignorable="x14ac"><mc:AlternateContent><mc:Choice Requires="x14ac"><sheetFormatPr x14ac:dyDescent="0.2"/><sheetData><row r="1" x14ac:dyDescent="0.3"/></sheetData></mc:Choice><mc:Fallback><sheetFormatPr/><sheetData/></mc:Fallback></mc:AlternateContent></worksheet>"#
+        );
+
+        let choice = stream(
+            choice_xml.as_bytes(),
+            &choices_capabilities(),
+            &StreamLimits::default(),
+            true,
+        )
+        .expect("supported choice branch");
+        assert_eq!(signature(&choice), (Some(0.2), vec![(1, 0.3)]));
+    }
+
+    #[test]
+    fn streaming_0361_raw_errors_survive_inactive_branches_and_later_malformed_tail() {
+        let duplicate = format!(
+            r#"<worksheet xmlns="{S}" xmlns:mc="{MC}" xmlns:x14ac="{X14AC}" xmlns:a="{X14AC}" xmlns:future="urn:future" mc:Ignorable="x14ac"><mc:AlternateContent><mc:Choice Requires="future"><sheetFormatPr x14ac:dyDescent="-1" a:dyDescent="NaN"/></mc:Choice><mc:Fallback><sheetFormatPr/></mc:Fallback></mc:AlternateContent></worksheet><tail/>"#
+        );
+        let duplicate_error = default_stream(duplicate.as_bytes(), true).expect_err("duplicate");
+        assert!(matches!(
+            duplicate_error,
+            StreamError::Mce {
+                raw_error: Some(raw),
+                ..
+            } if raw.to_string().contains("duplicate x14ac:dyDescent")
+        ));
+
+        let reserved = format!(
+            r#"<worksheet xmlns="{S}" xmlns:mc="{MC}" xmlns:x14ac="{X14AC}" xmlns:future="urn:future" mc:Ignorable="x14ac"><mc:AlternateContent><mc:Choice Requires="future"><sheetFormatPr litchi_x14ac_dyDescent="NaN"/></mc:Choice><mc:Fallback><sheetFormatPr/></mc:Fallback></mc:AlternateContent></worksheet><tail/>"#
+        );
+        let reserved_error = default_stream(reserved.as_bytes(), true).expect_err("reserved");
+        assert!(matches!(
+            reserved_error,
+            StreamError::Mce {
+                raw_error: Some(raw),
+                ..
+            } if raw.to_string().contains("reserved internal marker")
+        ));
+
+        let legacy = x14ac::capture_stream_legacy(
+            &mut Cursor::new(reserved.as_bytes()),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            true,
+        )
+        .expect_err("legacy adapter must retain raw precedence");
+        assert!(legacy.to_string().contains("reserved internal marker"));
+    }
+
+    #[test]
+    fn streaming_0361_uses_expanded_namespace_after_prefix_rebinding() {
+        let xml = format!(
+            r#"<worksheet xmlns="{S}" xmlns:mc="{MC}" xmlns:x14ac="{X14AC}" mc:Ignorable="x14ac"><sheetFormatPr xmlns:x14ac="urn:not-x14ac" x14ac:dyDescent="NaN"/><sheetData><row xmlns:x14ac="{X14AC}" x14ac:dyDescent="0.3"/></sheetData></worksheet>"#
+        );
+        let values = default_stream(xml.as_bytes(), true).expect("rebinding fixture");
+        assert_eq!(signature(&values), (None, vec![(1, 0.3)]));
+    }
+
+    #[test]
+    fn streaming_0361_preserves_legacy_row_inference_and_order_semantics() {
+        let continuity = worksheet(
+            r#"<sheetData><row r="3" x14ac:dyDescent="0.3"/><row x14ac:dyDescent="0.4"/></sheetData>"#,
+        );
+        let continuity_stream = default_stream(continuity.as_bytes(), true)
+            .expect("explicit and inferred rows")
+            .rows;
+        let continuity_legacy = x14ac::capture(continuity.as_bytes())
+            .expect("legacy explicit and inferred rows")
+            .rows;
+        assert_eq!(
+            continuity_stream
+                .iter()
+                .map(|(&row, &value)| (row, value.get()))
+                .collect::<Vec<_>>(),
+            continuity_legacy
+                .iter()
+                .map(|(&row, &value)| (row, value.get()))
+                .collect::<Vec<_>>()
+        );
+
+        let decreasing = worksheet(
+            r#"<sheetData><row r="3" x14ac:dyDescent="0.3"/><row r="2" x14ac:dyDescent="0.2"/></sheetData>"#,
+        );
+        assert_eq!(
+            signature(&default_stream(decreasing.as_bytes(), true).expect("decreasing rows")),
+            signature(&x14ac::capture(decreasing.as_bytes()).expect("legacy decreasing rows")),
+        );
+
+        let current = worksheet(
+            r#"<sheetData><row r="1"/><row x14ac:dyDescent="0.2"/><row r="4"/><row x14ac:dyDescent="0.4"/></sheetData>"#,
+        );
+        assert_eq!(
+            signature(&default_stream(current.as_bytes(), true).expect("current row state")),
+            (None, vec![(2, 0.2), (5, 0.4)]),
+        );
+
+        let duplicate = worksheet(
+            r#"<sheetData><row r="3" x14ac:dyDescent="0.3"/><row r="3" x14ac:dyDescent="0.4"/></sheetData>"#,
+        );
+        assert!(default_stream(duplicate.as_bytes(), true).is_err());
+        assert!(x14ac::capture(duplicate.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn streaming_0361_rejects_zero_and_grid_overflow_only_when_rows_are_captured() {
+        for row in ["0".to_owned(), (ROWS + 1).to_string()] {
+            let xml = worksheet(&format!(
+                r#"<sheetData><row r="{row}" x14ac:dyDescent="0.2"/></sheetData>"#
+            ));
+            assert!(
+                default_stream(xml.as_bytes(), true).is_err(),
+                "accepted row {row}"
+            );
+            assert!(
+                default_stream(xml.as_bytes(), false).is_ok(),
+                "focused defaults parsed row {row}"
+            );
+        }
+
+        let inferred = worksheet(&format!(
+            r#"<sheetData><row r="{ROWS}"/><row x14ac:dyDescent="0.2"/></sheetData>"#
+        ));
+        assert!(default_stream(inferred.as_bytes(), true).is_err());
+    }
+
+    #[test]
+    fn streaming_0361_accepts_exact_depth_event_and_input_limits_but_rejects_one_under() {
+        let xml = worksheet(r#"<sheetData><row r="1" x14ac:dyDescent="0.2"/></sheetData>"#);
+        let exact_events = StreamLimits {
+            max_events: 5,
+            ..StreamLimits::default()
+        };
+        default_stream_with_limits(&xml, &exact_events, true).expect("five exact events");
+        let under_events = StreamLimits {
+            max_events: 4,
+            ..exact_events.clone()
+        };
+        assert!(default_stream_with_limits(&xml, &under_events, true).is_err());
+
+        let exact_depth = StreamLimits {
+            processing: litchi_ooxml_common::mce::Limits {
+                max_depth: 3,
+                ..StreamLimits::default().processing
+            },
+            ..StreamLimits::default()
+        };
+        default_stream_with_limits(&xml, &exact_depth, true).expect("three exact levels");
+        let under_depth = StreamLimits {
+            processing: litchi_ooxml_common::mce::Limits {
+                max_depth: 2,
+                ..exact_depth.processing.clone()
+            },
+            ..exact_depth.clone()
+        };
+        assert!(default_stream_with_limits(&xml, &under_depth, true).is_err());
+
+        let exact_input = StreamLimits {
+            processing: litchi_ooxml_common::mce::Limits {
+                max_input_bytes: xml.len(),
+                ..StreamLimits::default().processing
+            },
+            ..StreamLimits::default()
+        };
+        default_stream_with_limits(&xml, &exact_input, true).expect("exact input size");
+        let under_input = StreamLimits {
+            processing: litchi_ooxml_common::mce::Limits {
+                max_input_bytes: xml.len() - 1,
+                ..exact_input.processing.clone()
+            },
+            ..exact_input
+        };
+        assert!(default_stream_with_limits(&xml, &under_input, true).is_err());
+
+        let event = format!(r#"<worksheet xmlns="{S}"/>"#);
+        let exact_event = StreamLimits {
+            max_event_bytes: event.len(),
+            ..StreamLimits::default()
+        };
+        default_stream_with_limits(event.as_str(), &exact_event, true).expect("exact event");
+        let under_event = StreamLimits {
+            max_event_bytes: event.len() - 1,
+            ..exact_event
+        };
+        assert!(default_stream_with_limits(event.as_str(), &under_event, true).is_err());
+    }
+
+    fn default_stream_with_limits(
+        xml: &str,
+        limits: &StreamLimits,
+        capture_rows: bool,
+    ) -> x14ac::StreamResult<Values> {
+        stream(
+            xml.as_bytes(),
+            &Capabilities::default(),
+            limits,
+            capture_rows,
+        )
+    }
+
+    struct ChunkedInput {
+        bytes: Vec<u8>,
+        position: usize,
+        chunk_size: usize,
+    }
+
+    impl ChunkedInput {
+        fn new(bytes: &[u8], chunk_size: usize) -> Self {
+            Self {
+                bytes: bytes.to_owned(),
+                position: 0,
+                chunk_size,
+            }
+        }
+    }
+
+    impl Read for ChunkedInput {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            let available = self.fill_buf()?;
+            let amount = available.len().min(output.len());
+            output[..amount].copy_from_slice(&available[..amount]);
+            self.consume(amount);
+            Ok(amount)
+        }
+    }
+
+    impl BufRead for ChunkedInput {
+        fn fill_buf(&mut self) -> io::Result<&[u8]> {
+            let end = self
+                .position
+                .saturating_add(self.chunk_size)
+                .min(self.bytes.len());
+            Ok(&self.bytes[self.position..end])
+        }
+
+        fn consume(&mut self, amount: usize) {
+            self.position = self.position.saturating_add(amount).min(self.bytes.len());
+        }
+    }
+
+    #[test]
+    fn streaming_0361_split_bom_and_chunk_sizes_match_cursor() {
+        let body = worksheet(
+            r#"<sheetFormatPr x14ac:dyDescent="0.2"/><sheetData><row r="1" x14ac:dyDescent="0.3"/></sheetData>"#,
+        );
+        let mut xml = vec![0xef, 0xbb, 0xbf];
+        xml.extend_from_slice(body.as_bytes());
+
+        let cursor = signature(
+            &stream(
+                &xml,
+                &Capabilities::default(),
+                &StreamLimits::default(),
+                true,
+            )
+            .expect("cursor stream"),
+        );
+        for chunk_size in [1, 2, 7] {
+            let mut reader = ChunkedInput::new(&xml, chunk_size);
+            let values = stream_reader(
+                &mut reader,
+                &Capabilities::default(),
+                &StreamLimits::default(),
+                true,
+            )
+            .expect("chunked stream");
+            assert_eq!(signature(&values), cursor, "chunk size {chunk_size}");
+        }
+    }
+
+    #[test]
+    fn streaming_0361_valid_fixture_matches_legacy_capture_and_defaults() {
+        let xml = worksheet(
+            r#"<sheetFormatPr x14ac:dyDescent="0.2"/><sheetData><row r="2" x14ac:dyDescent="0.3"/><row r="4" x14ac:dyDescent="0.4"/></sheetData>"#,
+        );
+        let streamed = default_stream(xml.as_bytes(), true).expect("streamed fixture");
+        let legacy = x14ac::capture(xml.as_bytes()).expect("legacy fixture");
+        assert_eq!(signature(&streamed), signature(&legacy));
+
+        let streamed_defaults = x14ac::capture_stream_defaults(
+            &mut Cursor::new(xml.as_bytes()),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+        )
+        .expect("streamed defaults");
+        let legacy_defaults = x14ac::capture_defaults(xml.as_bytes()).expect("legacy defaults");
+        assert_eq!(
+            streamed_defaults.map(|value| value.get()),
+            legacy_defaults.map(|value| value.get())
+        );
+    }
+
+    struct FailAfter {
+        bytes: Vec<u8>,
+        position: usize,
+    }
+
+    impl FailAfter {
+        fn new(bytes: &[u8]) -> Self {
+            Self {
+                bytes: bytes.to_owned(),
+                position: 0,
+            }
+        }
+    }
+
+    impl Read for FailAfter {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            let available = self.fill_buf()?;
+            let amount = available.len().min(output.len());
+            output[..amount].copy_from_slice(&available[..amount]);
+            self.consume(amount);
+            Ok(amount)
+        }
+    }
+
+    impl BufRead for FailAfter {
+        fn fill_buf(&mut self) -> io::Result<&[u8]> {
+            if self.position == self.bytes.len() {
+                return Err(io::Error::other("streaming 0361 input failure"));
+            }
+            Ok(&self.bytes[self.position..])
+        }
+
+        fn consume(&mut self, amount: usize) {
+            self.position = self.position.saturating_add(amount).min(self.bytes.len());
+        }
+    }
+
+    fn dual_callback_failure_xml() -> String {
+        worksheet(
+            r#"<sheetFormatPr x14ac:dyDescent="not-a-number"/><sheetData><row r="1" litchi_x14ac_dyDescent="0.2"/></sheetData>"#,
+        )
+    }
+
+    #[test]
+    fn streaming_0361_diagnostics_keep_primary_input_or_mce_and_callback_secondaries() {
+        let body = dual_callback_failure_xml();
+        let mut input = FailAfter::new(body.as_bytes());
+        let input_error = stream_reader(
+            &mut input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            true,
+        )
+        .expect_err("input failure");
+        assert!(matches!(
+            input_error,
+            StreamError::Input {
+                raw_error: Some(raw),
+                active_error: Some(active),
+                ..
+            } if raw.to_string().contains("reserved internal marker")
+                && active.to_string().contains("invalid x14ac:dyDescent")
+        ));
+
+        let malformed_tail = format!("{body}<tail/>");
+        let mce_error =
+            default_stream(malformed_tail.as_bytes(), true).expect_err("malformed tail");
+        assert!(matches!(
+            mce_error,
+            StreamError::Mce {
+                error: MceError::NonConformant(_) | MceError::Xml(_),
+                raw_error: Some(raw),
+                active_error: Some(active),
+                ..
+            } if raw.to_string().contains("reserved internal marker")
+                && active.to_string().contains("invalid x14ac:dyDescent")
+        ));
+
+        let legacy = x14ac::capture_stream_legacy(
+            &mut Cursor::new(malformed_tail.as_bytes()),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            true,
+        )
+        .expect_err("legacy raw precedence");
+        assert!(legacy.to_string().contains("reserved internal marker"));
+    }
+
+    #[test]
+    fn streaming_0361_legacy_adapter_maps_clean_eof_raw_then_active_errors() {
+        let body = dual_callback_failure_xml();
+        let error = default_stream(body.as_bytes(), true).expect_err("two callbacks");
+        assert!(matches!(
+            error,
+            StreamError::Callback {
+                raw_error: Some(raw),
+                active_error: Some(active),
+            } if raw.to_string().contains("reserved internal marker")
+                && active.to_string().contains("invalid x14ac:dyDescent")
+        ));
+        let legacy = x14ac::capture_stream_legacy(
+            &mut Cursor::new(body.as_bytes()),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            true,
+        )
+        .expect_err("raw callback precedence");
+        assert!(legacy.to_string().contains("reserved internal marker"));
+
+        let active_only =
+            worksheet(r#"<sheetData><row r="1" x14ac:dyDescent="not-a-number"/></sheetData>"#);
+        let active_error = default_stream(active_only.as_bytes(), true).expect_err("active error");
+        assert!(matches!(
+            active_error,
+            StreamError::Callback {
+                raw_error: None,
+                active_error: Some(active),
+            } if active.to_string().contains("invalid x14ac:dyDescent")
+        ));
+        let legacy_active = x14ac::capture_stream_legacy(
+            &mut Cursor::new(active_only.as_bytes()),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            true,
+        )
+        .expect_err("active callback mapping");
+        assert!(
+            legacy_active
+                .to_string()
+                .contains("invalid x14ac:dyDescent")
+        );
+    }
+}

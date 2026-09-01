@@ -526,3 +526,24 @@ fixed-memory or OOM-safety claim. Serial validation passed `11/11` focused,
 target was 267 MiB with approximately 14 GiB host availability, 134 GiB disk
 free, and exhausted swap. See [Change 0360](changes/0360-bounded-streaming-mce-events.md);
 `performance_claim: none`.
+
+## Change 0361 compliance update
+
+Change 0361 extends the owning `litchi-xlsx` consumer with bounded streaming
+x14ac raw and active observers while preserving the MCE ownership boundary.
+The raw observer sees ordinary and alias duplicates before generic duplicate
+validation. Raw-only one-pass recovery after semantic `NonConformant` or
+`MustUnderstand` retains the typed prior semantic error when a later XML,
+input, or limit failure becomes primary. The MCE and `AlternateContent`
+x14ac byte-compatibility branch streams, while the plain fast path is
+unchanged.
+
+The fixed 8 KiB `InterruptedRetryReader` and eight-retry ceiling complement
+the existing bounded stream limits, but do not turn the public path into a
+fixed-memory or OOM-safe contract: quick-XML and observer allocations remain
+outside the input buffer, and `capture_rows=true` may retain a `BTreeMap` up to
+configured `ROWS`. Validation passed MCE recovery `7/7`, raw attributes `4/4`,
+x14ac focused `12/12`, worksheet `35/35`, `litchi-ooxml-common` library
+`234/234`, and `litchi-xlsx` library `813/813`. Selected-cell and full-
+worksheet streaming, latency, RSS, and OOM evidence remain open. See [Change 0361](changes/0361-bounded-streaming-x14ac-observers.md);
+`performance_claim: none`.
