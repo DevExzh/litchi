@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import copy
 import inspect
+import io
 import json
 import re
 import tempfile
 import unittest
+from contextlib import ExitStack, redirect_stdout
 from dataclasses import replace
 from pathlib import Path
+from unittest import mock
 
 from tools import check_crate_boundaries as boundaries
 
@@ -980,6 +983,171 @@ def add_numbers_table_cell_control_canonical_scaffold(root: Path) -> None:
         "fn split_components_read_noop_and_all_control_transitions_are_atomic() {}\n"
         "fn assert_split_read_noop_and_write_reject() { no_op; is_noop; exact_bytes; write_reject; changed_edit_rejects; }\n"
         "fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically() { alias; external; opaque; atomic; }\n",
+        encoding="utf-8",
+    )
+
+
+def add_numbers_table_cell_number_format_canonical_scaffold(root: Path) -> None:
+    """Create a complete selector-first Number-format boundary fixture."""
+
+    semantic = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub mod transaction;\n"
+        "pub struct Number;\n",
+        encoding="utf-8",
+    )
+    transaction = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_TRANSACTION_SOURCE
+    transaction.parent.mkdir(parents=True, exist_ok=True)
+    transaction.write_text(
+        "pub use crate::package::table_cell_number_format::{"
+        + ", ".join(boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_TRANSACTION_TYPES)
+        + "};\n",
+        encoding="utf-8",
+    )
+
+    owner = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_TRANSACTION_TYPES
+        )
+        + "fn existing_cell_resolution() {}\n"
+        + "fn format_table_refcount_reference_entry_closure() {}\n"
+        + "fn exact_source_inverse_no_op_patch() {}\n"
+        + "fn candidate_reopen_readback_locality_same_content() {}\n"
+        + "fn budget_preflight_bounded_allocation_limit() {}\n"
+        + "fn unsupported_ambiguous_cross_component_fail_closed() {}\n"
+        + "impl Package {\n"
+        + "pub fn table_cell_number_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Option<Number>, Error> {}\n"
+        + "pub fn edit_table_cell_number_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Edit, Error> {}\n"
+        + "pub fn apply_table_cell_number_format(&self, patch: &Patch) -> Result<Commit, Error> {}\n"
+        + "}\n"
+        + "impl Edit {\n"
+        + "pub fn before(&self) -> Option<Number> { None }\n"
+        + "pub fn after(&self) -> Option<Number> { None }\n"
+        + "pub fn set(self, value: Number) -> Self { let _ = value; self }\n"
+        + "pub fn clear(self) -> Self { self }\n"
+        + "pub fn commit(self) -> Result<Commit, Error> { todo!() }\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+
+    lib_export, package_export, data_format_export = (
+        root / path
+        for path in boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_EXPORT_SOURCES[:3]
+    )
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text("pub mod cell;\n", encoding="utf-8")
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "pub(crate) mod table_cell_number_format;\n", encoding="utf-8"
+    )
+    data_format_export.parent.mkdir(parents=True, exist_ok=True)
+    data_format_export.write_text(
+        "pub mod number;\npub use number::Number;\n", encoding="utf-8"
+    )
+
+    codec = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "use buffa::DecodeOptions;\n"
+        "pub struct PreparedNumberFormatRewrite;\n"
+        "pub struct RewriteExecutionRequirements;\n"
+        "pub struct RewriteExecutionLimits;\n"
+        "pub fn decode_number_format_with_report() {\n"
+        "    preflight; let _ = DecodeOptions::new().decode_lazy_view(bytes);\n"
+        "    duplicate; noncanonical; unknown; raw; extend_from_slice;\n"
+        "    format_table; registry; refcount; reference; entry;\n"
+        "}\n"
+        "pub fn decode_cell_spec_with_report() {}\n"
+        "pub fn decode_bnc_cell_with_report() {}\n"
+        "pub fn prepare_number_format_rewrite() {}\n"
+        "pub fn canonical_number_format() { decimal_places; negative_style; thousands_separator; }\n"
+        "pub fn rewrite_number_format() { MAX_RECURSION_LIMIT; execution_requirements; execute; }\n"
+        "fn strict_projection() { buffa_numbers_table_cell_number_format_generated; }\n"
+        "#[cfg(test)]\nmod tests { #[test] fn number_format_round_trip_and_hostile_wire() {} }\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_PUBLIC_SOURCE
+    codec_lib.parent.mkdir(parents=True, exist_ok=True)
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        f"pub mod {boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_MODULE};\n"
+        f"mod {boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_GENERATED_MODULE};\n",
+        encoding="utf-8",
+    )
+
+    integration = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_INTEGRATION_SOURCE
+    integration.parent.mkdir(parents=True, exist_ok=True)
+    integration.write_text(
+        "#[test]\n"
+        "fn number_format_read_explicit_Number_and_automatic_Option() { explicit Number; automatic Option; read; }\n"
+        "fn set_reset_transaction() { edit_table_cell_number_format; set; clear; reset; automatic; }\n"
+        "fn exact_no_op_and_inverse_restore_bytes() { no_op; unchanged; inverse; byte_for_byte; }\n"
+        "fn conflict_fail_closed() { stale; foreign; ambiguous; conflict; unsupported; malformed; }\n"
+        "fn selector_locality_reopen_readback() { SheetSelector; TableSelector; CellPosition; locality; reopen; readback; }\n",
+        encoding="utf-8",
+    )
+
+    for fuzz_path in (
+        boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_FUZZ_SOURCE,
+        boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_FUZZ_SOURCE,
+    ):
+        absolute = root / fuzz_path
+        absolute.parent.mkdir(parents=True, exist_ok=True)
+        absolute.write_text(
+            "#![no_main]\nuse libfuzzer_sys::fuzz_target;\n"
+            "fuzz_target!(|data: &[u8]| { let _ = data; });\n",
+            encoding="utf-8",
+        )
+    for corpus in (
+        boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_FUZZ_CORPUS,
+        boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_FUZZ_CORPUS,
+    ):
+        (root / corpus).mkdir(parents=True, exist_ok=True)
+
+    example = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_EXAMPLE
+    example.parent.mkdir(parents=True, exist_ok=True)
+    example.write_text(
+        "fn main() { package.edit_table_cell_number_format(); }\n",
+        encoding="utf-8",
+    )
+    retired_example = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_EXAMPLE
+    retired_example.parent.mkdir(parents=True, exist_ok=True)
+    retired_example.write_text("fn main() {}\n", encoding="utf-8")
+
+    host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_SOURCE[0]
+    host.parent.mkdir(parents=True, exist_ok=True)
+    host.write_text(
+        "use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelector, CellPosition};\n"
+        "impl NumbersEditor {\n"
+        "#[deprecated(note = \"legacy compatibility shell\")]\n"
+        "pub fn table_cell_number_format(&self, table_id: u64, row: usize, column: usize) -> Result<Option<Number>> {\n"
+        "    let source_built = !self.package.source_is_exact(); if source_built { cell_number_format(); }\n"
+        "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
+        "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
+        "    let position = CellPosition::try_from_usize(row, column)?;\n"
+        "    match package.table_cell_number_format(sheet, table, position) { Err(Unsupported) | Err(Ambiguous) => Err(Unsupported), result => result }\n"
+        "}\n"
+        "#[deprecated(note = \"legacy compatibility shell\")]\n"
+        "pub fn set_table_cell_number_format(&mut self, table_id: u64, row: usize, column: usize, format: Number) -> Result<()> {\n"
+        "    let source_built = !self.package.source_is_exact(); if source_built || matches!(error, WrongFormatFamily) { set_cell_number_format(); }\n"
+        "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
+        "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
+        "    let position = CellPosition::try_from_usize(row, column)?;\n"
+        "    unsupported; ambiguous; package.edit_table_cell_number_format(sheet, table, position).set(format).commit()\n"
+        "}\n"
+        "#[deprecated(note = \"legacy compatibility shell\")]\n"
+        "pub fn reset_table_cell_number_format(&mut self, table_id: u64, row: usize, column: usize) -> Result<bool> {\n"
+        "    let source_built = !self.package.source_is_exact(); if source_built || matches!(error, WrongFormatFamily) { reset_cell_number_format(); }\n"
+        "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
+        "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
+        "    let position = CellPosition::try_from_usize(row, column)?;\n"
+        "    unsupported; ambiguous; package.edit_table_cell_number_format(sheet, table, position).clear().commit()\n"
+        "}\n"
+        "}\n",
         encoding="utf-8",
     )
 
@@ -15317,6 +15485,7 @@ fn rewrite_movie_title_operation(
                     any(fragment in item for item in violations),
                     msg=f"missing violation containing {fragment!r}: {violations!r}",
                 )
+
             self.assertFalse(any("decoy" in item for item in violations), violations)
 
     def test_keynote_slide_table_dimension_requires_semantic_and_selector_contract(
@@ -31261,6 +31430,336 @@ fn rewrite_movie_title_operation(
             root = Path(directory)
             self._write_iwork_atomic_publication_fixture(root)
             self.assertEqual(boundaries.audit_iwork_atomic_publication(root), [])
+
+    def test_numbers_table_cell_number_format_positive_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_number_format_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_number_format_codec_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_number_format_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_number_format_facade_rejects_raw_aliases_and_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_number_format_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type NumberFormatEdit = Edit;\n"
+                + "pub type NumberCommit = Commit;\n"
+                + "pub fn raw_number_format(table_id: TableId, row: usize, "
+                "source_bytes: Vec<u8>, view: WireView, archive: Archive) {}\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_EXPORT_SOURCES[1]
+            package.write_text(
+                "pub mod table_cell_number_format;\n"
+                "pub use table_cell_number_format::*;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_number_format_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "retains flat alias NumberFormatEdit",
+                "retains flat alias NumberCommit",
+                "typed raw identifier parameter table_id: TableId",
+                "raw identifier/coordinate parameter row: usize",
+                "opaque raw byte container source_bytes: Vec<u8>",
+                "wire type WireView",
+                "archive/IWA type Archive",
+                "raw helper raw_number_format",
+                "exposes public package::table_cell_number_format module",
+                "retains root aliases via glob",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn opaque_bytes(data: Vec<u8>, boxed: Box<[u8]>, "
+                + "borrowed: Cow<'_, [u8]>) {}\n",
+                encoding="utf-8",
+            )
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn monolith(editor: NumbersEditor) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_number_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("raw byte container type" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("monolithic host type NumbersEditor" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_table_cell_number_format_codec_requires_strict_lazy_projection(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_number_format_canonical_scaffold(root)
+            codec = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_SOURCE
+            complete = codec.read_text(encoding="utf-8")
+            for marker, expected in (
+                ("preflight; ", "strict canonical ingress"),
+                ("duplicate; ", "strict canonical ingress"),
+                ("unknown; raw; extend_from_slice;", "unknown/raw preservation"),
+                ("MAX_RECURSION_LIMIT; ", "bounded prepared rewrite"),
+                ("decimal_places; negative_style; thousands_separator;", "number format fields"),
+                ("format_table; registry; refcount; reference; entry;", "registry/refcount closure"),
+            ):
+                with self.subTest(marker=marker):
+                    codec.write_text(complete.replace(marker, ""), encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_number_format_codec_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing strict {expected} marker" in item for item in violations),
+                        (expected, violations),
+                    )
+            codec.write_text(
+                complete.replace("preflight; let _ =", "let _ ="),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_number_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("preflight wire before" in item for item in violations), violations)
+
+            codec.write_text(complete + "use prost::Message;\n", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_number_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("Prost production path" in item for item in violations), violations)
+
+            codec.write_text(complete, encoding="utf-8")
+            public = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_PUBLIC_SOURCE
+            public.write_text(
+                public.read_text(encoding="utf-8").replace(
+                    f"mod {boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_GENERATED_MODULE};",
+                    f"pub mod {boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_GENERATED_MODULE};",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_number_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("generated projection module must remain private" in item for item in violations), violations)
+
+            # Comments and string literals cannot spoof an executable fuzz
+            # harness once this owner gate is active.
+            codec.write_text(complete, encoding="utf-8")
+            fuzz = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_FUZZ_SOURCE
+            fuzz.write_text(
+                "// fuzz_target! is intentionally only a decoy\n"
+                'const DECOY: &str = "fuzz_target!";\n',
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_number_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("fuzz target is missing fuzz_target! harness" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_table_cell_number_format_host_is_deprecated_focused_and_fallback_gated(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_number_format_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
+                    root
+                ),
+                [],
+            )
+            (root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_EXAMPLE).unlink()
+            violations = boundaries.audit_numbers_table_cell_number_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("missing example" in item for item in violations), violations)
+            host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_SOURCE[0]
+            complete = host.read_text(encoding="utf-8")
+            host.write_text(
+                complete.replace(
+                    "#[deprecated(note = \"legacy compatibility shell\")]\n",
+                    "",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
+                root
+            )
+            self.assertTrue(any("must remain deprecated table_cell_number_format" in item for item in violations), violations)
+
+            host.write_text(
+                complete
+                + "fn production_number_route() { cell_number_format(); }\n"
+                + "fn old_caller(editor: &NumbersEditor) { editor.set_table_cell_number_format(); }\n"
+                + "fn old_read_caller(editor: &NumbersEditor) { editor.table_cell_number_format(); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
+                root
+            )
+            self.assertTrue(any("production call set_table_cell_number_format" in item for item in violations), violations)
+            self.assertTrue(any("production call table_cell_number_format" in item for item in violations), violations)
+            self.assertFalse(any("helper call cell_number_format" in item for item in violations), violations)
+
+            host.write_text(
+                complete.replace("source_is_exact", "source_was_exact"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing exact-source provenance gate" in item for item in violations),
+                violations,
+            )
+
+            host.write_text(
+                complete.replace("WrongFormatFamily", "AnyFormatFamily"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing the narrow family-replacement exception" in item for item in violations),
+                violations,
+            )
+
+            host.write_text(
+                complete.replace("package.table_cell_number_format", "self.table_cell_number_format"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
+                root
+            )
+            self.assertTrue(any("must delegate to focused Package" in item for item in violations), violations)
+
+            host.write_text(
+                complete.replace("FocusedNumbersPackage", "LegacyPackage"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
+                root
+            )
+            self.assertTrue(any("must delegate to focused Package" in item for item in violations), violations)
+
+    def test_numbers_table_cell_number_format_owner_gate_masks_test_decoys(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_OWNER_SOURCE
+            codec = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_SOURCE
+            package = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_EXPORT_SOURCES[1]
+            for path, source in (
+                (
+                    owner,
+                    "#[cfg(test)]\n"
+                    "pub fn fake_owner() { pub_number_format; }\n",
+                ),
+                (
+                    codec,
+                    "#[cfg(test)]\n"
+                    "pub fn fake_codec() { buffa; decode_lazy_view; }\n",
+                ),
+                (
+                    package,
+                    "#[cfg(test)]\n"
+                    "pub(crate) mod table_cell_number_format;\n",
+                ),
+            ):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(source, encoding="utf-8")
+            self.assertFalse(boundaries._numbers_table_cell_number_format_owner_present(root))
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_number_format_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_number_format_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for audit in (
+            "audit_numbers_table_cell_number_format_codec_source_topology",
+            "audit_numbers_table_cell_number_format_facade_source_topology",
+            "audit_iwa_numbers_table_cell_number_format_source_topology",
+        ):
+            self.assertIn(f"+ {audit}()", main_source)
+
+    def test_numbers_table_cell_number_format_main_dispatch_runs_audits(self) -> None:
+        """Exercise the real main aggregation so wiring cannot be text-only."""
+
+        policy = boundaries.load_policy(boundaries.DEFAULT_POLICY)
+        snapshot = valid_snapshot(policy)
+        focused_names = (
+            "audit_numbers_table_cell_number_format_codec_source_topology",
+            "audit_numbers_table_cell_number_format_facade_source_topology",
+            "audit_iwa_numbers_table_cell_number_format_source_topology",
+        )
+        focused_calls: list[str] = []
+        patches = []
+        for name, value in vars(boundaries).items():
+            if not name.startswith("audit_") or not callable(value):
+                continue
+            if name in focused_names:
+                replacement = mock.Mock(
+                    side_effect=lambda name=name: focused_calls.append(name) or []
+                )
+            else:
+                replacement = mock.Mock(return_value=[])
+            patches.append(mock.patch.object(boundaries, name, replacement))
+
+        with mock.patch.object(
+            boundaries, "cargo_metadata", return_value={}
+        ), mock.patch.object(
+            boundaries, "snapshot_from_metadata", return_value=snapshot
+        ), mock.patch.object(boundaries, "debt_report", return_value=[]), ExitStack() as stack:
+            for patch in patches:
+                stack.enter_context(patch)
+            with redirect_stdout(io.StringIO()):
+                result = boundaries.main(["--policy", str(boundaries.DEFAULT_POLICY)])
+
+        self.assertEqual(result, 0)
+        self.assertEqual(focused_calls, list(focused_names))
 
 
 if __name__ == "__main__":

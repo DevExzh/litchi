@@ -1655,3 +1655,45 @@ edit chart data, geometry, titles, captions, legends, formulas, or any other
 chart graph, and it does not add durable patch serialization, composition,
 merge, or history semantics. Apple Keynote native open/save/close/reopen
 acceptance and focused semantic reread are recorded in the verification ADR.
+
+## 2026-09-01 amendment: Numbers existing-cell Number-format transactions
+
+The focused Numbers owner now applies the snapshot/edit/patch contract to the
+explicit decimal `Number` format of one existing table cell. The semantic
+value is `litchi_numbers::cell::data_format::Number`; its checked settings are
+decimal places, negative-value presentation, and thousands-separator policy.
+An automatic cell is represented as absence of an explicit `Number`, so
+resetting an explicit format and reading a cell that has no format remain
+distinct from inventing a native default object. A source `SheetSelector`,
+sheet-scoped `TableSelector`, and checked `CellPosition` resolve the cell
+before a transaction is staged; native table IDs, format-table keys, BNC
+records, archive members, protobuf messages, and raw bytes stay below the
+format boundary.
+
+The read/edit/apply surface is existing-object-only. An edit is bound to one
+immutable exact package snapshot and exposes a named commit, diagnostics, an
+exact-source patch, and an inverse. An unchanged request shares the source and
+performs no candidate write. A changed request validates the selected cell's
+format reference and its registry/refcount closure, rewrites only the admitted
+Number-format state, reopens the candidate, and verifies the same semantic
+selector before atomic publication. Applying a stale, foreign, ambiguous, or
+already-consumed patch fails before publication; inverse application restores
+the complete source artifact.
+
+The adapter validates the source wire before constructing its private lazy
+Buffa view. Unknown and unselected fields, duplicate occurrences, and
+unrelated table cells remain source-authoritative; no generated owned message
+or normalization is used as the preservation source. The legacy
+`litchi_iwa::NumbersEditor` entry point remains a compatibility shell and
+delegates admitted exact graphs to the focused owner. Exact native structural
+admission failures do not enter its generic fallback; the deprecated raw-ID
+setter retains only its historical cross-family replacement exception after a
+typed `WrongFormatFamily` result. Source-built compatibility packages may
+still use the generic `DataFormat` implementation. Unsupported or ambiguous
+exact graphs otherwise fail closed. This is not a general data-format
+conversion transaction:
+it does not create or remove cells, change values/formulas, rewrite text,
+currency, percentage, scientific, fraction, numeral-system, date/time,
+duration, custom, or interactive-control formats, or mutate table geometry,
+styles, comments, merges, or cross-workbook references. Durable patch
+serialization and multi-edit composition remain separate ADR work.

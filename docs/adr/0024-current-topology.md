@@ -3844,3 +3844,26 @@ visibility, persisted sort configuration, physical table `Sort Now`, chart
 data, geometry, or broader chart graph mutation. It adds no normal dependency
 edge, retires no migration debt, and removes no migration host or monolith
 gate. The authoritative topology remains unchanged.
+
+## 2026-09-01 amendment: Numbers existing-cell Number-format owner (topology unchanged)
+
+The existing-cell decimal Number-format seam now has a focused semantic owner
+in `litchi-numbers`, using the existing `cell::data_format::Number` leaf and a
+selector-first package transaction. The private adapter retains BNC storage,
+format-table/refcount records, native identifiers, Buffa views, archive
+members, and publication. The legacy `litchi-iwa` Numbers editor remains a
+compatibility route that delegates admitted exact graphs; exact structural
+admission failures do not fall through to the generic implementation. Its
+deprecated raw-ID setter retains only the historical typed cross-family
+replacement exception, while source-built compatibility packages retain the
+generic `DataFormat` fallback. It is not a second semantic owner.
+
+This is an ownership seam within the current package graph. It adds no normal
+workspace package or dependency declaration, retires no ordered migration
+debt, removes no migration host, and does not change the monolith deletion
+gate. The current authoritative inventory remains 64 workspace packages, 237
+internal dependency declarations, 226 canonical edges, 11 ordered migration
+debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration
+host unless a root metadata audit proves otherwise. The focused seam does not
+claim ownership of other Number-family formats, cell values/formulas, styles,
+table topology, or generated-schema/normal Prost retirement.

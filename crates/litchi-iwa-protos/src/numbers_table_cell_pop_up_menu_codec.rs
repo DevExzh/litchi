@@ -702,6 +702,803 @@ pub fn decode_control_format_with_report(
     Ok((snapshot, budget.finish(0)))
 }
 
+/// Native Numbers display-format discriminator for a plain number cell.
+///
+/// `FormatStructArchive` is shared by many iWork features.  This narrow
+/// route intentionally accepts only the four fields that Numbers writes for
+/// its plain number format; currency, date, custom, and control formats stay
+/// on their respective package-owned paths.
+pub const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;
+
+/// Native discriminator used for automatic decimal places.
+pub const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;
+
+/// Largest fixed decimal-place value accepted by Numbers' native format.
+pub const MAX_NUMBER_DECIMAL_PLACES: u32 = 30;
+
+const NUMBER_FORMAT_TYPE_FIELD: u32 = 1;
+const NUMBER_FORMAT_DECIMAL_PLACES_FIELD: u32 = 2;
+const NUMBER_FORMAT_NEGATIVE_STYLE_FIELD: u32 = 4;
+const NUMBER_FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD: u32 = 5;
+const NUMBER_FORMAT_MAX_KNOWN_FIELD: u32 = 45;
+
+/// Borrowed semantic facts for a strict plain-number `FormatStructArchive`.
+///
+/// The complete source payload remains available through [`Self::raw`].
+/// Unknown extension fields and groups are never decoded into owned storage
+/// and are copied byte-for-byte by [`rewrite_number_format`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NumberFormatSnapshot<'source> {
+    source: &'source [u8],
+    format_type: u32,
+    decimal_places: u32,
+    negative_style: u32,
+    show_thousands_separator: bool,
+}
+
+impl<'source> NumberFormatSnapshot<'source> {
+    /// Borrow the original wire payload.
+    #[must_use]
+    pub const fn raw(self) -> &'source [u8] {
+        self.source
+    }
+
+    /// Return the native format discriminator (`256`).
+    #[must_use]
+    pub const fn format_type(self) -> u32 {
+        self.format_type
+    }
+
+    /// Return `253` for automatic places, otherwise a fixed value in `0..=30`.
+    #[must_use]
+    pub const fn decimal_places(self) -> u32 {
+        self.decimal_places
+    }
+
+    /// Return the native negative-number style (`0..=3`).
+    #[must_use]
+    pub const fn negative_style(self) -> u32 {
+        self.negative_style
+    }
+
+    /// Whether the thousands separator is displayed.
+    #[must_use]
+    pub const fn show_thousands_separator(self) -> bool {
+        self.show_thousands_separator
+    }
+}
+
+/// Owned scalar values accepted by the plain-number format writer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NumberFormatWrite {
+    decimal_places: u32,
+    negative_style: u32,
+    show_thousands_separator: bool,
+}
+
+impl NumberFormatWrite {
+    /// Construct a native plain-number format update.
+    #[must_use]
+    pub const fn new(
+        decimal_places: u32,
+        negative_style: u32,
+        show_thousands_separator: bool,
+    ) -> Self {
+        Self {
+            decimal_places,
+            negative_style,
+            show_thousands_separator,
+        }
+    }
+
+    /// Copy the four semantic values from a decoded snapshot.
+    #[must_use]
+    pub const fn from_snapshot(snapshot: NumberFormatSnapshot<'_>) -> Self {
+        Self::new(
+            snapshot.decimal_places,
+            snapshot.negative_style,
+            snapshot.show_thousands_separator,
+        )
+    }
+
+    /// Return the native decimal-place discriminator/value.
+    #[must_use]
+    pub const fn decimal_places(self) -> u32 {
+        self.decimal_places
+    }
+
+    /// Return the native negative-number style.
+    #[must_use]
+    pub const fn negative_style(self) -> u32 {
+        self.negative_style
+    }
+
+    /// Return the thousands-separator setting.
+    #[must_use]
+    pub const fn show_thousands_separator(self) -> bool {
+        self.show_thousands_separator
+    }
+
+    /// Replace the decimal-place discriminator/value.
+    #[must_use]
+    pub const fn with_decimal_places(mut self, value: u32) -> Self {
+        self.decimal_places = value;
+        self
+    }
+
+    /// Replace the native negative-number style.
+    #[must_use]
+    pub const fn with_negative_style(mut self, value: u32) -> Self {
+        self.negative_style = value;
+        self
+    }
+
+    /// Replace the thousands-separator setting.
+    #[must_use]
+    pub const fn with_show_thousands_separator(mut self, value: bool) -> Self {
+        self.show_thousands_separator = value;
+        self
+    }
+}
+
+/// Strictly decode one plain-number `FormatStructArchive`.
+pub fn decode_number_format(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<NumberFormatSnapshot<'_>, DecodeError> {
+    Ok(decode_number_format_with_report(source, options)?.0)
+}
+
+/// Strictly decode one plain-number format and return measured wire usage.
+pub fn decode_number_format_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(NumberFormatSnapshot<'_>, DecodeReport), DecodeError> {
+    let (snapshot, _layout, report) = scan_number_format(source, options)?;
+    Ok((snapshot, report))
+}
+
+/// Prepare a source-preserving plain-number format rewrite.
+///
+/// Preparation performs the complete strict source preflight, records exact
+/// output/work requirements, and allocates no candidate bytes.  Execution
+/// must be supplied finite caller-owned limits and performs a strict
+/// read-back before publishing the candidate.
+pub fn prepare_number_format_rewrite<'source>(
+    source: &'source [u8],
+    write: NumberFormatWrite,
+    options: DecodeOptions,
+) -> Result<PreparedNumberFormatRewrite<'source>, DecodeError> {
+    validate_number_format_write(write)?;
+    let (_snapshot, layout, source_report) = scan_number_format(source, options)?;
+    let output_bytes = number_format_rewrite_output_len(source, layout, write)?;
+    let candidate_work = output_bytes
+        .checked_mul(2)
+        .ok_or_else(DecodeError::invalid)?;
+    let fields = layout
+        .fields
+        .checked_mul(2)
+        .ok_or_else(DecodeError::invalid)?;
+    let work_bytes = source_report
+        .work_bytes()
+        .checked_add(output_bytes)
+        .and_then(|work| work.checked_add(candidate_work))
+        .ok_or_else(DecodeError::invalid)?;
+    let retained_bytes = source
+        .len()
+        .checked_add(output_bytes)
+        .ok_or_else(DecodeError::invalid)?;
+    let requirements = RewriteExecutionRequirements {
+        output_bytes,
+        fields,
+        work_bytes,
+        max_depth: layout.max_depth,
+        references: 0,
+        items: 0,
+        text_bytes: 0,
+        allocations: 1,
+        retained_bytes,
+        scratch_bytes: 0,
+    };
+    check_options(requirements, options)?;
+    Ok(PreparedNumberFormatRewrite {
+        source,
+        layout,
+        write,
+        requirements,
+        verify_options: options,
+    })
+}
+
+/// Rewrite one plain-number format while preserving unknown source fields.
+pub fn rewrite_number_format(
+    source: &[u8],
+    write: NumberFormatWrite,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_number_format_rewrite(source, write, options)?;
+    prepared.execute(RewriteExecutionLimits::exact(
+        prepared.execution_requirements(),
+    ))
+}
+
+/// Compatibility spelling for the table-cell format route.
+pub use rewrite_number_format as rewrite_table_cell_number_format;
+
+/// Prepared source-preserving plain-number rewrite.
+#[derive(Debug, Clone, Copy)]
+pub struct PreparedNumberFormatRewrite<'source> {
+    source: &'source [u8],
+    layout: NumberFormatLayout,
+    write: NumberFormatWrite,
+    requirements: RewriteExecutionRequirements,
+    verify_options: DecodeOptions,
+}
+
+impl PreparedNumberFormatRewrite<'_> {
+    /// Return the measured requirements that execution must be allowed.
+    #[must_use]
+    pub const fn execution_requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    /// Return a report-shaped view of the prepared operation.
+    #[must_use]
+    pub fn prepare_report(self) -> DecodeReport {
+        report_from_requirements(self.requirements)
+    }
+
+    /// Emit, strictly read back, and publish the source-preserving candidate.
+    pub fn execute(self, limits: RewriteExecutionLimits) -> Result<RewriteOutput, DecodeError> {
+        check_requirements(self.requirements, limits)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.requirements.output_bytes)
+            .map_err(|_| {
+                DecodeError::limited(DecodeLimit::Allocation {
+                    requested: self.requirements.output_bytes,
+                })
+            })?;
+        emit_number_format_rewrite(&mut bytes, self.source, self.layout, self.write)?;
+        if bytes.len() != self.requirements.output_bytes {
+            return Err(DecodeError::invalid());
+        }
+        verify_number_format_candidate(&bytes, self.write, self.verify_options, self.layout)?;
+        Ok(RewriteOutput {
+            bytes,
+            report: report_from_requirements(self.requirements),
+        })
+    }
+}
+
+/// Prepare a canonical plain-number format payload for a new list entry.
+///
+/// Unlike [`prepare_number_format_rewrite`], this constructor has no source
+/// payload and therefore has no unknown fields to preserve.  It is intended
+/// for a storage append where the format entry did not previously exist.
+pub fn prepare_number_format_write(
+    write: NumberFormatWrite,
+    options: DecodeOptions,
+) -> Result<PreparedNumberFormatWrite, DecodeError> {
+    validate_number_format_write(write)?;
+    let output_bytes = number_format_canonical_output_len(write)?;
+    let requirements = RewriteExecutionRequirements {
+        output_bytes,
+        fields: 4,
+        work_bytes: output_bytes
+            .checked_mul(3)
+            .ok_or_else(DecodeError::invalid)?,
+        max_depth: 0,
+        references: 0,
+        items: 0,
+        text_bytes: 0,
+        allocations: 1,
+        retained_bytes: output_bytes,
+        scratch_bytes: 0,
+    };
+    check_options(requirements, options)?;
+    Ok(PreparedNumberFormatWrite {
+        write,
+        requirements,
+        verify_options: options,
+    })
+}
+
+/// Prepare a canonical format append under the more explicit append spelling.
+pub use prepare_number_format_write as prepare_number_format_append;
+
+/// Encode a canonical plain-number format payload for a new list entry.
+pub fn canonical_number_format(
+    write: NumberFormatWrite,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_number_format_write(write, options)?;
+    prepared.execute(RewriteExecutionLimits::exact(
+        prepared.execution_requirements(),
+    ))
+}
+
+/// Prepared canonical plain-number format append.
+#[derive(Debug, Clone, Copy)]
+pub struct PreparedNumberFormatWrite {
+    write: NumberFormatWrite,
+    requirements: RewriteExecutionRequirements,
+    verify_options: DecodeOptions,
+}
+
+impl PreparedNumberFormatWrite {
+    /// Return the finite measured requirements for execution.
+    #[must_use]
+    pub const fn execution_requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    /// Return a report-shaped view of the prepared operation.
+    #[must_use]
+    pub fn prepare_report(self) -> DecodeReport {
+        report_from_requirements(self.requirements)
+    }
+
+    /// Emit and strictly read back a canonical format payload.
+    pub fn execute(self, limits: RewriteExecutionLimits) -> Result<RewriteOutput, DecodeError> {
+        check_requirements(self.requirements, limits)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.requirements.output_bytes)
+            .map_err(|_| {
+                DecodeError::limited(DecodeLimit::Allocation {
+                    requested: self.requirements.output_bytes,
+                })
+            })?;
+        emit_number_format_canonical(&mut bytes, self.write)?;
+        if bytes.len() != self.requirements.output_bytes {
+            return Err(DecodeError::invalid());
+        }
+        let layout = NumberFormatLayout {
+            fields: 4,
+            max_depth: 0,
+            spans: [None, None, None, None],
+        };
+        verify_number_format_candidate(&bytes, self.write, self.verify_options, layout)?;
+        Ok(RewriteOutput {
+            bytes,
+            report: report_from_requirements(self.requirements),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct NumberFieldSpan {
+    number: u32,
+    start: usize,
+    end: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct NumberFormatLayout {
+    fields: usize,
+    max_depth: u32,
+    spans: [Option<NumberFieldSpan>; 4],
+}
+
+#[derive(Debug, Clone, Copy)]
+struct NumberFormatScanState {
+    format_type: Option<u32>,
+    decimal_places: Option<u32>,
+    negative_style: Option<u32>,
+    show_thousands_separator: Option<bool>,
+    spans: [Option<NumberFieldSpan>; 4],
+}
+
+impl NumberFormatScanState {
+    const fn new() -> Self {
+        Self {
+            format_type: None,
+            decimal_places: None,
+            negative_style: None,
+            show_thousands_separator: None,
+            spans: [None, None, None, None],
+        }
+    }
+}
+
+fn scan_number_format<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+) -> Result<
+    (
+        NumberFormatSnapshot<'source>,
+        NumberFormatLayout,
+        DecodeReport,
+    ),
+    DecodeError,
+> {
+    let mut budget = Budget::new(source, options)?;
+    let mut state = NumberFormatScanState::new();
+    let end = scan_number_message(source, 0, 0, None, &mut budget, &mut state)?;
+    if end != source.len() {
+        return Err(DecodeError::invalid());
+    }
+    let format_type = state.format_type.ok_or_else(DecodeError::invalid)?;
+    let decimal_places = state.decimal_places.ok_or_else(DecodeError::invalid)?;
+    let negative_style = state.negative_style.ok_or_else(DecodeError::invalid)?;
+    let show_thousands_separator = state
+        .show_thousands_separator
+        .ok_or_else(DecodeError::invalid)?;
+    if format_type != NATIVE_NUMBER_FORMAT_TYPE
+        || (decimal_places != NATIVE_AUTOMATIC_DECIMAL_PLACES
+            && decimal_places > MAX_NUMBER_DECIMAL_PLACES)
+        || negative_style > 3
+    {
+        return Err(DecodeError::invalid());
+    }
+
+    let snapshot = NumberFormatSnapshot {
+        source,
+        format_type,
+        decimal_places,
+        negative_style,
+        show_thousands_separator,
+    };
+    buffa_number_format_parity(source, snapshot, &mut budget)?;
+    let report = budget.finish(0);
+    let layout = NumberFormatLayout {
+        fields: report.fields(),
+        max_depth: report.max_depth(),
+        spans: state.spans,
+    };
+    Ok((snapshot, layout, report))
+}
+
+fn buffa_number_format_parity(
+    source: &[u8],
+    snapshot: NumberFormatSnapshot<'_>,
+    budget: &mut Budget,
+) -> Result<(), DecodeError> {
+    let options = budget.options;
+    let view: projection::FormatStructArchiveLazyView<'_> = BuffaDecodeOptions::new()
+        .with_max_message_size(options.max_message_bytes)
+        .with_unknown_field_limit(options.max_message_bytes)
+        .with_element_memory_limit(0)
+        .with_recursion_limit(options.recursion_limit)
+        .decode_lazy_view(source)
+        .map_err(|_| DecodeError::invalid())?;
+    if view.format_type != Some(snapshot.format_type)
+        || view.decimal_places != Some(snapshot.decimal_places)
+        || view.negative_style != Some(snapshot.negative_style)
+        || view.show_thousands_separator != Some(snapshot.show_thousands_separator)
+    {
+        return Err(DecodeError::invalid());
+    }
+    budget.work(source.len())?;
+    Ok(())
+}
+
+fn scan_number_message(
+    source: &[u8],
+    mut cursor: usize,
+    depth: u32,
+    end_group: Option<u32>,
+    budget: &mut Budget,
+    state: &mut NumberFormatScanState,
+) -> Result<usize, DecodeError> {
+    while cursor < source.len() {
+        let start = cursor;
+        let (key, key_len) = read_varint(source, cursor)?;
+        let number = u32::try_from(key >> 3).map_err(|_| DecodeError::invalid())?;
+        let wire = u8::try_from(key & 7).map_err(|_| DecodeError::invalid())?;
+        if number == 0 || number > MAX_FIELD_NUMBER {
+            return Err(DecodeError::invalid());
+        }
+        cursor = cursor
+            .checked_add(key_len)
+            .ok_or_else(DecodeError::invalid)?;
+        if wire == 4 {
+            if end_group != Some(number) {
+                return Err(DecodeError::invalid());
+            }
+            budget.field(
+                cursor.checked_sub(start).ok_or_else(DecodeError::invalid)?,
+                depth,
+            )?;
+            return Ok(cursor);
+        }
+        let start_tag_end = cursor;
+        match wire {
+            0 => {
+                let value_len = if depth == 0 && number_format_slot(number).is_some() {
+                    read_varint(source, cursor)?.1
+                } else {
+                    // Unknown scalar values remain source-authoritative. The
+                    // field key is canonical, while an overlong value spelling
+                    // is retained byte-for-byte instead of normalized.
+                    read_varint_relaxed(source, cursor)?.1
+                };
+                cursor = cursor
+                    .checked_add(value_len)
+                    .ok_or_else(DecodeError::invalid)?;
+            },
+            1 => {
+                cursor = cursor.checked_add(8).ok_or_else(DecodeError::invalid)?;
+                if cursor > source.len() {
+                    return Err(DecodeError::invalid());
+                }
+            },
+            2 => {
+                let (length, length_len) = read_varint(source, cursor)?;
+                cursor = cursor
+                    .checked_add(length_len)
+                    .ok_or_else(DecodeError::invalid)?;
+                let length = usize::try_from(length).map_err(|_| DecodeError::invalid())?;
+                cursor = cursor
+                    .checked_add(length)
+                    .ok_or_else(DecodeError::invalid)?;
+                if cursor > source.len() {
+                    return Err(DecodeError::invalid());
+                }
+            },
+            3 => {
+                if depth >= budget.options.recursion_limit {
+                    return Err(DecodeError::limited(DecodeLimit::Nesting {
+                        observed: depth.saturating_add(1),
+                        maximum: budget.options.recursion_limit,
+                    }));
+                }
+                cursor = scan_number_message(
+                    source,
+                    cursor,
+                    depth.saturating_add(1),
+                    Some(number),
+                    budget,
+                    state,
+                )?;
+            },
+            5 => {
+                cursor = cursor.checked_add(4).ok_or_else(DecodeError::invalid)?;
+                if cursor > source.len() {
+                    return Err(DecodeError::invalid());
+                }
+            },
+            _ => return Err(DecodeError::invalid()),
+        }
+        // A group start is one wire record (its key) followed by nested
+        // records.  Charge each byte exactly once: nested records account for
+        // the group body, while this record accounts only for its start tag.
+        let record_len = if wire == 3 {
+            start_tag_end
+                .checked_sub(start)
+                .ok_or_else(DecodeError::invalid)?
+        } else {
+            cursor.checked_sub(start).ok_or_else(DecodeError::invalid)?
+        };
+        budget.field(record_len, depth)?;
+        if depth == 0 {
+            inspect_number_root_field(source, start, cursor, number, wire, state)?;
+        }
+    }
+    if end_group.is_some() {
+        return Err(DecodeError::invalid());
+    }
+    Ok(cursor)
+}
+
+fn inspect_number_root_field(
+    source: &[u8],
+    start: usize,
+    end: usize,
+    number: u32,
+    wire: u8,
+    state: &mut NumberFormatScanState,
+) -> Result<(), DecodeError> {
+    let Some(slot) = number_format_slot(number) else {
+        // Fields 3..45 are known `FormatStructArchive` fields with a
+        // different shape/meaning.  Treating one as opaque would let a
+        // caller accidentally publish a non-number format through this API.
+        if number <= NUMBER_FORMAT_MAX_KNOWN_FIELD {
+            return Err(DecodeError::invalid());
+        }
+        return Ok(());
+    };
+    if wire != 0 || state.spans[slot].is_some() {
+        return Err(DecodeError::invalid());
+    }
+    let (_, key_len) = read_varint(source, start)?;
+    let value_offset = start
+        .checked_add(key_len)
+        .ok_or_else(DecodeError::invalid)?;
+    let (value, _) = read_varint(source, value_offset)?;
+    let span = NumberFieldSpan { number, start, end };
+    state.spans[slot] = Some(span);
+    match number {
+        NUMBER_FORMAT_TYPE_FIELD => {
+            state.format_type = Some(u32::try_from(value).map_err(|_| DecodeError::invalid())?)
+        },
+        NUMBER_FORMAT_DECIMAL_PLACES_FIELD => {
+            state.decimal_places = Some(u32::try_from(value).map_err(|_| DecodeError::invalid())?)
+        },
+        NUMBER_FORMAT_NEGATIVE_STYLE_FIELD => {
+            state.negative_style = Some(u32::try_from(value).map_err(|_| DecodeError::invalid())?)
+        },
+        NUMBER_FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD => {
+            if value > 1 {
+                return Err(DecodeError::invalid());
+            }
+            state.show_thousands_separator = Some(value != 0);
+        },
+        _ => unreachable!("number format slot covers all selected fields"),
+    }
+    Ok(())
+}
+
+const fn number_format_slot(number: u32) -> Option<usize> {
+    match number {
+        NUMBER_FORMAT_TYPE_FIELD => Some(0),
+        NUMBER_FORMAT_DECIMAL_PLACES_FIELD => Some(1),
+        NUMBER_FORMAT_NEGATIVE_STYLE_FIELD => Some(2),
+        NUMBER_FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD => Some(3),
+        _ => None,
+    }
+}
+
+fn validate_number_format_write(write: NumberFormatWrite) -> Result<(), DecodeError> {
+    if (write.decimal_places != NATIVE_AUTOMATIC_DECIMAL_PLACES
+        && write.decimal_places > MAX_NUMBER_DECIMAL_PLACES)
+        || write.negative_style > 3
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(())
+}
+
+fn number_format_field_len(number: u32, value: u64) -> Result<usize, DecodeError> {
+    encoded_varint_len(u64::from(number) << 3)
+        .checked_add(encoded_varint_len(value))
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn number_format_rewrite_output_len(
+    source: &[u8],
+    layout: NumberFormatLayout,
+    write: NumberFormatWrite,
+) -> Result<usize, DecodeError> {
+    let mut old = 0usize;
+    for span in layout.spans.into_iter() {
+        let span = span.ok_or_else(DecodeError::invalid)?;
+        old = old
+            .checked_add(
+                span.end
+                    .checked_sub(span.start)
+                    .ok_or_else(DecodeError::invalid)?,
+            )
+            .ok_or_else(DecodeError::invalid)?;
+    }
+    let new = number_format_canonical_output_len(write)?;
+    source
+        .len()
+        .checked_sub(old)
+        .and_then(|length| length.checked_add(new))
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn number_format_canonical_output_len(write: NumberFormatWrite) -> Result<usize, DecodeError> {
+    let type_len = number_format_field_len(
+        NUMBER_FORMAT_TYPE_FIELD,
+        u64::from(NATIVE_NUMBER_FORMAT_TYPE),
+    )?;
+    let decimal_len = number_format_field_len(
+        NUMBER_FORMAT_DECIMAL_PLACES_FIELD,
+        u64::from(write.decimal_places),
+    )?;
+    let negative_len = number_format_field_len(
+        NUMBER_FORMAT_NEGATIVE_STYLE_FIELD,
+        u64::from(write.negative_style),
+    )?;
+    let thousands_len = number_format_field_len(
+        NUMBER_FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD,
+        u64::from(write.show_thousands_separator),
+    )?;
+    type_len
+        .checked_add(decimal_len)
+        .and_then(|length| length.checked_add(negative_len))
+        .and_then(|length| length.checked_add(thousands_len))
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn emit_number_format_canonical(
+    output: &mut Vec<u8>,
+    write: NumberFormatWrite,
+) -> Result<(), DecodeError> {
+    emit_varint_field(
+        output,
+        NUMBER_FORMAT_TYPE_FIELD,
+        u64::from(NATIVE_NUMBER_FORMAT_TYPE),
+    )?;
+    emit_varint_field(
+        output,
+        NUMBER_FORMAT_DECIMAL_PLACES_FIELD,
+        u64::from(write.decimal_places),
+    )?;
+    emit_varint_field(
+        output,
+        NUMBER_FORMAT_NEGATIVE_STYLE_FIELD,
+        u64::from(write.negative_style),
+    )?;
+    emit_varint_field(
+        output,
+        NUMBER_FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD,
+        u64::from(write.show_thousands_separator),
+    )?;
+    Ok(())
+}
+
+fn emit_number_format_rewrite(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    layout: NumberFormatLayout,
+    write: NumberFormatWrite,
+) -> Result<(), DecodeError> {
+    let mut ordered = [
+        layout.spans[0].ok_or_else(DecodeError::invalid)?,
+        layout.spans[1].ok_or_else(DecodeError::invalid)?,
+        layout.spans[2].ok_or_else(DecodeError::invalid)?,
+        layout.spans[3].ok_or_else(DecodeError::invalid)?,
+    ];
+    for index in 1..ordered.len() {
+        let mut cursor = index;
+        while cursor > 0 && ordered[cursor].start < ordered[cursor - 1].start {
+            ordered.swap(cursor, cursor - 1);
+            cursor -= 1;
+        }
+    }
+    let mut source_offset = 0usize;
+    for span in ordered {
+        output.extend_from_slice(
+            source
+                .get(source_offset..span.start)
+                .ok_or_else(DecodeError::invalid)?,
+        );
+        let value = match span.number {
+            NUMBER_FORMAT_TYPE_FIELD => u64::from(NATIVE_NUMBER_FORMAT_TYPE),
+            NUMBER_FORMAT_DECIMAL_PLACES_FIELD => u64::from(write.decimal_places),
+            NUMBER_FORMAT_NEGATIVE_STYLE_FIELD => u64::from(write.negative_style),
+            NUMBER_FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD => {
+                u64::from(write.show_thousands_separator)
+            },
+            _ => return Err(DecodeError::invalid()),
+        };
+        emit_varint_field(output, span.number, value)?;
+        source_offset = span.end;
+    }
+    output.extend_from_slice(
+        source
+            .get(source_offset..)
+            .ok_or_else(DecodeError::invalid)?,
+    );
+    Ok(())
+}
+
+fn verify_number_format_candidate(
+    source: &[u8],
+    write: NumberFormatWrite,
+    mut options: DecodeOptions,
+    layout: NumberFormatLayout,
+) -> Result<(), DecodeError> {
+    options.max_message_bytes = options.max_message_bytes.max(source.len());
+    let (snapshot, report) = decode_number_format_with_report(source, options)?;
+    let expected_work = source
+        .len()
+        .checked_mul(2)
+        .ok_or_else(DecodeError::invalid)?;
+    if report.fields() != layout.fields
+        || report.work_bytes() != expected_work
+        || report.max_depth() != layout.max_depth
+        || NumberFormatWrite::from_snapshot(snapshot) != write
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(())
+}
+
 fn buffa_cell_spec_parity(source: &[u8], budget: &mut Budget) -> Result<(), DecodeError> {
     let options = budget.options;
     let _: projection::CellSpecArchiveLazyView<'_> = BuffaDecodeOptions::new()
@@ -793,6 +1590,14 @@ struct Budget {
 
 impl Budget {
     fn new(source: &[u8], options: DecodeOptions) -> Result<Self, DecodeError> {
+        let hard_message_bytes =
+            usize::try_from(buffa::MAX_MESSAGE_BYTES).map_err(|_| DecodeError::invalid())?;
+        if options.max_message_bytes > hard_message_bytes {
+            return Err(DecodeError::limited(DecodeLimit::InputBytes {
+                observed: options.max_message_bytes,
+                maximum: hard_message_bytes,
+            }));
+        }
         if source.len() > options.max_message_bytes {
             return Err(DecodeError::limited(DecodeLimit::InputBytes {
                 observed: source.len(),
@@ -3881,5 +4686,266 @@ mod tests {
             .to_vec();
         invalid_checkbox.extend_from_slice(&[0x10, 0x01]);
         assert!(decode_control_format(&invalid_checkbox, options()).is_err());
+    }
+
+    fn native_number_format(decimal_places: u32, negative_style: u32, show: bool) -> Vec<u8> {
+        let mut source = Vec::new();
+        emit_varint_field(
+            &mut source,
+            NUMBER_FORMAT_TYPE_FIELD,
+            u64::from(NATIVE_NUMBER_FORMAT_TYPE),
+        )
+        .expect("type");
+        emit_varint_field(
+            &mut source,
+            NUMBER_FORMAT_DECIMAL_PLACES_FIELD,
+            u64::from(decimal_places),
+        )
+        .expect("decimal places");
+        emit_varint_field(
+            &mut source,
+            NUMBER_FORMAT_NEGATIVE_STYLE_FIELD,
+            u64::from(negative_style),
+        )
+        .expect("negative style");
+        emit_varint_field(
+            &mut source,
+            NUMBER_FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD,
+            u64::from(show),
+        )
+        .expect("thousands separator");
+        source
+    }
+
+    #[test]
+    fn number_format_native_fixture_uses_borrowed_buffa_parity_view() {
+        let source = [
+            0x08, 0x80, 0x02, // format_type = 256
+            0x10, 0xfd, 0x01, // decimal_places = automatic (253)
+            0x20, 0x02, // negative_style = red
+            0x28, 0x01, // show_thousands_separator = true
+        ];
+        let (snapshot, report) =
+            decode_number_format_with_report(&source, options()).expect("number format");
+        assert_eq!(snapshot.raw(), source.as_slice());
+        assert_eq!(snapshot.format_type(), NATIVE_NUMBER_FORMAT_TYPE);
+        assert_eq!(snapshot.decimal_places(), NATIVE_AUTOMATIC_DECIMAL_PLACES);
+        assert_eq!(snapshot.negative_style(), 2);
+        assert!(snapshot.show_thousands_separator());
+        assert_eq!(report.input_bytes(), source.len());
+        assert_eq!(report.fields(), 4);
+        assert_eq!(report.work_bytes(), source.len() * 2);
+        assert_eq!(report.allocations(), 0);
+    }
+
+    #[test]
+    fn number_format_accepts_native_scalar_domains_only() {
+        for decimal_places in [
+            0,
+            MAX_NUMBER_DECIMAL_PLACES,
+            NATIVE_AUTOMATIC_DECIMAL_PLACES,
+        ] {
+            let source = native_number_format(decimal_places, 0, false);
+            assert!(decode_number_format(&source, options()).is_ok());
+        }
+        for negative_style in 0..=3 {
+            let source = native_number_format(2, negative_style, false);
+            assert!(decode_number_format(&source, options()).is_ok());
+        }
+        for show in [false, true] {
+            let source = native_number_format(2, 0, show);
+            assert!(decode_number_format(&source, options()).is_ok());
+        }
+        for decimal_places in [31, 254] {
+            let source = native_number_format(decimal_places, 0, false);
+            assert!(decode_number_format(&source, options()).is_err());
+        }
+        let source = native_number_format(2, 4, false);
+        assert!(decode_number_format(&source, options()).is_err());
+        let source = native_number_format(2, 0, false);
+        let mut invalid_bool = source;
+        *invalid_bool.last_mut().expect("bool byte") = 2;
+        assert!(decode_number_format(&invalid_bool, options()).is_err());
+    }
+
+    #[test]
+    fn number_format_rejects_missing_duplicate_wrong_and_incompatible_fields() {
+        let fields = [
+            &[0x08, 0x80, 0x02][..],
+            &[0x10, 0x02][..],
+            &[0x20, 0x00][..],
+            &[0x28, 0x00][..],
+        ];
+        for omitted in 0..fields.len() {
+            let mut source = Vec::new();
+            for (index, field) in fields.iter().enumerate() {
+                if index != omitted {
+                    source.extend_from_slice(field);
+                }
+            }
+            assert!(decode_number_format(&source, options()).is_err());
+        }
+
+        let mut duplicate = native_number_format(2, 0, false);
+        duplicate.extend_from_slice(&[0x08, 0x80, 0x02]);
+        assert!(decode_number_format(&duplicate, options()).is_err());
+
+        let wrong_wire = [
+            0x0a, 0x01, 0x00, // field 1 encoded as length-delimited
+            0x10, 0x02, 0x20, 0x00, 0x28, 0x00,
+        ];
+        assert!(decode_number_format(&wrong_wire, options()).is_err());
+
+        let mut noncanonical = native_number_format(2, 0, false);
+        noncanonical.splice(1..3, [0x80, 0x82, 0x00]);
+        assert!(decode_number_format(&noncanonical, options()).is_err());
+
+        for incompatible in [[0x1a, 0x00], [0x30, 0x01], [0x72, 0x00]] {
+            let mut source = native_number_format(2, 0, false);
+            source.extend_from_slice(&incompatible);
+            assert!(decode_number_format(&source, options()).is_err());
+        }
+    }
+
+    #[test]
+    fn number_format_rejects_malformed_groups_but_preserves_unknown_extensions() {
+        let mut unterminated = native_number_format(2, 0, false);
+        unterminated.extend_from_slice(&[0xa3, 0x06, 0x08, 0x01]);
+        assert!(decode_number_format(&unterminated, options()).is_err());
+
+        let mut unmatched_end = native_number_format(2, 0, false);
+        unmatched_end.extend_from_slice(&[0xa4, 0x06]);
+        assert!(decode_number_format(&unmatched_end, options()).is_err());
+
+        let unknown_group = [0xa3, 0x06, 0xa8, 0x06, 0x01, 0xa4, 0x06];
+        let mut source = native_number_format(2, 0, false);
+        source.extend_from_slice(&[0xa0, 0x06, 0x81, 0x00]); // overlong unknown scalar 1
+        source.extend_from_slice(&unknown_group);
+        let (snapshot, report) =
+            decode_number_format_with_report(&source, options()).expect("unknown extension");
+        assert_eq!(snapshot.raw(), source.as_slice());
+        assert_eq!(report.work_bytes(), source.len() * 2);
+
+        let write = NumberFormatWrite::new(30, 3, true);
+        let output = rewrite_number_format(&source, write, options()).expect("rewrite");
+        assert!(output.bytes().ends_with(&[
+            0xa0, 0x06, 0x81, 0x00, 0xa3, 0x06, 0xa8, 0x06, 0x01, 0xa4, 0x06,
+        ]));
+        let rewritten = decode_number_format(output.bytes(), options()).expect("rewritten");
+        assert_eq!(NumberFormatWrite::from_snapshot(rewritten), write);
+
+        let no_op = rewrite_number_format(
+            output.bytes(),
+            NumberFormatWrite::from_snapshot(rewritten),
+            options(),
+        )
+        .expect("no-op rewrite");
+        assert_eq!(no_op.bytes(), output.bytes());
+    }
+
+    #[test]
+    fn prepared_number_format_execution_is_finite_and_measured() {
+        let source = native_number_format(2, 0, false);
+        let write = NumberFormatWrite::new(30, 3, true);
+        let prepared = prepare_number_format_rewrite(&source, write, options()).expect("prepare");
+        let requirements = prepared.execution_requirements();
+        assert!(requirements.output_bytes() > 0);
+        assert!(requirements.fields() >= 8);
+        assert!(requirements.work_bytes() >= requirements.output_bytes());
+        assert_eq!(requirements.allocations(), 1);
+        assert_eq!(
+            prepared
+                .execute(RewriteExecutionLimits::exact(requirements))
+                .expect("exact execution")
+                .bytes()
+                .len(),
+            requirements.output_bytes()
+        );
+
+        assert!(matches!(
+            prepared
+                .execute(
+                    RewriteExecutionLimits::exact(requirements)
+                        .with_output_bytes(requirements.output_bytes() - 1),
+                )
+                .expect_err("output minus one")
+                .resource_limit(),
+            Some(DecodeLimit::OutputBytes { .. })
+        ));
+        assert!(matches!(
+            prepared
+                .execute(
+                    RewriteExecutionLimits::exact(requirements)
+                        .with_fields(requirements.fields() - 1),
+                )
+                .expect_err("fields minus one")
+                .resource_limit(),
+            Some(DecodeLimit::Fields { .. })
+        ));
+        assert!(matches!(
+            prepared
+                .execute(
+                    RewriteExecutionLimits::exact(requirements)
+                        .with_work_bytes(requirements.work_bytes() - 1),
+                )
+                .expect_err("work minus one")
+                .resource_limit(),
+            Some(DecodeLimit::Work { .. })
+        ));
+        assert!(matches!(
+            prepared
+                .execute(RewriteExecutionLimits::exact(requirements).with_allocations(0))
+                .expect_err("allocation refused")
+                .resource_limit(),
+            Some(DecodeLimit::Allocation { .. })
+        ));
+        assert!(matches!(
+            prepared
+                .execute(
+                    RewriteExecutionLimits::exact(requirements)
+                        .with_retained_bytes(requirements.retained_bytes() - 1),
+                )
+                .expect_err("retained minus one")
+                .resource_limit(),
+            Some(DecodeLimit::Retained { .. })
+        ));
+    }
+
+    #[test]
+    fn canonical_number_format_append_roundtrips_through_lazy_projection() {
+        let write = NumberFormatWrite::new(NATIVE_AUTOMATIC_DECIMAL_PLACES, 1, true);
+        let prepared = prepare_number_format_write(write, options()).expect("prepare append");
+        let requirements = prepared.execution_requirements();
+        let output = prepared
+            .execute(RewriteExecutionLimits::exact(requirements))
+            .expect("append");
+        let snapshot = decode_number_format(output.bytes(), options()).expect("read append");
+        assert_eq!(NumberFormatWrite::from_snapshot(snapshot), write);
+        assert_eq!(
+            output.bytes(),
+            &[0x08, 0x80, 0x02, 0x10, 0xfd, 0x01, 0x20, 0x01, 0x28, 0x01]
+        );
+        assert_eq!(
+            canonical_number_format(write, options())
+                .expect("one-shot")
+                .bytes(),
+            output.bytes()
+        );
+    }
+
+    #[test]
+    fn number_format_rejects_limits_above_the_buffa_hard_ceiling() {
+        let source = native_number_format(2, 0, false);
+        let mut invalid = options();
+        invalid.max_message_bytes = usize::MAX;
+        assert!(matches!(
+            decode_number_format(&source, invalid)
+                .expect_err("oversized Buffa configuration")
+                .resource_limit(),
+            Some(DecodeLimit::InputBytes { observed, maximum })
+                if observed == usize::MAX
+                    && maximum == usize::try_from(buffa::MAX_MESSAGE_BYTES)
+                        .expect("Buffa ceiling fits usize")
+        ));
     }
 }

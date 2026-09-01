@@ -3448,3 +3448,38 @@ owner and from both persisted legend/sort settings and physical table
 `Sort Now`. It does not own chart data, series, geometry, layout, titles,
 captions, legend styling, formulas, physical row order, chart creation, or
 graph transfer. No public native graph API is introduced.
+
+## 2026-09-01 amendment: Numbers existing-cell Number-format semantic owner
+
+`litchi_numbers::cell::data_format::Number` is the single semantic value for
+an explicit decimal format on an existing Numbers table cell. It remains
+archive-free and contains only the checked decimal-place,
+negative-style, and thousands-separator settings. `None` at the
+`Option<Number>` cell-format boundary means that the cell has no explicit
+Number-family format. `Some(Number { decimal_places: Automatic, .. })` is a
+distinct explicit Number format and maps to the native automatic-decimal
+sentinel; callers do not receive a format-table key merely because the native
+file stores one.
+The existing checked constructors and compact scalar representation remain
+the only ordinary way to construct this value. No `IwaNumberFormat`, native
+ID, protobuf/Buffa message, BNC storage record, archive path, or raw-wire
+compatibility alias is introduced.
+
+The focused package methods use `SheetSelector`, a sheet-scoped
+`TableSelector`, and `CellPosition`, with contextual transaction types for
+the read/edit/apply and error paths. Selectors describe the caller's semantic
+intent; they are resolved against the immutable source before physical
+planning, and duplicate or missing names are typed failures. The Number leaf
+does not grow package handles, lifetime parameters, registry identity, or
+format-specific aliases. Native format-table identity, control coordination,
+custom registries, BNC flags, wire framing, and error conversion remain in the
+private Numbers adapter.
+
+This owner is deliberately narrower than `DataFormat`. It covers only an
+existing cell's decimal `Number` state and its explicit-to-automatic reset.
+It does not silently convert another display/control family, create a cell,
+author a value or formula, or expose general formatting or style mutation.
+Currency, percentage, scientific, fraction, numeral-system, date/time,
+duration, custom, text, checkbox, rating, slider, stepper, and pop-up-menu
+owners retain their existing contracts until each receives its own complete
+selector, wire, transaction, locality, and native gate.

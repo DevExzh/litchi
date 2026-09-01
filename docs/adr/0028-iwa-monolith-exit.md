@@ -7120,3 +7120,36 @@ retired, no migration debt is removed, and `litchi-iwa` remains the migration
 host. This bounded owner transfer is not evidence of complete Keynote
 authoring, host independence, arbitrary-producer parity, native byte parity,
 or performance/RSS behavior.
+
+## 2026-09-01 amendment: Numbers existing-cell Number-format focused-owner slice (not a monolith-exit gate)
+
+The focused Numbers package now has a bounded destination for the explicit
+decimal Number format of one existing table cell. Its selector-first semantic
+surface uses `SheetSelector`, a sheet-scoped `TableSelector`, and
+`CellPosition`, with `litchi_numbers::cell::data_format::Number` as the
+archive-free value. Exact-source transactions, inverse/conflict semantics,
+strict wire validation, private lazy Buffa inspection, bounded staging,
+candidate reopen, readback, and locality proof are required before
+publication. Native IDs, BNC records, format-table keys, generated messages,
+archive members, and raw bytes remain private to the adapter.
+
+The legacy Numbers editor remains a compatibility shell and delegates admitted
+exact graphs to this owner where the focused proof applies. Exact native
+structural admission failures cannot enter the generic fallback. The
+deprecated raw-ID setter keeps only its historical cross-family replacement
+exception after a typed `WrongFormatFamily` result, and source-built
+compatibility packages retain their generic `DataFormat` path. The shell owns
+no new semantic Number implementation; unsupported, ambiguous,
+cross-component, and otherwise unproven exact graphs fail closed. The slice is
+not a general `DataFormat` migration and does not move cell values, formulas,
+styles, geometry, comments, merges, controls, other display-format families,
+table creation/deletion, or cross-workbook transfer.
+
+None of the six monolith-exit gates closes here. No package or dependency edge
+is retired, no ordered migration debt is removed, and `litchi-iwa` remains the
+migration host. Native Numbers acceptance, exact test/quality/fuzz evidence,
+and disposable-artifact hashes are recorded in ADR 0008. This bounded
+ownership slice is not evidence of complete Numbers table authoring,
+generated-schema/normal-Prost retirement, host independence,
+arbitrary-producer parity, native byte parity, or package-wide performance/RSS
+behavior.

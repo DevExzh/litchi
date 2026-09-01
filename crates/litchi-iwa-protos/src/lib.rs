@@ -1630,6 +1630,12 @@ pub mod numbers_table_cell_pop_up_menu_codec;
 #[doc(hidden)]
 pub mod numbers_table_cell_control_codec;
 
+/// Neutral strict plain-number `FormatStructArchive` projection and measured
+/// source-preserving rewrite. Generated Buffa values remain private to the
+/// shared table-cell implementation.
+#[doc(hidden)]
+pub mod numbers_table_cell_number_format_codec;
+
 /// Format-neutral spelling for the Numbers interactive-cell control seam.
 #[doc(hidden)]
 pub mod table_cell_control_codec {

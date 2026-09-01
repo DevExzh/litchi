@@ -1990,3 +1990,40 @@ RSS, latency, throughput, or general performance claim. It also does not
 claim Buffa ownership of chart data or other chart graphs. Legend visibility,
 persisted sort configuration, and physical `Sort Now` remain separate slices.
 No normal dependency edge or migration-host ownership changes in this record.
+
+## 2026-09-01 amendment: Numbers existing-cell Number-format resource record
+
+The existing-cell Number-format transaction is a bounded source-preserving
+operation over the selected table cell, its BNC cell record, and the admitted
+shared Number-format registry/refcount closure. The strict ingress validates
+wire keys, length-delimited payloads, duplicate/cardinality rules, numeric
+domains, nesting, and known field framing before forcing a private borrowed
+Buffa view. Buffa is a lazy inspection/parity layer only; generated owned
+messages and Prost-style whole-message re-encoding are not the preservation
+authority. Unselected field bytes and unrelated package members remain
+borrowed from the exact source until the commit's fallible staging boundary.
+
+One operation-local budget charges the selected graph's input bytes, decoded
+fields and references, bounded wire work/nesting, semantic output bytes,
+retained and scratch bytes, and fallible staging allocations. Codec size,
+field, identifier, and dense-list cursor arithmetic is checked. Conservative
+owner aggregate charges saturate to the applicable ceiling before
+authorization, and output reservation occurs only after the relevant prepared
+plan limits and package reassembly preflight succeed. Dense format-list append
+updates the entry and `next_list_id` cursor in one prepared rewrite. A limit
+failure, malformed or ambiguous ownership, invalid format value, allocation
+refusal, candidate reopen disagreement, or locality mismatch leaves the source
+unchanged. An exact no-op shares the source and does not allocate a candidate;
+a changed operation performs one admitted rewrite, one bounded reopen/readback,
+and atomic publication.
+
+The locality proof is semantic rather than a package-wide rewrite promise:
+only the selected cell's admitted storage and the format-table/refcount
+records required by that cell may change, while unselected cells, unknown
+fields, controls, values, formulas, metadata, previews, and unrelated archive
+members remain byte-preserved. The exact member set and measured resource
+counts for the root verification run are intentionally recorded in ADR 0008,
+not inferred here. This amendment therefore makes no zero-copy, allocation
+count, peak-RSS, latency, throughput, or whole-package memory claim, and it
+does not transfer Buffa ownership of the remaining Numbers data-format
+families or table graph.

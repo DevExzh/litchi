@@ -863,6 +863,13 @@ pub struct TableDataListEntryAppend<'source> {
     key: u32,
     ref_count: u32,
     payload: TableDataListEntryPayload<'source>,
+    next_list_id_advance: Option<TableDataListNextListIdAdvance>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct TableDataListNextListIdAdvance {
+    expected: u32,
+    replacement: u32,
 }
 
 impl fmt::Debug for TableDataListEntryAppend<'_> {
@@ -872,6 +879,10 @@ impl fmt::Debug for TableDataListEntryAppend<'_> {
             .field("key", &"<redacted>")
             .field("ref_count", &self.ref_count)
             .field("payload", &self.payload)
+            .field(
+                "advances_next_list_id",
+                &self.next_list_id_advance.is_some(),
+            )
             .finish()
     }
 }
@@ -883,6 +894,7 @@ impl<'source> TableDataListEntryAppend<'source> {
             key,
             ref_count,
             payload: TableDataListEntryPayload::String(value),
+            next_list_id_advance: None,
         }
     }
 
@@ -892,6 +904,7 @@ impl<'source> TableDataListEntryAppend<'source> {
             key,
             ref_count,
             payload: TableDataListEntryPayload::Format(value),
+            next_list_id_advance: None,
         }
     }
 
@@ -901,7 +914,23 @@ impl<'source> TableDataListEntryAppend<'source> {
             key,
             ref_count,
             payload: TableDataListEntryPayload::ControlCellSpec(value),
+            next_list_id_advance: None,
         }
+    }
+
+    /// Atomically advance the root list allocator while appending this entry.
+    ///
+    /// The prepared rewrite accepts this transition only when `key` equals
+    /// `expected`, the source cursor equals `expected`, and `replacement` is
+    /// exactly the checked successor. This keeps dense native registries from
+    /// publishing an appended key while leaving `next_list_id` stale.
+    #[must_use]
+    pub const fn advance_next_list_id(mut self, expected: u32, replacement: u32) -> Self {
+        self.next_list_id_advance = Some(TableDataListNextListIdAdvance {
+            expected,
+            replacement,
+        });
+        self
     }
 
     #[must_use]
@@ -3715,6 +3744,35 @@ pub fn prepare_table_data_list_entry_rewrite<'source>(
         return Err(DecodeError::invalid());
     }
 
+    let next_list_id_rewrite = match mutation {
+        TableDataListEntryMutation::Append(value) => {
+            if value.key == 0 {
+                return Err(DecodeError::invalid());
+            }
+            if let Some(advance) = value.next_list_id_advance {
+                let successor = advance
+                    .expected
+                    .checked_add(1)
+                    .ok_or_else(DecodeError::invalid)?;
+                if snapshot.next_list_id != advance.expected
+                    || value.key != advance.expected
+                    || advance.replacement != successor
+                {
+                    return Err(DecodeError::invalid());
+                }
+                let (start, end) = wire_field_span(source, 2)?.ok_or_else(DecodeError::invalid)?;
+                Some(NextListIdRewriteSpan {
+                    start,
+                    end,
+                    replacement: advance.replacement,
+                })
+            } else {
+                None
+            }
+        },
+        TableDataListEntryMutation::RefCount(_) | TableDataListEntryMutation::Remove(_) => None,
+    };
+
     let payload_report = match mutation {
         TableDataListEntryMutation::Append(value) => {
             if value.ref_count == 0 || stage.has_key(value.key) {
@@ -3762,10 +3820,23 @@ pub fn prepare_table_data_list_entry_rewrite<'source>(
         },
     };
     let output_bytes = match mutation {
-        TableDataListEntryMutation::Append(value) => source
-            .len()
-            .checked_add(encoded_list_entry_length(value)?)
-            .ok_or_else(DecodeError::invalid)?,
+        TableDataListEntryMutation::Append(value) => {
+            let appended = source
+                .len()
+                .checked_add(encoded_list_entry_length(value)?)
+                .ok_or_else(DecodeError::invalid)?;
+            if let Some(rewrite) = next_list_id_rewrite {
+                let replacement_len = encoded_varint_len(16)
+                    .checked_add(encoded_varint_len(u64::from(rewrite.replacement)))
+                    .ok_or_else(DecodeError::invalid)?;
+                appended
+                    .checked_sub(rewrite.end - rewrite.start)
+                    .and_then(|length| length.checked_add(replacement_len))
+                    .ok_or_else(DecodeError::invalid)?
+            } else {
+                appended
+            }
+        },
         TableDataListEntryMutation::RefCount(value) => {
             let entry = stage
                 .unique_key(value.key)?
@@ -3832,15 +3903,34 @@ pub fn prepare_table_data_list_entry_rewrite<'source>(
         .capacity()
         .checked_mul(size_of::<ListEntryRewriteSpan<'static>>())
         .ok_or_else(DecodeError::invalid)?;
+    // `list_entry_insertion_offset` performs one bounded root scan during
+    // preparation. A cursor transition performs one additional root scan to
+    // stage the exact field span. Charge conservative full-decode ledgers for
+    // both scans rather than hiding planning work from the owner.
+    let planning_scan_count = if next_list_id_rewrite.is_some() {
+        2usize
+    } else {
+        1usize
+    };
+    let planning_scan_fields = source_report
+        .fields
+        .checked_mul(planning_scan_count)
+        .ok_or_else(DecodeError::invalid)?;
+    let planning_scan_work = source_report
+        .work_bytes
+        .checked_mul(planning_scan_count)
+        .ok_or_else(DecodeError::invalid)?;
     let fields = source_report
         .fields
         .checked_add(payload_report.fields)
+        .and_then(|fields| fields.checked_add(planning_scan_fields))
         .and_then(|fields| fields.checked_add(result_upper_bound.fields))
         .and_then(|fields| fields.checked_add(result_upper_bound.fields))
         .ok_or_else(DecodeError::invalid)?;
     let work_bytes = source_report
         .work_bytes
         .checked_add(payload_report.work_bytes)
+        .and_then(|work| work.checked_add(planning_scan_work))
         .and_then(|work| work.checked_add(result_upper_bound.work_bytes))
         .and_then(|work| work.checked_add(result_upper_bound.work_bytes))
         .ok_or_else(DecodeError::invalid)?;
@@ -3874,6 +3964,7 @@ pub fn prepare_table_data_list_entry_rewrite<'source>(
         mutation,
         entries: stage.entries,
         insertion_at,
+        next_list_id_rewrite,
         requirements,
     })
 }
@@ -3886,6 +3977,7 @@ pub struct PreparedTableDataListEntryRewrite<'source> {
     mutation: TableDataListEntryMutation<'source>,
     entries: Vec<ListEntryRewriteSpan<'source>>,
     insertion_at: usize,
+    next_list_id_rewrite: Option<NextListIdRewriteSpan>,
     requirements: TableDataListRewriteRequirements,
 }
 
@@ -3927,13 +4019,19 @@ impl PreparedTableDataListEntryRewrite<'_> {
             self.source,
             &self.entries,
             self.insertion_at,
+            self.next_list_id_rewrite,
             self.mutation,
         )?;
         if output.len() != requirements.output_bytes {
             return Err(DecodeError::invalid());
         }
         let options = self.options;
-        let (_snapshot, result) = decode_table_data_list_with_report(&output, options)?;
+        let (snapshot, result) = decode_table_data_list_with_report(&output, options)?;
+        if let Some(rewrite) = self.next_list_id_rewrite {
+            if snapshot.next_list_id != rewrite.replacement {
+                return Err(DecodeError::invalid());
+            }
+        }
         let mut verifier = ListMutationVerifier {
             mutation: self.mutation,
             matched: matches!(self.mutation, TableDataListEntryMutation::Remove(_)),
@@ -3977,6 +4075,13 @@ struct ListEntryRewriteSpan<'source> {
     end: usize,
     raw: &'source [u8],
     snapshot: TableDataListEntrySnapshot<'source>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct NextListIdRewriteSpan {
+    start: usize,
+    end: usize,
+    replacement: u32,
 }
 
 struct ListEntryRewriteStage<'source> {
@@ -4350,11 +4455,20 @@ fn assemble_table_data_list_entry_rewrite(
     source: &[u8],
     entries: &[ListEntryRewriteSpan<'_>],
     insertion_at: usize,
+    next_list_id_rewrite: Option<NextListIdRewriteSpan>,
     mutation: TableDataListEntryMutation<'_>,
 ) -> Result<(), DecodeError> {
     let mut cursor = 0usize;
+    let mut next_list_id_rewritten = false;
     if let TableDataListEntryMutation::Append(append) = mutation {
-        output.extend_from_slice(&source[..insertion_at]);
+        append_source_span(
+            output,
+            source,
+            0,
+            insertion_at,
+            next_list_id_rewrite,
+            &mut next_list_id_rewritten,
+        )?;
         append_table_data_list_entry(output, append)?;
         cursor = insertion_at;
     }
@@ -4362,7 +4476,14 @@ fn assemble_table_data_list_entry_rewrite(
         if entry.start < cursor {
             continue;
         }
-        output.extend_from_slice(&source[cursor..entry.start]);
+        append_source_span(
+            output,
+            source,
+            cursor,
+            entry.start,
+            next_list_id_rewrite,
+            &mut next_list_id_rewritten,
+        )?;
         let selected = match mutation {
             TableDataListEntryMutation::RefCount(edit) => entry.snapshot.key() == edit.key,
             TableDataListEntryMutation::Remove(edit) => entry.snapshot.key() == edit.key,
@@ -4387,7 +4508,48 @@ fn assemble_table_data_list_entry_rewrite(
         }
         cursor = entry.end;
     }
-    output.extend_from_slice(&source[cursor..]);
+    append_source_span(
+        output,
+        source,
+        cursor,
+        source.len(),
+        next_list_id_rewrite,
+        &mut next_list_id_rewritten,
+    )?;
+    if next_list_id_rewrite.is_some() != next_list_id_rewritten {
+        return Err(DecodeError::invalid());
+    }
+    Ok(())
+}
+
+fn append_source_span(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    start: usize,
+    end: usize,
+    next_list_id_rewrite: Option<NextListIdRewriteSpan>,
+    rewritten: &mut bool,
+) -> Result<(), DecodeError> {
+    if start > end || end > source.len() {
+        return Err(DecodeError::invalid());
+    }
+    let Some(rewrite) = next_list_id_rewrite else {
+        output.extend_from_slice(&source[start..end]);
+        return Ok(());
+    };
+    let overlaps = rewrite.start < end && start < rewrite.end;
+    if !overlaps {
+        output.extend_from_slice(&source[start..end]);
+        return Ok(());
+    }
+    if *rewritten || rewrite.start < start || rewrite.end > end || rewrite.start >= rewrite.end {
+        return Err(DecodeError::invalid());
+    }
+    output.extend_from_slice(&source[start..rewrite.start]);
+    encode_key(output, 2, 0);
+    encode_varint(output, u64::from(rewrite.replacement));
+    output.extend_from_slice(&source[rewrite.end..end]);
+    *rewritten = true;
     Ok(())
 }
 
@@ -9291,6 +9453,59 @@ mod tests {
                 .windows(payload.len())
                 .any(|window| window == payload)
         );
+    }
+
+    #[test]
+    fn prepared_dense_format_append_atomically_advances_next_list_id() {
+        let mut source = list_minimal();
+        source[1] = 2;
+        let payload = [0x08, 0x80, 0x02];
+        let (mut source, _) = rewrite_table_data_list_entry(
+            &source,
+            TableDataListEntryMutation::Append(TableDataListEntryAppend::format(1, 1, &payload)),
+            list_mutation_options(&source),
+        )
+        .expect("seed dense format list");
+        unknown_fields(&mut source, 91);
+        let segment = reference(700);
+        b(&mut source, 4, &segment);
+
+        let appended_payload = [0x08, 0x80, 0x02, 0x20, 0x03];
+        let append =
+            TableDataListEntryAppend::format(2, 1, &appended_payload).advance_next_list_id(2, 3);
+        let plan = prepare_table_data_list_entry_rewrite(
+            &source,
+            TableDataListEntryMutation::Append(append),
+            list_mutation_options(&source),
+        )
+        .expect("dense append plan");
+        let requirements = plan.requirements();
+        let (candidate, report) = plan
+            .execute(requirements.exact_limits())
+            .expect("dense append execute");
+        let (snapshot, _) =
+            decode_table_data_list_with_report(&candidate, list_mutation_options(&candidate))
+                .expect("dense append candidate");
+        assert_eq!(snapshot.next_list_id(), 3);
+        assert_eq!(report.output_bytes(), candidate.len());
+        assert!(
+            candidate
+                .windows(segment.len())
+                .any(|window| window == segment)
+        );
+
+        for invalid in [
+            TableDataListEntryAppend::format(2, 1, &appended_payload).advance_next_list_id(1, 2),
+            TableDataListEntryAppend::format(2, 1, &appended_payload).advance_next_list_id(2, 4),
+            TableDataListEntryAppend::format(1, 1, &appended_payload).advance_next_list_id(2, 3),
+        ] {
+            prepare_table_data_list_entry_rewrite(
+                &source,
+                TableDataListEntryMutation::Append(invalid),
+                list_mutation_options(&source),
+            )
+            .expect_err("invalid cursor transition must fail closed");
+        }
     }
 
     #[test]

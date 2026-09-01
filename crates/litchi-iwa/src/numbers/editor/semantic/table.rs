@@ -15,6 +15,7 @@ use litchi_numbers::{Package as FocusedNumbersPackage, TableCellCommentError};
 use litchi_numbers::cell::CellControl;
 
 type FocusedControlError = litchi_numbers::cell::data_format::control::transaction::Error;
+type FocusedNumberFormatError = litchi_numbers::cell::data_format::number::transaction::Error;
 
 fn focused_control_error(error: FocusedControlError) -> Error {
     Error::InvalidFormat(format!(
@@ -79,6 +80,211 @@ fn commit_focused_control_format(
     let mut bytes = Vec::new();
     bytes.try_reserve_exact(source_bytes.len()).map_err(|_| {
         Error::InvalidFormat("could not allocate focused Numbers cell-control candidate".to_owned())
+    })?;
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .map_err(|error| Error::Io(error.into_io_error()))?;
+    NumbersEditor::from_bytes(&bytes)
+}
+
+fn focused_number_format_error(error: FocusedNumberFormatError) -> Error {
+    Error::InvalidFormat(format!(
+        "focused Numbers cell-number-format operation failed: {error}"
+    ))
+}
+
+enum FocusedNumberFormatLocation {
+    Owner {
+        source: FocusedNumbersPackage,
+        sheet: litchi_numbers::SheetSelector<'static>,
+        table: litchi_numbers::TableSelector<'static>,
+        position: litchi_numbers::table::CellPosition,
+    },
+    LegacyFallback,
+}
+
+fn focused_number_format_location(
+    editor: &NumbersEditor,
+    source_bytes: &[u8],
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<FocusedNumberFormatLocation> {
+    let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
+    let position =
+        litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "invalid Numbers cell-number-format coordinate: {error}"
+            ))
+        })?;
+    let source = match FocusedNumbersPackage::from_bytes(source_bytes) {
+        Ok(source) => source,
+        Err(litchi_numbers::PackageError::InvalidFormat(_))
+            if !editor.package.source_is_exact() =>
+        {
+            return Ok(FocusedNumberFormatLocation::LegacyFallback);
+        },
+        Err(error) => {
+            return Err(Error::InvalidFormat(format!(
+                "focused Numbers cell-number-format source validation failed: {error}"
+            )));
+        },
+    };
+    Ok(FocusedNumberFormatLocation::Owner {
+        source,
+        sheet,
+        table,
+        position,
+    })
+}
+
+const fn focused_number_format_read_can_fallback(
+    error: FocusedNumberFormatError,
+    source_built: bool,
+) -> bool {
+    source_built
+        && matches!(
+            error,
+            FocusedNumberFormatError::CellNotFound
+                | FocusedNumberFormatError::UnsupportedDependency { .. }
+                | FocusedNumberFormatError::UnsupportedSource
+                | FocusedNumberFormatError::InvalidSource { .. }
+        )
+}
+
+const fn focused_number_format_edit_can_fallback(
+    error: FocusedNumberFormatError,
+    source_built: bool,
+) -> bool {
+    // Exact native packages fail closed for every structural admission error.
+    // The sole exact-source compatibility exception preserves the historical
+    // setter contract that replaces an explicit non-Number family. Synthetic
+    // source-built packages may also use the legacy codec until their builder
+    // graph is admitted by the focused owner.
+    matches!(error, FocusedNumberFormatError::WrongFormatFamily { .. })
+        || focused_number_format_read_can_fallback(error, source_built)
+}
+
+#[cfg(test)]
+mod number_format_fallback_policy_tests {
+    use super::{
+        FocusedNumberFormatError, focused_number_format_edit_can_fallback,
+        focused_number_format_read_can_fallback,
+    };
+    use litchi_numbers::cell::data_format::number::transaction::Path;
+
+    #[test]
+    fn exact_sources_never_fallback_after_structural_admission_failure() {
+        let structural = FocusedNumberFormatError::UnsupportedSource;
+        assert!(!focused_number_format_read_can_fallback(structural, false));
+        assert!(!focused_number_format_edit_can_fallback(structural, false));
+        assert!(focused_number_format_read_can_fallback(structural, true));
+        assert!(focused_number_format_edit_can_fallback(structural, true));
+
+        let family = FocusedNumberFormatError::WrongFormatFamily {
+            path: Path::Package,
+        };
+        assert!(!focused_number_format_read_can_fallback(family, false));
+        assert!(focused_number_format_edit_can_fallback(family, false));
+    }
+}
+
+fn focused_number_format(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Number>> {
+    let source_built = !editor.package.source_is_exact();
+    let source_bytes = editor.to_bytes()?;
+    let location = focused_number_format_location(editor, &source_bytes, table_id, row, column)?;
+    let FocusedNumberFormatLocation::Owner {
+        source,
+        sheet,
+        table,
+        position,
+    } = location
+    else {
+        return cell_data_format::cell_number_format(&editor.package, table_id, row, column);
+    };
+    match source.table_cell_number_format(sheet, table, position) {
+        Ok(format) => Ok(format),
+        Err(error) if focused_number_format_read_can_fallback(error, source_built) => {
+            cell_data_format::cell_number_format(&editor.package, table_id, row, column)
+        },
+        Err(error) => Err(focused_number_format_error(error)),
+    }
+}
+
+fn commit_legacy_number_format(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    format: Option<Number>,
+) -> Result<NumbersEditor> {
+    let mut staged = editor.package.clone();
+    match format {
+        Some(format) => {
+            cell_data_format::set_cell_number_format(&mut staged, table_id, row, column, format)?;
+        },
+        None => {
+            cell_data_format::reset_cell_number_format(&mut staged, table_id, row, column)?;
+        },
+    }
+    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let observed = cell_data_format::cell_number_format(&verified.package, table_id, row, column)?;
+    if observed != format {
+        return Err(Error::InvalidFormat(
+            "Numbers table-cell number-format failed legacy package validation".to_owned(),
+        ));
+    }
+    Ok(verified)
+}
+
+fn commit_focused_number_format(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    format: Option<Number>,
+) -> Result<NumbersEditor> {
+    let source_built = !editor.package.source_is_exact();
+    let source_bytes = editor.to_bytes()?;
+    let location = focused_number_format_location(editor, &source_bytes, table_id, row, column)?;
+    let FocusedNumberFormatLocation::Owner {
+        source,
+        sheet,
+        table,
+        position,
+    } = location
+    else {
+        return commit_legacy_number_format(editor, table_id, row, column, format);
+    };
+    let edit = match source.edit_table_cell_number_format(sheet, table, position) {
+        Ok(edit) => edit,
+        Err(error) if focused_number_format_edit_can_fallback(error, source_built) => {
+            return commit_legacy_number_format(editor, table_id, row, column, format);
+        },
+        Err(error) => return Err(focused_number_format_error(error)),
+    };
+    let commit = match format {
+        Some(format) => edit.set(format).commit(),
+        None => edit.clear().commit(),
+    };
+    let commit = match commit {
+        Ok(commit) => commit,
+        Err(error) if focused_number_format_edit_can_fallback(error, source_built) => {
+            return commit_legacy_number_format(editor, table_id, row, column, format);
+        },
+        Err(error) => return Err(focused_number_format_error(error)),
+    };
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(source_bytes.len()).map_err(|_| {
+        Error::InvalidFormat(
+            "could not allocate focused Numbers cell-number-format candidate".to_owned(),
+        )
     })?;
     commit
         .package()
@@ -503,16 +709,24 @@ impl NumbersEditor {
     /// Read an explicit decimal-number format for one zero-based table cell.
     ///
     /// `None` means the cell uses iWork's automatic data format.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers cell Number-format API; use litchi_numbers::Package::table_cell_number_format with SheetSelector, TableSelector, and CellPosition for the selector-first semantic read"
+    )]
     pub fn table_cell_number_format(
         &self,
         table_id: u64,
         row: usize,
         column: usize,
     ) -> Result<Option<Number>> {
-        cell_data_format::cell_number_format(&self.package, table_id, row, column)
+        focused_number_format(self, table_id, row, column)
     }
 
     /// Create or replace an explicit decimal-number format transactionally.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers cell Number-format API; use litchi_numbers::Package::edit_table_cell_number_format with SheetSelector, TableSelector, and CellPosition for selector-first writes"
+    )]
     pub fn set_table_cell_number_format(
         &mut self,
         table_id: u64,
@@ -520,32 +734,32 @@ impl NumbersEditor {
         column: usize,
         format: Number,
     ) -> Result<()> {
-        self.set_table_cell_data_format(table_id, row, column, format.into())
+        *self = commit_focused_number_format(self, table_id, row, column, Some(format))?;
+        Ok(())
     }
 
     /// Restore iWork's automatic data format for one table cell.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers cell Number-format API; use litchi_numbers::Package::edit_table_cell_number_format with SheetSelector, TableSelector, and CellPosition to clear the explicit format"
+    )]
     pub fn reset_table_cell_number_format(
         &mut self,
         table_id: u64,
         row: usize,
         column: usize,
     ) -> Result<bool> {
-        let mut staged = self.package.clone();
-        let changed =
-            cell_data_format::reset_cell_number_format(&mut staged, table_id, row, column)?;
-        if changed {
-            let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified
-                .table_cell_number_format(table_id, row, column)?
-                .is_some()
-            {
-                return Err(Error::InvalidFormat(
-                    "Numbers table-cell number-format reset failed package validation".to_owned(),
-                ));
-            }
-            *self = verified;
+        if focused_number_format(self, table_id, row, column)?.is_none() {
+            return Ok(false);
         }
-        Ok(changed)
+        let verified = commit_focused_number_format(self, table_id, row, column, None)?;
+        if focused_number_format(&verified, table_id, row, column)?.is_some() {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell number-format reset failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(true)
     }
 
     /// Read an explicit Text format for one zero-based table cell.

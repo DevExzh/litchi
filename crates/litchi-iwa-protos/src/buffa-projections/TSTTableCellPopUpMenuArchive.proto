@@ -29,3 +29,14 @@ message CellSpecArchive {
   optional bool chooser_control_start_w_first = 7;
   optional bool category_summary_should_display_label = 8;
 }
+
+// The four scalar fields needed by a plain Numbers number display format.
+// The complete TSK.FormatStructArchive remains source-authoritative: this
+// sidecar is deliberately a narrow lazy parity view and owns no unknown
+// fields or nested format state.
+message FormatStructArchive {
+  optional uint32 format_type = 1;
+  optional uint32 decimal_places = 2;
+  optional uint32 negative_style = 4;
+  optional bool show_thousands_separator = 5;
+}

@@ -15232,3 +15232,84 @@ This evidence makes only focused native acceptance and does not claim
 arbitrary-producer parity, native byte parity, benchmark/RSS results,
 complete Keynote chart authoring, or closure of a migration debt, dependency
 edge, migration-host item, or monolith-deletion gate.
+
+## 2026-09-01 amendment: Numbers existing-cell Number-format focused-owner verification
+
+The verification record for this slice must prove the existing-cell contract,
+not merely that the archive-free `Number` value compiles. The focused API is
+the Numbers package's selector-first Number-format read/edit/apply surface,
+using `SheetSelector`, a sheet-scoped `TableSelector`, and `CellPosition`.
+The required cases are explicit Number readback, automatic absence, set,
+reset, exact no-op, inverse restoration, stale/foreign/ambiguous selector and
+patch refusal, malformed/duplicate/wrong-wire source rejection, late budget
+failure without partial publication, candidate reopen/readback, and exact
+locality for the selected cell and its admitted registry/refcount closure.
+The host compatibility method must be shown to delegate the ordinary graph to
+the focused owner; it must not become a second Number-format implementation.
+
+The integrated evidence for this ADR-bearing commit is:
+
+- `cargo test -p litchi-iwa-protos` passed 643 unit tests and 3 integration
+  tests. `cargo test -p litchi-numbers --test table_cell_number_format` passed
+  14/14, `cargo test -p litchi-numbers --test
+  table_cell_data_format_fixture` passed 2/2, and the focused
+  `litchi-iwa` compatibility bridge test passed 1/1. The full
+  `litchi-numbers` run passed its 405 library tests with 4 ignored and its five
+  compatibility oracles before reaching the unrelated existing
+  `rooted_formula_source_is_materialized_once_in_semantic_text` failure; the
+  same failure reproduced at clean parent revision `59b1f33fd`;
+- `cargo check -p litchi-numbers --all-targets`, strict Clippy for the
+  `litchi-iwa-protos` library and all `litchi-numbers` targets, strict rustdoc
+  for both focused crates, workspace formatting, and `git diff --check`
+  passed. All 729 boundary-checker unit tests passed. The live checker reports
+  only three unrelated Pages lock violations from the protected pre-existing
+  untracked draft. All-target projection Clippy still stops on the pre-existing
+  `table_info_codec.rs` needless-borrow warning, and host-library strict Clippy
+  still reports unrelated legacy/deprecation debt;
+- the direct `numbers_table_cell_number_format_codec` target compiled and ran
+  64 bounded libFuzzer cases over six curated seeds without a crash (coverage
+  338, feature count 530, peak RSS 50 MiB). The archive-level
+  `numbers_table_cell_number_format` target also compiled and ran 64
+  ASan-instrumented cases over eight curated seeds without a crash (coverage
+  8,331, feature count 9,339, peak RSS 463 MiB). Generated discoveries were
+  kept disposable;
+- the projection ratchet pins the four-field proto2 Buffa sidecar to its
+  authoritative `TSKArchives.proto` fields and production ingress. Strict
+  source validation precedes the borrowed lazy view. Codec tests cover wrong
+  wire types, duplicate known fields, incompatible known family fields,
+  invalid enum/boolean/precision domains, noncanonical known values, malformed
+  groups, unknown-span preservation, prepared execution/output limits, and the
+  atomic dense format-list entry plus `next_list_id` cursor transition. Owner
+  tests cover package, semantic, retained, scratch, allocation, reopen, and
+  publication failure paths;
+- the checked source `test-data/iwork/numbers/basic.numbers` was 136,357 bytes
+  with SHA-256
+  `f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`.
+  The pre-native Rust candidate was 136,358 bytes with SHA-256
+  `f9f20083dd5dcdf6d8e41dd85816ee7984212fab9ce69d6432a8ab92c62b1be9`.
+  Only `Index/Tables/Tile.iwa` changed (226 to 228 bytes,
+  `45a6b978737c0c04476fb9d02988d9a47974bfdec142c7a6cae03017806b1d3e`
+  to `5a2c122f5e13b9327898933c715be998810da87a3370f427f5b0d894b3f11ec9`)
+  and `Index/Tables/DataList-904498-2.iwa` changed (58 to 57 bytes,
+  `e6799cebf9b5c85dff1f07e63d0f03c054fa19f456ca0652550dac7baf848ece`
+  to `83d32f6cc5bdcd70bcbf166216c2c39480d7d34a05101551bb38258721669498`).
+  Metadata, previews, and every other member were byte-identical; exact no-op
+  retained the candidate hash, and inverse application restored the complete
+  source hash; and
+- Computer Use opened the disposable Rust candidate at
+  `/private/tmp/litchi-numbers-number-format-final.gaegin/number-format.numbers`
+  in Apple Numbers without repair, recovery, or conversion UI. Numbers visibly
+  rendered Sheet 1 / Table 1 cell B3 as `42.000`. Save and close produced no
+  dialog; reopening the exact path again rendered `42.000`. Native save
+  normalized the package to 136,246 bytes with SHA-256
+  `4943b181b018de3a5edff36a453510553787b54652ed0baa170649dc46683d63`.
+  The focused Rust example reread the native-saved artifact as fixed three
+  decimal places, minus-sign negatives, and a shown thousands separator, then
+  produced an exact semantic no-op (`changed=false`, zero touched components,
+  no full reparse); both emitted copies retained the native-saved hash.
+
+This evidence makes a focused native-acceptance claim, not arbitrary-producer
+or native byte parity, package-wide performance, or migration-host exit. The
+slice remains limited to an existing decimal `Number` format and does not
+verify conversion or mutation of other display/control formats, cell values,
+formulas, styles, geometry, comments, merges, or cross-workbook references.

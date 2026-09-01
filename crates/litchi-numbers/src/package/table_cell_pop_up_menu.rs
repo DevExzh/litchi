@@ -3315,7 +3315,7 @@ fn resolved_component_index(source: &Package, identifier: u64, path: Path) -> Re
 /// FieldInfo occurrence is present, it must be unique and object-reference
 /// typed. This bounded slice does not claim exact field-path authority for
 /// producer-omitted metadata.
-fn validate_selected_model_reference(
+pub(super) fn validate_selected_model_reference(
     source: &Package,
     target: CellTarget,
     identifier: u64,

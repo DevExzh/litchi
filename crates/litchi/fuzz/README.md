@@ -182,6 +182,19 @@ not cross the fuzz target boundary. The checked-in seeds under
 `corpus/numbers_table_cell_pop_up_menu/` are command recipes, not native
 package bytes.
 
+`numbers_table_cell_number_format` is the focused selector-first decimal
+number-format lifecycle target. It replays bounded command bytes against the
+native `basic.numbers` workbook for automatic/no-op, explicit checked
+precision, clear, and reset operations. The target checks index and name
+selectors, typed coordinate failures, exact-source patch application and
+conflicts, inverse byte restoration, candidate semantic readback, checked
+constructor limits, bounded package/semantic ingress limits, and redacted
+malformed-input errors. Only `SheetSelector`, `TableSelector`,
+`CellPosition`, and archive-free `Number` values cross the public facade;
+native identifiers, generated messages, and wire payloads never enter the
+harness. The deterministic command recipes under
+`corpus/numbers_table_cell_number_format/` are not native package fixtures.
+
 `numbers_table_cell_control` is the unified selector-first cell-control
 lifecycle target. It drives Checkbox, StarRating, Slider, Stepper, and
 Pop-Up Menu values through `Package::{table_cell_control_format,
@@ -662,6 +675,15 @@ Run the focused Numbers Pop-Up Menu lifecycle target with its command seeds:
 ```sh
 cargo +nightly fuzz run numbers_table_cell_pop_up_menu \
   corpus/numbers_table_cell_pop_up_menu -- \
+  -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Numbers table-cell number-format target with its command
+seeds:
+
+```sh
+cargo +nightly fuzz run numbers_table_cell_number_format \
+  corpus/numbers_table_cell_number_format -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 
