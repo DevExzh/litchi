@@ -6,6 +6,8 @@
 //! and publication remain responsibilities of the concrete IWA adapter.
 
 pub mod control;
+/// Currency display values and exact-source transactions for existing cells.
+pub mod currency;
 pub mod custom;
 pub mod date_time;
 pub mod duration;
@@ -16,12 +18,13 @@ pub mod percentage;
 pub mod pop_up_menu;
 
 pub use control::{CellControl, NotCellControl, Slider, Stepper};
+pub use currency::{Currency, CurrencyCode, CurrencyStyle};
 pub use custom::Custom;
 pub use date_time::DateTime;
 pub use duration::Duration;
 pub use number::{
-    Currency, CurrencyCode, CurrencyStyle, DecimalPlaces, FixedDecimalPlaces, Fraction,
-    FractionAccuracy, NegativeStyle, Number, Percentage, Scientific, ThousandsSeparator,
+    DecimalPlaces, FixedDecimalPlaces, Fraction, FractionAccuracy, NegativeStyle, Number,
+    Percentage, Scientific, ThousandsSeparator,
 };
 pub use numeral_system::NumeralSystem;
 pub use pop_up_menu::PopUpMenu;

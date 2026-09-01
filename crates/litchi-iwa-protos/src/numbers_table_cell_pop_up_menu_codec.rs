@@ -20,6 +20,7 @@ use core::{fmt, str};
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
 
+use crate::buffa_numbers_table_cell_currency_format_generated::LitchiIwaNumbersTableCellCurrencyFormatProjection as currency_projection;
 use crate::buffa_numbers_table_cell_pop_up_menu_generated::LitchiIwaNumbersTableCellPopUpMenuProjection as projection;
 
 const POPUP_ITEM_FIELD: u32 = 2;
@@ -710,6 +711,9 @@ pub fn decode_control_format_with_report(
 /// on their respective package-owned paths.
 pub const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;
 
+/// Native Numbers display-format discriminator for a currency cell.
+pub const NATIVE_CURRENCY_FORMAT_TYPE: u32 = 257;
+
 /// Native Numbers display-format discriminator for a plain percentage cell.
 pub const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
 
@@ -1143,6 +1147,834 @@ impl PreparedNumberFormatWrite {
             report: report_from_requirements(self.requirements),
         })
     }
+}
+
+/// Borrowed semantic facts for one strict native Currency
+/// `FormatStructArchive`.
+///
+/// Currency deliberately has its own nominal snapshot even though the wire
+/// implementation shares the decimal scanner. This keeps a Number or
+/// Percentage snapshot from being passed to a Currency writer accidentally.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct CurrencyFormatSnapshot<'source> {
+    source: &'source [u8],
+    format_type: u32,
+    decimal_places: Option<u32>,
+    currency_code: Option<&'source str>,
+    negative_style: Option<u32>,
+    show_thousands_separator: Option<bool>,
+    use_accounting_style: Option<bool>,
+}
+
+impl<'source> CurrencyFormatSnapshot<'source> {
+    pub(crate) const fn raw(self) -> &'source [u8] {
+        self.source
+    }
+
+    pub(crate) const fn format_type(self) -> u32 {
+        self.format_type
+    }
+
+    pub(crate) const fn decimal_places(self) -> Option<u32> {
+        self.decimal_places
+    }
+
+    pub(crate) const fn currency_code(self) -> Option<&'source str> {
+        self.currency_code
+    }
+
+    pub(crate) const fn negative_style(self) -> Option<u32> {
+        self.negative_style
+    }
+
+    pub(crate) const fn show_thousands_separator(self) -> Option<bool> {
+        self.show_thousands_separator
+    }
+
+    pub(crate) const fn use_accounting_style(self) -> Option<bool> {
+        self.use_accounting_style
+    }
+}
+
+/// Borrowed scalar values accepted by the strict native Currency writer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct CurrencyFormatWrite<'source> {
+    decimal_places: Option<u32>,
+    currency_code: Option<&'source str>,
+    negative_style: Option<u32>,
+    show_thousands_separator: Option<bool>,
+    use_accounting_style: Option<bool>,
+}
+
+impl<'source> CurrencyFormatWrite<'source> {
+    pub(crate) const fn new(
+        currency_code: &'source str,
+        decimal_places: u32,
+        negative_style: u32,
+        show_thousands_separator: bool,
+        use_accounting_style: bool,
+    ) -> Self {
+        Self {
+            decimal_places: Some(decimal_places),
+            currency_code: Some(currency_code),
+            negative_style: Some(negative_style),
+            show_thousands_separator: Some(show_thousands_separator),
+            use_accounting_style: Some(use_accounting_style),
+        }
+    }
+
+    pub(crate) const fn from_snapshot(snapshot: CurrencyFormatSnapshot<'source>) -> Self {
+        Self {
+            decimal_places: snapshot.decimal_places,
+            currency_code: snapshot.currency_code,
+            negative_style: snapshot.negative_style,
+            show_thousands_separator: snapshot.show_thousands_separator,
+            use_accounting_style: snapshot.use_accounting_style,
+        }
+    }
+
+    pub(crate) const fn decimal_places(self) -> Option<u32> {
+        self.decimal_places
+    }
+
+    pub(crate) const fn currency_code(self) -> Option<&'source str> {
+        self.currency_code
+    }
+
+    pub(crate) const fn negative_style(self) -> Option<u32> {
+        self.negative_style
+    }
+
+    pub(crate) const fn show_thousands_separator(self) -> Option<bool> {
+        self.show_thousands_separator
+    }
+
+    pub(crate) const fn use_accounting_style(self) -> Option<bool> {
+        self.use_accounting_style
+    }
+
+    pub(crate) const fn with_decimal_places(mut self, value: u32) -> Self {
+        self.decimal_places = Some(value);
+        self
+    }
+
+    pub(crate) const fn with_currency_code(mut self, value: &'source str) -> Self {
+        self.currency_code = Some(value);
+        self
+    }
+
+    pub(crate) const fn with_negative_style(mut self, value: u32) -> Self {
+        self.negative_style = Some(value);
+        self
+    }
+
+    pub(crate) const fn with_show_thousands_separator(mut self, value: bool) -> Self {
+        self.show_thousands_separator = Some(value);
+        self
+    }
+
+    pub(crate) const fn with_use_accounting_style(mut self, value: bool) -> Self {
+        self.use_accounting_style = Some(value);
+        self
+    }
+}
+
+/// Prepared source-preserving native Currency rewrite.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PreparedCurrencyFormatRewrite<'source> {
+    source: &'source [u8],
+    layout: CurrencyFormatLayout,
+    write: CurrencyFormatWrite<'source>,
+    requirements: RewriteExecutionRequirements,
+    candidate_work: usize,
+    verify_options: DecodeOptions,
+}
+
+impl PreparedCurrencyFormatRewrite<'_> {
+    pub(crate) const fn execution_requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    pub(crate) fn prepare_report(self) -> DecodeReport {
+        report_from_requirements(self.requirements)
+    }
+
+    pub(crate) fn execute(
+        self,
+        limits: RewriteExecutionLimits,
+    ) -> Result<RewriteOutput, DecodeError> {
+        check_requirements(self.requirements, limits)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.requirements.output_bytes)
+            .map_err(|_| {
+                DecodeError::limited(DecodeLimit::Allocation {
+                    requested: self.requirements.output_bytes,
+                })
+            })?;
+        emit_currency_format_rewrite(&mut bytes, self.source, self.layout, self.write)?;
+        if bytes.len() != self.requirements.output_bytes {
+            return Err(DecodeError::invalid());
+        }
+        verify_currency_format_candidate(
+            &bytes,
+            self.write,
+            self.verify_options,
+            self.layout,
+            self.requirements,
+            self.candidate_work,
+        )?;
+        Ok(RewriteOutput {
+            bytes,
+            report: report_from_requirements(self.requirements),
+        })
+    }
+}
+
+/// Prepared canonical native Currency append.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PreparedCurrencyFormatWrite<'source> {
+    write: CurrencyFormatWrite<'source>,
+    requirements: RewriteExecutionRequirements,
+    verify_options: DecodeOptions,
+}
+
+impl PreparedCurrencyFormatWrite<'_> {
+    pub(crate) const fn execution_requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    pub(crate) fn prepare_report(self) -> DecodeReport {
+        report_from_requirements(self.requirements)
+    }
+
+    pub(crate) fn execute(
+        self,
+        limits: RewriteExecutionLimits,
+    ) -> Result<RewriteOutput, DecodeError> {
+        check_requirements(self.requirements, limits)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.requirements.output_bytes)
+            .map_err(|_| {
+                DecodeError::limited(DecodeLimit::Allocation {
+                    requested: self.requirements.output_bytes,
+                })
+            })?;
+        emit_currency_format_canonical(&mut bytes, self.write)?;
+        if bytes.len() != self.requirements.output_bytes {
+            return Err(DecodeError::invalid());
+        }
+        let layout = CurrencyFormatLayout {
+            max_depth: 0,
+            spans: [None, None, None, None, None, None],
+        };
+        verify_currency_format_candidate(
+            &bytes,
+            self.write,
+            self.verify_options,
+            layout,
+            self.requirements,
+            bytes
+                .len()
+                .checked_mul(2)
+                .ok_or_else(DecodeError::invalid)?,
+        )?;
+        Ok(RewriteOutput {
+            bytes,
+            report: report_from_requirements(self.requirements),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CurrencyFieldSpan {
+    slot: usize,
+    start: usize,
+    end: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CurrencyFormatLayout {
+    max_depth: u32,
+    spans: [Option<CurrencyFieldSpan>; 6],
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CurrencyFormatScanState<'source> {
+    format_type: Option<u32>,
+    decimal_places: Option<u32>,
+    currency_code: Option<&'source str>,
+    negative_style: Option<u32>,
+    show_thousands_separator: Option<bool>,
+    use_accounting_style: Option<bool>,
+    spans: [Option<CurrencyFieldSpan>; 6],
+}
+
+impl<'source> CurrencyFormatScanState<'source> {
+    const fn new() -> Self {
+        Self {
+            format_type: None,
+            decimal_places: None,
+            currency_code: None,
+            negative_style: None,
+            show_thousands_separator: None,
+            use_accounting_style: None,
+            spans: [None, None, None, None, None, None],
+        }
+    }
+}
+
+/// Strictly decode one native Currency `FormatStructArchive`.
+pub(crate) fn decode_currency_format(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<CurrencyFormatSnapshot<'_>, DecodeError> {
+    Ok(decode_currency_format_with_report(source, options)?.0)
+}
+
+/// Strictly decode one native Currency format and return measured wire use.
+pub(crate) fn decode_currency_format_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(CurrencyFormatSnapshot<'_>, DecodeReport), DecodeError> {
+    let (snapshot, _layout, report) = scan_currency_format(source, options)?;
+    Ok((snapshot, report))
+}
+
+/// Prepare a source-preserving native Currency rewrite.
+pub(crate) fn prepare_currency_format_rewrite<'source>(
+    source: &'source [u8],
+    write: CurrencyFormatWrite<'source>,
+    options: DecodeOptions,
+) -> Result<PreparedCurrencyFormatRewrite<'source>, DecodeError> {
+    validate_currency_format_write(write, options.max_text_bytes)?;
+    let (snapshot, layout, source_report) = scan_currency_format(source, options)?;
+    let output_bytes = currency_format_rewrite_output_len(source, layout, write)?;
+    let old_selected_bytes = currency_format_selected_source_len(layout)?;
+    let new_selected_bytes = currency_format_canonical_output_len(write)?;
+    let source_parse_work = source_report
+        .work_bytes()
+        .checked_sub(source.len())
+        .ok_or_else(DecodeError::invalid)?;
+    let candidate_parse_work = source_parse_work
+        .checked_sub(old_selected_bytes)
+        .and_then(|work| work.checked_add(new_selected_bytes))
+        .ok_or_else(DecodeError::invalid)?;
+    let candidate_work = candidate_parse_work
+        .checked_add(output_bytes)
+        .ok_or_else(DecodeError::invalid)?;
+    let fields = source_report
+        .fields()
+        .checked_sub(currency_format_selected_field_count(layout))
+        .and_then(|fields| fields.checked_add(currency_format_field_count(write)))
+        .ok_or_else(DecodeError::invalid)?;
+    let old_text_bytes = snapshot.currency_code().map_or(0, str::len);
+    let new_text_bytes = write.currency_code().map_or(0, str::len);
+    let text_bytes = source_report
+        .text_bytes()
+        .checked_sub(old_text_bytes)
+        .and_then(|text| text.checked_add(new_text_bytes))
+        .ok_or_else(DecodeError::invalid)?;
+    let retained_bytes = source
+        .len()
+        .checked_add(output_bytes)
+        .ok_or_else(DecodeError::invalid)?;
+    let requirements = RewriteExecutionRequirements {
+        output_bytes,
+        fields,
+        work_bytes: source_report
+            .work_bytes()
+            .checked_add(output_bytes)
+            .and_then(|work| work.checked_add(candidate_work))
+            .ok_or_else(DecodeError::invalid)?,
+        max_depth: layout.max_depth,
+        references: 0,
+        items: 0,
+        text_bytes,
+        allocations: 1,
+        retained_bytes,
+        scratch_bytes: 0,
+    };
+    check_options(requirements, options)?;
+    Ok(PreparedCurrencyFormatRewrite {
+        source,
+        layout,
+        write,
+        requirements,
+        candidate_work,
+        verify_options: options,
+    })
+}
+
+/// Rewrite one native Currency format while preserving unknown source fields.
+pub(crate) fn rewrite_currency_format(
+    source: &[u8],
+    write: CurrencyFormatWrite<'_>,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_currency_format_rewrite(source, write, options)?;
+    prepared.execute(RewriteExecutionLimits::exact(
+        prepared.execution_requirements(),
+    ))
+}
+
+/// Prepare a canonical native Currency format payload for a new list entry.
+pub(crate) fn prepare_currency_format_write<'source>(
+    write: CurrencyFormatWrite<'source>,
+    options: DecodeOptions,
+) -> Result<PreparedCurrencyFormatWrite<'source>, DecodeError> {
+    validate_currency_format_write(write, options.max_text_bytes)?;
+    let output_bytes = currency_format_canonical_output_len(write)?;
+    let text_bytes = write.currency_code().map_or(0, str::len);
+    let requirements = RewriteExecutionRequirements {
+        output_bytes,
+        fields: currency_format_field_count(write),
+        work_bytes: output_bytes
+            .checked_mul(3)
+            .ok_or_else(DecodeError::invalid)?,
+        max_depth: 0,
+        references: 0,
+        items: 0,
+        text_bytes,
+        allocations: 1,
+        retained_bytes: output_bytes,
+        scratch_bytes: 0,
+    };
+    check_options(requirements, options)?;
+    Ok(PreparedCurrencyFormatWrite {
+        write,
+        requirements,
+        verify_options: options,
+    })
+}
+
+/// Encode a canonical native Currency format payload for a new list entry.
+pub(crate) fn canonical_currency_format(
+    write: CurrencyFormatWrite<'_>,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_currency_format_write(write, options)?;
+    prepared.execute(RewriteExecutionLimits::exact(
+        prepared.execution_requirements(),
+    ))
+}
+
+fn scan_currency_format<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+) -> Result<
+    (
+        CurrencyFormatSnapshot<'source>,
+        CurrencyFormatLayout,
+        DecodeReport,
+    ),
+    DecodeError,
+> {
+    let mut budget = Budget::new(source, options)?;
+    let mut state = CurrencyFormatScanState::new();
+    let mut offset = 0usize;
+    while offset < source.len() {
+        let field = parse_one_field_limited(source, offset, 0, options.recursion_limit)?;
+        budget.field(field.raw.len(), 0)?;
+        budget.nested_fields(
+            field.nested_fields,
+            field.nested_work_bytes,
+            field.nested_max_depth,
+        )?;
+        inspect_currency_root_field(offset, field, &mut budget, &mut state)?;
+        offset = field.end;
+    }
+    let format_type = state.format_type.ok_or_else(DecodeError::invalid)?;
+    if format_type != NATIVE_CURRENCY_FORMAT_TYPE
+        || state.decimal_places.is_none()
+        || state.currency_code.is_none()
+        || state.negative_style.is_none()
+        || state.show_thousands_separator.is_none()
+        || state.use_accounting_style.is_none()
+        || state.currency_code.is_some() != state.use_accounting_style.is_some()
+        || state.decimal_places.is_some_and(|value| {
+            value != NATIVE_AUTOMATIC_DECIMAL_PLACES && value > MAX_NUMBER_DECIMAL_PLACES
+        })
+        || state.negative_style.is_some_and(|value| value > 3)
+    {
+        return Err(DecodeError::invalid());
+    }
+    let snapshot = CurrencyFormatSnapshot {
+        source,
+        format_type,
+        decimal_places: state.decimal_places,
+        currency_code: state.currency_code,
+        negative_style: state.negative_style,
+        show_thousands_separator: state.show_thousands_separator,
+        use_accounting_style: state.use_accounting_style,
+    };
+    buffa_currency_format_parity(source, snapshot, &mut budget)?;
+    let report = budget.finish(0);
+    let layout = CurrencyFormatLayout {
+        max_depth: report.max_depth(),
+        spans: state.spans,
+    };
+    Ok((snapshot, layout, report))
+}
+
+fn inspect_currency_root_field<'source>(
+    start: usize,
+    field: Field<'source>,
+    budget: &mut Budget,
+    state: &mut CurrencyFormatScanState<'source>,
+) -> Result<(), DecodeError> {
+    let Some(slot) = currency_format_slot(field.number) else {
+        // TSK fields through 45 are known FormatStructArchive fields with a
+        // different shape/meaning. Treating one as opaque would let a caller
+        // publish another display format through the Currency API.
+        if field.number <= NUMBER_FORMAT_MAX_KNOWN_FIELD {
+            return Err(DecodeError::invalid());
+        }
+        budget.mark_unknown();
+        return Ok(());
+    };
+    if state.spans[slot].is_some() {
+        return Err(DecodeError::invalid());
+    }
+    let span = CurrencyFieldSpan {
+        slot,
+        start,
+        end: field.end,
+    };
+    match slot {
+        0 | 1 | 3 => {
+            let value = u32::try_from(field.known_varint()?).map_err(|_| DecodeError::invalid())?;
+            match slot {
+                0 => state.format_type = Some(value),
+                1 => state.decimal_places = Some(value),
+                3 => state.negative_style = Some(value),
+                _ => unreachable!("currency integer slot is exhaustive"),
+            }
+        },
+        2 => {
+            if field.wire != 2 {
+                return Err(DecodeError::invalid());
+            }
+            let payload = field.payload.ok_or_else(DecodeError::invalid)?;
+            let value = str::from_utf8(payload).map_err(|_| DecodeError::invalid())?;
+            budget.text(payload.len())?;
+            validate_currency_code(value)?;
+            state.currency_code = Some(value);
+        },
+        4 => set_bool(&mut state.show_thousands_separator, field, false)?,
+        5 => set_bool(&mut state.use_accounting_style, field, false)?,
+        _ => unreachable!("currency format slot is exhaustive"),
+    }
+    state.spans[slot] = Some(span);
+    Ok(())
+}
+
+fn buffa_currency_format_parity(
+    source: &[u8],
+    snapshot: CurrencyFormatSnapshot<'_>,
+    budget: &mut Budget,
+) -> Result<(), DecodeError> {
+    let options = budget.options;
+    let view: currency_projection::FormatStructArchiveLazyView<'_> = BuffaDecodeOptions::new()
+        .with_max_message_size(options.max_message_bytes)
+        .with_unknown_field_limit(options.max_fields)
+        .with_element_memory_limit(0)
+        .with_recursion_limit(options.recursion_limit)
+        .decode_lazy_view(source)
+        .map_err(|_| DecodeError::invalid())?;
+    if view.format_type != Some(snapshot.format_type)
+        || view.decimal_places != snapshot.decimal_places
+        || view.currency_code != snapshot.currency_code
+        || view.negative_style != snapshot.negative_style
+        || view.show_thousands_separator != snapshot.show_thousands_separator
+        || view.use_accounting_style != snapshot.use_accounting_style
+    {
+        return Err(DecodeError::invalid());
+    }
+    budget.work(source.len())?;
+    Ok(())
+}
+
+fn validate_currency_code(value: &str) -> Result<(), DecodeError> {
+    if value.len() != 3 || !value.bytes().all(|byte| byte.is_ascii_uppercase()) {
+        return Err(DecodeError::invalid());
+    }
+    Ok(())
+}
+
+fn validate_currency_format_write(
+    write: CurrencyFormatWrite<'_>,
+    max_text_bytes: usize,
+) -> Result<(), DecodeError> {
+    if write.decimal_places.is_none()
+        || write.currency_code.is_none()
+        || write.negative_style.is_none()
+        || write.show_thousands_separator.is_none()
+        || write.use_accounting_style.is_none()
+        || write.currency_code.is_some() != write.use_accounting_style.is_some()
+        || write.decimal_places.is_some_and(|value| {
+            value != NATIVE_AUTOMATIC_DECIMAL_PLACES && value > MAX_NUMBER_DECIMAL_PLACES
+        })
+        || write.negative_style.is_some_and(|value| value > 3)
+    {
+        return Err(DecodeError::invalid());
+    }
+    if let Some(value) = write.currency_code {
+        validate_text(value, max_text_bytes)?;
+        validate_currency_code(value)?;
+    }
+    Ok(())
+}
+
+fn currency_format_slot(number: u32) -> Option<usize> {
+    match number {
+        FORMAT_TYPE_FIELD => Some(0),
+        FORMAT_DECIMAL_PLACES_FIELD => Some(1),
+        FORMAT_CURRENCY_CODE_FIELD => Some(2),
+        FORMAT_NEGATIVE_STYLE_FIELD => Some(3),
+        FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD => Some(4),
+        FORMAT_USE_ACCOUNTING_STYLE_FIELD => Some(5),
+        _ => None,
+    }
+}
+
+fn currency_format_field_count(write: CurrencyFormatWrite<'_>) -> usize {
+    1usize
+        + usize::from(write.decimal_places.is_some())
+        + usize::from(write.currency_code.is_some())
+        + usize::from(write.negative_style.is_some())
+        + usize::from(write.show_thousands_separator.is_some())
+        + usize::from(write.use_accounting_style.is_some())
+}
+
+fn currency_format_selected_field_count(layout: CurrencyFormatLayout) -> usize {
+    layout.spans.into_iter().filter(Option::is_some).count()
+}
+
+fn currency_format_selected_source_len(layout: CurrencyFormatLayout) -> Result<usize, DecodeError> {
+    layout
+        .spans
+        .into_iter()
+        .flatten()
+        .try_fold(0usize, |length, span| {
+            length
+                .checked_add(
+                    span.end
+                        .checked_sub(span.start)
+                        .ok_or_else(DecodeError::invalid)?,
+                )
+                .ok_or_else(DecodeError::invalid)
+        })
+}
+
+fn currency_format_rewrite_output_len(
+    source: &[u8],
+    layout: CurrencyFormatLayout,
+    write: CurrencyFormatWrite<'_>,
+) -> Result<usize, DecodeError> {
+    let old = currency_format_selected_source_len(layout)?;
+    let new = currency_format_canonical_output_len(write)?;
+    source
+        .len()
+        .checked_sub(old)
+        .and_then(|length| length.checked_add(new))
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn currency_format_canonical_output_len(
+    write: CurrencyFormatWrite<'_>,
+) -> Result<usize, DecodeError> {
+    let mut length =
+        number_format_field_len(FORMAT_TYPE_FIELD, u64::from(NATIVE_CURRENCY_FORMAT_TYPE))?;
+    if let Some(value) = write.decimal_places {
+        length = length
+            .checked_add(number_format_field_len(
+                FORMAT_DECIMAL_PLACES_FIELD,
+                u64::from(value),
+            )?)
+            .ok_or_else(DecodeError::invalid)?;
+    }
+    if let Some(value) = write.currency_code {
+        length = length
+            .checked_add(length_field_len(FORMAT_CURRENCY_CODE_FIELD, value.len())?)
+            .ok_or_else(DecodeError::invalid)?;
+    }
+    if let Some(value) = write.negative_style {
+        length = length
+            .checked_add(number_format_field_len(
+                FORMAT_NEGATIVE_STYLE_FIELD,
+                u64::from(value),
+            )?)
+            .ok_or_else(DecodeError::invalid)?;
+    }
+    if let Some(value) = write.show_thousands_separator {
+        length = length
+            .checked_add(number_format_field_len(
+                FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD,
+                u64::from(value),
+            )?)
+            .ok_or_else(DecodeError::invalid)?;
+    }
+    if let Some(value) = write.use_accounting_style {
+        length = length
+            .checked_add(number_format_field_len(
+                FORMAT_USE_ACCOUNTING_STYLE_FIELD,
+                u64::from(value),
+            )?)
+            .ok_or_else(DecodeError::invalid)?;
+    }
+    Ok(length)
+}
+
+fn currency_format_write_present(write: CurrencyFormatWrite<'_>, slot: usize) -> bool {
+    match slot {
+        0 => true,
+        1 => write.decimal_places.is_some(),
+        2 => write.currency_code.is_some(),
+        3 => write.negative_style.is_some(),
+        4 => write.show_thousands_separator.is_some(),
+        5 => write.use_accounting_style.is_some(),
+        _ => false,
+    }
+}
+
+fn emit_currency_format_field(
+    output: &mut Vec<u8>,
+    slot: usize,
+    write: CurrencyFormatWrite<'_>,
+) -> Result<(), DecodeError> {
+    match slot {
+        0 => emit_varint_field(
+            output,
+            FORMAT_TYPE_FIELD,
+            u64::from(NATIVE_CURRENCY_FORMAT_TYPE),
+        ),
+        1 => emit_varint_field(
+            output,
+            FORMAT_DECIMAL_PLACES_FIELD,
+            u64::from(write.decimal_places.ok_or_else(DecodeError::invalid)?),
+        ),
+        2 => emit_len_field(
+            output,
+            FORMAT_CURRENCY_CODE_FIELD,
+            write
+                .currency_code
+                .ok_or_else(DecodeError::invalid)?
+                .as_bytes(),
+        ),
+        3 => emit_varint_field(
+            output,
+            FORMAT_NEGATIVE_STYLE_FIELD,
+            u64::from(write.negative_style.ok_or_else(DecodeError::invalid)?),
+        ),
+        4 => emit_varint_field(
+            output,
+            FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD,
+            u64::from(
+                write
+                    .show_thousands_separator
+                    .ok_or_else(DecodeError::invalid)?,
+            ),
+        ),
+        5 => emit_varint_field(
+            output,
+            FORMAT_USE_ACCOUNTING_STYLE_FIELD,
+            u64::from(
+                write
+                    .use_accounting_style
+                    .ok_or_else(DecodeError::invalid)?,
+            ),
+        ),
+        _ => Err(DecodeError::invalid()),
+    }
+}
+
+fn emit_currency_format_canonical(
+    output: &mut Vec<u8>,
+    write: CurrencyFormatWrite<'_>,
+) -> Result<(), DecodeError> {
+    validate_currency_format_write(write, usize::MAX)?;
+    for slot in 0..6 {
+        if currency_format_write_present(write, slot) {
+            emit_currency_format_field(output, slot, write)?;
+        }
+    }
+    Ok(())
+}
+
+fn emit_currency_format_rewrite(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    layout: CurrencyFormatLayout,
+    write: CurrencyFormatWrite<'_>,
+) -> Result<(), DecodeError> {
+    let mut ordered = [
+        layout.spans[0],
+        layout.spans[1],
+        layout.spans[2],
+        layout.spans[3],
+        layout.spans[4],
+        layout.spans[5],
+    ];
+    let mut source_offset = 0usize;
+    for index in 1..ordered.len() {
+        let mut cursor = index;
+        while cursor > 0
+            && ordered[cursor].is_some()
+            && (ordered[cursor - 1].is_none()
+                || ordered[cursor].as_ref().is_some_and(|current| {
+                    ordered[cursor - 1]
+                        .as_ref()
+                        .is_some_and(|previous| current.start < previous.start)
+                }))
+        {
+            ordered.swap(cursor, cursor - 1);
+            cursor -= 1;
+        }
+    }
+    for span in ordered.into_iter().flatten() {
+        output.extend_from_slice(
+            source
+                .get(source_offset..span.start)
+                .ok_or_else(DecodeError::invalid)?,
+        );
+        if currency_format_write_present(write, span.slot) {
+            emit_currency_format_field(output, span.slot, write)?;
+        }
+        source_offset = span.end;
+    }
+    output.extend_from_slice(
+        source
+            .get(source_offset..)
+            .ok_or_else(DecodeError::invalid)?,
+    );
+    for slot in 0..6 {
+        if layout.spans[slot].is_none() && currency_format_write_present(write, slot) {
+            emit_currency_format_field(output, slot, write)?;
+        }
+    }
+    Ok(())
+}
+
+fn verify_currency_format_candidate(
+    source: &[u8],
+    write: CurrencyFormatWrite<'_>,
+    options: DecodeOptions,
+    layout: CurrencyFormatLayout,
+    requirements: RewriteExecutionRequirements,
+    candidate_work: usize,
+) -> Result<(), DecodeError> {
+    let (snapshot, report) = decode_currency_format_with_report(source, options)?;
+    if report.fields() != requirements.fields()
+        || report.work_bytes() != candidate_work
+        || report.max_depth() != layout.max_depth
+        || report.text_bytes() != requirements.text_bytes()
+        || CurrencyFormatWrite::from_snapshot(snapshot) != write
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -4298,6 +5130,7 @@ fn write_varint(output: &mut Vec<u8>, mut value: u64) -> Result<(), DecodeError>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::numbers_table_cell_currency_format_codec as currency_codec;
     use crate::numbers_table_cell_percentage_format_codec as percentage_codec;
 
     fn options() -> DecodeOptions {
@@ -5108,6 +5941,228 @@ mod tests {
         )
         .expect("thousands separator");
         source
+    }
+
+    fn native_currency_format(
+        decimal_places: u32,
+        currency_code: &str,
+        negative_style: u32,
+        show: bool,
+        accounting: bool,
+    ) -> Vec<u8> {
+        let mut source = Vec::new();
+        emit_varint_field(
+            &mut source,
+            FORMAT_TYPE_FIELD,
+            u64::from(NATIVE_CURRENCY_FORMAT_TYPE),
+        )
+        .expect("type");
+        emit_varint_field(
+            &mut source,
+            FORMAT_DECIMAL_PLACES_FIELD,
+            u64::from(decimal_places),
+        )
+        .expect("decimal places");
+        emit_len_field(
+            &mut source,
+            FORMAT_CURRENCY_CODE_FIELD,
+            currency_code.as_bytes(),
+        )
+        .expect("currency code");
+        emit_varint_field(
+            &mut source,
+            FORMAT_NEGATIVE_STYLE_FIELD,
+            u64::from(negative_style),
+        )
+        .expect("negative style");
+        emit_varint_field(
+            &mut source,
+            FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD,
+            u64::from(show),
+        )
+        .expect("thousands separator");
+        emit_varint_field(
+            &mut source,
+            FORMAT_USE_ACCOUNTING_STYLE_FIELD,
+            u64::from(accounting),
+        )
+        .expect("accounting style");
+        source
+    }
+
+    #[test]
+    fn currency_format_native_fixture_is_strict_and_buffa_lazy() {
+        let source = native_currency_format(NATIVE_AUTOMATIC_DECIMAL_PLACES, "EUR", 3, true, true);
+        let (snapshot, report) =
+            currency_codec::decode_currency_format_with_report(&source, options())
+                .expect("currency format");
+        assert_eq!(snapshot.raw(), source.as_slice());
+        assert_eq!(snapshot.format_type(), NATIVE_CURRENCY_FORMAT_TYPE);
+        assert_eq!(
+            snapshot.decimal_places(),
+            Some(NATIVE_AUTOMATIC_DECIMAL_PLACES)
+        );
+        assert_eq!(snapshot.currency_code(), Some("EUR"));
+        assert_eq!(snapshot.negative_style(), Some(3));
+        assert_eq!(snapshot.show_thousands_separator(), Some(true));
+        assert_eq!(snapshot.use_accounting_style(), Some(true));
+        assert_eq!(report.input_bytes(), source.len());
+        assert_eq!(report.fields(), 6);
+        assert_eq!(report.work_bytes(), source.len() * 2);
+        assert_eq!(report.text_bytes(), 3);
+        assert_eq!(report.allocations(), 0);
+    }
+
+    #[test]
+    fn currency_format_accepts_only_native_domains_and_complete_fields() {
+        for decimal_places in [
+            0,
+            MAX_NUMBER_DECIMAL_PLACES,
+            NATIVE_AUTOMATIC_DECIMAL_PLACES,
+        ] {
+            let source = native_currency_format(decimal_places, "USD", 0, false, false);
+            assert!(currency_codec::decode_currency_format(&source, options()).is_ok());
+        }
+        for negative_style in 0..=3 {
+            let source = native_currency_format(2, "USD", negative_style, false, false);
+            assert!(currency_codec::decode_currency_format(&source, options()).is_ok());
+        }
+        for show in [false, true] {
+            let source = native_currency_format(2, "USD", 0, show, false);
+            assert!(currency_codec::decode_currency_format(&source, options()).is_ok());
+        }
+        for accounting in [false, true] {
+            let source = native_currency_format(2, "USD", 0, false, accounting);
+            assert!(currency_codec::decode_currency_format(&source, options()).is_ok());
+        }
+        for decimal_places in [31, 254] {
+            let source = native_currency_format(decimal_places, "USD", 0, false, false);
+            assert!(currency_codec::decode_currency_format(&source, options()).is_err());
+        }
+        let source = native_currency_format(2, "USD", 4, false, false);
+        assert!(currency_codec::decode_currency_format(&source, options()).is_err());
+        for code in ["usd", "US", "EURO", "€UR"] {
+            let source = native_currency_format(2, code, 0, false, false);
+            assert!(currency_codec::decode_currency_format(&source, options()).is_err());
+        }
+
+        let complete = native_currency_format(2, "USD", 0, false, false);
+        let fields = [
+            &[0x08, 0x81, 0x02][..],
+            &[0x10, 0x02][..],
+            &[0x1a, 0x03, b'U', b'S', b'D'][..],
+            &[0x20, 0x00][..],
+            &[0x28, 0x00][..],
+            &[0x30, 0x00][..],
+        ];
+        for omitted in 0..fields.len() {
+            let mut source = Vec::new();
+            for (index, field) in fields.iter().enumerate() {
+                if index != omitted {
+                    source.extend_from_slice(field);
+                }
+            }
+            assert!(currency_codec::decode_currency_format(&source, options()).is_err());
+        }
+        let mut invalid_bool = complete.clone();
+        let last = invalid_bool.len() - 1;
+        *invalid_bool.get_mut(last).expect("bool byte") = 2;
+        assert!(currency_codec::decode_currency_format(&invalid_bool, options()).is_err());
+
+        let mut incompatible = complete;
+        incompatible.extend_from_slice(&[0x38, 0x01]);
+        assert!(currency_codec::decode_currency_format(&incompatible, options()).is_err());
+    }
+
+    #[test]
+    fn currency_format_rewrite_preserves_unknown_source_and_prepared_accounting() {
+        let mut source = native_currency_format(2, "USD", 0, false, false);
+        let unknown = [
+            0xa0, 0x06, 0x81, 0x00, // unknown scalar 100, overlong value spelling
+            0xa3, 0x06, 0xa8, 0x06, 0x01, 0xa4, 0x06, // unknown balanced group
+        ];
+        source.extend_from_slice(&unknown);
+        let write = currency_codec::CurrencyFormatWrite::new("JPY", 30, 3, true, true);
+        let prepared = currency_codec::prepare_currency_format_rewrite(&source, write, options())
+            .expect("prepare currency rewrite");
+        let requirements = prepared.execution_requirements();
+        let output = prepared
+            .execute(RewriteExecutionLimits::exact(requirements))
+            .expect("execute currency rewrite");
+        assert_eq!(output.bytes().len(), requirements.output_bytes());
+        assert_eq!(output.report().fields(), requirements.fields());
+        assert_eq!(output.report().work_bytes(), requirements.work_bytes());
+        assert!(output.bytes().ends_with(&unknown));
+        let snapshot = currency_codec::decode_currency_format(output.bytes(), options())
+            .expect("rewritten currency");
+        assert_eq!(
+            currency_codec::CurrencyFormatWrite::from_snapshot(snapshot),
+            write
+        );
+
+        let no_op = currency_codec::rewrite_currency_format(
+            output.bytes(),
+            currency_codec::CurrencyFormatWrite::from_snapshot(snapshot),
+            options(),
+        )
+        .expect("currency no-op rewrite");
+        assert_eq!(no_op.bytes(), output.bytes());
+        assert!(matches!(
+            prepared
+                .execute(
+                    RewriteExecutionLimits::exact(requirements)
+                        .with_output_bytes(requirements.output_bytes() - 1)
+                )
+                .expect_err("output ceiling")
+                .resource_limit(),
+            Some(DecodeLimit::OutputBytes { .. })
+        ));
+        assert!(matches!(
+            prepared
+                .execute(
+                    RewriteExecutionLimits::exact(requirements)
+                        .with_work_bytes(requirements.work_bytes() - 1)
+                )
+                .expect_err("work ceiling")
+                .resource_limit(),
+            Some(DecodeLimit::Work { .. })
+        ));
+    }
+
+    #[test]
+    fn currency_format_canonical_append_has_exact_wire_and_report() {
+        let write = currency_codec::CurrencyFormatWrite::new("EUR", 2, 3, true, true);
+        let prepared = currency_codec::prepare_currency_format_write(write, options())
+            .expect("prepare currency append");
+        let requirements = prepared.execution_requirements();
+        let output = prepared
+            .execute(RewriteExecutionLimits::exact(requirements))
+            .expect("currency append");
+        assert_eq!(
+            output.bytes(),
+            &[
+                0x08, 0x81, 0x02, // format_type = 257
+                0x10, 0x02, // decimal_places = 2
+                0x1a, 0x03, b'E', b'U', b'R', // currency_code
+                0x20, 0x03, // negative_style = red parentheses
+                0x28, 0x01, // show_thousands_separator = true
+                0x30, 0x01, // use_accounting_style = true
+            ]
+        );
+        assert_eq!(requirements.fields(), 6);
+        assert_eq!(requirements.work_bytes(), output.bytes().len() * 3);
+        let (_, report) =
+            currency_codec::decode_currency_format_with_report(output.bytes(), options())
+                .expect("decode currency append");
+        assert_eq!(report.work_bytes(), output.bytes().len() * 2);
+        assert_eq!(report.fields(), requirements.fields());
+        assert_eq!(report.text_bytes(), requirements.text_bytes());
+        assert_eq!(
+            currency_codec::canonical_currency_format(write, options())
+                .expect("one-shot currency")
+                .bytes(),
+            output.bytes()
+        );
     }
 
     #[test]

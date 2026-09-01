@@ -3891,3 +3891,25 @@ edges, 11 ordered migration debts with IDs
 `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. The slice
 does not claim ownership of the other display/control families, table topology,
 cell values/formulas, or remaining generated-Prost host paths.
+
+## 2026-09-01 amendment: Numbers existing-cell Currency-format owner (topology unchanged)
+
+The existing-cell Currency-format seam now has a focused semantic owner in
+`litchi-numbers`, with archive-free Currency values and selector-first package
+read/edit/apply transactions. The private adapter resolves native type `257`
+through the referenced format-list payload, handles the alternate-number BNC
+record and optional secondary generic Number reference, and keeps list keys,
+refcounts, native IDs, Buffa views, archive members, and publication below the
+public boundary. Exact-source patches, inverses, strict preflight, candidate
+reopen/readback, and locality checks remain owner requirements.
+
+The deprecated `litchi-iwa` Currency methods are compatibility delegates for
+admitted exact graphs; exact structural, budget, lock, or wrong-family
+rejections fail closed, while source-built compatibility packages may retain
+the generic route. This ownership seam adds no workspace package, dependency
+declaration, canonical edge, or migration-debt retirement, and removes no
+migration host or monolith-deletion gate. The authoritative inventory remains
+64 workspace packages, 237 internal dependency declarations, 226 canonical
+edges, 11 ordered migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15,
+16, 17]`, and one migration host. Operation-specific native Currency E3/E4
+evidence is recorded in ADR 0008; it closes no topology or deletion gate.

@@ -65,7 +65,11 @@ const FORMAT_METADATA_FLAGS: u32 = CONTROL_CELL_SPEC_FLAG
 const EXPLICIT_FORMAT_FLAGS_START: usize = 6;
 const EXPLICIT_FORMAT_FLAGS_END: usize = 8;
 pub const EXPLICIT_DECIMAL_FORMAT: u16 = 1;
-pub const EXPLICIT_CURRENCY_FORMAT: u16 = 0x0803;
+/// Explicit Currency metadata marker written by native Numbers.
+pub const EXPLICIT_CURRENCY_FORMAT: u16 = 0x0802;
+/// Explicit Currency marker when the BNC cell also retains a Number format.
+pub const EXPLICIT_CURRENCY_WITH_NUMBER_FORMAT: u16 =
+    EXPLICIT_CURRENCY_FORMAT | EXPLICIT_DECIMAL_FORMAT;
 pub const EXPLICIT_DATE_TIME_FORMAT: u16 = 0x0008;
 pub const EXPLICIT_DURATION_FORMAT: u16 = 0x0005;
 pub const EXPLICIT_CHECKBOX_FORMAT: u16 = 0x0020;
@@ -78,6 +82,17 @@ pub const DURATION_CELL_FORMAT_KIND: u32 = 4;
 pub const CHECKBOX_CELL_FORMAT_KIND: u32 = 6;
 pub const STAR_RATING_CELL_FORMAT_KIND: u32 = DECIMAL_CELL_FORMAT_KIND;
 pub const TEXT_CELL_FORMAT_KIND: u32 = 5;
+
+/// Return the exact native Currency marker for the secondary-identifier
+/// shape.
+#[must_use]
+pub const fn explicit_currency_format_flags(has_secondary_number_format: bool) -> u16 {
+    if has_secondary_number_format {
+        EXPLICIT_CURRENCY_WITH_NUMBER_FORMAT
+    } else {
+        EXPLICIT_CURRENCY_FORMAT
+    }
+}
 
 const VALUE_FLAGS: u32 = DECIMAL_FLAG
     | NUMBER_FLAG
@@ -113,6 +128,14 @@ pub(crate) const FIELD_LAYOUT: &[(u32, usize)] = &[
     (0x0010_0000, 4),
 ];
 const FIELD_COUNT: usize = FIELD_LAYOUT.len();
+
+/// Conservative allocation count for one owned [`BncCell::parse`].
+///
+/// Every present fixed-layout field can allocate one map node and one value
+/// buffer; the opaque tail can allocate one additional buffer. Focused
+/// package owners use this bound to debit their operation ledger before
+/// materializing an owned cell.
+pub const MAX_OWNED_BNC_PARSE_ALLOCATIONS: usize = FIELD_COUNT * 2 + 1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
@@ -246,6 +269,15 @@ pub enum StoredValue {
     Unsupported(u8),
 }
 
+/// Native numeric representation of a BNC cell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NumericCellType {
+    /// The ordinary Numbers numeric cell type.
+    Number,
+    /// Numbers' alternate numeric cell type used by Currency formats.
+    AlternateNumber,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CachedScalar {
     Number(FiniteF64),
@@ -320,6 +352,16 @@ impl BncCell {
     #[must_use]
     pub fn stored_value(&self) -> StoredValue {
         stored_value_from(self.prefix[1], |flag| self.u32_field(flag))
+    }
+
+    /// Returns the native numeric representation when this cell is numeric.
+    #[must_use]
+    pub fn numeric_cell_type(&self) -> Option<NumericCellType> {
+        match self.prefix[1] {
+            CELL_TYPE_NUMBER => Some(NumericCellType::Number),
+            CELL_TYPE_ALTERNATE_NUMBER => Some(NumericCellType::AlternateNumber),
+            _ => None,
+        }
     }
 
     /// Replaces the cell value with a number.
@@ -610,6 +652,68 @@ impl BncCell {
         Ok(())
     }
 
+    /// Replaces only the explicit Currency display metadata.
+    ///
+    /// Unlike [`Self::set_data_format_identifier`], this focused primitive
+    /// never converts the stored scalar, its formula cache, or any unrelated
+    /// field. A Currency format uses Numbers' alternate-number cell type, so
+    /// installing an identifier changes a plain numeric cell to that type and
+    /// clearing the identifier changes it back. Passing `None` also removes
+    /// the optional secondary format identifier while retaining every
+    /// non-format field and opaque trailing byte. When installing a Currency
+    /// identifier, an existing secondary `CELL_FORMAT_IDENTIFIER_FLAG` is
+    /// retained because native Currency cells may reference both entries in
+    /// the format table. It exists for graph owners that have already
+    /// validated the native format family and need to move a cell between
+    /// entries in that Currency format list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an explicit format identifier is zero.
+    pub fn set_currency_format_identifier_preserving_value(
+        &mut self,
+        identifier: Option<u32>,
+    ) -> Result<()> {
+        if identifier.is_some_and(|value| value == 0) {
+            return Err(Error::InvalidFormat(
+                "Currency format identifier must be non-zero".to_owned(),
+            ));
+        }
+
+        let secondary_identifier = (self.cell_format_kind() == Some(CURRENCY_CELL_FORMAT_KIND))
+            .then(|| self.fields.get(&CELL_FORMAT_IDENTIFIER_FLAG).cloned())
+            .flatten();
+        let has_secondary_identifier = secondary_identifier.is_some();
+        self.fields
+            .retain(|field, _| FORMAT_METADATA_FLAGS & field == 0);
+        let explicit_flags = if let Some(identifier) = identifier {
+            if self.prefix[1] == CELL_TYPE_NUMBER {
+                self.prefix[1] = CELL_TYPE_ALTERNATE_NUMBER;
+            }
+            self.fields.insert(
+                CELL_FORMAT_KIND_FLAG,
+                CURRENCY_CELL_FORMAT_KIND.to_le_bytes().to_vec(),
+            );
+            self.fields.insert(
+                CURRENCY_FORMAT_IDENTIFIER_FLAG,
+                identifier.to_le_bytes().to_vec(),
+            );
+            if let Some(secondary_identifier) = secondary_identifier {
+                self.fields
+                    .insert(CELL_FORMAT_IDENTIFIER_FLAG, secondary_identifier);
+            }
+            explicit_currency_format_flags(has_secondary_identifier)
+        } else {
+            if self.prefix[1] == CELL_TYPE_ALTERNATE_NUMBER {
+                self.prefix[1] = CELL_TYPE_NUMBER;
+            }
+            0
+        };
+        self.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
+            .copy_from_slice(&explicit_flags.to_le_bytes());
+        Ok(())
+    }
+
     fn set_data_format_metadata_identifier(
         &mut self,
         identifier: u32,
@@ -721,7 +825,10 @@ impl BncCell {
                     CURRENCY_FORMAT_IDENTIFIER_FLAG,
                     identifier.to_le_bytes().to_vec(),
                 );
-                (EXPLICIT_CURRENCY_FORMAT, CURRENCY_CELL_FORMAT_KIND)
+                (
+                    explicit_currency_format_flags(false),
+                    CURRENCY_CELL_FORMAT_KIND,
+                )
             },
             CellDataFormatKind::DateTime => {
                 if matches!(
@@ -2797,6 +2904,112 @@ mod tests {
     }
 
     #[test]
+    fn focused_currency_format_identifier_preserves_value_references_and_tail() {
+        assert_eq!(EXPLICIT_CURRENCY_FORMAT, 0x0802);
+
+        let mut cell = BncCell::minimal();
+        cell.prefix[2..].copy_from_slice(&[0xa1, 0xb2, 0xc3, 0xd4, 0xe5, 0xf6]);
+        cell.set_number(42.25).unwrap();
+        cell.set_formula_reference(17);
+        cell.fields
+            .insert(FORMULA_ERROR_FLAG, 19u32.to_le_bytes().to_vec());
+        cell.set_style_identifier(Some(23));
+        cell.set_comment_identifier(Some(29));
+        cell.tail.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
+        assert_eq!(cell.numeric_cell_type(), Some(NumericCellType::Number));
+
+        let original_prefix = cell.prefix;
+        let original_value = value_fields(&cell);
+        let original_cache = cell.cached_scalar().unwrap();
+        let original_formula = cell.formula_identifier().unwrap();
+        let original_formula_error = cell.formula_error_identifier();
+        let original_style = cell.style_identifier();
+        let original_comment = cell.comment_identifier();
+        let original_tail = cell.tail.clone();
+
+        cell.set_currency_format_identifier_preserving_value(Some(43))
+            .unwrap();
+        assert_eq!(cell.prefix[0], original_prefix[0]);
+        assert_eq!(
+            cell.numeric_cell_type(),
+            Some(NumericCellType::AlternateNumber)
+        );
+        assert_eq!(
+            cell.prefix[2..EXPLICIT_FORMAT_FLAGS_START],
+            original_prefix[2..EXPLICIT_FORMAT_FLAGS_START]
+        );
+        assert_eq!(
+            cell.numeric_cell_type(),
+            Some(NumericCellType::AlternateNumber)
+        );
+        assert_eq!(cell.explicit_format_flags(), EXPLICIT_CURRENCY_FORMAT);
+        assert_eq!(cell.cell_format_kind(), Some(CURRENCY_CELL_FORMAT_KIND));
+        assert_eq!(cell.format_identifier(), Some(43));
+        assert_eq!(cell.secondary_format_identifier(), None);
+        assert_eq!(cell.control_cell_spec_identifier(), None);
+        assert_eq!(value_fields(&cell), original_value);
+        assert_eq!(cell.cached_scalar().unwrap(), original_cache);
+        assert_eq!(cell.formula_identifier().unwrap(), original_formula);
+        assert_eq!(cell.formula_error_identifier(), original_formula_error);
+        assert_eq!(cell.style_identifier(), original_style);
+        assert_eq!(cell.comment_identifier(), original_comment);
+        assert_eq!(cell.tail, original_tail);
+
+        cell.fields
+            .insert(CELL_FORMAT_IDENTIFIER_FLAG, 41u32.to_le_bytes().to_vec());
+        cell.set_currency_format_identifier_preserving_value(Some(47))
+            .unwrap();
+        assert_eq!(
+            cell.explicit_format_flags(),
+            EXPLICIT_CURRENCY_WITH_NUMBER_FORMAT
+        );
+        assert_eq!(
+            cell.numeric_cell_type(),
+            Some(NumericCellType::AlternateNumber)
+        );
+        assert_eq!(cell.format_identifier(), Some(47));
+        assert_eq!(cell.secondary_format_identifier(), Some(41));
+        assert_eq!(value_fields(&cell), original_value);
+        assert_eq!(cell.cached_scalar().unwrap(), original_cache);
+        assert_eq!(cell.formula_identifier().unwrap(), original_formula);
+        assert_eq!(cell.formula_error_identifier(), original_formula_error);
+        assert_eq!(cell.style_identifier(), original_style);
+        assert_eq!(cell.comment_identifier(), original_comment);
+        assert_eq!(cell.tail, original_tail);
+
+        let mut reparsed = BncCell::parse(&cell.encode()).unwrap();
+        reparsed
+            .set_currency_format_identifier_preserving_value(None)
+            .unwrap();
+        assert_eq!(reparsed.prefix[0], original_prefix[0]);
+        assert_eq!(reparsed.numeric_cell_type(), Some(NumericCellType::Number));
+        assert_eq!(
+            reparsed.prefix[2..EXPLICIT_FORMAT_FLAGS_START],
+            original_prefix[2..EXPLICIT_FORMAT_FLAGS_START]
+        );
+        assert_eq!(reparsed.explicit_format_flags(), 0);
+        assert_eq!(reparsed.cell_format_kind(), None);
+        assert_eq!(reparsed.format_identifier(), None);
+        assert_eq!(reparsed.secondary_format_identifier(), None);
+        assert_eq!(reparsed.control_cell_spec_identifier(), None);
+        assert_eq!(value_fields(&reparsed), original_value);
+        assert_eq!(reparsed.cached_scalar().unwrap(), original_cache);
+        assert_eq!(reparsed.formula_identifier().unwrap(), original_formula);
+        assert_eq!(reparsed.formula_error_identifier(), original_formula_error);
+        assert_eq!(reparsed.style_identifier(), original_style);
+        assert_eq!(reparsed.comment_identifier(), original_comment);
+        assert_eq!(reparsed.tail, original_tail);
+
+        let before_rejection = reparsed.encode();
+        assert!(
+            reparsed
+                .set_currency_format_identifier_preserving_value(Some(0))
+                .is_err()
+        );
+        assert_eq!(reparsed.encode(), before_rejection);
+    }
+
+    #[test]
     fn slider_formats_match_native_number_and_currency_metadata() {
         let native_number =
             hex("0502000000000100013400001900000000000000000000000000403004000000010000000c000000");
@@ -2822,7 +3035,10 @@ mod tests {
             currency.cached_scalar().unwrap(),
             Some(CachedScalar::Number(finite(25.0)))
         );
-        assert_eq!(currency.explicit_format_flags(), EXPLICIT_CURRENCY_FORMAT);
+        assert_eq!(
+            currency.explicit_format_flags(),
+            EXPLICIT_CURRENCY_WITH_NUMBER_FORMAT
+        );
         assert_eq!(currency.cell_format_kind(), Some(CURRENCY_CELL_FORMAT_KIND));
         assert_eq!(currency.control_cell_spec_identifier(), Some(4));
         assert_eq!(currency.format_identifier(), Some(11));

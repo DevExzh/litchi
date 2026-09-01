@@ -1,6 +1,6 @@
 # iWork Progress Audit
 
-> Audit baseline: 2026-09-01 at committed `b6e6ada83` (`feat(numbers): own plain number cell formats`). This update evaluates the focused Percentage-format slice completed from that baseline; it remains scoped verification rather than release certification.
+> Audit baseline: 2026-09-01 at committed `b6e6ada83` (`feat(numbers): own plain number cell formats`). This update evaluates the focused Percentage-format slice and current Currency-format owner work from that baseline; it remains scoped verification rather than release certification.
 
 ## Conclusion
 
@@ -11,7 +11,7 @@ The iWork implementation is substantial but is **not suite-complete or release-c
 - Broad fresh creation, structural editing, rich formatting, charts, shapes, and media remain largely in the legacy `litchi-iwa` migration host.
 - Three authoritative Pages, Keynote, and Numbers matrices now report focused-owner, legacy-host, preservation, and evidence boundaries; the existing implementation review still explicitly excludes iWork.
 - Native fixtures establish basic parse/no-op fidelity, but there is no suite-wide automated proof that Litchi-modified files are accepted, saved, closed, and reopened by all three native applications.
-- The focused Percentage owner and codec checks are green at the synthetic/source level. A disposable native Numbers open/save/close/reopen probe and strict Rust semantic no-op readback are recorded in ADR 0008, but formal E3/E4 promotion and frozen-fixture ledger evidence remain pending.
+- The focused Percentage owner and codec checks are green at the synthetic/source level. The focused Currency codec filter passes 4/4, the `litchi-numbers-wire` library passes 32/32, and the package target passes 22/22 after native BNC flag handling became shape-dependent. ADR 0008 records operation-specific native Currency E3/E4 evidence with exact candidate/native-resaved hashes, inverse restoration, and strict no-op reread. Percentage remains below formal E3/E4 promotion; Currency native evidence remains limited to its stated existing-cell operation.
 
 The detailed provisional coverage assessment is in [IWORK_FEATURE_MATRIX_AUDIT.md](IWORK_FEATURE_MATRIX_AUDIT.md).
 
@@ -22,7 +22,7 @@ The detailed provisional coverage assessment is in [IWORK_FEATURE_MATRIX_AUDIT.m
 | Root `litchi::iwork` facade | Immutable, bounded Pages/Keynote/Numbers projection; host-free dependency path | Read-only and text-oriented; no package/edit, metadata, media, chart, or formula editing/recalculation surface | 🟡 focused read facade |
 | `litchi-pages` | ZIP/directory semantic read; exact retained-package output; selected text, layout, footnote, header/footer, and table-property transactions | Fresh package creation, section/table structural CRUD, table cells/formulas, rich formatting, drawings, charts, media, collaboration, export | 🟡 bounded reader/editor |
 | `litchi-keynote` | Show/slide read; existing-slide state, text, notes, settings, background, transition, selected chart/movie/table properties | Slide creation/duplication, full table data, chart data/series/CRUD, media bytes/CRUD, full build/animation editing, shapes/groups, masters/themes, collaboration, rendering/export | 🟡 bounded reader/editor |
-| `litchi-numbers` | Rooted workbook read; selected scalar cells, formulas, controls, table settings, names/order, comments/replies, and existing-cell Number/Percentage display formats | Sheet/table lifecycle, row/column topology, full formula engine, other generic formats/rich styles, package merge editing, charts/media/drawables, filters/pivots/categories, print/page setup and workbook export | 🟡 bounded reader/editor |
+| `litchi-numbers` | Rooted workbook read; selected scalar cells, formulas, controls, table settings, names/order, comments/replies, and existing-cell Number/Percentage/Currency display formats | Sheet/table lifecycle, row/column topology, full formula engine, other generic formats/rich styles, package merge editing, charts/media/drawables, filters/pivots/categories, print/page setup and workbook export | 🟡 bounded reader/editor |
 | `litchi-iwa` | Broad source-free authoring and native mutation across all three applications; extensive tests/examples | It is explicitly a compatibility/migration host, exposes native/raw seams, and still owns most rich/structural authoring | 🟡 broad but non-canonical |
 | Shared IWA crates | Bounded Snappy/wire/archive parsing, package preservation, detection, focused codecs, exact artifacts, COW state, and archive-owned durable publication | Concrete-owner index adoption, aggregate graph/memory budgets, directory write parity, durable patch serialization/history, encryption/signatures | 🟡 mature substrate with open boundaries |
 
@@ -35,7 +35,7 @@ ADR 0028 defines `litchi-iwa` as the sole legacy migration host and makes deleti
 Positive progress:
 
 - The root facade depends on the three concrete owners rather than `litchi-iwa` ([feature wiring](../crates/litchi/Cargo.toml#L60), [facade](../crates/litchi/src/iwork/mod.rs#L1)).
-- Recent waves moved narrow Pages table/text owners, Numbers cells/settings/comments owners, and Keynote chart/movie/table owners into focused crates.
+- Recent waves moved narrow Pages table/text owners, Numbers cells/settings/comments/display-format owners, and Keynote chart/movie/table owners into focused crates.
 - `litchi-iwa-index` is a neutral leaf consistent with ADR 0029.
 - No `TODO`, `FIXME`, `todo!`, or `unimplemented!` stubs were found across the iWork crates; incomplete work is represented by typed refusal paths and migration debt.
 
@@ -62,15 +62,20 @@ The prior [format implementation review](FORMAT_IMPLEMENTATION_REVIEW.md#scope-a
 ## Current-worktree verification
 
 These results describe the focused pre-commit slice snapshot, not a release artifact. The
-Percentage and current broad Numbers rows were rerun for this slice; the Keynote row remains a
-historical dirty-worktree diagnostic and is not evidence against the focused Percentage
-implementation:
+Percentage, Currency, and current broad Numbers rows were rerun for this
+slice; the Keynote row remains a historical dirty-worktree diagnostic and is not evidence against
+the focused display-format implementations:
 
 | Check | Result |
 |---|---|
 | `python3 tools/check_crate_boundaries.py` | ❌ Three errors: untracked `crates/litchi-iwa/src/pages/editor/tables/lock.rs` restores the retired `body_table_lock_state` and `set_body_table_lock_state` host surface |
 | `cargo test -p litchi-numbers --test table_cell_percentage_format --no-fail-fast` | ✅ 19/19 focused Percentage owner tests passed, including selector, family-boundary, malformed-input, locality, inverse, concurrency, and budget cases |
 | `cargo test -p litchi-iwa-protos percentage_format --no-fail-fast` | ✅ 4/4 focused Percentage codec tests passed, covering native domains, canonical framing, unknown preservation, and Number/Percentage separation |
+| `cargo test -p litchi-numbers --test table_cell_currency_format --no-fail-fast --locked --offline` | ✅ 22/22 focused Currency owner tests passed after native BNC flag handling became shape-dependent, including refcount and secondary-reference cases |
+| `cargo test -p litchi-iwa-protos currency_format --lib --no-fail-fast` | ✅ 4/4 focused Currency codec tests passed, covering native domains, canonical framing, unknown preservation, and lazy-view separation |
+| `cargo test -p litchi-numbers-wire --lib` | ✅ 32/32 focused Numbers wire library tests passed |
+| Focused Currency fuzz targets | 🟡 Source-visible with bounded synthetic/adversarial corpus coverage; sanitizer smoke evidence remains separately scoped and is not used to broaden the native claim |
+| Numbers Currency native validation | ✅ Operation-specific E3/E4 evidence: Numbers 14.4 opened the Rust candidate without repair/recovery/conversion, preserved B2/B3 text/scalar semantics and requested Currency settings through save/close/reopen, and strict Rust no-op reread plus exact inverse restoration matched the recorded hashes in ADR 0008 |
 | Current broad Numbers gate | ❌ 405 unit tests passed/4 ignored; all integration targets passed except `table_data_list_reader_integration`, where 19 passed and 6 pre-existing comment/reply cases returned `InvalidSource` while validating synthetic comment metadata |
 | Numbers 14.4 Percentage probe | ✅ Rust candidate opened without repair; native save/close/reopen retained `4,200.000%`, three decimals, red-parentheses negatives, thousands separator, and Actual value `42`; strict Rust reread emitted an exact semantic no-op with zero touched components and the native-resaved SHA-256 unchanged |
 | Historical broad Keynote baseline (2026-08-31) | ❌ 153 unit tests passed/1 failed; `soundtrack_order` integration was 3 passed/5 failed; rerun reproduced `selected_zip_suffix_and_central_records_allow_only_reassembly_fields` central-record failure |
@@ -109,7 +114,7 @@ Repository history is also incomplete locally. `git rev-list HEAD...@{upstream}`
 
 1. Restore the missing Git objects and establish a clean, reproducible audit revision.
 2. Maintain the new authoritative app matrices against a frozen revision and keep focused-owner support, legacy-host-only support, opaque preservation, and native evidence distinct.
-3. Keep the completed Percentage slice isolated from unresolved sort, lock, projection, and other untracked drafts before promoting any additional support claim.
+3. Keep the completed Percentage and focused Currency slices isolated from unresolved sort, lock, projection, and other untracked drafts before promoting any additional support claim.
 4. Restore the boundary ratchet and fix the reproducible Numbers storage/comment and Keynote soundtrack/ZIP-preservation failures.
 
 ### P1 — close product and release gates

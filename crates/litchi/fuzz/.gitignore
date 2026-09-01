@@ -24,6 +24,9 @@ target
 !/corpus/numbers_table_cell_percentage_format/
 !/corpus/numbers_table_cell_percentage_format/*
 !/corpus/numbers_table_cell_percentage_format/*.seed
+!/corpus/numbers_table_cell_currency_format/
+!/corpus/numbers_table_cell_currency_format/*
+!/corpus/numbers_table_cell_currency_format/*.seed
 !/corpus/numbers_table_sort_order/
 !/corpus/numbers_table_sort_order/*
 !/corpus/numbers_table_relocation/

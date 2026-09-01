@@ -18,6 +18,7 @@ type FocusedControlError = litchi_numbers::cell::data_format::control::transacti
 type FocusedNumberFormatError = litchi_numbers::cell::data_format::number::transaction::Error;
 type FocusedPercentageFormatError =
     litchi_numbers::cell::data_format::percentage::transaction::Error;
+type FocusedCurrencyFormatError = litchi_numbers::cell::data_format::currency::transaction::Error;
 
 fn focused_control_error(error: FocusedControlError) -> Error {
     Error::InvalidFormat(format!(
@@ -537,6 +538,259 @@ fn commit_focused_percentage_format(
     bytes.try_reserve_exact(source_bytes.len()).map_err(|_| {
         Error::InvalidFormat(
             "could not allocate focused Numbers cell-percentage-format candidate".to_owned(),
+        )
+    })?;
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .map_err(|error| Error::Io(error.into_io_error()))?;
+    NumbersEditor::from_bytes(&bytes)
+}
+
+fn focused_currency_format_error(error: FocusedCurrencyFormatError) -> Error {
+    Error::InvalidFormat(format!(
+        "focused Numbers cell-currency-format operation failed: {error}"
+    ))
+}
+
+enum FocusedCurrencyFormatLocation {
+    Owner {
+        source: FocusedNumbersPackage,
+        sheet: litchi_numbers::SheetSelector<'static>,
+        table: litchi_numbers::TableSelector<'static>,
+        position: litchi_numbers::table::CellPosition,
+    },
+    LegacyFallback,
+}
+
+fn focused_currency_format_location(
+    editor: &NumbersEditor,
+    source_bytes: &[u8],
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<FocusedCurrencyFormatLocation> {
+    let (sheet, table): (
+        litchi_numbers::SheetSelector<'static>,
+        litchi_numbers::TableSelector<'static>,
+    ) = selectors::focused_table_location(editor, table_id)?;
+    let position =
+        litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "invalid Numbers cell-currency-format coordinate: {error}"
+            ))
+        })?;
+    let source = match FocusedNumbersPackage::from_bytes(source_bytes) {
+        Ok(source) => source,
+        Err(litchi_numbers::PackageError::InvalidFormat(_))
+            if !editor.package.source_is_exact() =>
+        {
+            return Ok(FocusedCurrencyFormatLocation::LegacyFallback);
+        },
+        Err(error) => {
+            return Err(Error::InvalidFormat(format!(
+                "focused Numbers cell-currency-format source validation failed: {error}"
+            )));
+        },
+    };
+    Ok(FocusedCurrencyFormatLocation::Owner {
+        source,
+        sheet,
+        table,
+        position,
+    })
+}
+
+const fn focused_currency_format_read_can_fallback(
+    error: FocusedCurrencyFormatError,
+    source_built: bool,
+) -> bool {
+    source_built
+        && matches!(
+            error,
+            FocusedCurrencyFormatError::CellNotFound
+                | FocusedCurrencyFormatError::UnsupportedDependency { .. }
+                | FocusedCurrencyFormatError::UnsupportedSource
+                | FocusedCurrencyFormatError::InvalidSource { .. }
+        )
+}
+
+const fn focused_currency_format_edit_can_fallback(
+    error: FocusedCurrencyFormatError,
+    source_built: bool,
+    allow_family_replacement: bool,
+) -> bool {
+    // Exact native packages fail closed after every focused-owner rejection.
+    // Cross-family replacement remains a source-built compatibility behavior;
+    // it cannot bypass the exact package's lock, budget, and locality owner.
+    source_built
+        && ((allow_family_replacement
+            && matches!(error, FocusedCurrencyFormatError::WrongFormatFamily { .. }))
+            || focused_currency_format_read_can_fallback(error, true))
+}
+
+#[cfg(test)]
+mod currency_format_fallback_policy_tests {
+    use super::{
+        FocusedCurrencyFormatError, focused_currency_format_edit_can_fallback,
+        focused_currency_format_read_can_fallback,
+    };
+    use litchi_numbers::cell::data_format::currency::transaction::Path;
+
+    #[test]
+    fn exact_sources_never_fallback_after_structural_admission_failure() {
+        let structural = FocusedCurrencyFormatError::UnsupportedSource;
+        assert!(!focused_currency_format_read_can_fallback(
+            structural, false
+        ));
+        assert!(!focused_currency_format_edit_can_fallback(
+            structural, false, true
+        ));
+        assert!(focused_currency_format_read_can_fallback(structural, true));
+        assert!(focused_currency_format_edit_can_fallback(
+            structural, true, true
+        ));
+
+        let family = FocusedCurrencyFormatError::WrongFormatFamily {
+            path: Path::Package,
+        };
+        assert!(!focused_currency_format_read_can_fallback(family, false));
+        assert!(!focused_currency_format_edit_can_fallback(
+            family, false, true
+        ));
+        assert!(focused_currency_format_edit_can_fallback(
+            family, true, true
+        ));
+        assert!(!focused_currency_format_edit_can_fallback(
+            family, true, false
+        ));
+    }
+}
+
+fn focused_currency_format(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Currency>> {
+    let source_built = !editor.package.source_is_exact();
+    let source_bytes = editor.to_bytes()?;
+    let location = focused_currency_format_location(editor, &source_bytes, table_id, row, column)?;
+    let FocusedCurrencyFormatLocation::Owner {
+        source,
+        sheet,
+        table,
+        position,
+    } = location
+    else {
+        return cell_data_format::cell_currency_format(&editor.package, table_id, row, column);
+    };
+    match source.table_cell_currency_format(sheet, table, position) {
+        Ok(format) => Ok(format),
+        Err(error) if focused_currency_format_read_can_fallback(error, source_built) => {
+            cell_data_format::cell_currency_format(&editor.package, table_id, row, column)
+        },
+        Err(error) => Err(focused_currency_format_error(error)),
+    }
+}
+
+fn commit_legacy_currency_format(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    format: Option<Currency>,
+) -> Result<NumbersEditor> {
+    let source_built = !editor.package.source_is_exact();
+    let mut staged = editor.package.clone();
+    match format {
+        Some(format) => {
+            let data_format = DataFormat::Currency(format);
+            cell_data_format::set_cell_data_format(
+                &mut staged,
+                table_id,
+                row,
+                column,
+                &data_format,
+            )?;
+        },
+        None => {
+            cell_data_format::reset_cell_currency_format(&mut staged, table_id, row, column)?;
+        },
+    }
+    // A generated package must stay source-built across this compatibility
+    // mutation. Reopening its normalized bytes would manufacture exact-source
+    // provenance and disable the same bounded fallback on the next operation.
+    let verified = if source_built {
+        staged.validate()?;
+        NumbersEditor::from_package(staged)?
+    } else {
+        NumbersEditor::from_bytes(&staged.to_bytes()?)?
+    };
+    let observed =
+        cell_data_format::cell_currency_format(&verified.package, table_id, row, column)?;
+    if observed != format {
+        return Err(Error::InvalidFormat(
+            "Numbers table-cell currency-format failed legacy package validation".to_owned(),
+        ));
+    }
+    Ok(verified)
+}
+
+fn commit_focused_currency_format(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    format: Option<Currency>,
+    allow_family_replacement: bool,
+) -> Result<NumbersEditor> {
+    let source_built = !editor.package.source_is_exact();
+    let source_bytes = editor.to_bytes()?;
+    let location = focused_currency_format_location(editor, &source_bytes, table_id, row, column)?;
+    let FocusedCurrencyFormatLocation::Owner {
+        source,
+        sheet,
+        table,
+        position,
+    } = location
+    else {
+        return commit_legacy_currency_format(editor, table_id, row, column, format);
+    };
+    let edit = match source.edit_table_cell_currency_format(sheet, table, position) {
+        Ok(edit) => edit,
+        Err(error)
+            if focused_currency_format_edit_can_fallback(
+                error,
+                source_built,
+                allow_family_replacement,
+            ) =>
+        {
+            return commit_legacy_currency_format(editor, table_id, row, column, format);
+        },
+        Err(error) => return Err(focused_currency_format_error(error)),
+    };
+    let commit = match format {
+        Some(format) => edit.set(format).commit(),
+        None => edit.clear().commit(),
+    };
+    let commit = match commit {
+        Ok(commit) => commit,
+        Err(error)
+            if focused_currency_format_edit_can_fallback(
+                error,
+                source_built,
+                allow_family_replacement,
+            ) =>
+        {
+            return commit_legacy_currency_format(editor, table_id, row, column, format);
+        },
+        Err(error) => return Err(focused_currency_format_error(error)),
+    };
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(source_bytes.len()).map_err(|_| {
+        Error::InvalidFormat(
+            "could not allocate focused Numbers cell-currency-format candidate".to_owned(),
         )
     })?;
     commit
@@ -1116,16 +1370,24 @@ impl NumbersEditor {
     /// Read an explicit currency format for one zero-based table cell.
     ///
     /// `None` means the cell uses iWork's automatic data format.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers cell Currency-format API; use litchi_numbers::Package::table_cell_currency_format with SheetSelector, TableSelector, and CellPosition for the selector-first semantic read"
+    )]
     pub fn table_cell_currency_format(
         &self,
         table_id: u64,
         row: usize,
         column: usize,
     ) -> Result<Option<Currency>> {
-        cell_data_format::cell_currency_format(&self.package, table_id, row, column)
+        focused_currency_format(self, table_id, row, column)
     }
 
     /// Create or replace an explicit currency format transactionally.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers cell Currency-format API; use litchi_numbers::Package::edit_table_cell_currency_format with SheetSelector, TableSelector, and CellPosition for selector-first writes"
+    )]
     pub fn set_table_cell_currency_format(
         &mut self,
         table_id: u64,
@@ -1133,29 +1395,32 @@ impl NumbersEditor {
         column: usize,
         format: Currency,
     ) -> Result<()> {
-        self.set_table_cell_data_format(table_id, row, column, format.into())
+        *self = commit_focused_currency_format(self, table_id, row, column, Some(format), true)?;
+        Ok(())
     }
 
     /// Restore Automatic from an explicit Currency cell.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers cell Currency-format API; use litchi_numbers::Package::edit_table_cell_currency_format with SheetSelector, TableSelector, and CellPosition to clear the explicit Currency format"
+    )]
     pub fn reset_table_cell_currency_format(
         &mut self,
         table_id: u64,
         row: usize,
         column: usize,
     ) -> Result<bool> {
-        let mut staged = self.package.clone();
-        let changed =
-            cell_data_format::reset_cell_currency_format(&mut staged, table_id, row, column)?;
-        if changed {
-            let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
-                return Err(Error::InvalidFormat(
-                    "Numbers currency-format reset failed package validation".to_owned(),
-                ));
-            }
-            *self = verified;
+        if focused_currency_format(self, table_id, row, column)?.is_none() {
+            return Ok(false);
         }
-        Ok(changed)
+        let verified = commit_focused_currency_format(self, table_id, row, column, None, false)?;
+        if focused_currency_format(&verified, table_id, row, column)?.is_some() {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell currency-format reset failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(true)
     }
 
     /// Read an explicit percentage format for one zero-based table cell.
