@@ -23,10 +23,12 @@ pub(crate) mod worksheet_property;
 ///
 /// This surface is an internal format-owner API. `NotEligible` is a
 /// capability result, not full worksheet validation; callers must fall back
-/// to the materialized worksheet parser whenever it is returned.
+/// to the materialized worksheet parser whenever it is returned. Eligible
+/// results include [`selected_worksheet::SelectedDependencies`] for the zero-based shared-string
+/// and direct-cell-style indexes observed across the complete stream.
 pub mod selected_worksheet {
     pub use super::worksheet::selected::{
-        NotEligibleReason, ScanOutcome, SelectedCell, StreamResult, scan,
+        NotEligibleReason, ScanOutcome, SelectedCell, SelectedDependencies, StreamResult, scan,
     };
 }
 

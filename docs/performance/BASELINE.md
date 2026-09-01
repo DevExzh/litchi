@@ -1,5 +1,30 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Latest XLSX selected-cell dependency streaming (change 0364)
+
+Change 0364 extends the eligible cold selected-cell path with sequential,
+verified dependency reads. The scan tracks maximum shared-string and direct
+cell-style references across all worksheet cells plus the target SST index,
+then reads canonical `sharedStrings` followed by `styles`. Plain selected SST
+and direct `c@s` values resolve without `Store`, worksheet `PartData`, a full
+text `Vec`, a style `Catalog`, or semantic dependency-cache publication.
+Warm semantic caches no longer rematerialize evicted `PartData`; public
+signatures remain unchanged.
+
+Dependency readers reach XML EOF and CRC, size, source, and cancellation
+fences before values or fallback are returned. Invalid, missing, or
+out-of-range references and unsupported or oversize parts retain established
+eager diagnostics after readers close. Rich, phonetic, extension, and foreign
+SST entries, row or column styles, merges, shared, array, and data-table
+formulas remain eager fallbacks, and the final cell source/cancellation fence
+runs even on parser errors.
+
+Focused validation passed `28/28`, library validation passed `856/856`, and
+scoped Clippy passed apart from the known unrelated pre-existing `hyperlinks`
+`useless_asref` issue. Quick-XML and current-item allocations are bounded only
+by documented limits. No latency, RSS, OOM, or fixed-memory claim follows;
+`performance_claim: none`. See [Change 0364](changes/0364-xlsx-selected-cell-dependency-streaming.md).
+
 ## Latest XLSX source-worksheet selected-cell routing (change 0363)
 
 Change 0363 routes cold `SourceWorksheet::cell` through

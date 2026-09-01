@@ -31,7 +31,7 @@ use litchi_opc::{
 use litchi_sheet::{Area, At, Cell as Address, Rect};
 
 use super::{DateSystem, Flavor, Selector, Visibility, WorksheetKind, codec};
-use crate::cell::{Cell, Store, Text, View};
+use crate::cell::{Cell, Store, Text, Value, View};
 use crate::error::{Error, Result, allocation, invalid};
 use crate::raw;
 
@@ -646,16 +646,16 @@ impl SourceWorksheet {
         let address = at.into().resolve()?;
         let value = if self.data.cells.get().is_some() || self.data.kind != WorksheetKind::Worksheet
         {
-            self.eager_cell(address)?
+            self.eager_cell(address)
         } else {
-            self.stream_cell(address)?
+            self.stream_cell(address)
         };
         // `Store::view` returns an owned clone, so the source may change
         // during that clone without being observed by the earlier store
         // check. Revalidate immediately before publishing the value.
         self.owner.package.source_version()?;
         self.owner.execution_check()?;
-        Ok(value)
+        value
     }
 
     fn eager_cell(&self, address: Address) -> Result<SourceCellView> {
@@ -692,9 +692,46 @@ impl SourceWorksheet {
             return self.eager_cell(address);
         };
         match outcome {
-            raw::selected_worksheet::ScanOutcome::Eligible(selected) => match selected.cell {
-                Some(cell) => Ok(SourceCellView::Stored(cell)),
-                None => Ok(SourceCellView::Missing),
+            raw::selected_worksheet::ScanOutcome::Eligible(selected) => {
+                let dependencies = selected.dependencies;
+                let mut shared_text = None;
+                let mut fallback = false;
+
+                if let Some(max_index) = dependencies.max_shared_string_index {
+                    match self.owner.stream_shared_strings_dependency(
+                        max_index,
+                        dependencies.target_shared_string_index,
+                    )? {
+                        SelectedDependency::Ready(text) => shared_text = text,
+                        SelectedDependency::Fallback => fallback = true,
+                    }
+                }
+                if !fallback && let Some(max_index) = dependencies.max_direct_style_index {
+                    if matches!(
+                        self.owner.stream_styles_dependency(max_index)?,
+                        SelectedDependency::Fallback
+                    ) {
+                        fallback = true;
+                    }
+                }
+
+                // Dependency readers must be fully released before a stale
+                // source can trigger eager materialization. Keep this fence
+                // in addition to the publication fence in `cell`.
+                self.owner.package.source_version()?;
+                self.owner.execution_check()?;
+                if fallback {
+                    return self.eager_cell(address);
+                }
+
+                match (selected.cell, dependencies.target_shared_string_index) {
+                    (Some(cell), _) => Ok(SourceCellView::Stored(cell)),
+                    (None, Some(_)) => match shared_text {
+                        Some(text) => Ok(SourceCellView::Stored(Cell::Value(Value::Text(text)))),
+                        None => self.eager_cell(address),
+                    },
+                    (None, None) => Ok(SourceCellView::Missing),
+                }
             },
             raw::selected_worksheet::ScanOutcome::NotEligible(_) => self.eager_cell(address),
         }
@@ -815,6 +852,11 @@ fn selected_stream_limits(declared: u64) -> Option<StreamLimits> {
     Some(limits)
 }
 
+enum SelectedDependency<T> {
+    Ready(T),
+    Fallback,
+}
+
 fn map_verified_reader_error(
     error: VerifiedDecodedReaderError<StreamError<Error, Error>>,
 ) -> Error {
@@ -865,13 +907,89 @@ impl SourceInner {
         check_execution(self.execution.as_ref())
     }
 
+    #[expect(
+        clippy::result_large_err,
+        reason = "The dependency stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
+    )]
+    fn stream_shared_strings_dependency(
+        &self,
+        max_index: u32,
+        target_index: Option<u32>,
+    ) -> Result<SelectedDependency<Option<Text>>> {
+        self.execution_check()?;
+        let Some(uri) = self.shared_strings_uri.as_ref() else {
+            return Ok(SelectedDependency::Fallback);
+        };
+
+        let max_index = match usize::try_from(max_index) {
+            Ok(index) => index,
+            Err(_) => return Ok(SelectedDependency::Fallback),
+        };
+        let target_index = match target_index {
+            Some(index) => match usize::try_from(index) {
+                Ok(index) => Some(index),
+                Err(_) => return Ok(SelectedDependency::Fallback),
+            },
+            None => None,
+        };
+        let selected = {
+            let part = self.package.part(uri)?;
+            let declared = part.declared_uncompressed_size()?;
+            let Some(limits) = selected_stream_limits(declared) else {
+                return Ok(SelectedDependency::Fallback);
+            };
+            let capabilities = Capabilities::default();
+            part.with_verified_decoded_reader(|reader| {
+                raw::strings::stream_selected(reader, &capabilities, &limits, target_index)
+            })
+            .map_err(map_verified_reader_error)?
+        };
+
+        if selected.unsupported_rich
+            || max_index >= selected.count
+            || target_index.is_some() && selected.requested.is_none()
+        {
+            return Ok(SelectedDependency::Fallback);
+        }
+        Ok(SelectedDependency::Ready(selected.requested))
+    }
+
+    #[expect(
+        clippy::result_large_err,
+        reason = "The dependency stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
+    )]
+    fn stream_styles_dependency(&self, max_index: u32) -> Result<SelectedDependency<()>> {
+        self.execution_check()?;
+        let Some(uri) = self.styles_uri.as_ref() else {
+            return Ok(SelectedDependency::Fallback);
+        };
+        let count = {
+            let part = self.package.part(uri)?;
+            let declared = part.declared_uncompressed_size()?;
+            let Some(limits) = selected_stream_limits(declared) else {
+                return Ok(SelectedDependency::Fallback);
+            };
+            let capabilities = Capabilities::default();
+            part.with_verified_decoded_reader(|reader| {
+                raw::styles::stream_count(reader, &capabilities, &limits)
+            })
+            .map_err(map_verified_reader_error)?
+        };
+
+        if max_index >= count {
+            Ok(SelectedDependency::Fallback)
+        } else {
+            Ok(SelectedDependency::Ready(()))
+        }
+    }
+
     fn shared_strings(&self) -> Result<Option<&[Text]>> {
         self.execution_check()?;
         let Some(uri) = self.shared_strings_uri.as_ref() else {
             return Ok(None);
         };
         if let Some(strings) = self.shared_strings.get() {
-            let _payload = self.package.part(uri)?.data()?;
+            let _part = self.package.part(uri)?;
             self.execution_check()?;
             self.package.source_version()?;
             return Ok(Some(strings));
@@ -896,7 +1014,7 @@ impl SourceInner {
             return Ok(0);
         };
         if let Some(styles) = self.styles.get() {
-            let _payload = self.package.part(uri)?.data()?;
+            let _part = self.package.part(uri)?;
             self.execution_check()?;
             self.package.source_version()?;
             return Ok(styles.len());
@@ -1868,6 +1986,480 @@ mod tests {
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
             );
+        }
+    }
+
+    mod streaming_0364_tests {
+        use std::io::Cursor;
+        use std::sync::Arc;
+        use std::sync::atomic::Ordering;
+
+        use litchi_opc::OpcError;
+        use litchi_opc::SourceCacheLimits;
+        use litchi_opc::constants::content_type as ct;
+        use soapberry_zip::office::StreamingArchiveWriter;
+
+        use super::{
+            CountingSource, ReadLimits, SourceBackedWorkbook, SourceCellView, VersionFlipSource,
+            managed_context,
+        };
+        use crate::{Cell, Error, Value};
+
+        const SPREADSHEETML_NAMESPACE: &str =
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+        const SHARED_STRINGS_RELATIONSHIP: &str =
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings";
+        const STYLES_RELATIONSHIP: &str =
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
+
+        fn dependency_xlsx(
+            worksheet: &str,
+            shared_strings: Option<&str>,
+            styles: Option<&str>,
+        ) -> Vec<u8> {
+            let shared_override = shared_strings.map_or_else(String::new, |_| {
+                format!(
+                    r#"<Override PartName="/xl/sharedStrings.xml" ContentType="{}"/>"#,
+                    ct::SML_SHARED_STRINGS,
+                )
+            });
+            let styles_override = styles.map_or_else(String::new, |_| {
+                format!(
+                    r#"<Override PartName="/xl/styles.xml" ContentType="{}"/>"#,
+                    ct::SML_STYLES,
+                )
+            });
+            let shared_relationship = shared_strings.map_or_else(String::new, |_| {
+                format!(
+                    r#"<Relationship Id="rId2" Type="{SHARED_STRINGS_RELATIONSHIP}" Target="sharedStrings.xml"/>"#,
+                )
+            });
+            let styles_relationship = styles.map_or_else(String::new, |_| {
+                format!(
+                    r#"<Relationship Id="rId3" Type="{STYLES_RELATIONSHIP}" Target="styles.xml"/>"#,
+                )
+            });
+
+            let mut writer = StreamingArchiveWriter::new();
+            writer
+                .write_stored(
+                    "[Content_Types].xml",
+                    format!(
+                        r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="{}"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="{}"/>{shared_override}{styles_override}</Types>"#,
+                        ct::SML_SHEET_MAIN,
+                        ct::SML_WORKSHEET,
+                    )
+                    .as_bytes(),
+                )
+                .unwrap();
+            writer
+                .write_stored(
+                    "_rels/.rels",
+                    br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#,
+                )
+                .unwrap();
+            writer
+                .write_stored(
+                    "xl/workbook.xml",
+                    br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>"#,
+                )
+                .unwrap();
+            writer
+                .write_stored(
+                    "xl/_rels/workbook.xml.rels",
+                    format!(
+                        r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>{shared_relationship}{styles_relationship}</Relationships>"#,
+                    )
+                    .as_bytes(),
+                )
+                .unwrap();
+            writer
+                .write_stored("xl/worksheets/sheet1.xml", worksheet.as_bytes())
+                .unwrap();
+            if let Some(shared_strings) = shared_strings {
+                writer
+                    .write_stored("xl/sharedStrings.xml", shared_strings.as_bytes())
+                    .unwrap();
+            }
+            if let Some(styles) = styles {
+                writer
+                    .write_stored("xl/styles.xml", styles.as_bytes())
+                    .unwrap();
+            }
+            writer.finish_to_bytes().unwrap()
+        }
+
+        fn worksheet(cells: &str) -> String {
+            let first = std::str::from_utf8(super::FIRST_MARKER).unwrap();
+            let second = std::str::from_utf8(super::SECOND_MARKER).unwrap();
+            format!(
+                r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><!--{first} {second}--><sheetData><row r="1">{cells}</row></sheetData></worksheet>"#,
+            )
+        }
+
+        fn plain_shared_strings(values: &[&str]) -> String {
+            let items = values
+                .iter()
+                .map(|value| format!(r#"<si><t>{value}</t></si>"#))
+                .collect::<String>();
+            format!(
+                r#"<sst xmlns="{SPREADSHEETML_NAMESPACE}" count="{count}" uniqueCount="{count}">{items}</sst>"#,
+                count = values.len(),
+            )
+        }
+
+        fn styles(count: usize) -> String {
+            let formats = "<xf/>".repeat(count);
+            format!(
+                r#"<styleSheet xmlns="{SPREADSHEETML_NAMESPACE}"><cellXfs count="{count}">{formats}</cellXfs></styleSheet>"#,
+            )
+        }
+
+        fn rich_shared_strings() -> String {
+            format!(
+                r#"<sst xmlns="{SPREADSHEETML_NAMESPACE}" count="1" uniqueCount="1"><si><r><rPr/><t>rich </t></r><r><t>text</t></r></si></sst>"#,
+            )
+        }
+
+        fn assert_text(view: SourceCellView, expected: &str) {
+            assert!(matches!(
+                view,
+                SourceCellView::Stored(Cell::Value(Value::Text(ref value)))
+                    if value.as_str() == expected
+            ));
+        }
+
+        fn assert_error_without_store(bytes: Vec<u8>) {
+            let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            assert!(sheet.cell("A1").is_err());
+            assert!(sheet.data.cells.get().is_none());
+        }
+
+        #[test]
+        fn plain_shared_string_and_style_stream_0364_avoids_materialization() {
+            let bytes = dependency_xlsx(
+                &worksheet(r#"<c r="A1" t="s" s="0"><v>0</v></c>"#),
+                Some(&plain_shared_strings(&["plain"])),
+                Some(&styles(1)),
+            );
+            let source = Arc::new(CountingSource::new(bytes));
+            let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let cold = workbook.cache_diagnostics();
+
+            assert_text(sheet.cell("A1").unwrap(), "plain");
+            assert!(sheet.data.cells.get().is_none());
+            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(workbook.inner.styles.get().is_none());
+            let after = workbook.cache_diagnostics();
+            assert_eq!(after.cold_loads, cold.cold_loads);
+            assert_eq!(after.successful_loads, cold.successful_loads);
+            assert!(source.first_body_marker_reads.load(Ordering::SeqCst) > 0);
+        }
+
+        #[test]
+        fn unselected_dependency_maxima_0364_are_validated() {
+            let valid = dependency_xlsx(
+                &worksheet(r#"<c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c>"#),
+                Some(&plain_shared_strings(&["selected", "unselected"])),
+                None,
+            );
+            let workbook = SourceBackedWorkbook::from_reader(Cursor::new(valid)).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            assert_text(sheet.cell("A1").unwrap(), "selected");
+            assert!(sheet.data.cells.get().is_none());
+
+            let invalid = dependency_xlsx(
+                &worksheet(r#"<c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c>"#),
+                Some(&plain_shared_strings(&["selected"])),
+                None,
+            );
+            let workbook = SourceBackedWorkbook::from_reader(Cursor::new(invalid)).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            assert!(sheet.cell("A1").is_err());
+            assert!(sheet.data.cells.get().is_none());
+        }
+
+        #[test]
+        fn requested_plain_and_rich_sst_0364_have_eager_parity() {
+            let plain = dependency_xlsx(
+                &worksheet(r#"<c r="A1" t="s"><v>0</v></c>"#),
+                Some(&plain_shared_strings(&["rich text"])),
+                None,
+            );
+            let workbook = SourceBackedWorkbook::from_reader(Cursor::new(plain)).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            assert_text(sheet.cell("A1").unwrap(), "rich text");
+            assert!(sheet.data.cells.get().is_none());
+            assert!(workbook.inner.shared_strings.get().is_none());
+
+            let rich = dependency_xlsx(
+                &worksheet(r#"<c r="A1" t="s"><v>0</v></c>"#),
+                Some(&rich_shared_strings()),
+                None,
+            );
+            let workbook = SourceBackedWorkbook::from_reader(Cursor::new(rich)).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            assert_text(sheet.cell("A1").unwrap(), "rich text");
+            assert!(sheet.data.cells.get().is_some());
+            assert!(workbook.inner.shared_strings.get().is_some());
+        }
+
+        #[test]
+        fn invalid_and_missing_dependency_refs_0364_fall_back_without_store() {
+            assert_error_without_store(dependency_xlsx(
+                &worksheet(r#"<c r="A1" t="s"><v>0</v></c>"#),
+                None,
+                None,
+            ));
+            assert_error_without_store(dependency_xlsx(
+                &worksheet(r#"<c r="A1" t="s"><v>1</v></c>"#),
+                Some(&plain_shared_strings(&["only zero"])),
+                None,
+            ));
+            assert_error_without_store(dependency_xlsx(
+                &worksheet(r#"<c r="A1" s="0"><v>7</v></c>"#),
+                None,
+                None,
+            ));
+            assert_error_without_store(dependency_xlsx(
+                &worksheet(r#"<c r="A1" s="1"><v>7</v></c>"#),
+                None,
+                Some(&styles(1)),
+            ));
+        }
+
+        #[test]
+        fn late_dependency_errors_0364_are_primary_without_publication() {
+            let late_shared = format!(
+                r#"<sst xmlns="{SPREADSHEETML_NAMESPACE}" count="2" uniqueCount="2"><si><t>ready</t></si><si><t>late"#,
+            );
+            let bytes = dependency_xlsx(
+                &worksheet(r#"<c r="A1" t="s"><v>0</v></c>"#),
+                Some(&late_shared),
+                None,
+            );
+            let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let cold = workbook.cache_diagnostics();
+            assert!(sheet.cell("A1").is_err());
+            assert!(sheet.data.cells.get().is_none());
+            assert!(workbook.inner.shared_strings.get().is_none());
+            assert_eq!(
+                workbook.cache_diagnostics().successful_loads,
+                cold.successful_loads
+            );
+
+            let late_styles = format!(
+                r#"<styleSheet xmlns="{SPREADSHEETML_NAMESPACE}"><cellXfs count="1"><xf/></cellXfs><cellStyles>"#,
+            );
+            let bytes = dependency_xlsx(
+                &worksheet(r#"<c r="A1" s="0"><v>7</v></c>"#),
+                None,
+                Some(&late_styles),
+            );
+            let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let cold = workbook.cache_diagnostics();
+            assert!(sheet.cell("A1").is_err());
+            assert!(sheet.data.cells.get().is_none());
+            assert!(workbook.inner.styles.get().is_none());
+            assert_eq!(
+                workbook.cache_diagnostics().successful_loads,
+                cold.successful_loads
+            );
+        }
+
+        #[test]
+        fn dependency_crc_errors_0364_do_not_publish_semantics() {
+            let mut shared = dependency_xlsx(
+                &worksheet(r#"<c r="A1" t="s"><v>0</v></c>"#),
+                Some(&plain_shared_strings(&["crc"])),
+                None,
+            );
+            let shared_marker = b"<t>crc</t>";
+            let shared_offset = shared
+                .windows(shared_marker.len())
+                .position(|window| window == shared_marker)
+                .unwrap();
+            shared[shared_offset + 3] = b"C"[0];
+            let workbook = SourceBackedWorkbook::from_reader(Cursor::new(shared)).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let cold = workbook.cache_diagnostics();
+            assert!(sheet.cell("A1").is_err());
+            assert!(sheet.data.cells.get().is_none());
+            assert!(workbook.inner.shared_strings.get().is_none());
+            assert_eq!(
+                workbook.cache_diagnostics().successful_loads,
+                cold.successful_loads
+            );
+
+            let mut style = dependency_xlsx(
+                &worksheet(r#"<c r="A1" s="0"><v>7</v></c>"#),
+                None,
+                Some(&styles(1).replace("<xf/>", r#"<xf numFmtId="0"/>"#)),
+            );
+            let style_marker = b"numFmtId=\"0\"";
+            let style_offset = style
+                .windows(style_marker.len())
+                .position(|window| window == style_marker)
+                .unwrap();
+            style[style_offset + 10] = b"1"[0];
+            let workbook = SourceBackedWorkbook::from_reader(Cursor::new(style)).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let cold = workbook.cache_diagnostics();
+            assert!(sheet.cell("A1").is_err());
+            assert!(sheet.data.cells.get().is_none());
+            assert!(workbook.inner.styles.get().is_none());
+            assert_eq!(
+                workbook.cache_diagnostics().successful_loads,
+                cold.successful_loads
+            );
+        }
+
+        #[test]
+        fn dependency_source_change_and_cancellation_0364_stay_primary() {
+            let bytes = dependency_xlsx(
+                &worksheet(r#"<c r="A1" t="s"><v>0</v></c>"#),
+                Some(&plain_shared_strings(&["changed"])),
+                Some(&styles(1)),
+            );
+            let source = Arc::new(CountingSource::new(bytes.clone()));
+            let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let cold = workbook.cache_diagnostics();
+            source.changed();
+            assert!(matches!(
+                sheet.cell("A1"),
+                Err(Error::Package(OpcError::SourceChanged { .. }))
+            ));
+            assert!(sheet.data.cells.get().is_none());
+            assert_eq!(
+                workbook.cache_diagnostics().successful_loads,
+                cold.successful_loads
+            );
+
+            let source = Arc::new(CountingSource::new(bytes));
+            let (_budget, cancellation_source, context) = managed_context(u64::MAX);
+            let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+                source,
+                ReadLimits::default(),
+                context,
+            )
+            .unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let cold = workbook.cache_diagnostics();
+            cancellation_source.cancel();
+            assert!(matches!(
+                sheet.cell("A1"),
+                Err(Error::Package(OpcError::Cancelled))
+            ));
+            assert!(sheet.data.cells.get().is_none());
+            assert_eq!(
+                workbook.cache_diagnostics().successful_loads,
+                cold.successful_loads
+            );
+        }
+
+        #[test]
+        fn repeated_eligible_dependency_query_0364_rescans_source() {
+            let bytes = dependency_xlsx(
+                &worksheet(r#"<c r="A1" t="s"><v>0</v></c>"#),
+                Some(&plain_shared_strings(&["repeat"])),
+                Some(&styles(1)),
+            );
+            let source = Arc::new(CountingSource::new(bytes));
+            let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let cold = workbook.cache_diagnostics();
+            assert_text(sheet.cell("A1").unwrap(), "repeat");
+            let first_reads = source.first_body_marker_reads.load(Ordering::SeqCst);
+            assert!(first_reads > 0);
+            assert_text(sheet.cell("A1").unwrap(), "repeat");
+            assert!(source.first_body_marker_reads.load(Ordering::SeqCst) > first_reads);
+            assert!(sheet.data.cells.get().is_none());
+            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(workbook.inner.styles.get().is_none());
+            assert_eq!(
+                workbook.cache_diagnostics().successful_loads,
+                cold.successful_loads
+            );
+        }
+
+        #[test]
+        fn semantic_dependency_caches_0364_survive_payload_eviction() {
+            let bytes = dependency_xlsx(
+                &worksheet(r#"<c r="A1" t="s" s="0"><v>0</v></c>"#),
+                Some(&rich_shared_strings()),
+                Some(&styles(1)),
+            );
+            let source = Arc::new(CountingSource::new(bytes));
+            let cache_limits = SourceCacheLimits::new(4096, 1).unwrap();
+            let workbook =
+                SourceBackedWorkbook::from_read_at_with_cache_limits(source, cache_limits).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            assert_text(sheet.cell("A1").unwrap(), "rich text");
+            assert!(sheet.data.cells.get().is_some());
+            assert!(workbook.inner.shared_strings.get().is_some());
+            assert!(workbook.inner.styles.get().is_some());
+
+            let shared_uri = workbook.inner.shared_strings_uri.as_ref().unwrap().clone();
+            let styles_uri = workbook.inner.styles_uri.as_ref().unwrap().clone();
+            {
+                let _data = workbook
+                    .inner
+                    .package
+                    .part(&shared_uri)
+                    .unwrap()
+                    .data()
+                    .unwrap();
+            }
+            {
+                let _data = workbook
+                    .inner
+                    .package
+                    .part(&styles_uri)
+                    .unwrap()
+                    .data()
+                    .unwrap();
+            }
+            let evicted = workbook.cache_diagnostics();
+            assert!(evicted.evictions > 0);
+            let cold_loads = evicted.cold_loads;
+            assert_eq!(
+                workbook.inner.shared_strings().unwrap().unwrap()[0].as_str(),
+                "rich text"
+            );
+            assert_eq!(workbook.inner.style_count().unwrap(), 1);
+            assert_text(sheet.cell("A1").unwrap(), "rich text");
+            assert_eq!(workbook.cache_diagnostics().cold_loads, cold_loads);
+        }
+
+        #[test]
+        fn final_fence_0364_outranks_parser_error() {
+            let first = std::str::from_utf8(super::FIRST_MARKER).unwrap();
+            let second = std::str::from_utf8(super::SECOND_MARKER).unwrap();
+            let worksheet = format!(
+                r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><!--{first} {second}--><sheetData><row r="1"><c r="A1"><v>7</v></c>"#,
+            );
+            let bytes = dependency_xlsx(&worksheet, None, None);
+            let baseline_source = Arc::new(VersionFlipSource::new(bytes.clone(), None));
+            let baseline = SourceBackedWorkbook::from_read_at(baseline_source.clone()).unwrap();
+            let baseline_sheet = baseline.sheet("Sheet1").unwrap().unwrap();
+            assert!(baseline_sheet.cell("A1").is_err());
+            let final_check_call = baseline_source.version_calls.load(Ordering::SeqCst);
+            drop(baseline_sheet);
+            drop(baseline);
+
+            let source = Arc::new(VersionFlipSource::new(bytes, Some(final_check_call)));
+            let workbook = SourceBackedWorkbook::from_read_at(source).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            assert!(matches!(
+                sheet.cell("A1"),
+                Err(Error::Package(OpcError::SourceChanged { .. }))
+            ));
+            assert!(sheet.data.cells.get().is_none());
         }
     }
 }

@@ -1,5 +1,11 @@
 //! Streaming parser for the workbook shared-string table.
 
+use std::io::BufRead;
+
+use litchi_ooxml_common::mce::{
+    Capabilities, Name, SemanticElement, SemanticEvent, StreamError, StreamLimits,
+    process_markup_compatibility_stream_with_observers,
+};
 use litchi_ooxml_common::xml::{decode_xml_reference, unqualified_attribute_value};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -8,7 +14,9 @@ use quick_xml::reader::NsReader;
 
 use crate::cell::Text;
 use crate::error::{Result, allocation, invalid};
-use crate::raw::namespace::is_spreadsheetml_name;
+use crate::raw::namespace::{
+    SPREADSHEETML_NAMESPACE, STRICT_SPREADSHEETML_NAMESPACE, is_spreadsheetml_name,
+};
 
 const MAX_CELL_CHARACTERS: usize = 32_767;
 // A supplementary Unicode scalar can occupy two seven-byte `_xHHHH_`
@@ -50,6 +58,474 @@ pub(crate) fn parse(content: &[u8]) -> Result<Box<[Text]>> {
     let content = std::str::from_utf8(processed.as_ref())
         .map_err(|error| invalid(format!("shared strings XML is not UTF-8: {error}")))?;
     Parser::parse(content)
+}
+
+/// Result of a bounded MCE-selected shared-string dependency scan.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Selected {
+    /// Number of active direct `si` items in the selected semantic stream.
+    pub(crate) count: usize,
+    /// The requested plain item, if the requested index exists and is safely
+    /// representable as plain text.
+    pub(crate) requested: Option<Text>,
+    /// Whether the active stream contained a rich, extension, or foreign
+    /// construct that this dependency scan does not model.
+    pub(crate) unsupported_rich: bool,
+}
+
+/// Scan one MCE-selected shared-string part without materializing its table.
+///
+/// The stream is consumed through EOF.  Only the requested plain item is
+/// retained; every active item is still structurally and text-bound validated.
+/// Unsupported rich, phonetic, extension, and foreign constructs are reported
+/// in [`Selected::unsupported_rich`] rather than approximated as plain text.
+#[allow(clippy::result_large_err)]
+pub(crate) fn stream_selected(
+    input: &mut dyn BufRead,
+    capabilities: &Capabilities,
+    limits: &StreamLimits,
+    requested: Option<usize>,
+) -> std::result::Result<Selected, StreamError<crate::Error, crate::Error>> {
+    let mut parser = SelectedParser::new(requested);
+    let _report = process_markup_compatibility_stream_with_observers(
+        input,
+        capabilities,
+        limits,
+        |_| Ok::<(), crate::Error>(()),
+        |event| parser.event(event),
+    )?;
+    parser.finish().map_err(|error| StreamError::Callback {
+        raw_error: None,
+        active_error: Some(error),
+    })
+}
+
+#[derive(Debug)]
+struct SelectedParser {
+    stack: Vec<Context>,
+    item: Option<SelectedItem>,
+    count: usize,
+    requested_index: Option<usize>,
+    requested: Option<Text>,
+    root_seen: bool,
+    closed_root: bool,
+    unsupported_rich: bool,
+}
+
+impl SelectedParser {
+    fn new(requested_index: Option<usize>) -> Self {
+        Self {
+            stack: Vec::new(),
+            item: None,
+            count: 0,
+            requested_index,
+            requested: None,
+            root_seen: false,
+            closed_root: false,
+            unsupported_rich: false,
+        }
+    }
+
+    fn event(&mut self, event: SemanticEvent<'_>) -> Result<()> {
+        match event {
+            SemanticEvent::Start(element) => self.start(&element, false),
+            SemanticEvent::Empty(element) => self.start(&element, true),
+            SemanticEvent::End(element) => self.end(&element),
+            SemanticEvent::Text(text) | SemanticEvent::CData(text)
+                if self.stack.last() == Some(&Context::Text) =>
+            {
+                self.push_text(text.text())
+            },
+            SemanticEvent::GeneralRef(reference) if self.stack.last() == Some(&Context::Text) => {
+                let name = std::str::from_utf8(reference.name.as_ref()).map_err(|error| {
+                    invalid(format!("shared-string XML reference is not UTF-8: {error}"))
+                })?;
+                let reference = quick_xml::events::BytesRef::new(name);
+                let value = decode_xml_reference(&reference)?;
+                self.push_text(&value)
+            },
+            _ => Ok(()),
+        }
+    }
+
+    fn start(&mut self, element: &SemanticElement<'_>, empty: bool) -> Result<()> {
+        if self.stack.is_empty() {
+            if self.root_seen || self.closed_root || !is_spreadsheetml_element(element, b"sst") {
+                return Err(invalid(
+                    "shared strings XML must have one SpreadsheetML sst root",
+                ));
+            }
+            self.parse_root_hints(element)?;
+            self.root_seen = true;
+            if empty {
+                self.closed_root = true;
+            } else {
+                self.push_context(Context::Table)?;
+            }
+            return Ok(());
+        }
+
+        let parent = *self
+            .stack
+            .last()
+            .ok_or_else(|| invalid("shared strings XML is missing its root context"))?;
+        let child = self.start_context(parent, element)?;
+        if marks_unsupported(parent, element) {
+            self.mark_unsupported();
+        }
+        if empty {
+            if child == Context::Item {
+                self.finish_item()?;
+            }
+        } else {
+            self.push_context(child)?;
+        }
+        Ok(())
+    }
+
+    fn start_context(&mut self, parent: Context, element: &SemanticElement<'_>) -> Result<Context> {
+        if parent == Context::Table && is_spreadsheetml_element(element, b"si") {
+            if self.item.is_some() {
+                return Err(invalid("nested shared-string item"));
+            }
+            let index = self.count;
+            self.count = self
+                .count
+                .checked_add(1)
+                .ok_or_else(|| invalid("shared-string item count overflow"))?;
+            self.item = Some(SelectedItem::new(
+                index,
+                self.requested_index == Some(index),
+            ));
+            return Ok(Context::Item);
+        }
+        if parent == Context::Item && is_spreadsheetml_element(element, b"t") {
+            let item = self
+                .item
+                .as_mut()
+                .ok_or_else(|| invalid("shared-string text outside an item"))?;
+            if item.saw_simple || item.saw_run {
+                return Err(invalid(
+                    "shared-string item mixes or duplicates simple and rich text",
+                ));
+            }
+            item.saw_simple = true;
+            return Ok(Context::Text);
+        }
+        if parent == Context::Item && is_spreadsheetml_element(element, b"r") {
+            let item = self
+                .item
+                .as_mut()
+                .ok_or_else(|| invalid("shared-string run outside an item"))?;
+            if item.saw_simple {
+                return Err(invalid("shared-string item mixes simple and rich text"));
+            }
+            item.runs = item
+                .runs
+                .checked_add(1)
+                .filter(|count| *count <= MAX_RUNS)
+                .ok_or_else(|| invalid("shared string has too many rich-text runs"))?;
+            item.saw_run = true;
+            item.seen_text_in_run = false;
+            return Ok(Context::Run);
+        }
+        if parent == Context::Run && is_spreadsheetml_element(element, b"t") {
+            let item = self
+                .item
+                .as_mut()
+                .ok_or_else(|| invalid("shared-string run text outside an item"))?;
+            if item.seen_text_in_run {
+                return Err(invalid("shared-string run has duplicate text"));
+            }
+            item.seen_text_in_run = true;
+            return Ok(Context::Text);
+        }
+        if parent == Context::Item && is_spreadsheetml_element(element, b"rPh") {
+            let item = self
+                .item
+                .as_mut()
+                .ok_or_else(|| invalid("phonetic run outside a shared-string item"))?;
+            item.phonetic_runs = item
+                .phonetic_runs
+                .checked_add(1)
+                .filter(|count| *count <= MAX_RUNS)
+                .ok_or_else(|| invalid("shared string has too many phonetic runs"))?;
+            return Ok(Context::Phonetic);
+        }
+        Ok(Context::Other)
+    }
+
+    fn end(&mut self, element: &litchi_ooxml_common::mce::SemanticEnd<'_>) -> Result<()> {
+        let context = self
+            .stack
+            .pop()
+            .ok_or_else(|| invalid("shared strings XML has a closing element outside its root"))?;
+        match context {
+            Context::Item => self.finish_item(),
+            Context::Table => {
+                if !is_spreadsheetml_element_name(&element.expanded_name, b"sst") {
+                    return Err(invalid(
+                        "shared strings XML has an invalid root closing element",
+                    ));
+                }
+                if self.item.is_some() {
+                    return Err(invalid("shared-string item remained open at the root"));
+                }
+                self.closed_root = true;
+                Ok(())
+            },
+            Context::Run | Context::Text | Context::Phonetic | Context::Other => Ok(()),
+        }
+    }
+
+    fn push_text(&mut self, value: &str) -> Result<()> {
+        let item = self
+            .item
+            .as_mut()
+            .ok_or_else(|| invalid("shared-string text outside an item"))?;
+        item.encoded_bytes = item
+            .encoded_bytes
+            .checked_add(value.len())
+            .filter(|length| *length <= MAX_ENCODED_TEXT_BYTES)
+            .ok_or_else(|| invalid("shared-string encoded text is too large"))?;
+        item.text_state.push(value)?;
+        if let Some(text) = item.text.as_mut() {
+            text.try_reserve(value.len())
+                .map_err(|source| allocation("shared-string text", source))?;
+            text.push_str(value);
+        }
+        Ok(())
+    }
+
+    fn finish_item(&mut self) -> Result<()> {
+        let mut item = self
+            .item
+            .take()
+            .ok_or_else(|| invalid("missing shared-string item"))?;
+        item.text_state.finish()?;
+        if item.index != self.requested_index.unwrap_or(usize::MAX) || item.unsupported {
+            return Ok(());
+        }
+        let text = item
+            .text
+            .take()
+            .ok_or_else(|| invalid("missing requested shared-string scratch"))?;
+        let text = decode_spreadsheet_text(&text)?;
+        if text.chars().count() > MAX_CELL_CHARACTERS {
+            return Err(invalid(format!(
+                "shared string exceeds {MAX_CELL_CHARACTERS} characters"
+            )));
+        }
+        self.requested = Some(text.into());
+        Ok(())
+    }
+
+    fn parse_root_hints(&self, element: &SemanticElement<'_>) -> Result<()> {
+        if let Some(value) = root_attribute(element, "uniqueCount") {
+            parse_count_hint_value(value, b"uniqueCount")?;
+        }
+        if let Some(value) = root_attribute(element, "count") {
+            parse_count_hint_value(value, b"count")?;
+        }
+        Ok(())
+    }
+
+    fn push_context(&mut self, context: Context) -> Result<()> {
+        self.stack
+            .try_reserve(1)
+            .map_err(|source| allocation("shared-string element stack", source))?;
+        self.stack.push(context);
+        Ok(())
+    }
+
+    fn mark_unsupported(&mut self) {
+        self.unsupported_rich = true;
+        if let Some(item) = self.item.as_mut() {
+            item.unsupported = true;
+        }
+    }
+
+    fn finish(self) -> Result<Selected> {
+        if !self.root_seen || !self.closed_root || !self.stack.is_empty() || self.item.is_some() {
+            return Err(invalid(
+                "shared strings XML has an invalid root or element stack",
+            ));
+        }
+        Ok(Selected {
+            count: self.count,
+            requested: self.requested,
+            unsupported_rich: self.unsupported_rich,
+        })
+    }
+}
+
+#[derive(Debug)]
+struct SelectedItem {
+    index: usize,
+    text: Option<String>,
+    text_state: SpreadsheetTextState,
+    encoded_bytes: usize,
+    runs: u32,
+    phonetic_runs: u32,
+    saw_simple: bool,
+    saw_run: bool,
+    seen_text_in_run: bool,
+    unsupported: bool,
+}
+
+impl SelectedItem {
+    fn new(index: usize, retain_text: bool) -> Self {
+        Self {
+            index,
+            text: retain_text.then(String::new),
+            text_state: SpreadsheetTextState::default(),
+            encoded_bytes: 0,
+            runs: 0,
+            phonetic_runs: 0,
+            saw_simple: false,
+            saw_run: false,
+            seen_text_in_run: false,
+            unsupported: false,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct SpreadsheetTextState {
+    candidate: [u8; 7],
+    candidate_len: usize,
+    high_surrogate: Option<u16>,
+    decoded_chars: usize,
+}
+
+impl SpreadsheetTextState {
+    fn push(&mut self, value: &str) -> Result<()> {
+        for character in value.chars() {
+            self.push_character(character)?;
+        }
+        Ok(())
+    }
+
+    fn push_character(&mut self, character: char) -> Result<()> {
+        if self.candidate_len != 0 {
+            if character.is_ascii() && self.candidate_len < self.candidate.len() {
+                self.candidate[self.candidate_len] = character as u8;
+                self.candidate_len += 1;
+                if self.candidate_len == self.candidate.len() {
+                    self.resolve_candidate()?;
+                }
+                return Ok(());
+            }
+            self.flush_candidate_literal()?;
+        }
+
+        if self.high_surrogate.is_some() {
+            if character != '_' {
+                return Err(invalid("unpaired high surrogate in SpreadsheetML escape"));
+            }
+            self.candidate[0] = b'_';
+            self.candidate_len = 1;
+        } else if character == '_' {
+            self.candidate[0] = b'_';
+            self.candidate_len = 1;
+        } else {
+            self.add_decoded_chars(1)?;
+        }
+        Ok(())
+    }
+
+    fn finish(&mut self) -> Result<()> {
+        if self.high_surrogate.is_some() {
+            return Err(invalid("unpaired high surrogate in SpreadsheetML escape"));
+        }
+        if self.candidate_len != 0 {
+            self.flush_candidate_literal()?;
+        }
+        Ok(())
+    }
+
+    fn resolve_candidate(&mut self) -> Result<()> {
+        let candidate = self.candidate;
+        let unit = spreadsheet_escape_at(&candidate[..candidate.len()], 0).map(|(unit, _)| unit);
+        self.candidate_len = 0;
+        let Some(unit) = unit else {
+            if self.high_surrogate.is_some() {
+                return Err(invalid("unpaired high surrogate in SpreadsheetML escape"));
+            }
+            self.add_decoded_chars(1)?;
+            for byte in &candidate[1..] {
+                self.push_character(char::from(*byte))?;
+            }
+            return Ok(());
+        };
+
+        if let Some(high) = self.high_surrogate.take() {
+            if !(0xDC00..=0xDFFF).contains(&unit) {
+                return Err(invalid(format!(
+                    "unpaired high surrogate in SpreadsheetML escape (high {high:04X})"
+                )));
+            }
+            self.add_decoded_chars(1)?;
+        } else if (0xD800..=0xDBFF).contains(&unit) {
+            self.high_surrogate = Some(unit);
+        } else if (0xDC00..=0xDFFF).contains(&unit) {
+            return Err(invalid("unpaired low surrogate in SpreadsheetML escape"));
+        } else {
+            self.add_decoded_chars(1)?;
+        }
+        Ok(())
+    }
+
+    fn flush_candidate_literal(&mut self) -> Result<()> {
+        let length = self.candidate_len;
+        self.candidate_len = 0;
+        self.add_decoded_chars(length)
+    }
+
+    fn add_decoded_chars(&mut self, count: usize) -> Result<()> {
+        self.decoded_chars = self
+            .decoded_chars
+            .checked_add(count)
+            .filter(|count| *count <= MAX_CELL_CHARACTERS)
+            .ok_or_else(|| {
+                invalid(format!(
+                    "shared string exceeds {MAX_CELL_CHARACTERS} characters"
+                ))
+            })?;
+        Ok(())
+    }
+}
+
+fn root_attribute<'a>(element: &'a SemanticElement<'_>, local_name: &str) -> Option<&'a str> {
+    element
+        .attrs()
+        .iter()
+        .find(|attribute| {
+            attribute.expanded_name.namespace.is_empty()
+                && attribute.expanded_name.local_name == local_name
+        })
+        .map(|attribute| attribute.value())
+}
+
+fn marks_unsupported(parent: Context, element: &SemanticElement<'_>) -> bool {
+    if !is_spreadsheetml_element(element, b"") {
+        return true;
+    }
+    match parent {
+        Context::Table => element.expanded_name.local_name != "si",
+        Context::Item | Context::Run => element.expanded_name.local_name != "t",
+        Context::Text | Context::Phonetic | Context::Other => true,
+    }
+}
+
+fn is_spreadsheetml_element(element: &SemanticElement<'_>, local_name: &[u8]) -> bool {
+    is_spreadsheetml_element_name(&element.expanded_name, local_name)
+}
+
+fn is_spreadsheetml_element_name(name: &Name, local_name: &[u8]) -> bool {
+    (name.namespace.as_bytes() == SPREADSHEETML_NAMESPACE
+        || name.namespace.as_bytes() == STRICT_SPREADSHEETML_NAMESPACE)
+        && (local_name.is_empty() || name.local_name.as_bytes() == local_name)
 }
 
 impl Parser {
@@ -262,28 +738,33 @@ fn current(stack: &[Context]) -> Result<Context> {
 
 fn count_hint(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<Option<usize>> {
     unqualified_attribute_value(element, name, decoder)?
-        .map(|value| {
-            let count = value.parse::<u64>().map_err(|_source| {
-                invalid(format!(
-                    "invalid shared-string {} '{value}'",
-                    String::from_utf8_lossy(name)
-                ))
-            })?;
-            if count > MAX_OFFICE_COUNT {
-                return Err(invalid(format!(
-                    "shared-string {} exceeds {MAX_OFFICE_COUNT}",
-                    String::from_utf8_lossy(name)
-                )));
-            }
-            usize::try_from(count)
-                .map_err(|_source| invalid("shared-string count does not fit this platform"))
-        })
+        .map(|value| parse_count_hint_value(&value, name))
         .transpose()
+}
+
+fn parse_count_hint_value(value: &str, name: &[u8]) -> Result<usize> {
+    let count = value.parse::<u64>().map_err(|_source| {
+        invalid(format!(
+            "invalid shared-string {} '{value}'",
+            String::from_utf8_lossy(name)
+        ))
+    })?;
+    if count > MAX_OFFICE_COUNT {
+        return Err(invalid(format!(
+            "shared-string {} exceeds {MAX_OFFICE_COUNT}",
+            String::from_utf8_lossy(name)
+        )));
+    }
+    usize::try_from(count)
+        .map_err(|_source| invalid("shared-string count does not fit this platform"))
 }
 
 pub(crate) fn decode_spreadsheet_text(value: &str) -> Result<String> {
     let bytes = value.as_bytes();
-    let mut decoded = String::with_capacity(value.len());
+    let mut decoded = String::new();
+    decoded
+        .try_reserve(value.len())
+        .map_err(|source| allocation("shared-string decoded text", source))?;
     let mut copied_until = 0;
     let mut index = 0;
 
@@ -385,7 +866,187 @@ fn hex(byte: u8) -> Option<u8> {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
+    use litchi_ooxml_common::mce::{Capabilities, StreamError, StreamLimits};
+
     use super::*;
+
+    #[allow(clippy::result_large_err)]
+    fn streaming_0364_run(
+        content: &[u8],
+        capabilities: &Capabilities,
+        limits: &StreamLimits,
+        requested: Option<usize>,
+    ) -> std::result::Result<Selected, StreamError<crate::Error, crate::Error>> {
+        let mut input = Cursor::new(content);
+        stream_selected(&mut input, capabilities, limits, requested)
+    }
+
+    #[allow(clippy::result_large_err)]
+    fn streaming_0364_default(
+        content: &[u8],
+        requested: Option<usize>,
+    ) -> std::result::Result<Selected, StreamError<crate::Error, crate::Error>> {
+        streaming_0364_run(
+            content,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            requested,
+        )
+    }
+
+    #[test]
+    fn streaming_0364_selects_plain_requested_indexes() {
+        let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+            <si><t>first</t></si>
+            <si><t>middle</t></si>
+            <si><t>last</t></si>
+        </sst>"#;
+
+        let first = streaming_0364_default(xml, Some(0)).expect("first shared string");
+        assert_eq!(first.count, 3);
+        assert_eq!(first.requested.as_ref().map(Text::as_str), Some("first"));
+        assert!(!first.unsupported_rich);
+
+        let last = streaming_0364_default(xml, Some(2)).expect("last shared string");
+        assert_eq!(last.count, 3);
+        assert_eq!(last.requested.as_ref().map(Text::as_str), Some("last"));
+
+        let missing = streaming_0364_default(xml, Some(3)).expect("missing shared string");
+        assert_eq!(missing.count, 3);
+        assert!(missing.requested.is_none());
+    }
+
+    #[test]
+    fn streaming_0364_decodes_split_reference_escapes() {
+        let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+            <si><t>_xD83D&#x5f;_xDE00_</t></si>
+            <si><t>A&amp;B&#x21;</t></si>
+        </sst>"#;
+
+        let split = streaming_0364_default(xml, Some(0)).expect("split SpreadsheetML escape");
+        assert_eq!(split.requested.as_ref().map(Text::as_str), Some("😀"));
+
+        let references = streaming_0364_default(xml, Some(1)).expect("XML references");
+        assert_eq!(
+            references.requested.as_ref().map(Text::as_str),
+            Some("A&B!")
+        );
+    }
+
+    #[test]
+    fn streaming_0364_marks_unsupported_constructs_without_approximation() {
+        let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:x="urn:foreign">
+            <si><t>safe</t></si>
+            <si><r><t>rich</t></r></si>
+            <si><rPh><t>phonetic</t></rPh></si>
+            <si><extLst><ext/></extLst></si>
+            <si><x:foreign/></si>
+        </sst>"#;
+
+        for index in 1..5 {
+            let selected = streaming_0364_default(xml, Some(index)).expect("unsupported item");
+            assert_eq!(selected.count, 5);
+            assert!(selected.requested.is_none(), "requested index {index}");
+            assert!(selected.unsupported_rich);
+        }
+        let safe = streaming_0364_default(xml, Some(0)).expect("plain item");
+        assert_eq!(safe.requested.as_ref().map(Text::as_str), Some("safe"));
+        assert!(safe.unsupported_rich);
+    }
+
+    #[test]
+    fn streaming_0364_selects_mce_choice_or_fallback() {
+        let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+            xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+            xmlns:x="urn:choice">
+            <mc:AlternateContent>
+                <mc:Choice Requires="x"><si><t>choice</t></si></mc:Choice>
+                <mc:Fallback><si><t>fallback</t></si></mc:Fallback>
+            </mc:AlternateContent>
+        </sst>"#;
+
+        let fallback = streaming_0364_default(xml, Some(0)).expect("fallback branch");
+        assert_eq!(fallback.count, 1);
+        assert_eq!(
+            fallback.requested.as_ref().map(Text::as_str),
+            Some("fallback")
+        );
+        assert!(!fallback.unsupported_rich);
+
+        let mut capabilities = Capabilities::default();
+        capabilities.understand_namespace("urn:choice");
+        let choice = streaming_0364_run(xml, &capabilities, &StreamLimits::default(), Some(0))
+            .expect("choice branch");
+        assert_eq!(choice.count, 1);
+        assert_eq!(choice.requested.as_ref().map(Text::as_str), Some("choice"));
+        assert!(!choice.unsupported_rich);
+    }
+
+    #[test]
+    fn streaming_0364_drains_malformed_tail_and_rejects_roots() {
+        let malformed_tail =
+            br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+            <si><t>requested</t></si><si><t>broken</si></sst>"#;
+        assert!(streaming_0364_default(malformed_tail, Some(0)).is_err());
+
+        let wrong_root =
+            br#"<notSst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#;
+        assert!(streaming_0364_default(wrong_root, Some(0)).is_err());
+
+        let trailing_root =
+            br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/><tail/>"#;
+        assert!(streaming_0364_default(trailing_root, None).is_err());
+    }
+
+    #[test]
+    fn streaming_0364_enforces_exact_stream_and_text_limits() {
+        let empty = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#;
+
+        let mut input_exact = StreamLimits::default();
+        input_exact.processing.max_input_bytes = empty.len();
+        assert!(streaming_0364_run(empty, &Capabilities::default(), &input_exact, None).is_ok());
+        input_exact.processing.max_input_bytes = empty.len() - 1;
+        assert!(streaming_0364_run(empty, &Capabilities::default(), &input_exact, None).is_err());
+
+        let mut event_exact = StreamLimits::default();
+        event_exact.max_event_bytes = empty.len();
+        assert!(streaming_0364_run(empty, &Capabilities::default(), &event_exact, None).is_ok());
+        event_exact.max_event_bytes = empty.len() - 1;
+        assert!(streaming_0364_run(empty, &Capabilities::default(), &event_exact, None).is_err());
+
+        let exact_text = "_xD83D__xDE00_".repeat(MAX_CELL_CHARACTERS);
+        let exact_xml = format!(
+            r#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>{exact_text}</t></si></sst>"#
+        );
+        assert!(streaming_0364_default(exact_xml.as_bytes(), None).is_ok());
+
+        let too_many_chars = "a".repeat(MAX_CELL_CHARACTERS + 1);
+        let too_many_xml = format!(
+            r#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>{too_many_chars}</t></si></sst>"#
+        );
+        assert!(streaming_0364_default(too_many_xml.as_bytes(), None).is_err());
+
+        let over_encoded = format!("{exact_text}_xD83D__xDE00_");
+        let over_encoded_xml = format!(
+            r#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>{over_encoded}</t></si></sst>"#
+        );
+        assert!(streaming_0364_default(over_encoded_xml.as_bytes(), None).is_err());
+    }
+
+    #[test]
+    fn streaming_0364_accepts_advisory_count_mismatches_and_rejects_bad_hints() {
+        let mismatch = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="0" uniqueCount="2"><si><t>x</t></si></sst>"#;
+        let selected = streaming_0364_default(mismatch, None).expect("advisory mismatch");
+        assert_eq!(selected.count, 1);
+
+        let invalid = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" uniqueCount="NaN"/>"#;
+        assert!(streaming_0364_default(invalid, None).is_err());
+
+        let excessive = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="2147483648"/>"#;
+        assert!(streaming_0364_default(excessive, None).is_err());
+    }
 
     #[test]
     fn preserves_indexes_and_resolves_plain_rich_and_escaped_text() {

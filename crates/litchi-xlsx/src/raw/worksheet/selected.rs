@@ -33,7 +33,9 @@ const X14AC_NAMESPACE: &[u8] = x14ac::NAMESPACE;
 /// One physical cell selection result.
 ///
 /// `None` means that the requested coordinate has no stored `<c>` record;
-/// `Some(Cell::Empty)` is an explicitly stored empty cell.
+/// `Some(Cell::Empty)` is an explicitly stored empty cell. A non-formula
+/// shared-string cell with a valid `<v>` is deferred instead: its `cell` is
+/// `None` and [`SelectedCell::dependencies`] retains its shared-string index.
 #[derive(Debug)]
 pub struct SelectedCell {
     /// Requested coordinate, retained so later source readers can bind the
@@ -42,6 +44,31 @@ pub struct SelectedCell {
     /// Stored semantic cell, or `None` when the coordinate has no `<c>`
     /// record. An explicit empty record is represented by `Cell::Empty`.
     pub cell: Option<Cell>,
+    /// Bounded dependency metadata observed while scanning the complete
+    /// worksheet stream.
+    pub dependencies: SelectedDependencies,
+}
+
+/// Dependency metadata retained by an eligible selected worksheet scan.
+///
+/// All indexes are zero-based and are retained without resolving workbook
+/// parts. `None` means that no matching reference was observed. The maxima
+/// include unselected cells, so callers can use them to bound the dependency
+/// tables needed by a later materialized read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct SelectedDependencies {
+    /// Largest shared-string index referenced by any non-formula `t="s"`
+    /// cell with a valid `<v>` value.
+    pub max_shared_string_index: Option<u32>,
+    /// Largest direct cell style index present in any valid `c@s` attribute.
+    /// Row and column style inheritance is not represented; it makes the scan
+    /// [`NotEligibleReason::Styles`] instead.
+    pub max_direct_style_index: Option<u32>,
+    /// Shared-string index referenced by the requested cell, when that cell is
+    /// a valid non-formula `t="s"` cell. `Some` identifies a deferred selected
+    /// cell and is distinct from a missing coordinate or an explicit empty
+    /// cell.
+    pub target_shared_string_index: Option<u32>,
 }
 
 /// Why a worksheet was structurally valid but outside the scanner's first
@@ -54,7 +81,8 @@ pub enum NotEligibleReason {
     UnsupportedStructure,
     /// Merge anchors and covered-cell semantics require worksheet-wide state.
     MergeSemantics,
-    /// Resolving a shared-string index requires the workbook string table.
+    /// A shared-string reference has lexical content outside the bounded
+    /// index form retained by the scanner.
     SharedStrings,
     /// Styles or inherited row/column formatting are not selected-cell safe.
     Styles,
@@ -286,6 +314,7 @@ struct Scanner {
     seen_sheet_data: bool,
     pending_cell: Option<PendingCell>,
     selected: Option<Cell>,
+    dependencies: SelectedDependencies,
     not_eligible: Option<NotEligibleReason>,
 }
 
@@ -303,6 +332,7 @@ impl Scanner {
             seen_sheet_data: false,
             pending_cell: None,
             selected: None,
+            dependencies: SelectedDependencies::default(),
             not_eligible: None,
         }
     }
@@ -322,6 +352,7 @@ impl Scanner {
         Ok(ScanOutcome::Eligible(SelectedCell {
             address: self.requested,
             cell: self.selected,
+            dependencies: self.dependencies,
         }))
     }
 
@@ -494,6 +525,11 @@ impl Scanner {
     }
 
     fn start_row(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
+        if unqualified_attribute(element, "s").is_some()
+            || unqualified_attribute(element, "customFormat").is_some()
+        {
+            self.mark(NotEligibleReason::Styles);
+        }
         self.validate_attributes(element, &["r"], true)?;
         let number = match unqualified_attribute(element, "r") {
             Some(value) => parse_one_based_row(value)?,
@@ -522,7 +558,18 @@ impl Scanner {
     }
 
     fn start_cell(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
-        self.validate_attributes(element, &["r", "t"], false)?;
+        self.validate_attributes(element, &["r", "t", "s"], false)?;
+        if let Some(style) = unqualified_attribute(element, "s") {
+            let Some(style) = style.parse::<u32>().ok() else {
+                self.mark(NotEligibleReason::Styles);
+                return Ok(None);
+            };
+            self.dependencies.max_direct_style_index = Some(
+                self.dependencies
+                    .max_direct_style_index
+                    .map_or(style, |current| current.max(style)),
+            );
+        }
         let (row, last_column) = self
             .row
             .ok_or_else(|| invalid("worksheet cell outside a row"))?;
@@ -556,14 +603,14 @@ impl Scanner {
 
         let kind = CellKind::from_attribute(unqualified_attribute(element, "t"));
         match kind {
-            CellKind::SharedString => self.mark(NotEligibleReason::SharedStrings),
             CellKind::Date | CellKind::Unknown => self.mark(NotEligibleReason::UnsupportedCellType),
             CellKind::Untyped
             | CellKind::Numeric
             | CellKind::Boolean
             | CellKind::Error
             | CellKind::String
-            | CellKind::InlineString => {},
+            | CellKind::InlineString
+            | CellKind::SharedString => {},
         }
         if self.not_eligible.is_some() {
             return Ok(None);
@@ -575,6 +622,12 @@ impl Scanner {
 
     fn start_formula(&mut self, element: &SemanticElement<'_>) -> Result<()> {
         self.validate_attributes(element, &["t", "ref", "si", "bx"], false)?;
+        if matches!(
+            self.pending_cell.as_ref().map(|cell| cell.kind),
+            Some(CellKind::SharedString)
+        ) {
+            self.mark(NotEligibleReason::FormulaSemantics);
+        }
         let formula_type = unqualified_attribute(element, "t").unwrap_or("normal");
         if let Some(reference) = unqualified_attribute(element, "ref") {
             FormulaRange::parse(reference)?;
@@ -676,6 +729,27 @@ impl Scanner {
         } else {
             None
         };
+        let shared_string_index =
+            if formula.is_none() && matches!(cell.kind, CellKind::SharedString) && cell.saw_value {
+                let Some(index) = cell.value.trim().parse::<u32>().ok() else {
+                    self.mark(NotEligibleReason::SharedStrings);
+                    return Ok(());
+                };
+                self.dependencies.max_shared_string_index = Some(
+                    self.dependencies
+                        .max_shared_string_index
+                        .map_or(index, |current| current.max(index)),
+                );
+                Some(index)
+            } else {
+                None
+            };
+        if let Some(index) = shared_string_index {
+            if cell.selected {
+                self.dependencies.target_shared_string_index = Some(index);
+            }
+            return Ok(());
+        }
         let inline = if cell.saw_inline {
             if formula.is_some() {
                 return Err(invalid("formula cell cannot contain an inline string"));

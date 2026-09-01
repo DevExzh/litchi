@@ -1,5 +1,30 @@
 # Performance hotspot inventory
 
+## XLSX selected-cell dependency streaming boundary (change 0364)
+
+Change 0364 extends the selected-cell path with sequential, verified
+dependency reads, not a measured hotspot (`performance_claim: none`). The
+scan tracks maximum shared-string and direct cell-style references across all
+cells plus the target SST index, then streams canonical `sharedStrings`
+followed by `styles`. Plain selected SST and direct `c@s` values avoid
+`Store`, worksheet `PartData`, a full text `Vec`, a style `Catalog`, and
+semantic dependency-cache publication. Warm semantic caches no longer
+rematerialize evicted `PartData`; public signatures remain unchanged.
+
+Dependency readers reach XML EOF and CRC, size, source, and cancellation
+fences before returning a value or eager fallback. Invalid, missing, or
+out-of-range references and unsupported or oversize parts retain established
+eager diagnostics after readers close. Rich, phonetic, extension, and foreign
+SST entries, row or column styles, merges, shared, array, and data-table
+formulas remain eager. The final cell source/cancellation fence also runs on
+parser errors.
+
+Focused validation passed `28/28`, library validation passed `856/856`, and
+scoped Clippy passed apart from the known unrelated pre-existing `hyperlinks`
+`useless_asref` issue. Quick-XML and current-item allocations remain bounded
+only by documented limits. No latency, RSS, OOM, or fixed-memory evidence
+follows. See [Change 0364](changes/0364-xlsx-selected-cell-dependency-streaming.md).
+
 ## XLSX source-worksheet selected-cell routing boundary (change 0363)
 
 Change 0363 is a correctness/ownership integration, not a measured hotspot

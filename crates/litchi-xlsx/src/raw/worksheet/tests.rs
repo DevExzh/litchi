@@ -1289,12 +1289,6 @@ mod streaming_0362_selected_tests {
             ),
             (
                 worksheet(
-                    r#"<sheetData><row r="1"><c r="A1" t="s"><v>0</v></c></row></sheetData>"#,
-                ),
-                NotEligibleReason::SharedStrings,
-            ),
-            (
-                worksheet(
                     r#"<cols><col min="1" max="1" width="10" customWidth="1"/></cols><sheetData/>"#,
                 ),
                 NotEligibleReason::Styles,
@@ -1320,6 +1314,17 @@ mod streaming_0362_selected_tests {
         for (xml, reason) in cases {
             assert_not_eligible(&xml, "A1", reason);
         }
+
+        let shared_string =
+            worksheet(r#"<sheetData><row r="1"><c r="A1" t="s"><v>0</v></c></row></sheetData>"#);
+        let ScanOutcome::Eligible(selected) =
+            scan_xml(&shared_string, "A1").expect("valid shared-string cell")
+        else {
+            panic!("expected eligible deferred shared-string target");
+        };
+        assert!(selected.cell.is_none());
+        assert_eq!(selected.dependencies.target_shared_string_index, Some(0));
+        assert_eq!(selected.dependencies.max_shared_string_index, Some(0));
     }
 
     #[test]
@@ -1525,5 +1530,143 @@ mod streaming_0362_selected_tests {
         fn consume(&mut self, amount: usize) {
             self.position = self.position.saturating_add(amount).min(self.bytes.len());
         }
+    }
+}
+
+#[cfg(test)]
+mod streaming_0364_dependency_metadata_tests {
+    use std::io::Cursor;
+
+    use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
+    use litchi_sheet::Cell as Address;
+
+    use super::super::selected::{NotEligibleReason, ScanOutcome, scan};
+    use crate::cell::{Cell, Value};
+
+    const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+    fn address(reference: &str) -> Address {
+        Address::from_a1(reference).expect("valid worksheet address")
+    }
+
+    fn worksheet(body: &str) -> String {
+        format!(r#"<worksheet xmlns="{SPREADSHEETML}">{body}</worksheet>"#)
+    }
+
+    fn scan_xml(xml: &str, target: &str) -> super::super::selected::StreamResult<ScanOutcome> {
+        let mut input = Cursor::new(xml.as_bytes());
+        scan(
+            &mut input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            address(target),
+        )
+    }
+
+    #[test]
+    fn streaming_0364_dependency_metadata_tracks_global_maxima_and_target_states() {
+        let xml = worksheet(
+            r#"<sheetData>
+                <row r="1">
+                    <c r="A1" t="s" s="4"><v>7</v></c>
+                    <c r="B1" t="s" s="13"><v>11</v></c>
+                    <c r="C1" s="8"><v>1</v></c>
+                </row>
+                <row r="3"><c r="C3"/></row>
+            </sheetData>"#,
+        );
+
+        let ScanOutcome::Eligible(deferred) = scan_xml(&xml, "A1").expect("deferred target") else {
+            panic!("expected eligible deferred target");
+        };
+        assert!(deferred.cell.is_none());
+        assert_eq!(deferred.dependencies.max_shared_string_index, Some(11));
+        assert_eq!(deferred.dependencies.max_direct_style_index, Some(13));
+        assert_eq!(deferred.dependencies.target_shared_string_index, Some(7));
+
+        let ScanOutcome::Eligible(missing) = scan_xml(&xml, "B2").expect("missing target") else {
+            panic!("expected eligible missing target");
+        };
+        assert!(missing.cell.is_none());
+        assert_eq!(missing.dependencies.max_shared_string_index, Some(11));
+        assert_eq!(missing.dependencies.max_direct_style_index, Some(13));
+        assert_eq!(missing.dependencies.target_shared_string_index, None);
+
+        let ScanOutcome::Eligible(empty) = scan_xml(&xml, "C3").expect("explicit empty target")
+        else {
+            panic!("expected eligible explicit empty target");
+        };
+        assert!(matches!(empty.cell, Some(Cell::Empty)));
+        assert_eq!(empty.dependencies.max_shared_string_index, Some(11));
+        assert_eq!(empty.dependencies.max_direct_style_index, Some(13));
+        assert_eq!(empty.dependencies.target_shared_string_index, None);
+    }
+
+    #[test]
+    fn streaming_0364_dependency_metadata_keeps_valid_direct_styles_eligible() {
+        let xml = worksheet(
+            r#"<sheetData><row r="1">
+                <c r="A1" s="2"><v>1</v></c>
+                <c r="B1" s="17"><v>2</v></c>
+                <c r="C1" s="5"><v>3</v></c>
+            </row></sheetData>"#,
+        );
+        let ScanOutcome::Eligible(selected) = scan_xml(&xml, "A1").expect("valid direct styles")
+        else {
+            panic!("valid direct styles must remain eligible");
+        };
+        assert!(matches!(
+            selected.cell,
+            Some(Cell::Value(Value::Number(value))) if value.as_str() == "1"
+        ));
+        assert_eq!(selected.dependencies.max_shared_string_index, None);
+        assert_eq!(selected.dependencies.max_direct_style_index, Some(17));
+        assert_eq!(selected.dependencies.target_shared_string_index, None);
+    }
+
+    #[test]
+    fn streaming_0364_dependency_metadata_marks_invalid_lexicals_not_eligible() {
+        let cases = [
+            (
+                worksheet(
+                    r#"<sheetData><row r="1"><c r="A1" s="not-a-style"><v>1</v></c></row></sheetData>"#,
+                ),
+                NotEligibleReason::Styles,
+            ),
+            (
+                worksheet(
+                    r#"<sheetData><row r="1"><c r="A1" t="s"><v>not-an-index</v></c></row></sheetData>"#,
+                ),
+                NotEligibleReason::SharedStrings,
+            ),
+            (
+                worksheet(
+                    r#"<sheetData><row r="1"><c r="A1" t="s"><f>1+1</f><v>0</v></c></row></sheetData>"#,
+                ),
+                NotEligibleReason::FormulaSemantics,
+            ),
+        ];
+
+        for (xml, expected) in cases {
+            match scan_xml(&xml, "A1").expect("metadata scan") {
+                ScanOutcome::NotEligible(actual) => assert_eq!(actual, expected),
+                other => panic!("expected {expected:?}, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn streaming_0364_dependency_metadata_keeps_late_malformed_xml_primary() {
+        let xml = format!(
+            r#"<worksheet xmlns="{SPREADSHEETML}"><sheetData><row r="1"><c r="A1" s="not-a-style"><v>1</v></c></row></sheetData></worksheet><tail>"#
+        );
+        let error = scan_xml(&xml, "A1").expect_err("late malformed XML");
+        assert!(matches!(
+            error,
+            StreamError::Mce {
+                error: MceError::NonConformant(_) | MceError::Xml(_),
+                ..
+            }
+        ));
     }
 }
