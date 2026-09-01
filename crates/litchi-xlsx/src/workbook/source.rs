@@ -22,10 +22,11 @@ use litchi_core::FileSource;
 use litchi_core::{
     ExecutionContext, ExecutionError, ReadAt, Selector as CoreSelector, SourceVersion,
 };
+use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     PackURI, PartData, PartView, ReadLimits, SourceBackedPackage, SourceCacheDiagnostics,
-    SourceCacheLimits,
+    SourceCacheLimits, VerifiedDecodedReaderError,
 };
 use litchi_sheet::{Area, At, Cell as Address, Rect};
 
@@ -47,6 +48,7 @@ const INTL_MACROSHEET_REL: &str =
     "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet";
 const CHARTSHEET_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml";
+const MCE_HARD_MAX_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
 fn check_execution(context: Option<&ExecutionContext>) -> Result<()> {
     let Some(context) = context else {
@@ -642,10 +644,11 @@ impl SourceWorksheet {
     /// Look up an exact logical cell state, returning an owning semantic value.
     pub fn cell<'a>(&self, at: impl Into<At<'a>>) -> Result<SourceCellView> {
         let address = at.into().resolve()?;
-        let value = match self.store()?.view(address) {
-            View::Missing => SourceCellView::Missing,
-            View::Covered(range) => SourceCellView::Covered(range),
-            View::Stored(cell) => SourceCellView::Stored(cell.clone()),
+        let value = if self.data.cells.get().is_some() || self.data.kind != WorksheetKind::Worksheet
+        {
+            self.eager_cell(address)?
+        } else {
+            self.stream_cell(address)?
         };
         // `Store::view` returns an owned clone, so the source may change
         // during that clone without being observed by the earlier store
@@ -653,6 +656,48 @@ impl SourceWorksheet {
         self.owner.package.source_version()?;
         self.owner.execution_check()?;
         Ok(value)
+    }
+
+    fn eager_cell(&self, address: Address) -> Result<SourceCellView> {
+        Ok(match self.store()?.view(address) {
+            View::Missing => SourceCellView::Missing,
+            View::Covered(range) => SourceCellView::Covered(range),
+            View::Stored(cell) => SourceCellView::Stored(cell.clone()),
+        })
+    }
+
+    #[expect(
+        clippy::result_large_err,
+        reason = "The stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
+    )]
+    fn stream_cell(&self, address: Address) -> Result<SourceCellView> {
+        self.owner.execution_check()?;
+        let outcome = {
+            let part = self.owner.package.part(&self.data.part_uri)?;
+            let declared = part.declared_uncompressed_size()?;
+            match selected_stream_limits(declared) {
+                Some(limits) => {
+                    let capabilities = Capabilities::default();
+                    Some(
+                        part.with_verified_decoded_reader(|reader| {
+                            raw::selected_worksheet::scan(reader, &capabilities, &limits, address)
+                        })
+                        .map_err(map_verified_reader_error)?,
+                    )
+                },
+                None => None,
+            }
+        };
+        let Some(outcome) = outcome else {
+            return self.eager_cell(address);
+        };
+        match outcome {
+            raw::selected_worksheet::ScanOutcome::Eligible(selected) => match selected.cell {
+                Some(cell) => Ok(SourceCellView::Stored(cell)),
+                None => Ok(SourceCellView::Missing),
+            },
+            raw::selected_worksheet::ScanOutcome::NotEligible(_) => self.eager_cell(address),
+        }
     }
 
     /// Read every stored cell selected by a checked range into owning values.
@@ -756,6 +801,62 @@ impl SourceWorksheet {
         self.data.cells.get().ok_or_else(|| {
             invalid("source-backed worksheet cache initialization did not publish a value")
         })
+    }
+}
+
+fn selected_stream_limits(declared: u64) -> Option<StreamLimits> {
+    if declared == 0 || declared > MCE_HARD_MAX_BYTES {
+        return None;
+    }
+    let declared = usize::try_from(declared).ok()?;
+    let mut limits = StreamLimits::default();
+    limits.processing.max_input_bytes = declared;
+    limits.processing.max_output_bytes = declared;
+    Some(limits)
+}
+
+fn map_verified_reader_error(
+    error: VerifiedDecodedReaderError<StreamError<Error, Error>>,
+) -> Error {
+    match error {
+        VerifiedDecodedReaderError::Opc { error, .. } => Error::Package(error),
+        VerifiedDecodedReaderError::Callback(error) => map_selected_stream_error(error),
+        _ => invalid("unknown verified OPC decoded reader error"),
+    }
+}
+
+fn map_selected_stream_error(error: StreamError<Error, Error>) -> Error {
+    match error {
+        StreamError::Input {
+            raw_error: Some(raw_error),
+            ..
+        }
+        | StreamError::Mce {
+            raw_error: Some(raw_error),
+            ..
+        }
+        | StreamError::Callback {
+            raw_error: Some(raw_error),
+            ..
+        } => raw_error,
+        StreamError::Input { error, .. } => Error::Package(litchi_opc::OpcError::IoError(error)),
+        StreamError::Mce { error, .. } => map_selected_mce_error(error),
+        StreamError::Callback {
+            raw_error: None,
+            active_error: Some(active_error),
+        } => active_error,
+        StreamError::Callback {
+            raw_error: None,
+            active_error: None,
+        } => invalid("MCE stream callback failure without an observer error"),
+        _ => invalid("unknown MCE stream error"),
+    }
+}
+
+fn map_selected_mce_error(error: MceError) -> Error {
+    match error {
+        MceError::Xml(message) => invalid(format!("invalid worksheet extension XML: {message}")),
+        error => Error::MarkupCompatibility(error),
     }
 }
 
@@ -1284,6 +1385,7 @@ mod tests {
         .unwrap();
 
         let first = workbook.sheet("First").unwrap().unwrap();
+        assert!(first.stored_extent().unwrap().is_some());
         assert!(matches!(
             first.cell("A1").unwrap(),
             SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
@@ -1413,6 +1515,7 @@ mod tests {
         assert_eq!(source.second_body_marker_reads.load(Ordering::SeqCst), 0);
 
         let first = workbook.sheet("First").unwrap().unwrap();
+        assert!(first.stored_extent().unwrap().is_some());
         assert!(matches!(
             first.cell("A1").unwrap(),
             SourceCellView::Stored(Cell::Value(Value::Number(ref value))) if value.as_str() == "7"
@@ -1451,7 +1554,7 @@ mod tests {
         assert_eq!(workbook.cache_diagnostics().successful_loads, 1);
         assert_eq!(budget.used(Resource::Memory), workbook_bytes);
         let first = workbook.sheet("First").unwrap().unwrap();
-        let result = first.cell("A1");
+        let result = first.stored_extent();
         assert!(matches!(
             result,
             Err(Error::Package(OpcError::Execution(
@@ -1542,5 +1645,229 @@ mod tests {
         drop(first);
         drop(workbook);
         assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    mod streaming_0363_tests {
+        use std::io::Cursor;
+        use std::sync::Arc;
+        use std::sync::atomic::Ordering;
+
+        use litchi_opc::OpcError;
+        use litchi_opc::constants::content_type as ct;
+        use soapberry_zip::office::StreamingArchiveWriter;
+
+        use super::{
+            CountingSource, ReadLimits, SourceBackedWorkbook, SourceCellView, managed_context,
+            source_backed_xlsx,
+        };
+        use crate::{Cell, Error, Value};
+
+        const SPREADSHEETML_NAMESPACE: &str =
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+        fn one_sheet_xlsx(worksheet: &str) -> Vec<u8> {
+            let mut writer = StreamingArchiveWriter::new();
+            writer
+                .write_stored(
+                    "[Content_Types].xml",
+                    format!(
+                        r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="{}"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="{}"/></Types>"#,
+                        ct::SML_SHEET_MAIN,
+                        ct::SML_WORKSHEET,
+                    )
+                    .as_bytes(),
+                )
+                .unwrap();
+            writer
+                .write_stored(
+                    "_rels/.rels",
+                    br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#,
+                )
+                .unwrap();
+            writer
+                .write_stored(
+                    "xl/workbook.xml",
+                    br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>"#,
+                )
+                .unwrap();
+            writer
+                .write_stored(
+                    "xl/_rels/workbook.xml.rels",
+                    br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#,
+                )
+                .unwrap();
+            writer
+                .write_stored("xl/worksheets/sheet1.xml", worksheet.as_bytes())
+                .unwrap();
+            writer.finish_to_bytes().unwrap()
+        }
+
+        #[test]
+        fn eligible_scalar_cell_queries_0363_preserve_sparse_states_without_store() {
+            let bytes = one_sheet_xlsx(&format!(
+                r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1"/></row></sheetData></worksheet>"#,
+            ));
+            let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let cold = workbook.cache_diagnostics();
+
+            assert!(sheet.data.cells.get().is_none());
+            assert!(matches!(
+                sheet.cell("A1").unwrap(),
+                SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
+                    if value.as_str() == "7"
+            ));
+            assert!(sheet.data.cells.get().is_none());
+            assert!(matches!(sheet.cell("C1").unwrap(), SourceCellView::Missing));
+            assert!(sheet.data.cells.get().is_none());
+            assert!(matches!(
+                sheet.cell("B1").unwrap(),
+                SourceCellView::Stored(Cell::Empty)
+            ));
+            assert!(sheet.data.cells.get().is_none());
+
+            let after = workbook.cache_diagnostics();
+            assert_eq!(after.successful_loads, cold.successful_loads);
+            assert_eq!(after.retained_bytes, cold.retained_bytes);
+        }
+
+        #[test]
+        fn eligible_scalar_cell_queries_0363_rescan_without_cache() {
+            let source = Arc::new(CountingSource::new(source_backed_xlsx()));
+            let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+            let sheet = workbook.sheet("First").unwrap().unwrap();
+            let cold = workbook.cache_diagnostics();
+
+            assert!(sheet.data.cells.get().is_none());
+            assert!(matches!(
+                sheet.cell("A1").unwrap(),
+                SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
+                    if value.as_str() == "7"
+            ));
+            let first_reads = source.first_body_marker_reads.load(Ordering::SeqCst);
+            assert!(first_reads > 0);
+            assert!(sheet.data.cells.get().is_none());
+            assert_eq!(
+                workbook.cache_diagnostics().successful_loads,
+                cold.successful_loads
+            );
+
+            assert!(matches!(
+                sheet.cell("A1").unwrap(),
+                SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
+                    if value.as_str() == "7"
+            ));
+            assert!(source.first_body_marker_reads.load(Ordering::SeqCst) > first_reads);
+            assert!(sheet.data.cells.get().is_none());
+            assert_eq!(
+                workbook.cache_diagnostics().successful_loads,
+                cold.successful_loads
+            );
+        }
+
+        #[test]
+        fn merge_not_eligible_0363_falls_back_and_initializes_store() {
+            let bytes = one_sheet_xlsx(&format!(
+                r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells></worksheet>"#,
+            ));
+            let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let cold = workbook.cache_diagnostics();
+            assert!(sheet.data.cells.get().is_none());
+
+            assert!(matches!(
+                sheet.cell("B1").unwrap(),
+                SourceCellView::Covered(range) if range.a1() == "A1:B1"
+            ));
+            assert!(sheet.data.cells.get().is_some());
+            assert!(matches!(
+                sheet.cell("A1").unwrap(),
+                SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
+                    if value.as_str() == "7"
+            ));
+            assert!(workbook.cache_diagnostics().successful_loads > cold.successful_loads);
+        }
+
+        #[test]
+        fn malformed_tail_0363_does_not_publish_store() {
+            let bytes = one_sheet_xlsx(&format!(
+                r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><sheetData><row r="1"><c r="A1"><v>7</v></c>"#,
+            ));
+            let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let cold = workbook.cache_diagnostics();
+
+            assert!(sheet.cell("A1").is_err());
+            assert!(sheet.data.cells.get().is_none());
+            assert_eq!(
+                workbook.cache_diagnostics().successful_loads,
+                cold.successful_loads
+            );
+        }
+
+        #[test]
+        fn crc_failure_0363_does_not_publish_store() {
+            let mut bytes = source_backed_xlsx();
+            let value = b"<v>7</v>";
+            let offset = bytes
+                .windows(value.len())
+                .position(|window| window == value)
+                .expect("first worksheet value is present");
+            bytes[offset + 3] = b'8';
+            let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
+            let sheet = workbook.sheet("First").unwrap().unwrap();
+            let cold = workbook.cache_diagnostics();
+
+            assert!(sheet.cell("A1").is_err());
+            assert!(sheet.data.cells.get().is_none());
+            assert_eq!(
+                workbook.cache_diagnostics().successful_loads,
+                cold.successful_loads
+            );
+        }
+
+        #[test]
+        fn source_change_0363_does_not_publish_store() {
+            let source = Arc::new(CountingSource::new(source_backed_xlsx()));
+            let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+            let sheet = workbook.sheet("First").unwrap().unwrap();
+            let cold = workbook.cache_diagnostics();
+            source.changed();
+
+            assert!(matches!(
+                sheet.cell("A1"),
+                Err(Error::Package(OpcError::SourceChanged { .. }))
+            ));
+            assert!(sheet.data.cells.get().is_none());
+            assert_eq!(
+                workbook.cache_diagnostics().successful_loads,
+                cold.successful_loads
+            );
+        }
+
+        #[test]
+        fn cancellation_0363_does_not_publish_store() {
+            let source = Arc::new(CountingSource::new(source_backed_xlsx()));
+            let (_budget, cancellation_source, context) = managed_context(u64::MAX);
+            let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+                source,
+                ReadLimits::default(),
+                context,
+            )
+            .unwrap();
+            let sheet = workbook.sheet("First").unwrap().unwrap();
+            let cold = workbook.cache_diagnostics();
+            cancellation_source.cancel();
+
+            assert!(matches!(
+                sheet.cell("A1"),
+                Err(Error::Package(OpcError::Cancelled))
+            ));
+            assert!(sheet.data.cells.get().is_none());
+            assert_eq!(
+                workbook.cache_diagnostics().successful_loads,
+                cold.successful_loads
+            );
+        }
     }
 }

@@ -1,5 +1,27 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Latest XLSX source-worksheet selected-cell routing (change 0363)
+
+Change 0363 routes cold `SourceWorksheet::cell` through
+`PartView::with_verified_decoded_reader` and the raw selected-worksheet
+scanner for eligible simple scalar worksheets. Eligible cold queries do not
+publish full worksheet `PartData`, `Store`, or cache state; repeated cold
+queries rescan, while warm `Store` queries retain their existing fast path.
+Every `NotEligible` result falls back to the eager store only after the
+verified reader returns and CRC/size/source/context checks complete. Merges,
+shared strings, styles, shared formulas, and rich inline values preserve
+semantics through that fallback. Source/cancellation/ZIP errors remain
+primary, and final outer fences run before a value. Zero, unrepresentable, and
+greater-than-2-GiB declared parts bypass the scanner and retain existing eager
+behavior. Public signatures, `cells`, `visit`, and `stored_extent` are
+unchanged.
+
+Focused/source/library evidence is `7/7`, `16/16`, and `828/828`; scoped Clippy
+passed apart from the known unrelated pre-existing `hyperlinks` `useless_asref`
+issue. Single-job capped validation observed no OOM as a protocol fact only.
+No latency, RSS, fixed-memory, OOM-safety, or dependency-streaming claim
+follows; `performance_claim: none`. See [Change 0363](changes/0363-xlsx-source-worksheet-selected-cell-scan.md).
+
 ## Latest XLSX selected-worksheet raw scan (change 0362)
 
 Change 0362 adds the public narrow raw path

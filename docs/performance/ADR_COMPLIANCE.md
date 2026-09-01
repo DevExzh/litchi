@@ -1,5 +1,31 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0363 compliance update
+
+Change 0363 keeps selected-cell routing in the owning XLSX semantic path and
+uses the existing OPC `PartView::with_verified_decoded_reader` boundary plus
+the raw selected-worksheet scanner. Eligible cold `SourceWorksheet::cell`
+queries do not publish full worksheet `PartData`, `Store`, or cache state and
+rescan on later cold queries; warm `Store` queries retain the existing fast
+path. No public signature, `cells`, `visit`, or `stored_extent` contract
+changes, and no dependency streaming is added.
+
+Every `NotEligible` result enters the eager store only after verified-reader
+return and CRC/size/source/context checks complete. Merges, shared strings,
+styles, shared formulas, and rich inline values therefore retain eager-parser
+semantics. Source/cancellation/ZIP errors remain primary, and final outer
+fences run before a value is returned. Zero, unrepresentable, and
+greater-than-2-GiB declared parts bypass the scanner and retain existing eager
+behavior, avoiding a new lower part-size limit. This preserves the existing
+typed error, freshness, and lossless-fallback boundaries without exposing a
+reader, cache, or physical package handle through ordinary CRUD APIs.
+
+Validation passed focused `7/7`, source `16/16`, and library `828/828` gates;
+scoped Clippy passed apart from the known unrelated pre-existing `hyperlinks`
+`useless_asref` issue. The single-job capped validation protocol observed no
+OOM; that is protocol evidence only. No latency, RSS, fixed-memory, or
+OOM-safety claim follows; `performance_claim: none`. See [Change 0363](changes/0363-xlsx-source-worksheet-selected-cell-scan.md).
+
 ## XLSB source-ingress hard-probe boundary (change 0354)
 
 Change 0354 keeps XLSB semantics in `litchi-xlsb`, source/path admission in
