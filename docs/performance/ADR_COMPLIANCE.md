@@ -547,3 +547,27 @@ x14ac focused `12/12`, worksheet `35/35`, `litchi-ooxml-common` library
 `234/234`, and `litchi-xlsx` library `813/813`. Selected-cell and full-
 worksheet streaming, latency, RSS, and OOM evidence remain open. See [Change 0361](changes/0361-bounded-streaming-x14ac-observers.md);
 `performance_claim: none`.
+
+## Change 0362 compliance update
+
+Change 0362 publishes the narrow selected-worksheet capability in the owning
+`litchi-xlsx::raw` layer through
+`selected_worksheet::{scan, ScanOutcome, SelectedCell, NotEligibleReason,
+StreamResult}`. One pass performs active MCE+x14ac selection through XML EOF
+for an eligible single-cell subset, distinguishes `Missing` from explicit
+`Empty`, validates strict row/cell order and scalar lexical forms, and lets
+x14ac `ValidateOnly` parse descent without a row `BTreeMap`.
+
+Unsupported merges, styles, shared strings, shared or array formulas, rich
+inline values, and unknown valid structures become typed `NotEligible` only
+after XML/MCE/raw EOF. The result is not worksheet semantic validity, so the
+caller MUST fall back to the eager parser. This keeps unsupported content and
+invalid input on typed boundaries without leaking a package reader, source
+owner, or low-level verification handle into the ordinary semantic API.
+
+Focused validation passed `8/8`, worksheet module `43/43`, and
+`litchi-xlsx` library `821/821`. quick-XML, observer, and conversion
+allocations are outside the accounting boundary; no source-worksheet routing,
+OPC verified reader, CRC/size/source fence, full-worksheet streaming,
+latency, RSS, or OOM claim follows. See [Change 0362](changes/0362-xlsx-selected-worksheet-scan.md);
+`performance_claim: none`.

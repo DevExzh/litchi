@@ -1,5 +1,26 @@
 # Performance program phase report
 
+## XLSX selected-worksheet raw scan boundary (change 0362)
+
+Change 0362 adds the public narrow raw path
+`litchi_xlsx::raw::selected_worksheet::{scan, ScanOutcome, SelectedCell,
+NotEligibleReason, StreamResult}`. For an eligible single-cell subset, one
+pass performs active MCE+x14ac selection through XML EOF, distinguishes
+`Missing` from explicit `Empty`, validates strict row/cell order and scalar
+lexical forms, and lets x14ac `ValidateOnly` parse descent without a row
+`BTreeMap`.
+
+Merges, styles, shared strings, shared or array formulas, rich inline values,
+and unknown valid structures yield typed `NotEligible` only after XML/MCE/raw
+EOF. The caller MUST fall back to the eager parser because `NotEligible` is
+not worksheet semantic validity. Focused validation is `8/8`, worksheet module
+validation is `43/43`, and the `litchi-xlsx` library is `821/821`. This is
+correctness evidence only (`performance_claim: none`): quick-XML, observer,
+and conversion allocations are excluded, and no latency, RSS, or OOM claim is
+made. Source-worksheet routing, the OPC verified reader, CRC/size/source
+fences, and full-worksheet streaming remain outside this change. See [Change
+0362](changes/0362-xlsx-selected-worksheet-scan.md).
+
 ## XLSB source-ingress hard-probe boundary (change 0354)
 
 Change 0354 closes a private XLSB source-ingress admission boundary. Non-ZIP,

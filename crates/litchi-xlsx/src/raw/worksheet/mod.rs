@@ -7,6 +7,7 @@
 mod codec;
 pub(crate) mod edit;
 mod model;
+pub(crate) mod selected;
 mod semantic;
 mod validation;
 mod x14ac;

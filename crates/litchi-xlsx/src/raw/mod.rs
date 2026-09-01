@@ -19,6 +19,17 @@ pub mod web;
 pub(crate) mod worksheet;
 pub(crate) mod worksheet_property;
 
+/// Bounded source selection of one worksheet coordinate.
+///
+/// This surface is an internal format-owner API. `NotEligible` is a
+/// capability result, not full worksheet validation; callers must fall back
+/// to the materialized worksheet parser whenever it is returned.
+pub mod selected_worksheet {
+    pub use super::worksheet::selected::{
+        NotEligibleReason, ScanOutcome, SelectedCell, StreamResult, scan,
+    };
+}
+
 pub use catalog::{parse_catalog, parse_sheet};
 
 /// Parse only the direct worksheet-grid defaults from one `WorksheetPart`.

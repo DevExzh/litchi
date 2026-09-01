@@ -1,5 +1,25 @@
 # Performance hotspot inventory
 
+## XLSX selected-worksheet raw scan boundary (change 0362)
+
+Change 0362 is a correctness-only raw capability, not a measured hotspot
+(`performance_claim: none`). The public
+`litchi_xlsx::raw::selected_worksheet::{scan, ScanOutcome, SelectedCell,
+NotEligibleReason, StreamResult}` path performs one-pass MCE+x14ac active
+selection through XML EOF for an eligible single-cell subset. It distinguishes
+`Missing` from explicit `Empty`, validates strict row/cell order and scalar
+lexical forms, and lets x14ac `ValidateOnly` parse descent without retaining a
+row `BTreeMap`.
+
+Merges, styles, shared strings, shared or array formulas, rich inline values,
+and unknown valid structures return typed `NotEligible` only after XML/MCE/raw
+EOF. Callers MUST fall back to the eager parser because `NotEligible` is not
+worksheet semantic validity. Focused, worksheet-module, and library evidence
+is `8/8`, `43/43`, and `821/821`. quick-XML, observer, and conversion
+allocations are outside the accounting boundary. No latency, RSS, OOM,
+source-worksheet, OPC verified-reader, CRC/size/source-fence, or
+full-worksheet-streaming claim follows.
+
 ## XLSB source-ingress hard-probe boundary (change 0354)
 
 Change 0354 is correctness/admission closure, not a measured hotspot

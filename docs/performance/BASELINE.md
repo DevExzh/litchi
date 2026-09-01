@@ -1,5 +1,26 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Latest XLSX selected-worksheet raw scan (change 0362)
+
+Change 0362 adds the public narrow raw path
+`litchi_xlsx::raw::selected_worksheet::{scan, ScanOutcome, SelectedCell,
+NotEligibleReason, StreamResult}`. It performs one-pass MCE+x14ac active
+selection through XML EOF for an eligible single-cell subset, distinguishes
+`Missing` from explicit `Empty`, validates strict row/cell order and scalar
+lexical forms, and lets x14ac `ValidateOnly` parse descent without a row
+`BTreeMap`. Merges, styles, shared strings, shared or array formulas, rich
+inline values, and unknown valid structures produce typed `NotEligible` only
+after XML/MCE/raw EOF; callers MUST fall back to the eager parser because
+`NotEligible` is not worksheet semantic validity.
+
+Focused validation passed `8/8`, worksheet module `43/43`, and
+`litchi-xlsx` library `821/821`. No source-worksheet routing, OPC verified
+reader, CRC/size/source fence, or full-worksheet streaming was added.
+quick-XML, observer, and conversion allocations remain outside the accounting
+boundary. This is correctness evidence only: no latency, RSS, OOM, or
+performance claim changes the baseline. See [Change 0362](changes/0362-xlsx-selected-worksheet-scan.md);
+`performance_claim: none`.
+
 ## Latest DOCX source-path ingress and OPC error result (change 0356)
 
 Change 0356 makes Unix and Windows `Document` path ingress single-source:

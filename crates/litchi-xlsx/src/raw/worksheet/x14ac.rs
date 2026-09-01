@@ -59,6 +59,16 @@ enum Context {
     Other,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum RowMode {
+    /// Retain each validated row descent in the legacy map.
+    Retain,
+    /// Validate row numbers and descent values without retaining row values.
+    ValidateOnly,
+    /// Preserve the focused-defaults behavior and do not inspect row values.
+    Ignore,
+}
+
 pub(crate) fn capture(content: &[u8]) -> Result<Values> {
     if has_markup_compatibility(content)
         && has_descent_attribute(content)
@@ -96,13 +106,50 @@ pub(crate) fn capture_defaults(content: &[u8]) -> Result<Option<Descent>> {
 /// hidden compatibility branches.  The active observer receives only the
 /// selected semantic stream and consumes a raw candidate only for its matching
 /// element event.  No event or source buffer escapes either callback.
+#[expect(
+    clippy::result_large_err,
+    reason = "The stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
+)]
 pub(crate) fn capture_stream(
     input: &mut dyn BufRead,
     capabilities: &Capabilities,
     limits: &StreamLimits,
     capture_rows: bool,
 ) -> StreamResult<Values> {
-    let state = RefCell::new(StreamObserverState::new(capture_rows));
+    let row_mode = if capture_rows {
+        RowMode::Retain
+    } else {
+        RowMode::Ignore
+    };
+    capture_stream_with_active(input, capabilities, limits, row_mode, |_event| {
+        Ok::<(), crate::Error>(())
+    })
+}
+
+/// Capture x14ac values while composing one active semantic observer.
+///
+/// The raw observer still runs before MCE selection, and the x14ac active
+/// observer still consumes the selected stream before `active` does. This is
+/// the internal join point for bounded source readers; both observers share
+/// the committed MCE stream and no rewritten XML buffer is materialized.
+/// `ValidateOnly` validates row lexical values without retaining the legacy
+/// row map. This helper makes no fixed-memory or OOM-safety claim: quick-xml,
+/// MCE, and observer allocations remain outside the input-buffer bound.
+#[expect(
+    clippy::result_large_err,
+    reason = "The stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
+)]
+pub(super) fn capture_stream_with_active<Active>(
+    input: &mut dyn BufRead,
+    capabilities: &Capabilities,
+    limits: &StreamLimits,
+    row_mode: RowMode,
+    mut active: Active,
+) -> StreamResult<Values>
+where
+    Active: for<'a> FnMut(&SemanticEvent<'a>) -> Result<()>,
+{
+    let state = RefCell::new(StreamObserverState::new(row_mode));
     let result = process_markup_compatibility_stream_with_observers(
         input,
         capabilities,
@@ -114,10 +161,13 @@ pub(crate) fn capture_stream(
             state.raw(element)
         },
         |event| {
-            let mut state = state
-                .try_borrow_mut()
-                .map_err(|_| invalid("worksheet extension observers were re-entered"))?;
-            state.active(event)
+            {
+                let mut state = state
+                    .try_borrow_mut()
+                    .map_err(|_| invalid("worksheet extension observers were re-entered"))?;
+                state.active(&event)?;
+            }
+            active(&event)
         },
     );
     match result {
@@ -127,6 +177,10 @@ pub(crate) fn capture_stream(
 }
 
 /// Capture only the selected worksheet default from a callback-scoped stream.
+#[expect(
+    clippy::result_large_err,
+    reason = "The stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
+)]
 pub(crate) fn capture_stream_defaults(
     input: &mut dyn BufRead,
     capabilities: &Capabilities,
@@ -215,7 +269,7 @@ struct PendingCandidate {
 
 #[derive(Debug)]
 struct StreamObserverState {
-    capture_rows: bool,
+    row_mode: RowMode,
     stack: Vec<Context>,
     values: Values,
     previous_row: u32,
@@ -224,9 +278,9 @@ struct StreamObserverState {
 }
 
 impl StreamObserverState {
-    fn new(capture_rows: bool) -> Self {
+    fn new(row_mode: RowMode) -> Self {
         Self {
-            capture_rows,
+            row_mode,
             stack: Vec::new(),
             values: Values::default(),
             previous_row: 0,
@@ -287,7 +341,7 @@ impl StreamObserverState {
         Ok(())
     }
 
-    fn active(&mut self, event: SemanticEvent<'_>) -> Result<()> {
+    fn active(&mut self, event: &SemanticEvent<'_>) -> Result<()> {
         match event {
             SemanticEvent::Start(element) => self.selected_start(element, RawElementKind::Start),
             SemanticEvent::Empty(element) => self.selected_start(element, RawElementKind::Empty),
@@ -319,18 +373,22 @@ impl StreamObserverState {
         }
     }
 
-    fn selected_start(&mut self, element: SemanticElement<'_>, kind: RawElementKind) -> Result<()> {
+    fn selected_start(
+        &mut self,
+        element: &SemanticElement<'_>,
+        kind: RawElementKind,
+    ) -> Result<()> {
         if kind == RawElementKind::Start && self.stack.len() >= MAX_XML_DEPTH {
             return Err(invalid(format!(
                 "worksheet extension XML exceeds {MAX_XML_DEPTH} levels"
             )));
         }
-        let candidate = self.take_candidate(kind, &element);
+        let candidate = self.take_candidate(kind, element);
         let parent = self.stack.last().copied();
-        let context = if parent.is_none() && is_spreadsheetml_element(&element, "worksheet") {
+        let context = if parent.is_none() && is_spreadsheetml_element(element, "worksheet") {
             Context::Worksheet
         } else if parent == Some(Context::Worksheet)
-            && is_spreadsheetml_element(&element, "sheetFormatPr")
+            && is_spreadsheetml_element(element, "sheetFormatPr")
         {
             if let Some(candidate) = candidate {
                 let value = parse_descent_lexical(&candidate.decoded_value)?;
@@ -340,12 +398,12 @@ impl StreamObserverState {
             }
             Context::Other
         } else if parent == Some(Context::Worksheet)
-            && is_spreadsheetml_element(&element, "sheetData")
+            && is_spreadsheetml_element(element, "sheetData")
         {
             Context::SheetData
-        } else if parent == Some(Context::SheetData) && is_spreadsheetml_element(&element, "row") {
-            if self.capture_rows {
-                let number = match unqualified_semantic_attribute(&element, "r") {
+        } else if parent == Some(Context::SheetData) && is_spreadsheetml_element(element, "row") {
+            if !matches!(self.row_mode, RowMode::Ignore) {
+                let number = match unqualified_semantic_attribute(element, "r") {
                     Some(value) => parse_one_based_row(value)?,
                     None => self
                         .previous_row
@@ -358,7 +416,9 @@ impl StreamObserverState {
                 self.previous_row = number;
                 if let Some(candidate) = candidate {
                     let value = parse_descent_lexical(&candidate.decoded_value)?;
-                    if self.values.rows.insert(number, value).is_some() {
+                    if matches!(self.row_mode, RowMode::Retain)
+                        && self.values.rows.insert(number, value).is_some()
+                    {
                         return Err(invalid(format!(
                             "duplicate worksheet row {number} dyDescent"
                         )));
