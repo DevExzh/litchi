@@ -1413,6 +1413,7 @@ fn number_format_from_native(native: &FormatStructArchive) -> Result<Number> {
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
     use crate::numbers::cell::CellValue;

@@ -53,6 +53,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/numbers_table_cell_storage_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_pop_up_menu_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_control_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_table_cell_number_format_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec.rs");
     // Keep the native Numbers and Pages message-ID routes tied to their schema
     // projections when this crate is built from the workspace. Published
@@ -1205,8 +1206,8 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
         ),
         (
             "TSTTableCellPopUpMenuArchive.proto",
-            1052,
-            "343dba7ba59458e2b06c34d5da2b71cf868c349bb738e05c1e85cdee7c87bea0",
+            1499,
+            "1f12a6fecff8262e107e613489a3a33c800f54a0a12618ed76279b768f6eb4c9",
         ),
         (
             "TSTTableHeaderSettingsArchive.proto",
@@ -1564,6 +1565,7 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
         "src/pages_footnote_graph_codec.rs",
         "src/table_appearance_codec.rs",
         "src/numbers_table_cell_control_codec.rs",
+        "src/numbers_table_cell_number_format_codec.rs",
     ];
 
     let mut expected_paths = CODECS
@@ -4013,7 +4015,7 @@ fn enforce_numbers_table_cell_pop_up_menu_projection_provenance(
         "mod buffa_numbers_table_cell_pop_up_menu_generated {",
         "/buffa-numbers-table-cell-pop-up-menu/iwa_numbers_table_cell_pop_up_menu_buffa_protos.rs",
     ];
-    const PROJECTION_MARKERS: [&str; 12] = [
+    const PROJECTION_MARKERS: [&str; 17] = [
         "message CellValueArchive {",
         "required int32 cell_value_type = 1;",
         "optional bytes string_value = 5;",
@@ -4025,10 +4027,16 @@ fn enforce_numbers_table_cell_pop_up_menu_projection_provenance(
         "optional bytes chooser_control_popup_model = 6;",
         "optional bool chooser_control_start_w_first = 7;",
         "optional bool category_summary_should_display_label = 8;",
+        "message FormatStructArchive {",
+        "optional uint32 format_type = 1;",
+        "optional uint32 decimal_places = 2;",
+        "optional uint32 negative_style = 4;",
+        "optional bool show_thousands_separator = 5;",
         "syntax = \"proto2\";",
     ];
     let tst = fs::read_to_string(proto_directory.join("TSTArchives.proto"))?;
     let tsce = fs::read_to_string(proto_directory.join("TSCEArchives.proto"))?;
+    let tsk = fs::read_to_string(proto_directory.join("TSKArchives.proto"))?;
     let projection =
         fs::read_to_string(projection_directory.join("TSTTableCellPopUpMenuArchive.proto"))?;
     let codec = fs::read_to_string("src/numbers_table_cell_pop_up_menu_codec.rs")?;
@@ -4055,6 +4063,14 @@ fn enforce_numbers_table_cell_pop_up_menu_projection_provenance(
         || !PROJECTION_MARKERS
             .iter()
             .all(|marker| projection.matches(marker).count() == 1)
+        || [
+            "optional uint32 format_type = 1;",
+            "optional uint32 decimal_places = 2;",
+            "optional uint32 negative_style = 4;",
+            "optional bool show_thousands_separator = 5;",
+        ]
+        .iter()
+        .any(|field| tsk.matches(field).count() != 1)
         || projection.len() > 2 * 1024
         || projection.contains("repeated ")
         || !ROUTER_MARKERS
@@ -4115,7 +4131,7 @@ fn enforce_numbers_table_cell_pop_up_menu_projection_budget(
 fn enforce_numbers_table_cell_control_codec_provenance(
     proto_directory: &Path,
 ) -> Result<(), Box<dyn Error>> {
-    const CODEC_MARKERS: [&str; 19] = [
+    const CODEC_MARKERS: [&str; 29] = [
         "pub const STEPPER_INTERACTION_TYPE: u32 = 4;",
         "pub const SLIDER_INTERACTION_TYPE: u32 = 5;",
         "pub const STAR_RATING_INTERACTION_TYPE: u32 = 6;",
@@ -4135,8 +4151,18 @@ fn enforce_numbers_table_cell_control_codec_provenance(
         "fn emit_fixed64_field(",
         "pub struct RewriteExecutionRequirements",
         "pub struct RewriteExecutionLimits",
+        "pub const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;",
+        "pub const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;",
+        "pub struct NumberFormatSnapshot<'source>",
+        "pub struct NumberFormatWrite",
+        "pub fn decode_number_format_with_report(",
+        "pub fn prepare_number_format_rewrite<'source>(",
+        "pub struct PreparedNumberFormatRewrite<'source>",
+        "pub fn prepare_number_format_write(",
+        "pub fn canonical_number_format(",
+        "pub struct PreparedNumberFormatWrite",
     ];
-    const NEUTRAL_MARKERS: [&str; 10] = [
+    const NEUTRAL_MARKERS: [&str; 14] = [
         "pub use crate::numbers_table_cell_pop_up_menu_codec::{\n    CHECKBOX_INTERACTION_TYPE",
         "PreparedControlCellSpecWrite as PreparedCellSpecWrite",
         "PreparedControlFormatWrite as PreparedFormatWrite",
@@ -4147,6 +4173,10 @@ fn enforce_numbers_table_cell_control_codec_provenance(
         "prepare_control_format_write_fields as prepare_format_write_fields",
         "canonical_control_format_fields as canonical_format_fields",
         "rewrite_control_format_fields as rewrite_format_fields",
+        "NumberFormatSnapshot, NumberFormatWrite, PreparedNumberFormatRewrite,",
+        "PreparedNumberFormatWrite, canonical_number_format, decode_number_format,",
+        "decode_number_format_with_report, prepare_number_format_append, prepare_number_format_rewrite,",
+        "prepare_number_format_write, rewrite_number_format, rewrite_table_cell_number_format,",
     ];
     let tst = fs::read_to_string(proto_directory.join("TSTArchives.proto"))?;
     let tsk = fs::read_to_string(proto_directory.join("TSKArchives.proto"))?;

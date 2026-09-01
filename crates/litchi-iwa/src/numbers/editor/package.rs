@@ -870,32 +870,13 @@ pub(crate) fn reset_table_cell_text_style_in_package(
     cell_paragraph_style::reset_text_style(package, table_id, row, column)
 }
 
-pub(crate) fn table_cell_number_format_in_package(
-    package: &IWorkPackage,
-    table_id: u64,
-    row: usize,
-    column: usize,
-) -> Result<Option<Number>> {
-    cell_data_format::cell_number_format(package, table_id, row, column)
-}
-
-pub(crate) fn set_table_cell_number_format_in_package(
-    package: &mut IWorkPackage,
-    table_id: u64,
-    row: usize,
-    column: usize,
-    format: Number,
-) -> Result<()> {
-    cell_data_format::set_cell_number_format(package, table_id, row, column, format)
-}
-
 pub(crate) fn common_table_cell_number_format_in_package(
     package: &IWorkPackage,
     table_id: u64,
     row: usize,
     column: usize,
 ) -> Result<Option<Number>> {
-    table_cell_number_format_in_package(package, table_id, row, column)
+    cell_data_format::cell_number_format(package, table_id, row, column)
 }
 
 pub(crate) fn set_common_table_cell_number_format_in_package(
@@ -905,7 +886,7 @@ pub(crate) fn set_common_table_cell_number_format_in_package(
     column: usize,
     format: Number,
 ) -> Result<()> {
-    set_table_cell_number_format_in_package(package, table_id, row, column, format)
+    cell_data_format::set_cell_number_format(package, table_id, row, column, format)
 }
 
 pub(crate) fn reset_table_cell_number_format_in_package(

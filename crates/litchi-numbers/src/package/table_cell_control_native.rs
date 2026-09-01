@@ -5,9 +5,13 @@
 //! scalar-control graph surgery will be added here as the source-preserving
 //! list transition is shared with the audited Pop-Up Menu engine.
 
-use litchi_iwa_core::{Archive, ArchiveObject, SnappyStream};
+use litchi_iwa_core::{
+    Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
+    ArchiveReferencePolicy, ArchiveReferenceVisitor, SnappyStream,
+};
 use litchi_iwa_protos::{
     numbers_table_cell_control_codec as control_codec,
+    numbers_table_cell_number_format_codec as number_format_codec,
     numbers_table_cell_pop_up_menu_codec as popup_codec,
     numbers_table_cell_storage_codec as storage_codec,
     package_metadata_codec::RewriteOptions as MetadataRewriteOptions,
@@ -24,11 +28,12 @@ use super::{
 use crate::cell::data_format::CellControl;
 use crate::cell::data_format::{
     control::DisplayFormat,
-    number::{CurrencyStyle, DecimalPlaces, FractionAccuracy, NegativeStyle, ThousandsSeparator},
+    number::{
+        CurrencyStyle, DecimalPlaces, FixedDecimalPlaces, FractionAccuracy, NegativeStyle, Number,
+        ThousandsSeparator,
+    },
     numeral_system::{NegativeStyle as NumeralNegativeStyle, Places},
 };
-
-const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;
 
 /// Marker used by the generic owner to keep native failures content-free.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -136,8 +141,9 @@ pub(super) fn preflight_copy_on_write_scalar_control(
     let messages = archive
         .objects
         .iter()
-        .map(|object| object.messages.len())
-        .sum::<usize>()
+        .fold(0usize, |total, object| {
+            total.saturating_add(object.messages.len())
+        })
         .saturating_add(6);
     budget.charge_payload_messages(messages, path)?;
     budget.charge_payload_items(messages.saturating_add(archive.objects.len()), path)?;
@@ -160,12 +166,15 @@ fn archive_serialized_bound(archive: &Archive) -> usize {
             bound = bound
                 .saturating_add(32)
                 .saturating_add(info.object_references.len().saturating_mul(16));
-            bound = bound.saturating_add(
-                info.field_infos
-                    .iter()
-                    .map(|field| field.object_references.len().saturating_mul(16) + 32)
-                    .sum::<usize>(),
-            );
+            bound = bound.saturating_add(info.field_infos.iter().fold(0usize, |total, field| {
+                total.saturating_add(
+                    field
+                        .object_references
+                        .len()
+                        .saturating_mul(16)
+                        .saturating_add(32),
+                )
+            }));
         }
     }
     bound
@@ -699,6 +708,676 @@ pub(super) fn rewrite_scalar_control(
     })
 }
 
+/// Rewrite the display-format list and BNC metadata for an ordinary Number
+/// cell.  Number formats share the same native `FormatStructArchive` list as
+/// scalar controls, but do not own a `CellSpecArchive`; keeping this focused
+/// route separate prevents a display-only edit from manufacturing an
+/// interactive control graph or touching the control list.
+pub(super) fn rewrite_number_format(
+    source: &Package,
+    target: CellTarget,
+    before: Option<&Number>,
+    after: Option<&Number>,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<NativeControlOutput, Error> {
+    if target.locked {
+        return Err(Error::TableLocked { path });
+    }
+
+    let model_component = source
+        .state
+        .components
+        .catalog()
+        .get_index(target.component_index)
+        .ok_or(Error::InvalidSource { path })?;
+    let model_archive = model_component.archive();
+    let model_object = unique_object(model_archive, target.model_identifier, path)?;
+    let model_index = unique_message_index(model_object, 6_001, path)?;
+    let model_payload = &model_object.messages[model_index].data;
+    let (model, model_report) = storage_codec::decode_table_model_with_report(
+        model_payload,
+        budget.residual_storage_options(model_payload),
+    )
+    .map_err(|error| map_storage_error(error, path))?;
+    charge_storage_report(budget, model_report, path)?;
+    let (store, store_report) = storage_codec::decode_data_store_with_report(
+        model.base_data_store(),
+        budget.residual_storage_options(model.base_data_store()),
+    )
+    .map_err(|error| map_storage_error(error, path))?;
+    charge_storage_report(budget, store_report, path)?;
+    let mut tile_references = TileReferenceCollector::default();
+    let (tile_storage, tile_report) = storage_codec::decode_tile_storage_with_visitor(
+        store.tiles(),
+        budget.residual_storage_options(store.tiles()),
+        &mut tile_references,
+    )
+    .map_err(|error| map_storage_error(error, path))?;
+    charge_storage_report(budget, tile_report, path)?;
+    let tile_size = tile_storage
+        .tile_size()
+        .filter(|size| *size != 0)
+        .ok_or(Error::InvalidSource { path })?;
+    let tile_id = target.position.row() / tile_size;
+    let mut tile_matches = tile_references
+        .tiles
+        .iter()
+        .filter(|(id, _)| *id == tile_id)
+        .map(|(_, reference)| *reference);
+    let tile_identifier = tile_matches.next().ok_or(Error::CellNotFound)?;
+    if tile_matches.next().is_some() || tile_identifier == target.model_identifier {
+        return Err(Error::InvalidSource { path });
+    }
+    popup::validate_selected_model_reference(source, target, tile_identifier, path)?;
+    require_exclusive_selected_model_reference(source, target, tile_identifier, path, budget)?;
+    if tile_references
+        .tiles
+        .iter()
+        .any(|(_, reference)| *reference == 0)
+        || tile_references
+            .tiles
+            .iter()
+            .enumerate()
+            .any(|(index, (id, reference))| {
+                tile_references.tiles[index + 1..]
+                    .iter()
+                    .any(|(other_id, other_reference)| {
+                        id == other_id || reference == other_reference
+                    })
+            })
+    {
+        return Err(Error::InvalidSource { path });
+    }
+    let tile_component_index = resolved_component_index(source, tile_identifier, path)?;
+    let tile_archive = source
+        .state
+        .components
+        .catalog()
+        .get_index(tile_component_index)
+        .ok_or(Error::InvalidSource { path })?
+        .archive();
+    let tile_object = unique_object(tile_archive, tile_identifier, path)?;
+    let tile_message_index = unique_message_index(tile_object, 6_002, path)?;
+    let tile_payload = tile_object.messages[tile_message_index].data.clone();
+    let cell_source = popup_native::tile_cell(
+        &tile_payload,
+        target.position.row(),
+        target.position.column(),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    let cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
+    let old_format = cell.format_identifier();
+    if cell.control_cell_spec_identifier().is_some() {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    match (old_format, cell.cell_format_kind()) {
+        (Some(identifier), Some(litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND))
+            if identifier != 0 => {},
+        (None, None) => {},
+        _ => return Err(Error::UnsupportedDependency { path }),
+    }
+    if old_format.is_some() && cell.secondary_format_identifier().is_some() {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    let explicit_flags = cell.explicit_format_flags();
+    if explicit_flags != 0 && explicit_flags != litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    if old_format.is_none() && explicit_flags != 0 {
+        return Err(Error::InvalidSource { path });
+    }
+
+    let format_table_identifier = store
+        .format_table()
+        .ok_or(Error::InvalidSource { path })?
+        .identifier();
+    // Native Numbers commonly retains a distinct legacy pre-BNC format list
+    // beside the current BNC list. The cell's BNC key is authoritative for
+    // the current list, so preserve the legacy sidecar without conflating the
+    // two ownership domains.
+    if format_table_identifier == target.model_identifier
+        || format_table_identifier == tile_identifier
+    {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    popup::validate_selected_model_reference(source, target, format_table_identifier, path)?;
+    require_exclusive_selected_model_reference(
+        source,
+        target,
+        format_table_identifier,
+        path,
+        budget,
+    )?;
+    let format_component_index = resolved_component_index(source, format_table_identifier, path)?;
+    let format_archive = source
+        .state
+        .components
+        .catalog()
+        .get_index(format_component_index)
+        .ok_or(Error::InvalidSource { path })?
+        .archive();
+    let metadata_facts = validate_metadata_ownership(
+        source,
+        &[
+            target.component_index,
+            tile_component_index,
+            format_component_index,
+        ],
+        budget,
+        path,
+    )?;
+    validate_cross_component_reference(
+        &metadata_facts,
+        target.component_index,
+        tile_component_index,
+        tile_identifier,
+        path,
+    )?;
+    validate_cross_component_reference(
+        &metadata_facts,
+        target.component_index,
+        format_component_index,
+        format_table_identifier,
+        path,
+    )?;
+    metadata_facts
+        .current_uuids_if_registered(&[
+            (target.component_index, target.model_identifier),
+            (tile_component_index, tile_identifier),
+            (format_component_index, format_table_identifier),
+        ])
+        .map_err(|_| Error::UnsupportedDependency { path })?;
+    let format_object = unique_object(format_archive, format_table_identifier, path)?;
+    let format_message = unique_list_message(format_object, 2, budget, path)?;
+    let format_message_index = format_message.message_index;
+    let format_payload = format_message.payload.to_owned();
+    let format_facts = list_facts(&format_payload, budget, path)?;
+    if format_facts
+        .entries
+        .iter()
+        .any(|entry| !entry.is_format || entry.payload.is_empty())
+    {
+        return Err(Error::InvalidSource { path });
+    }
+    validate_number_format_refcounts(
+        source,
+        &tile_references.tiles,
+        format_facts.entries.as_slice(),
+        budget,
+        path,
+    )?;
+
+    if let Some(old_key) = old_format {
+        let entry = format_facts
+            .entries
+            .iter()
+            .find(|entry| entry.key == old_key)
+            .ok_or(Error::InvalidSource { path })?;
+        if entry.ref_count == 0 || !entry.is_format {
+            return Err(Error::InvalidSource { path });
+        }
+        let (snapshot, report) = number_format_codec::decode_number_format_with_report(
+            entry.payload.as_slice(),
+            control_codec_options(entry.payload.len(), budget),
+        )
+        .map_err(|error| map_control_error(error, path))?;
+        charge_control_decode_report(budget, report, path)?;
+        let current = number_from_number_format_snapshot(snapshot, path)?;
+        if explicit_flags == litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT {
+            if before != Some(&current) {
+                return Err(Error::PatchConflict);
+            }
+        } else if before.is_some() {
+            return Err(Error::PatchConflict);
+        }
+    } else if before.is_some() {
+        return Err(Error::PatchConflict);
+    }
+
+    let desired_payload = match after {
+        Some(value) if old_format.is_some() => {
+            let entry = format_facts
+                .entries
+                .iter()
+                .find(|entry| Some(entry.key) == old_format)
+                .ok_or(Error::InvalidSource { path })?;
+            let prepared = number_format_codec::prepare_number_format_rewrite(
+                entry.payload.as_slice(),
+                number_format_write(*value),
+                control_codec_options(entry.payload.len(), budget),
+            )
+            .map_err(|error| map_control_error(error, path))?;
+            let requirements = prepared.execution_requirements();
+            charge_control_requirements(budget, requirements, path)?;
+            let output = prepared
+                .execute(number_format_codec::RewriteExecutionLimits::exact(
+                    requirements,
+                ))
+                .map_err(|error| map_control_error(error, path))?;
+            verify_control_report(output.report(), requirements, path)?;
+            Some(output.into_bytes())
+        },
+        Some(value) => Some(canonical_number_format(
+            *value,
+            format_payload.len(),
+            budget,
+            path,
+        )?),
+        None => None,
+    };
+    let (new_format, new_format_key) = mutate_list(
+        &format_payload,
+        old_format,
+        desired_payload.as_deref(),
+        true,
+        budget,
+        path,
+    )?;
+    let replacement_cell = if let Some(_value) = after {
+        let key = new_format_key.ok_or(Error::InvalidSource { path })?;
+        let mut cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
+        cell.set_data_format_identifier(key, CellDataFormatKind::NumberOrPercentage, None)
+            .map_err(|_| Error::UnsupportedDependency { path })?;
+        cell.encode()
+    } else {
+        let mut cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
+        cell.clear_explicit_format();
+        cell.encode()
+    };
+    let patched_tile = popup_native::patch_tile_cell(
+        &tile_payload,
+        target.position.row(),
+        target.position.column(),
+        &replacement_cell,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    let archive_limits = source
+        .state
+        .options
+        .archive()
+        .effective_archive_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let mut component_indices = vec![tile_component_index, format_component_index];
+    component_indices.sort_unstable();
+    component_indices.dedup();
+    let mut archives = component_indices
+        .iter()
+        .map(|&component_index| {
+            let component = source
+                .state
+                .components
+                .catalog()
+                .get_index(component_index)
+                .ok_or(Error::InvalidSource { path })?;
+            budget.charge_archive(
+                component.archive(),
+                archive_serialized_bound(component.archive()),
+                path,
+            )?;
+            Ok::<_, Error>((component_index, component.archive().clone()))
+        })
+        .collect::<Result<Vec<_>, Error>>()?;
+    popup_native::validate_message_without_object_references(
+        format_archive,
+        format_table_identifier,
+        format_message_index,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    popup_native::replace_message_preserving_header(
+        archive_for_mut(&mut archives, format_component_index, path)?,
+        format_table_identifier,
+        format_message_index,
+        new_format,
+        archive_limits,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    popup_native::replace_message_preserving_header(
+        archive_for_mut(&mut archives, tile_component_index, path)?,
+        tile_identifier,
+        tile_message_index,
+        patched_tile,
+        archive_limits,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+
+    let mut source_serialized_bytes = 0usize;
+    let mut candidate_serialized_bytes = 0usize;
+    for (component_index, candidate) in &archives {
+        let source_archive = source
+            .state
+            .components
+            .catalog()
+            .get_index(*component_index)
+            .ok_or(Error::InvalidSource { path })?
+            .archive();
+        let source_length = source_archive
+            .encoded_len_with_limits(archive_limits)
+            .map_err(|_| Error::InvalidSource { path })?;
+        let candidate_length = candidate
+            .encoded_len_with_limits(archive_limits)
+            .map_err(|_| Error::InvalidSource { path })?;
+        source_serialized_bytes = source_serialized_bytes
+            .checked_add(source_length)
+            .ok_or(Error::InvalidSource { path })?;
+        candidate_serialized_bytes = candidate_serialized_bytes
+            .checked_add(candidate_length)
+            .ok_or(Error::InvalidSource { path })?;
+    }
+    let comparison_bytes = source_serialized_bytes
+        .checked_add(candidate_serialized_bytes)
+        .ok_or(Error::InvalidSource { path })?;
+    let serialization_allocations = archives
+        .len()
+        .checked_mul(2)
+        .and_then(|count| count.checked_add(1))
+        .ok_or(Error::InvalidSource { path })?;
+    budget.charge_allocations(serialization_allocations, path)?;
+    budget.charge_scratch_bytes(comparison_bytes, path)?;
+    budget.charge_retained_bytes(candidate_serialized_bytes, path)?;
+    budget.charge_transaction_work(comparison_bytes, path)?;
+
+    let mut members = Vec::new();
+    members
+        .try_reserve_exact(archives.len())
+        .map_err(|_| Error::Allocation {
+            amount: archives.len(),
+            path,
+        })?;
+    for (component_index, archive) in archives {
+        let changed_identifiers = [
+            (tile_component_index, tile_identifier),
+            (format_component_index, format_table_identifier),
+        ]
+        .iter()
+        .filter_map(|(owner, identifier)| (*owner == component_index).then_some(*identifier))
+        .collect::<Vec<_>>();
+        popup_native::verify_archive_object_locality(
+            source
+                .state
+                .components
+                .catalog()
+                .get_index(component_index)
+                .ok_or(Error::InvalidSource { path })?
+                .archive(),
+            &archive,
+            &changed_identifiers,
+        )
+        .map_err(|_| Error::Verification)?;
+        let expected_archive_bytes = archive
+            .encoded_len_with_limits(archive_limits)
+            .map_err(|_| Error::InvalidSource { path })?;
+        let archive_bytes = archive
+            .to_bytes_with_limits(archive_limits)
+            .map_err(|_| Error::InvalidSource { path })?;
+        if archive_bytes.len() != expected_archive_bytes {
+            return Err(Error::Verification);
+        }
+        budget
+            .charge_payload_bytes(archive_bytes.len(), path)
+            .map_err(|_| Error::LimitExceeded {
+                kind: super::table_cell_pop_up_menu::LimitKind::PayloadBytes,
+                observed: archive_bytes.len() as u64,
+                maximum: u64::MAX,
+                path,
+            })?;
+        let member_name = source
+            .state
+            .components
+            .catalog()
+            .get_index(component_index)
+            .ok_or(Error::InvalidSource { path })?
+            .name()
+            .to_owned();
+        members.push(NativeControlMember {
+            member_name,
+            archive_bytes,
+        });
+    }
+    Ok(NativeControlOutput {
+        members,
+        component_indices,
+        changed_objects: vec![
+            (tile_component_index, tile_identifier),
+            (format_component_index, format_table_identifier),
+        ],
+    })
+}
+
+/// Failure returned by the Number-format reader before the package facade
+/// redacts native details.  A format-family mismatch is intentionally kept
+/// distinct from malformed ownership: callers asking for a Number must not
+/// mistake an explicit currency, percentage, date, or control format for the
+/// automatic state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum NumberFormatReadError {
+    WrongFormatFamily,
+    Native(Error),
+}
+
+impl From<Error> for NumberFormatReadError {
+    fn from(error: Error) -> Self {
+        Self::Native(error)
+    }
+}
+
+pub(super) fn read_number_format(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+) -> Result<Option<Number>, NumberFormatReadError> {
+    let mut budget = TransactionBudget::for_cell_control(source);
+    read_number_format_with_budget(source, target, path, &mut budget)
+}
+
+/// Read one existing cell's explicit decimal Number format while charging a
+/// caller-owned operation ledger.  The selected format entry is checked
+/// against a complete tile-cell reference census before a borrowed strict
+/// format view is converted to the archive-free value.
+pub(super) fn read_number_format_with_budget(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Option<Number>, NumberFormatReadError> {
+    let model_component = source
+        .state
+        .components
+        .catalog()
+        .get_index(target.component_index)
+        .ok_or(Error::InvalidSource { path })?;
+    let model_archive = model_component.archive();
+    let model_object = unique_object(model_archive, target.model_identifier, path)?;
+    let model_index = unique_message_index(model_object, 6_001, path)?;
+    let model_payload = &model_object.messages[model_index].data;
+    let (model, model_report) = storage_codec::decode_table_model_with_report(
+        model_payload,
+        budget.residual_storage_options(model_payload),
+    )
+    .map_err(|error| map_storage_error(error, path))?;
+    charge_storage_report(budget, model_report, path)?;
+    let (store, store_report) = storage_codec::decode_data_store_with_report(
+        model.base_data_store(),
+        budget.residual_storage_options(model.base_data_store()),
+    )
+    .map_err(|error| map_storage_error(error, path))?;
+    charge_storage_report(budget, store_report, path)?;
+    let mut tile_references = TileReferenceCollector::default();
+    let (tile_storage, tile_report) = storage_codec::decode_tile_storage_with_visitor(
+        store.tiles(),
+        budget.residual_storage_options(store.tiles()),
+        &mut tile_references,
+    )
+    .map_err(|error| map_storage_error(error, path))?;
+    charge_storage_report(budget, tile_report, path)?;
+    let tile_size = tile_storage
+        .tile_size()
+        .filter(|size| *size != 0)
+        .ok_or(Error::InvalidSource { path })?;
+    if tile_references
+        .tiles
+        .iter()
+        .any(|(_, reference)| *reference == 0)
+        || tile_references
+            .tiles
+            .iter()
+            .enumerate()
+            .any(|(index, (id, reference))| {
+                tile_references.tiles[index + 1..]
+                    .iter()
+                    .any(|(other_id, other_reference)| {
+                        id == other_id || reference == other_reference
+                    })
+            })
+    {
+        return Err(Error::InvalidSource { path }.into());
+    }
+    let tile_id = target.position.row() / tile_size;
+    let mut tile_matches = tile_references
+        .tiles
+        .iter()
+        .filter(|(id, _)| *id == tile_id)
+        .map(|(_, reference)| *reference);
+    let tile_identifier = tile_matches.next().ok_or(Error::CellNotFound)?;
+    if tile_matches.next().is_some() || tile_identifier == target.model_identifier {
+        return Err(Error::InvalidSource { path }.into());
+    }
+    popup::validate_selected_model_reference(source, target, tile_identifier, path)?;
+    let tile_component_index = resolved_component_index(source, tile_identifier, path)?;
+    let tile_archive = source
+        .state
+        .components
+        .catalog()
+        .get_index(tile_component_index)
+        .ok_or(Error::InvalidSource { path })?
+        .archive();
+    let tile_object = unique_object(tile_archive, tile_identifier, path)?;
+    let tile_message_index = unique_message_index(tile_object, 6_002, path)?;
+    let tile_payload = &tile_object.messages[tile_message_index].data;
+    let cell_source = popup_native::tile_cell(
+        tile_payload,
+        target.position.row(),
+        target.position.column(),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    let cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
+    let format_identifier = cell.format_identifier();
+    if cell.control_cell_spec_identifier().is_some() {
+        return Err(NumberFormatReadError::WrongFormatFamily);
+    }
+    match cell.cell_format_kind() {
+        Some(litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND) => {},
+        Some(_) => return Err(NumberFormatReadError::WrongFormatFamily),
+        None if format_identifier.is_some() || cell.explicit_format_flags() != 0 => {
+            return Err(NumberFormatReadError::WrongFormatFamily);
+        },
+        None => return Ok(None),
+    }
+    let format_identifier = format_identifier
+        .filter(|identifier| *identifier != 0)
+        .ok_or(Error::InvalidSource { path })?;
+    if cell.secondary_format_identifier().is_some() {
+        return Err(NumberFormatReadError::WrongFormatFamily);
+    }
+    let explicit_flags = cell.explicit_format_flags();
+    if explicit_flags != 0 && explicit_flags != litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT {
+        return Err(NumberFormatReadError::WrongFormatFamily);
+    }
+
+    let format_table_identifier = store
+        .format_table()
+        .ok_or(Error::InvalidSource { path })?
+        .identifier();
+    // A distinct `format_table_pre_bnc` is a valid native compatibility
+    // sidecar. This transaction owns only the current BNC format table.
+    if format_table_identifier == target.model_identifier
+        || format_table_identifier == tile_identifier
+    {
+        return Err(Error::UnsupportedDependency { path }.into());
+    }
+    popup::validate_selected_model_reference(source, target, format_table_identifier, path)?;
+    let format_component_index = resolved_component_index(source, format_table_identifier, path)?;
+    let format_archive = source
+        .state
+        .components
+        .catalog()
+        .get_index(format_component_index)
+        .ok_or(Error::InvalidSource { path })?
+        .archive();
+    let metadata_facts = validate_metadata_ownership(
+        source,
+        &[
+            target.component_index,
+            tile_component_index,
+            format_component_index,
+        ],
+        budget,
+        path,
+    )?;
+    validate_cross_component_reference(
+        &metadata_facts,
+        target.component_index,
+        tile_component_index,
+        tile_identifier,
+        path,
+    )?;
+    validate_cross_component_reference(
+        &metadata_facts,
+        target.component_index,
+        format_component_index,
+        format_table_identifier,
+        path,
+    )?;
+    metadata_facts
+        .current_uuids_if_registered(&[
+            (target.component_index, target.model_identifier),
+            (tile_component_index, tile_identifier),
+            (format_component_index, format_table_identifier),
+        ])
+        .map_err(|_| Error::UnsupportedDependency { path })?;
+    let format_object = unique_object(format_archive, format_table_identifier, path)?;
+    let format_message = unique_list_message(format_object, 2, budget, path)?;
+    let format_payload = format_message.payload.to_owned();
+    let format_facts = list_facts(&format_payload, budget, path)?;
+    if format_facts
+        .entries
+        .iter()
+        .any(|entry| !entry.is_format || entry.payload.is_empty())
+    {
+        return Err(Error::InvalidSource { path }.into());
+    }
+    validate_number_format_refcounts(
+        source,
+        &tile_references.tiles,
+        format_facts.entries.as_slice(),
+        budget,
+        path,
+    )?;
+    let entry = format_facts
+        .entries
+        .iter()
+        .find(|entry| entry.key == format_identifier)
+        .ok_or(Error::InvalidSource { path })?;
+    if entry.ref_count == 0 || !entry.is_format {
+        return Err(Error::InvalidSource { path }.into());
+    }
+    let (snapshot, report) = number_format_codec::decode_number_format_with_report(
+        entry.payload.as_slice(),
+        control_codec_options(entry.payload.len(), budget),
+    )
+    .map_err(|error| map_control_error(error, path))?;
+    charge_control_decode_report(budget, report, path)?;
+    if snapshot.format_type() != 256 {
+        return Err(NumberFormatReadError::WrongFormatFamily);
+    }
+    let number = number_from_number_format_snapshot(snapshot, path)?;
+    if explicit_flags == 0 {
+        Ok(None)
+    } else {
+        Ok(Some(number))
+    }
+}
+
 #[derive(Clone)]
 struct ListEntry {
     key: u32,
@@ -857,6 +1536,11 @@ impl BncReferenceCensus {
                 return false;
             }
         }
+        if let Some(identifier) = cell.secondary_format_identifier() {
+            if !Self::increment(&mut self.formats, identifier) {
+                return false;
+            }
+        }
         if let Some(identifier) = control {
             if !Self::increment(&mut self.controls, identifier) {
                 return false;
@@ -869,6 +1553,7 @@ impl BncReferenceCensus {
 struct ListVisitor {
     entries: Vec<ListEntry>,
     segments: usize,
+    invalid_shape: bool,
 }
 
 impl storage_codec::StorageVisitor for ListVisitor {
@@ -877,12 +1562,13 @@ impl storage_codec::StorageVisitor for ListVisitor {
         record: storage_codec::TableDataListEntryRecord<'_>,
     ) -> Result<(), storage_codec::DecodeError> {
         let snapshot = record.snapshot();
-        let (payload, is_format) = if let Some(payload) = snapshot.format() {
-            (payload.to_vec(), true)
-        } else if let Some(payload) = snapshot.cell_spec() {
-            (payload.to_vec(), false)
-        } else {
-            (Vec::new(), false)
+        let (payload, is_format) = match (snapshot.format(), snapshot.cell_spec()) {
+            (Some(payload), None) => (payload.to_vec(), true),
+            (None, Some(payload)) => (payload.to_vec(), false),
+            _ => {
+                self.invalid_shape = true;
+                (Vec::new(), false)
+            },
         };
         self.entries.push(ListEntry {
             key: snapshot.key(),
@@ -927,6 +1613,7 @@ fn list_facts_with_input(
     let mut visitor = ListVisitor {
         entries: Vec::new(),
         segments: 0,
+        invalid_shape: false,
     };
     let options = budget.residual_storage_options(source);
     let (list, report) =
@@ -939,12 +1626,14 @@ fn list_facts_with_input(
     }
     budget.charge_payload_items(visitor.entries.len(), path)?;
     budget.charge_transaction_work(source.len(), path)?;
-    if visitor.segments != 0
-        || visitor.entries.iter().enumerate().any(|(index, entry)| {
-            visitor.entries[index + 1..]
-                .iter()
-                .any(|other| other.key == entry.key)
-        })
+    visitor.entries.sort_unstable_by_key(|entry| entry.key);
+    if visitor.invalid_shape
+        || visitor.segments != 0
+        || visitor.entries.iter().any(|entry| entry.key == 0)
+        || visitor
+            .entries
+            .windows(2)
+            .any(|pair| pair[0].key == pair[1].key)
     {
         return Err(Error::UnsupportedDependency { path });
     }
@@ -970,27 +1659,44 @@ fn mutate_list(
             .find(|entry| entry.is_format == format && entry.payload == payload)
             .map(|entry| entry.key)
     });
-    let desired_key = if desired_payload.is_some() {
+    let (desired_key, next_list_id_advance) = if desired_payload.is_some() {
         if let Some(existing) = matches {
-            Some(existing)
+            (Some(existing), None)
         } else {
-            let maximum = facts
-                .entries
-                .iter()
-                .map(|entry| entry.key)
-                .max()
-                .unwrap_or(0);
-            let next = maximum
-                .checked_add(1)
-                .ok_or(Error::InvalidSource { path })?;
-            let candidate = facts.next_key.max(1).max(next);
-            if facts.entries.iter().any(|entry| entry.key == candidate) {
-                return Err(Error::InvalidSource { path });
+            let mut candidate = 1u32;
+            for entry in &facts.entries {
+                if entry.key < candidate {
+                    continue;
+                }
+                if entry.key == candidate {
+                    candidate = candidate
+                        .checked_add(1)
+                        .ok_or(Error::InvalidSource { path })?;
+                } else {
+                    break;
+                }
             }
-            Some(candidate)
+            // Prefer a free key below the source-authoritative cursor. A
+            // dense registry appends exactly at the cursor and advances it in
+            // the same prepared source-preserving rewrite.
+            if facts.next_key == 0 || candidate > facts.next_key {
+                return Err(Error::UnsupportedDependency { path });
+            }
+            let advance = if candidate == facts.next_key {
+                Some((
+                    facts.next_key,
+                    facts
+                        .next_key
+                        .checked_add(1)
+                        .ok_or(Error::UnsupportedDependency { path })?,
+                ))
+            } else {
+                None
+            };
+            (Some(candidate), advance)
         }
     } else {
-        None
+        (None, None)
     };
     let mut output = source.to_owned();
     if old_key != desired_key {
@@ -1045,7 +1751,7 @@ fn mutate_list(
                 );
                 output = apply_list_mutation_with_budget(&output, mutation, budget, path)?;
             } else {
-                let append = if format {
+                let mut append = if format {
                     storage_codec::TableDataListEntryAppend::format(desired_key, 1, payload)
                 } else {
                     storage_codec::TableDataListEntryAppend::control_cell_spec(
@@ -1054,6 +1760,9 @@ fn mutate_list(
                         payload,
                     )
                 };
+                if let Some((expected, replacement)) = next_list_id_advance {
+                    append = append.advance_next_list_id(expected, replacement);
+                }
                 output = apply_list_mutation_with_budget(
                     &output,
                     storage_codec::TableDataListEntryMutation::Append(append),
@@ -1136,6 +1845,28 @@ fn charge_storage_report_without_input(
     budget.charge_wire_reference_bytes(report.reference_bytes(), path)?;
     budget.charge_wire_text_bytes(report.text_bytes(), path)?;
     Ok(())
+}
+
+fn canonical_number_format(
+    value: Number,
+    source_len: usize,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let prepared = number_format_codec::prepare_number_format_write(
+        number_format_write(value),
+        control_codec_options(source_len, budget),
+    )
+    .map_err(|error| map_control_error(error, path))?;
+    let requirements = prepared.execution_requirements();
+    charge_control_requirements(budget, requirements, path)?;
+    let output = prepared
+        .execute(number_format_codec::RewriteExecutionLimits::exact(
+            requirements,
+        ))
+        .map_err(|error| map_control_error(error, path))?;
+    verify_control_report(output.report(), requirements, path)?;
+    Ok(output.into_bytes())
 }
 
 fn map_storage_error(error: storage_codec::DecodeError, path: Path) -> Error {
@@ -1319,7 +2050,7 @@ fn decimal_format_write<'source>(
     thousands_separator: ThousandsSeparator,
 ) -> control_codec::ControlFormatWrite<'source> {
     write = write.with_decimal_places(match decimal_places {
-        DecimalPlaces::Automatic => NATIVE_AUTOMATIC_DECIMAL_PLACES,
+        DecimalPlaces::Automatic => number_format_codec::NATIVE_AUTOMATIC_DECIMAL_PLACES,
         DecimalPlaces::Fixed(value) => u32::from(value.value()),
     });
     write
@@ -1395,6 +2126,196 @@ fn charge_control_decode_report(
     budget.charge_scratch_bytes(report.scratch_bytes(), path)?;
     budget.charge_retained_bytes(report.retained_bytes(), path)?;
     budget.charge_transaction_work(report.output_bytes(), path)
+}
+
+/// Require the selected TableModel message to be the only package message
+/// whose archive header owns an inbound edge to a mutable tile or format-list
+/// object. A second table sharing either object would make a cell-local
+/// rewrite affect data outside the selected semantic owner.
+fn require_exclusive_selected_model_reference(
+    source: &Package,
+    target: CellTarget,
+    identifier: u64,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<(), Error> {
+    struct Probe {
+        identifier: u64,
+        allowed: bool,
+        expected_message: usize,
+        matches: usize,
+        unexpected: bool,
+    }
+
+    impl ArchiveReferenceVisitor for Probe {
+        fn visit_reference(
+            &mut self,
+            occurrence: ArchiveReferenceOccurrence,
+        ) -> litchi_iwa_core::Result<()> {
+            if occurrence.kind == ArchiveReferenceKind::Object
+                && occurrence.referenced_identifier == self.identifier
+            {
+                self.matches = self.matches.saturating_add(1);
+                self.unexpected |=
+                    !self.allowed || occurrence.message_index != self.expected_message;
+            }
+            Ok(())
+        }
+    }
+
+    let archive_limits = source
+        .state
+        .options
+        .archive()
+        .effective_archive_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let mut selected = 0usize;
+    let mut inspected = 0usize;
+    for (component_index, component) in source.state.components.catalog().iter().enumerate() {
+        for object in &component.archive().objects {
+            let object_identifier = object
+                .archive_info
+                .identifier
+                .ok_or(Error::InvalidSource { path })?;
+            let header_bytes =
+                usize::try_from(object.header_length).map_err(|_| Error::InvalidSource { path })?;
+            budget.charge_allocations(1, path)?;
+            budget.charge_transaction_work(header_bytes.saturating_mul(4), path)?;
+            let mut probe = Probe {
+                identifier,
+                allowed: component_index == target.component_index
+                    && object_identifier == target.model_identifier,
+                expected_message: target.message_index,
+                matches: 0,
+                unexpected: false,
+            };
+            let occurrences = object
+                .inspect_references_with_policy_and_limits(
+                    &mut probe,
+                    ArchiveReferencePolicy::RejectUnknownMetadata,
+                    archive_limits,
+                )
+                .map_err(|_| Error::UnsupportedDependency { path })?;
+            inspected = inspected
+                .checked_add(occurrences)
+                .ok_or(Error::InvalidSource { path })?;
+            budget.charge_payload_references(occurrences, path)?;
+            if probe.unexpected {
+                return Err(Error::UnsupportedDependency { path });
+            }
+            selected = selected
+                .checked_add(probe.matches)
+                .ok_or(Error::InvalidSource { path })?;
+        }
+    }
+    // The selected header contains one required aggregate edge and may mirror
+    // it once in a typed FieldInfo. `validate_selected_model_reference`
+    // already proves that exact shape; this package-wide census proves that
+    // no other message or opaque metadata owns the mutable object.
+    if selected == 0 || inspected == 0 {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    Ok(())
+}
+
+fn validate_number_format_refcounts(
+    source: &Package,
+    tile_references: &[(u32, u64)],
+    formats: &[ListEntry],
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<(), Error> {
+    let mut census = BncReferenceCensus::default();
+    for (_, tile_identifier) in tile_references {
+        let component_index = resolved_component_index(source, *tile_identifier, path)?;
+        let archive = source
+            .state
+            .components
+            .catalog()
+            .get_index(component_index)
+            .ok_or(Error::InvalidSource { path })?
+            .archive();
+        let tile = unique_object(archive, *tile_identifier, path)?;
+        let message_index = unique_message_index(tile, 6_002, path)?;
+        let (_, report) = storage_codec::decode_tile_with_visitor(
+            &tile.messages[message_index].data,
+            budget.residual_storage_options(&tile.messages[message_index].data),
+            &mut census,
+        )
+        .map_err(|error| map_storage_error(error, path))?;
+        charge_storage_report(budget, report, path)?;
+        if census.invalid {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    for entry in formats {
+        let observed = census
+            .formats
+            .iter()
+            .find(|(identifier, _)| *identifier == entry.key)
+            .map_or(0, |(_, count)| *count);
+        if observed != usize::try_from(entry.ref_count).unwrap_or(usize::MAX) {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    if census
+        .formats
+        .iter()
+        .any(|(identifier, _)| !formats.iter().any(|entry| entry.key == *identifier))
+    {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok(())
+}
+
+fn number_from_number_format_snapshot(
+    format: number_format_codec::NumberFormatSnapshot<'_>,
+    path: Path,
+) -> Result<Number, Error> {
+    if format.format_type() != number_format_codec::NATIVE_NUMBER_FORMAT_TYPE {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    let decimal_places = match format.decimal_places() {
+        number_format_codec::NATIVE_AUTOMATIC_DECIMAL_PLACES => DecimalPlaces::Automatic,
+        value => DecimalPlaces::Fixed(
+            FixedDecimalPlaces::new(
+                u8::try_from(value).map_err(|_| Error::InvalidSource { path })?,
+            )
+            .map_err(|_| Error::InvalidSource { path })?,
+        ),
+    };
+    let negative_style = match format.negative_style() {
+        0 => NegativeStyle::MinusSign,
+        1 => NegativeStyle::Red,
+        2 => NegativeStyle::Parentheses,
+        3 => NegativeStyle::RedParentheses,
+        _ => return Err(Error::InvalidSource { path }),
+    };
+    let thousands_separator = match format.show_thousands_separator() {
+        false => ThousandsSeparator::Hidden,
+        true => ThousandsSeparator::Shown,
+    };
+    Ok(Number::new(
+        decimal_places,
+        negative_style,
+        thousands_separator,
+    ))
+}
+
+fn number_format_write(value: Number) -> number_format_codec::NumberFormatWrite {
+    number_format_codec::NumberFormatWrite::new(
+        match value.decimal_places() {
+            DecimalPlaces::Automatic => number_format_codec::NATIVE_AUTOMATIC_DECIMAL_PLACES,
+            DecimalPlaces::Fixed(places) => u32::from(places.value()),
+        },
+        match value.negative_style() {
+            NegativeStyle::MinusSign => 0,
+            NegativeStyle::Red => 1,
+            NegativeStyle::Parentheses => 2,
+            NegativeStyle::RedParentheses => 3,
+        },
+        matches!(value.thousands_separator(), ThousandsSeparator::Shown),
+    )
 }
 
 fn verify_control_report(
@@ -1580,6 +2501,26 @@ fn validate_metadata_ownership<'source>(
             .map_err(|_| Error::InvalidSource { path })?;
     }
     Ok(facts)
+}
+
+fn validate_cross_component_reference(
+    facts: &popup_metadata::RegistryFacts<'_>,
+    source_component_index: usize,
+    target_component_index: usize,
+    object_identifier: u64,
+    path: Path,
+) -> Result<(), Error> {
+    if source_component_index == target_component_index {
+        return Ok(());
+    }
+    facts
+        .require_external_edge(
+            source_component_index,
+            target_component_index,
+            Some(object_identifier),
+            Some(false),
+        )
+        .map_err(|_| Error::UnsupportedDependency { path })
 }
 
 fn unique_object(archive: &Archive, identifier: u64, path: Path) -> Result<&ArchiveObject, Error> {

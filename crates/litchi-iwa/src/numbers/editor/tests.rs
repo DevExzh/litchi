@@ -3437,6 +3437,39 @@ fn focused_cell_edit_round_trips_through_legacy_host_reader() {
 }
 
 #[test]
+#[allow(deprecated)]
+fn focused_number_format_round_trips_through_legacy_host_bridge() {
+    let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/numbers/basic.numbers");
+    let mut editor = NumbersEditor::open(fixture).unwrap();
+    let table_id = editor.tables().unwrap()[0].object_id;
+    let before = editor.table_cell_number_format(table_id, 2, 1).unwrap();
+    let format = litchi_numbers::cell::data_format::number::Number::new(
+        litchi_numbers::cell::data_format::number::DecimalPlaces::fixed(3).unwrap(),
+        litchi_numbers::cell::data_format::number::NegativeStyle::RedParentheses,
+        litchi_numbers::cell::data_format::number::ThousandsSeparator::Shown,
+    );
+
+    editor
+        .set_table_cell_number_format(table_id, 2, 1, format)
+        .unwrap();
+    assert_eq!(
+        editor.table_cell_number_format(table_id, 2, 1).unwrap(),
+        Some(format)
+    );
+
+    assert!(
+        editor
+            .reset_table_cell_number_format(table_id, 2, 1)
+            .unwrap()
+    );
+    assert_eq!(
+        editor.table_cell_number_format(table_id, 2, 1).unwrap(),
+        before
+    );
+}
+
+#[test]
 fn builder_empty_table_accepts_focused_commit_apply_and_inverse() {
     fn bytes(package: &FocusedNumbersPackage) -> Vec<u8> {
         let mut output = Vec::new();

@@ -3,6 +3,14 @@
 use std::fmt;
 use std::str::FromStr;
 
+/// Selector-first exact-source transactions for one existing table cell's
+/// decimal Number format.
+pub mod transaction {
+    pub use crate::package::table_cell_number_format::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+    };
+}
+
 macro_rules! decimal_format {
     ($name:ident, $description:literal) => {
         #[doc = $description]

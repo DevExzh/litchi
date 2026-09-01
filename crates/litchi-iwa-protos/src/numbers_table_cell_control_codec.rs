@@ -16,6 +16,14 @@ pub use crate::numbers_table_cell_pop_up_menu_codec::{
 };
 
 pub use crate::numbers_table_cell_pop_up_menu_codec::{
+    MAX_NUMBER_DECIMAL_PLACES, NATIVE_AUTOMATIC_DECIMAL_PLACES, NATIVE_NUMBER_FORMAT_TYPE,
+    NumberFormatSnapshot, NumberFormatWrite, PreparedNumberFormatRewrite,
+    PreparedNumberFormatWrite, canonical_number_format, decode_number_format,
+    decode_number_format_with_report, prepare_number_format_append, prepare_number_format_rewrite,
+    prepare_number_format_write, rewrite_number_format, rewrite_table_cell_number_format,
+};
+
+pub use crate::numbers_table_cell_pop_up_menu_codec::{
     PreparedControlCellSpecWrite, PreparedControlCellSpecWrite as PreparedCellSpecWrite,
     PreparedControlFormatWrite, PreparedControlFormatWrite as PreparedFormatWrite,
 };

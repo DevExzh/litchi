@@ -1,5 +1,49 @@
 # Numbers tile-storage codec fuzzing
 
+## Numbers plain-number cell-format codec
+
+`numbers_table_cell_number_format_codec` drives the neutral strict Number
+format seam for one borrowed `FormatStructArchive` payload. Successful cases
+compare scalar and measured lazy reads, preserve the caller's source slice,
+round-trip fixed and automatic decimal places, and replay prepared
+source-preserving rewrites with exact finite limits. Canonical appends are
+checked independently, while unknown scalar/group spans are required to stay
+byte-for-byte intact. Fixed recipes keep missing, duplicate, wrong-wire,
+incompatible, invalid-domain, truncated, and unmatched-group errors hot.
+
+The target accepts at most 64 KiB and uses 128 KiB output, 16,384 fields,
+512 KiB of aggregate work, and nesting depth 64. Corpus entries are small
+hand-authored `hex:` wire recipes; they are not copied native package bytes.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check numbers_table_cell_number_format_codec
+```
+
+Run a bounded smoke with mutable corpus, artifacts, and build output outside
+the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-number-format-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+cp corpus/numbers_table_cell_number_format_codec/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  numbers_table_cell_number_format_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
 ## Numbers formula-archive codec
 
 `numbers_formula_archive` sends one bounded, caller-owned
