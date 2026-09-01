@@ -1,5 +1,27 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Latest XLSB source-ingress hard-probe result (change 0354)
+
+Change 0354 separates recoverable private XLSB source probes from hard
+ZIP/OPC/classifier errors. Non-ZIP, no-match, and missing-manifest inputs may
+retain the compatibility fallback; hard failures return typed `OpcError`, and
+`Workbook::from_bytes` does not eagerly retry them. Path `FileSource` preflights
+the caller's exact `max_input_bytes`, passes that exact limit to fallback
+reading, drops the catalog before fallback, and moves retained `Bytes` into
+the owned source without a clone, preserving pointer/capacity ownership.
+Known non-XLSB detector variants return `NotOfficeFile` without reopening the
+pathname. Explicit eager APIs, public smart detection, and the positive
+non-ZIP compatibility fallback remain unchanged. Final serial evidence is
+the XLSB-only private filter `7/7` (included in the `litchi-xlsb` lib `51/51`),
+XLSB facade `23/23`, and successful `xlsx` and `xlsx,xlsb` checks under one
+job/thread, disabled incremental/debug compilation, one disk target, and an
+8 GiB limit. The target reached 564 MiB; post-run available memory was
+approximately 14 GiB with swap saturated. This is correctness/resource-run
+evidence only (`performance_claim: none`), not an OOM, RSS, latency, or
+constant-memory claim. PPTX hard-probe fallback, public eager/portable
+fallback separation, finer constructor ZIP mapping, and full selected-
+worksheet materialization remain open.
+
 ## Latest XLSB source-backed fallback admission result (change 0353)
 
 Change 0353 removes the post-admission XLSB source-text retry through an eager

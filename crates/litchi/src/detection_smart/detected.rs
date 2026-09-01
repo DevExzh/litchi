@@ -273,6 +273,8 @@ pub(crate) enum WorkbookSourceBytesDetection {
     /// A validated source-retaining OPC owner whose catalog identifies XLSB.
     #[cfg(feature = "xlsb")]
     Xlsb(crate::opc::SourceBackedPackage),
+    /// A source-backed OPC probe failure that must not be retried eagerly.
+    OpcError(crate::opc::OpcError),
     /// The original bytes for the established byte-backed detector.
     Fallback(Vec<u8>),
 }
@@ -314,9 +316,16 @@ pub(crate) fn detect_workbook_source_bytes_with_limits(
     let source: Arc<dyn ReadAt> = Arc::new(litchi_core::OwnedSource::from_arc(Arc::clone(&shared)));
     let package_result =
         crate::opc::SourceBackedPackage::from_read_at_with_limits(Arc::clone(&source), limits);
-    let Ok(package) = package_result else {
-        drop(source);
-        return WorkbookSourceBytesDetection::Fallback(reclaim_source_bytes(shared));
+    let package = match package_result {
+        Ok(package) => package,
+        Err(error) if missing_ooxml_content_types_error(&error) => {
+            drop(source);
+            return WorkbookSourceBytesDetection::Fallback(reclaim_source_bytes(shared));
+        },
+        Err(error) => {
+            drop(source);
+            return WorkbookSourceBytesDetection::OpcError(error);
+        },
     };
 
     let format =
@@ -324,10 +333,10 @@ pub(crate) fn detect_workbook_source_bytes_with_limits(
             &package,
         ) {
             Ok(format) => format,
-            Err(_) => {
+            Err(error) => {
                 drop(package);
                 drop(source);
-                return WorkbookSourceBytesDetection::Fallback(reclaim_source_bytes(shared));
+                return WorkbookSourceBytesDetection::OpcError(error);
             },
         };
     match format {
@@ -496,10 +505,7 @@ fn hard_docx_source_bytes_probe_error(error: &crate::opc::OpcError) -> bool {
     hard_ooxml_probe_error(error)
 }
 
-#[cfg(all(
-    feature = "odt",
-    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
-))]
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 fn missing_ooxml_content_types_error(error: &crate::opc::OpcError) -> bool {
     matches!(
         error,
@@ -596,6 +602,7 @@ fn reclaim_presentation_source_bytes(shared: std::sync::Arc<Vec<u8>>) -> Vec<u8>
 
 #[cfg(all(
     any(feature = "ods", feature = "xlsx", feature = "xls", feature = "xlsb"),
+    not(feature = "opc"),
     any(unix, windows)
 ))]
 const UNIFIED_WORKBOOK_MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
@@ -677,7 +684,12 @@ pub(crate) fn detect_workbook_source_path(
         #[cfg(not(feature = "ods"))]
         let is_ods = false;
 
-        finish_non_ooxml_workbook_source(source, source_version, is_ods)
+        finish_non_ooxml_workbook_source(
+            source,
+            source_version,
+            is_ods,
+            UNIFIED_WORKBOOK_MAX_INPUT_BYTES,
+        )
     }
 }
 
@@ -699,6 +711,15 @@ pub(crate) fn detect_workbook_source_path_with_limits(
 
     let source: Arc<dyn ReadAt> = Arc::new(litchi_core::FileSource::open(path)?);
     let source_version = source.version()?;
+    let source_length = source.len()?;
+    ensure_path_source_current(source.as_ref(), source_version)?;
+    if source_length > limits.max_input_bytes() {
+        return Err(Box::new(crate::opc::OpcError::ReadLimit {
+            resource: crate::opc::ReadResource::InputBytes,
+            actual: source_length,
+            maximum: limits.max_input_bytes(),
+        }));
+    }
 
     #[cfg(feature = "ods")]
     let is_ods = litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())?
@@ -736,13 +757,11 @@ pub(crate) fn detect_workbook_source_path_with_limits(
                 limits,
             ) {
                 Ok(package) => Some(package),
-                Err(error) if hard_workbook_ooxml_probe_error(&error) => {
-                    return Err(Box::new(error));
-                },
-                Err(_) => {
+                Err(error) if missing_ooxml_content_types_error(&error) => {
                     ensure_path_source_current(source.as_ref(), source_version)?;
                     None
                 },
+                Err(error) => return Err(Box::new(error)),
             }
         } else {
             None
@@ -755,8 +774,14 @@ pub(crate) fn detect_workbook_source_path_with_limits(
                 )
                 .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)?;
             let Some(format) = format else {
+                drop(package);
                 ensure_path_source_current(source.as_ref(), source_version)?;
-                return finish_non_ooxml_workbook_source(source, source_version, is_ods);
+                return finish_non_ooxml_workbook_source(
+                    source,
+                    source_version,
+                    is_ods,
+                    limits.max_input_bytes(),
+                );
             };
 
             #[cfg(feature = "xlsx")]
@@ -813,16 +838,7 @@ pub(crate) fn detect_workbook_source_path_with_limits(
         }
     }
 
-    finish_non_ooxml_workbook_source(source, source_version, is_ods)
-}
-
-#[cfg(all(
-    any(feature = "ods", feature = "xlsx", feature = "xls", feature = "xlsb"),
-    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
-    any(unix, windows)
-))]
-fn hard_workbook_ooxml_probe_error(error: &crate::opc::OpcError) -> bool {
-    hard_ooxml_probe_error(error)
+    finish_non_ooxml_workbook_source(source, source_version, is_ods, limits.max_input_bytes())
 }
 
 #[cfg(all(
@@ -833,6 +849,7 @@ fn finish_non_ooxml_workbook_source(
     source: std::sync::Arc<dyn litchi_core::ReadAt>,
     source_version: litchi_core::SourceVersion,
     is_ods: bool,
+    max_input_bytes: u64,
 ) -> std::result::Result<WorkbookSourcePathDetection, Box<dyn std::error::Error + Send + Sync>> {
     #[cfg(feature = "ods")]
     if is_ods {
@@ -856,7 +873,7 @@ fn finish_non_ooxml_workbook_source(
         return Ok(WorkbookSourcePathDetection::Xls { workbook, cfb });
     }
 
-    read_path_source_bytes(source.as_ref(), source_version)
+    read_path_source_bytes(source.as_ref(), source_version, max_input_bytes)
         .map(WorkbookSourcePathDetection::Bytes)
         .map_err(|error| Box::new(error) as Box<dyn std::error::Error + Send + Sync>)
 }
@@ -1001,17 +1018,18 @@ fn ensure_path_source_current(
 fn read_path_source_bytes(
     source: &dyn litchi_core::ReadAt,
     expected: litchi_core::SourceVersion,
+    max_input_bytes: u64,
 ) -> litchi_core::Result<Vec<u8>> {
     ensure_path_source_current(source, expected)?;
     let length = source.len()?;
     ensure_path_source_current(source, expected)?;
 
-    if length > UNIFIED_WORKBOOK_MAX_INPUT_BYTES {
+    if length > max_input_bytes {
         return Err(litchi_core::Error::ResourceLimit(
             litchi_core::ResourceLimit {
                 resource: litchi_core::Resource::InputBytes,
                 observed: length,
-                limit: UNIFIED_WORKBOOK_MAX_INPUT_BYTES,
+                limit: max_input_bytes,
                 scope: std::sync::Arc::from("unified filesystem workbook"),
             },
         ));
@@ -2446,15 +2464,152 @@ mod short_signature_tests {
         ));
     }
 
-    #[cfg(feature = "xlsx")]
+    #[cfg(any(feature = "xlsx", feature = "xlsb"))]
     #[test]
-    fn source_xlsx_probe_preserves_non_xlsx_bytes_for_fallback() {
+    fn source_workbook_probe_preserves_non_workbook_bytes_for_fallback() {
         let bytes = b"not an XLSX package".to_vec();
-        let detected = super::detect_workbook_source_bytes(bytes.clone());
+        let pointer = bytes.as_ptr();
+        let capacity = bytes.capacity();
+        let detected = super::detect_workbook_source_bytes(bytes);
         let super::WorkbookSourceBytesDetection::Fallback(retained) = detected else {
             panic!("non-XLSX bytes unexpectedly selected the source owner");
         };
-        assert_eq!(retained, bytes);
+        assert_eq!(retained.as_ptr(), pointer);
+        assert_eq!(retained.capacity(), capacity);
+    }
+
+    #[cfg(any(feature = "xlsx", feature = "xlsb"))]
+    #[test]
+    fn source_workbook_probe_propagates_input_limit() {
+        let limits = crate::opc::ReadLimits::builder()
+            .max_input_bytes(1)
+            .expect("test input limit")
+            .build()
+            .expect("consistent test limits");
+        let detected =
+            super::detect_workbook_source_bytes_with_limits(b"PK\x03\x04".to_vec(), limits);
+        assert!(matches!(
+            detected,
+            super::WorkbookSourceBytesDetection::OpcError(crate::opc::OpcError::ReadLimit {
+                resource: crate::opc::ReadResource::InputBytes,
+                actual: 4,
+                maximum: 1,
+            })
+        ));
+    }
+
+    #[cfg(any(feature = "xlsx", feature = "xlsb"))]
+    #[test]
+    fn source_workbook_probe_propagates_part_limit() {
+        use std::io::Write;
+
+        let mut output = std::io::Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(&mut output);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        writer.start_file("[Content_Types].xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="txt" ContentType="text/plain"/></Types>"#,
+            )
+            .unwrap();
+        writer.start_file("one.txt", options).unwrap();
+        writer.write_all(b"one").unwrap();
+        writer.start_file("two.txt", options).unwrap();
+        writer.write_all(b"two").unwrap();
+        writer.finish().unwrap();
+
+        let limits = crate::opc::ReadLimits::builder()
+            .max_parts(1)
+            .expect("test part limit")
+            .build()
+            .expect("consistent test limits");
+        let detected = super::detect_workbook_source_bytes_with_limits(output.into_inner(), limits);
+        assert!(matches!(
+            detected,
+            super::WorkbookSourceBytesDetection::OpcError(crate::opc::OpcError::ReadLimit {
+                resource: crate::opc::ReadResource::Parts,
+                actual: 2,
+                maximum: 1,
+            })
+        ));
+    }
+
+    #[cfg(any(feature = "xlsx", feature = "xlsb"))]
+    #[test]
+    fn source_workbook_probe_propagates_malformed_zip_candidate() {
+        let detected = super::detect_workbook_source_bytes_with_limits(
+            b"PK\x03\x04malformed".to_vec(),
+            crate::opc::ReadLimits::default(),
+        );
+        assert!(matches!(
+            detected,
+            super::WorkbookSourceBytesDetection::OpcError(crate::opc::OpcError::ZipError(_))
+        ));
+    }
+
+    #[cfg(any(feature = "xlsx", feature = "xlsb"))]
+    #[test]
+    fn source_workbook_probe_falls_back_for_missing_content_types() {
+        use std::io::Write;
+
+        let mut output = std::io::Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(&mut output);
+        writer
+            .start_file(
+                "plain.txt",
+                zip::write::SimpleFileOptions::default()
+                    .compression_method(zip::CompressionMethod::Stored),
+            )
+            .unwrap();
+        writer.write_all(b"not an OPC package").unwrap();
+        writer.finish().unwrap();
+
+        let bytes = output.into_inner();
+        let pointer = bytes.as_ptr();
+        let capacity = bytes.capacity();
+        let detected = super::detect_workbook_source_bytes_with_limits(
+            bytes,
+            crate::opc::ReadLimits::default(),
+        );
+        let super::WorkbookSourceBytesDetection::Fallback(retained) = detected else {
+            panic!("missing content types unexpectedly selected a source owner");
+        };
+        assert_eq!(retained.as_ptr(), pointer);
+        assert_eq!(retained.capacity(), capacity);
+    }
+
+    #[cfg(any(feature = "xlsx", feature = "xlsb"))]
+    #[test]
+    fn source_workbook_probe_falls_back_for_valid_non_workbook_opc() {
+        use std::io::Write;
+
+        let mut output = std::io::Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(&mut output);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        writer.start_file("[Content_Types].xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="txt" ContentType="text/plain"/></Types>"#,
+            )
+            .unwrap();
+        writer.start_file("plain.txt", options).unwrap();
+        writer.write_all(b"not a workbook").unwrap();
+        writer.finish().unwrap();
+
+        let bytes = output.into_inner();
+        let pointer = bytes.as_ptr();
+        let capacity = bytes.capacity();
+        let detected = super::detect_workbook_source_bytes_with_limits(
+            bytes,
+            crate::opc::ReadLimits::default(),
+        );
+        let super::WorkbookSourceBytesDetection::Fallback(retained) = detected else {
+            panic!("valid non-workbook OPC unexpectedly selected a source owner");
+        };
+        assert_eq!(retained.as_ptr(), pointer);
+        assert_eq!(retained.capacity(), capacity);
     }
 
     #[cfg(feature = "pptx")]

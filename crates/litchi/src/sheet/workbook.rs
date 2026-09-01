@@ -388,6 +388,9 @@ impl Workbook {
 
         #[cfg(any(feature = "xlsx", feature = "xlsb"))]
         let bytes = match crate::detection_smart::detected::detect_workbook_source_bytes(bytes) {
+            crate::detection_smart::detected::WorkbookSourceBytesDetection::OpcError(error) => {
+                return Err(Box::new(crate::map_ooxml_error(error)));
+            },
             #[cfg(feature = "xlsb")]
             crate::detection_smart::detected::WorkbookSourceBytesDetection::Xlsb(package) => {
                 let metadata = crate::ooxml_common::properties::read_source_backed(&package)
@@ -1108,6 +1111,126 @@ mod source_xlsx_path_tests {
                 resource: litchi_opc::ReadResource::InputBytes,
                 ..
             })
+        ));
+    }
+
+    #[test]
+    fn filesystem_xlsx_preflights_tight_input_limit_before_reads() {
+        let path = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(path.path(), valid_package("bounded sparse")).unwrap();
+        path.as_file().set_len(1024 * 1024 + 1).unwrap();
+        let limits = litchi_opc::ReadLimits::builder()
+            .max_input_bytes(1024)
+            .expect("test input limit")
+            .build()
+            .expect("consistent test limits");
+
+        let error = match crate::detection_smart::detected::detect_workbook_source_path_with_limits(
+            path.path(),
+            limits,
+        ) {
+            Ok(_) => panic!("sparse oversized source unexpectedly opened"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.downcast_ref::<litchi_opc::OpcError>(),
+            Some(litchi_opc::OpcError::ReadLimit {
+                resource: litchi_opc::ReadResource::InputBytes,
+                actual: 1_048_577,
+                maximum: 1024,
+            })
+        ));
+    }
+
+    #[test]
+    fn bytes_xlsx_propagates_malformed_opc_probe_error() {
+        let error = match Workbook::from_bytes(b"PK\x03\x04malformed".to_vec()) {
+            Ok(_) => panic!("malformed ZIP candidate unexpectedly opened"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.downcast_ref::<Error>(),
+            Some(Error::InvalidFormat(_))
+        ));
+    }
+
+    #[test]
+    fn bytes_xlsx_matching_catalog_owner_error_stays_typed() {
+        use std::io::Write;
+
+        let mut output = std::io::Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(&mut output);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        writer.start_file("[Content_Types].xml", options).unwrap();
+        writer
+            .write_all(
+                format!(
+                    r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Override PartName="/xl/workbook.xml" ContentType="{WORKBOOK}"/></Types>"#
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+        writer.start_file("_rels/.rels", options).unwrap();
+        writer
+            .write_all(
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer.finish().unwrap();
+
+        let error = match Workbook::from_bytes(output.into_inner()) {
+            Ok(_) => panic!("matching XLSX catalog without its owner unexpectedly opened"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.downcast_ref::<Error>(),
+            Some(Error::InvalidFormat(_))
+        ));
+    }
+}
+
+#[cfg(all(test, feature = "xlsb", any(unix, windows)))]
+mod source_xlsb_path_tests {
+    use litchi_core::Error;
+    use std::io::{Cursor, Write};
+
+    fn minimal_xlsx_marked_opc() -> Vec<u8> {
+        let mut output = Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(&mut output);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        writer.start_file("[Content_Types].xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/></Types>"#,
+            )
+            .unwrap();
+        writer.start_file("xl/workbook.xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheets/></workbook>"#,
+            )
+            .unwrap();
+        writer.finish().unwrap();
+        output.into_inner()
+    }
+
+    #[test]
+    fn xlsb_dynamic_open_rejects_known_xlsx_without_reopening_path() {
+        let path = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(path.path(), minimal_xlsx_marked_opc()).unwrap();
+
+        let error = match crate::sheet::functions::open_xlsb_workbook_dyn_with_limits(
+            path.path(),
+            litchi_xlsb::ReadLimits::default(),
+        ) {
+            Ok(_) => panic!("XLSX unexpectedly opened through the XLSB API"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.downcast_ref::<Error>(),
+            Some(Error::NotOfficeFile)
         ));
     }
 }
