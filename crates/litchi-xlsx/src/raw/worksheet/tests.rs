@@ -1093,3 +1093,437 @@ mod streaming_0361_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod streaming_0362_selected_tests {
+    use std::io::{self, BufRead, Cursor, Read};
+
+    use litchi_ooxml_common::mce::{Capabilities, Limits, StreamLimits};
+    use litchi_sheet::Cell as Address;
+
+    use super::super::{
+        selected::{NotEligibleReason, ScanOutcome, SelectedCell, scan},
+        x14ac,
+    };
+    use crate::cell::{Cell, Value};
+
+    const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+    const X14AC: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac";
+
+    fn address(reference: &str) -> Address {
+        Address::from_a1(reference).expect("valid worksheet address")
+    }
+
+    fn worksheet(body: &str) -> String {
+        format!(r#"<worksheet xmlns="{SPREADSHEETML}">{body}</worksheet>"#)
+    }
+
+    fn x14ac_worksheet(body: &str) -> String {
+        format!(
+            r#"<worksheet xmlns="{SPREADSHEETML}" xmlns:mc="{MC}" xmlns:x14ac="{X14AC}" mc:Ignorable="x14ac">{body}</worksheet>"#
+        )
+    }
+
+    fn alternate_content(choice: &str, fallback: &str) -> String {
+        format!(
+            r#"<worksheet xmlns="{SPREADSHEETML}" xmlns:mc="{MC}" xmlns:x14ac="{X14AC}" mc:Ignorable="x14ac"><mc:AlternateContent><mc:Choice Requires="x14ac">{choice}</mc:Choice><mc:Fallback>{fallback}</mc:Fallback></mc:AlternateContent></worksheet>"#
+        )
+    }
+
+    fn scan_xml(xml: &str, target: &str) -> x14ac::StreamResult<ScanOutcome> {
+        let capabilities = Capabilities::default();
+        let limits = StreamLimits::default();
+        scan_xml_with(xml, target, &capabilities, &limits)
+    }
+
+    fn scan_xml_with(
+        xml: &str,
+        target: &str,
+        capabilities: &Capabilities,
+        limits: &StreamLimits,
+    ) -> x14ac::StreamResult<ScanOutcome> {
+        let mut input = Cursor::new(xml.as_bytes());
+        scan(&mut input, capabilities, limits, address(target))
+    }
+
+    fn eligible(xml: &str, target: &str) -> SelectedCell {
+        match scan_xml(xml, target) {
+            Ok(ScanOutcome::Eligible(selected)) => selected,
+            other => panic!("expected eligible selection, got {other:?}"),
+        }
+    }
+
+    fn assert_not_eligible(xml: &str, target: &str, expected: NotEligibleReason) {
+        match scan_xml(xml, target) {
+            Ok(ScanOutcome::NotEligible(reason)) => assert_eq!(reason, expected),
+            other => panic!("expected {expected:?}, got {other:?}"),
+        }
+    }
+
+    fn assert_number(selected: SelectedCell, expected: &str) {
+        match selected.cell {
+            Some(Cell::Value(Value::Number(value))) => assert_eq!(value.as_str(), expected),
+            other => panic!("expected number {expected}, got {other:?}"),
+        }
+    }
+
+    fn assert_text(selected: SelectedCell, expected: &str) {
+        match selected.cell {
+            Some(Cell::Value(Value::Text(value))) => assert_eq!(value.as_str(), expected),
+            other => panic!("expected text {expected}, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn streaming_0362_selected_outcomes_cover_first_last_missing_and_empty() {
+        let xml = worksheet(
+            r#"<sheetData><row r="1"><c r="A1"><v>-0.000</v></c></row><row r="3"><c r="C3"/></row></sheetData>"#,
+        );
+
+        let first = eligible(&xml, "A1");
+        assert_eq!(first.address, address("A1"));
+        assert_number(first, "-0.000");
+
+        let last = eligible(&xml, "C3");
+        assert_eq!(last.address, address("C3"));
+        assert!(matches!(last.cell, Some(Cell::Empty)));
+
+        let missing = eligible(&xml, "B2");
+        assert_eq!(missing.address, address("B2"));
+        assert!(missing.cell.is_none());
+    }
+
+    #[test]
+    fn streaming_0362_selected_payloads_cover_scalar_variants() {
+        let boolean = eligible(
+            &worksheet(r#"<sheetData><row r="1"><c r="A1" t="b"><v>1</v></c></row></sheetData>"#),
+            "A1",
+        );
+        assert!(matches!(boolean.cell, Some(Cell::Value(Value::Bool(true)))));
+
+        let error = eligible(
+            &worksheet(
+                r#"<sheetData><row r="1"><c r="A1" t="e"><v>#DIV/0!</v></c></row></sheetData>"#,
+            ),
+            "A1",
+        );
+        assert!(matches!(
+            error.cell,
+            Some(Cell::Value(Value::Error(value))) if value.as_str() == "#DIV/0!"
+        ));
+
+        let plain = eligible(
+            &worksheet(
+                r#"<sheetData><row r="1"><c r="A1" t="str"><v>plain</v></c></row></sheetData>"#,
+            ),
+            "A1",
+        );
+        assert_text(plain, "plain");
+
+        let formula_string = eligible(
+            &worksheet(
+                r#"<sheetData><row r="1"><c r="A1" t="str"><f>CONCAT("a","b")</f><v>ab</v></c></row></sheetData>"#,
+            ),
+            "A1",
+        );
+        match formula_string.cell {
+            Some(Cell::Formula(formula)) => {
+                assert_eq!(formula.text(), "CONCAT(\"a\",\"b\")");
+                assert!(formula.cached().is_some());
+            },
+            other => panic!("expected formula-string cell, got {other:?}"),
+        }
+
+        let inline = eligible(
+            &worksheet(
+                r#"<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>inline text</t></is></c></row></sheetData>"#,
+            ),
+            "A1",
+        );
+        assert_text(inline, "inline text");
+
+        let scalar_formula = eligible(
+            &worksheet(
+                r#"<sheetData><row r="1"><c r="A1"><f>SUM(B1:B2)</f><v>3</v></c></row></sheetData>"#,
+            ),
+            "A1",
+        );
+        match scalar_formula.cell {
+            Some(Cell::Formula(formula)) => {
+                assert_eq!(formula.text(), "SUM(B1:B2)");
+                assert!(formula.cached().is_some());
+            },
+            other => panic!("expected scalar formula cell, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn streaming_0362_selected_rejects_ordering_and_adjacent_duplicates() {
+        let decreasing_rows = worksheet(
+            r#"<sheetData><row r="2"><c r="A2"><v>2</v></c></row><row r="1"><c r="A1"><v>1</v></c></row></sheetData>"#,
+        );
+        assert_not_eligible(&decreasing_rows, "A1", NotEligibleReason::Ordering);
+
+        let decreasing_cells = worksheet(
+            r#"<sheetData><row r="1"><c r="B1"><v>2</v></c><c r="A1"><v>1</v></c></row></sheetData>"#,
+        );
+        assert_not_eligible(&decreasing_cells, "A1", NotEligibleReason::Ordering);
+
+        let duplicate_row = worksheet(r#"<sheetData><row r="1"/><row r="1"/></sheetData>"#);
+        assert!(scan_xml(&duplicate_row, "A1").is_err());
+
+        let duplicate_cell =
+            worksheet(r#"<sheetData><row r="1"><c r="A1"/><c r="A1"/></row></sheetData>"#);
+        assert!(scan_xml(&duplicate_cell, "A1").is_err());
+    }
+
+    #[test]
+    fn streaming_0362_selected_marks_unsupported_structures_not_eligible() {
+        let cases = [
+            (
+                worksheet(
+                    r#"<mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells><sheetData/>"#,
+                ),
+                NotEligibleReason::MergeSemantics,
+            ),
+            (
+                worksheet(
+                    r#"<sheetData><row r="1"><c r="A1" t="s"><v>0</v></c></row></sheetData>"#,
+                ),
+                NotEligibleReason::SharedStrings,
+            ),
+            (
+                worksheet(
+                    r#"<cols><col min="1" max="1" width="10" customWidth="1"/></cols><sheetData/>"#,
+                ),
+                NotEligibleReason::Styles,
+            ),
+            (
+                worksheet(
+                    r#"<sheetData><row r="1"><c r="A1"><f t="shared" si="0" ref="A1:A2">A1+1</f><v>2</v></c></row></sheetData>"#,
+                ),
+                NotEligibleReason::FormulaSemantics,
+            ),
+            (
+                worksheet(
+                    r#"<sheetData><row r="1"><c r="A1" t="inlineStr"><is><r><rPr><b/></rPr><t>rich</t></r></is></c></row></sheetData>"#,
+                ),
+                NotEligibleReason::RichInlineText,
+            ),
+            (
+                worksheet(r#"<sheetPr/><sheetData/>"#),
+                NotEligibleReason::UnsupportedStructure,
+            ),
+        ];
+
+        for (xml, reason) in cases {
+            assert_not_eligible(&xml, "A1", reason);
+        }
+    }
+
+    #[test]
+    fn streaming_0362_selected_chooses_supported_choice_or_fallback() {
+        let choice_supported = alternate_content(
+            r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>"#,
+            r#"<mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>"#,
+        );
+        let mut capabilities = Capabilities::default();
+        capabilities.understand_namespace(X14AC);
+        let selected_choice = scan_xml_with(
+            &choice_supported,
+            "A1",
+            &capabilities,
+            &StreamLimits::default(),
+        )
+        .expect("supported choice stream");
+        match selected_choice {
+            ScanOutcome::Eligible(selected) => assert_number(selected, "7"),
+            other => panic!("expected supported choice, got {other:?}"),
+        }
+
+        let fallback_selected = alternate_content(
+            r#"<mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>"#,
+            r#"<sheetData><row r="1"><c r="A1"><v>8</v></c></row></sheetData>"#,
+        );
+        match scan_xml(&fallback_selected, "A1").expect("fallback stream") {
+            ScanOutcome::Eligible(selected) => assert_number(selected, "8"),
+            other => panic!("expected fallback branch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn streaming_0362_selected_validates_x14ac_without_retaining_rows() {
+        let valid = x14ac_worksheet(
+            r#"<sheetData><row r="1" x14ac:dyDescent="0.3"><c r="A1"><v>9</v></c></row></sheetData>"#,
+        );
+        assert_number(eligible(&valid, "A1"), "9");
+
+        let values = x14ac::capture_stream_with_active(
+            &mut Cursor::new(valid.as_bytes()),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            x14ac::RowMode::ValidateOnly,
+            |_| Ok(()),
+        )
+        .expect("valid x14ac descent");
+        assert!(values.rows.is_empty());
+
+        let malformed = x14ac_worksheet(
+            r#"<sheetData><row r="1" x14ac:dyDescent="not-a-number"><c r="A1"><v>9</v></c></row></sheetData>"#,
+        );
+        assert!(scan_xml(&malformed, "A1").is_err());
+        assert!(
+            x14ac::capture_stream_with_active(
+                &mut Cursor::new(malformed.as_bytes()),
+                &Capabilities::default(),
+                &StreamLimits::default(),
+                x14ac::RowMode::ValidateOnly,
+                |_| Ok(()),
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn streaming_0362_selected_does_not_return_early_before_malformed_tail() {
+        let xml = format!(
+            r#"<worksheet xmlns="{SPREADSHEETML}"><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData></worksheet><tail>"#
+        );
+        assert!(scan_xml(&xml, "A1").is_err());
+    }
+
+    #[test]
+    fn streaming_0362_selected_respects_exact_limits_and_split_input() {
+        let explicit_empty = worksheet(r#"<sheetData><row r="1"><c r="A1"/></row></sheetData>"#);
+        let exact_events = StreamLimits {
+            max_events: 7,
+            ..StreamLimits::default()
+        };
+        assert!(
+            scan_xml_with(
+                &explicit_empty,
+                "A1",
+                &Capabilities::default(),
+                &exact_events,
+            )
+            .is_ok()
+        );
+        let under_events = StreamLimits {
+            max_events: 6,
+            ..exact_events.clone()
+        };
+        assert!(
+            scan_xml_with(
+                &explicit_empty,
+                "A1",
+                &Capabilities::default(),
+                &under_events,
+            )
+            .is_err()
+        );
+
+        let exact_input = StreamLimits {
+            processing: Limits {
+                max_input_bytes: explicit_empty.len(),
+                ..StreamLimits::default().processing
+            },
+            ..StreamLimits::default()
+        };
+        assert!(
+            scan_xml_with(
+                &explicit_empty,
+                "A1",
+                &Capabilities::default(),
+                &exact_input,
+            )
+            .is_ok()
+        );
+        let under_input = StreamLimits {
+            processing: Limits {
+                max_input_bytes: explicit_empty.len() - 1,
+                ..exact_input.processing.clone()
+            },
+            ..exact_input.clone()
+        };
+        assert!(
+            scan_xml_with(
+                &explicit_empty,
+                "A1",
+                &Capabilities::default(),
+                &under_input,
+            )
+            .is_err()
+        );
+
+        let empty_root = format!(r#"<worksheet xmlns="{SPREADSHEETML}"><sheetData/></worksheet>"#,);
+        let root_start = format!(r#"<worksheet xmlns="{SPREADSHEETML}">"#);
+        let exact_event = StreamLimits {
+            max_event_bytes: root_start.len(),
+            ..StreamLimits::default()
+        };
+        assert!(scan_xml_with(&empty_root, "A1", &Capabilities::default(), &exact_event,).is_ok());
+        let under_event = StreamLimits {
+            max_event_bytes: root_start.len() - 1,
+            ..exact_event.clone()
+        };
+        assert!(scan_xml_with(&empty_root, "A1", &Capabilities::default(), &under_event,).is_err());
+
+        let split_xml =
+            worksheet(r#"<sheetData><row r="1"><c r="A1"><v>11</v></c></row></sheetData>"#);
+        for chunk_size in [1, 2, 7] {
+            let mut input = ChunkedInput::new(split_xml.as_bytes(), chunk_size);
+            match scan(
+                &mut input,
+                &Capabilities::default(),
+                &StreamLimits::default(),
+                address("A1"),
+            )
+            .expect("split selected stream")
+            {
+                ScanOutcome::Eligible(selected) => assert_number(selected, "11"),
+                other => panic!("expected split eligible result, got {other:?}"),
+            }
+        }
+    }
+
+    struct ChunkedInput {
+        bytes: Vec<u8>,
+        position: usize,
+        chunk_size: usize,
+    }
+
+    impl ChunkedInput {
+        fn new(bytes: &[u8], chunk_size: usize) -> Self {
+            Self {
+                bytes: bytes.to_vec(),
+                position: 0,
+                chunk_size,
+            }
+        }
+    }
+
+    impl Read for ChunkedInput {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            let available = self.fill_buf()?;
+            let amount = available.len().min(output.len());
+            output[..amount].copy_from_slice(&available[..amount]);
+            self.consume(amount);
+            Ok(amount)
+        }
+    }
+
+    impl BufRead for ChunkedInput {
+        fn fill_buf(&mut self) -> io::Result<&[u8]> {
+            let end = self
+                .position
+                .saturating_add(self.chunk_size)
+                .min(self.bytes.len());
+            Ok(&self.bytes[self.position..end])
+        }
+
+        fn consume(&mut self, amount: usize) {
+            self.position = self.position.saturating_add(amount).min(self.bytes.len());
+        }
+    }
+}
