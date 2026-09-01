@@ -588,6 +588,21 @@ impl BncCell {
         }
     }
 
+    /// Reports whether every present display-metadata field belongs to the
+    /// ordinary decimal shape.
+    ///
+    /// Number, Percentage, and Scientific cells may carry only the shared
+    /// format kind and primary format identifier. This check catches orphan
+    /// Currency/date/duration/text/control identifiers that the kind-directed
+    /// accessors intentionally do not expose.
+    #[must_use]
+    pub fn has_only_decimal_format_metadata(&self) -> bool {
+        self.fields.keys().all(|field| {
+            FORMAT_METADATA_FLAGS & field == 0
+                || matches!(*field, CELL_FORMAT_KIND_FLAG | CELL_FORMAT_IDENTIFIER_FLAG)
+        })
+    }
+
     /// Applies a Numbers data format and its identifier to the cell.
     ///
     /// # Errors
@@ -610,7 +625,7 @@ impl BncCell {
         self.set_data_format_metadata_identifier(identifier, kind, control_identifier)
     }
 
-    /// Replaces only the explicit Number-or-Percentage display metadata.
+    /// Replaces only explicit decimal-family display metadata.
     ///
     /// Unlike [`Self::set_data_format_identifier`], this focused primitive
     /// never converts the stored value, its formula cache, or the native cell
@@ -628,7 +643,7 @@ impl BncCell {
     ) -> Result<()> {
         if identifier.is_some_and(|value| value == 0) {
             return Err(Error::InvalidFormat(
-                "Number-or-Percentage format identifier must be non-zero".to_owned(),
+                "decimal-format identifier must be non-zero".to_owned(),
             ));
         }
 
@@ -3010,6 +3025,148 @@ mod tests {
     }
 
     #[test]
+    fn scientific_format_uses_decimal_wire_metadata_and_preserves_cell_bytes() {
+        // Scientific is a distinct format-list family, but its BNC cell
+        // metadata is exactly the shared decimal-family shape. Keep
+        // the source deliberately rich so this transition cannot silently
+        // drop a formula/cache, style, comment, or opaque tail.
+        let mut cell = BncCell::minimal();
+        cell.prefix[2..].copy_from_slice(&[0xa1, 0xb2, 0xc3, 0xd4, 0xe5, 0xf6]);
+        cell.set_number(42.25).unwrap();
+        cell.set_formula_reference(17);
+        cell.fields
+            .insert(FORMULA_ERROR_FLAG, 19u32.to_le_bytes().to_vec());
+        cell.set_style_identifier(Some(23));
+        cell.set_text_style_identifier(Some(29));
+        cell.set_conditional_style(Some(31), Some(37));
+        cell.set_comment_identifier(Some(41));
+        cell.tail.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
+
+        let original_prefix = cell.prefix;
+        let original_value = value_fields(&cell);
+        let original_cache = cell.cached_scalar().unwrap();
+        let original_formula = cell.formula_identifier().unwrap();
+        let original_formula_error = cell.formula_error_identifier();
+        let original_style = cell.style_identifier();
+        let original_text_style = cell.text_style_identifier();
+        let original_conditional_style = cell.conditional_style_identifier();
+        let original_conditional_rule = cell.conditional_style_applied_rule();
+        let original_comment = cell.comment_identifier();
+        let original_tail = cell.tail.clone();
+
+        cell.set_number_or_percentage_format_identifier_preserving_value(Some(43))
+            .unwrap();
+
+        assert_eq!(cell.prefix[0], original_prefix[0]);
+        assert_eq!(
+            cell.prefix[2..EXPLICIT_FORMAT_FLAGS_START],
+            original_prefix[2..EXPLICIT_FORMAT_FLAGS_START]
+        );
+        assert_eq!(
+            cell.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END],
+            EXPLICIT_DECIMAL_FORMAT.to_le_bytes()
+        );
+        assert_eq!(cell.explicit_format_flags(), EXPLICIT_DECIMAL_FORMAT);
+        assert_eq!(cell.cell_format_kind(), Some(DECIMAL_CELL_FORMAT_KIND));
+        assert_eq!(cell.format_identifier(), Some(43));
+        assert_eq!(cell.secondary_format_identifier(), None);
+        assert_eq!(cell.control_cell_spec_identifier(), None);
+        assert!(cell.has_only_decimal_format_metadata());
+
+        assert_eq!(cell.stored_value(), StoredValue::Formula(original_formula));
+        assert_eq!(value_fields(&cell), original_value);
+        assert_eq!(cell.cached_scalar().unwrap(), original_cache);
+        assert_eq!(cell.formula_error_identifier(), original_formula_error);
+        assert_eq!(cell.style_identifier(), original_style);
+        assert_eq!(cell.text_style_identifier(), original_text_style);
+        assert_eq!(
+            cell.conditional_style_identifier(),
+            original_conditional_style
+        );
+        assert_eq!(
+            cell.conditional_style_applied_rule(),
+            original_conditional_rule
+        );
+        assert_eq!(cell.comment_identifier(), original_comment);
+        assert_eq!(cell.tail, original_tail);
+
+        let reparsed = BncCell::parse(&cell.encode()).unwrap();
+        assert_eq!(reparsed.explicit_format_flags(), EXPLICIT_DECIMAL_FORMAT);
+        assert_eq!(reparsed.cell_format_kind(), Some(DECIMAL_CELL_FORMAT_KIND));
+        assert_eq!(reparsed.format_identifier(), Some(43));
+        assert_eq!(
+            reparsed.stored_value(),
+            StoredValue::Formula(original_formula)
+        );
+        assert_eq!(reparsed.cached_scalar().unwrap(), original_cache);
+        assert_eq!(reparsed.formula_error_identifier(), original_formula_error);
+        assert_eq!(reparsed.style_identifier(), original_style);
+        assert_eq!(reparsed.text_style_identifier(), original_text_style);
+        assert_eq!(reparsed.comment_identifier(), original_comment);
+        assert_eq!(reparsed.tail, original_tail);
+    }
+
+    #[test]
+    fn scientific_format_preserves_empty_cells_and_has_no_wire_family_marker() {
+        let mut scientific = BncCell::minimal();
+        scientific.prefix[2..].copy_from_slice(&[0x11, 0x22, 0x33, 0x44, 0x55, 0x66]);
+        scientific.set_style_identifier(Some(7));
+        scientific.set_comment_identifier(Some(11));
+        scientific.tail.extend_from_slice(b"scientific-tail");
+        let original_prefix = scientific.prefix;
+        let original_tail = scientific.tail.clone();
+
+        scientific
+            .set_number_or_percentage_format_identifier_preserving_value(Some(13))
+            .unwrap();
+        assert_eq!(scientific.stored_value(), StoredValue::Empty);
+        assert_eq!(scientific.cached_scalar().unwrap(), None);
+        assert_eq!(scientific.explicit_format_flags(), EXPLICIT_DECIMAL_FORMAT);
+        assert_eq!(
+            scientific.cell_format_kind(),
+            Some(DECIMAL_CELL_FORMAT_KIND)
+        );
+        assert_eq!(scientific.format_identifier(), Some(13));
+        assert_eq!(scientific.style_identifier(), Some(7));
+        assert_eq!(scientific.comment_identifier(), Some(11));
+        assert_eq!(scientific.tail, original_tail);
+
+        let mut number_or_percentage = BncCell::minimal();
+        number_or_percentage.prefix[2..].copy_from_slice(&original_prefix[2..]);
+        number_or_percentage.set_style_identifier(Some(7));
+        number_or_percentage.set_comment_identifier(Some(11));
+        number_or_percentage
+            .tail
+            .extend_from_slice(b"scientific-tail");
+        number_or_percentage
+            .set_number_or_percentage_format_identifier_preserving_value(Some(13))
+            .unwrap();
+        // The format-list payload, not the BNC cell, distinguishes Scientific
+        // from Number and Percentage.  A wire-only reader must not infer a
+        // specific family from this identical decimal cell shape.
+        assert_eq!(scientific.encode(), number_or_percentage.encode());
+
+        let encoded = scientific.encode();
+        let mut reparsed = BncCell::parse(&encoded).unwrap();
+        reparsed
+            .set_number_or_percentage_format_identifier_preserving_value(None)
+            .unwrap();
+        assert_eq!(reparsed.stored_value(), StoredValue::Empty);
+        assert_eq!(reparsed.cached_scalar().unwrap(), None);
+        assert_eq!(reparsed.explicit_format_flags(), 0);
+        assert_eq!(reparsed.cell_format_kind(), None);
+        assert_eq!(reparsed.format_identifier(), None);
+        assert_eq!(reparsed.prefix[0], original_prefix[0]);
+        assert_eq!(
+            reparsed.prefix[2..EXPLICIT_FORMAT_FLAGS_START],
+            original_prefix[2..EXPLICIT_FORMAT_FLAGS_START]
+        );
+        assert_eq!(reparsed.style_identifier(), Some(7));
+        assert_eq!(reparsed.comment_identifier(), Some(11));
+        assert_eq!(reparsed.tail, original_tail);
+    }
+
+    #[test]
     fn slider_formats_match_native_number_and_currency_metadata() {
         let native_number =
             hex("0502000000000100013400001900000000000000000000000000403004000000010000000c000000");
@@ -3043,6 +3200,7 @@ mod tests {
         assert_eq!(currency.control_cell_spec_identifier(), Some(4));
         assert_eq!(currency.format_identifier(), Some(11));
         assert_eq!(currency.secondary_format_identifier(), Some(12));
+        assert!(!currency.has_only_decimal_format_metadata());
         assert_eq!(currency.encode(), native_currency);
 
         let mut empty = BncCell::minimal();

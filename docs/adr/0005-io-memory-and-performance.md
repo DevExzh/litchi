@@ -2086,3 +2086,32 @@ claim. The focused Currency owner does not transfer Buffa or package-resource
 ownership for other display/control families, cell values/formulas, styles, or
 table topology; its operation-specific native E3/E4 evidence is recorded in
 ADR 0008 and does not establish a package-wide performance claim.
+
+## 2026-09-01 amendment: Numbers existing-cell Scientific-format resource record
+
+The Scientific transaction is a bounded source-preserving operation over one
+selected cell, its BNC format reference, and the admitted shared
+format-list/refcount closure. The strict type-259 codec validates required
+fields, canonical varints, fixed precision, the native minus-sign style, hidden
+thousands-separator state, duplicate/cardinality rules, length-delimited and
+group framing, nesting, and work before constructing its private borrowed
+Buffa view. Buffa is an inspection/parity layer only; generated owned messages
+and normal-Prost whole-message re-encoding are not the source of preservation.
+
+The operation-local budget charges package input/output, physical entries and
+payloads, decoded objects/messages/references, wire bytes/fields/nesting/work,
+retained and scratch bytes, compressed output, staging allocations, and total
+transaction work. Checked cursor/size arithmetic and fallible reservations
+guard every publication boundary. Exact no-ops do not construct a candidate;
+changed edits use copy-on-write, retain unknown and unselected bytes, reopen
+and read back the selected Scientific value, and compare complete physical
+locality for untouched members. Malformed, wrong-family, unsupported,
+over-budget, allocation, lock, candidate-verification, or locality failures
+leave the source unchanged.
+
+This is a bounded correctness/refusal contract only. It makes no zero-copy,
+allocation-count, peak-RSS, latency, throughput, or whole-package memory claim,
+and it does not transfer wire or package-resource ownership for other display
+families, values/formulas, styles, or table topology. Focused test/fuzz and
+native app evidence, including any artifact hashes, remains pending and must be
+recorded in ADR 0008 before it is described as certification.

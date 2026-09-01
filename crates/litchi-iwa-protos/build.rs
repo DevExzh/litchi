@@ -56,6 +56,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/numbers_table_cell_number_format_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_percentage_format_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_currency_format_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_table_cell_scientific_format_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec.rs");
     // Keep the native Numbers and Pages message-ID routes tied to their schema
     // projections when this crate is built from the workspace. Published
@@ -1603,6 +1604,7 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
         "src/numbers_table_cell_number_format_codec.rs",
         "src/numbers_table_cell_percentage_format_codec.rs",
         "src/numbers_table_cell_currency_format_codec.rs",
+        "src/numbers_table_cell_scientific_format_codec.rs",
     ];
 
     let mut expected_paths = CODECS
@@ -4225,7 +4227,7 @@ fn enforce_numbers_table_cell_currency_format_projection_budget(
 fn enforce_numbers_table_cell_control_codec_provenance(
     proto_directory: &Path,
 ) -> Result<(), Box<dyn Error>> {
-    const CODEC_MARKERS: [&str; 41] = [
+    const CODEC_MARKERS: [&str; 44] = [
         "pub const STEPPER_INTERACTION_TYPE: u32 = 4;",
         "pub const SLIDER_INTERACTION_TYPE: u32 = 5;",
         "pub const STAR_RATING_INTERACTION_TYPE: u32 = 6;",
@@ -4248,6 +4250,9 @@ fn enforce_numbers_table_cell_control_codec_provenance(
         "pub const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;",
         "pub const NATIVE_CURRENCY_FORMAT_TYPE: u32 = 257;",
         "pub const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;",
+        "pub const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;",
+        "pub const NATIVE_SCIENTIFIC_NEGATIVE_STYLE: u32 = 0;",
+        "pub const NATIVE_SCIENTIFIC_SHOW_THOUSANDS_SEPARATOR: bool = false;",
         "pub const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;",
         "pub struct NumberFormatSnapshot<'source>",
         "pub struct NumberFormatWrite",
@@ -4268,7 +4273,7 @@ fn enforce_numbers_table_cell_control_codec_provenance(
         "pub fn canonical_number_format(",
         "pub struct PreparedNumberFormatWrite",
     ];
-    const NEUTRAL_MARKERS: [&str; 18] = [
+    const NEUTRAL_MARKERS: [&str; 20] = [
         "pub use crate::numbers_table_cell_pop_up_menu_codec::{\n    CHECKBOX_INTERACTION_TYPE",
         "PreparedControlCellSpecWrite as PreparedCellSpecWrite",
         "PreparedControlFormatWrite as PreparedFormatWrite",
@@ -4287,6 +4292,8 @@ fn enforce_numbers_table_cell_control_codec_provenance(
         "canonical_percentage_format, decode_percentage_format, decode_percentage_format_with_report,",
         "pub use crate::numbers_table_cell_currency_format_codec::{",
         "canonical_currency_format, decode_currency_format, decode_currency_format_with_report,",
+        "pub use crate::numbers_table_cell_scientific_format_codec::{",
+        "canonical_scientific_format, decode_scientific_format, decode_scientific_format_with_report,",
     ];
     const PERCENTAGE_MARKERS: [&str; 23] = [
         "use crate::numbers_table_cell_pop_up_menu_codec as core;",
@@ -4340,16 +4347,47 @@ fn enforce_numbers_table_cell_control_codec_provenance(
         ".map(PreparedCurrencyFormatRewrite)",
         ".map(PreparedCurrencyFormatWrite)",
     ];
+    const SCIENTIFIC_MARKERS: [&str; 27] = [
+        "use crate::numbers_table_cell_pop_up_menu_codec as core;",
+        "pub use core::NATIVE_SCIENTIFIC_FORMAT_TYPE;",
+        "pub use core::NATIVE_AUTOMATIC_DECIMAL_PLACES;",
+        "pub const MAX_SCIENTIFIC_DECIMAL_PLACES: u32 = core::MAX_NUMBER_DECIMAL_PLACES;",
+        "pub use core::NATIVE_SCIENTIFIC_NEGATIVE_STYLE;",
+        "pub use core::NATIVE_SCIENTIFIC_SHOW_THOUSANDS_SEPARATOR;",
+        "pub struct ScientificFormatSnapshot<'source>(",
+        "pub struct ScientificFormatWrite(core::NumberFormatWrite);",
+        "pub const fn from_snapshot(snapshot: ScientificFormatSnapshot<'_>)",
+        "pub struct PreparedScientificFormatRewrite<'source>(",
+        "pub struct PreparedScientificFormatWrite(core::PreparedNumberFormatWrite);",
+        "pub fn decode_scientific_format(",
+        "pub fn decode_scientific_format_with_report(",
+        "pub fn prepare_scientific_format_rewrite<'source>(",
+        "pub fn rewrite_scientific_format(",
+        "pub fn prepare_scientific_format_write(",
+        "pub use prepare_scientific_format_write as prepare_scientific_format_append;",
+        "pub fn canonical_scientific_format(",
+        "pub use rewrite_scientific_format as rewrite_table_cell_scientific_format;",
+        "core::decode_decimal_format(source, NATIVE_SCIENTIFIC_FORMAT_TYPE,",
+        "core::decode_decimal_format_with_report(source, NATIVE_SCIENTIFIC_FORMAT_TYPE,",
+        "core::prepare_decimal_format_rewrite(source, write.0, NATIVE_SCIENTIFIC_FORMAT_TYPE",
+        "core::rewrite_decimal_format(source, write.0, NATIVE_SCIENTIFIC_FORMAT_TYPE",
+        "core::prepare_decimal_format_write(write.0, NATIVE_SCIENTIFIC_FORMAT_TYPE",
+        "core::canonical_decimal_format(write.0, NATIVE_SCIENTIFIC_FORMAT_TYPE",
+        ".map(PreparedScientificFormatRewrite)",
+        ".map(PreparedScientificFormatWrite)",
+    ];
     let tst = fs::read_to_string(proto_directory.join("TSTArchives.proto"))?;
     let tsk = fs::read_to_string(proto_directory.join("TSKArchives.proto"))?;
     let codec = fs::read_to_string("src/numbers_table_cell_pop_up_menu_codec.rs")?;
     let neutral = fs::read_to_string("src/numbers_table_cell_control_codec.rs")?;
     let percentage = fs::read_to_string("src/numbers_table_cell_percentage_format_codec.rs")?;
     let currency = fs::read_to_string("src/numbers_table_cell_currency_format_codec.rs")?;
+    let scientific = fs::read_to_string("src/numbers_table_cell_scientific_format_codec.rs")?;
     let lib = fs::read_to_string("src/lib.rs")?;
     let production_codec = production_codec_source(&codec);
     let production_percentage = production_codec_source(&percentage);
     let production_currency = production_codec_source(&currency);
+    let production_scientific = production_codec_source(&scientific);
     const CELL_SPEC_FIELDS: [&str; 3] = [
         "optional double range_control_min = 3;",
         "optional double range_control_max = 4;",
@@ -4375,6 +4413,9 @@ fn enforce_numbers_table_cell_control_codec_provenance(
         || !CURRENCY_MARKERS
             .iter()
             .all(|marker| production_currency.matches(marker).count() == 1)
+        || !SCIENTIFIC_MARKERS
+            .iter()
+            .all(|marker| production_scientific.matches(marker).count() == 1)
         || !CELL_SPEC_FIELDS
             .iter()
             .all(|field| tst.matches(field).count() == 1)
@@ -4392,6 +4433,10 @@ fn enforce_numbers_table_cell_control_codec_provenance(
             != 1
         || lib
             .matches("pub mod numbers_table_cell_currency_format_codec;")
+            .count()
+            != 1
+        || lib
+            .matches("pub mod numbers_table_cell_scientific_format_codec;")
             .count()
             != 1
         || production_codec.contains("prost::")
@@ -4413,6 +4458,13 @@ fn enforce_numbers_table_cell_control_codec_provenance(
         || production_currency.contains(".encode(")
         || production_currency.contains("pub type CurrencyFormat")
         || production_currency.contains("pub type PreparedCurrencyFormat")
+        || production_scientific.contains("prost::")
+        || production_scientific.contains("to_owned_message")
+        || production_scientific.contains("encode_to_vec")
+        || production_scientific.contains("try_encode")
+        || production_scientific.contains(".encode(")
+        || production_scientific.contains("pub type ScientificFormat")
+        || production_scientific.contains("pub type PreparedScientificFormat")
     {
         return Err(
             "Numbers control-cell codec drifted from the strict CellSpec/FormatStruct route or introduced generated/encoding ownership".into(),

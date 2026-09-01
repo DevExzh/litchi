@@ -15408,3 +15408,65 @@ existing-cell Currency scenario, not broad Numbers formatting, arbitrary-
 producer parity, native byte parity, or package-wide performance/RSS behavior.
 The Currency slice closes no package, dependency declaration, canonical edge,
 ordered migration debt, migration host, or ADR 0028 deletion gate.
+
+## 2026-09-01 amendment: Numbers existing-cell Scientific-format native validation record
+
+The focused owner is
+`litchi_numbers::Package::{table_cell_scientific_format,
+edit_table_cell_scientific_format, apply_table_cell_scientific_format}` with a
+semantic `SheetSelector`, sheet-scoped `TableSelector`, and checked
+`CellPosition`. It owns one existing cell's explicit fixed-precision Scientific
+format: native type 259, decimal places `0..=30`, minus-sign negatives, and a
+hidden thousands separator. `None` denotes inherited/no-explicit Scientific;
+automatic precision is not an explicit Scientific value.
+
+The locked/offline focused package run passed 19/19 tests. It covers selectors,
+all precisions `0..=30`, read/set/clear/reset, exact no-op and inverse,
+source-authorized apply, stale/foreign/wrong-family conflict rejection,
+locked-table atomicity, copy-on-write/refcounts, malformed graph and strict
+wire refusal, unknown-field preservation, scalar/style/comment/opaque-byte
+preservation, budgets, concurrency, candidate reopen/readback, and locality.
+The strict Buffa codec filter passed 4/4, `litchi-numbers-wire` passed 34/34,
+and the six filtered legacy-host tests passed 6/6, including exact focused
+delegation plus the explicitly source-built compatibility route. The four
+Scientific boundary audits reported zero violations; the unrelated untracked
+Pages table-lock draft remains the only full-boundary failure.
+
+Both committed fuzz surfaces received sanitizer-backed bounded smokes. The
+strict codec target ran 100 executions from its 33-file corpus, and the package
+target ran 100 executions from its 10-file corpus. Neither produced a crash or
+artifact. These runs are robustness evidence for the stated targets, not a
+claim of exhaustive input-space coverage.
+
+Computer Use validated the focused operation in Numbers 14.4 (7043.0.93). The
+clean native source contained B2 text `Litchi native Numbers fixture`, B3 scalar
+`42`, and explicit Scientific precision 4. It was 136,830 bytes with SHA-256
+`af20e95691a3b09119e35b90860b556a8cae3c920561b54a49394b50fbb3d89b`.
+The Rust transaction changed only the precision to 7 and reported
+`changed=true`, `touched_components=2`, and `full_reparse=true`. Its 136,830-byte
+candidate had SHA-256
+`17c0fd20d7b1401432ce85e2114b5964245ca0e385863182c0614fb436b60257`;
+only `Index/Tables/Tile.iwa` and
+`Index/Tables/DataList-904498-2.iwa` changed. The inverse was byte-identical to
+the source and retained the source SHA-256. Restaging precision 7 was also
+byte-identical to the Rust candidate and reported zero touched components with
+no full reparse.
+
+Numbers opened the Rust candidate without repair, recovery, or conversion UI.
+B2 remained unchanged, B3 rendered `4.2000000E+01`, the inspector reported
+Scientific with seven decimal places, and the actual scalar remained 42.
+Numbers saved, closed, and reopened the document without a prompt; the same
+text, rendered value, and precision remained. Native save normalization
+produced a 137,008-byte artifact with SHA-256
+`aabc53de3b29472535f8c1f1ec40d6ce4bff88eb5ac527892491573906bed1cf`.
+A strict Rust reread of that native-resaved artifact returned explicit
+precision 7; restaging it reported `changed=false`, `touched_components=0`,
+and `full_reparse=false`, and the output was byte-identical with the same
+SHA-256.
+
+These facts establish operation-specific native E3/E4 evidence for this
+existing-cell Scientific scenario. They do not establish arbitrary-producer
+parity, native byte parity after Numbers' own save normalization, generic
+display-format or rich-style support, package-wide performance/RSS behavior,
+migration-host exit, dependency-edge retirement, or an ADR 0028 deletion-gate
+closure.

@@ -7208,3 +7208,32 @@ declarations, 226 canonical edges, and debt IDs `[1, 2, 4, 8, 10, 12, 13, 14,
 acceptance and exact test/fuzz evidence remain operation-specific and are
 tracked separately in ADR 0008. The Currency candidate's native E3/E4 evidence
 is recorded there, but it closes no monolith-exit gate.
+
+## 2026-09-01 amendment: Numbers existing-cell Scientific-format focused-owner slice (not a monolith-exit gate)
+
+The current Scientific slice gives `litchi-numbers` a bounded owner for the
+explicit fixed-precision Scientific format of one existing table cell. The
+selector-first package surface uses semantic sheet/table selectors and a
+checked cell position; the private adapter owns native type 259, the shared
+decimal BNC shape, format-list identity/refcounts, strict wire validation,
+copy-on-write, exact-source patches/inverses, candidate reopen/readback, and
+physical locality. Native IDs, generated messages, Buffa values, archive
+members, and raw bytes remain private.
+
+Scientific is deliberately separate from Number, Percentage, Currency, and
+other display/control families. It fixes native minus-sign negatives and a
+hidden thousands separator, supports only existing-cell display metadata and
+explicit-to-automatic reset, and does not create cells, author values or
+formulas, mutate styles or table topology, or provide package authoring. The
+legacy host methods are compatibility delegates; exact-source owner failures
+cannot escape to the generic fallback, while source-built compatibility
+packages may retain their historical route.
+
+None of the six monolith-exit gates closes. No package, dependency edge, or
+ordered migration debt is retired, `litchi-iwa` remains the one migration host,
+and the documented topology remains 64 packages, 237 internal dependency
+declarations, 226 canonical edges, and debt IDs `[1, 2, 4, 8, 10, 12, 13, 14,
+15, 16, 17]`. Build/test/fuzz and native app evidence are intentionally not
+claimed until the pending ADR 0008 ledger is frozen; this source-level seam is
+not evidence of host independence, arbitrary-producer parity, native byte
+parity, or package-wide performance/RSS behavior.

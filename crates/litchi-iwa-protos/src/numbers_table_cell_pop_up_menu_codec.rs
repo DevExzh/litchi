@@ -190,7 +190,7 @@ pub struct DecodeError {
 }
 
 impl DecodeError {
-    const fn invalid() -> Self {
+    pub(crate) const fn invalid() -> Self {
         Self { limit: None }
     }
 
@@ -716,6 +716,15 @@ pub const NATIVE_CURRENCY_FORMAT_TYPE: u32 = 257;
 
 /// Native Numbers display-format discriminator for a plain percentage cell.
 pub const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
+
+/// Native Numbers display-format discriminator for a scientific cell.
+pub const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
+
+/// Native negative-number style used by scientific formats.
+pub const NATIVE_SCIENTIFIC_NEGATIVE_STYLE: u32 = 0;
+
+/// Scientific formats never display a thousands separator.
+pub const NATIVE_SCIENTIFIC_SHOW_THOUSANDS_SEPARATOR: bool = false;
 
 /// Native discriminator used for automatic decimal places.
 pub const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;
@@ -2041,6 +2050,10 @@ fn scan_decimal_format<'source>(
         || (decimal_places != NATIVE_AUTOMATIC_DECIMAL_PLACES
             && decimal_places > MAX_NUMBER_DECIMAL_PLACES)
         || negative_style > 3
+        || (expected_format_type == NATIVE_SCIENTIFIC_FORMAT_TYPE
+            && (decimal_places == NATIVE_AUTOMATIC_DECIMAL_PLACES
+                || negative_style != NATIVE_SCIENTIFIC_NEGATIVE_STYLE
+                || show_thousands_separator != NATIVE_SCIENTIFIC_SHOW_THOUSANDS_SEPARATOR))
     {
         return Err(DecodeError::invalid());
     }
@@ -2255,7 +2268,7 @@ const fn number_format_slot(number: u32) -> Option<usize> {
 fn validate_decimal_format_type(format_type: u32) -> Result<(), DecodeError> {
     if matches!(
         format_type,
-        NATIVE_NUMBER_FORMAT_TYPE | NATIVE_PERCENTAGE_FORMAT_TYPE
+        NATIVE_NUMBER_FORMAT_TYPE | NATIVE_PERCENTAGE_FORMAT_TYPE | NATIVE_SCIENTIFIC_FORMAT_TYPE
     ) {
         Ok(())
     } else {
@@ -2271,6 +2284,10 @@ fn validate_decimal_format_write(
     if (write.decimal_places != NATIVE_AUTOMATIC_DECIMAL_PLACES
         && write.decimal_places > MAX_NUMBER_DECIMAL_PLACES)
         || write.negative_style > 3
+        || (format_type == NATIVE_SCIENTIFIC_FORMAT_TYPE
+            && (write.decimal_places == NATIVE_AUTOMATIC_DECIMAL_PLACES
+                || write.negative_style != NATIVE_SCIENTIFIC_NEGATIVE_STYLE
+                || write.show_thousands_separator != NATIVE_SCIENTIFIC_SHOW_THOUSANDS_SEPARATOR))
     {
         return Err(DecodeError::invalid());
     }

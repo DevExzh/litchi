@@ -1,6 +1,6 @@
 # iWork Progress Audit
 
-> Audit baseline: 2026-09-01 at committed `b6e6ada83` (`feat(numbers): own plain number cell formats`). This update evaluates the focused Percentage-format slice and current Currency-format owner work from that baseline; it remains scoped verification rather than release certification.
+> Audit baseline: 2026-09-01 at committed `d33f30f41` (`feat(numbers): own currency cell formats`). This update evaluates the focused Scientific-format owner work from that baseline; it remains scoped verification rather than release certification.
 
 ## Conclusion
 
@@ -12,6 +12,7 @@ The iWork implementation is substantial but is **not suite-complete or release-c
 - Three authoritative Pages, Keynote, and Numbers matrices now report focused-owner, legacy-host, preservation, and evidence boundaries; the existing implementation review still explicitly excludes iWork.
 - Native fixtures establish basic parse/no-op fidelity, but there is no suite-wide automated proof that Litchi-modified files are accepted, saved, closed, and reopened by all three native applications.
 - The focused Percentage owner and codec checks are green at the synthetic/source level. The focused Currency codec filter passes 4/4, the `litchi-numbers-wire` library passes 32/32, and the package target passes 22/22 after native BNC flag handling became shape-dependent. ADR 0008 records operation-specific native Currency E3/E4 evidence with exact candidate/native-resaved hashes, inverse restoration, and strict no-op reread. Percentage remains below formal E3/E4 promotion; Currency native evidence remains limited to its stated existing-cell operation.
+- The focused Scientific owner now has an archive-free value, selector-first exact-source transaction, strict Buffa type-259 route, bounded sanitizer smokes, and operation-specific native E3/E4 evidence. The package target passed 19/19, strict codec filter 4/4, wire library 34/34, and legacy bridge filter 6/6. Numbers 14.4 opened, saved, closed, and reopened the precision-7 candidate without repair; strict reread was an exact semantic no-op. This evidence remains limited to the recorded existing-cell operation.
 
 The detailed provisional coverage assessment is in [IWORK_FEATURE_MATRIX_AUDIT.md](IWORK_FEATURE_MATRIX_AUDIT.md).
 
@@ -22,7 +23,7 @@ The detailed provisional coverage assessment is in [IWORK_FEATURE_MATRIX_AUDIT.m
 | Root `litchi::iwork` facade | Immutable, bounded Pages/Keynote/Numbers projection; host-free dependency path | Read-only and text-oriented; no package/edit, metadata, media, chart, or formula editing/recalculation surface | 🟡 focused read facade |
 | `litchi-pages` | ZIP/directory semantic read; exact retained-package output; selected text, layout, footnote, header/footer, and table-property transactions | Fresh package creation, section/table structural CRUD, table cells/formulas, rich formatting, drawings, charts, media, collaboration, export | 🟡 bounded reader/editor |
 | `litchi-keynote` | Show/slide read; existing-slide state, text, notes, settings, background, transition, selected chart/movie/table properties | Slide creation/duplication, full table data, chart data/series/CRUD, media bytes/CRUD, full build/animation editing, shapes/groups, masters/themes, collaboration, rendering/export | 🟡 bounded reader/editor |
-| `litchi-numbers` | Rooted workbook read; selected scalar cells, formulas, controls, table settings, names/order, comments/replies, and existing-cell Number/Percentage/Currency display formats | Sheet/table lifecycle, row/column topology, full formula engine, other generic formats/rich styles, package merge editing, charts/media/drawables, filters/pivots/categories, print/page setup and workbook export | 🟡 bounded reader/editor |
+| `litchi-numbers` | Rooted workbook read; selected scalar cells, formulas, controls, table settings, names/order, comments/replies, and existing-cell Number/Percentage/Currency/Scientific display formats | Sheet/table lifecycle, row/column topology, full formula engine, other generic formats/rich styles, package merge editing, charts/media/drawables, filters/pivots/categories, print/page setup and workbook export | 🟡 bounded reader/editor |
 | `litchi-iwa` | Broad source-free authoring and native mutation across all three applications; extensive tests/examples | It is explicitly a compatibility/migration host, exposes native/raw seams, and still owns most rich/structural authoring | 🟡 broad but non-canonical |
 | Shared IWA crates | Bounded Snappy/wire/archive parsing, package preservation, detection, focused codecs, exact artifacts, COW state, and archive-owned durable publication | Concrete-owner index adoption, aggregate graph/memory budgets, directory write parity, durable patch serialization/history, encryption/signatures | 🟡 mature substrate with open boundaries |
 
@@ -62,9 +63,9 @@ The prior [format implementation review](FORMAT_IMPLEMENTATION_REVIEW.md#scope-a
 ## Current-worktree verification
 
 These results describe the focused pre-commit slice snapshot, not a release artifact. The
-Percentage, Currency, and current broad Numbers rows were rerun for this
-slice; the Keynote row remains a historical dirty-worktree diagnostic and is not evidence against
-the focused display-format implementations:
+Scientific rows were rerun for this slice. The Percentage and Currency rows retain their
+previously recorded results. The Keynote row remains a historical dirty-worktree diagnostic and
+is not evidence against the focused display-format implementations:
 
 | Check | Result |
 |---|---|
@@ -76,6 +77,7 @@ the focused display-format implementations:
 | `cargo test -p litchi-numbers-wire --lib` | ✅ 32/32 focused Numbers wire library tests passed |
 | Focused Currency fuzz targets | 🟡 Source-visible with bounded synthetic/adversarial corpus coverage; sanitizer smoke evidence remains separately scoped and is not used to broaden the native claim |
 | Numbers Currency native validation | ✅ Operation-specific E3/E4 evidence: Numbers 14.4 opened the Rust candidate without repair/recovery/conversion, preserved B2/B3 text/scalar semantics and requested Currency settings through save/close/reopen, and strict Rust no-op reread plus exact inverse restoration matched the recorded hashes in ADR 0008 |
+| Scientific focused owner/build/test/fuzz/native validation | ✅ Package 19/19, strict Buffa codec 4/4, wire 34/34, and filtered legacy bridge 6/6 passed. Targeted Scientific boundary audits reported zero violations. Sanitizer-backed codec/package smokes completed 100 executions from 33/10 corpus files. Numbers 14.4 opened the precision-7 Rust candidate without repair, retained text/scalar/format through save-close-reopen, and strict reread produced an exact no-op; ADR 0008 freezes source, candidate, native-resaved, inverse, and locality hashes. |
 | Current broad Numbers gate | ❌ 405 unit tests passed/4 ignored; all integration targets passed except `table_data_list_reader_integration`, where 19 passed and 6 pre-existing comment/reply cases returned `InvalidSource` while validating synthetic comment metadata |
 | Numbers 14.4 Percentage probe | ✅ Rust candidate opened without repair; native save/close/reopen retained `4,200.000%`, three decimals, red-parentheses negatives, thousands separator, and Actual value `42`; strict Rust reread emitted an exact semantic no-op with zero touched components and the native-resaved SHA-256 unchanged |
 | Historical broad Keynote baseline (2026-08-31) | ❌ 153 unit tests passed/1 failed; `soundtrack_order` integration was 3 passed/5 failed; rerun reproduced `selected_zip_suffix_and_central_records_allow_only_reassembly_fields` central-record failure |
@@ -84,7 +86,10 @@ the focused display-format implementations:
 
 The four ignored Numbers native-oracle tests were not run because their private external fixture is unavailable.
 The disposable Percentage probe establishes operation-specific native evidence, but formal E3/E4
-promotion remains pending until its artifact and ledger are frozen and reproducible.
+promotion remains pending until its artifact and ledger are frozen and reproducible. The
+Scientific record establishes operation-specific E3/E4 evidence for one existing-cell precision
+change only: it does not certify arbitrary producers, other display families, package-wide
+resource behavior, or a monolith deletion gate.
 
 ## Safety and integrity findings
 
@@ -114,7 +119,7 @@ Repository history is also incomplete locally. `git rev-list HEAD...@{upstream}`
 
 1. Restore the missing Git objects and establish a clean, reproducible audit revision.
 2. Maintain the new authoritative app matrices against a frozen revision and keep focused-owner support, legacy-host-only support, opaque preservation, and native evidence distinct.
-3. Keep the completed Percentage and focused Currency slices isolated from unresolved sort, lock, projection, and other untracked drafts before promoting any additional support claim.
+3. Keep the completed Percentage, Currency, and Scientific slices isolated from unresolved sort, lock, projection, and other untracked work before promoting any additional support claim.
 4. Restore the boundary ratchet and fix the reproducible Numbers storage/comment and Keynote soundtrack/ZIP-preservation failures.
 
 ### P1 — close product and release gates

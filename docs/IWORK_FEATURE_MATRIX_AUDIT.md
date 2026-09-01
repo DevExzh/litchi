@@ -1,8 +1,7 @@
 # iWork Feature-Matrix Audit
 
-> Source audit starting at committed `b6e6ada83` (2026-09-01) and including the focused
-> Percentage-format slice plus the current Currency-format owner work from that baseline. This
-> document records the rationale and
+> Source audit starting at committed `d33f30f41` (2026-09-01) and including the focused
+> Scientific-format owner work from that baseline. This document records the rationale and
 > cross-suite gaps behind the three authoritative app matrices and does not replace them.
 
 ## Matrix state
@@ -32,6 +31,11 @@ focused Currency owner and codec are now source-visible with the focused codec f
 at 22/22 after native BNC flag handling became shape-dependent. The operation-specific native Numbers candidate opened cleanly and
 survived native save/close/reopen with strict Rust no-op reread; exact hashes and settings are
 recorded in ADR 0008. This is operation-specific E3/E4 evidence, not a broad-format claim.
+The Scientific owner now has an archive-free value, selector-first transaction, strict Buffa
+type-259 codec, green focused tests, bounded sanitizer smokes, and a frozen operation-specific
+native ledger. Numbers 14.4 opened, saved, closed, and reopened the Rust candidate without repair;
+strict reread verified the requested precision and emitted an exact no-op. This is narrowly scoped
+E3/E4 evidence, not a broad-format claim.
 Exact current and historical results are recorded in [IWORK_PROGRESS_AUDIT.md](IWORK_PROGRESS_AUDIT.md#current-worktree-verification).
 
 ## Shared IWA capabilities
@@ -117,7 +121,8 @@ Primary references: [package boundary](../crates/litchi-keynote/src/package.rs#L
 | Cell controls/pop-up menus | 🟡 | 🟡 | 🟡 | Checkbox/star/slider/stepper/pop-up only, under strict graph profiles |
 | Existing-cell Number/Percentage display formats | 🟡 | ✅ | 🟡 | Selector-first existing-cell Number and Percentage read/set/reset operations preserve the scalar value and unrelated bytes. Number has operation-specific native evidence; Percentage focused/synthetic coverage is green, and ADR 0008 records a disposable native Numbers open/save/close/reopen plus strict Rust semantic no-op readback. The artifact/ledger is not frozen, so Percentage E3/E4 remain pending. See the [Numbers matrix](../crates/litchi-numbers/docs/FEATURE_MATRIX.md#cells-formulas-controls-and-annotations). |
 | Existing-cell Currency display formats | 🟡 | ✅ | 🟡 | Selector-first existing-cell Currency read/set/clear/reset operations expose checked currency code, decimal, negative, thousands-separator, and Standard/Accounting settings while preserving the scalar value and unrelated bytes. The focused codec filter passes 4/4, the `litchi-numbers-wire` library passes 32/32, and the latest package target passes 22/22 after native BNC flag handling became shape-dependent: plain no-secondary Currency uses `0x0802`, while a Currency record carrying a secondary Number ID uses `0x0803` (`0x0802 | EXPLICIT_DECIMAL_FORMAT`, with `EXPLICIT_DECIMAL_FORMAT = 0x0001`). Standard versus Accounting does not choose this flag. ADR 0008 records operation-specific E3/E4 evidence: a clean native open, native save/close/reopen with the same scalar/settings/text, strict Rust no-op reread, exact inverse restoration, and exact candidate/native-resaved hashes. Bounded fuzz evidence remains separately scoped; no broad-format or deletion-gate claim is made. See the [Numbers matrix](../crates/litchi-numbers/docs/FEATURE_MATRIX.md#cells-formulas-controls-and-annotations). |
-| Other generic display formats and rich styles | ❌ | ❌ | ❌ | Outside the focused Number/Percentage/Currency operations above, no general package getter or formatting transaction is exposed; date, duration, text, custom, and rich-style families remain unsupported at this owner boundary. |
+| Existing-cell Scientific display formats | 🟡 | ✅ | 🟡 | Selector-first [`table_cell_scientific_format`](../crates/litchi-numbers/src/package/table_cell_scientific_format.rs#L382) and archive-free [`Scientific`](../crates/litchi-numbers/src/cell/data_format/scientific.rs#L1) cover one existing cell's fixed decimal precision, native minus-sign negatives, and hidden thousands separator with explicit-to-automatic reset semantics. The package target passed 19/19, strict Buffa type-259 codec 4/4, wire library 34/34, and filtered legacy bridge 6/6; bounded codec/package sanitizer smokes each completed 100 executions. Numbers 14.4 opened, saved, closed, and reopened the precision-7 candidate without repair while preserving B2 text and B3 scalar 42, and strict reread was byte-identical. [ADR 0008](adr/0008-migration-and-verification.md#2026-09-01-amendment-numbers-existing-cell-scientific-format-native-validation-record) freezes the hashes and limits this to operation-specific E3/E4 evidence. |
+| Other generic display formats and rich styles | ❌ | ❌ | ❌ | Outside the focused Number/Percentage/Currency/Scientific operations above, no general package getter or formatting transaction is exposed; date, duration, text, custom, and rich-style families remain unsupported at this owner boundary. |
 | Cell comments/replies | 🟡 | 🟡 | 🟡 | Text-only, strict rooted/co-located ownership; no broad threads, authors, mentions, or attachments; current integration tests are red |
 | Charts/shapes/text boxes/media | ❌ | ❌ | ❌ | No focused semantic/package owner |
 | Filters/categories/groups/pivots | ❌ | ❌ | ❌ | Detection/refusal or schema presence only; no semantic CRUD |
@@ -166,6 +171,11 @@ and operation-specific native E3/E4 evidence recorded in ADR 0008, including exa
 candidate/native-resaved hashes and strict no-op reread. The checked native Number fixture only
 proves family-boundary behavior and does not promote Percentage native support; Currency evidence
 does not generalize beyond its stated existing-cell operation.
+The Scientific row has focused build/provenance, test, bounded sanitizer-smoke, and operation-specific
+native E3/E4 evidence. Numbers 14.4 retained the requested precision, text, and scalar through
+open/save/close/reopen, and strict Rust reread produced an exact no-op. This promotes only the
+recorded existing-cell Scientific operation; it does not establish arbitrary-producer parity,
+generic formatting support, or any ADR 0028 deletion-gate closure.
 
 ## Matrix maintenance requirements
 

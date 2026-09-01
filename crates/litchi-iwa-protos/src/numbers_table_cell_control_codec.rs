@@ -40,6 +40,16 @@ pub use crate::numbers_table_cell_currency_format_codec::{
     rewrite_currency_format, rewrite_table_cell_currency_format,
 };
 
+pub use crate::numbers_table_cell_scientific_format_codec::{
+    MAX_SCIENTIFIC_DECIMAL_PLACES, NATIVE_SCIENTIFIC_FORMAT_TYPE, NATIVE_SCIENTIFIC_NEGATIVE_STYLE,
+    NATIVE_SCIENTIFIC_SHOW_THOUSANDS_SEPARATOR, PreparedScientificFormatRewrite,
+    PreparedScientificFormatWrite, ScientificFormatSnapshot, ScientificFormatWrite,
+    canonical_scientific_format, decode_scientific_format, decode_scientific_format_with_report,
+    prepare_scientific_format_append, prepare_scientific_format_rewrite,
+    prepare_scientific_format_write, rewrite_scientific_format,
+    rewrite_table_cell_scientific_format,
+};
+
 pub use crate::numbers_table_cell_pop_up_menu_codec::{
     PreparedControlCellSpecWrite, PreparedControlCellSpecWrite as PreparedCellSpecWrite,
     PreparedControlFormatWrite, PreparedControlFormatWrite as PreparedFormatWrite,

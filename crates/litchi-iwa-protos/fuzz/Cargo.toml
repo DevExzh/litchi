@@ -227,6 +227,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "numbers_table_cell_scientific_format_codec"
+path = "fuzz_targets/numbers_table_cell_scientific_format_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "movie_playback_codec"
 path = "fuzz_targets/movie_playback_codec.rs"
 test = false

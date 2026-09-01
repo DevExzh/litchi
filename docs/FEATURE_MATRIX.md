@@ -67,10 +67,11 @@ declarations, 226 canonical edges, 11 ordered migration debts, and one migration
 topology facts, not evidence that the concrete format owners or the monolith deletion gate are
 complete.
 
-The Numbers matrix now records bounded existing-cell Number, Percentage, and Currency display
-format owners. Currency support is operation-specific and remains separate from generic display
-format or rich-style support; suite-wide/native general-format acceptance and the ADR 0028
-deletion gate remain open.
+The Numbers matrix now records bounded existing-cell Number, Percentage, Currency, and Scientific
+display-format owners. Currency and Scientific support are operation-specific and remain separate
+from generic display format or rich-style support; suite-wide/native general-format acceptance
+and the ADR 0028 deletion gate remain open. Scientific has focused build, test, fuzz, and native
+Numbers evidence recorded in ADR 0008, without broadening that operation-specific claim.
 
 For XLSB sparklines, the detailed XLSB matrix records the strict, bounded Worksheet-ABNF support
 for [MS-XLSB] §2.1.7.62 and records §2.4.228-230, §2.4.581-583, and §2.4.806. The common
