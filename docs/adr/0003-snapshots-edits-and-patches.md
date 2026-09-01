@@ -1686,14 +1686,49 @@ unrelated table cells remain source-authoritative; no generated owned message
 or normalization is used as the preservation source. The legacy
 `litchi_iwa::NumbersEditor` entry point remains a compatibility shell and
 delegates admitted exact graphs to the focused owner. Exact native structural
-admission failures do not enter its generic fallback; the deprecated raw-ID
-setter retains only its historical cross-family replacement exception after a
-typed `WrongFormatFamily` result. Source-built compatibility packages may
-still use the generic `DataFormat` implementation. Unsupported or ambiguous
-exact graphs otherwise fail closed. This is not a general data-format
+admission failures do not enter its generic fallback; a typed
+`WrongFormatFamily` result also fails closed instead of escaping the focused
+transaction. Source-built compatibility packages may still use the generic
+`DataFormat` implementation, including their historical replacement behavior.
+Unsupported or ambiguous exact graphs otherwise fail closed. This is not a general data-format
 conversion transaction:
 it does not create or remove cells, change values/formulas, rewrite text,
 currency, percentage, scientific, fraction, numeral-system, date/time,
 duration, custom, or interactive-control formats, or mutate table geometry,
 styles, comments, merges, or cross-workbook references. Durable patch
 serialization and multi-edit composition remain separate ADR work.
+
+## 2026-09-01 amendment: Numbers existing-cell Percentage-format transactions
+
+The focused Numbers owner now applies the same source-bound transaction
+contract to an existing cell's explicit `Percentage` format. The archive-free
+value contains checked decimal places, negative-value presentation, and
+thousands-separator policy. `None` means that the selected cell has no explicit
+Percentage-family format; `Some(Percentage { decimal_places: Automatic, .. })`
+is a real explicit format using the native automatic-decimal sentinel. The
+public read/edit/apply surface accepts a `SheetSelector`, a sheet-scoped
+`TableSelector`, and a checked `CellPosition`; format-list keys, BNC records,
+native type 258, archive members, and raw bytes remain private.
+
+The transaction is existing-object-only and bound to one immutable exact
+package snapshot. Exact no-ops share the source. Changed edits validate the
+selected BNC family, the type-258 payload, list identity, full-cell reference
+census, and refcount closure before applying copy-on-write. The commit exposes
+diagnostics, an exact-source patch, and an inverse; stale, foreign, replayed,
+wrong-family, malformed, over-budget, or ambiguous sources fail before
+publication. Candidate reopening, selector-equivalent readback, semantic
+equality, and complete physical ZIP-member locality are required before the
+new package is published.
+
+The private codec uses a nominal Percentage snapshot/write/prepared-plan
+surface over one shared decimal wire implementation. Strict handwritten
+preflight precedes a borrowed Buffa lazy view, while unknown extension spans
+and all unselected bytes remain source-authoritative. The value-preserving BNC
+primitive changes only Number-or-Percentage display metadata; stored values,
+formula caches, other cell fields, and opaque tails are retained. The
+deprecated `litchi_iwa::NumbersEditor` route delegates admitted exact packages
+to this owner and cannot fall back after any exact-source owner rejection;
+only source-built compatibility packages retain the generic route. This does
+not own Number, currency, scientific, fraction, numeral-system, date/time,
+duration, custom, text, or interactive-control formats, nor cell values,
+formulas, styles, table topology, or multi-edit patch composition.

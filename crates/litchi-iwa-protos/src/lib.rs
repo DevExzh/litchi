@@ -1636,6 +1636,12 @@ pub mod numbers_table_cell_control_codec;
 #[doc(hidden)]
 pub mod numbers_table_cell_number_format_codec;
 
+/// Neutral strict plain-percentage `FormatStructArchive` projection and
+/// measured source-preserving rewrite. The wire implementation reuses the
+/// shared table-cell decimal-format core and the existing scalar Buffa view.
+#[doc(hidden)]
+pub mod numbers_table_cell_percentage_format_codec;
+
 /// Format-neutral spelling for the Numbers interactive-cell control seam.
 #[doc(hidden)]
 pub mod table_cell_control_codec {

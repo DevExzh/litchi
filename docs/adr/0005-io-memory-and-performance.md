@@ -2027,3 +2027,34 @@ not inferred here. This amendment therefore makes no zero-copy, allocation
 count, peak-RSS, latency, throughput, or whole-package memory claim, and it
 does not transfer Buffa ownership of the remaining Numbers data-format
 families or table graph.
+
+## 2026-09-01 amendment: Numbers existing-cell Percentage-format resource record
+
+Percentage reuses the single focused decimal graph owner rather than copying
+the Number registry, tile, metadata, census, or locality implementation. Its
+strict type-258 codec performs bounded raw-wire validation before a private
+borrowed Buffa lazy-view parity check. Public Percentage snapshots, writes,
+and prepared plans are nominal wrappers, so compile-time family separation is
+preserved without duplicating the scanner or emitter. Candidate readback keeps
+the caller's original message ceiling; it does not raise that ceiling to the
+candidate size.
+
+The transaction threads finite package, graph, wire, output, retained, scratch,
+work, and allocation ceilings through native planning, reassembly, candidate
+reopen, and semantic readback. Checked size/cursor arithmetic and fallible
+output reservation protect publication. Shared entries use copy-on-write;
+exact semantic reuse avoids duplicate entries; zero-refcount entries are
+culled; stale or zero `next_list_id` values fail closed. The BNC wire crate
+exposes one narrowly named metadata-only decimal operation so the package owner
+does not duplicate BNC layout constants or invoke scalar conversion policy.
+
+Locality verification compares complete physical ZIP member records for every
+untouched member, requires each authorized native and metadata member exactly
+once, permits only deletion of invalidated previews, and validates the selected
+members' preserved headers. Tests cover all 256 valid decimal/negative/
+separator combinations, COW/refcounts, unknown extensions, malformed input,
+operation limits, exact no-op/inverse behavior, concurrency, and native
+selector equivalence. These are bounded correctness claims only: this record
+makes no peak-RSS, allocation-count, latency, throughput, zero-copy, or
+package-wide performance claim and does not extend ownership to other data
+format families.

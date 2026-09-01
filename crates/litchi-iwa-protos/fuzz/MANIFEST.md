@@ -34,6 +34,8 @@ generated libFuzzer output part of the repository.
 | `keynote_movie_geometry_codec` | `fuzz_targets/keynote_movie_geometry_codec.rs` | `corpus/keynote_movie_geometry_codec/` |
 | `numbers_table_cell_pop_up_menu_codec` | `fuzz_targets/numbers_table_cell_pop_up_menu_codec.rs` | `corpus/numbers_table_cell_pop_up_menu_codec/` |
 | `numbers_table_cell_control_codec` | `fuzz_targets/numbers_table_cell_control_codec.rs` | `corpus/numbers_table_cell_control_codec/` |
+| `numbers_table_cell_number_format_codec` | `fuzz_targets/numbers_table_cell_number_format_codec.rs` | `corpus/numbers_table_cell_number_format_codec/` |
+| `numbers_table_cell_percentage_format_codec` | `fuzz_targets/numbers_table_cell_percentage_format_codec.rs` | `corpus/numbers_table_cell_percentage_format_codec/` |
 | `movie_playback_codec` | `fuzz_targets/movie_playback_codec.rs` | `corpus/movie_playback_codec/` |
 
 `fuzz_targets/numbers_table_model.rs` is retained as a source-only harness and

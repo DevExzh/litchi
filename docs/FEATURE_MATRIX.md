@@ -1,14 +1,14 @@
-# Office File Format Feature Matrix
+# Document Format Feature Matrix
 
 This document is the index and shared guideline for the format-specific feature matrices. It
 intentionally does not duplicate the detailed feature rows. The authoritative, format-specific
 claims live in the linked documents under the corresponding crate.
 
 The matrices describe public Litchi API support, not rendering fidelity or complete conformance
-with every revision of a Microsoft protocol or OpenDocument standard. A protocol feature can be
-listed as unsupported even when the underlying package can preserve an opaque part. Conversely,
-bounded metadata or pass-through support must be marked partial rather than presented as semantic
-read/write support.
+with every revision of a Microsoft protocol, OpenDocument standard, or proprietary iWork schema.
+A protocol feature can be listed as unsupported even when the underlying package can preserve an
+opaque part. Conversely, bounded metadata or pass-through support must be marked partial rather
+than presented as semantic read/write support.
 
 ## Status model
 
@@ -37,6 +37,9 @@ otherwise.
 | `litchi-xlsx` | SpreadsheetML (`.xlsx`, related OOXML packages) | [MS-XLSX], [MS-OE376], [MS-OI29500], [MS-OWEXML], [MS-ODRAWXML], [MS-OFFCRYPTO], [MS-OVBA] | [SpreadsheetML feature matrix](../crates/litchi-xlsx/docs/FEATURE_MATRIX.md) |
 | `litchi-ppt` | PowerPoint binary (`.ppt`) | [MS-PPT], [MS-CFB], [MS-OLEPS], [MS-ODRAW], [MS-OGRAPH], [MS-OSHARED] | [PowerPoint binary feature matrix](../crates/litchi-ppt/docs/FEATURE_MATRIX.md) |
 | `litchi-pptx` | PresentationML (`.pptx`, related OOXML packages) | [MS-PPTX], [MS-OE376], [MS-OI29500], [MS-ODRAWXML], [MS-OFFCRYPTO], [MS-OVBA] | [PresentationML feature matrix](../crates/litchi-pptx/docs/FEATURE_MATRIX.md) |
+| `litchi-pages` | Apple Pages (`.pages`) | Apple IWA package plus Pages, text, table, and shared schema projections | [Pages feature matrix](../crates/litchi-pages/docs/FEATURE_MATRIX.md) |
+| `litchi-keynote` | Apple Keynote (`.key`) | Apple IWA package plus Keynote, presentation, text, table, chart, and shared schema projections | [Keynote feature matrix](../crates/litchi-keynote/docs/FEATURE_MATRIX.md) |
+| `litchi-numbers` | Apple Numbers (`.numbers`) | Apple IWA package plus Numbers, table, formula, chart, and shared schema projections | [Numbers feature matrix](../crates/litchi-numbers/docs/FEATURE_MATRIX.md) |
 | `litchi-odt` | OpenDocument text (`.odt`, `.ott`) | ISO/IEC 26300 structures and shared ODF package/style models | [OpenDocument text feature matrix](../crates/litchi-odt/docs/FEATURE_MATRIX.md) |
 | `litchi-ods` | OpenDocument spreadsheet (`.ods`, `.ots`) | ISO/IEC 26300 structures and shared ODF package/style/formula models | [OpenDocument spreadsheet feature matrix](../crates/litchi-ods/docs/FEATURE_MATRIX.md) |
 | `litchi-odp` | OpenDocument presentation (`.odp`, `.otp`) | ISO/IEC 26300 structures and shared ODF package/style/drawing models | [OpenDocument presentation feature matrix](../crates/litchi-odp/docs/FEATURE_MATRIX.md) |
@@ -53,6 +56,16 @@ live in `litchi-odf-common` and `litchi-odf-formula`; `litchi-odf` is a thin det
 feature-gated family umbrella. Concrete package and semantic ownership remains in each ODF family
 crate. Shared Office package and drawing behavior lives in the crates named by the specification
 map below.
+
+For iWork, the concrete Pages, Keynote, and Numbers matrices own user-facing semantic and package
+claims. Shared `litchi-iwa-*` crates are substrate, not a fourth format. Capabilities that remain
+only in the legacy `litchi-iwa` migration host do not count as focused-owner support unless the
+relevant detailed matrix labels them explicitly as host-only.
+
+The current iWork migration inventory is 64 workspace packages, 237 internal dependency
+declarations, 226 canonical edges, 11 ordered migration debts, and one migration host. These are
+topology facts, not evidence that the concrete format owners or the monolith deletion gate are
+complete.
 
 For XLSB sparklines, the detailed XLSB matrix records the strict, bounded Worksheet-ABNF support
 for [MS-XLSB] §2.1.7.62 and records §2.4.228-230, §2.4.581-583, and §2.4.806. The common
@@ -146,7 +159,7 @@ give the authoritative status and limitations for each concrete format.
 | Drawing, media, and embedded objects | Typed support varies by format; opaque preservation is not semantic rendering | `litchi-drawingml`, `litchi-odraw`, `litchi-ograph`, format matrices |
 | Formula and equation conversion/evaluation | Shared formula/equation infrastructure with intentionally incomplete host semantics | `litchi-formula`, `litchi-eval`, ODF/XLS/XLSB/XLSX matrices |
 | VBA and macro-enabled packages | Bounded codepage-aware project/module metadata and preservation; VBA is never compiled, interpreted, or executed | `litchi-vba`, OOXML matrices |
-| Conversion and interchange | Markdown, images, RTF, iWork, CSV/TSV and other text-workbook APIs are separate from the ten matrices | `litchi-markdown`, `litchi-imgconv`, `litchi-rtf`, `litchi-pages`, `litchi-keynote`, `litchi-numbers`, `litchi-sheet` |
+| Conversion and interchange | Markdown, images, RTF, CSV/TSV, and conversion APIs beyond each native format surface are separate from the detailed matrices unless a matrix explicitly includes them | `litchi-markdown`, `litchi-imgconv`, `litchi-rtf`, `litchi-pages`, `litchi-keynote`, `litchi-numbers`, `litchi-sheet` |
 
 ## Shared specification map
 
@@ -164,6 +177,7 @@ must use the most specific format specification available and then account for s
 | `[MS-OFFCRYPTO]` | Office encryption and password-protection envelopes |
 | `[MS-OVBA]`, `[MS-VBAL]` | Macro project/module streams and VBA codec boundaries |
 | `[MS-OSHARED]`, `[MS-DTYP]`, `[MS-LCID]`, `[MS-UCODEREF]` | Shared Office types, code pages, locale identifiers, and Unicode references |
+| Vendored Apple IWA protobuf schemas and focused projections | Audit input for Pages, Keynote, Numbers, shared archive/text/table/chart models, and typed refusals; generated schema availability is not semantic feature support |
 
 The specifications describe what a producer or consumer may encounter. They do not by themselves
 prove that Litchi implements a feature. Each row must be grounded in the public API and its tests,
@@ -193,8 +207,9 @@ APIs generally support in-memory and path-based workflows, but streaming, lazy l
 parsing, and rendering fidelity vary by crate. Typed errors and resource bounds are part of the
 support claim where the detailed matrix says so.
 
-The project treats untrusted Office and ODF content as data: external references are not fetched,
-and macros, VBA, ActiveX, controls, OLE objects, and embedded code are never executed or activated.
+The project treats untrusted Office, ODF, and iWork content as data. External references are not
+fetched, and macros, VBA, ActiveX, controls, OLE objects, and embedded code are never executed or
+activated.
 Those payloads may only be retained, inspected, validated, inventoried, or edited as inert blobs.
 Actions, formulas, and links are likewise never executed as document content. Formula evaluation and conversion
 must describe their supported function/AST subset and any caller-provided capabilities. Signature

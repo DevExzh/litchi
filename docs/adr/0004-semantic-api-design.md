@@ -3483,3 +3483,31 @@ Currency, percentage, scientific, fraction, numeral-system, date/time,
 duration, custom, text, checkbox, rating, slider, stepper, and pop-up-menu
 owners retain their existing contracts until each receives its own complete
 selector, wire, transaction, locality, and native gate.
+
+## 2026-09-01 amendment: Numbers existing-cell Percentage-format semantic owner
+
+`litchi_numbers::cell::data_format::Percentage` is now the sole semantic value
+for an explicit Percentage display format on an existing Numbers table cell.
+It is archive-free, heap-free, and contains only checked `DecimalPlaces`,
+`NegativeStyle`, and `ThousandsSeparator` values. `Option<Percentage>` keeps
+absence distinct from an explicit automatic-decimal format. Percentage has its
+own public value module, transaction vocabulary, codec snapshots, writes, and
+prepared plans; none is a type alias for Number even though both families
+share a private decimal wire core.
+
+`Package::{table_cell_percentage_format,
+edit_table_cell_percentage_format, apply_table_cell_percentage_format}` is
+selector-first and existing-cell-only. Callers identify a sheet, a table in
+that sheet, and a checked cell position. The API exposes no raw table ID,
+format key, BNC flag, native discriminator, protobuf/Buffa value, archive path,
+or compatibility object. Wrong-family selection is typed and symmetric: a
+Number payload cannot be read or edited as Percentage, and a Percentage
+payload cannot be admitted by the Number owner.
+
+This owner does not infer family from the shared decimal BNC kind; it resolves
+the referenced format-list payload and requires native type 258. It does not
+convert a different display/control family, create cells, or author values,
+formulas, general styles, or table structure. The legacy editor remains a
+deprecated compatibility delegate, and every exact-source rejection stays
+fail-closed; only synthetic source-built packages may use the generic legacy
+format route.

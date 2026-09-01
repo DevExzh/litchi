@@ -15313,3 +15313,35 @@ or native byte parity, package-wide performance, or migration-host exit. The
 slice remains limited to an existing decimal `Number` format and does not
 verify conversion or mutation of other display/control formats, cell values,
 formulas, styles, geometry, comments, merges, or cross-workbook references.
+
+## 2026-09-01 amendment: Numbers existing-cell Percentage-format native validation record
+
+The focused Percentage-format owner retains the selector-first existing-cell
+contract and the source/synthetic gates recorded in the Numbers matrix. A
+manual native validation probe used Numbers 14.4 (7043.0.93). The original Rust
+candidate was 136,813 bytes with SHA-256
+`683c14caec0293a4d1beafe7b8fe3a2dc996b2bdbb78aadcf771333317d280a5` and opened
+without repair or conversion UI. Numbers displayed B3 as `4,200.000%` with
+Percentage, three decimal places, red negatives with parentheses, and the
+thousands separator enabled; the underlying Actual value remained `42`.
+
+Numbers then saved the document through its native UI. The native-resaved
+artifact was 136,822 bytes with SHA-256
+`196eb6bfbb363fdf1041048db0bc99188656d339a536bcbc0b017bb277fe4c4a`.
+Close/reopen of the exact path reproduced the Percentage settings and value
+without a repair or conversion prompt. The pre-open source to use for this
+record is `/private/tmp/litchi-numbers-percentage-format.ft2PRN`; a later app
+autosave changed the disposable opened candidate, so that later pathname is
+not treated as the original Rust artifact.
+
+The focused Rust example then reread the native-resaved artifact and requested
+the same fixed three decimal places, red-parentheses negatives, and shown
+thousands separator. It reported `changed=false`, zero touched components, and
+no full reparse. The emitted target and inverse were byte-identical to the
+136,822-byte native-resaved input; all three retained SHA-256
+`196eb6bfbb363fdf1041048db0bc99188656d339a536bcbc0b017bb277fe4c4a`.
+
+This is recorded as native validation evidence for the disposable probe, not as
+a broad Numbers compatibility or performance claim. The focused matrix keeps
+Percentage below formal E3/E4 promotion until this evidence is attached to a
+frozen committed fixture/ledger; no other display-format family is covered.

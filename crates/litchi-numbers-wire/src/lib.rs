@@ -54,6 +54,14 @@ const DATE_TIME_FORMAT_IDENTIFIER_FLAG: u32 = 0x0000_8000;
 const DURATION_FORMAT_IDENTIFIER_FLAG: u32 = 0x0001_0000;
 const TEXT_FORMAT_IDENTIFIER_FLAG: u32 = 0x0002_0000;
 const CHECKBOX_FORMAT_IDENTIFIER_FLAG: u32 = 0x0004_0000;
+const FORMAT_METADATA_FLAGS: u32 = CONTROL_CELL_SPEC_FLAG
+    | CELL_FORMAT_KIND_FLAG
+    | CELL_FORMAT_IDENTIFIER_FLAG
+    | CURRENCY_FORMAT_IDENTIFIER_FLAG
+    | DATE_TIME_FORMAT_IDENTIFIER_FLAG
+    | DURATION_FORMAT_IDENTIFIER_FLAG
+    | TEXT_FORMAT_IDENTIFIER_FLAG
+    | CHECKBOX_FORMAT_IDENTIFIER_FLAG;
 const EXPLICIT_FORMAT_FLAGS_START: usize = 6;
 const EXPLICIT_FORMAT_FLAGS_END: usize = 8;
 pub const EXPLICIT_DECIMAL_FORMAT: u16 = 1;
@@ -558,6 +566,48 @@ impl BncCell {
         self.validate_data_format_request(kind, control_identifier)?;
         self.convert_scalar_for_data_format(kind)?;
         self.set_data_format_metadata_identifier(identifier, kind, control_identifier)
+    }
+
+    /// Replaces only the explicit Number-or-Percentage display metadata.
+    ///
+    /// Unlike [`Self::set_data_format_identifier`], this focused primitive
+    /// never converts the stored value, its formula cache, or the native cell
+    /// type. Passing `None` removes the explicit format while retaining every
+    /// non-format field and opaque trailing byte. It exists for graph owners
+    /// that have already validated the native format family and need to move
+    /// a cell between entries in that same decimal format list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an explicit format identifier is zero.
+    pub fn set_number_or_percentage_format_identifier_preserving_value(
+        &mut self,
+        identifier: Option<u32>,
+    ) -> Result<()> {
+        if identifier.is_some_and(|value| value == 0) {
+            return Err(Error::InvalidFormat(
+                "Number-or-Percentage format identifier must be non-zero".to_owned(),
+            ));
+        }
+
+        self.fields
+            .retain(|field, _| FORMAT_METADATA_FLAGS & field == 0);
+        let explicit_flags = if let Some(identifier) = identifier {
+            self.fields.insert(
+                CELL_FORMAT_KIND_FLAG,
+                DECIMAL_CELL_FORMAT_KIND.to_le_bytes().to_vec(),
+            );
+            self.fields.insert(
+                CELL_FORMAT_IDENTIFIER_FLAG,
+                identifier.to_le_bytes().to_vec(),
+            );
+            EXPLICIT_DECIMAL_FORMAT
+        } else {
+            0
+        };
+        self.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
+            .copy_from_slice(&explicit_flags.to_le_bytes());
+        Ok(())
     }
 
     fn set_data_format_metadata_identifier(
@@ -2681,6 +2731,69 @@ mod tests {
             .unwrap();
         assert_eq!(value_fields(&duration), original_duration);
         assert_eq!(duration.stored_value(), StoredValue::Duration);
+    }
+
+    #[test]
+    fn focused_decimal_format_identifier_preserves_every_non_format_byte() {
+        let mut cell = BncCell::minimal();
+        cell.set_number(42.25).unwrap();
+        cell.set_formula_reference(17);
+        cell.set_style_identifier(Some(23));
+        cell.set_comment_identifier(Some(29));
+        cell.tail.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
+        cell.set_data_format_identifier(31, CellDataFormatKind::NumericControlCurrency, Some(37))
+            .unwrap();
+
+        let original_prefix = cell.prefix[..EXPLICIT_FORMAT_FLAGS_START].to_vec();
+        let original_fields = cell
+            .fields
+            .iter()
+            .filter(|(flag, _)| FORMAT_METADATA_FLAGS & **flag == 0)
+            .map(|(flag, value)| (*flag, value.clone()))
+            .collect::<Vec<_>>();
+        let original_tail = cell.tail.clone();
+        let original_value = value_fields(&cell);
+
+        cell.set_number_or_percentage_format_identifier_preserving_value(Some(41))
+            .unwrap();
+        assert_eq!(cell.prefix[..EXPLICIT_FORMAT_FLAGS_START], original_prefix);
+        assert_eq!(cell.explicit_format_flags(), EXPLICIT_DECIMAL_FORMAT);
+        assert_eq!(cell.cell_format_kind(), Some(DECIMAL_CELL_FORMAT_KIND));
+        assert_eq!(cell.format_identifier(), Some(41));
+        assert_eq!(cell.control_cell_spec_identifier(), None);
+        assert_eq!(value_fields(&cell), original_value);
+        assert_eq!(cell.tail, original_tail);
+        assert_eq!(
+            cell.fields
+                .iter()
+                .filter(|(flag, _)| FORMAT_METADATA_FLAGS & **flag == 0)
+                .map(|(flag, value)| (*flag, value.clone()))
+                .collect::<Vec<_>>(),
+            original_fields
+        );
+
+        let encoded = cell.try_encode_with_limit(usize::MAX).unwrap();
+        let mut reparsed = BncCell::parse(&encoded).unwrap();
+        reparsed
+            .set_number_or_percentage_format_identifier_preserving_value(None)
+            .unwrap();
+        assert_eq!(
+            reparsed.prefix[..EXPLICIT_FORMAT_FLAGS_START],
+            original_prefix
+        );
+        assert_eq!(reparsed.explicit_format_flags(), 0);
+        assert_eq!(reparsed.cell_format_kind(), None);
+        assert_eq!(reparsed.format_identifier(), None);
+        assert_eq!(value_fields(&reparsed), original_value);
+        assert_eq!(reparsed.tail, original_tail);
+
+        let before_rejection = reparsed.encode();
+        assert!(
+            reparsed
+                .set_number_or_percentage_format_identifier_preserving_value(Some(0))
+                .is_err()
+        );
+        assert_eq!(reparsed.encode(), before_rejection);
     }
 
     #[test]

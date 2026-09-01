@@ -2122,13 +2122,40 @@ fn has_legacy_table_model_wire_shape(data: &[u8]) -> Result<bool> {
     Ok(true)
 }
 
-fn sparse_table_model_compatibility_shape(data: &[u8]) -> bool {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TableModelCompatibilityShape {
+    Sparse,
+    DenseWithGeneratedDefaultStyles,
+}
+
+fn table_model_compatibility_shape(data: &[u8]) -> Option<TableModelCompatibilityShape> {
+    // `prost::Message::encode_to_vec` emits proto2 required message fields
+    // even when their generated value is the empty/default message. A few
+    // historical and archive-free Numbers producers therefore serialize all
+    // native style references as `Reference { identifier: 0 }` while still
+    // carrying the selected DataStore routes. Those payloads are the
+    // compatibility shape even though the DataStore itself is populated;
+    // strict reference projection quite correctly rejects identifier zero.
+    const DEFAULT_STYLE_REFERENCE_FIELDS: [(u32, u16); 9] = [
+        (3, 1 << 0),
+        (18, 1 << 1),
+        (19, 1 << 2),
+        (20, 1 << 3),
+        (21, 1 << 4),
+        (24, 1 << 5),
+        (25, 1 << 6),
+        (26, 1 << 7),
+        (27, 1 << 8),
+    ];
+    const ALL_DEFAULT_STYLE_REFERENCES: u16 = (1 << DEFAULT_STYLE_REFERENCE_FIELDS.len()) - 1;
     let mut table_id = false;
     let mut base_data_store = false;
     let mut dense_data_store = false;
     let mut number_of_rows = false;
     let mut number_of_columns = false;
     let mut table_name = false;
+    let mut default_style_references = 0_u16;
+    let mut invalid_default_style_shape = false;
     let mut invalid_shape = false;
     let root_scan = preflight_wire_tree_with_limits(data, WireLimits::default(), |visit| {
         // A sparse compatibility model omits the native DataStore metadata
@@ -2155,6 +2182,29 @@ fn sparse_table_model_compatibility_shape(data: &[u8]) -> bool {
             return Ok(WireDescent::Skip);
         }
         let field = visit.field();
+        if let Some((_, bit)) = DEFAULT_STYLE_REFERENCE_FIELDS
+            .iter()
+            .find(|(number, _)| *number == field.number())
+        {
+            // Treat only the exact canonical empty Reference as the
+            // generated proto2 default. Duplicates, wrong wire types,
+            // malformed framing, and non-zero references stay on the
+            // strict/native admission path.
+            if field.wire_type() != 2
+                || default_style_references & *bit != 0
+                || field.validate_canonical_framing().is_err()
+                || field.payload() != [0x08, 0x00]
+            {
+                // Style references are outside the historical sparse-shape
+                // admission gate, so a real reference must not invalidate
+                // that pre-existing route. It only disqualifies the new,
+                // narrower generated-default-style compatibility shape.
+                invalid_default_style_shape = true;
+            } else {
+                default_style_references |= *bit;
+            }
+            return Ok(WireDescent::Skip);
+        }
         match field.number() {
             1 => {
                 // The compatibility extractor does not consume table_id, but
@@ -2242,13 +2292,28 @@ fn sparse_table_model_compatibility_shape(data: &[u8]) -> bool {
     // Sparse compatibility defaults for omitted dimensions would otherwise
     // manufacture a valid-looking 0x0 table from a merely truncated model.
     // An explicit 0x0 pair remains valid and retains historical compatibility.
-    root_scan.is_ok()
-        && base_data_store
-        && number_of_rows
-        && number_of_columns
-        && !dense_data_store
-        && table_name
-        && !invalid_shape
+    if root_scan.is_err()
+        || !base_data_store
+        || !number_of_rows
+        || !number_of_columns
+        || !table_name
+        || invalid_shape
+    {
+        return None;
+    }
+    if !dense_data_store {
+        Some(TableModelCompatibilityShape::Sparse)
+    } else if !invalid_default_style_shape
+        && default_style_references == ALL_DEFAULT_STYLE_REFERENCES
+    {
+        Some(TableModelCompatibilityShape::DenseWithGeneratedDefaultStyles)
+    } else {
+        None
+    }
+}
+
+fn sparse_table_model_compatibility_shape(data: &[u8]) -> bool {
+    table_model_compatibility_shape(data) == Some(TableModelCompatibilityShape::Sparse)
 }
 
 fn compact_table<T>(entries: impl IntoIterator<Item = (u32, T)>) -> Result<CompactTable<T>> {
@@ -2656,39 +2721,34 @@ impl<'a> TableDataExtractor<'a> {
             match numbers_table_cell_storage_codec::decode_table_model_with_report(source, options)
             {
                 Ok(decoded) => Ok(decoded),
-                // Classification is deliberately deferred until the strict
-                // route has failed. It is an admission probe, not a second
-                // unconditional walk of every native model, and compatibility
-                // callers retain their generated last-wins behavior outside
-                // this branch.
-                Err(error)
-                    if error.resource_limit().is_none()
-                        && sparse_table_model_compatibility_shape(source) =>
-                {
-                    compatibility_defaults = true;
-                    compatibility_data_store = true;
-                    let compatibility_options = table_cell_decode_options(
-                        source,
-                        usize::MAX,
-                        MAX_FORMULA_WIRE_BYTES,
-                        budget.remaining_payload_fields(),
-                        budget.remaining_payload_work(),
-                    );
-                    numbers_table_cell_storage_codec::decode_table_model_compatibility_with_report(
-                        source,
-                        compatibility_options,
-                    )
-                },
+                Err(error) if error.resource_limit().is_some() => Err(error),
                 Err(error) => {
-                    if error.resource_limit().is_some() {
-                        Err(error)
+                    // Classification is deliberately deferred until the
+                    // strict route has failed. It is an admission probe, not
+                    // an unconditional walk of every native model.
+                    if let Some(shape) = table_model_compatibility_shape(source) {
+                        compatibility_defaults = true;
+                        // Generated proto2 default style references affect the
+                        // root projection only. A populated native DataStore
+                        // must retain strict selected-sidecar/tile validation.
+                        compatibility_data_store = shape == TableModelCompatibilityShape::Sparse;
+                        let compatibility_options = table_cell_decode_options(
+                            source,
+                            usize::MAX,
+                            MAX_FORMULA_WIRE_BYTES,
+                            budget.remaining_payload_fields(),
+                            budget.remaining_payload_work(),
+                        );
+                        numbers_table_cell_storage_codec::decode_table_model_compatibility_with_report(
+                            source,
+                            compatibility_options,
+                        )
                     } else {
-                        // A dense native model remains strict at the root, but a
-                        // malformed unselected DataStore metadata route (for
-                        // example, row-header ownership) must not make package
-                        // ingress fail. Retry only the nested store compatibility
-                        // projection; selected sidecars and tile storage remain
-                        // strict in the extraction pass below.
+                        // A dense native model remains strict at the root, but
+                        // malformed unselected DataStore metadata (for example,
+                        // row-header ownership) must not make package ingress
+                        // fail. Retry only the nested compatibility projection;
+                        // selected sidecars and tile storage remain strict below.
                         match numbers_table_cell_storage_codec::decode_table_model_with_compatibility_data_store_with_report(source, options)
                         {
                             Ok(decoded) => {
