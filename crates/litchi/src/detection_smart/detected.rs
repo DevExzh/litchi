@@ -526,6 +526,12 @@ pub(crate) enum PresentationSourceBytesDetection {
     /// A validated PPTX catalog whose PresentationML semantic opening failed.
     /// The caller reports this typed owner error without reopening eagerly.
     PptxError(crate::pptx::Error),
+    /// A source or OPC catalog failure that must not be hidden by eager retry.
+    OpcError(crate::opc::OpcError),
+    /// A recognized OOXML family whose facade is not a presentation.
+    OtherOoxml(litchi_core::detection::FileFormat),
+    /// A recognized non-presentation OOXML family whose owner is disabled.
+    DisabledOtherOoxml(litchi_core::detection::FileFormat),
     /// The original bytes for the established byte-backed detector.
     Fallback(Vec<u8>),
 }
@@ -564,12 +570,18 @@ pub(crate) fn detect_presentation_source_bytes(
     let package_result = {
         let source: Arc<dyn ReadAt> =
             Arc::new(litchi_core::OwnedSource::from_arc(Arc::clone(&shared)));
+        #[cfg(test)]
+        super::record_opc_probe();
         crate::opc::SourceBackedPackage::from_read_at_with_limits(source, limits)
     };
-    let Ok(package) = package_result else {
-        return PresentationSourceBytesDetection::Fallback(reclaim_presentation_source_bytes(
-            shared,
-        ));
+    let package = match package_result {
+        Ok(package) => package,
+        Err(error) if missing_ooxml_content_types_error(&error) => {
+            return PresentationSourceBytesDetection::Fallback(reclaim_presentation_source_bytes(
+                shared,
+            ));
+        },
+        Err(error) => return PresentationSourceBytesDetection::OpcError(error),
     };
 
     let format =
@@ -577,11 +589,9 @@ pub(crate) fn detect_presentation_source_bytes(
             &package,
         ) {
             Ok(format) => format,
-            Err(_) => {
+            Err(error) => {
                 drop(package);
-                return PresentationSourceBytesDetection::Fallback(
-                    reclaim_presentation_source_bytes(shared),
-                );
+                return PresentationSourceBytesDetection::OpcError(error);
             },
         };
     if format == Some(litchi_core::detection::FileFormat::Pptx) {
@@ -592,7 +602,25 @@ pub(crate) fn detect_presentation_source_bytes(
     }
 
     drop(package);
-    PresentationSourceBytesDetection::Fallback(reclaim_presentation_source_bytes(shared))
+    let Some(format) = format else {
+        return PresentationSourceBytesDetection::Fallback(reclaim_presentation_source_bytes(
+            shared,
+        ));
+    };
+    let enabled_other_owner = match format {
+        #[cfg(feature = "docx")]
+        litchi_core::detection::FileFormat::Docx => true,
+        #[cfg(feature = "xlsx")]
+        litchi_core::detection::FileFormat::Xlsx => true,
+        #[cfg(feature = "xlsb")]
+        litchi_core::detection::FileFormat::Xlsb => true,
+        _ => false,
+    };
+    if enabled_other_owner {
+        PresentationSourceBytesDetection::OtherOoxml(format)
+    } else {
+        PresentationSourceBytesDetection::DisabledOtherOoxml(format)
+    }
 }
 
 #[cfg(feature = "pptx")]
@@ -996,7 +1024,13 @@ fn xls_source_recoverable_probe_error(error: &crate::xls::SourceBackedError) -> 
 }
 
 #[cfg(all(
-    any(feature = "ods", feature = "xlsx", feature = "xls", feature = "xlsb"),
+    any(
+        feature = "pptx",
+        feature = "ods",
+        feature = "xlsx",
+        feature = "xls",
+        feature = "xlsb"
+    ),
     any(unix, windows)
 ))]
 fn ensure_path_source_current(
@@ -1012,7 +1046,13 @@ fn ensure_path_source_current(
 }
 
 #[cfg(all(
-    any(feature = "ods", feature = "xlsx", feature = "xls", feature = "xlsb"),
+    any(
+        feature = "pptx",
+        feature = "ods",
+        feature = "xlsx",
+        feature = "xls",
+        feature = "xlsb"
+    ),
     any(unix, windows)
 ))]
 fn read_path_source_bytes(
@@ -1030,7 +1070,7 @@ fn read_path_source_bytes(
                 resource: litchi_core::Resource::InputBytes,
                 observed: length,
                 limit: max_input_bytes,
-                scope: std::sync::Arc::from("unified filesystem workbook"),
+                scope: std::sync::Arc::from("unified filesystem OOXML fallback"),
             },
         ));
     }
@@ -1043,7 +1083,7 @@ fn read_path_source_bytes(
     bytes
         .try_reserve_exact(length)
         .map_err(|source| litchi_core::Error::Allocation {
-            resource: "unified filesystem workbook source bytes",
+            resource: "unified filesystem OOXML fallback source bytes",
             source,
         })?;
     bytes.resize(length, 0);
@@ -1056,6 +1096,53 @@ fn read_path_source_bytes(
     }
     ensure_path_source_current(source, expected)?;
     Ok(bytes)
+}
+
+#[cfg(all(feature = "pptx", any(unix, windows)))]
+fn pptx_path_core_error_to_opc(error: litchi_core::Error) -> crate::opc::OpcError {
+    match error {
+        litchi_core::Error::Io(error) => crate::opc::OpcError::IoError(error),
+        litchi_core::Error::SourceChanged { expected, observed } => {
+            crate::opc::OpcError::SourceChanged {
+                expected,
+                actual: observed,
+            }
+        },
+        litchi_core::Error::Allocation { resource, source } => {
+            crate::opc::OpcError::Allocation { resource, source }
+        },
+        litchi_core::Error::ResourceLimit(limit) => {
+            if matches!(&limit.resource, litchi_core::Resource::InputBytes) {
+                crate::opc::OpcError::ReadLimit {
+                    resource: crate::opc::ReadResource::InputBytes,
+                    actual: limit.observed,
+                    maximum: limit.limit,
+                }
+            } else {
+                crate::opc::OpcError::ZipError(format!(
+                    "PPTX filesystem resource limit for {:?}: observed {}, maximum {}",
+                    limit.resource, limit.observed, limit.limit
+                ))
+            }
+        },
+        error => crate::opc::OpcError::ZipError(error.to_string()),
+    }
+}
+
+/// Read a positional presentation fallback through one bounded source.
+#[cfg(all(feature = "pptx", any(unix, windows)))]
+pub(crate) fn read_presentation_path_bytes_with_limits(
+    path: &std::path::Path,
+    max_input_bytes: u64,
+) -> std::result::Result<Vec<u8>, crate::opc::OpcError> {
+    use litchi_core::ReadAt;
+    use std::sync::Arc;
+
+    let source: Arc<dyn ReadAt> =
+        Arc::new(litchi_core::FileSource::open(path).map_err(crate::opc::OpcError::IoError)?);
+    let source_version = source.version().map_err(crate::opc::OpcError::IoError)?;
+    read_path_source_bytes(source.as_ref(), source_version, max_input_bytes)
+        .map_err(pptx_path_core_error_to_opc)
 }
 
 /// Checked ODP preparation for the unified presentation facade.
@@ -1484,6 +1571,8 @@ pub(crate) enum PptxSourcePathDetection {
     /// marker in the same ZIP from taking ownership while preserving the
     /// byte detector's `NotOfficeFile` result.
     DisabledOtherOoxml(litchi_core::detection::FileFormat),
+    /// Bytes retained from the same pinned source for lower-precedence fallback.
+    Bytes(Vec<u8>),
 }
 
 /// Error from the private source-backed PPTX path probe.
@@ -1617,24 +1706,22 @@ pub(crate) fn detect_docx_source_path_with_limits(
 
     #[cfg(test)]
     super::record_opc_probe();
-    let package = match crate::opc::SourceBackedPackage::from_read_at_with_limits(
-        std::sync::Arc::clone(&source),
-        limits,
-    ) {
-        Ok(package) => package,
-        Err(error) if hard_docx_source_bytes_probe_error(&error) => {
-            return Err(DocxSourcePathError::Opc(error));
-        },
-        Err(error) if ooxml_extension => return Err(DocxSourcePathError::Opc(error)),
-        Err(_) => {
-            if crate::detection_smart::detect_file_format(path).is_some() {
-                return Ok(None);
-            }
-            return Err(DocxSourcePathError::Opc(crate::opc::OpcError::ZipError(
-                "ZIP input is not a supported Office package".to_owned(),
-            )));
-        },
-    };
+    let package =
+        match crate::opc::SourceBackedPackage::from_read_at_with_limits(source.clone(), limits) {
+            Ok(package) => package,
+            Err(error) if hard_docx_source_bytes_probe_error(&error) => {
+                return Err(DocxSourcePathError::Opc(error));
+            },
+            Err(error) if ooxml_extension => return Err(DocxSourcePathError::Opc(error)),
+            Err(_) => {
+                if crate::detection_smart::detect_file_format(path).is_some() {
+                    return Ok(None);
+                }
+                return Err(DocxSourcePathError::Opc(crate::opc::OpcError::ZipError(
+                    "ZIP input is not a supported Office package".to_owned(),
+                )));
+            },
+        };
 
     let format =
         crate::detection_smart::ooxml::try_detect_ooxml_format_from_source_backed_package(&package)
@@ -1897,22 +1984,20 @@ pub(crate) fn detect_docx_from_odt_source_candidate_with_limits(
 
     #[cfg(test)]
     super::record_opc_probe();
-    let package = match crate::opc::SourceBackedPackage::from_read_at_with_limits(
-        std::sync::Arc::clone(&source),
-        limits,
-    ) {
-        Ok(package) => package,
-        Err(error) if missing_ooxml_content_types_error(&error) => {
-            candidate
-                .ensure_current_opc()
-                .map_err(DocxSourcePathError::Opc)?;
-            return Ok(None);
-        },
-        Err(error) if hard_docx_source_bytes_probe_error(&error) => {
-            return Err(DocxSourcePathError::Opc(error));
-        },
-        Err(error) => return Err(DocxSourcePathError::Opc(error)),
-    };
+    let package =
+        match crate::opc::SourceBackedPackage::from_read_at_with_limits(source.clone(), limits) {
+            Ok(package) => package,
+            Err(error) if missing_ooxml_content_types_error(&error) => {
+                candidate
+                    .ensure_current_opc()
+                    .map_err(DocxSourcePathError::Opc)?;
+                return Ok(None);
+            },
+            Err(error) if hard_docx_source_bytes_probe_error(&error) => {
+                return Err(DocxSourcePathError::Opc(error));
+            },
+            Err(error) => return Err(DocxSourcePathError::Opc(error)),
+        };
 
     let format =
         crate::detection_smart::ooxml::try_detect_ooxml_format_from_source_backed_package(&package)
@@ -1974,58 +2059,80 @@ pub(crate) fn detect_pptx_source_path_with_limits(
             .map_err(crate::opc::OpcError::IoError)
             .map_err(PptxSourcePathError::Opc)?,
     );
+    let source_version = source
+        .version()
+        .map_err(crate::opc::OpcError::IoError)
+        .map_err(PptxSourcePathError::Opc)?;
     let mut signature = [0_u8; 4];
     let read = source
         .read_at(0, &mut signature)
         .map_err(crate::opc::OpcError::IoError)
+        .map_err(PptxSourcePathError::Opc)?;
+    ensure_path_source_current(source.as_ref(), source_version)
+        .map_err(pptx_path_core_error_to_opc)
         .map_err(PptxSourcePathError::Opc)?;
     let zip_magic = read == signature.len()
         && litchi_core::detection::simd_utils::signature_matches(
             &signature,
             litchi_core::detection::utils::ZIP_SIGNATURE,
         );
-    if !ooxml_extension && !zip_magic {
-        return Ok(None);
-    }
 
-    // OOXML-suffixed paths apply the caller's policy before any lower-family
-    // handoff. Native ODP paths may first prove that no OOXML catalog exists
-    // under the ODF detector's own finite policy.
+    // Apply the caller's byte policy before any fallback allocation, including
+    // extensionless non-ZIP input.
     let input_bytes = source
         .len()
         .map_err(crate::opc::OpcError::IoError)
         .map_err(PptxSourcePathError::Opc)?;
-    if ooxml_extension && input_bytes > limits.max_input_bytes() {
-        return Err(PptxSourcePathError::Opc(crate::opc::OpcError::ReadLimit {
-            resource: crate::opc::ReadResource::InputBytes,
-            actual: input_bytes,
-            maximum: limits.max_input_bytes(),
-        }));
-    }
-
-    #[cfg(feature = "odp")]
-    let ordinary_odp = {
-        let odp_mime = litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())
-            .map_err(odf_probe_error_to_opc)
-            .map_err(PptxSourcePathError::Opc)?;
-        odp_mime == Some(litchi_core::FileFormat::Odp)
-            && litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at(source.as_ref())
-                .map_err(odf_probe_error_to_opc)
-                .map_err(PptxSourcePathError::Opc)?
-                == Some(false)
-    };
-    #[cfg(not(feature = "odp"))]
-    let ordinary_odp = false;
-    if ordinary_odp {
-        return Ok(None);
-    }
-
+    ensure_path_source_current(source.as_ref(), source_version)
+        .map_err(pptx_path_core_error_to_opc)
+        .map_err(PptxSourcePathError::Opc)?;
     if input_bytes > limits.max_input_bytes() {
         return Err(PptxSourcePathError::Opc(crate::opc::OpcError::ReadLimit {
             resource: crate::opc::ReadResource::InputBytes,
             actual: input_bytes,
             maximum: limits.max_input_bytes(),
         }));
+    }
+    if !ooxml_extension && !zip_magic {
+        return Ok(None);
+    }
+
+    #[cfg(feature = "odp")]
+    let ordinary_odp = {
+        let odp_mime = match litchi_odf_common::detect::packaged_mime_read_at(source.as_ref()) {
+            Ok(odp_mime) => odp_mime,
+            Err(error) => {
+                ensure_path_source_current(source.as_ref(), source_version)
+                    .map_err(pptx_path_core_error_to_opc)
+                    .map_err(PptxSourcePathError::Opc)?;
+                return Err(PptxSourcePathError::Opc(odf_probe_error_to_opc(error)));
+            },
+        };
+        ensure_path_source_current(source.as_ref(), source_version)
+            .map_err(pptx_path_core_error_to_opc)
+            .map_err(PptxSourcePathError::Opc)?;
+        let has_ooxml_catalog = if odp_mime == Some(litchi_core::FileFormat::Odp) {
+            match litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at(source.as_ref()) {
+                Ok(has_ooxml_catalog) => has_ooxml_catalog,
+                Err(error) => {
+                    ensure_path_source_current(source.as_ref(), source_version)
+                        .map_err(pptx_path_core_error_to_opc)
+                        .map_err(PptxSourcePathError::Opc)?;
+                    return Err(PptxSourcePathError::Opc(odf_probe_error_to_opc(error)));
+                },
+            }
+        } else {
+            None
+        };
+        ensure_path_source_current(source.as_ref(), source_version)
+            .map_err(pptx_path_core_error_to_opc)
+            .map_err(PptxSourcePathError::Opc)?;
+        odp_mime == Some(litchi_core::FileFormat::Odp) && has_ooxml_catalog == Some(false)
+    };
+    #[cfg(not(feature = "odp"))]
+    let ordinary_odp = false;
+    if ordinary_odp {
+        return Ok(None);
     }
 
     if !zip_magic {
@@ -2036,26 +2143,44 @@ pub(crate) fn detect_pptx_source_path_with_limits(
 
     #[cfg(test)]
     super::record_opc_probe();
-    let package = match crate::opc::SourceBackedPackage::from_read_at_with_limits(source, limits) {
-        Ok(package) => package,
-        Err(error) if hard_ooxml_probe_error(&error) => {
-            return Err(PptxSourcePathError::Opc(error));
-        },
-        Err(error) if ooxml_extension => return Err(PptxSourcePathError::Opc(error)),
-        Err(_) => {
-            if crate::detection_smart::detect_file_format(path).is_some() {
-                return Ok(None);
-            }
-            return Err(PptxSourcePathError::Opc(crate::opc::OpcError::ZipError(
-                "ZIP input is not a supported Office package".to_owned(),
-            )));
-        },
-    };
+    let package =
+        match crate::opc::SourceBackedPackage::from_read_at_with_limits(source.clone(), limits) {
+            Ok(package) => package,
+            Err(error) if hard_ooxml_probe_error(&error) => {
+                ensure_path_source_current(source.as_ref(), source_version)
+                    .map_err(pptx_path_core_error_to_opc)
+                    .map_err(PptxSourcePathError::Opc)?;
+                return Err(PptxSourcePathError::Opc(error));
+            },
+            Err(error) if ooxml_extension => {
+                ensure_path_source_current(source.as_ref(), source_version)
+                    .map_err(pptx_path_core_error_to_opc)
+                    .map_err(PptxSourcePathError::Opc)?;
+                return Err(PptxSourcePathError::Opc(error));
+            },
+            Err(_error) => {
+                ensure_path_source_current(source.as_ref(), source_version)
+                    .map_err(pptx_path_core_error_to_opc)
+                    .map_err(PptxSourcePathError::Opc)?;
+                let bytes = read_path_source_bytes(
+                    source.as_ref(),
+                    source_version,
+                    limits.max_input_bytes(),
+                )
+                .map_err(pptx_path_core_error_to_opc)
+                .map_err(PptxSourcePathError::Opc)?;
+                return Ok(Some(PptxSourcePathDetection::Bytes(bytes)));
+            },
+        };
 
-    let format =
-        crate::detection_smart::ooxml::try_detect_ooxml_format_from_source_backed_package(&package)
-            .map_err(PptxSourcePathError::Opc)?;
+    let format_result =
+        crate::detection_smart::ooxml::try_detect_ooxml_format_from_source_backed_package(&package);
+    ensure_path_source_current(source.as_ref(), source_version)
+        .map_err(pptx_path_core_error_to_opc)
+        .map_err(PptxSourcePathError::Opc)?;
+    let format = format_result.map_err(PptxSourcePathError::Opc)?;
     let Some(format) = format else {
+        drop(package);
         return Ok(None);
     };
     if format != litchi_core::detection::FileFormat::Pptx {
@@ -2079,9 +2204,13 @@ pub(crate) fn detect_pptx_source_path_with_limits(
         }));
     }
 
-    crate::pptx::SourceBackedPresentation::from_source_backed_package(package)
-        .map(|presentation| Some(PptxSourcePathDetection::Pptx(presentation)))
-        .map_err(PptxSourcePathError::Pptx)
+    let presentation_result =
+        crate::pptx::SourceBackedPresentation::from_source_backed_package(package);
+    ensure_path_source_current(source.as_ref(), source_version)
+        .map_err(pptx_path_core_error_to_opc)
+        .map_err(PptxSourcePathError::Opc)?;
+    let presentation = presentation_result.map_err(PptxSourcePathError::Pptx)?;
+    Ok(Some(PptxSourcePathDetection::Pptx(presentation)))
 }
 
 #[cfg(any(feature = "docx", feature = "pptx"))]
@@ -2641,7 +2770,7 @@ mod short_signature_tests {
 
     #[cfg(feature = "pptx")]
     #[test]
-    fn source_pptx_probe_preserves_valid_non_pptx_opc_allocation_for_fallback() {
+    fn source_pptx_probe_terminals_valid_non_pptx_opc_classification() {
         use crate::opc::constants::{content_type as ct, relationship_type as rt};
         use crate::opc::{BlobPart, OpcPackage, PackURI, PackageWriter, TargetMode};
 
@@ -2664,16 +2793,82 @@ mod short_signature_tests {
             )
             .unwrap();
         let bytes = PackageWriter::to_bytes(&package).unwrap();
-        let pointer = bytes.as_ptr();
-        let capacity = bytes.capacity();
-
         let detected =
             super::detect_presentation_source_bytes(bytes, crate::opc::ReadLimits::default());
-        let super::PresentationSourceBytesDetection::Fallback(retained) = detected else {
-            panic!("non-PPTX OPC unexpectedly selected the presentation owner");
-        };
-        assert_eq!(retained.as_ptr(), pointer);
-        assert_eq!(retained.capacity(), capacity);
+        assert!(matches!(
+            detected,
+            super::PresentationSourceBytesDetection::OtherOoxml(_)
+                | super::PresentationSourceBytesDetection::DisabledOtherOoxml(_)
+        ));
+    }
+
+    #[cfg(feature = "pptx")]
+    #[test]
+    fn source_pptx_probe_propagates_input_limit() {
+        let limits = crate::opc::ReadLimits::builder()
+            .max_input_bytes(1)
+            .expect("test input limit")
+            .build()
+            .expect("consistent test limits");
+        let detected = super::detect_presentation_source_bytes(b"PK\x03\x04".to_vec(), limits);
+        assert!(matches!(
+            detected,
+            super::PresentationSourceBytesDetection::OpcError(crate::opc::OpcError::ReadLimit {
+                resource: crate::opc::ReadResource::InputBytes,
+                actual: 4,
+                maximum: 1,
+            })
+        ));
+    }
+
+    #[cfg(feature = "pptx")]
+    #[test]
+    fn source_pptx_probe_propagates_part_limit() {
+        use std::io::Write;
+
+        let mut output = std::io::Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(&mut output);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        writer.start_file("[Content_Types].xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="txt" ContentType="text/plain"/></Types>"#,
+            )
+            .unwrap();
+        writer.start_file("one.txt", options).unwrap();
+        writer.write_all(b"one").unwrap();
+        writer.start_file("two.txt", options).unwrap();
+        writer.write_all(b"two").unwrap();
+        writer.finish().unwrap();
+
+        let limits = crate::opc::ReadLimits::builder()
+            .max_parts(1)
+            .expect("test part limit")
+            .build()
+            .expect("consistent test limits");
+        let detected = super::detect_presentation_source_bytes(output.into_inner(), limits);
+        assert!(matches!(
+            detected,
+            super::PresentationSourceBytesDetection::OpcError(crate::opc::OpcError::ReadLimit {
+                resource: crate::opc::ReadResource::Parts,
+                actual: 2,
+                maximum: 1,
+            })
+        ));
+    }
+
+    #[cfg(feature = "pptx")]
+    #[test]
+    fn source_pptx_probe_propagates_malformed_zip_candidate() {
+        let detected = super::detect_presentation_source_bytes(
+            b"PK\x03\x04malformed".to_vec(),
+            crate::opc::ReadLimits::default(),
+        );
+        assert!(matches!(
+            detected,
+            super::PresentationSourceBytesDetection::OpcError(crate::opc::OpcError::ZipError(_))
+        ));
     }
 
     #[cfg(feature = "rtf")]
