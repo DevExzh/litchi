@@ -1053,6 +1053,7 @@ def add_numbers_table_cell_number_format_canonical_scaffold(root: Path) -> None:
     codec.parent.mkdir(parents=True, exist_ok=True)
     codec.write_text(
         "use buffa::DecodeOptions;\n"
+        "pub const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;\n"
         "pub struct PreparedNumberFormatRewrite;\n"
         "pub struct RewriteExecutionRequirements;\n"
         "pub struct RewriteExecutionLimits;\n"
@@ -1106,7 +1107,9 @@ def add_numbers_table_cell_number_format_canonical_scaffold(root: Path) -> None:
         boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_FUZZ_CORPUS,
         boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_FUZZ_CORPUS,
     ):
-        (root / corpus).mkdir(parents=True, exist_ok=True)
+        absolute = root / corpus
+        absolute.mkdir(parents=True, exist_ok=True)
+        (absolute / "canonical_number.seed").write_bytes(b"number")
 
     example = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_EXAMPLE
     example.parent.mkdir(parents=True, exist_ok=True)
@@ -1147,6 +1150,277 @@ def add_numbers_table_cell_number_format_canonical_scaffold(root: Path) -> None:
         "    let position = CellPosition::try_from_usize(row, column)?;\n"
         "    unsupported; ambiguous; package.edit_table_cell_number_format(sheet, table, position).clear().commit()\n"
         "}\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+
+def add_numbers_table_cell_percentage_format_canonical_scaffold(
+    root: Path,
+    *,
+    include_shared_core: bool = False,
+    number_via_control_native: bool = False,
+) -> None:
+    """Create a complete independent Percentage-format boundary fixture."""
+
+    add_numbers_table_cell_number_format_canonical_scaffold(root)
+
+    semantic = root / boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub use super::number::Percentage;\n"
+        "pub mod transaction;\n",
+        encoding="utf-8",
+    )
+    transaction = root / boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_TRANSACTION_SOURCE
+    transaction.parent.mkdir(parents=True, exist_ok=True)
+    transaction.write_text(
+        "pub use crate::package::table_cell_percentage_format::{"
+        + ", ".join(boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_TRANSACTION_TYPES)
+        + "};\n",
+        encoding="utf-8",
+    )
+
+    owner = root / boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "use super::table_cell_display_format_native as native;\n"
+        + "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_TRANSACTION_TYPES
+        )
+        + "fn existing_cell_resolution() {}\n"
+        + "fn format_table_refcount_reference_entry_closure() {}\n"
+        + "fn exact_source_inverse_no_op_patch() {}\n"
+        + "fn candidate_reopen_readback_locality_same_content() {}\n"
+        + "fn budget_preflight_bounded_allocation_limit() {}\n"
+        + "fn unsupported_ambiguous_cross_component_fail_closed() {}\n"
+        + "fn shared_core_route() { native::read_display_format_with_budget(); native::rewrite_display_format(); }\n"
+        + "impl Package {\n"
+        + "pub fn table_cell_percentage_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Option<Percentage>, Error> { shared_core_route(); todo!() }\n"
+        + "pub fn edit_table_cell_percentage_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Edit, Error> { shared_core_route(); todo!() }\n"
+        + "pub fn apply_table_cell_percentage_format(&self, patch: &Patch) -> Result<Commit, Error> { shared_core_route(); todo!() }\n"
+        + "}\n"
+        + "impl Edit {\n"
+        + "pub fn before(&self) -> Option<Percentage> { None }\n"
+        + "pub fn after(&self) -> Option<Percentage> { None }\n"
+        + "pub fn set(self, value: Percentage) -> Self { let _ = value; self }\n"
+        + "pub fn clear(self) -> Self { self }\n"
+        + "pub fn reset(self) -> Self { self.clear() }\n"
+        + "pub fn commit(self) -> Result<Commit, Error> { todo!() }\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+
+    if include_shared_core:
+        core = root / boundaries.NUMBERS_TABLE_CELL_DISPLAY_FORMAT_NATIVE_SOURCE
+        core.parent.mkdir(parents=True, exist_ok=True)
+        core.write_text(
+            "use super::Package;\n"
+            "pub(super) fn read_display_format_with_budget() {}\n"
+            "pub(super) fn rewrite_display_format() { prepare_display_rewrite(); prepare_display_append(); }\n"
+            "fn prepare_display_rewrite() {}\n"
+            "fn prepare_display_append() {}\n",
+            encoding="utf-8",
+        )
+        number_owner = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_OWNER_SOURCE
+        number_owner_source = number_owner.read_text(encoding="utf-8")
+        if number_via_control_native:
+            forwarding = root / boundaries.NUMBERS_TABLE_CELL_DISPLAY_FORMAT_FORWARDING_SOURCE
+            forwarding.parent.mkdir(parents=True, exist_ok=True)
+            forwarding.write_text(
+                "pub(super) use super::table_cell_display_format_native::{"
+                "read_number_format, read_number_format_with_budget, rewrite_number_format};\n"
+                "fn canonical_format() {}\n",
+                encoding="utf-8",
+            )
+            number_route = (
+                "pub struct Edit;\n"
+                "use super::table_cell_control_native as native;\n"
+                "fn shared_core_route() { native::read_number_format_with_budget(); native::rewrite_number_format(); }\n"
+            )
+        else:
+            number_route = (
+                "pub struct Edit;\n"
+                "use super::table_cell_display_format_native as native;\n"
+                "fn shared_core_route() { native::read_display_format_with_budget(); native::rewrite_display_format(); }\n"
+            )
+        number_owner.write_text(
+            number_owner_source.replace("pub struct Edit;\n", number_route).replace(
+                "pub fn table_cell_number_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Option<Number>, Error> {}",
+                "pub fn table_cell_number_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Option<Number>, Error> { shared_core_route(); todo!() }",
+            ),
+            encoding="utf-8",
+        )
+
+    lib_export = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_EXPORT_SOURCES[0]
+    package_export = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_EXPORT_SOURCES[1]
+    data_format_export = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_EXPORT_SOURCES[2]
+    package_export.write_text(
+        "pub(crate) mod table_cell_number_format;\n"
+        "pub(crate) mod table_cell_percentage_format;\n",
+        encoding="utf-8",
+    )
+    data_format_export.write_text(
+        "pub mod number;\n"
+        "pub mod percentage;\n"
+        "pub use number::Number;\n"
+        "pub use percentage::Percentage;\n",
+        encoding="utf-8",
+    )
+    # The root export is intentionally unchanged except for making the
+    # explicit source fixture obvious to the facade scan.
+    lib_export.write_text("pub mod cell;\n", encoding="utf-8")
+
+    codec = root / boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "use buffa::DecodeOptions;\n"
+        "pub const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;\n"
+        "pub const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;\n"
+        "pub type PercentageFormatSnapshot<'source> = ();\n"
+        "pub type PercentageFormatWrite = ();\n"
+        "pub type PreparedPercentageFormatRewrite<'source> = ();\n"
+        "pub struct RewriteExecutionRequirements;\n"
+        "pub struct RewriteExecutionLimits;\n"
+        "pub fn decode_percentage_format_with_report() {\n"
+        "    let format_type = NATIVE_PERCENTAGE_FORMAT_TYPE;\n"
+        "    if format_type != expected_format_type { return; }\n"
+        "    preflight; let _ = DecodeOptions::new().decode_lazy_view(bytes);\n"
+        "    duplicate; noncanonical; unknown; raw; extend_from_slice;\n"
+        "    format_table; registry; refcount; reference; entry;\n"
+        "}\n"
+        "pub fn prepare_percentage_format_rewrite() {}\n"
+        "pub fn canonical_percentage_format() { decimal_places; negative_style; thousands_separator; }\n"
+        "pub fn rewrite_percentage_format() { MAX_RECURSION_LIMIT; execution_requirements; execute; }\n"
+        "fn strict_projection() { buffa_numbers_table_cell_percentage_format_generated; }\n"
+        "#[cfg(test)]\nmod tests { #[test] fn percentage_format_round_trip_and_hostile_wire() {} }\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_PUBLIC_SOURCE
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        f"pub mod {boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_MODULE};\n"
+        f"#[doc(hidden)]\npub mod {boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_MODULE};\n"
+        f"mod {boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_GENERATED_MODULE};\n",
+        encoding="utf-8",
+    )
+
+    integration = root / boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_INTEGRATION_SOURCE
+    integration.parent.mkdir(parents=True, exist_ok=True)
+    integration.write_text(
+        "#[test]\n"
+        "fn percentage_format_read_explicit_Percentage_and_automatic_Option() { explicit Percentage; automatic Option; read; }\n"
+        "fn set_reset_transaction() { edit_table_cell_percentage_format; set; clear; reset; automatic; }\n"
+        "fn exact_no_op_and_inverse_restore_bytes() { no_op; unchanged; inverse; byte_for_byte; }\n"
+        "fn conflict_fail_closed() { stale; foreign; ambiguous; conflict; unsupported; malformed; }\n"
+        "fn selector_locality_reopen_readback() { SheetSelector; TableSelector; CellPosition; locality; reopen; readback; }\n",
+        encoding="utf-8",
+    )
+    for fuzz_path in (
+        boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_FUZZ_SOURCE,
+        boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_FUZZ_SOURCE,
+    ):
+        absolute = root / fuzz_path
+        absolute.parent.mkdir(parents=True, exist_ok=True)
+        absolute.write_text(
+            "#![no_main]\nuse libfuzzer_sys::fuzz_target;\n"
+            "fuzz_target!(|data: &[u8]| { let _ = data; });\n",
+            encoding="utf-8",
+        )
+    for corpus in (
+        boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_FUZZ_CORPUS,
+        boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_FUZZ_CORPUS,
+    ):
+        absolute = root / corpus
+        absolute.mkdir(parents=True, exist_ok=True)
+        (absolute / "canonical_percentage_type_258.seed").write_bytes(b"percentage")
+
+    example = root / boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_EXAMPLE
+    example.parent.mkdir(parents=True, exist_ok=True)
+    example.write_text(
+        "fn main() { package.edit_table_cell_percentage_format(); }\n",
+        encoding="utf-8",
+    )
+    host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_SOURCE[0]
+    host.parent.mkdir(parents=True, exist_ok=True)
+    host.write_text(
+        host.read_text(encoding="utf-8")
+        + "\n"
+        + "use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelector, CellPosition};\n"
+        + "impl NumbersEditor {\n"
+        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
+        + "pub fn table_cell_percentage_format(&self, table_id: u64, row: usize, column: usize) -> Result<Option<Percentage>> {\n"
+        + "    let source_built = !self.package.source_is_exact(); if source_built { cell_percentage_format(); }\n"
+        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
+        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
+        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
+        + "    package.table_cell_percentage_format(sheet, table, position)\n"
+        + "}\n"
+        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
+        + "pub fn set_table_cell_percentage_format(&mut self, table_id: u64, row: usize, column: usize, format: Percentage) -> Result<()> {\n"
+        + "    let source_built = !self.package.source_is_exact(); let allow_family_replacement = true; if source_built || allow_family_replacement && matches!(error, WrongFormatFamily) { set_cell_percentage_format(); }\n"
+        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
+        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
+        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
+        + "    package.edit_table_cell_percentage_format(sheet, table, position).set(format).commit()\n"
+        + "}\n"
+        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
+        + "pub fn reset_table_cell_percentage_format(&mut self, table_id: u64, row: usize, column: usize) -> Result<bool> {\n"
+        + "    let source_built = !self.package.source_is_exact(); let allow_family_replacement = true; if source_built || allow_family_replacement && matches!(error, WrongFormatFamily) { reset_cell_percentage_format(); }\n"
+        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
+        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
+        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
+        + "    package.edit_table_cell_percentage_format(sheet, table, position).clear().commit()\n"
+        + "}\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+
+
+def add_percentage_format_selector_context_host(
+    root: Path,
+    *,
+    typed_location: bool,
+) -> None:
+    """Replace the Percentage host with a helper-only selector route fixture."""
+
+    host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_SOURCE[0]
+    selector_fields = (
+        "sheet: litchi_numbers::SheetSelector<'static>, "
+        "table: litchi_numbers::TableSelector<'static>, "
+        "position: litchi_numbers::table::CellPosition,"
+        if typed_location
+        else "sheet: usize, table: usize, position: usize,"
+    )
+    host.write_text(
+        "use litchi_numbers::Package as FocusedNumbersPackage;\n"
+        "enum FocusedPercentageFormatLocation {\n"
+        "    Owner { "
+        + selector_fields
+        + " source: FocusedNumbersPackage },\n"
+        "}\n"
+        "fn focused_percentage_format_location() -> Result<FocusedPercentageFormatLocation> {\n"
+        "    let source = FocusedNumbersPackage::from_bytes(bytes)?;\n"
+        "    Ok(FocusedPercentageFormatLocation::Owner { source, sheet, table, position })\n"
+        "}\n"
+        "fn focused_percentage_format() -> Result<Option<Percentage>> {\n"
+        "    let location = focused_percentage_format_location()?;\n"
+        "    let FocusedPercentageFormatLocation::Owner { source, sheet, table, position } = location else { return Err(Unsupported); };\n"
+        "    source.table_cell_percentage_format(sheet, table, position)\n"
+        "}\n"
+        "fn commit_focused_percentage_format() -> Result<()> {\n"
+        "    let location = focused_percentage_format_location()?;\n"
+        "    let FocusedPercentageFormatLocation::Owner { source, sheet, table, position } = location else { return Err(Unsupported); };\n"
+        "    source.edit_table_cell_percentage_format(sheet, table, position).set(format).commit()\n"
+        "}\n"
+        "impl NumbersEditor {\n"
+        "#[deprecated(note = \"legacy compatibility shell\")]\n"
+        "pub fn table_cell_percentage_format(&self, table_id: u64, row: usize, column: usize) -> Result<Option<Percentage>> { focused_percentage_format() }\n"
+        "#[deprecated(note = \"legacy compatibility shell\")]\n"
+        "pub fn set_table_cell_percentage_format(&mut self, table_id: u64, row: usize, column: usize, format: Percentage) -> Result<()> { commit_focused_percentage_format() }\n"
+        "#[deprecated(note = \"legacy compatibility shell\")]\n"
+        "pub fn reset_table_cell_percentage_format(&mut self, table_id: u64, row: usize, column: usize) -> Result<bool> { commit_focused_percentage_format() }\n"
         "}\n",
         encoding="utf-8",
     )
@@ -31454,6 +31728,284 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
+    def test_numbers_table_cell_percentage_format_positive_contract_and_shared_core(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_percentage_format_canonical_scaffold(
+                root, include_shared_core=True, number_via_control_native=True
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_percentage_format_codec_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_percentage_format_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_percentage_format_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_display_format_shared_core_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_percentage_format_facade_rejects_spoofed_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_percentage_format_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type PercentageFormatEdit = Edit;\n"
+                + "pub fn raw_percentage_format(table_id: TableId, row: usize, source_bytes: Vec<u8>, view: WireView, archive: Archive) {}\n"
+                + "pub fn opaque_percentage_bytes(data: Vec<u8>, boxed: Box<[u8]>, borrowed: Cow<'_, [u8]>) {}\n"
+                + "pub fn monolith(editor: NumbersEditor) {}\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_EXPORT_SOURCES[1]
+            package.write_text(
+                "pub mod table_cell_percentage_format;\n"
+                "pub use table_cell_percentage_format::*;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_percentage_format_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "retains flat alias PercentageFormatEdit",
+                "typed raw identifier parameter table_id: TableId",
+                "raw identifier/coordinate parameter row: usize",
+                "opaque raw byte container source_bytes: Vec<u8>",
+                "wire type WireView",
+                "archive/IWA type Archive",
+                "raw helper raw_percentage_format",
+                "opaque raw byte container type Vec<u8>",
+                "monolithic host type NumbersEditor",
+                "exposes its package owner module",
+                "retains root aliases via glob",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_numbers_table_cell_percentage_format_codec_rejects_type_order_and_decoys(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_percentage_format_canonical_scaffold(root)
+            codec = root / boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_SOURCE
+            complete = codec.read_text(encoding="utf-8")
+            for marker, expected in (
+                ("preflight; ", "strict canonical ingress"),
+                ("duplicate; ", "strict canonical ingress"),
+                ("unknown; raw; extend_from_slice;", "unknown/raw preservation"),
+                ("MAX_RECURSION_LIMIT; ", "bounded prepared rewrite"),
+                ("decimal_places; negative_style; thousands_separator;", "percentage format fields"),
+                ("format_table; registry; refcount; reference; entry;", "registry/refcount closure"),
+            ):
+                with self.subTest(marker=marker):
+                    codec.write_text(complete.replace(marker, ""), encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_percentage_format_codec_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing strict {expected} marker" in item for item in violations),
+                        (expected, violations),
+                    )
+            codec.write_text(
+                complete.replace("NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258", "NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 256"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_percentage_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("native type 258" in item for item in violations), violations)
+
+            codec.write_text(
+                complete.replace("preflight; let _ =", "let _ ="), encoding="utf-8"
+            )
+            violations = boundaries.audit_numbers_table_cell_percentage_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("preflight wire before" in item for item in violations), violations)
+
+            codec.write_text(complete + "use prost::Message;\n", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_percentage_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("Prost production path" in item for item in violations), violations)
+
+            codec.write_text(
+                "// fuzz_target! and Buffa are decoys\n"
+                'const DECOY: &str = "decode_lazy_view unknown raw";\n',
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_percentage_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("strict API" in item for item in violations), violations)
+
+            public = root / boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_PUBLIC_SOURCE
+            complete_public = public.read_text(encoding="utf-8")
+            public.write_text(
+                complete_public.replace(
+                    f"mod {boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_GENERATED_MODULE};",
+                    f"pub mod {boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_GENERATED_MODULE};",
+                ),
+                encoding="utf-8",
+            )
+            codec.write_text(complete, encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_percentage_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("generated projection" in item and "private" in item for item in violations), violations)
+
+            corpus = root / boundaries.NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_FUZZ_CORPUS
+            for path in corpus.iterdir():
+                path.unlink()
+            violations = boundaries.audit_numbers_table_cell_percentage_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("corpus must be nonempty" in item for item in violations), violations)
+
+    def test_numbers_table_cell_display_format_shared_core_rejects_import_only_and_duplicates(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_percentage_format_canonical_scaffold(
+                root, include_shared_core=True
+            )
+            number_owner = root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_OWNER_SOURCE
+            number_source = number_owner.read_text(encoding="utf-8")
+            number_owner.write_text(
+                number_source.replace(
+                    "native::read_display_format_with_budget(); native::rewrite_display_format();",
+                    "native::read_display_format_with_budget();",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_display_format_shared_core_source_topology(
+                root
+            )
+            self.assertTrue(any("actual shared-core rewrite call" in item for item in violations), violations)
+
+            number_owner.write_text(
+                number_source
+                + "fn local_rewrite_display_format() { Archive; BncCell; format_table; refcount; }\n"
+                + "fn rewrite_display_format() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_display_format_shared_core_source_topology(
+                root
+            )
+            self.assertTrue(any("local scanner/writer rewrite_display_format" in item for item in violations), violations)
+            self.assertTrue(any("duplicate native graph traversal" in item for item in violations), violations)
+
+            core = root / boundaries.NUMBERS_TABLE_CELL_DISPLAY_FORMAT_NATIVE_SOURCE
+            core.write_text(
+                core.read_text(encoding="utf-8")
+                + "fn rewrite_display_format() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_display_format_shared_core_source_topology(
+                root
+            )
+            self.assertTrue(any("duplicate implementations rewrite_display_format" in item for item in violations), violations)
+
+    def test_iwa_numbers_table_cell_percentage_format_host_is_deprecated_focused_and_gated(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_percentage_format_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_percentage_format_source_topology(
+                    root
+                ),
+                [],
+            )
+            host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_SOURCE[0]
+            complete = host.read_text(encoding="utf-8")
+            legacy_attribute = "#[deprecated(note = \"legacy compatibility shell\")]\n"
+            host.write_text(
+                complete[: complete.rfind(legacy_attribute)]
+                + complete[complete.rfind(legacy_attribute) + len(legacy_attribute) :],
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_percentage_format_source_topology(
+                root
+            )
+            self.assertTrue(any("must remain deprecated" in item and "percentage_format" in item for item in violations), violations)
+
+            host.write_text(
+                complete.replace("source_is_exact", "source_was_exact"), encoding="utf-8"
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_percentage_format_source_topology(
+                root
+            )
+            self.assertTrue(any("missing exact-source provenance gate" in item for item in violations), violations)
+
+            host.write_text(
+                complete.replace("allow_family_replacement", "allow_any_family"), encoding="utf-8"
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_percentage_format_source_topology(
+                root
+            )
+            self.assertTrue(any("narrow family-replacement exception" in item for item in violations), violations)
+
+            host.write_text(
+                complete + "fn old_percentage_caller(editor: &NumbersEditor) { editor.set_table_cell_percentage_format(); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_percentage_format_source_topology(
+                root
+            )
+            self.assertTrue(any("raw-ID production call set_table_cell_percentage_format" in item for item in violations), violations)
+
+    def test_iwa_numbers_table_cell_percentage_format_requires_typed_selector_context(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_percentage_format_canonical_scaffold(root)
+            add_percentage_format_selector_context_host(root, typed_location=True)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_percentage_format_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            add_percentage_format_selector_context_host(root, typed_location=False)
+            violations = boundaries.audit_iwa_numbers_table_cell_percentage_format_source_topology(
+                root
+            )
+            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+                self.assertTrue(
+                    any(
+                        "missing selector-first" in item and selector in item
+                        for item in violations
+                    ),
+                    (selector, violations),
+                )
+
     def test_numbers_table_cell_number_format_facade_rejects_raw_aliases_and_leaks(
         self,
     ) -> None:
@@ -31722,6 +32274,10 @@ fn rewrite_movie_title_operation(
             "audit_numbers_table_cell_number_format_codec_source_topology",
             "audit_numbers_table_cell_number_format_facade_source_topology",
             "audit_iwa_numbers_table_cell_number_format_source_topology",
+            "audit_numbers_table_cell_percentage_format_codec_source_topology",
+            "audit_numbers_table_cell_percentage_format_facade_source_topology",
+            "audit_iwa_numbers_table_cell_percentage_format_source_topology",
+            "audit_numbers_table_cell_display_format_shared_core_source_topology",
         ):
             self.assertIn(f"+ {audit}()", main_source)
 
@@ -31734,6 +32290,10 @@ fn rewrite_movie_title_operation(
             "audit_numbers_table_cell_number_format_codec_source_topology",
             "audit_numbers_table_cell_number_format_facade_source_topology",
             "audit_iwa_numbers_table_cell_number_format_source_topology",
+            "audit_numbers_table_cell_percentage_format_codec_source_topology",
+            "audit_numbers_table_cell_percentage_format_facade_source_topology",
+            "audit_iwa_numbers_table_cell_percentage_format_source_topology",
+            "audit_numbers_table_cell_display_format_shared_core_source_topology",
         )
         focused_calls: list[str] = []
         patches = []

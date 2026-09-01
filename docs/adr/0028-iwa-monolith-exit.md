@@ -7136,9 +7136,9 @@ archive members, and raw bytes remain private to the adapter.
 The legacy Numbers editor remains a compatibility shell and delegates admitted
 exact graphs to this owner where the focused proof applies. Exact native
 structural admission failures cannot enter the generic fallback. The
-deprecated raw-ID setter keeps only its historical cross-family replacement
-exception after a typed `WrongFormatFamily` result, and source-built
-compatibility packages retain their generic `DataFormat` path. The shell owns
+deprecated raw-ID setter also fails closed after an exact-source
+`WrongFormatFamily` result, while source-built compatibility packages retain
+their generic `DataFormat` path and historical replacement behavior. The shell owns
 no new semantic Number implementation; unsupported, ambiguous,
 cross-component, and otherwise unproven exact graphs fail closed. The slice is
 not a general `DataFormat` migration and does not move cell values, formulas,
@@ -7153,3 +7153,29 @@ ownership slice is not evidence of complete Numbers table authoring,
 generated-schema/normal-Prost retirement, host independence,
 arbitrary-producer parity, native byte parity, or package-wide performance/RSS
 behavior.
+
+## 2026-09-01 amendment: Numbers existing-cell Percentage-format focused-owner slice (not a monolith-exit gate)
+
+The focused Numbers package now owns the explicit Percentage format of one
+existing table cell through `Percentage` and selector-first read/edit/apply
+transactions. Exact-source patches and inverses, strict type-258 wire/Buffa
+validation, family-specific nominal types, complete BNC/list refcount census,
+copy-on-write, bounded candidate publication, reopen/readback, and physical
+ZIP locality are required. Native identifiers, list keys, BNC records,
+generated values, archive members, and raw bytes remain private.
+
+The deprecated host methods are compatibility delegates. They may use the
+generic path only for synthetic source-built packages; an exact package cannot
+escape the focused owner after a structural, budget, lock, locality, or
+wrong-family rejection. This slice is deliberately limited to Percentage and
+does not transfer Currency, Scientific, Fraction, Numeral System, Date/Time,
+Duration, Custom, text, interactive-control, value/formula, style, or table-
+topology ownership.
+
+None of the six monolith-exit gates closes. No dependency edge or ordered debt
+is retired, `litchi-iwa` remains the one migration host, and the authoritative
+topology stays at 64 packages, 237 internal dependency declarations, 226
+canonical edges, and debt IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`.
+Native acceptance and exact quality/fuzz evidence are recorded separately in
+ADR 0008; this is not evidence of complete Numbers authoring, host independence,
+arbitrary-producer parity, native byte parity, or performance/RSS behavior.

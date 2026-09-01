@@ -195,6 +195,20 @@ native identifiers, generated messages, and wire payloads never enter the
 harness. The deterministic command recipes under
 `corpus/numbers_table_cell_number_format/` are not native package fixtures.
 
+`numbers_table_cell_percentage_format` is the typed selector-first Percentage
+format lifecycle target. It replays bounded command bytes against the checked
+`basic.numbers` source for index/name selectors, coordinate failures, and
+content-redacted errors. The stable B3 cell is Number in that source, so the
+target explicitly checks that Percentage reads and edit opens refuse the wrong
+family atomically; if a Percentage-bearing source is supplied later, the same
+public harness exercises automatic/no-op, checked precision, clear/reset,
+exact-source patch application, stale and inverse conflicts, candidate
+readback, and changed-versus-no-op diagnostics. It uses only
+`SheetSelector`, `TableSelector`, `CellPosition`, and archive-free
+`Percentage` values at the facade boundary. The command recipes under
+`corpus/numbers_table_cell_percentage_format/` are small inputs, not native
+package bytes.
+
 `numbers_table_cell_control` is the unified selector-first cell-control
 lifecycle target. It drives Checkbox, StarRating, Slider, Stepper, and
 Pop-Up Menu values through `Package::{table_cell_control_format,
@@ -684,6 +698,15 @@ seeds:
 ```sh
 cargo +nightly fuzz run numbers_table_cell_number_format \
   corpus/numbers_table_cell_number_format -- \
+  -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Numbers table-cell Percentage-format target with its command
+seeds:
+
+```sh
+cargo +nightly fuzz run numbers_table_cell_percentage_format \
+  corpus/numbers_table_cell_percentage_format -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 

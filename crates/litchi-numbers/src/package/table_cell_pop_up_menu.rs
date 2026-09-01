@@ -1373,35 +1373,85 @@ pub(super) fn verify_package_locality_for_members(
         super::table_headers::rewrite::physical_source(source).map_err(|_| Error::Verification)?;
     let candidate_catalog = super::table_headers::rewrite::physical_source(candidate)
         .map_err(|_| Error::Verification)?;
-    let allowed = |name: &str| {
-        native_members.contains(&name)
-            || name == super::metadata::ENTRY_NAME
+    if native_members.iter().enumerate().any(|(index, name)| {
+        name.is_empty()
+            || *name == super::metadata::ENTRY_NAME
             || name.starts_with("preview")
-    };
-    for entry in source_catalog.package().iter() {
-        if allowed(entry.name()) {
-            continue;
-        }
-        let counterpart = candidate_catalog
+            || native_members[..index].contains(name)
+    }) {
+        return Err(Error::Verification);
+    }
+    let selected =
+        |name: &str| native_members.contains(&name) || name == super::metadata::ENTRY_NAME;
+
+    for name in native_members
+        .iter()
+        .copied()
+        .chain(std::iter::once(super::metadata::ENTRY_NAME))
+    {
+        let mut source_matches = source_catalog
             .package()
             .iter()
-            .find(|candidate_entry| candidate_entry.name() == entry.name())
-            .ok_or(Error::Verification)?;
-        if counterpart.data() != entry.data() {
+            .filter(|entry| entry.name() == name);
+        let source_entry = source_matches.next().ok_or(Error::Verification)?;
+        if source_matches.next().is_some() {
+            return Err(Error::Verification);
+        }
+        let mut candidate_matches = candidate_catalog
+            .package()
+            .iter()
+            .filter(|entry| entry.name() == name);
+        let candidate_entry = candidate_matches.next().ok_or(Error::Verification)?;
+        if candidate_matches.next().is_some()
+            || !super::table_headers::rewrite::selected_package_member_preserved(
+                source_entry,
+                candidate_entry,
+            )
+        {
             return Err(Error::Verification);
         }
     }
-    for entry in candidate_catalog.package().iter() {
-        if allowed(entry.name()) {
-            continue;
-        }
-        let counterpart = source_catalog
+
+    // Preview invalidation may delete source previews, but it may neither add
+    // one nor rewrite a retained preview's physical ZIP record.
+    for candidate_entry in candidate_catalog
+        .package()
+        .iter()
+        .filter(|entry| entry.name().starts_with("preview"))
+    {
+        let mut source_matches = source_catalog
             .package()
             .iter()
-            .find(|source_entry| source_entry.name() == entry.name())
-            .ok_or(Error::Verification)?;
-        if counterpart.data() != entry.data() {
+            .filter(|entry| entry.name() == candidate_entry.name());
+        let source_entry = source_matches.next().ok_or(Error::Verification)?;
+        if source_matches.next().is_some()
+            || !super::table_headers::rewrite::package_member_preserved(
+                source_entry,
+                candidate_entry,
+            )
+        {
             return Err(Error::Verification);
+        }
+    }
+
+    let mut source_untouched = source_catalog
+        .package()
+        .iter()
+        .filter(|entry| !selected(entry.name()) && !entry.name().starts_with("preview"));
+    let mut candidate_untouched = candidate_catalog
+        .package()
+        .iter()
+        .filter(|entry| !selected(entry.name()) && !entry.name().starts_with("preview"));
+    loop {
+        match (source_untouched.next(), candidate_untouched.next()) {
+            (Some(source_entry), Some(candidate_entry))
+                if source_entry.name() == candidate_entry.name()
+                    && super::table_headers::rewrite::package_member_preserved(
+                        source_entry,
+                        candidate_entry,
+                    ) => {},
+            (None, None) => break,
+            _ => return Err(Error::Verification),
         }
     }
     Ok(())

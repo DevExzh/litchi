@@ -1808,7 +1808,12 @@ fn rewrite_control_list(
             let prepared = popup_codec::prepare_cell_spec_write(
                 popup_identifier,
                 desired.starts_with_first,
-                popup_options_for_bytes(source),
+                // A newly-created CellSpec is usually larger than the empty
+                // control-list payload that is being rewritten.  Derive the
+                // codec ceiling from the source list plus the fixed native
+                // CellSpec envelope instead of rejecting the valid candidate
+                // solely because it grows an empty list.
+                popup_options_for_capacity(source.len().saturating_add(16)),
             )
             .map_err(|_| NativePopUpError::Codec)?;
             let requirements = prepared.execution_requirements();
@@ -2198,10 +2203,21 @@ fn storage_options(source: &[u8]) -> storage_codec::DecodeOptions {
 }
 
 fn popup_options_for_bytes(source: &[u8]) -> popup_codec::DecodeOptions {
-    popup_codec::DecodeOptions::for_source(source)
-        .with_max_output_bytes(source.len().saturating_mul(4).max(1))
-        .with_max_items(source.len().max(1))
-        .with_max_text_bytes(source.len().saturating_mul(4).max(1))
+    popup_options_for_capacity(source.len())
+}
+
+fn popup_options_for_capacity(bytes: usize) -> popup_codec::DecodeOptions {
+    let bytes = bytes.max(1);
+    popup_codec::DecodeOptions::new(
+        bytes,
+        bytes.saturating_mul(4).max(1),
+        bytes.saturating_mul(8).max(1),
+        bytes.saturating_mul(16).max(1),
+        64,
+        bytes,
+        bytes,
+        bytes.saturating_mul(4).max(1),
+    )
 }
 
 fn popup_options_for_items(items: &[&str]) -> popup_codec::DecodeOptions {

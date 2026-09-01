@@ -14,7 +14,9 @@ use std::io;
 use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::{
     varint::encode_varint,
-    wire::{WireView, append_length_delimited_field, append_varint_field},
+    wire::{
+        WireView, append_length_delimited_field, append_varint_field, patch_nested_varint_field,
+    },
 };
 use litchi_iwa_core::{
     Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
@@ -70,6 +72,34 @@ pub(crate) const SECOND_FORMAT_KEY: u32 = 2;
 pub(crate) const FIRST_CELL: (usize, usize) = (0, 0);
 pub(crate) const SECOND_CELL: (usize, usize) = (0, 1);
 
+/// Native format families represented by the deterministic fixture.
+///
+/// Number and Percentage share the BNC decimal-cell kind.  Their native
+/// family discriminator lives in the format-list payload, so keeping that
+/// discriminator explicit in the fixture prevents tests from accidentally
+/// treating a Percentage as a Number merely because the cell wire shape is
+/// identical.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum FormatFamily {
+    Number,
+    Percentage,
+}
+
+impl FormatFamily {
+    /// Native `FormatStructArchive.format_type` for this family.
+    pub(crate) const fn native_type(self) -> u32 {
+        match self {
+            Self::Number => NATIVE_NUMBER_FORMAT_TYPE,
+            Self::Percentage => NATIVE_PERCENTAGE_FORMAT_TYPE,
+        }
+    }
+}
+
+/// Native Number format-list discriminator.
+pub(crate) const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;
+/// Native Percentage format-list discriminator.
+pub(crate) const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
+
 /// Whether the two cells initially share their format-list entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FormatSharing {
@@ -113,12 +143,25 @@ pub(crate) enum Corruption {
 /// gives the second cell a Percentage format with key two and two refcount-one
 /// entries.
 pub(crate) fn synthetic_package(sharing: FormatSharing) -> FixtureResult<Vec<u8>> {
+    synthetic_package_for(FormatFamily::Number, sharing)
+}
+
+/// Build a canonical package for one selected decimal format family.
+///
+/// `Shared` makes both cells use `family`.  `Unshared` intentionally retains
+/// the historical mixed fixture: the first cell is Number and the second is
+/// Percentage.  That shape is useful for wrong-family and cross-entry COW
+/// tests while preserving every existing Number test's bytes and semantics.
+pub(crate) fn synthetic_package_for(
+    family: FormatFamily,
+    sharing: FormatSharing,
+) -> FixtureResult<Vec<u8>> {
     let document = document_object()?;
     let sheet = sheet_object()?;
     let table_info = table_info_object()?;
     let model = table_model_object()?;
     let tile = tile_object(sharing)?;
-    let sidecars = sidecar_object(sharing)?;
+    let sidecars = sidecar_object(family, sharing)?;
 
     let document_member = compressed(vec![document, sheet])?;
     let tables_member = compressed(vec![table_info, model, tile, sidecars])?;
@@ -156,7 +199,15 @@ pub(crate) fn synthetic_package(sharing: FormatSharing) -> FixtureResult<Vec<u8>
 
 /// Build one of the controlled malformed graphs from the shared baseline.
 pub(crate) fn corrupted_package(corruption: Corruption) -> FixtureResult<Vec<u8>> {
-    let source = synthetic_package(FormatSharing::Shared)?;
+    corrupted_package_for(FormatFamily::Number, corruption)
+}
+
+/// Build one controlled malformed graph for a selected format family.
+pub(crate) fn corrupted_package_for(
+    family: FormatFamily,
+    corruption: Corruption,
+) -> FixtureResult<Vec<u8>> {
+    let source = synthetic_package_for(family, FormatSharing::Shared)?;
     match corruption {
         Corruption::DuplicateFormatKey => rewrite_format_list(&source, |list| {
             let entry = list
@@ -425,12 +476,26 @@ fn formatted_cell(format_key: u32, kind: CellDataFormatKind, value: f64) -> Fixt
     Ok(cell.encode())
 }
 
-fn sidecar_object(sharing: FormatSharing) -> FixtureResult<ArchiveObject> {
+fn sidecar_object(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<ArchiveObject> {
     let format_entries = match sharing {
-        FormatSharing::Shared => vec![format_entry(FIRST_FORMAT_KEY, 2, 256, 2)],
+        FormatSharing::Shared => vec![format_entry(
+            FIRST_FORMAT_KEY,
+            2,
+            family.native_type(),
+            2,
+            2,
+            true,
+        )],
         FormatSharing::Unshared => vec![
-            format_entry(FIRST_FORMAT_KEY, 1, 256, 2),
-            format_entry(SECOND_FORMAT_KEY, 1, 258, 1),
+            format_entry(FIRST_FORMAT_KEY, 1, NATIVE_NUMBER_FORMAT_TYPE, 2, 2, true),
+            format_entry(
+                SECOND_FORMAT_KEY,
+                1,
+                NATIVE_PERCENTAGE_FORMAT_TYPE,
+                1,
+                0,
+                false,
+            ),
         ],
     };
     let list_specs = [
@@ -473,6 +538,8 @@ fn format_entry(
     refcount: u32,
     format_type: u32,
     decimal_places: u32,
+    negative_style: u32,
+    show_thousands_separator: bool,
 ) -> tst::table_data_list::ListEntry {
     tst::table_data_list::ListEntry {
         key,
@@ -480,8 +547,8 @@ fn format_entry(
         format: Some(tsk::FormatStructArchive {
             format_type: Some(format_type),
             decimal_places: Some(decimal_places),
-            negative_style: Some(if format_type == 258 { 0 } else { 2 }),
-            show_thousands_separator: Some(format_type != 258),
+            negative_style: Some(negative_style),
+            show_thousands_separator: Some(show_thousands_separator),
             ..Default::default()
         }),
         ..Default::default()
@@ -667,6 +734,25 @@ pub(crate) fn rewrite_tables(
     rewrite_member(source, TABLES_MEMBER, mutate)
 }
 
+/// Mark the rooted fixture table as locked while retaining the surrounding
+/// TableInfo wire records exactly.  The lock lives on the inherited
+/// `TSD.DrawableArchive` envelope (TableInfo field 1, Drawable field 5), so
+/// patching that scalar exercises the same native ownership path as a source
+/// opened from Numbers without re-encoding the complete message.
+pub(crate) fn locked_table_package(source: &[u8]) -> FixtureResult<Vec<u8>> {
+    rewrite_tables(source, |archive| {
+        let table_info = archive
+            .object_mut(TABLE_INFO_ID)
+            .ok_or_else(|| io::Error::other("format fixture table info is missing"))?;
+        let message = table_info
+            .messages
+            .first_mut()
+            .ok_or_else(|| io::Error::other("format fixture table info payload is missing"))?;
+        message.data = patch_nested_varint_field(&message.data, &[1, 5], false, Some(1))?;
+        Ok(())
+    })
+}
+
 fn rewrite_format_list(
     source: &[u8],
     mutate: impl FnOnce(&mut tst::TableDataList) -> FixtureResult,
@@ -675,6 +761,114 @@ fn rewrite_format_list(
         let mut list = tst::TableDataList::decode(payload)?;
         mutate(&mut list)?;
         Ok(list.encode_to_vec())
+    })
+}
+
+/// Return the current BNC format-list message payload.
+pub(crate) fn format_list_payload(source: &[u8]) -> FixtureResult<Vec<u8>> {
+    let archive = member_archive(source, TABLES_MEMBER)?;
+    let sidecars = archive
+        .object(SIDECAR_ID)
+        .ok_or_else(|| io::Error::other("format sidecar is missing"))?;
+    sidecars
+        .messages
+        .iter()
+        .find(|message| {
+            message.type_ == TABLE_DATA_LIST_TYPE
+                && tst::TableDataList::decode(message.data.as_slice())
+                    .map(|list| list.list_type == tst::table_data_list::ListType::Format as i32)
+                    .unwrap_or(false)
+        })
+        .map(|message| message.data.clone())
+        .ok_or_else(|| io::Error::other("format list message is missing").into())
+}
+
+/// Return sorted `(format-list key, refcount)` facts for the current list.
+pub(crate) fn format_entry_facts(source: &[u8]) -> FixtureResult<Vec<(u32, u32)>> {
+    let list = tst::TableDataList::decode(format_list_payload(source)?.as_slice())?;
+    let mut facts = list
+        .entries
+        .into_iter()
+        .map(|entry| (entry.key, entry.refcount))
+        .collect::<Vec<_>>();
+    facts.sort_unstable();
+    Ok(facts)
+}
+
+/// Return the list allocator cursor without exposing native package objects.
+pub(crate) fn format_next_list_id(source: &[u8]) -> FixtureResult<u32> {
+    Ok(tst::TableDataList::decode(format_list_payload(source)?.as_slice())?.next_list_id)
+}
+
+/// Return one raw nested format payload by its list key.
+///
+/// The lookup is wire-oriented rather than a prost re-encode so unknown
+/// fields and non-canonical bytes remain available for exact preservation
+/// assertions.
+pub(crate) fn format_payload_by_key(source: &[u8], key: u32) -> FixtureResult<Vec<u8>> {
+    let payload = format_list_payload(source)?;
+    let list = WireView::parse(&payload)?;
+    for field in list.fields().filter(|field| field.number() == 3) {
+        let entry = tst::table_data_list::ListEntry::decode(field.payload())?;
+        if entry.key != key {
+            continue;
+        }
+        let entry_view = WireView::parse(field.payload())?;
+        return entry_view
+            .fields()
+            .find(|entry_field| entry_field.number() == 6)
+            .map(|entry_field| entry_field.payload().to_vec())
+            .ok_or_else(|| io::Error::other("format payload field is missing").into());
+    }
+    Err(io::Error::other(format!("format entry key {key} is missing")).into())
+}
+
+/// Return one exact raw extension record from a decoded format payload.
+pub(crate) fn unknown_field_record(payload: &[u8], field_number: u32) -> FixtureResult<Vec<u8>> {
+    WireView::parse(payload)?
+        .fields()
+        .find(|field| field.number() == field_number)
+        .map(|field| field.raw().to_vec())
+        .ok_or_else(|| io::Error::other("unknown extension is missing").into())
+}
+
+/// Return all encoded BNC cells in the fixture tile's first row.
+pub(crate) fn tile_cells(source: &[u8]) -> FixtureResult<Vec<Vec<u8>>> {
+    let payload = object_message(source, TABLES_MEMBER, TILE_ID, TILE_TYPE)?;
+    let tile = tst::Tile::decode(payload.as_slice())?;
+    let row = tile
+        .row_infos
+        .first()
+        .ok_or_else(|| io::Error::other("format fixture row is missing"))?;
+    unpack_row(row)
+}
+
+/// Return each first-row cell's current BNC primary format key.
+pub(crate) fn format_keys(source: &[u8]) -> FixtureResult<Vec<Option<u32>>> {
+    tile_cells(source)?
+        .into_iter()
+        .map(|cell| Ok(BncCell::parse(&cell)?.format_identifier()))
+        .collect()
+}
+
+/// Rewrite first-row BNC cells while retaining all other fixture bytes.
+pub(crate) fn rewrite_tile_cells(
+    source: &[u8],
+    mutate: impl FnOnce(&mut Vec<Vec<u8>>) -> FixtureResult,
+) -> FixtureResult<Vec<u8>> {
+    rewrite_tile(source, |tile| {
+        let row = tile
+            .row_infos
+            .first_mut()
+            .ok_or_else(|| io::Error::other("format fixture row is missing"))?;
+        let mut cells = unpack_row(row)?;
+        mutate(&mut cells)?;
+        let (storage, offsets) = pack_row(&cells)?;
+        row.cell_storage_buffer = Some(storage.clone());
+        row.cell_offsets = Some(offsets.clone());
+        row.cell_storage_buffer_pre_bnc = storage;
+        row.cell_offsets_pre_bnc = offsets;
+        Ok(())
     })
 }
 
@@ -699,6 +893,68 @@ fn rewrite_format_list_raw(
         message.data = mutate(message.data.as_slice())?;
         Ok(())
     })
+}
+
+/// Replace one nested format payload selected by its list key.
+///
+/// This is deliberately kept raw: decoding and re-encoding the enclosing
+/// list with prost would discard unknown fields that owner rewrites are
+/// required to preserve byte-for-byte.
+pub(crate) fn rewrite_format_payload_by_key(
+    source: &[u8],
+    key: u32,
+    replacement: &[u8],
+) -> FixtureResult<Vec<u8>> {
+    rewrite_format_list_raw(source, |payload| {
+        let view = WireView::parse(payload)?;
+        let mut output = Vec::with_capacity(payload.len());
+        let mut replaced = false;
+        for field in view.fields() {
+            if field.number() != 3 || replaced {
+                output.extend_from_slice(field.raw());
+                continue;
+            }
+            let entry = tst::table_data_list::ListEntry::decode(field.payload())?;
+            if entry.key != key {
+                output.extend_from_slice(field.raw());
+                continue;
+            }
+            let entry_view = WireView::parse(field.payload())?;
+            let mut entry_output = Vec::with_capacity(field.payload().len());
+            let mut format_found = false;
+            for entry_field in entry_view.fields() {
+                if entry_field.number() == 6 && !format_found {
+                    append_length_delimited_field(&mut entry_output, 6, replacement)?;
+                    format_found = true;
+                } else {
+                    entry_output.extend_from_slice(entry_field.raw());
+                }
+            }
+            if !format_found {
+                return Err(io::Error::other("format payload field is missing").into());
+            }
+            append_length_delimited_field(&mut output, 3, &entry_output)?;
+            replaced = true;
+        }
+        if !replaced {
+            return Err(io::Error::other(format!("format entry key {key} is missing")).into());
+        }
+        Ok(output)
+    })
+}
+
+/// Patch one known native-format varint while preserving all other wire
+/// records.  The caller can use this to make a package-valid payload reach
+/// the semantic owner with an intentionally invalid domain or field shape.
+pub(crate) fn rewrite_format_varint_by_key(
+    source: &[u8],
+    key: u32,
+    field_number: u32,
+    value: u64,
+) -> FixtureResult<Vec<u8>> {
+    let payload = format_payload_by_key(source, key)?;
+    let replacement = patch_nested_varint_field(&payload, &[field_number], true, Some(value))?;
+    rewrite_format_payload_by_key(source, key, &replacement)
 }
 
 fn rewrite_tile(
@@ -765,35 +1021,43 @@ fn first_format_payload(source: &[u8]) -> FixtureResult<Vec<u8>> {
 }
 
 fn replace_first_format_payload(source: &[u8], replacement: &[u8]) -> FixtureResult<Vec<u8>> {
+    rewrite_format_payload_by_key_from_payload(source, FIRST_FORMAT_KEY, replacement)
+}
+
+fn rewrite_format_payload_by_key_from_payload(
+    source: &[u8],
+    key: u32,
+    replacement: &[u8],
+) -> FixtureResult<Vec<u8>> {
     let view = WireView::parse(source)?;
-    let mut output = Vec::new();
+    let mut output = Vec::with_capacity(source.len());
     let mut replaced = false;
     for field in view.fields() {
-        if field.number() == 3 && !replaced {
-            // TableDataList.entries is field three, while ListEntry.format is
-            // nested field six.  Rebuild only the nested payload so an
-            // intentionally malformed replacement can remain malformed; a
-            // prost round trip would discard unknown extensions and reject a
-            // truncated payload before the hostile decoder saw it.
-            let entry_view = WireView::parse(field.payload())?;
-            let mut entry = Vec::new();
-            let mut format_found = false;
-            for entry_field in entry_view.fields() {
-                if entry_field.number() == 6 && !format_found {
-                    append_length_delimited_field(&mut entry, 6, replacement)?;
-                    format_found = true;
-                } else {
-                    entry.extend_from_slice(entry_field.raw());
-                }
-            }
-            if !format_found {
-                return Err(io::Error::other("format payload field is missing").into());
-            }
-            append_length_delimited_field(&mut output, 3, &entry)?;
-            replaced = true;
-        } else {
+        if field.number() != 3 || replaced {
             output.extend_from_slice(field.raw());
+            continue;
         }
+        let entry = tst::table_data_list::ListEntry::decode(field.payload())?;
+        if entry.key != key {
+            output.extend_from_slice(field.raw());
+            continue;
+        }
+        let entry_view = WireView::parse(field.payload())?;
+        let mut entry_output = Vec::with_capacity(field.payload().len());
+        let mut format_found = false;
+        for entry_field in entry_view.fields() {
+            if entry_field.number() == 6 && !format_found {
+                append_length_delimited_field(&mut entry_output, 6, replacement)?;
+                format_found = true;
+            } else {
+                entry_output.extend_from_slice(entry_field.raw());
+            }
+        }
+        if !format_found {
+            return Err(io::Error::other("format payload field is missing").into());
+        }
+        append_length_delimited_field(&mut output, 3, &entry_output)?;
+        replaced = true;
     }
     if !replaced {
         return Err(io::Error::other("format entry field is missing").into());

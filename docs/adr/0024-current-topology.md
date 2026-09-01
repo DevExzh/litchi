@@ -3854,9 +3854,10 @@ format-table/refcount records, native identifiers, Buffa views, archive
 members, and publication. The legacy `litchi-iwa` Numbers editor remains a
 compatibility route that delegates admitted exact graphs; exact structural
 admission failures do not fall through to the generic implementation. Its
-deprecated raw-ID setter retains only the historical typed cross-family
-replacement exception, while source-built compatibility packages retain the
-generic `DataFormat` fallback. It is not a second semantic owner.
+deprecated raw-ID setter also fails closed for exact-source cross-family
+rejections, while source-built compatibility packages retain the generic
+`DataFormat` fallback and their historical replacement behavior. It is not a
+second semantic owner.
 
 This is an ownership seam within the current package graph. It adds no normal
 workspace package or dependency declaration, retires no ordered migration
@@ -3867,3 +3868,26 @@ debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration
 host unless a root metadata audit proves otherwise. The focused seam does not
 claim ownership of other Number-family formats, cell values/formulas, styles,
 table topology, or generated-schema/normal Prost retirement.
+
+## 2026-09-01 amendment: Numbers existing-cell Percentage-format owner (topology unchanged)
+
+The existing-cell Percentage-format seam now has a focused semantic owner in
+`litchi-numbers`. It uses the archive-free `cell::data_format::Percentage`
+value and selector-first package read/edit/apply transactions. The private
+adapter resolves native type 258 through the referenced format-list payload,
+shares the audited decimal graph/COW owner with Number, and retains BNC storage,
+list keys, refcounts, metadata, Buffa views, archive members, and publication
+below the public boundary. Nominal protocol and transaction types prevent
+Number/Percentage substitution at compile time.
+
+The deprecated `litchi-iwa` Percentage methods delegate admitted exact graphs
+to the focused owner. Every exact-source structural or wrong-family rejection
+fails closed; only source-built compatibility packages may use the generic
+legacy format implementation. This ownership transfer changes no workspace
+package, dependency declaration, canonical edge, ordered migration debt,
+migration host, or monolith-deletion gate. The authoritative inventory remains
+64 workspace packages, 237 internal dependency declarations, 226 canonical
+edges, 11 ordered migration debts with IDs
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. The slice
+does not claim ownership of the other display/control families, table topology,
+cell values/formulas, or remaining generated-Prost host paths.

@@ -11,6 +11,8 @@ pub mod date_time;
 pub mod duration;
 pub mod number;
 pub mod numeral_system;
+/// Percentage display values and exact-source transactions for existing cells.
+pub mod percentage;
 pub mod pop_up_menu;
 
 pub use control::{CellControl, NotCellControl, Slider, Stepper};

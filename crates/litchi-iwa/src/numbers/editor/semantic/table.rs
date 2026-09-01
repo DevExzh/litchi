@@ -16,6 +16,8 @@ use litchi_numbers::cell::CellControl;
 
 type FocusedControlError = litchi_numbers::cell::data_format::control::transaction::Error;
 type FocusedNumberFormatError = litchi_numbers::cell::data_format::number::transaction::Error;
+type FocusedPercentageFormatError =
+    litchi_numbers::cell::data_format::percentage::transaction::Error;
 
 fn focused_control_error(error: FocusedControlError) -> Error {
     Error::InvalidFormat(format!(
@@ -157,13 +159,12 @@ const fn focused_number_format_edit_can_fallback(
     error: FocusedNumberFormatError,
     source_built: bool,
 ) -> bool {
-    // Exact native packages fail closed for every structural admission error.
-    // The sole exact-source compatibility exception preserves the historical
-    // setter contract that replaces an explicit non-Number family. Synthetic
-    // source-built packages may also use the legacy codec until their builder
-    // graph is admitted by the focused owner.
-    matches!(error, FocusedNumberFormatError::WrongFormatFamily { .. })
-        || focused_number_format_read_can_fallback(error, source_built)
+    // Exact native packages fail closed after every focused-owner rejection,
+    // including cross-family edits. Synthetic source-built packages may use
+    // the legacy codec until their builder graph is admitted by the owner.
+    source_built
+        && (matches!(error, FocusedNumberFormatError::WrongFormatFamily { .. })
+            || focused_number_format_read_can_fallback(error, true))
 }
 
 #[cfg(test)]
@@ -186,7 +187,48 @@ mod number_format_fallback_policy_tests {
             path: Path::Package,
         };
         assert!(!focused_number_format_read_can_fallback(family, false));
-        assert!(focused_number_format_edit_can_fallback(family, false));
+        assert!(!focused_number_format_edit_can_fallback(family, false));
+        assert!(focused_number_format_edit_can_fallback(family, true));
+    }
+}
+
+#[cfg(test)]
+mod percentage_format_fallback_policy_tests {
+    use super::{
+        FocusedPercentageFormatError, focused_percentage_format_edit_can_fallback,
+        focused_percentage_format_read_can_fallback,
+    };
+    use litchi_numbers::cell::data_format::percentage::transaction::Path;
+
+    #[test]
+    fn exact_sources_never_fallback_after_structural_admission_failure() {
+        let structural = FocusedPercentageFormatError::UnsupportedSource;
+        assert!(!focused_percentage_format_read_can_fallback(
+            structural, false
+        ));
+        assert!(!focused_percentage_format_edit_can_fallback(
+            structural, false, true
+        ));
+        assert!(focused_percentage_format_read_can_fallback(
+            structural, true
+        ));
+        assert!(focused_percentage_format_edit_can_fallback(
+            structural, true, true
+        ));
+
+        let family = FocusedPercentageFormatError::WrongFormatFamily {
+            path: Path::Package,
+        };
+        assert!(!focused_percentage_format_read_can_fallback(family, false));
+        assert!(!focused_percentage_format_edit_can_fallback(
+            family, false, true
+        ));
+        assert!(focused_percentage_format_edit_can_fallback(
+            family, true, true
+        ));
+        assert!(!focused_percentage_format_edit_can_fallback(
+            family, true, false
+        ));
     }
 }
 
@@ -284,6 +326,217 @@ fn commit_focused_number_format(
     bytes.try_reserve_exact(source_bytes.len()).map_err(|_| {
         Error::InvalidFormat(
             "could not allocate focused Numbers cell-number-format candidate".to_owned(),
+        )
+    })?;
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .map_err(|error| Error::Io(error.into_io_error()))?;
+    NumbersEditor::from_bytes(&bytes)
+}
+
+fn focused_percentage_format_error(error: FocusedPercentageFormatError) -> Error {
+    Error::InvalidFormat(format!(
+        "focused Numbers cell-percentage-format operation failed: {error}"
+    ))
+}
+
+enum FocusedPercentageFormatLocation {
+    Owner {
+        source: FocusedNumbersPackage,
+        sheet: litchi_numbers::SheetSelector<'static>,
+        table: litchi_numbers::TableSelector<'static>,
+        position: litchi_numbers::table::CellPosition,
+    },
+    LegacyFallback,
+}
+
+fn focused_percentage_format_location(
+    editor: &NumbersEditor,
+    source_bytes: &[u8],
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<FocusedPercentageFormatLocation> {
+    let (sheet, table): (
+        litchi_numbers::SheetSelector<'static>,
+        litchi_numbers::TableSelector<'static>,
+    ) = selectors::focused_table_location(editor, table_id)?;
+    let position =
+        litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
+            Error::InvalidFormat(format!(
+                "invalid Numbers cell-percentage-format coordinate: {error}"
+            ))
+        })?;
+    let source = match FocusedNumbersPackage::from_bytes(source_bytes) {
+        Ok(source) => source,
+        Err(litchi_numbers::PackageError::InvalidFormat(_))
+            if !editor.package.source_is_exact() =>
+        {
+            return Ok(FocusedPercentageFormatLocation::LegacyFallback);
+        },
+        Err(error) => {
+            return Err(Error::InvalidFormat(format!(
+                "focused Numbers cell-percentage-format source validation failed: {error}"
+            )));
+        },
+    };
+    Ok(FocusedPercentageFormatLocation::Owner {
+        source,
+        sheet,
+        table,
+        position,
+    })
+}
+
+const fn focused_percentage_format_read_can_fallback(
+    error: FocusedPercentageFormatError,
+    source_built: bool,
+) -> bool {
+    source_built
+        && matches!(
+            error,
+            FocusedPercentageFormatError::CellNotFound
+                | FocusedPercentageFormatError::UnsupportedDependency { .. }
+                | FocusedPercentageFormatError::UnsupportedSource
+                | FocusedPercentageFormatError::InvalidSource { .. }
+        )
+}
+
+const fn focused_percentage_format_edit_can_fallback(
+    error: FocusedPercentageFormatError,
+    source_built: bool,
+    allow_family_replacement: bool,
+) -> bool {
+    // Exact native packages fail closed after every focused-owner rejection.
+    // Cross-family replacement remains a source-built compatibility behavior;
+    // it cannot bypass the exact package's lock, budget, and locality owner.
+    source_built
+        && ((allow_family_replacement
+            && matches!(
+                error,
+                FocusedPercentageFormatError::WrongFormatFamily { .. }
+            ))
+            || focused_percentage_format_read_can_fallback(error, true))
+}
+
+fn focused_percentage_format(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<Option<Percentage>> {
+    let source_built = !editor.package.source_is_exact();
+    let source_bytes = editor.to_bytes()?;
+    let location =
+        focused_percentage_format_location(editor, &source_bytes, table_id, row, column)?;
+    let FocusedPercentageFormatLocation::Owner {
+        source,
+        sheet,
+        table,
+        position,
+    } = location
+    else {
+        return cell_data_format::cell_percentage_format(&editor.package, table_id, row, column);
+    };
+    match source.table_cell_percentage_format(sheet, table, position) {
+        Ok(format) => Ok(format),
+        Err(error) if focused_percentage_format_read_can_fallback(error, source_built) => {
+            cell_data_format::cell_percentage_format(&editor.package, table_id, row, column)
+        },
+        Err(error) => Err(focused_percentage_format_error(error)),
+    }
+}
+
+fn commit_legacy_percentage_format(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    format: Option<Percentage>,
+) -> Result<NumbersEditor> {
+    let mut staged = editor.package.clone();
+    match format {
+        Some(format) => {
+            let data_format = DataFormat::Percentage(format);
+            cell_data_format::set_cell_data_format(
+                &mut staged,
+                table_id,
+                row,
+                column,
+                &data_format,
+            )?;
+        },
+        None => {
+            cell_data_format::reset_cell_percentage_format(&mut staged, table_id, row, column)?;
+        },
+    }
+    let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+    let observed =
+        cell_data_format::cell_percentage_format(&verified.package, table_id, row, column)?;
+    if observed != format {
+        return Err(Error::InvalidFormat(
+            "Numbers table-cell percentage-format failed legacy package validation".to_owned(),
+        ));
+    }
+    Ok(verified)
+}
+
+fn commit_focused_percentage_format(
+    editor: &NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    format: Option<Percentage>,
+    allow_family_replacement: bool,
+) -> Result<NumbersEditor> {
+    let source_built = !editor.package.source_is_exact();
+    let source_bytes = editor.to_bytes()?;
+    let location =
+        focused_percentage_format_location(editor, &source_bytes, table_id, row, column)?;
+    let FocusedPercentageFormatLocation::Owner {
+        source,
+        sheet,
+        table,
+        position,
+    } = location
+    else {
+        return commit_legacy_percentage_format(editor, table_id, row, column, format);
+    };
+    let edit = match source.edit_table_cell_percentage_format(sheet, table, position) {
+        Ok(edit) => edit,
+        Err(error)
+            if focused_percentage_format_edit_can_fallback(
+                error,
+                source_built,
+                allow_family_replacement,
+            ) =>
+        {
+            return commit_legacy_percentage_format(editor, table_id, row, column, format);
+        },
+        Err(error) => return Err(focused_percentage_format_error(error)),
+    };
+    let commit = match format {
+        Some(format) => edit.set(format).commit(),
+        None => edit.clear().commit(),
+    };
+    let commit = match commit {
+        Ok(commit) => commit,
+        Err(error)
+            if focused_percentage_format_edit_can_fallback(
+                error,
+                source_built,
+                allow_family_replacement,
+            ) =>
+        {
+            return commit_legacy_percentage_format(editor, table_id, row, column, format);
+        },
+        Err(error) => return Err(focused_percentage_format_error(error)),
+    };
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(source_bytes.len()).map_err(|_| {
+        Error::InvalidFormat(
+            "could not allocate focused Numbers cell-percentage-format candidate".to_owned(),
         )
     })?;
     commit
@@ -671,6 +924,7 @@ impl NumbersEditor {
         column: usize,
         format: DataFormat,
     ) -> Result<()> {
+        let source_built = !self.package.source_is_exact();
         let current = cell_data_format::cell_data_format(&self.package, table_id, row, column)?;
         if let Ok(control) = CellControl::try_from(format.clone()) {
             *self = commit_focused_control_format(self, table_id, row, column, Some(control))?;
@@ -696,7 +950,16 @@ impl NumbersEditor {
         }
         let mut staged = self.package.clone();
         cell_data_format::set_cell_data_format(&mut staged, table_id, row, column, &format)?;
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
+        // Keep generated packages source-built through the compatibility
+        // mutation. Reopening their bytes would incorrectly turn the
+        // normalized builder output into an exact-source package and disable
+        // the narrowly-scoped focused-owner fallback on the next operation.
+        let verified = if source_built {
+            staged.validate()?;
+            Self::from_package(staged)?
+        } else {
+            Self::from_bytes(&staged.to_bytes()?)?
+        };
         if verified.table_cell_data_format(table_id, row, column)? != format {
             return Err(Error::InvalidFormat(
                 "Numbers table-cell data format failed package validation".to_owned(),
@@ -898,16 +1161,24 @@ impl NumbersEditor {
     /// Read an explicit percentage format for one zero-based table cell.
     ///
     /// `None` means the cell uses iWork's automatic data format.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers cell Percentage-format API; use litchi_numbers::Package::table_cell_percentage_format with SheetSelector, TableSelector, and CellPosition for the selector-first semantic read"
+    )]
     pub fn table_cell_percentage_format(
         &self,
         table_id: u64,
         row: usize,
         column: usize,
     ) -> Result<Option<Percentage>> {
-        cell_data_format::cell_percentage_format(&self.package, table_id, row, column)
+        focused_percentage_format(self, table_id, row, column)
     }
 
     /// Create or replace an explicit percentage format transactionally.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers cell Percentage-format API; use litchi_numbers::Package::edit_table_cell_percentage_format with SheetSelector, TableSelector, and CellPosition for selector-first writes"
+    )]
     pub fn set_table_cell_percentage_format(
         &mut self,
         table_id: u64,
@@ -915,29 +1186,32 @@ impl NumbersEditor {
         column: usize,
         format: Percentage,
     ) -> Result<()> {
-        self.set_table_cell_data_format(table_id, row, column, format.into())
+        *self = commit_focused_percentage_format(self, table_id, row, column, Some(format), true)?;
+        Ok(())
     }
 
     /// Restore iWork's automatic format from an explicit Percentage cell.
+    #[deprecated(
+        since = "0.0.1",
+        note = "legacy raw-ID Numbers cell Percentage-format API; use litchi_numbers::Package::edit_table_cell_percentage_format with SheetSelector, TableSelector, and CellPosition to clear the explicit format"
+    )]
     pub fn reset_table_cell_percentage_format(
         &mut self,
         table_id: u64,
         row: usize,
         column: usize,
     ) -> Result<bool> {
-        let mut staged = self.package.clone();
-        let changed =
-            cell_data_format::reset_cell_percentage_format(&mut staged, table_id, row, column)?;
-        if changed {
-            let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            if verified.table_cell_data_format(table_id, row, column)? != DataFormat::Automatic {
-                return Err(Error::InvalidFormat(
-                    "Numbers percentage-format reset failed package validation".to_owned(),
-                ));
-            }
-            *self = verified;
+        if focused_percentage_format(self, table_id, row, column)?.is_none() {
+            return Ok(false);
         }
-        Ok(changed)
+        let verified = commit_focused_percentage_format(self, table_id, row, column, None, false)?;
+        if focused_percentage_format(&verified, table_id, row, column)?.is_some() {
+            return Err(Error::InvalidFormat(
+                "Numbers table-cell percentage-format reset failed package validation".to_owned(),
+            ));
+        }
+        *self = verified;
+        Ok(true)
     }
 
     /// Read an explicit scientific-notation format for one table cell.

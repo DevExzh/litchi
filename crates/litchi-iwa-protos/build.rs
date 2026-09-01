@@ -54,6 +54,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/numbers_table_cell_pop_up_menu_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_control_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_number_format_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_table_cell_percentage_format_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec.rs");
     // Keep the native Numbers and Pages message-ID routes tied to their schema
     // projections when this crate is built from the workspace. Published
@@ -1566,6 +1567,7 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
         "src/table_appearance_codec.rs",
         "src/numbers_table_cell_control_codec.rs",
         "src/numbers_table_cell_number_format_codec.rs",
+        "src/numbers_table_cell_percentage_format_codec.rs",
     ];
 
     let mut expected_paths = CODECS
@@ -4098,6 +4100,7 @@ fn enforce_numbers_table_cell_pop_up_menu_projection_budget(
     let mut bytes = 0u64;
     let mut repeated_views = 0usize;
     let mut lazy_repeated_views = 0usize;
+    let mut lazy_message_fields = 0usize;
     let mut files = 0usize;
     for entry in fs::read_dir(directory)? {
         let entry = entry?;
@@ -4118,10 +4121,18 @@ fn enforce_numbers_table_cell_pop_up_menu_projection_budget(
         lazy_repeated_views = lazy_repeated_views
             .checked_add(text.matches("LazyRepeatedView").count())
             .ok_or("popup lazy-repeated-view count overflow")?;
+        lazy_message_fields = lazy_message_fields
+            .checked_add(text.matches("LazyMessageFieldView").count())
+            .ok_or("popup lazy-message-field count overflow")?;
     }
-    if files != 5 || bytes > 180 * 1024 || repeated_views != 0 || lazy_repeated_views != 0 {
+    if files != 5
+        || bytes > 180 * 1024
+        || repeated_views != 0
+        || lazy_repeated_views != 0
+        || lazy_message_fields != 0
+    {
         return Err(format!(
-            "Numbers table-cell popup projection generated {files} files/{bytes} bytes/{repeated_views} repeated/{lazy_repeated_views} lazy repeated views"
+            "Numbers table-cell popup projection generated {files} files/{bytes} bytes/{repeated_views} repeated/{lazy_repeated_views} lazy repeated/{lazy_message_fields} lazy message fields"
         )
         .into());
     }
@@ -4131,7 +4142,7 @@ fn enforce_numbers_table_cell_pop_up_menu_projection_budget(
 fn enforce_numbers_table_cell_control_codec_provenance(
     proto_directory: &Path,
 ) -> Result<(), Box<dyn Error>> {
-    const CODEC_MARKERS: [&str; 29] = [
+    const CODEC_MARKERS: [&str; 35] = [
         "pub const STEPPER_INTERACTION_TYPE: u32 = 4;",
         "pub const SLIDER_INTERACTION_TYPE: u32 = 5;",
         "pub const STAR_RATING_INTERACTION_TYPE: u32 = 6;",
@@ -4152,9 +4163,15 @@ fn enforce_numbers_table_cell_control_codec_provenance(
         "pub struct RewriteExecutionRequirements",
         "pub struct RewriteExecutionLimits",
         "pub const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;",
+        "pub const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;",
         "pub const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;",
         "pub struct NumberFormatSnapshot<'source>",
         "pub struct NumberFormatWrite",
+        "pub(crate) fn decode_decimal_format_with_report(",
+        "pub(crate) fn prepare_decimal_format_rewrite<'source>(",
+        "pub(crate) fn prepare_decimal_format_write(",
+        "pub(crate) fn rewrite_decimal_format(",
+        "pub(crate) fn canonical_decimal_format(",
         "pub fn decode_number_format_with_report(",
         "pub fn prepare_number_format_rewrite<'source>(",
         "pub struct PreparedNumberFormatRewrite<'source>",
@@ -4162,7 +4179,7 @@ fn enforce_numbers_table_cell_control_codec_provenance(
         "pub fn canonical_number_format(",
         "pub struct PreparedNumberFormatWrite",
     ];
-    const NEUTRAL_MARKERS: [&str; 14] = [
+    const NEUTRAL_MARKERS: [&str; 16] = [
         "pub use crate::numbers_table_cell_pop_up_menu_codec::{\n    CHECKBOX_INTERACTION_TYPE",
         "PreparedControlCellSpecWrite as PreparedCellSpecWrite",
         "PreparedControlFormatWrite as PreparedFormatWrite",
@@ -4177,13 +4194,42 @@ fn enforce_numbers_table_cell_control_codec_provenance(
         "PreparedNumberFormatWrite, canonical_number_format, decode_number_format,",
         "decode_number_format_with_report, prepare_number_format_append, prepare_number_format_rewrite,",
         "prepare_number_format_write, rewrite_number_format, rewrite_table_cell_number_format,",
+        "pub use crate::numbers_table_cell_percentage_format_codec::{",
+        "canonical_percentage_format, decode_percentage_format, decode_percentage_format_with_report,",
+    ];
+    const PERCENTAGE_MARKERS: [&str; 23] = [
+        "use crate::numbers_table_cell_pop_up_menu_codec as core;",
+        "pub use core::NATIVE_PERCENTAGE_FORMAT_TYPE;",
+        "pub const MAX_PERCENTAGE_DECIMAL_PLACES: u32 = core::MAX_NUMBER_DECIMAL_PLACES;",
+        "pub struct PercentageFormatSnapshot<'source>(",
+        "pub struct PercentageFormatWrite(core::NumberFormatWrite);",
+        "pub const fn from_snapshot(snapshot: PercentageFormatSnapshot<'_>)",
+        "pub struct PreparedPercentageFormatRewrite<'source>(",
+        "pub struct PreparedPercentageFormatWrite(core::PreparedNumberFormatWrite);",
+        "pub fn decode_percentage_format(",
+        "pub fn decode_percentage_format_with_report(",
+        "pub fn prepare_percentage_format_rewrite<'source>(",
+        "pub fn rewrite_percentage_format(",
+        "pub fn prepare_percentage_format_write(",
+        "pub use prepare_percentage_format_write as prepare_percentage_format_append;",
+        "pub fn canonical_percentage_format(",
+        "pub use rewrite_percentage_format as rewrite_table_cell_percentage_format;",
+        "core::decode_decimal_format(source, NATIVE_PERCENTAGE_FORMAT_TYPE,",
+        "core::decode_decimal_format_with_report(source, NATIVE_PERCENTAGE_FORMAT_TYPE,",
+        "core::prepare_decimal_format_rewrite(source, write.0, NATIVE_PERCENTAGE_FORMAT_TYPE",
+        "core::rewrite_decimal_format(source, write.0, NATIVE_PERCENTAGE_FORMAT_TYPE",
+        "core::prepare_decimal_format_write(write.0, NATIVE_PERCENTAGE_FORMAT_TYPE,",
+        "core::canonical_decimal_format(write.0, NATIVE_PERCENTAGE_FORMAT_TYPE,",
+        ".map(PreparedPercentageFormatRewrite)",
     ];
     let tst = fs::read_to_string(proto_directory.join("TSTArchives.proto"))?;
     let tsk = fs::read_to_string(proto_directory.join("TSKArchives.proto"))?;
     let codec = fs::read_to_string("src/numbers_table_cell_pop_up_menu_codec.rs")?;
     let neutral = fs::read_to_string("src/numbers_table_cell_control_codec.rs")?;
+    let percentage = fs::read_to_string("src/numbers_table_cell_percentage_format_codec.rs")?;
     let lib = fs::read_to_string("src/lib.rs")?;
     let production_codec = production_codec_source(&codec);
+    let production_percentage = production_codec_source(&percentage);
     const CELL_SPEC_FIELDS: [&str; 3] = [
         "optional double range_control_min = 3;",
         "optional double range_control_max = 4;",
@@ -4203,6 +4249,9 @@ fn enforce_numbers_table_cell_control_codec_provenance(
         || !NEUTRAL_MARKERS
             .iter()
             .all(|marker| neutral.matches(marker).count() == 1)
+        || !PERCENTAGE_MARKERS
+            .iter()
+            .all(|marker| production_percentage.matches(marker).count() == 1)
         || !CELL_SPEC_FIELDS
             .iter()
             .all(|field| tst.matches(field).count() == 1)
@@ -4214,11 +4263,22 @@ fn enforce_numbers_table_cell_control_codec_provenance(
             .count()
             != 1
         || lib.matches("pub mod table_cell_control_codec {").count() != 1
+        || lib
+            .matches("pub mod numbers_table_cell_percentage_format_codec;")
+            .count()
+            != 1
         || production_codec.contains("prost::")
         || production_codec.contains("to_owned_message")
         || production_codec.contains("encode_to_vec")
         || production_codec.contains("try_encode")
         || production_codec.contains(".encode(")
+        || production_percentage.contains("prost::")
+        || production_percentage.contains("to_owned_message")
+        || production_percentage.contains("encode_to_vec")
+        || production_percentage.contains("try_encode")
+        || production_percentage.contains(".encode(")
+        || production_percentage.contains("pub type PercentageFormat")
+        || production_percentage.contains("pub type PreparedPercentageFormat")
     {
         return Err(
             "Numbers control-cell codec drifted from the strict CellSpec/FormatStruct route or introduced generated/encoding ownership".into(),

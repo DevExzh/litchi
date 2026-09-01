@@ -23,6 +23,15 @@ pub use crate::numbers_table_cell_pop_up_menu_codec::{
     prepare_number_format_write, rewrite_number_format, rewrite_table_cell_number_format,
 };
 
+pub use crate::numbers_table_cell_percentage_format_codec::{
+    MAX_PERCENTAGE_DECIMAL_PLACES, NATIVE_PERCENTAGE_FORMAT_TYPE, PercentageFormatSnapshot,
+    PercentageFormatWrite, PreparedPercentageFormatRewrite, PreparedPercentageFormatWrite,
+    canonical_percentage_format, decode_percentage_format, decode_percentage_format_with_report,
+    prepare_percentage_format_append, prepare_percentage_format_rewrite,
+    prepare_percentage_format_write, rewrite_percentage_format,
+    rewrite_table_cell_percentage_format,
+};
+
 pub use crate::numbers_table_cell_pop_up_menu_codec::{
     PreparedControlCellSpecWrite, PreparedControlCellSpecWrite as PreparedCellSpecWrite,
     PreparedControlFormatWrite, PreparedControlFormatWrite as PreparedFormatWrite,

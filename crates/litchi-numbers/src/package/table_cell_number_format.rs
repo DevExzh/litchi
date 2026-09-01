@@ -869,7 +869,7 @@ fn verify_number_package_locality_with_members(
             .iter()
             .find(|entry| entry.name() == source_entry.name())
             .ok_or(Error::Verification)?;
-        if candidate_entry.data() != source_entry.data() {
+        if !super::table_headers::rewrite::package_member_preserved(source_entry, candidate_entry) {
             return Err(Error::Verification);
         }
     }
@@ -881,7 +881,7 @@ fn verify_number_package_locality_with_members(
             .iter()
             .find(|entry| entry.name() == candidate_entry.name())
             .ok_or(Error::Verification)?;
-        if source_entry.data() != candidate_entry.data() {
+        if !super::table_headers::rewrite::package_member_preserved(source_entry, candidate_entry) {
             return Err(Error::Verification);
         }
     }

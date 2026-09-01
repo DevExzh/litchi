@@ -44,6 +44,53 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
   -timeout=10 -rss_limit_mb=2048
 ```
 
+## Numbers Percentage cell-format codec
+
+`numbers_table_cell_percentage_format_codec` exercises the strict Percentage
+variant of the same borrowed `FormatStructArchive` seam. It requires native
+format type 258, so a valid Number (type 256) payload is rejected by this
+wrapper even though both formats share fields for decimal places, negative
+style, and thousands separators. Successful cases compare scalar and measured
+reads, preserve unknown scalar/group spans, replay source-preserving rewrites
+under exact finite limits, and round-trip canonical automatic and fixed
+precision writes. Fixed recipes keep missing, duplicate, wrong-wire,
+incompatible, noncanonical, invalid-domain, cross-family, and malformed-group
+errors hot.
+
+The target accepts raw inputs up to 64 KiB and uses 128 KiB output, 16,384
+fields, 512 KiB of aggregate work, and nesting depth 64. Corpus entries are
+small hand-authored `hex:` wire recipes; they are not copied native package
+bytes.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check numbers_table_cell_percentage_format_codec
+```
+
+Run a bounded smoke with mutable corpus, artifacts, and build output outside
+the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-percentage-format-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+cp corpus/numbers_table_cell_percentage_format_codec/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  numbers_table_cell_percentage_format_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
 ## Numbers formula-archive codec
 
 `numbers_formula_archive` sends one bounded, caller-owned

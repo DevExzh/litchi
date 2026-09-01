@@ -278,7 +278,9 @@ fn exercise_input_limit() {
             );
             black_box(error);
         },
-        Err(error) => panic!("an oversized Numbers input must return a typed input-byte limit: {error}"),
+        Err(error) => {
+            panic!("an oversized Numbers input must return a typed input-byte limit: {error}")
+        },
         Ok(_) => panic!("an oversized Numbers input must be rejected"),
     }
 }

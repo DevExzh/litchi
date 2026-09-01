@@ -710,6 +710,9 @@ pub fn decode_control_format_with_report(
 /// on their respective package-owned paths.
 pub const NATIVE_NUMBER_FORMAT_TYPE: u32 = 256;
 
+/// Native Numbers display-format discriminator for a plain percentage cell.
+pub const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
+
 /// Native discriminator used for automatic decimal places.
 pub const NATIVE_AUTOMATIC_DECIMAL_PLACES: u32 = 253;
 
@@ -722,7 +725,8 @@ const NUMBER_FORMAT_NEGATIVE_STYLE_FIELD: u32 = 4;
 const NUMBER_FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD: u32 = 5;
 const NUMBER_FORMAT_MAX_KNOWN_FIELD: u32 = 45;
 
-/// Borrowed semantic facts for a strict plain-number `FormatStructArchive`.
+/// Borrowed semantic facts for a strict plain Number or Percentage
+/// `FormatStructArchive`.
 ///
 /// The complete source payload remains available through [`Self::raw`].
 /// Unknown extension fields and groups are never decoded into owned storage
@@ -743,7 +747,8 @@ impl<'source> NumberFormatSnapshot<'source> {
         self.source
     }
 
-    /// Return the native format discriminator (`256`).
+    /// Return the native format discriminator (`256` for Number, `258` for
+    /// Percentage).
     #[must_use]
     pub const fn format_type(self) -> u32 {
         self.format_type
@@ -768,7 +773,8 @@ impl<'source> NumberFormatSnapshot<'source> {
     }
 }
 
-/// Owned scalar values accepted by the plain-number format writer.
+/// Owned scalar values accepted by the plain Number or Percentage format
+/// writer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NumberFormatWrite {
     decimal_places: u32,
@@ -846,7 +852,7 @@ pub fn decode_number_format(
     source: &[u8],
     options: DecodeOptions,
 ) -> Result<NumberFormatSnapshot<'_>, DecodeError> {
-    Ok(decode_number_format_with_report(source, options)?.0)
+    decode_decimal_format(source, NATIVE_NUMBER_FORMAT_TYPE, options)
 }
 
 /// Strictly decode one plain-number format and return measured wire usage.
@@ -854,7 +860,23 @@ pub fn decode_number_format_with_report(
     source: &[u8],
     options: DecodeOptions,
 ) -> Result<(NumberFormatSnapshot<'_>, DecodeReport), DecodeError> {
-    let (snapshot, _layout, report) = scan_number_format(source, options)?;
+    decode_decimal_format_with_report(source, NATIVE_NUMBER_FORMAT_TYPE, options)
+}
+
+pub(crate) fn decode_decimal_format(
+    source: &[u8],
+    format_type: u32,
+    options: DecodeOptions,
+) -> Result<NumberFormatSnapshot<'_>, DecodeError> {
+    Ok(decode_decimal_format_with_report(source, format_type, options)?.0)
+}
+
+pub(crate) fn decode_decimal_format_with_report(
+    source: &[u8],
+    format_type: u32,
+    options: DecodeOptions,
+) -> Result<(NumberFormatSnapshot<'_>, DecodeReport), DecodeError> {
+    let (snapshot, _layout, report) = scan_decimal_format(source, format_type, options)?;
     Ok((snapshot, report))
 }
 
@@ -869,9 +891,18 @@ pub fn prepare_number_format_rewrite<'source>(
     write: NumberFormatWrite,
     options: DecodeOptions,
 ) -> Result<PreparedNumberFormatRewrite<'source>, DecodeError> {
-    validate_number_format_write(write)?;
-    let (_snapshot, layout, source_report) = scan_number_format(source, options)?;
-    let output_bytes = number_format_rewrite_output_len(source, layout, write)?;
+    prepare_decimal_format_rewrite(source, write, NATIVE_NUMBER_FORMAT_TYPE, options)
+}
+
+pub(crate) fn prepare_decimal_format_rewrite<'source>(
+    source: &'source [u8],
+    write: NumberFormatWrite,
+    format_type: u32,
+    options: DecodeOptions,
+) -> Result<PreparedNumberFormatRewrite<'source>, DecodeError> {
+    validate_decimal_format_write(write, format_type)?;
+    let (_snapshot, layout, source_report) = scan_decimal_format(source, format_type, options)?;
+    let output_bytes = decimal_format_rewrite_output_len(source, layout, write, format_type)?;
     let candidate_work = output_bytes
         .checked_mul(2)
         .ok_or_else(DecodeError::invalid)?;
@@ -905,6 +936,7 @@ pub fn prepare_number_format_rewrite<'source>(
         source,
         layout,
         write,
+        format_type,
         requirements,
         verify_options: options,
     })
@@ -916,7 +948,16 @@ pub fn rewrite_number_format(
     write: NumberFormatWrite,
     options: DecodeOptions,
 ) -> Result<RewriteOutput, DecodeError> {
-    let prepared = prepare_number_format_rewrite(source, write, options)?;
+    rewrite_decimal_format(source, write, NATIVE_NUMBER_FORMAT_TYPE, options)
+}
+
+pub(crate) fn rewrite_decimal_format(
+    source: &[u8],
+    write: NumberFormatWrite,
+    format_type: u32,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_decimal_format_rewrite(source, write, format_type, options)?;
     prepared.execute(RewriteExecutionLimits::exact(
         prepared.execution_requirements(),
     ))
@@ -929,8 +970,9 @@ pub use rewrite_number_format as rewrite_table_cell_number_format;
 #[derive(Debug, Clone, Copy)]
 pub struct PreparedNumberFormatRewrite<'source> {
     source: &'source [u8],
-    layout: NumberFormatLayout,
+    layout: DecimalFormatLayout,
     write: NumberFormatWrite,
+    format_type: u32,
     requirements: RewriteExecutionRequirements,
     verify_options: DecodeOptions,
 }
@@ -959,11 +1001,23 @@ impl PreparedNumberFormatRewrite<'_> {
                     requested: self.requirements.output_bytes,
                 })
             })?;
-        emit_number_format_rewrite(&mut bytes, self.source, self.layout, self.write)?;
+        emit_decimal_format_rewrite(
+            &mut bytes,
+            self.source,
+            self.layout,
+            self.write,
+            self.format_type,
+        )?;
         if bytes.len() != self.requirements.output_bytes {
             return Err(DecodeError::invalid());
         }
-        verify_number_format_candidate(&bytes, self.write, self.verify_options, self.layout)?;
+        verify_decimal_format_candidate(
+            &bytes,
+            self.write,
+            self.format_type,
+            self.verify_options,
+            self.layout,
+        )?;
         Ok(RewriteOutput {
             bytes,
             report: report_from_requirements(self.requirements),
@@ -980,8 +1034,16 @@ pub fn prepare_number_format_write(
     write: NumberFormatWrite,
     options: DecodeOptions,
 ) -> Result<PreparedNumberFormatWrite, DecodeError> {
-    validate_number_format_write(write)?;
-    let output_bytes = number_format_canonical_output_len(write)?;
+    prepare_decimal_format_write(write, NATIVE_NUMBER_FORMAT_TYPE, options)
+}
+
+pub(crate) fn prepare_decimal_format_write(
+    write: NumberFormatWrite,
+    format_type: u32,
+    options: DecodeOptions,
+) -> Result<PreparedNumberFormatWrite, DecodeError> {
+    validate_decimal_format_write(write, format_type)?;
+    let output_bytes = decimal_format_canonical_output_len(write, format_type)?;
     let requirements = RewriteExecutionRequirements {
         output_bytes,
         fields: 4,
@@ -999,6 +1061,7 @@ pub fn prepare_number_format_write(
     check_options(requirements, options)?;
     Ok(PreparedNumberFormatWrite {
         write,
+        format_type,
         requirements,
         verify_options: options,
     })
@@ -1012,7 +1075,15 @@ pub fn canonical_number_format(
     write: NumberFormatWrite,
     options: DecodeOptions,
 ) -> Result<RewriteOutput, DecodeError> {
-    let prepared = prepare_number_format_write(write, options)?;
+    canonical_decimal_format(write, NATIVE_NUMBER_FORMAT_TYPE, options)
+}
+
+pub(crate) fn canonical_decimal_format(
+    write: NumberFormatWrite,
+    format_type: u32,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_decimal_format_write(write, format_type, options)?;
     prepared.execute(RewriteExecutionLimits::exact(
         prepared.execution_requirements(),
     ))
@@ -1022,6 +1093,7 @@ pub fn canonical_number_format(
 #[derive(Debug, Clone, Copy)]
 pub struct PreparedNumberFormatWrite {
     write: NumberFormatWrite,
+    format_type: u32,
     requirements: RewriteExecutionRequirements,
     verify_options: DecodeOptions,
 }
@@ -1050,16 +1122,22 @@ impl PreparedNumberFormatWrite {
                     requested: self.requirements.output_bytes,
                 })
             })?;
-        emit_number_format_canonical(&mut bytes, self.write)?;
+        emit_decimal_format_canonical(&mut bytes, self.write, self.format_type)?;
         if bytes.len() != self.requirements.output_bytes {
             return Err(DecodeError::invalid());
         }
-        let layout = NumberFormatLayout {
+        let layout = DecimalFormatLayout {
             fields: 4,
             max_depth: 0,
             spans: [None, None, None, None],
         };
-        verify_number_format_candidate(&bytes, self.write, self.verify_options, layout)?;
+        verify_decimal_format_candidate(
+            &bytes,
+            self.write,
+            self.format_type,
+            self.verify_options,
+            layout,
+        )?;
         Ok(RewriteOutput {
             bytes,
             report: report_from_requirements(self.requirements),
@@ -1068,29 +1146,29 @@ impl PreparedNumberFormatWrite {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct NumberFieldSpan {
+struct DecimalFieldSpan {
     number: u32,
     start: usize,
     end: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
-struct NumberFormatLayout {
+struct DecimalFormatLayout {
     fields: usize,
     max_depth: u32,
-    spans: [Option<NumberFieldSpan>; 4],
+    spans: [Option<DecimalFieldSpan>; 4],
 }
 
 #[derive(Debug, Clone, Copy)]
-struct NumberFormatScanState {
+struct DecimalFormatScanState {
     format_type: Option<u32>,
     decimal_places: Option<u32>,
     negative_style: Option<u32>,
     show_thousands_separator: Option<bool>,
-    spans: [Option<NumberFieldSpan>; 4],
+    spans: [Option<DecimalFieldSpan>; 4],
 }
 
-impl NumberFormatScanState {
+impl DecimalFormatScanState {
     const fn new() -> Self {
         Self {
             format_type: None,
@@ -1102,20 +1180,22 @@ impl NumberFormatScanState {
     }
 }
 
-fn scan_number_format<'source>(
+fn scan_decimal_format<'source>(
     source: &'source [u8],
+    expected_format_type: u32,
     options: DecodeOptions,
 ) -> Result<
     (
         NumberFormatSnapshot<'source>,
-        NumberFormatLayout,
+        DecimalFormatLayout,
         DecodeReport,
     ),
     DecodeError,
 > {
+    validate_decimal_format_type(expected_format_type)?;
     let mut budget = Budget::new(source, options)?;
-    let mut state = NumberFormatScanState::new();
-    let end = scan_number_message(source, 0, 0, None, &mut budget, &mut state)?;
+    let mut state = DecimalFormatScanState::new();
+    let end = scan_decimal_message(source, 0, 0, None, &mut budget, &mut state)?;
     if end != source.len() {
         return Err(DecodeError::invalid());
     }
@@ -1125,7 +1205,7 @@ fn scan_number_format<'source>(
     let show_thousands_separator = state
         .show_thousands_separator
         .ok_or_else(DecodeError::invalid)?;
-    if format_type != NATIVE_NUMBER_FORMAT_TYPE
+    if format_type != expected_format_type
         || (decimal_places != NATIVE_AUTOMATIC_DECIMAL_PLACES
             && decimal_places > MAX_NUMBER_DECIMAL_PLACES)
         || negative_style > 3
@@ -1142,7 +1222,7 @@ fn scan_number_format<'source>(
     };
     buffa_number_format_parity(source, snapshot, &mut budget)?;
     let report = budget.finish(0);
-    let layout = NumberFormatLayout {
+    let layout = DecimalFormatLayout {
         fields: report.fields(),
         max_depth: report.max_depth(),
         spans: state.spans,
@@ -1158,7 +1238,7 @@ fn buffa_number_format_parity(
     let options = budget.options;
     let view: projection::FormatStructArchiveLazyView<'_> = BuffaDecodeOptions::new()
         .with_max_message_size(options.max_message_bytes)
-        .with_unknown_field_limit(options.max_message_bytes)
+        .with_unknown_field_limit(options.max_fields)
         .with_element_memory_limit(0)
         .with_recursion_limit(options.recursion_limit)
         .decode_lazy_view(source)
@@ -1174,13 +1254,13 @@ fn buffa_number_format_parity(
     Ok(())
 }
 
-fn scan_number_message(
+fn scan_decimal_message(
     source: &[u8],
     mut cursor: usize,
     depth: u32,
     end_group: Option<u32>,
     budget: &mut Budget,
-    state: &mut NumberFormatScanState,
+    state: &mut DecimalFormatScanState,
 ) -> Result<usize, DecodeError> {
     while cursor < source.len() {
         let start = cursor;
@@ -1244,7 +1324,7 @@ fn scan_number_message(
                         maximum: budget.options.recursion_limit,
                     }));
                 }
-                cursor = scan_number_message(
+                cursor = scan_decimal_message(
                     source,
                     cursor,
                     depth.saturating_add(1),
@@ -1273,7 +1353,7 @@ fn scan_number_message(
         };
         budget.field(record_len, depth)?;
         if depth == 0 {
-            inspect_number_root_field(source, start, cursor, number, wire, state)?;
+            inspect_decimal_root_field(source, start, cursor, number, wire, state)?;
         }
     }
     if end_group.is_some() {
@@ -1282,13 +1362,13 @@ fn scan_number_message(
     Ok(cursor)
 }
 
-fn inspect_number_root_field(
+fn inspect_decimal_root_field(
     source: &[u8],
     start: usize,
     end: usize,
     number: u32,
     wire: u8,
-    state: &mut NumberFormatScanState,
+    state: &mut DecimalFormatScanState,
 ) -> Result<(), DecodeError> {
     let Some(slot) = number_format_slot(number) else {
         // Fields 3..45 are known `FormatStructArchive` fields with a
@@ -1307,7 +1387,7 @@ fn inspect_number_root_field(
         .checked_add(key_len)
         .ok_or_else(DecodeError::invalid)?;
     let (value, _) = read_varint(source, value_offset)?;
-    let span = NumberFieldSpan { number, start, end };
+    let span = DecimalFieldSpan { number, start, end };
     state.spans[slot] = Some(span);
     match number {
         NUMBER_FORMAT_TYPE_FIELD => {
@@ -1340,7 +1420,22 @@ const fn number_format_slot(number: u32) -> Option<usize> {
     }
 }
 
-fn validate_number_format_write(write: NumberFormatWrite) -> Result<(), DecodeError> {
+fn validate_decimal_format_type(format_type: u32) -> Result<(), DecodeError> {
+    if matches!(
+        format_type,
+        NATIVE_NUMBER_FORMAT_TYPE | NATIVE_PERCENTAGE_FORMAT_TYPE
+    ) {
+        Ok(())
+    } else {
+        Err(DecodeError::invalid())
+    }
+}
+
+fn validate_decimal_format_write(
+    write: NumberFormatWrite,
+    format_type: u32,
+) -> Result<(), DecodeError> {
+    validate_decimal_format_type(format_type)?;
     if (write.decimal_places != NATIVE_AUTOMATIC_DECIMAL_PLACES
         && write.decimal_places > MAX_NUMBER_DECIMAL_PLACES)
         || write.negative_style > 3
@@ -1356,10 +1451,11 @@ fn number_format_field_len(number: u32, value: u64) -> Result<usize, DecodeError
         .ok_or_else(DecodeError::invalid)
 }
 
-fn number_format_rewrite_output_len(
+fn decimal_format_rewrite_output_len(
     source: &[u8],
-    layout: NumberFormatLayout,
+    layout: DecimalFormatLayout,
     write: NumberFormatWrite,
+    format_type: u32,
 ) -> Result<usize, DecodeError> {
     let mut old = 0usize;
     for span in layout.spans.into_iter() {
@@ -1372,7 +1468,7 @@ fn number_format_rewrite_output_len(
             )
             .ok_or_else(DecodeError::invalid)?;
     }
-    let new = number_format_canonical_output_len(write)?;
+    let new = decimal_format_canonical_output_len(write, format_type)?;
     source
         .len()
         .checked_sub(old)
@@ -1380,11 +1476,12 @@ fn number_format_rewrite_output_len(
         .ok_or_else(DecodeError::invalid)
 }
 
-fn number_format_canonical_output_len(write: NumberFormatWrite) -> Result<usize, DecodeError> {
-    let type_len = number_format_field_len(
-        NUMBER_FORMAT_TYPE_FIELD,
-        u64::from(NATIVE_NUMBER_FORMAT_TYPE),
-    )?;
+fn decimal_format_canonical_output_len(
+    write: NumberFormatWrite,
+    format_type: u32,
+) -> Result<usize, DecodeError> {
+    validate_decimal_format_type(format_type)?;
+    let type_len = number_format_field_len(NUMBER_FORMAT_TYPE_FIELD, u64::from(format_type))?;
     let decimal_len = number_format_field_len(
         NUMBER_FORMAT_DECIMAL_PLACES_FIELD,
         u64::from(write.decimal_places),
@@ -1404,15 +1501,13 @@ fn number_format_canonical_output_len(write: NumberFormatWrite) -> Result<usize,
         .ok_or_else(DecodeError::invalid)
 }
 
-fn emit_number_format_canonical(
+fn emit_decimal_format_canonical(
     output: &mut Vec<u8>,
     write: NumberFormatWrite,
+    format_type: u32,
 ) -> Result<(), DecodeError> {
-    emit_varint_field(
-        output,
-        NUMBER_FORMAT_TYPE_FIELD,
-        u64::from(NATIVE_NUMBER_FORMAT_TYPE),
-    )?;
+    validate_decimal_format_type(format_type)?;
+    emit_varint_field(output, NUMBER_FORMAT_TYPE_FIELD, u64::from(format_type))?;
     emit_varint_field(
         output,
         NUMBER_FORMAT_DECIMAL_PLACES_FIELD,
@@ -1431,12 +1526,14 @@ fn emit_number_format_canonical(
     Ok(())
 }
 
-fn emit_number_format_rewrite(
+fn emit_decimal_format_rewrite(
     output: &mut Vec<u8>,
     source: &[u8],
-    layout: NumberFormatLayout,
+    layout: DecimalFormatLayout,
     write: NumberFormatWrite,
+    format_type: u32,
 ) -> Result<(), DecodeError> {
+    validate_decimal_format_type(format_type)?;
     let mut ordered = [
         layout.spans[0].ok_or_else(DecodeError::invalid)?,
         layout.spans[1].ok_or_else(DecodeError::invalid)?,
@@ -1458,7 +1555,7 @@ fn emit_number_format_rewrite(
                 .ok_or_else(DecodeError::invalid)?,
         );
         let value = match span.number {
-            NUMBER_FORMAT_TYPE_FIELD => u64::from(NATIVE_NUMBER_FORMAT_TYPE),
+            NUMBER_FORMAT_TYPE_FIELD => u64::from(format_type),
             NUMBER_FORMAT_DECIMAL_PLACES_FIELD => u64::from(write.decimal_places),
             NUMBER_FORMAT_NEGATIVE_STYLE_FIELD => u64::from(write.negative_style),
             NUMBER_FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD => {
@@ -1477,14 +1574,14 @@ fn emit_number_format_rewrite(
     Ok(())
 }
 
-fn verify_number_format_candidate(
+fn verify_decimal_format_candidate(
     source: &[u8],
     write: NumberFormatWrite,
-    mut options: DecodeOptions,
-    layout: NumberFormatLayout,
+    format_type: u32,
+    options: DecodeOptions,
+    layout: DecimalFormatLayout,
 ) -> Result<(), DecodeError> {
-    options.max_message_bytes = options.max_message_bytes.max(source.len());
-    let (snapshot, report) = decode_number_format_with_report(source, options)?;
+    let (snapshot, report) = decode_decimal_format_with_report(source, format_type, options)?;
     let expected_work = source
         .len()
         .checked_mul(2)
@@ -1503,7 +1600,7 @@ fn buffa_cell_spec_parity(source: &[u8], budget: &mut Budget) -> Result<(), Deco
     let options = budget.options;
     let _: projection::CellSpecArchiveLazyView<'_> = BuffaDecodeOptions::new()
         .with_max_message_size(options.max_message_bytes)
-        .with_unknown_field_limit(options.max_message_bytes)
+        .with_unknown_field_limit(options.max_fields)
         .with_element_memory_limit(0)
         .with_recursion_limit(options.recursion_limit)
         .decode_lazy_view(source)
@@ -1516,7 +1613,7 @@ fn buffa_cell_value_parity(source: &[u8], budget: &mut Budget) -> Result<(), Dec
     let options = budget.options;
     let _: projection::CellValueArchiveLazyView<'_> = BuffaDecodeOptions::new()
         .with_max_message_size(options.max_message_bytes)
-        .with_unknown_field_limit(options.max_message_bytes)
+        .with_unknown_field_limit(options.max_fields)
         .with_element_memory_limit(0)
         .with_recursion_limit(options.recursion_limit)
         .decode_lazy_view(source)
@@ -1529,7 +1626,7 @@ fn buffa_string_value_parity(source: &[u8], budget: &mut Budget) -> Result<(), D
     let options = budget.options;
     let _: projection::StringCellValueArchiveLazyView<'_> = BuffaDecodeOptions::new()
         .with_max_message_size(options.max_message_bytes)
-        .with_unknown_field_limit(options.max_message_bytes)
+        .with_unknown_field_limit(options.max_fields)
         .with_element_memory_limit(0)
         .with_recursion_limit(options.recursion_limit)
         .decode_lazy_view(source)
@@ -3498,10 +3595,9 @@ fn report_from_requirements(requirements: RewriteExecutionRequirements) -> Decod
 
 fn verify_popup_model_candidate(
     source: &[u8],
-    mut options: DecodeOptions,
+    options: DecodeOptions,
     requirements: RewriteExecutionRequirements,
 ) -> Result<(), DecodeError> {
-    options.max_message_bytes = options.max_message_bytes.max(source.len());
     let (_, report) = decode_popup_menu_model_with_report(source, options)?;
     let candidate_work = requirements
         .work_bytes
@@ -3520,10 +3616,9 @@ fn verify_popup_model_candidate(
 
 fn verify_cell_spec_candidate(
     source: &[u8],
-    mut options: DecodeOptions,
+    options: DecodeOptions,
     requirements: RewriteExecutionRequirements,
 ) -> Result<(), DecodeError> {
-    options.max_message_bytes = options.max_message_bytes.max(source.len());
     let (_, report) = decode_cell_spec_with_report(source, options)?;
     let candidate_work = requirements
         .work_bytes
@@ -3541,10 +3636,9 @@ fn verify_cell_spec_candidate(
 
 fn verify_control_cell_spec_candidate(
     source: &[u8],
-    mut options: DecodeOptions,
+    options: DecodeOptions,
     requirements: RewriteExecutionRequirements,
 ) -> Result<(), DecodeError> {
-    options.max_message_bytes = options.max_message_bytes.max(source.len());
     let (_, report) = decode_control_cell_spec_with_report(source, options)?;
     let candidate_work = requirements
         .work_bytes
@@ -3562,10 +3656,9 @@ fn verify_control_cell_spec_candidate(
 
 fn verify_control_format_candidate(
     source: &[u8],
-    mut options: DecodeOptions,
+    options: DecodeOptions,
     requirements: RewriteExecutionRequirements,
 ) -> Result<(), DecodeError> {
-    options.max_message_bytes = options.max_message_bytes.max(source.len());
     let (_, report) = decode_control_format_with_report(source, options)?;
     let candidate_work = requirements
         .work_bytes
@@ -3585,6 +3678,17 @@ fn check_options(
     requirements: RewriteExecutionRequirements,
     options: DecodeOptions,
 ) -> Result<(), DecodeError> {
+    // Candidate verification decodes the emitted bytes with the original
+    // caller-owned message ceiling. Keep that ceiling authoritative rather
+    // than widening it to fit the candidate after preparation; otherwise a
+    // one-byte varint growth could allocate and publish a message the caller
+    // explicitly refused to admit. This check runs before output allocation.
+    if requirements.output_bytes > options.max_message_bytes {
+        return Err(DecodeError::limited(DecodeLimit::InputBytes {
+            observed: requirements.output_bytes,
+            maximum: options.max_message_bytes,
+        }));
+    }
     if requirements.output_bytes > options.max_output_bytes {
         return Err(DecodeError::limited(DecodeLimit::OutputBytes {
             observed: requirements.output_bytes,
@@ -4194,6 +4298,7 @@ fn write_varint(output: &mut Vec<u8>, mut value: u64) -> Result<(), DecodeError>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::numbers_table_cell_percentage_format_codec as percentage_codec;
 
     fn options() -> DecodeOptions {
         DecodeOptions::new(16 * 1024, 16 * 1024, 16 * 1024, 64 * 1024, 64, 16, 64, 4096)
@@ -4844,6 +4949,33 @@ mod tests {
     }
 
     #[test]
+    fn number_format_rewrite_rejects_varint_growth_within_original_message_ceiling() {
+        // `decimal_places = 0` uses a one-byte varint. Automatic decimal
+        // places (`253`) uses two bytes, so the source-preserving candidate is
+        // one byte larger. Keep a large opaque extension in the source so the
+        // caller's message ceiling is above the small-format threshold; this
+        // exercises candidate preflight rather than the source scan.
+        let mut source = native_number_format(0, 0, false);
+        source.extend_from_slice(&[0xa2, 0x06, 0x80, 0x02]); // unknown field 100, 256 bytes
+        source.resize(source.len() + 256, 0xde);
+        let mut bounded = options();
+        bounded.max_message_bytes = source.len();
+
+        assert!(decode_number_format(&source, bounded).is_ok());
+        let error = prepare_number_format_rewrite(
+            &source,
+            NumberFormatWrite::new(NATIVE_AUTOMATIC_DECIMAL_PLACES, 0, false),
+            bounded,
+        )
+        .expect_err("encoded growth must stay within the caller ceiling");
+        assert!(matches!(
+            error.resource_limit(),
+            Some(DecodeLimit::InputBytes { observed, maximum })
+                if observed == source.len() + 1 && maximum == source.len()
+        ));
+    }
+
+    #[test]
     fn prepared_number_format_execution_is_finite_and_measured() {
         let source = native_number_format(2, 0, false);
         let write = NumberFormatWrite::new(30, 3, true);
@@ -4946,6 +5078,196 @@ mod tests {
                 if observed == usize::MAX
                     && maximum == usize::try_from(buffa::MAX_MESSAGE_BYTES)
                         .expect("Buffa ceiling fits usize")
+        ));
+    }
+
+    fn native_percentage_format(decimal_places: u32, negative_style: u32, show: bool) -> Vec<u8> {
+        let mut source = Vec::new();
+        emit_varint_field(
+            &mut source,
+            NUMBER_FORMAT_TYPE_FIELD,
+            u64::from(NATIVE_PERCENTAGE_FORMAT_TYPE),
+        )
+        .expect("type");
+        emit_varint_field(
+            &mut source,
+            NUMBER_FORMAT_DECIMAL_PLACES_FIELD,
+            u64::from(decimal_places),
+        )
+        .expect("decimal places");
+        emit_varint_field(
+            &mut source,
+            NUMBER_FORMAT_NEGATIVE_STYLE_FIELD,
+            u64::from(negative_style),
+        )
+        .expect("negative style");
+        emit_varint_field(
+            &mut source,
+            NUMBER_FORMAT_SHOW_THOUSANDS_SEPARATOR_FIELD,
+            u64::from(show),
+        )
+        .expect("thousands separator");
+        source
+    }
+
+    #[test]
+    fn percentage_format_is_type_258_and_isolated_from_number() {
+        let source = [
+            0x08, 0x82, 0x02, // format_type = 258
+            0x10, 0xfd, 0x01, // decimal_places = automatic (253)
+            0x20, 0x03, // negative_style = red parentheses
+            0x28, 0x01, // show_thousands_separator = true
+        ];
+        let (snapshot, report) =
+            percentage_codec::decode_percentage_format_with_report(&source, options())
+                .expect("percentage format");
+        assert_eq!(snapshot.raw(), source.as_slice());
+        assert_eq!(snapshot.format_type(), NATIVE_PERCENTAGE_FORMAT_TYPE);
+        assert_eq!(snapshot.decimal_places(), NATIVE_AUTOMATIC_DECIMAL_PLACES);
+        assert_eq!(snapshot.negative_style(), 3);
+        assert!(snapshot.show_thousands_separator());
+        assert_eq!(report.input_bytes(), source.len());
+        assert_eq!(report.fields(), 4);
+        assert_eq!(report.work_bytes(), source.len() * 2);
+        assert_eq!(report.allocations(), 0);
+        assert!(decode_number_format(&source, options()).is_err());
+
+        let number = native_number_format(2, 0, false);
+        assert!(percentage_codec::decode_percentage_format(&number, options()).is_err());
+    }
+
+    #[test]
+    fn percentage_format_accepts_native_domains_only() {
+        for decimal_places in [
+            0,
+            percentage_codec::MAX_PERCENTAGE_DECIMAL_PLACES,
+            NATIVE_AUTOMATIC_DECIMAL_PLACES,
+        ] {
+            let source = native_percentage_format(decimal_places, 0, false);
+            assert!(percentage_codec::decode_percentage_format(&source, options()).is_ok());
+        }
+        for negative_style in 0..=3 {
+            let source = native_percentage_format(2, negative_style, false);
+            assert!(percentage_codec::decode_percentage_format(&source, options()).is_ok());
+        }
+        for show in [false, true] {
+            let source = native_percentage_format(2, 0, show);
+            assert!(percentage_codec::decode_percentage_format(&source, options()).is_ok());
+        }
+        for decimal_places in [31, 254] {
+            let source = native_percentage_format(decimal_places, 0, false);
+            assert!(percentage_codec::decode_percentage_format(&source, options()).is_err());
+        }
+        let source = native_percentage_format(2, 4, false);
+        assert!(percentage_codec::decode_percentage_format(&source, options()).is_err());
+        let source = native_percentage_format(2, 0, false);
+        let mut invalid_bool = source;
+        *invalid_bool.last_mut().expect("bool byte") = 2;
+        assert!(percentage_codec::decode_percentage_format(&invalid_bool, options()).is_err());
+    }
+
+    #[test]
+    fn percentage_format_rejects_malformed_and_known_fields_but_preserves_unknowns() {
+        let fields = [
+            &[0x08, 0x82, 0x02][..],
+            &[0x10, 0x02][..],
+            &[0x20, 0x00][..],
+            &[0x28, 0x00][..],
+        ];
+        for omitted in 0..fields.len() {
+            let mut source = Vec::new();
+            for (index, field) in fields.iter().enumerate() {
+                if index != omitted {
+                    source.extend_from_slice(field);
+                }
+            }
+            assert!(percentage_codec::decode_percentage_format(&source, options()).is_err());
+        }
+
+        let mut duplicate = native_percentage_format(2, 0, false);
+        duplicate.extend_from_slice(&[0x08, 0x82, 0x02]);
+        assert!(percentage_codec::decode_percentage_format(&duplicate, options()).is_err());
+
+        let wrong_wire = [
+            0x0a, 0x01, 0x00, // field 1 encoded as length-delimited
+            0x10, 0x02, 0x20, 0x00, 0x28, 0x00,
+        ];
+        assert!(percentage_codec::decode_percentage_format(&wrong_wire, options()).is_err());
+
+        for incompatible in [[0x1a, 0x00], [0x30, 0x01], [0x72, 0x00]] {
+            let mut source = native_percentage_format(2, 0, false);
+            source.extend_from_slice(&incompatible);
+            assert!(percentage_codec::decode_percentage_format(&source, options()).is_err());
+        }
+
+        let mut unterminated = native_percentage_format(2, 0, false);
+        unterminated.extend_from_slice(&[0xa3, 0x06, 0x08, 0x01]);
+        assert!(percentage_codec::decode_percentage_format(&unterminated, options()).is_err());
+
+        let unknown_group = [0xa3, 0x06, 0xa8, 0x06, 0x01, 0xa4, 0x06];
+        let mut source = native_percentage_format(2, 0, false);
+        source.extend_from_slice(&[0xa0, 0x06, 0x81, 0x00]);
+        source.extend_from_slice(&unknown_group);
+        let snapshot = percentage_codec::decode_percentage_format(&source, options())
+            .expect("unknown extension");
+        assert_eq!(snapshot.raw(), source.as_slice());
+
+        let write = percentage_codec::PercentageFormatWrite::new(30, 3, true);
+        let output = percentage_codec::rewrite_percentage_format(&source, write, options())
+            .expect("percentage rewrite");
+        assert!(output.bytes().ends_with(&[
+            0xa0, 0x06, 0x81, 0x00, 0xa3, 0x06, 0xa8, 0x06, 0x01, 0xa4, 0x06,
+        ]));
+        let rewritten = percentage_codec::decode_percentage_format(output.bytes(), options())
+            .expect("rewritten percentage");
+        assert_eq!(
+            percentage_codec::PercentageFormatWrite::from_snapshot(rewritten),
+            write
+        );
+        assert!(
+            rewrite_number_format(
+                source.as_slice(),
+                NumberFormatWrite::new(3, 0, false),
+                options()
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn prepared_percentage_format_limits_and_canonical_bytes_are_exact() {
+        let write =
+            percentage_codec::PercentageFormatWrite::new(NATIVE_AUTOMATIC_DECIMAL_PLACES, 1, true);
+        let prepared = percentage_codec::prepare_percentage_format_write(write, options())
+            .expect("prepare percentage append");
+        let requirements = prepared.execution_requirements();
+        let output = prepared
+            .execute(RewriteExecutionLimits::exact(requirements))
+            .expect("percentage append");
+        assert_eq!(
+            output.bytes(),
+            &[0x08, 0x82, 0x02, 0x10, 0xfd, 0x01, 0x20, 0x01, 0x28, 0x01]
+        );
+        let snapshot = percentage_codec::decode_percentage_format(output.bytes(), options())
+            .expect("read percentage append");
+        assert_eq!(
+            percentage_codec::PercentageFormatWrite::from_snapshot(snapshot),
+            write
+        );
+        assert_eq!(requirements.output_bytes(), output.bytes().len());
+        assert_eq!(requirements.fields(), 4);
+        assert_eq!(requirements.work_bytes(), output.bytes().len() * 3);
+        assert_eq!(requirements.allocations(), 1);
+        assert!(matches!(
+            percentage_codec::prepare_percentage_format_write(write, options())
+                .expect("prepare percentage limits")
+                .execute(
+                    RewriteExecutionLimits::exact(requirements)
+                        .with_output_bytes(requirements.output_bytes() - 1),
+                )
+                .expect_err("percentage output ceiling")
+                .resource_limit(),
+            Some(DecodeLimit::OutputBytes { .. })
         ));
     }
 }

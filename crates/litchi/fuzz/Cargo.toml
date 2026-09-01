@@ -222,6 +222,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "numbers_table_cell_percentage_format"
+path = "fuzz_targets/numbers_table_cell_percentage_format.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "numbers_table_cell_comment_reply"
 path = "fuzz_targets/numbers_table_cell_comment_reply.rs"
 test = false
@@ -285,6 +292,7 @@ litchi-iwa-archive = { path = "../../litchi-iwa-archive" }
 litchi-iwa-common = { path = "../../litchi-iwa-common" }
 litchi-iwa-core = { path = "../../litchi-iwa-core" }
 litchi-iwa-protos = { path = "../../litchi-iwa-protos" }
+litchi-numbers-wire = { path = "../../litchi-numbers-wire" }
 prost = "0.14"
 
 [profile.release]
