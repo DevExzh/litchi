@@ -3789,3 +3789,27 @@ speed, RSS, or OOM-prevention claim. DOCX extensionless/freshness, non-Unix
 eager arbitration/input limits, ODT helper defaults, ODP prepared-package
 reparse, the public eager smart API, and selected-part materialization remain
 residual scope.
+## Change 0356: DOCX source-path and OPC error boundaries
+
+This change is implemented correctness and ownership hardening only
+(`performance_claim: none`). Unix and Windows document paths now use one
+`FileSource` and one `SourceVersion` through ODT MIME/catalog arbitration, the
+DOCX source owner, and bounded `Bytes` fallback. Portable fallback performs
+checked length conversion/reservation, fixed `read_exact` reads, and a final
+handle-length check. Caller DOCX limits remain on ZIP/known OOXML candidates;
+generic fallback is finite at 2 GiB but still materializes bytes. Terminal
+DOCX `OtherOoxml`/`DisabledOtherOoxml`, allocation-preserving genuine
+missing-manifest/no-match fallback, valid-DOCX-over-malformed-ODF-polyglot
+precedence, and ordinary ODT separation are covered.
+
+The OPC prerequisite types allocation, all six limit resources, and raw I/O;
+archive-index, catalog, validation-catalog phase, selected-stream, and
+preservation-index paths retain cancellation/execution/source-freshness
+precedence, with only `UnsupportedPreservation` becoming overlay-unavailable.
+Public APIs and `DetectedFormat` do not change. Focused and serial validation
+passed `6/6`, `271/271`, `90/90`, and the DOCX/ODT/PPTX/XLSX/XLS feature checks
+under the constrained one-target environment. Admission uses a caller-sized
+physical result buffer with typed fallible reservation and releases the part
+reservation on admission failure. This is correctness/resource safety only,
+with no performance or OOM claim. The final target was 1009 MiB;
+no speed, RSS, or OOM-prevention claim is made. See [Change 0356](changes/0356-docx-source-path-and-opc-errors.md).

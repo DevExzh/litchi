@@ -1811,7 +1811,10 @@ mod tests {
         .expect("public OPC probe must not panic on a hostile reader");
         let error = result.unwrap_err();
         match error {
-            OpcError::ZipError(message) => assert!(message.contains("OPC source reader returned")),
+            OpcError::IoError(error) => {
+                assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+                assert!(error.to_string().contains("OPC source reader returned"));
+            },
             other => panic!("expected typed hostile-reader error, got {other:?}"),
         }
         assert_eq!(reader.stream_position().unwrap(), original_position);

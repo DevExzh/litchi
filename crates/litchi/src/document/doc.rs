@@ -691,31 +691,48 @@ impl Document {
 
         #[cfg(not(feature = "docx"))]
         {
-            #[cfg(all(feature = "odt", any(unix, windows)))]
-            if let Some(candidate) =
-                crate::detection_smart::detected::detect_odt_source_path(path.as_ref())?
+            #[cfg(any(unix, windows))]
             {
-                let ooxml_catalog = candidate.ooxml_catalog_state()?;
-                #[cfg(any(feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-                if ooxml_catalog != Some(false)
-                    && crate::detection_smart::detected::odt_source_candidate_has_ooxml_owner(
-                        &candidate,
-                    )
-                    .map_err(Self::map_source_opc_error)?
-                {
-                    return Err(Error::InvalidFormat(
-                        "Detected format is not a document format or feature not enabled"
-                            .to_owned(),
-                    ));
-                }
-                let _ = ooxml_catalog;
-                return Ok(Self {
-                    inner: DocumentImpl::OdtSource(candidate.into_document()?),
-                });
+                let detected =
+                    crate::detection_smart::detected::detect_document_source_path(path.as_ref())?;
+                return match detected {
+                    #[cfg(feature = "odt")]
+                    crate::detection_smart::detected::DocumentSourcePathDetection::Odt(
+                        candidate,
+                    ) => {
+                        let ooxml_catalog = candidate.ooxml_catalog_state()?;
+                        #[cfg(any(feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+                        if ooxml_catalog != Some(false)
+                            && crate::detection_smart::detected::odt_source_candidate_has_ooxml_owner(
+                                &candidate,
+                            )
+                            .map_err(Self::map_source_opc_error)?
+                        {
+                            return Err(Error::InvalidFormat(
+                                "Detected format is not a document format or feature not enabled"
+                                    .to_owned(),
+                            ));
+                        }
+                        let _ = ooxml_catalog;
+                        Ok(Self {
+                            inner: DocumentImpl::OdtSource(candidate.into_document()?),
+                        })
+                    },
+                    crate::detection_smart::detected::DocumentSourcePathDetection::Bytes(bytes) => {
+                        Self::from_bytes(bytes)
+                    },
+                };
             }
 
-            let bytes = std::fs::read(path.as_ref())?;
-            Self::from_bytes(bytes)
+            #[cfg(not(any(unix, windows)))]
+            {
+                let bytes = crate::detection_smart::detected::read_document_path_bytes_with_limits(
+                    path.as_ref(),
+                    crate::detection_smart::detected::UNIFIED_DOCUMENT_FALLBACK_MAX_INPUT_BYTES,
+                    crate::detection_smart::detected::UNIFIED_DOCUMENT_FALLBACK_MAX_INPUT_BYTES,
+                )?;
+                Self::from_bytes(bytes)
+            }
         }
     }
 
@@ -729,76 +746,10 @@ impl Document {
         path: P,
         limits: crate::docx::ReadLimits,
     ) -> Result<Self> {
-        #[cfg(all(feature = "odt", any(unix, windows)))]
-        let odt_candidate = crate::detection_smart::detected::detect_odt_source_path_with_limits(
-            path.as_ref(),
-            limits,
-        )?;
-        #[cfg(all(feature = "odt", any(unix, windows)))]
-        let odt_candidate = if let Some(candidate) = odt_candidate {
-            if candidate.ooxml_catalog_state()? == Some(false) {
-                return Ok(Self {
-                    inner: DocumentImpl::OdtSource(candidate.into_document()?),
-                });
-            }
-            Some(candidate)
-        } else {
-            None
-        };
-
-        #[cfg(all(feature = "odt", any(unix, windows)))]
-        if let Some(candidate) = odt_candidate.as_ref()
-            && let Some(detected) =
-                crate::detection_smart::detected::detect_docx_from_odt_source_candidate_with_limits(
-                    candidate, limits,
-                )
-                .map_err(|error| match error {
-                    crate::detection_smart::detected::DocxSourcePathError::Opc(error) => {
-                        Self::map_source_opc_error(error)
-                    },
-                    crate::detection_smart::detected::DocxSourcePathError::Docx(error) => {
-                        Self::map_source_docx_error(error)
-                    },
-                })?
+        #[cfg(any(unix, windows))]
         {
-            match detected {
-                crate::detection_smart::detected::DocxSourcePathDetection::Docx(package) => {
-                    return Ok(Self {
-                        inner: DocumentImpl::DocxSource(package, Default::default()),
-                    });
-                },
-                crate::detection_smart::detected::DocxSourcePathDetection::OtherOoxml(format) => {
-                    let _ = format;
-                    return Err(Error::InvalidFormat(
-                        "Detected format is not a document format or feature not enabled"
-                            .to_owned(),
-                    ));
-                },
-                crate::detection_smart::detected::DocxSourcePathDetection::DisabledOtherOoxml(
-                    format,
-                ) => {
-                    let _ = format;
-                    return Err(Error::NotOfficeFile);
-                },
-            }
-        }
-
-        #[cfg(any(unix, windows))]
-        let should_probe_docx = {
-            #[cfg(feature = "odt")]
-            {
-                odt_candidate.is_none()
-            }
-            #[cfg(not(feature = "odt"))]
-            {
-                true
-            }
-        };
-
-        #[cfg(any(unix, windows))]
-        if should_probe_docx
-            && let Some(detected) =
-                crate::detection_smart::detected::detect_docx_source_path_with_limits(
+            let detected =
+                crate::detection_smart::detected::detect_document_source_path_with_limits(
                     path.as_ref(),
                     limits,
                 )
@@ -809,47 +760,61 @@ impl Document {
                     crate::detection_smart::detected::DocxSourcePathError::Docx(error) => {
                         Self::map_source_docx_error(error)
                     },
-                })?
-        {
-            match detected {
-                crate::detection_smart::detected::DocxSourcePathDetection::Docx(package) => {
-                    return Ok(Self {
-                        inner: DocumentImpl::DocxSource(package, Default::default()),
-                    });
+                })?;
+            return match detected {
+                #[cfg(feature = "odt")]
+                crate::detection_smart::detected::DocumentSourcePathDetection::Odt(candidate) => {
+                    Ok(Self {
+                        inner: DocumentImpl::OdtSource(candidate.into_document()?),
+                    })
                 },
-                crate::detection_smart::detected::DocxSourcePathDetection::OtherOoxml(format) => {
-                    let _ = format;
-                    return Err(Error::InvalidFormat(
-                        "Detected format is not a document format or feature not enabled"
-                            .to_owned(),
-                    ));
+                crate::detection_smart::detected::DocumentSourcePathDetection::Docx(detected) => {
+                    match detected {
+                        crate::detection_smart::detected::DocxSourcePathDetection::Docx(package) => {
+                            Ok(Self {
+                                inner: DocumentImpl::DocxSource(package, Default::default()),
+                            })
+                        },
+                        crate::detection_smart::detected::DocxSourcePathDetection::OtherOoxml(
+                            format,
+                        ) => {
+                            let _ = format;
+                            Err(Error::InvalidFormat(
+                                "Detected format is not a document format or feature not enabled"
+                                    .to_owned(),
+                            ))
+                        },
+                        crate::detection_smart::detected::DocxSourcePathDetection::DisabledOtherOoxml(
+                            format,
+                        ) => {
+                            let _ = format;
+                            Err(Error::NotOfficeFile)
+                        },
+                        crate::detection_smart::detected::DocxSourcePathDetection::Bytes(bytes) => {
+                            Self::from_bytes_with_limits(bytes, limits)
+                        },
+                    }
                 },
-                crate::detection_smart::detected::DocxSourcePathDetection::DisabledOtherOoxml(
-                    format,
-                ) => {
-                    let _ = format;
-                    return Err(Error::NotOfficeFile);
-                },
-            }
-        }
-
-        #[cfg(all(feature = "odt", any(unix, windows)))]
-        if let Some(candidate) = odt_candidate {
-            return Ok(Self {
-                inner: DocumentImpl::OdtSource(candidate.into_document()?),
-            });
+            };
         }
 
         #[cfg(not(any(unix, windows)))]
         if let Some(detected) =
             crate::detection_smart::detected::detect_ooxml_path_with_limits(path.as_ref(), limits)
-                .map_err(crate::map_ooxml_error)?
+                .map_err(Self::map_source_opc_error)?
         {
             return Self::from_detected(detected);
         }
 
-        let bytes = std::fs::read(path.as_ref())?;
-        Self::from_bytes(bytes)
+        #[cfg(not(any(unix, windows)))]
+        {
+            let bytes = crate::detection_smart::detected::read_document_path_bytes_with_limits(
+                path.as_ref(),
+                limits.max_input_bytes(),
+                crate::detection_smart::detected::UNIFIED_DOCUMENT_FALLBACK_MAX_INPUT_BYTES,
+            )?;
+            Self::from_bytes_with_limits(bytes, limits)
+        }
     }
 
     /// Create a Document from a byte buffer.
@@ -908,6 +873,18 @@ impl Document {
             },
             crate::detection_smart::detected::DocxSourceBytesDetection::DocxError(error) => {
                 return Err(Self::map_source_docx_error(error));
+            },
+            crate::detection_smart::detected::DocxSourceBytesDetection::OtherOoxml(format) => {
+                let _ = format;
+                return Err(Error::InvalidFormat(
+                    "Detected format is not a document format or feature not enabled".to_owned(),
+                ));
+            },
+            crate::detection_smart::detected::DocxSourceBytesDetection::DisabledOtherOoxml(
+                format,
+            ) => {
+                let _ = format;
+                return Err(Error::NotOfficeFile);
             },
             crate::detection_smart::detected::DocxSourceBytesDetection::OpcError(error) => {
                 return Err(Self::map_source_opc_error(error));
@@ -2210,6 +2187,25 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "docx")]
+    fn owned_docx_wrong_family_is_terminal() {
+        let bytes = minimal_ooxml(
+            "ppt/presentation.xml",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+            br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+            None,
+        );
+        let error = match Document::from_bytes(bytes) {
+            Ok(_) => panic!("non-document OOXML must not fallback"),
+            Err(error) => error,
+        };
+        #[cfg(feature = "pptx")]
+        assert!(matches!(error, Error::InvalidFormat(_)));
+        #[cfg(not(feature = "pptx"))]
+        assert!(matches!(error, Error::NotOfficeFile));
+    }
+
+    #[test]
     #[cfg(all(feature = "docx", feature = "odt"))]
     fn owned_odt_bytes_do_not_use_docx_limits() {
         let limits = crate::docx::ReadLimits::builder()
@@ -2912,6 +2908,113 @@ mod tests {
                 crate::opc::OpcError::ReadLimit { .. }
             )
         ));
+
+        let public_limits = crate::docx::ReadLimits::builder()
+            .max_input_bytes(1)
+            .expect("positive public input limit")
+            .build()
+            .expect("valid public input limits");
+        assert!(matches!(
+            Document::open_with_limits(oversized.path(), public_limits),
+            Err(Error::ResourceLimit(litchi_core::ResourceLimit {
+                resource: litchi_core::Resource::InputBytes,
+                observed: 4096,
+                limit: 1,
+                ..
+            }))
+        ));
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", any(unix, windows)))]
+    fn filesystem_docx_path_reports_typed_zip_and_part_errors() {
+        let malformed = tempfile::Builder::new()
+            .suffix(".docx")
+            .tempfile()
+            .expect("temporary malformed ZIP path");
+        std::fs::write(malformed.path(), b"PK\x03\x04not a complete ZIP")
+            .expect("write malformed ZIP");
+        assert!(matches!(
+            Document::open(malformed.path()),
+            Err(Error::ZipError(_))
+        ));
+
+        let parts = tempfile::Builder::new()
+            .suffix(".docx")
+            .tempfile()
+            .expect("temporary part-limited path");
+        std::fs::write(
+            parts.path(),
+            minimal_docx(
+                br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            ),
+        )
+        .expect("write part-limited DOCX");
+        let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        writer.start_file("[Content_Types].xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>"#,
+            )
+            .unwrap();
+        writer.start_file("_rels/.rels", options).unwrap();
+        writer
+            .write_all(
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer.start_file("word/document.xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/></w:body></w:document>"#,
+            )
+            .unwrap();
+        writer.start_file("word/styles.xml", options).unwrap();
+        writer
+            .write_all(
+                br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
+            )
+            .unwrap();
+        std::fs::write(parts.path(), writer.finish().unwrap().into_inner())
+            .expect("replace with two-part DOCX");
+        let limits = crate::docx::ReadLimits::builder()
+            .max_parts(1)
+            .expect("positive part limit")
+            .build()
+            .expect("valid part limits");
+        let probe_limits = crate::docx::ReadLimits::builder()
+            .max_parts(1)
+            .expect("positive probe part limit")
+            .build()
+            .expect("valid probe part limits");
+        assert!(matches!(
+            crate::detection_smart::detected::detect_document_source_path_with_limits(
+                parts.path(),
+                probe_limits,
+            ),
+            Err(crate::detection_smart::detected::DocxSourcePathError::Opc(
+                crate::opc::OpcError::ReadLimit {
+                    resource: crate::opc::ReadResource::Parts,
+                    actual: 2,
+                    maximum: 1,
+                }
+            ))
+        ));
+        let error = match Document::open_with_limits(parts.path(), limits) {
+            Ok(_) => panic!("part limit must reject the package"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            Error::ResourceLimit(litchi_core::ResourceLimit {
+                resource: litchi_core::Resource::Objects,
+                observed: 2,
+                limit: 1,
+                ..
+            })
+        ));
     }
 
     #[test]
@@ -2957,6 +3060,116 @@ mod tests {
         let document = Document::open(temporary.path()).expect("OOXML precedence");
         assert!(matches!(&document.inner, DocumentImpl::DocxSource(_, _)));
         assert_eq!(document.text().unwrap(), "OOXML wins");
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", any(unix, windows)))]
+    fn extensionless_docx_path_uses_the_source_owner() {
+        let bytes = minimal_docx(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>extensionless</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let temporary = tempfile::NamedTempFile::new().expect("extensionless DOCX path");
+        std::fs::write(temporary.path(), bytes).expect("write extensionless DOCX");
+
+        let document =
+            Document::open_with_limits(temporary.path(), crate::docx::ReadLimits::default())
+                .expect("open extensionless DOCX");
+        assert!(matches!(&document.inner, DocumentImpl::DocxSource(_, _)));
+        assert_eq!(document.text().unwrap(), "extensionless");
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", any(unix, windows)))]
+    fn extensionless_zip_without_content_types_uses_byte_fallback() {
+        let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        writer.start_file("plain.txt", options).unwrap();
+        writer.write_all(b"not an office package").unwrap();
+        let bytes = writer.finish().unwrap().into_inner();
+        let temporary = tempfile::NamedTempFile::new().expect("extensionless ZIP path");
+        std::fs::write(temporary.path(), bytes).expect("write extensionless ZIP");
+
+        assert!(matches!(
+            Document::open(temporary.path()),
+            Err(Error::NotOfficeFile)
+        ));
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", any(unix, windows)))]
+    fn extensionless_non_ooxml_path_uses_the_neutral_fallback_ceiling() {
+        let temporary = tempfile::NamedTempFile::new().expect("extensionless fallback path");
+        std::fs::write(temporary.path(), vec![b'x'; 4096]).expect("write fallback bytes");
+        let limits = crate::docx::ReadLimits::builder()
+            .max_input_bytes(1)
+            .expect("positive input limit")
+            .build()
+            .expect("valid input limits");
+
+        let error = match Document::open_with_limits(temporary.path(), limits) {
+            Ok(_) => panic!("non-OOXML fallback must still be classified"),
+            Err(error) => error,
+        };
+        assert!(matches!(error, Error::NotOfficeFile));
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", feature = "odt", any(unix, windows)))]
+    fn docx_polyglot_wins_before_missing_or_malformed_odf_manifest() {
+        let valid = minimal_ooxml(
+            "word/document.xml",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>polyglot</w:t></w:r></w:p></w:body></w:document>"#,
+            None,
+        );
+        let valid = add_odt_member(
+            &valid,
+            "mimetype",
+            b"application/vnd.oasis.opendocument.text",
+        );
+        let malformed = add_odt_member(&valid, "META-INF/manifest.xml", b"<manifest:broken>");
+
+        let from_bytes = Document::from_bytes(malformed.clone()).expect("DOCX byte precedence");
+        assert!(matches!(&from_bytes.inner, DocumentImpl::DocxSource(_, _)));
+        assert_eq!(from_bytes.text().unwrap(), "polyglot");
+
+        let temporary = tempfile::Builder::new()
+            .suffix(".odt")
+            .tempfile()
+            .expect("DOCX/ODF polyglot path");
+        std::fs::write(temporary.path(), malformed).expect("write DOCX/ODF polyglot");
+        let from_path = Document::open(temporary.path()).expect("DOCX path precedence");
+        assert!(matches!(&from_path.inner, DocumentImpl::DocxSource(_, _)));
+        assert_eq!(from_path.text().unwrap(), "polyglot");
+    }
+
+    #[test]
+    #[cfg(all(feature = "docx", feature = "odt", any(unix, windows)))]
+    fn docx_polyglot_without_odf_manifest_wins_for_bytes_and_path() {
+        let bytes = add_odt_member(
+            &minimal_ooxml(
+                "word/document.xml",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+                br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>manifest absent</w:t></w:r></w:p></w:body></w:document>"#,
+                None,
+            ),
+            "mimetype",
+            b"application/vnd.oasis.opendocument.text",
+        );
+
+        let from_bytes = Document::from_bytes(bytes.clone()).expect("DOCX byte precedence");
+        assert!(matches!(&from_bytes.inner, DocumentImpl::DocxSource(_, _)));
+        assert_eq!(from_bytes.text().unwrap(), "manifest absent");
+
+        let temporary = tempfile::Builder::new()
+            .suffix(".odt")
+            .tempfile()
+            .expect("DOCX/ODF absent-manifest path");
+        std::fs::write(temporary.path(), bytes).expect("write absent-manifest polyglot");
+        let from_path = Document::open(temporary.path()).expect("DOCX path precedence");
+        assert!(matches!(&from_path.inner, DocumentImpl::DocxSource(_, _)));
+        assert_eq!(from_path.text().unwrap(), "manifest absent");
     }
 
     #[test]
