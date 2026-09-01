@@ -34,6 +34,39 @@ detection, neutral
 limits, ordinary ODT limits, `parts_by_name` casing, and selected-Part
 materialization remain open. See [Change 0356](changes/0356-docx-source-path-and-opc-errors.md).
 
+## Latest workbook and presentation two-ceiling path result (change 0357)
+
+Change 0357 gives Workbook and Presentation filesystem paths a two-ceiling
+policy. OOXML and uncertain/polyglot candidates use caller `ReadLimits` capped
+by a neutral 2 GiB absolute ceiling; ordinary canonical ODP/ODS, content-
+derived renamed ODP, OLE, and generic non-ZIP fallback use the neutral 2 GiB
+policy. Unknown or missing-content-types ZIPs and ODF inputs with an uncertain
+OOXML catalog remain caller-limited. PPTX, ODP, native PPT, and bounded `Bytes`
+arbitration share one `FileSource` and `SourceVersion`, including freshness,
+without pathname reopen. Wrong-family `OtherOoxml`/`DisabledOtherOoxml` is
+terminal. The ODF catalog neutral-budget helper applies the input,
+compressed-byte, entry, and total ceilings together.
+
+Evidence is `15/15` focused ODF detection tests with `260` filtered, `6/6`
+catalog arbitration tests, `82/82` `litchi` `pptx,odp,ppt` library tests, and
+`84/84` `litchi` `ods,xlsx` library tests, plus passing quiet checks for
+`pptx`, `odp,ppt`, `odp`, `ppt`, and `xls,xlsx`. The first constrained compile
+found two `Arc<FileSource>` to `Arc<dyn ReadAt>` coercion errors; they were
+fixed before final checks. The serial run used one 8 GiB process ceiling, one
+Cargo job, disabled incremental/debug compilation, one disk target, and one
+test thread. The target's final/peak observed footprint was 1.3 GiB; host
+availability was approximately 14 GiB with 133 GiB disk free and exhausted
+swap. No parallel build or OOM occurred. This is correctness/resource
+evidence only (`performance_claim: none`), not speed, RSS, allocation,
+constant-memory, or OOM-prevention evidence. See [Change 0357](changes/0357-workbook-presentation-two-ceiling-policy.md).
+
+The eager public `DetectedFormat`, full neutral fallback materialization, flat
+ODF MIME decode before strict bounding, infallible Presentation aggregate
+`Vec`/`join`, portable same-size identity, native PPT mutation coverage,
+`Current User` plus `Workbook` OLE classifier inconsistency, applicable
+prepared ODP reparse, OPC case lookup, and selected-Part materialization
+remain open.
+
 ## Latest XLSB source-ingress hard-probe result (change 0354)
 
 Change 0354 separates recoverable private XLSB source probes from hard

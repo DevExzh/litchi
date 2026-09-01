@@ -2813,3 +2813,34 @@ Residual hotspots are the eager public smart detector, the neutral 2 GiB
 materializing fallback, non-Unix ODT policy differences, lower-family probe
 input-limit behavior, ordinary ODT limits, `parts_by_name` casing, and
 selected-Part materialization. Evidence is recorded in [Change 0356](changes/0356-docx-source-path-and-opc-errors.md).
+
+## Change 0357 update
+
+Change 0357 closes the implemented Workbook and Presentation filesystem
+fallback policy boundary. OOXML and uncertain/polyglot candidates use caller
+limits capped by a neutral 2 GiB ceiling, while ordinary canonical ODP/ODS,
+content-derived renamed ODP, OLE, and generic non-ZIP fallback use the neutral
+2 GiB policy. Unknown or missing-content-types ZIPs and uncertain ODF/OOXML
+catalogs remain caller-limited. PPTX, ODP, native PPT, and bounded `Bytes`
+arbitration share one `FileSource`/`SourceVersion`; freshness is checked on
+that source, and wrong-family `OtherOoxml`/`DisabledOtherOoxml` is terminal.
+The ODF catalog detector now has a neutral-budget helper for its checked input,
+compressed, entry, and total ceilings. This is correctness/resource evidence
+only (`performance_claim: none`).
+
+Serial evidence is `15/15` focused ODF detection tests with `260` filtered,
+`6/6` catalog arbitration tests, `82/82` `litchi` `pptx,odp,ppt` tests, and
+`84/84` `litchi` `ods,xlsx` tests, with quiet `pptx`, `odp,ppt`, `odp`, `ppt`,
+and `xls,xlsx` checks passing. Two initial `Arc<FileSource>` to
+`Arc<dyn ReadAt>` compile errors were corrected before final validation. One
+8 GiB process ceiling, one Cargo job, disabled incremental/debug compilation,
+one disk target, and one test thread were used; the target's final/peak
+observed footprint was 1.3 GiB, host availability approximately 14 GiB with
+133 GiB disk free, and swap was exhausted. No parallel build or OOM occurred.
+
+Residual hotspots are the eager public `DetectedFormat`, fully materialized
+neutral fallback, flat ODF MIME decode before strict bounding, infallible
+Presentation aggregate `Vec`/`join`, portable same-size identity, native PPT
+probe-time mutation coverage, `Current User` plus `Workbook` OLE classifier
+inconsistency, applicable prepared ODP reparsing, OPC case lookup, and
+selected-Part materialization. Evidence is recorded in [Change 0357](changes/0357-workbook-presentation-two-ceiling-policy.md).
