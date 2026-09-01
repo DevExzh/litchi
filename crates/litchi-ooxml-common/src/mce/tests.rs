@@ -544,3 +544,577 @@ mod fixture_tests {
         assert_eq!(output.report.selected_fallbacks, 1);
     }
 }
+
+#[cfg(test)]
+mod streaming_0360_tests {
+    use super::super::{
+        Capabilities, Error, Name,
+        stream::{
+            RawElement, RawElementKind, SemanticEvent, StreamError, StreamLimits, StreamReport,
+            process_markup_compatibility_stream,
+            process_markup_compatibility_stream_with_observers,
+        },
+    };
+    use std::{
+        convert::Infallible,
+        io::{self, BufRead, Cursor, Read},
+    };
+
+    const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+
+    fn streaming_0360_expanded(name: &Name) -> String {
+        format!("{}:{}", name.namespace, name.local_name)
+    }
+
+    fn streaming_0360_event_signature(event: &SemanticEvent<'_>) -> String {
+        match event {
+            SemanticEvent::Start(element) => format!(
+                "start:{}:{}",
+                String::from_utf8_lossy(element.name()),
+                streaming_0360_expanded(&element.expanded_name),
+            ),
+            SemanticEvent::Empty(element) => format!(
+                "empty:{}:{}",
+                String::from_utf8_lossy(element.name()),
+                streaming_0360_expanded(&element.expanded_name),
+            ),
+            SemanticEvent::End(element) => format!(
+                "end:{}:{}",
+                String::from_utf8_lossy(element.name()),
+                streaming_0360_expanded(&element.expanded_name),
+            ),
+            SemanticEvent::Text(text) => format!("text:{}", text.text()),
+            SemanticEvent::CData(text) => format!("cdata:{}", text.text()),
+            SemanticEvent::Comment(text) => format!("comment:{}", text.text()),
+            SemanticEvent::Decl(decl) => {
+                format!("decl:{}", String::from_utf8_lossy(decl.raw.as_ref()))
+            },
+            SemanticEvent::GeneralRef(reference) => {
+                format!("ref:{}", String::from_utf8_lossy(reference.name.as_ref()))
+            },
+        }
+    }
+
+    fn streaming_0360_raw_signature(element: &RawElement<'_>) -> String {
+        let kind = match element.kind {
+            RawElementKind::Start => "start",
+            RawElementKind::Empty => "empty",
+        };
+        format!("{kind}:{}", String::from_utf8_lossy(element.name()))
+    }
+
+    fn streaming_0360_active(
+        xml: &[u8],
+        capabilities: &Capabilities,
+        limits: &StreamLimits,
+    ) -> Result<(StreamReport, Vec<String>), StreamError<Infallible, &'static str>> {
+        let mut input = Cursor::new(xml);
+        let mut events = Vec::new();
+        let report =
+            process_markup_compatibility_stream(&mut input, capabilities, limits, |event| {
+                events.push(streaming_0360_event_signature(&event));
+                Ok::<(), &'static str>(())
+            })?;
+        Ok((report, events))
+    }
+
+    fn streaming_0360_both_observers(
+        input: &mut dyn BufRead,
+        capabilities: &Capabilities,
+        limits: &StreamLimits,
+    ) -> Result<(StreamReport, Vec<String>, Vec<String>), StreamError<&'static str, &'static str>>
+    {
+        let mut raw_events = Vec::new();
+        let mut active_events = Vec::new();
+        let report = process_markup_compatibility_stream_with_observers(
+            input,
+            capabilities,
+            limits,
+            |element| {
+                raw_events.push(streaming_0360_raw_signature(&element));
+                Ok::<(), &'static str>(())
+            },
+            |event| {
+                active_events.push(streaming_0360_event_signature(&event));
+                Ok::<(), &'static str>(())
+            },
+        )?;
+        Ok((report, raw_events, active_events))
+    }
+
+    fn streaming_0360_callback_failure(
+        input: &mut dyn BufRead,
+        capabilities: &Capabilities,
+        limits: &StreamLimits,
+    ) -> StreamError<&'static str, &'static str> {
+        process_markup_compatibility_stream_with_observers(
+            input,
+            capabilities,
+            limits,
+            |_| Err::<(), &'static str>("raw callback"),
+            |_| Err::<(), &'static str>("active callback"),
+        )
+        .unwrap_err()
+    }
+
+    struct Streaming0360OneByte {
+        bytes: Vec<u8>,
+        position: usize,
+    }
+
+    impl Streaming0360OneByte {
+        fn new(bytes: &[u8]) -> Self {
+            Self {
+                bytes: bytes.to_vec(),
+                position: 0,
+            }
+        }
+    }
+
+    impl Read for Streaming0360OneByte {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            if output.is_empty() || self.position == self.bytes.len() {
+                return Ok(0);
+            }
+            output[0] = self.bytes[self.position];
+            self.position += 1;
+            Ok(1)
+        }
+    }
+
+    impl BufRead for Streaming0360OneByte {
+        fn fill_buf(&mut self) -> io::Result<&[u8]> {
+            if self.position == self.bytes.len() {
+                Ok(&[])
+            } else {
+                Ok(&self.bytes[self.position..self.position + 1])
+            }
+        }
+
+        fn consume(&mut self, amount: usize) {
+            self.position = self.position.saturating_add(amount).min(self.bytes.len());
+        }
+    }
+
+    struct Streaming0360FailAfter {
+        bytes: Vec<u8>,
+        position: usize,
+    }
+
+    impl Streaming0360FailAfter {
+        fn new(bytes: &[u8]) -> Self {
+            Self {
+                bytes: bytes.to_vec(),
+                position: 0,
+            }
+        }
+    }
+
+    impl Read for Streaming0360FailAfter {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            let available = self.fill_buf()?;
+            let amount = available.len().min(output.len());
+            output[..amount].copy_from_slice(&available[..amount]);
+            self.consume(amount);
+            Ok(amount)
+        }
+    }
+
+    impl BufRead for Streaming0360FailAfter {
+        fn fill_buf(&mut self) -> io::Result<&[u8]> {
+            if self.position == self.bytes.len() {
+                Err(io::Error::other("streaming 0360 input failure"))
+            } else {
+                Ok(&self.bytes[self.position..])
+            }
+        }
+
+        fn consume(&mut self, amount: usize) {
+            self.position = self.position.saturating_add(amount).min(self.bytes.len());
+        }
+    }
+
+    #[test]
+    fn streaming_0360_projects_namespaced_events_and_counts_them() {
+        let xml = br#"<p:r xmlns:p="urn:r"><p:item p:value="&amp;">text</p:item></p:r>"#;
+        let (report, events) =
+            streaming_0360_active(xml, &Capabilities::new(), &StreamLimits::default()).unwrap();
+
+        assert_eq!(
+            events,
+            vec![
+                "start:p:r:urn:r:r",
+                "start:p:item:urn:r:item",
+                "text:text",
+                "end:p:item:urn:r:item",
+                "end:p:r:urn:r:r",
+            ]
+        );
+        assert_eq!(
+            report,
+            StreamReport {
+                events: 5,
+                ..StreamReport::default()
+            }
+        );
+    }
+
+    #[test]
+    fn streaming_0360_raw_sees_inactive_branches_active_sees_selection() {
+        let xml = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" xmlns:s="urn:s"><mc:AlternateContent><mc:Choice Requires="x"><x:inactive/></mc:Choice><mc:Choice Requires="s"><s:active/></mc:Choice><mc:Fallback><fallback/></mc:Fallback></mc:AlternateContent></r>"#
+        );
+        let mut capabilities = Capabilities::new();
+        capabilities.understand_namespace("urn:s");
+        let mut input = Cursor::new(xml.as_bytes());
+        let (report, raw, active) =
+            streaming_0360_both_observers(&mut input, &capabilities, &StreamLimits::default())
+                .unwrap();
+
+        assert!(raw.iter().any(|event| event == "start:mc:Choice"));
+        assert!(raw.iter().any(|event| event == "empty:x:inactive"));
+        assert!(raw.iter().any(|event| event == "empty:s:active"));
+        assert_eq!(
+            active,
+            vec!["start:r::r", "empty:s:active:urn:s:active", "end:r::r",]
+        );
+        assert!(!active.iter().any(|event| event.contains("inactive")));
+        assert!(!active.iter().any(|event| event.contains("fallback")));
+        assert_eq!(report.alternate_content_count, 1);
+        assert_eq!(report.selected_choices, 1);
+        assert_eq!(report.selected_fallbacks, 0);
+    }
+
+    #[test]
+    fn streaming_0360_callbacks_disable_independently_and_are_retained() {
+        let xml = b"<r><one/><two/></r>";
+        let mut input = Cursor::new(xml);
+        let mut raw_calls = 0;
+        let mut active_calls = 0;
+        let error = process_markup_compatibility_stream_with_observers(
+            &mut input,
+            &Capabilities::new(),
+            &StreamLimits::default(),
+            |_| {
+                raw_calls += 1;
+                Err::<(), &'static str>("raw callback")
+            },
+            |_| {
+                active_calls += 1;
+                Err::<(), &'static str>("active callback")
+            },
+        )
+        .unwrap_err();
+
+        match error {
+            StreamError::Callback {
+                raw_error: Some(raw),
+                active_error: Some(active),
+            } => {
+                assert_eq!(raw, "raw callback");
+                assert_eq!(active, "active callback");
+            },
+            _ => panic!("expected both callback errors"),
+        }
+        assert_eq!(raw_calls, 1);
+        assert_eq!(active_calls, 1);
+    }
+
+    #[test]
+    fn streaming_0360_later_failures_keep_callback_errors_as_secondary() {
+        let mut malformed = Cursor::new(b"<r></q>");
+        let malformed_error = streaming_0360_callback_failure(
+            &mut malformed,
+            &Capabilities::new(),
+            &StreamLimits::default(),
+        );
+        match malformed_error {
+            StreamError::Mce {
+                error: Error::Xml(_) | Error::NonConformant(_),
+                raw_error: Some(raw),
+                active_error: Some(active),
+            } => {
+                assert_eq!(raw, "raw callback");
+                assert_eq!(active, "active callback");
+            },
+            _ => panic!("expected malformed XML to be primary"),
+        }
+
+        let mce = format!(r#"<r xmlns:mc="{MC}"><mc:AlternateContent/></r>"#);
+        let mut mce_input = Cursor::new(mce.as_bytes());
+        let mce_error = streaming_0360_callback_failure(
+            &mut mce_input,
+            &Capabilities::new(),
+            &StreamLimits::default(),
+        );
+        match mce_error {
+            StreamError::Mce {
+                error: Error::NonConformant(_),
+                raw_error: Some(raw),
+                active_error: Some(active),
+            } => {
+                assert_eq!(raw, "raw callback");
+                assert_eq!(active, "active callback");
+            },
+            _ => panic!("expected MCE failure to be primary"),
+        }
+
+        let mut failed_input = Streaming0360FailAfter::new(b"<r/>");
+        let input_error = streaming_0360_callback_failure(
+            &mut failed_input,
+            &Capabilities::new(),
+            &StreamLimits::default(),
+        );
+        match input_error {
+            StreamError::Input {
+                raw_error: Some(raw),
+                active_error: Some(active),
+                ..
+            } => {
+                assert_eq!(raw, "raw callback");
+                assert_eq!(active, "active callback");
+            },
+            _ => panic!("expected input failure to be primary"),
+        }
+    }
+
+    #[test]
+    fn streaming_0360_event_and_count_limits_are_exact_and_typed() {
+        let nested = b"<r><leaf/></r>";
+        let exact_events = StreamLimits {
+            max_events: 3,
+            ..StreamLimits::default()
+        };
+        let (report, _) =
+            streaming_0360_active(nested, &Capabilities::new(), &exact_events).unwrap();
+        assert_eq!(report.events, 3);
+
+        let over_events = StreamLimits {
+            max_events: 2,
+            ..exact_events
+        };
+        assert!(matches!(
+            streaming_0360_active(nested, &Capabilities::new(), &over_events),
+            Err(StreamError::Mce {
+                error: Error::LimitExceeded(message),
+                ..
+            }) if message.contains("stream event count")
+        ));
+
+        let attr_xml = format!(r#"<r value="{}"/>"#, "x".repeat(64));
+        let exact_attribute = StreamLimits {
+            max_event_bytes: attr_xml.len(),
+            ..StreamLimits::default()
+        };
+        streaming_0360_active(attr_xml.as_bytes(), &Capabilities::new(), &exact_attribute).unwrap();
+        let over_attribute = StreamLimits {
+            max_event_bytes: attr_xml.len() - 1,
+            ..exact_attribute.clone()
+        };
+        assert!(matches!(
+            streaming_0360_active(attr_xml.as_bytes(), &Capabilities::new(), &over_attribute),
+            Err(StreamError::Mce {
+                error: Error::LimitExceeded(message),
+                ..
+            }) if message.contains("stream event bytes")
+        ));
+
+        let text_xml = format!("<r>{}</r>", "t".repeat(128));
+        let exact_text = StreamLimits {
+            max_event_bytes: 129,
+            ..StreamLimits::default()
+        };
+        streaming_0360_active(text_xml.as_bytes(), &Capabilities::new(), &exact_text).unwrap();
+        let over_text = StreamLimits {
+            max_event_bytes: 128,
+            ..exact_text
+        };
+        assert!(matches!(
+            streaming_0360_active(text_xml.as_bytes(), &Capabilities::new(), &over_text),
+            Err(StreamError::Mce {
+                error: Error::LimitExceeded(message),
+                ..
+            }) if message.contains("stream event bytes")
+        ));
+    }
+
+    #[test]
+    fn streaming_0360_prefix_reader_handles_split_bom_and_replays_prefix() {
+        let mut bom_input = Streaming0360OneByte::new(b"\xef\xbb\xbf<r/>");
+        let mut bom_events = Vec::new();
+        let bom_report = process_markup_compatibility_stream(
+            &mut bom_input,
+            &Capabilities::new(),
+            &StreamLimits::default(),
+            |event| {
+                bom_events.push(streaming_0360_event_signature(&event));
+                Ok::<(), &'static str>(())
+            },
+        )
+        .unwrap();
+        assert_eq!(bom_report.events, 1);
+        assert_eq!(bom_events, vec!["empty:r::r"]);
+
+        let mut prefix_input = Streaming0360OneByte::new(b"<?xml version=\"1.0\"?><r/>");
+        let mut prefix_events = Vec::new();
+        process_markup_compatibility_stream(
+            &mut prefix_input,
+            &Capabilities::new(),
+            &StreamLimits::default(),
+            |event| {
+                prefix_events.push(streaming_0360_event_signature(&event));
+                Ok::<(), &'static str>(())
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            prefix_events,
+            vec!["decl:xml version=\"1.0\"", "empty:r::r"]
+        );
+    }
+
+    #[test]
+    fn streaming_0360_rejects_direct_alternate_content_data() {
+        for content in ["text", "<![CDATA[ ]]>"] {
+            let xml = format!(
+                r#"<r xmlns:mc="{MC}" xmlns:x="urn:x"><mc:AlternateContent>{content}<mc:Choice Requires="x"><yes/></mc:Choice><mc:Fallback><no/></mc:Fallback></mc:AlternateContent></r>"#
+            );
+            assert!(
+                streaming_0360_active(
+                    xml.as_bytes(),
+                    &Capabilities::new(),
+                    &StreamLimits::default()
+                )
+                .is_err(),
+                "accepted direct AlternateContent data: {content}"
+            );
+        }
+    }
+
+    #[test]
+    fn streaming_0360_rejects_custom_references_in_hidden_branches_and_prolog() {
+        let hidden = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:x="urn:x"><mc:AlternateContent><mc:Choice Requires="x"><x:payload>&custom;</x:payload></mc:Choice><mc:Fallback><ok/></mc:Fallback></mc:AlternateContent></r>"#
+        );
+        assert!(
+            streaming_0360_active(
+                hidden.as_bytes(),
+                &Capabilities::new(),
+                &StreamLimits::default()
+            )
+            .is_err()
+        );
+        assert!(
+            streaming_0360_active(
+                b"&custom;<r/>",
+                &Capabilities::new(),
+                &StreamLimits::default()
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn streaming_0360_rejects_bad_document_boundaries() {
+        for xml in [&b"<r></q>"[..], &b""[..], &b"<r/>tail"[..]] {
+            assert!(
+                streaming_0360_active(xml, &Capabilities::new(), &StreamLimits::default()).is_err(),
+                "accepted malformed document: {:?}",
+                xml
+            );
+        }
+    }
+
+    #[test]
+    fn streaming_0360_expands_rebound_and_unqualified_attributes() {
+        let xml =
+            br#"<r xmlns:p="urn:one"><p:item xmlns:p="urn:two" p:qualified="yes" plain="ok"/></r>"#;
+        let mut item = None;
+        let mut input = Cursor::new(xml);
+        let report = process_markup_compatibility_stream(
+            &mut input,
+            &Capabilities::new(),
+            &StreamLimits::default(),
+            |event| {
+                if let SemanticEvent::Empty(element) = event
+                    && element.name() == b"p:item"
+                {
+                    item = Some((
+                        element.expanded_name.clone(),
+                        element
+                            .attrs()
+                            .iter()
+                            .map(|attribute| {
+                                (
+                                    attribute.expanded_name.clone(),
+                                    attribute.value().to_owned(),
+                                )
+                            })
+                            .collect::<Vec<_>>(),
+                    ));
+                }
+                Ok::<(), &'static str>(())
+            },
+        )
+        .unwrap();
+
+        assert_eq!(report.events, 3);
+        let (element_name, attributes) = item.expect("rebound item must be observed");
+        assert_eq!(element_name.namespace, "urn:two");
+        assert_eq!(element_name.local_name, "item");
+        let qualified = attributes
+            .iter()
+            .find(|(name, _)| name.local_name == "qualified")
+            .expect("qualified attribute must be observed");
+        assert_eq!(qualified.0.namespace, "urn:two");
+        assert_eq!(qualified.1, "yes");
+        let plain = attributes
+            .iter()
+            .find(|(name, _)| name.local_name == "plain")
+            .expect("unqualified attribute must be observed");
+        assert!(plain.0.namespace.is_empty());
+        assert_eq!(plain.1, "ok");
+    }
+
+    #[test]
+    fn streaming_0360_processes_preserves_and_keeps_opaque_content() {
+        let mut capabilities = Capabilities::new();
+        capabilities.preserve_extension_element(Name {
+            namespace: "urn:ext".to_owned(),
+            local_name: "opaque".to_owned(),
+        });
+        let xml = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" xmlns:ext="urn:ext" mc:Ignorable="x ext" mc:ProcessContent="x:unwrap" mc:PreserveElements="x:keep" mc:PreserveAttributes="x:flag"><x:unwrap><known/></x:unwrap><x:keep x:flag="yes"><x:drop/><known2/></x:keep><ext:opaque><ext:child>opaque</ext:child></ext:opaque><x:drop/></r>"#
+        );
+        let (report, events) =
+            streaming_0360_active(xml.as_bytes(), &capabilities, &StreamLimits::default()).unwrap();
+
+        assert!(events.iter().any(|event| event.starts_with("empty:known:")));
+        assert!(
+            events
+                .iter()
+                .any(|event| event.starts_with("start:x:keep:"))
+        );
+        assert!(
+            events
+                .iter()
+                .any(|event| event.starts_with("empty:known2:"))
+        );
+        assert!(
+            events
+                .iter()
+                .any(|event| event.starts_with("start:ext:opaque:"))
+        );
+        assert!(
+            events
+                .iter()
+                .any(|event| event.starts_with("start:ext:child:"))
+        );
+        assert!(events.iter().any(|event| event == "text:opaque"));
+        assert!(!events.iter().any(|event| event.contains("x:drop")));
+        assert_eq!(report.unwrapped_elements, 1);
+        assert_eq!(report.preserved_elements, 1);
+        assert_eq!(report.preserved_attributes, 1);
+        assert_eq!(report.ignored_elements, 2);
+    }
+}

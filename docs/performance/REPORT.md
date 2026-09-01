@@ -3902,3 +3902,26 @@ No parallel build ran. The current XLSX selected-cell path remains unchanged
 and still materializes its worksheet/store; streaming MCE/x14ac and semantic
 scanning are later work. See [Change 0359](changes/0359-callback-scoped-verified-decoded-readers.md);
 `performance_claim: none`.
+
+## Change 0360: bounded streaming MCE events
+
+Change 0360 adds a new `litchi-ooxml-common::mce` stream processor without
+changing the legacy normalized-buffer path. Independent HRTB raw and active
+observers expose namespace-resolved elements before filtering and the selected
+semantic event stream after filtering. Inactive branches remain fully parsed,
+and typed observer errors are retained while XML/MCE/input validation continues
+to EOF.
+
+Finite event, per-event consumed-byte, attribute, context, name, namespace,
+depth, directive, and choice limits make the path bounded streaming. A fixed
+prefix stage handles split UTF-8 BOMs, interrupted reads have a finite retry
+budget, and invalid consume calls become typed errors. The contract is not
+fixed-memory or OOM-safe because quick-XML state, decoded allocations,
+collection overhead, and callback-owned data remain outside its byte estimate.
+
+Serial validation passed `11/11` focused streaming tests, `223/223` library
+tests, and `1/1` existing markup-compatibility integration test. The single
+on-disk target was 267 MiB with approximately 14 GiB host availability, 134 GiB
+disk free, and exhausted swap. No parallel build ran. XLSX x14ac/worksheet
+integration and selected-cell scanning remain open. See [Change 0360](changes/0360-bounded-streaming-mce-events.md);
+`performance_claim: none`.
