@@ -5,6 +5,9 @@
 //! results retain a validated archive index; ODS, ODP, iWork, and RTF results
 //! retain the caller's moved byte buffer for subsequent parsing.
 
+#[allow(dead_code, reason = "used only by ODF-enabled path classifiers")]
+const UNIFIED_ODF_CATALOG_PROBE_MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+
 /// Detected format with reusable parsed owners or moved source bytes.
 ///
 /// This enum represents the result of format detection, where each format
@@ -539,11 +542,13 @@ fn hard_docx_source_bytes_probe_error(error: &crate::opc::OpcError) -> bool {
     all(feature = "docx", feature = "odt")
 ))]
 fn missing_ooxml_content_types_error(error: &crate::opc::OpcError) -> bool {
-    matches!(
-        error,
-        crate::opc::OpcError::PartNotFound(part)
-            if part == "[Content_Types].xml" || part == "/[Content_Types].xml"
-    )
+    match error {
+        crate::opc::OpcError::PartNotFound(part) => {
+            part == "[Content_Types].xml" || part == "/[Content_Types].xml"
+        },
+        crate::opc::OpcError::InvalidContentTypesManifest(_) => true,
+        _ => false,
+    }
 }
 
 /// Result of the private source-backed PPTX bytes probe.
@@ -662,10 +667,9 @@ fn reclaim_presentation_source_bytes(shared: std::sync::Arc<Vec<u8>>) -> Vec<u8>
 
 #[cfg(all(
     any(feature = "ods", feature = "xlsx", feature = "xls", feature = "xlsb"),
-    not(feature = "opc"),
     any(unix, windows)
 ))]
-const UNIFIED_WORKBOOK_MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+pub(crate) const UNIFIED_WORKBOOK_FALLBACK_MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
 /// Result of the private source-backed workbook path probe.
 #[cfg(all(
@@ -748,7 +752,7 @@ pub(crate) fn detect_workbook_source_path(
             source,
             source_version,
             is_ods,
-            UNIFIED_WORKBOOK_MAX_INPUT_BYTES,
+            UNIFIED_WORKBOOK_FALLBACK_MAX_INPUT_BYTES,
         )
     }
 }
@@ -773,42 +777,90 @@ pub(crate) fn detect_workbook_source_path_with_limits(
     let source_version = source.version()?;
     let source_length = source.len()?;
     ensure_path_source_current(source.as_ref(), source_version)?;
-    if source_length > limits.max_input_bytes() {
+
+    let mut signature = [0_u8; 4];
+    let read = source.read_at(0, &mut signature)?;
+    ensure_path_source_current(source.as_ref(), source_version)?;
+    let zip_magic = read == signature.len()
+        && litchi_core::detection::simd_utils::signature_matches(
+            &signature,
+            litchi_core::detection::utils::ZIP_SIGNATURE,
+        );
+    let ooxml_extension = has_ooxml_extension(path);
+
+    if source_length > UNIFIED_WORKBOOK_FALLBACK_MAX_INPUT_BYTES {
         return Err(Box::new(crate::opc::OpcError::ReadLimit {
             resource: crate::opc::ReadResource::InputBytes,
             actual: source_length,
-            maximum: limits.max_input_bytes(),
+            maximum: UNIFIED_WORKBOOK_FALLBACK_MAX_INPUT_BYTES,
         }));
     }
 
     #[cfg(feature = "ods")]
-    let is_ods = litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())?
-        == Some(litchi_core::detection::FileFormat::Ods);
+    let is_ods = if zip_magic {
+        litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())?
+            == Some(litchi_core::detection::FileFormat::Ods)
+    } else {
+        false
+    };
     #[cfg(not(feature = "ods"))]
     let is_ods = false;
+    ensure_path_source_current(source.as_ref(), source_version)?;
 
     #[cfg(all(
         feature = "ods",
         any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
     ))]
-    let ordinary_ods = is_ods
-        && litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at(source.as_ref())?
-            == Some(false);
+    let ordinary_ods = if is_ods {
+        litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at_with_limits(
+            source.as_ref(),
+            litchi_odf_common::detect::CatalogProbeLimits::default()
+                .with_neutral_input_budget(UNIFIED_ODF_CATALOG_PROBE_MAX_INPUT_BYTES),
+        )? == Some(false)
+    } else {
+        false
+    };
+    #[cfg(all(
+        feature = "ods",
+        not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))
+    ))]
+    let ordinary_ods = is_ods;
     #[cfg(all(
         not(feature = "ods"),
         any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
     ))]
     let ordinary_ods = false;
+    #[cfg(all(
+        not(feature = "ods"),
+        not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))
+    ))]
+    let ordinary_ods = false;
+    ensure_path_source_current(source.as_ref(), source_version)?;
+
+    let ooxml_candidate = zip_magic || ooxml_extension;
+    let max_input_bytes = if ordinary_ods {
+        UNIFIED_WORKBOOK_FALLBACK_MAX_INPUT_BYTES
+    } else if ooxml_candidate {
+        limits.max_input_bytes()
+    } else {
+        UNIFIED_WORKBOOK_FALLBACK_MAX_INPUT_BYTES
+    };
+    if source_length > max_input_bytes {
+        return Err(Box::new(crate::opc::OpcError::ReadLimit {
+            resource: crate::opc::ReadResource::InputBytes,
+            actual: source_length,
+            maximum: max_input_bytes,
+        }));
+    }
+
+    if ooxml_extension && !zip_magic {
+        return Err(Box::new(crate::opc::OpcError::ZipError(
+            "OOXML-suffixed input does not have ZIP magic".to_owned(),
+        )));
+    }
 
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     {
-        let mut signature = [0_u8; 4];
-        let read = source.read_at(0, &mut signature)?;
-        let zip_magic = read == signature.len()
-            && litchi_core::detection::simd_utils::signature_matches(
-                &signature,
-                litchi_core::detection::utils::ZIP_SIGNATURE,
-            );
         let source_package = if zip_magic && !ordinary_ods {
             #[cfg(test)]
             super::record_opc_probe();
@@ -898,7 +950,7 @@ pub(crate) fn detect_workbook_source_path_with_limits(
         }
     }
 
-    finish_non_ooxml_workbook_source(source, source_version, is_ods, limits.max_input_bytes())
+    finish_non_ooxml_workbook_source(source, source_version, is_ods, max_input_bytes)
 }
 
 #[cfg(all(
@@ -1286,19 +1338,220 @@ fn pptx_path_core_error_to_opc(error: litchi_core::Error) -> crate::opc::OpcErro
 }
 
 /// Read a positional presentation fallback through one bounded source.
-#[cfg(all(feature = "pptx", any(unix, windows)))]
+///
+/// OOXML candidates use the caller's limit; generic non-ZIP sources use the
+/// private neutral fallback ceiling. The portable implementation keeps ODP
+/// arbitration, the bounded allocation, and the final read on one handle.
+#[allow(
+    dead_code,
+    reason = "the portable presentation path uses this helper; positional platforms classify and retain owners directly"
+)]
+#[cfg(feature = "pptx")]
 pub(crate) fn read_presentation_path_bytes_with_limits(
     path: &std::path::Path,
-    max_input_bytes: u64,
+    ooxml_max_input_bytes: u64,
+    fallback_max_input_bytes: u64,
 ) -> std::result::Result<Vec<u8>, crate::opc::OpcError> {
-    use litchi_core::ReadAt;
-    use std::sync::Arc;
+    #[cfg(any(unix, windows))]
+    {
+        use litchi_core::ReadAt;
+        use std::sync::Arc;
 
-    let source: Arc<dyn ReadAt> =
-        Arc::new(litchi_core::FileSource::open(path).map_err(crate::opc::OpcError::IoError)?);
-    let source_version = source.version().map_err(crate::opc::OpcError::IoError)?;
-    read_path_source_bytes(source.as_ref(), source_version, max_input_bytes)
-        .map_err(pptx_path_core_error_to_opc)
+        let source: Arc<dyn ReadAt> =
+            Arc::new(litchi_core::FileSource::open(path).map_err(crate::opc::OpcError::IoError)?);
+        let source_version = source.version().map_err(crate::opc::OpcError::IoError)?;
+        let mut signature = [0_u8; 4];
+        let read = source
+            .read_at(0, &mut signature)
+            .map_err(crate::opc::OpcError::IoError)?;
+        ensure_path_source_current(source.as_ref(), source_version)
+            .map_err(pptx_path_core_error_to_opc)?;
+        let zip_magic = read == signature.len()
+            && litchi_core::detection::simd_utils::signature_matches(
+                &signature,
+                litchi_core::detection::utils::ZIP_SIGNATURE,
+            );
+        #[cfg(feature = "odp")]
+        let ordinary_odp = if zip_magic {
+            let odp_mime = litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())
+                .map_err(odf_probe_error_to_opc)?;
+            ensure_path_source_current(source.as_ref(), source_version)
+                .map_err(pptx_path_core_error_to_opc)?;
+            if odp_mime == Some(litchi_core::FileFormat::Odp) {
+                let catalog =
+                    litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at_with_limits(
+                        source.as_ref(),
+                        litchi_odf_common::detect::CatalogProbeLimits::default()
+                            .with_neutral_input_budget(UNIFIED_ODF_CATALOG_PROBE_MAX_INPUT_BYTES),
+                    )
+                    .map_err(odf_probe_error_to_opc)?;
+                ensure_path_source_current(source.as_ref(), source_version)
+                    .map_err(pptx_path_core_error_to_opc)?;
+                catalog == Some(false)
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        #[cfg(not(feature = "odp"))]
+        let ordinary_odp = false;
+        let ooxml_candidate = has_ooxml_extension(path) || zip_magic;
+        let max_input_bytes = effective_presentation_path_input_limit(
+            ordinary_odp,
+            ooxml_candidate,
+            ooxml_max_input_bytes,
+            fallback_max_input_bytes,
+        );
+        read_path_source_bytes(source.as_ref(), source_version, max_input_bytes)
+            .map_err(pptx_path_core_error_to_opc)
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    {
+        use std::io::{Read, Seek, SeekFrom};
+
+        let mut file = std::fs::File::open(path).map_err(crate::opc::OpcError::IoError)?;
+        let mut signature = [0_u8; 4];
+        let read = file
+            .read(&mut signature)
+            .map_err(crate::opc::OpcError::IoError)?;
+        let zip_magic = read == signature.len()
+            && litchi_core::detection::simd_utils::signature_matches(
+                &signature,
+                litchi_core::detection::utils::ZIP_SIGNATURE,
+            );
+        let ooxml_extension = has_ooxml_extension(path);
+
+        #[cfg(feature = "odp")]
+        let ordinary_odp = if zip_magic {
+            ordinary_odp_path_candidate(&mut file)?
+        } else {
+            false
+        };
+        #[cfg(not(feature = "odp"))]
+        let ordinary_odp = false;
+
+        let ooxml_candidate = ooxml_extension || zip_magic;
+        let max_input_bytes = effective_presentation_path_input_limit(
+            ordinary_odp,
+            ooxml_candidate,
+            ooxml_max_input_bytes,
+            fallback_max_input_bytes,
+        );
+        let input_bytes = file
+            .metadata()
+            .map_err(crate::opc::OpcError::IoError)?
+            .len();
+        if input_bytes > max_input_bytes {
+            return Err(crate::opc::OpcError::ReadLimit {
+                resource: crate::opc::ReadResource::InputBytes,
+                actual: input_bytes,
+                maximum: max_input_bytes,
+            });
+        }
+        if ooxml_extension && !zip_magic {
+            return Err(crate::opc::OpcError::ZipError(
+                "OOXML-suffixed input does not have ZIP magic".to_owned(),
+            ));
+        }
+
+        let length = usize::try_from(input_bytes).map_err(|_| crate::opc::OpcError::ReadLimit {
+            resource: crate::opc::ReadResource::InputBytes,
+            actual: input_bytes,
+            maximum: u64::try_from(usize::MAX).unwrap_or(u64::MAX),
+        })?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(length)
+            .map_err(|source| crate::opc::OpcError::Allocation {
+                resource: "unified filesystem presentation fallback source bytes",
+                source,
+            })?;
+        bytes.resize(length, 0);
+        file.seek(SeekFrom::Start(0))
+            .map_err(crate::opc::OpcError::IoError)?;
+        file.read_exact(&mut bytes)
+            .map_err(crate::opc::OpcError::IoError)?;
+        let final_bytes = file
+            .metadata()
+            .map_err(crate::opc::OpcError::IoError)?
+            .len();
+        if final_bytes != input_bytes {
+            return Err(crate::opc::OpcError::IoError(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "filesystem source length changed during presentation read",
+            )));
+        }
+        Ok(bytes)
+    }
+}
+
+#[cfg(feature = "pptx")]
+fn effective_presentation_path_input_limit(
+    ordinary_odp: bool,
+    ooxml_candidate: bool,
+    ooxml_max_input_bytes: u64,
+    fallback_max_input_bytes: u64,
+) -> u64 {
+    let neutral_max_input_bytes =
+        fallback_max_input_bytes.min(UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES);
+    if ordinary_odp || !ooxml_candidate {
+        neutral_max_input_bytes
+    } else {
+        ooxml_max_input_bytes.min(neutral_max_input_bytes)
+    }
+}
+
+#[cfg(all(test, feature = "pptx"))]
+mod presentation_path_policy_tests {
+    use super::{
+        UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES, effective_presentation_path_input_limit,
+    };
+
+    #[test]
+    fn ordinary_odp_ignores_ooxml_suffix_limit() {
+        assert_eq!(
+            effective_presentation_path_input_limit(
+                true,
+                true,
+                1,
+                UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES,
+            ),
+            UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES,
+        );
+    }
+
+    #[test]
+    fn ooxml_candidate_uses_the_lower_of_caller_and_neutral_limits() {
+        assert_eq!(
+            effective_presentation_path_input_limit(
+                false,
+                true,
+                UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES + 1,
+                UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES,
+            ),
+            UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES,
+        );
+        assert_eq!(
+            effective_presentation_path_input_limit(
+                false,
+                true,
+                1,
+                UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES,
+            ),
+            1,
+        );
+        assert_eq!(
+            effective_presentation_path_input_limit(
+                false,
+                false,
+                1,
+                UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES + 1,
+            ),
+            UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES,
+        );
+    }
 }
 
 /// Checked ODP preparation for the unified presentation facade.
@@ -1644,14 +1897,6 @@ pub(crate) fn detect_ooxml_path_with_limits(
     }
 
     let input_bytes = file.metadata()?.len();
-    #[cfg(all(not(any(unix, windows)), any(feature = "odt", feature = "odp")))]
-    if ooxml_extension && input_bytes > limits.max_input_bytes() {
-        return Err(crate::opc::OpcError::ReadLimit {
-            resource: crate::opc::ReadResource::InputBytes,
-            actual: input_bytes,
-            maximum: limits.max_input_bytes(),
-        });
-    }
 
     #[cfg(all(not(any(unix, windows)), any(feature = "odt", feature = "odp")))]
     if ordinary_odf_path_candidate(&mut file)? {
@@ -1712,7 +1957,35 @@ fn ordinary_odf_path_candidate(file: &mut std::fs::File) -> crate::opc::Result<b
         return Ok(false);
     }
     file.seek(SeekFrom::Start(0))?;
-    Ok(litchi_odf_common::detect::packaged_has_ooxml_catalog_from_reader(file) == Some(false))
+    Ok(
+        litchi_odf_common::detect::packaged_has_ooxml_catalog_from_reader_with_limits(
+            file,
+            litchi_odf_common::detect::CatalogProbeLimits::default()
+                .with_neutral_input_budget(UNIFIED_ODF_CATALOG_PROBE_MAX_INPUT_BYTES),
+        ) == Some(false),
+    )
+}
+
+#[cfg(all(not(any(unix, windows)), feature = "pptx", feature = "odp"))]
+fn ordinary_odp_path_candidate(file: &mut std::fs::File) -> crate::opc::Result<bool> {
+    use std::io::{Read, Seek, SeekFrom};
+
+    file.seek(SeekFrom::Start(0))?;
+    let mut prefix = [0_u8; 512];
+    let prefix_len = file.read(&mut prefix)?;
+    if litchi_odf_common::detect::packaged_mime(&prefix[..prefix_len])
+        != Some(litchi_core::detection::FileFormat::Odp)
+    {
+        return Ok(false);
+    }
+    file.seek(SeekFrom::Start(0))?;
+    Ok(
+        litchi_odf_common::detect::packaged_has_ooxml_catalog_from_reader_with_limits(
+            file,
+            litchi_odf_common::detect::CatalogProbeLimits::default()
+                .with_neutral_input_budget(UNIFIED_ODF_CATALOG_PROBE_MAX_INPUT_BYTES),
+        ) == Some(false),
+    )
 }
 
 /// Result of the private source-backed PPTX path probe.
@@ -1720,6 +1993,12 @@ fn ordinary_odf_path_candidate(file: &mut std::fs::File) -> crate::opc::Result<b
 pub(crate) enum PptxSourcePathDetection {
     /// A validated, source-retaining PPTX owner.
     Pptx(crate::pptx::SourceBackedPresentation),
+    /// A validated, source-retaining ODP owner.
+    #[cfg(feature = "odp")]
+    Odp(litchi_odp::SourceBackedPresentation),
+    /// A validated, source-retaining native PowerPoint owner.
+    #[cfg(feature = "ppt")]
+    Ppt(crate::ppt::SourceBackedPackage),
     /// A recognized OOXML family whose facade is not a presentation.
     OtherOoxml(litchi_core::detection::FileFormat),
     /// A recognized non-presentation OOXML family whose facade feature is
@@ -1739,7 +2018,22 @@ pub(crate) enum PptxSourcePathError {
     Opc(crate::opc::OpcError),
     /// A validated PPTX catalog failed PresentationML semantic opening.
     Pptx(crate::pptx::Error),
+    /// A native source owner failed after classification.
+    #[cfg(any(feature = "odp", feature = "ppt"))]
+    Source(litchi_core::Error),
 }
+
+/// Neutral safety ceiling for generic filesystem presentation fallbacks.
+/// Caller PPTX limits apply only after a source is classified as an OOXML
+/// candidate.
+#[cfg(any(
+    feature = "pptx",
+    feature = "ppt",
+    feature = "odp",
+    feature = "keynote"
+))]
+pub(crate) const UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES: u64 =
+    UNIFIED_ODF_CATALOG_PROBE_MAX_INPUT_BYTES;
 
 /// Result of the private source-backed DOCX path probe.
 #[cfg(all(feature = "docx", any(unix, windows)))]
@@ -2425,8 +2719,10 @@ pub(crate) fn detect_pptx_source_path_with_limits(
             litchi_core::detection::utils::ZIP_SIGNATURE,
         );
 
-    // Apply the caller's byte policy before any fallback allocation, including
-    // extensionless non-ZIP input.
+    // Read the source size before deciding which policy applies. ODF
+    // arbitration must happen first so an ordinary ODP can reach its native
+    // source-backed owner even when the caller supplied a very small OOXML
+    // limit.
     let input_bytes = source
         .len()
         .map_err(crate::opc::OpcError::IoError)
@@ -2434,25 +2730,20 @@ pub(crate) fn detect_pptx_source_path_with_limits(
     ensure_path_source_current(source.as_ref(), source_version)
         .map_err(pptx_path_core_error_to_opc)
         .map_err(PptxSourcePathError::Opc)?;
-    if input_bytes > limits.max_input_bytes() {
+
+    if input_bytes > UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES {
         return Err(PptxSourcePathError::Opc(crate::opc::OpcError::ReadLimit {
             resource: crate::opc::ReadResource::InputBytes,
             actual: input_bytes,
-            maximum: limits.max_input_bytes(),
+            maximum: UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES,
         }));
-    }
-    if !ooxml_extension && !zip_magic {
-        return Ok(None);
     }
 
     #[cfg(feature = "odp")]
-    let ordinary_odp = {
+    let ordinary_odp = if zip_magic {
         let odp_mime = match litchi_odf_common::detect::packaged_mime_read_at(source.as_ref()) {
             Ok(odp_mime) => odp_mime,
             Err(error) => {
-                ensure_path_source_current(source.as_ref(), source_version)
-                    .map_err(pptx_path_core_error_to_opc)
-                    .map_err(PptxSourcePathError::Opc)?;
                 return Err(PptxSourcePathError::Opc(odf_probe_error_to_opc(error)));
             },
         };
@@ -2460,12 +2751,13 @@ pub(crate) fn detect_pptx_source_path_with_limits(
             .map_err(pptx_path_core_error_to_opc)
             .map_err(PptxSourcePathError::Opc)?;
         let has_ooxml_catalog = if odp_mime == Some(litchi_core::FileFormat::Odp) {
-            match litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at(source.as_ref()) {
+            match litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at_with_limits(
+                source.as_ref(),
+                litchi_odf_common::detect::CatalogProbeLimits::default()
+                    .with_neutral_input_budget(UNIFIED_ODF_CATALOG_PROBE_MAX_INPUT_BYTES),
+            ) {
                 Ok(has_ooxml_catalog) => has_ooxml_catalog,
                 Err(error) => {
-                    ensure_path_source_current(source.as_ref(), source_version)
-                        .map_err(pptx_path_core_error_to_opc)
-                        .map_err(PptxSourcePathError::Opc)?;
                     return Err(PptxSourcePathError::Opc(odf_probe_error_to_opc(error)));
                 },
             }
@@ -2476,11 +2768,67 @@ pub(crate) fn detect_pptx_source_path_with_limits(
             .map_err(pptx_path_core_error_to_opc)
             .map_err(PptxSourcePathError::Opc)?;
         odp_mime == Some(litchi_core::FileFormat::Odp) && has_ooxml_catalog == Some(false)
+    } else {
+        false
     };
     #[cfg(not(feature = "odp"))]
     let ordinary_odp = false;
+
+    let ooxml_candidate = ooxml_extension || zip_magic;
+    let max_input_bytes = if ordinary_odp {
+        UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES
+    } else if ooxml_candidate {
+        limits.max_input_bytes()
+    } else {
+        UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES
+    };
+    if input_bytes > max_input_bytes {
+        return Err(PptxSourcePathError::Opc(crate::opc::OpcError::ReadLimit {
+            resource: crate::opc::ReadResource::InputBytes,
+            actual: input_bytes,
+            maximum: max_input_bytes,
+        }));
+    }
+    #[cfg(feature = "odp")]
     if ordinary_odp {
-        return Ok(None);
+        let odp_source: std::sync::Arc<dyn litchi_core::ReadAt> = source.clone();
+        let odp_result = litchi_odp::SourceBackedPresentation::from_read_at(odp_source);
+        ensure_path_source_current(source.as_ref(), source_version)
+            .map_err(pptx_path_core_error_to_opc)
+            .map_err(PptxSourcePathError::Opc)?;
+        let odp = odp_result
+            .map_err(|error| PptxSourcePathError::Source(litchi_core::Error::from(error)))?;
+        return Ok(Some(PptxSourcePathDetection::Odp(odp)));
+    }
+    if !ooxml_candidate {
+        #[cfg(feature = "ppt")]
+        {
+            let native_source: std::sync::Arc<dyn litchi_core::ReadAt> = source.clone();
+            let native = try_open_native_ppt_source(native_source);
+            match native {
+                Ok(Some(ppt)) => {
+                    ensure_path_source_current(source.as_ref(), source_version)
+                        .map_err(pptx_path_core_error_to_opc)
+                        .map_err(PptxSourcePathError::Opc)?;
+                    return Ok(Some(PptxSourcePathDetection::Ppt(ppt)));
+                },
+                Ok(None) => {},
+                Err(error) => {
+                    ensure_path_source_current(source.as_ref(), source_version)
+                        .map_err(pptx_path_core_error_to_opc)
+                        .map_err(PptxSourcePathError::Opc)?;
+                    return Err(PptxSourcePathError::Source(error));
+                },
+            }
+        }
+        let bytes = read_path_source_bytes(
+            source.as_ref(),
+            source_version,
+            UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES,
+        )
+        .map_err(pptx_path_core_error_to_opc)
+        .map_err(PptxSourcePathError::Opc)?;
+        return Ok(Some(PptxSourcePathDetection::Bytes(bytes)));
     }
 
     if !zip_magic {
@@ -2529,8 +2877,15 @@ pub(crate) fn detect_pptx_source_path_with_limits(
     let format = format_result.map_err(PptxSourcePathError::Opc)?;
     let Some(format) = format else {
         drop(package);
-        return Ok(None);
+        let bytes =
+            read_path_source_bytes(source.as_ref(), source_version, limits.max_input_bytes())
+                .map_err(pptx_path_core_error_to_opc)
+                .map_err(PptxSourcePathError::Opc)?;
+        return Ok(Some(PptxSourcePathDetection::Bytes(bytes)));
     };
+    ensure_path_source_current(source.as_ref(), source_version)
+        .map_err(pptx_path_core_error_to_opc)
+        .map_err(PptxSourcePathError::Opc)?;
     if format != litchi_core::detection::FileFormat::Pptx {
         // Match the eager detector's feature-gated result: retain the
         // classification even when its leaf owner is disabled, while telling
@@ -2561,7 +2916,251 @@ pub(crate) fn detect_pptx_source_path_with_limits(
     Ok(Some(PptxSourcePathDetection::Pptx(presentation)))
 }
 
-#[cfg(any(feature = "docx", feature = "pptx"))]
+#[cfg(all(feature = "ppt", any(unix, windows)))]
+fn try_open_native_ppt_source(
+    source: std::sync::Arc<dyn litchi_core::ReadAt>,
+) -> litchi_core::Result<Option<crate::ppt::SourceBackedPackage>> {
+    let shared = match litchi_cfb::SharedOleFile::open(source) {
+        Ok(shared) => shared,
+        Err(error) if native_ppt_cfb_error_is_soft(&error) => return Ok(None),
+        Err(error) => return Err(litchi_core::Error::from(error)),
+    };
+
+    #[cfg(feature = "doc")]
+    if shared.exists(&["WordDocument"]) {
+        return Ok(None);
+    }
+
+    crate::ppt::SourceBackedPackage::from_shared_if_powerpoint(shared)
+        .map_err(litchi_core::Error::from)
+}
+
+#[cfg(all(feature = "ppt", any(unix, windows)))]
+fn native_ppt_cfb_error_is_soft(error: &litchi_cfb::OleError) -> bool {
+    matches!(
+        error,
+        litchi_cfb::OleError::InvalidFormat(_)
+            | litchi_cfb::OleError::InvalidData(_)
+            | litchi_cfb::OleError::NotOleFile
+            | litchi_cfb::OleError::CorruptedFile(_)
+            | litchi_cfb::OleError::StreamNotFound
+    )
+}
+
+/// Result of the source-pinned presentation path probe when OOXML support is
+/// disabled. ODP and native PowerPoint owners remain source-backed; all other
+/// formats retain bytes from the same source.
+#[cfg(all(
+    not(feature = "pptx"),
+    any(feature = "ppt", feature = "odp", feature = "keynote")
+))]
+pub(crate) enum PresentationSourcePathDetection {
+    #[cfg(feature = "odp")]
+    Odp(litchi_odp::SourceBackedPresentation),
+    #[cfg(feature = "ppt")]
+    Ppt(crate::ppt::SourceBackedPackage),
+    Bytes(Vec<u8>),
+}
+
+/// Probe a presentation path once when the PPTX feature is unavailable.
+///
+/// The same source policy is used as the PPTX path: ordinary ODP and native
+/// PowerPoint use the private neutral ceiling, while generic fallback bytes
+/// are retained from the opened source rather than rereading the pathname.
+#[cfg(all(
+    not(feature = "pptx"),
+    any(feature = "ppt", feature = "odp", feature = "keynote"),
+    any(unix, windows)
+))]
+pub(crate) fn detect_presentation_source_path(
+    path: &std::path::Path,
+) -> litchi_core::Result<PresentationSourcePathDetection> {
+    use litchi_core::ReadAt;
+
+    let source: std::sync::Arc<dyn ReadAt> =
+        std::sync::Arc::new(litchi_core::FileSource::open(path)?);
+    let source_version = source.version()?;
+    let mut signature = [0_u8; 4];
+    let read = source.read_at(0, &mut signature)?;
+    ensure_path_source_current(source.as_ref(), source_version)?;
+    let zip_magic = read == signature.len()
+        && litchi_core::detection::simd_utils::signature_matches(
+            &signature,
+            litchi_core::detection::utils::ZIP_SIGNATURE,
+        );
+    let ooxml_extension = has_ooxml_extension(path);
+    let input_bytes = source.len()?;
+    ensure_path_source_current(source.as_ref(), source_version)?;
+    if input_bytes > UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES {
+        return Err(litchi_core::Error::ResourceLimit(
+            litchi_core::ResourceLimit {
+                resource: litchi_core::Resource::InputBytes,
+                observed: input_bytes,
+                limit: UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES,
+                scope: "unified filesystem presentation".into(),
+            },
+        ));
+    }
+
+    #[cfg(feature = "odp")]
+    if zip_magic {
+        let odp_mime = litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())?;
+        ensure_path_source_current(source.as_ref(), source_version)?;
+        if odp_mime == Some(litchi_core::FileFormat::Odp) {
+            let catalog =
+                litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at_with_limits(
+                    source.as_ref(),
+                    litchi_odf_common::detect::CatalogProbeLimits::default()
+                        .with_neutral_input_budget(UNIFIED_ODF_CATALOG_PROBE_MAX_INPUT_BYTES),
+                )?;
+            ensure_path_source_current(source.as_ref(), source_version)?;
+            if catalog == Some(false) {
+                let odp_result = litchi_odp::SourceBackedPresentation::from_read_at(
+                    std::sync::Arc::clone(&source),
+                );
+                ensure_path_source_current(source.as_ref(), source_version)?;
+                let odp = odp_result?;
+                return Ok(PresentationSourcePathDetection::Odp(odp));
+            }
+        }
+    }
+
+    if !zip_magic && !ooxml_extension {
+        #[cfg(feature = "ppt")]
+        {
+            let native = try_open_native_ppt_source(std::sync::Arc::clone(&source));
+            match native {
+                Ok(Some(ppt)) => {
+                    ensure_path_source_current(source.as_ref(), source_version)?;
+                    return Ok(PresentationSourcePathDetection::Ppt(ppt));
+                },
+                Ok(None) => {},
+                Err(error) => {
+                    ensure_path_source_current(source.as_ref(), source_version)?;
+                    return Err(error);
+                },
+            }
+        }
+    }
+    if ooxml_extension && !zip_magic {
+        return Err(litchi_core::Error::InvalidFormat(
+            "OOXML-suffixed input does not have ZIP magic".to_owned(),
+        ));
+    }
+
+    let bytes = read_path_source_bytes(
+        source.as_ref(),
+        source_version,
+        UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES,
+    )?;
+    Ok(PresentationSourcePathDetection::Bytes(bytes))
+}
+
+#[cfg(all(
+    not(feature = "pptx"),
+    any(feature = "ppt", feature = "odp", feature = "keynote"),
+    not(any(unix, windows))
+))]
+pub(crate) fn detect_presentation_source_path(
+    path: &std::path::Path,
+) -> litchi_core::Result<PresentationSourcePathDetection> {
+    use std::io::{Read, Seek, SeekFrom};
+
+    let mut file = std::fs::File::open(path)?;
+    let mut signature = [0_u8; 4];
+    let read = file.read(&mut signature)?;
+    let zip_magic = read == signature.len()
+        && litchi_core::detection::simd_utils::signature_matches(
+            &signature,
+            litchi_core::detection::utils::ZIP_SIGNATURE,
+        );
+    let ooxml_extension = has_ooxml_extension(path);
+    let input_bytes = file.metadata()?.len();
+    if input_bytes > UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES {
+        return Err(litchi_core::Error::ResourceLimit(
+            litchi_core::ResourceLimit {
+                resource: litchi_core::Resource::InputBytes,
+                observed: input_bytes,
+                limit: UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES,
+                scope: "unified filesystem presentation".into(),
+            },
+        ));
+    }
+
+    #[cfg(feature = "odp")]
+    let _ordinary_odp = if zip_magic {
+        ordinary_odp_path_candidate_without_pptx(&mut file)?
+    } else {
+        false
+    };
+
+    if ooxml_extension && !zip_magic {
+        return Err(litchi_core::Error::InvalidFormat(
+            "OOXML-suffixed input does not have ZIP magic".to_owned(),
+        ));
+    }
+
+    let length = usize::try_from(input_bytes).map_err(|_| {
+        litchi_core::Error::ResourceLimit(litchi_core::ResourceLimit {
+            resource: litchi_core::Resource::InputBytes,
+            observed: input_bytes,
+            limit: u64::try_from(usize::MAX).unwrap_or(u64::MAX),
+            scope: "unified filesystem presentation".into(),
+        })
+    })?;
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(length)
+        .map_err(|source| litchi_core::Error::Allocation {
+            resource: "unified filesystem presentation source bytes",
+            source,
+        })?;
+    bytes.resize(length, 0);
+    file.seek(SeekFrom::Start(0))?;
+    file.read_exact(&mut bytes)?;
+    let final_bytes = file.metadata()?.len();
+    if final_bytes != input_bytes {
+        return Err(litchi_core::Error::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "filesystem source length changed during presentation read",
+        )));
+    }
+    Ok(PresentationSourcePathDetection::Bytes(bytes))
+}
+
+#[cfg(all(not(feature = "pptx"), feature = "odp", not(any(unix, windows))))]
+fn ordinary_odp_path_candidate_without_pptx(file: &mut std::fs::File) -> litchi_core::Result<bool> {
+    use std::io::{Read, Seek, SeekFrom};
+
+    file.seek(SeekFrom::Start(0))?;
+    let mut prefix = [0_u8; 512];
+    let prefix_len = file.read(&mut prefix)?;
+    if litchi_odf_common::detect::packaged_mime(&prefix[..prefix_len])
+        != Some(litchi_core::detection::FileFormat::Odp)
+    {
+        return Ok(false);
+    }
+    file.seek(SeekFrom::Start(0))?;
+    Ok(
+        litchi_odf_common::detect::packaged_has_ooxml_catalog_from_reader_with_limits(
+            file,
+            litchi_odf_common::detect::CatalogProbeLimits::default()
+                .with_neutral_input_budget(UNIFIED_ODF_CATALOG_PROBE_MAX_INPUT_BYTES),
+        ) == Some(false),
+    )
+}
+
+#[cfg(any(
+    feature = "docx",
+    feature = "pptx",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "ods",
+    feature = "xls",
+    feature = "ppt",
+    feature = "odp",
+    feature = "keynote"
+))]
 fn has_ooxml_extension(path: &std::path::Path) -> bool {
     let Some(extension) = path.extension().and_then(std::ffi::OsStr::to_str) else {
         return false;
@@ -2709,6 +3308,41 @@ mod short_signature_tests {
 
         assert_eq!(spreadsheet.prepared_index_identity(), index_identity);
         assert!(spreadsheet.content_xml().contains("office:spreadsheet"));
+    }
+
+    #[cfg(all(
+        feature = "ods",
+        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
+    ))]
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn source_workbook_path_falls_back_to_ods_for_malformed_catalog() {
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer
+            .set_mimetype(litchi_odf_common::constants::ODF_SPREADSHEET)
+            .unwrap();
+        writer
+            .add_file(
+                litchi_odf_common::constants::ODF_CONTENT,
+                br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:spreadsheet/></office:body></office:document-content>"#,
+            )
+            .unwrap();
+        writer
+            .add_file("[Content_Types].xml", b"<not-an-opc-types-root/>")
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let temporary = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(temporary.path(), bytes).unwrap();
+
+        let detected = super::detect_workbook_source_path_with_limits(
+            temporary.path(),
+            crate::opc::ReadLimits::default(),
+        )
+        .expect("malformed catalog should fall back to the ODS owner");
+        assert!(matches!(
+            detected,
+            super::WorkbookSourcePathDetection::Ods(_)
+        ));
     }
 
     #[cfg(all(

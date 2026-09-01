@@ -72,6 +72,24 @@ impl CatalogProbeLimits {
             max_total_bytes,
         }
     }
+
+    /// Return a copy with a different source-size ceiling.
+    #[must_use]
+    pub const fn with_max_input_bytes(mut self, maximum: u64) -> Self {
+        self.max_input_bytes = maximum;
+        self
+    }
+
+    /// Return a copy with a neutral ingress budget for all byte-sized ZIP
+    /// resources while retaining the finite member, name, and metadata caps.
+    #[must_use]
+    pub const fn with_neutral_input_budget(mut self, maximum: u64) -> Self {
+        self.max_input_bytes = maximum;
+        self.max_compressed_bytes = maximum;
+        self.max_entry_bytes = maximum;
+        self.max_total_bytes = maximum;
+        self
+    }
 }
 
 impl Default for CatalogProbeLimits {
@@ -1240,6 +1258,25 @@ mod tests {
         malformed.truncate(malformed.len() - 1);
         assert_eq!(packaged_has_ooxml_catalog(&malformed), None);
         assert_eq!(packaged_has_ooxml_catalog(b"not a ZIP"), None);
+    }
+
+    #[test]
+    fn neutral_catalog_probe_budget_sets_exact_byte_ceilings() {
+        let defaults = CatalogProbeLimits::default();
+        let neutral = defaults.with_neutral_input_budget(7);
+
+        assert_eq!(
+            neutral,
+            CatalogProbeLimits::new(
+                7,
+                defaults.max_members,
+                defaults.max_member_name_bytes,
+                defaults.max_metadata_bytes,
+                7,
+                7,
+                7,
+            )
+        );
     }
 
     #[test]

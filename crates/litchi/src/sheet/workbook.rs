@@ -1177,6 +1177,8 @@ mod source_xlsx_path_tests {
                 br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>"#,
             )
             .unwrap();
+        writer.start_file("xl/workbook.xml", options).unwrap();
+        writer.write_all(b"<not-a-workbook/>").unwrap();
         writer.finish().unwrap();
 
         let error = match Workbook::from_bytes(output.into_inner()) {
@@ -1409,8 +1411,22 @@ mod flat_ods_dispatch_tests {
 
 #[cfg(all(test, feature = "ods", any(feature = "xlsx", feature = "xlsb")))]
 mod ooxml_odf_polyglot_tests {
-    use super::Workbook;
+    use super::{Workbook, WorkbookImpl};
     use std::io::{Cursor, Write};
+
+    fn ordinary_ods() -> Vec<u8> {
+        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        writer
+            .set_mimetype(litchi_odf_common::constants::ODF_SPREADSHEET)
+            .unwrap();
+        writer
+            .add_file(
+                "content.xml",
+                br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><office:body><office:spreadsheet><table:table table:name="Sheet1"/></office:spreadsheet></office:body></office:document-content>"#,
+            )
+            .unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
 
     fn dual_marker_xlsx() -> Vec<u8> {
         let mut output = Cursor::new(Vec::new());
@@ -1460,6 +1476,63 @@ mod ooxml_odf_polyglot_tests {
             .unwrap();
         writer.finish().unwrap();
         output.into_inner()
+    }
+
+    #[test]
+    fn ordinary_ods_path_uses_ods_owner_under_tight_ooxml_limit() {
+        let bytes = ordinary_ods();
+        let path = tempfile::Builder::new().suffix(".xlsx").tempfile().unwrap();
+        std::fs::write(path.path(), &bytes).unwrap();
+        let limits = litchi_opc::ReadLimits::builder()
+            .max_input_bytes(1)
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let detected =
+            match crate::detection_smart::detected::detect_workbook_source_path_with_limits(
+                path.path(),
+                limits,
+            ) {
+                Ok(detected) => detected,
+                Err(_) => panic!("ordinary ODS must use the neutral fallback budget"),
+            };
+        assert!(matches!(
+            detected,
+            crate::detection_smart::detected::WorkbookSourcePathDetection::Ods(_)
+        ));
+
+        let workbook = Workbook::open(path.path()).expect("ordinary ODS path");
+        assert!(matches!(workbook.inner, WorkbookImpl::OdsSource(_)));
+    }
+
+    #[test]
+    fn ods_ooxml_polyglot_remains_caller_limited() {
+        let bytes = dual_marker_xlsx();
+        let path = tempfile::Builder::new().suffix(".ods").tempfile().unwrap();
+        std::fs::write(path.path(), &bytes).unwrap();
+        let limits = litchi_opc::ReadLimits::builder()
+            .max_input_bytes(1)
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let error = match crate::detection_smart::detected::detect_workbook_source_path_with_limits(
+            path.path(),
+            limits,
+        ) {
+            Ok(_) => panic!("ODS/OOXML polyglot must remain caller-limited"),
+            Err(error) => error,
+        };
+        let observed = u64::try_from(bytes.len()).unwrap();
+        assert!(matches!(
+            error.downcast_ref::<litchi_opc::OpcError>(),
+            Some(litchi_opc::OpcError::ReadLimit {
+                resource: litchi_opc::ReadResource::InputBytes,
+                actual,
+                maximum: 1,
+            }) if *actual == observed
+        ));
     }
 
     #[cfg(feature = "xlsx")]

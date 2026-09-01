@@ -435,3 +435,34 @@ recorded in [Change 0356](changes/0356-docx-source-path-and-opc-errors.md);
 `performance_claim: none`. The caller-sized physical result buffer uses typed
 fallible reservation and releases the part reservation on admission failure;
 this is correctness/resource safety only, with no performance or OOM claim.
+
+## Change 0357 compliance update
+
+Change 0357 remains within the accepted topology and public-layer boundaries:
+Workbook and Presentation continue to own their format-specific source
+arbitration, while ODF catalog budgeting remains in `litchi-odf-common`; no
+public archive type, physical identifier, runtime handle, lock, executor,
+source generic, or `DetectedFormat` surface is introduced. The one-source
+PPTX/ODP/PPT path and freshness fence preserve ADR 0003 source identity and
+failure atomicity. Caller-limited OOXML/uncertain candidates are capped by a
+finite neutral 2 GiB ceiling, while ordinary ODP/ODS and lower-family/generic
+fallbacks use the same checked neutral budget. Terminal wrong-family OOXML
+and lossless ODF ownership preserve the unsupported-content policy. The ODF
+catalog helper keeps input, compressed, entry, and total ceilings explicit;
+there is no dependency edge, unsafe high-level code, or ADR exception.
+
+Validation and residuals are recorded in [Change 0357](changes/0357-workbook-presentation-two-ceiling-policy.md);
+`performance_claim: none`. The serial constrained evidence includes ODF
+detection `15/15` with `260` filtered, catalog arbitration `6/6`, facade
+`pptx,odp,ppt` `82/82`, facade `ods,xlsx` `84/84`, and passing quiet
+`pptx`, `odp,ppt`, `odp`, `ppt`, and `xls,xlsx` checks. Two initial
+`Arc<FileSource>` to `Arc<dyn ReadAt>` coercion errors were corrected before
+final checks. One 8 GiB process ceiling, one Cargo job, one disk target, and
+one test thread were used; the target's final/peak observed footprint was 1.3
+GiB, host availability approximately 14 GiB with 133 GiB disk free, and swap
+was exhausted. No parallel build or OOM occurred, and no speed, RSS,
+allocation, constant-memory, or OOM-prevention claim follows. The eager
+public detector, materializing neutral fallback, flat ODF MIME decode,
+infallible Presentation aggregation, portable identity, native PPT mutation
+coverage, Current User/Workbook classifier mismatch, prepared ODP reparse,
+OPC case lookup, and selected-Part materialization remain residual.

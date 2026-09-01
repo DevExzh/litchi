@@ -347,7 +347,7 @@ mod ooxml_odf_arbitration {
     }
 
     #[test]
-    fn valid_odp_with_a_pptx_suffix_reaches_the_odp_facade() {
+    fn renamed_odp_with_tiny_pptx_limit_uses_the_odp_policy() {
         let bytes = odf_package(ODP_MIME, ODP_CONTENT);
         let temporary = tempfile::Builder::new()
             .suffix(".pptx")
@@ -362,14 +362,13 @@ mod ooxml_odf_arbitration {
         );
 
         let limits = litchi::pptx::ReadLimits::builder()
-            .max_input_bytes(u64::try_from(bytes.len() - 1).expect("fixture length fits in u64"))
+            .max_input_bytes(1)
             .expect("positive input limit")
             .build()
             .expect("limits are consistent");
-        assert!(
-            Presentation::open_with_limits(temporary.path(), limits).is_err(),
-            "tight limits must not reset before the renamed ODP fallback"
-        );
+        let limited = Presentation::open_with_limits(temporary.path(), limits)
+            .expect("renamed ordinary ODP uses the neutral ODP budget");
+        assert_eq!(limited.slide_count().expect("slide count is readable"), 1);
     }
 }
 

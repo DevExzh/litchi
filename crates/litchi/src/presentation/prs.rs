@@ -109,10 +109,15 @@ pub struct Presentation {
 }
 
 #[cfg(all(feature = "odp", any(unix, windows)))]
-fn map_odp_error(error: Error, operation: &str) -> Error {
+fn map_odp_error(error: Error, _operation: &str) -> Error {
     match error {
-        source_changed @ Error::SourceChanged { .. } => source_changed,
-        other => Error::ParseError(format!("Failed to {operation}: {other}")),
+        error @ (Error::Io(_)
+        | Error::Allocation { .. }
+        | Error::ResourceLimit(_)
+        | Error::SourceChanged { .. }
+        | Error::InvalidFormat(_)
+        | Error::ParseError(_)) => error,
+        other => other,
     }
 }
 
@@ -214,6 +219,31 @@ mod source_odp_path_tests {
         );
     }
 
+    #[cfg(feature = "pptx")]
+    #[test]
+    fn canonical_and_renamed_odp_paths_use_source_owner_under_tight_pptx_limit() {
+        let bytes = package();
+        let limits = crate::pptx::ReadLimits::builder()
+            .max_input_bytes(1)
+            .expect("positive input limit")
+            .build()
+            .expect("consistent input limit");
+
+        for suffix in [".odp", ".pptx"] {
+            let temporary = tempfile::Builder::new()
+                .suffix(suffix)
+                .tempfile()
+                .expect("temporary ODP path");
+            std::fs::write(temporary.path(), &bytes).expect("write ODP fixture");
+            let presentation = Presentation::open_with_limits(temporary.path(), limits)
+                .expect("ordinary ODP must use its source owner before PPTX limits");
+            assert!(matches!(
+                &presentation.inner,
+                PresentationImpl::OdpSource(_)
+            ));
+        }
+    }
+
     #[test]
     fn path_source_metadata_and_dimensions_report_stale_source() {
         let temporary = tempfile::NamedTempFile::new().expect("temporary ODP path");
@@ -281,6 +311,54 @@ mod source_odp_path_tests {
         assert!(matches!(
             error,
             Error::InvalidFormat(_) | Error::ParseError(_)
+        ));
+    }
+}
+
+#[cfg(all(
+    test,
+    not(feature = "pptx"),
+    any(feature = "ppt", feature = "odp", feature = "keynote"),
+    any(unix, windows)
+))]
+mod no_pptx_path_tests {
+    use super::Presentation;
+
+    #[test]
+    fn generic_path_is_bounded_by_neutral_ceiling_without_pptx() {
+        let temporary = tempfile::NamedTempFile::new().expect("temporary sparse input");
+        let neutral =
+            crate::detection_smart::detected::UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES;
+        let neutral_plus_one = neutral + 1;
+        temporary
+            .as_file()
+            .set_len(neutral_plus_one)
+            .expect("create sparse input");
+
+        let error = match crate::detection_smart::detected::detect_presentation_source_path(
+            temporary.path(),
+        ) {
+            Ok(_) => panic!("generic input over the neutral ceiling must fail"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            litchi_core::Error::ResourceLimit(limit)
+                if limit.resource == litchi_core::Resource::InputBytes
+                    && limit.observed == neutral_plus_one
+                    && limit.limit == neutral
+        ));
+
+        let public_error = match Presentation::open(temporary.path()) {
+            Ok(_) => panic!("generic input over the neutral ceiling must fail publicly"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            public_error,
+            litchi_core::Error::ResourceLimit(limit)
+                if limit.resource == litchi_core::Resource::InputBytes
+                    && limit.observed == neutral_plus_one
+                    && limit.limit == neutral
         ));
     }
 }
@@ -497,29 +575,42 @@ impl Presentation {
     /// # Ok::<(), litchi::common::Error>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        #[cfg(all(feature = "ppt", any(unix, windows), not(feature = "pptx")))]
-        if let Some(presentation) = Self::open_native_ppt_path(path.as_ref())? {
-            return Ok(presentation);
-        }
-
         #[cfg(feature = "pptx")]
         {
             Self::open_with_limits(path, crate::pptx::ReadLimits::default())
         }
 
-        #[cfg(not(feature = "pptx"))]
+        #[cfg(all(
+            not(feature = "pptx"),
+            any(feature = "ppt", feature = "odp", feature = "keynote")
+        ))]
         {
-            #[cfg(all(
-                feature = "odp",
-                any(unix, windows),
-                not(any(feature = "docx", feature = "xlsx", feature = "xlsb"))
-            ))]
-            if let Some(presentation) = Self::open_source_backed_odp_path(path.as_ref())? {
-                return Ok(presentation);
+            match crate::detection_smart::detected::detect_presentation_source_path(path.as_ref())?
+            {
+                #[cfg(feature = "odp")]
+                crate::detection_smart::detected::PresentationSourcePathDetection::Odp(
+                    presentation,
+                ) => Ok(Self {
+                    inner: PresentationImpl::OdpSource(presentation),
+                    cached_metadata: OnceLock::from(Some(litchi_core::Metadata::default())),
+                }),
+                #[cfg(feature = "ppt")]
+                crate::detection_smart::detected::PresentationSourcePathDetection::Ppt(package) => {
+                    Self::from_native_ppt_package(package)
+                },
+                crate::detection_smart::detected::PresentationSourcePathDetection::Bytes(bytes) => {
+                    Self::from_bytes(bytes)
+                },
             }
+        }
 
-            let bytes = std::fs::read(path.as_ref())?;
-            Self::from_bytes(bytes)
+        #[cfg(all(
+            not(feature = "pptx"),
+            not(any(feature = "ppt", feature = "odp", feature = "keynote"))
+        ))]
+        {
+            let _ = path;
+            Err(Error::NotOfficeFile)
         }
     }
 
@@ -587,8 +678,8 @@ impl Presentation {
         limits: crate::pptx::ReadLimits,
     ) -> Result<Self> {
         #[cfg(any(unix, windows))]
-        if let Some(detected) =
-            crate::detection_smart::detected::detect_pptx_source_path_with_limits(
+        {
+            let detected = crate::detection_smart::detected::detect_pptx_source_path_with_limits(
                 path.as_ref(),
                 limits,
             )
@@ -599,61 +690,54 @@ impl Presentation {
                 crate::detection_smart::detected::PptxSourcePathError::Pptx(error) => {
                     map_pptx_catalog_error(error)
                 },
-            })?
-        {
-            match detected {
+                #[cfg(any(feature = "odp", feature = "ppt"))]
+                crate::detection_smart::detected::PptxSourcePathError::Source(error) => error,
+            })?;
+            let detected = detected.ok_or(Error::NotOfficeFile)?;
+            return match detected {
                 crate::detection_smart::detected::PptxSourcePathDetection::Pptx(presentation) => {
-                    return Self::from_source_backed_pptx(presentation);
+                    Self::from_source_backed_pptx(presentation)
+                },
+                #[cfg(feature = "odp")]
+                crate::detection_smart::detected::PptxSourcePathDetection::Odp(presentation) => {
+                    Ok(Self {
+                        inner: PresentationImpl::OdpSource(presentation),
+                        cached_metadata: OnceLock::from(Some(litchi_core::Metadata::default())),
+                    })
+                },
+                #[cfg(feature = "ppt")]
+                crate::detection_smart::detected::PptxSourcePathDetection::Ppt(package) => {
+                    Self::from_native_ppt_package(package)
                 },
                 crate::detection_smart::detected::PptxSourcePathDetection::OtherOoxml(format) => {
-                    // Bind the classified family so the private detector
-                    // remains able to report it in future diagnostics while
-                    // preserving the established facade error text.
                     let _ = format;
-                    return Err(Error::InvalidFormat(
+                    Err(Error::InvalidFormat(
                         "Detected format is not a presentation format or feature not enabled"
                             .to_owned(),
-                    ));
+                    ))
                 },
                 crate::detection_smart::detected::PptxSourcePathDetection::DisabledOtherOoxml(
                     format,
                 ) => {
                     let _ = format;
-                    return Err(Error::NotOfficeFile);
+                    Err(Error::NotOfficeFile)
                 },
                 crate::detection_smart::detected::PptxSourcePathDetection::Bytes(bytes) => {
-                    return Self::from_bytes_with_limits(bytes, limits);
+                    Self::from_bytes_with_limits(bytes, limits)
                 },
-            }
+            };
         }
 
         #[cfg(not(any(unix, windows)))]
-        if let Some(detected) =
-            crate::detection_smart::detected::detect_ooxml_path_with_limits(path.as_ref(), limits)
-                .map_err(crate::map_ooxml_error)?
         {
-            return Self::from_detected(detected);
+            let bytes = crate::detection_smart::detected::read_presentation_path_bytes_with_limits(
+                path.as_ref(),
+                limits.max_input_bytes(),
+                crate::detection_smart::detected::UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES,
+            )
+            .map_err(Self::map_source_opc_error)?;
+            return Self::from_bytes_with_limits(bytes, limits);
         }
-
-        #[cfg(all(feature = "ppt", any(unix, windows)))]
-        if let Some(presentation) = Self::open_native_ppt_path(path.as_ref())? {
-            return Ok(presentation);
-        }
-
-        #[cfg(all(feature = "odp", any(unix, windows)))]
-        if let Some(presentation) = Self::open_source_backed_odp_path(path.as_ref())? {
-            return Ok(presentation);
-        }
-
-        #[cfg(any(unix, windows))]
-        let bytes = crate::detection_smart::detected::read_presentation_path_bytes_with_limits(
-            path.as_ref(),
-            limits.max_input_bytes(),
-        )
-        .map_err(Self::map_source_opc_error)?;
-        #[cfg(not(any(unix, windows)))]
-        let bytes = std::fs::read(path.as_ref())?;
-        Self::from_bytes_with_limits(bytes, limits)
     }
 
     /// Create a Presentation from a byte buffer.
@@ -712,67 +796,18 @@ impl Presentation {
         }
     }
 
-    #[cfg(all(feature = "ppt", any(unix, windows)))]
-    fn open_native_ppt_path(path: &Path) -> Result<Option<Self>> {
-        let source = std::sync::Arc::new(litchi_core::FileSource::open(path)?);
-        let shared = match litchi_cfb::SharedOleFile::open(source) {
-            Ok(shared) => shared,
-            // Classification failures precede PPT ownership. Preserve the
-            // established byte/detection fallback for malformed or non-CFB
-            // inputs instead of leaking a PPT-specific error.
-            Err(_error) => return Ok(None),
-        };
-
-        #[cfg(feature = "doc")]
-        if shared.exists(&["WordDocument"]) {
-            // Match the existing smart detector's DOC-before-PPT precedence
-            // for valid OLE polyglots. The byte fallback below then returns
-            // the established non-presentation result for the DOC owner.
-            return Ok(None);
-        }
-
-        let Some(package) =
-            ppt::SourceBackedPackage::from_shared_if_powerpoint(shared).map_err(Error::from)?
-        else {
-            return Ok(None);
-        };
-
+    #[cfg(feature = "ppt")]
+    fn from_native_ppt_package(package: ppt::SourceBackedPackage) -> Result<Self> {
         let cached_metadata = package
             .metadata()
             .ok()
             .map(litchi_core::Metadata::from)
             .filter(|metadata| metadata.has_data());
         let pres = package.presentation().map_err(Error::from)?;
-        Ok(Some(Self {
+        Ok(Self {
             inner: PresentationImpl::Ppt(pres),
             cached_metadata: OnceLock::from(cached_metadata),
-        }))
-    }
-
-    #[cfg(all(
-        feature = "odp",
-        any(unix, windows),
-        any(
-            feature = "pptx",
-            not(any(feature = "docx", feature = "xlsx", feature = "xlsb"))
-        )
-    ))]
-    fn open_source_backed_odp_path(path: &Path) -> Result<Option<Self>> {
-        let source: std::sync::Arc<dyn litchi_core::ReadAt> =
-            std::sync::Arc::new(litchi_core::FileSource::open(path)?);
-        let detected = litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())?;
-        if detected != Some(litchi_core::FileFormat::Odp) {
-            return Ok(None);
-        }
-
-        let presentation = litchi_odp::SourceBackedPresentation::from_read_at(source)?;
-        Ok(Some(Self {
-            inner: PresentationImpl::OdpSource(presentation),
-            // Preserve the established unified ODP contract.  The typed ODP
-            // owner validates `meta.xml`, but the root facade has always
-            // projected a present, empty metadata value for this family.
-            cached_metadata: OnceLock::from(Some(litchi_core::Metadata::default())),
-        }))
+        })
     }
 
     /// Create a presentation from bytes with an explicit PPTX/OPC resource
@@ -1771,6 +1806,8 @@ mod tests {
 #[cfg(all(test, feature = "ppt", any(unix, windows)))]
 mod native_ppt_path_tests {
     use super::Presentation;
+    #[cfg(feature = "pptx")]
+    use super::PresentationImpl;
     #[cfg(feature = "doc")]
     use litchi_cfb::{OleFile, OleWriter};
     #[cfg(feature = "doc")]
@@ -1803,6 +1840,35 @@ mod native_ppt_path_tests {
                 .unwrap()
                 .map(|metadata| format!("{metadata:?}"))
         );
+    }
+
+    #[cfg(feature = "pptx")]
+    #[test]
+    fn native_ppt_source_owner_precedes_tiny_pptx_limit() {
+        let path = test_data_path().join("ole/ppt/SampleShow.ppt");
+        let limits = crate::pptx::ReadLimits::builder()
+            .max_input_bytes(1)
+            .expect("positive input limit")
+            .build()
+            .expect("consistent input limit");
+
+        let detected = match crate::detection_smart::detected::detect_pptx_source_path_with_limits(
+            &path, limits,
+        ) {
+            Ok(Some(detected)) => detected,
+            Ok(None) => panic!("native PPT source owner was not detected"),
+            Err(_) => panic!("native PPT must not use the tiny PPTX limit"),
+        };
+        assert!(matches!(
+            detected,
+            crate::detection_smart::detected::PptxSourcePathDetection::Ppt(_)
+        ));
+
+        let presentation = match Presentation::open_with_limits(&path, limits) {
+            Ok(presentation) => presentation,
+            Err(_) => panic!("native PPT must open through its source owner"),
+        };
+        assert!(matches!(presentation.inner, PresentationImpl::Ppt(_)));
     }
 
     #[test]
@@ -2394,7 +2460,7 @@ mod source_pptx_path_tests {
     }
 
     #[test]
-    fn oversized_arbitrary_non_zip_refuses_before_fallback_allocation() {
+    fn generic_non_zip_uses_neutral_fallback_and_public_not_office() {
         let temporary = tempfile::NamedTempFile::new().expect("temporary arbitrary input");
         std::fs::write(temporary.path(), vec![b'x'; 4096]).expect("write arbitrary input");
         let limits = crate::pptx::ReadLimits::builder()
@@ -2407,30 +2473,67 @@ mod source_pptx_path_tests {
             temporary.path(),
             limits,
         ) {
-            Ok(_) => panic!("oversized arbitrary input must stop before fallback allocation"),
-            Err(error) => error,
+            Ok(detected) => detected,
+            Err(_) => panic!("generic input must use the neutral fallback ceiling"),
         };
-        assert!(matches!(
-            detected,
-            crate::detection_smart::detected::PptxSourcePathError::Opc(
-                crate::opc::OpcError::ReadLimit {
-                    resource: crate::opc::ReadResource::InputBytes,
-                    actual: 4096,
-                    maximum: 1,
-                }
-            )
-        ));
+        let Some(crate::detection_smart::detected::PptxSourcePathDetection::Bytes(bytes)) =
+            detected
+        else {
+            panic!("generic input did not retain fallback bytes");
+        };
+        assert_eq!(bytes.len(), 4096);
 
         let error = match Presentation::open_with_limits(temporary.path(), limits) {
-            Ok(_) => panic!("arbitrary input must not become a presentation"),
+            Ok(_) => panic!("generic input must not become a presentation"),
+            Err(error) => error,
+        };
+        assert!(matches!(error, litchi_core::Error::NotOfficeFile));
+    }
+
+    #[test]
+    fn generic_non_zip_over_neutral_ceiling_reports_exact_limit() {
+        let temporary = tempfile::NamedTempFile::new().expect("temporary sparse input");
+        let neutral =
+            crate::detection_smart::detected::UNIFIED_PRESENTATION_FALLBACK_MAX_INPUT_BYTES;
+        let neutral_plus_one = neutral + 1;
+        temporary
+            .as_file()
+            .set_len(neutral_plus_one)
+            .expect("create sparse input");
+        let limits = crate::pptx::ReadLimits::builder()
+            .max_input_bytes(1)
+            .expect("positive input limit")
+            .build()
+            .expect("consistent input limit");
+
+        let error = match crate::detection_smart::detected::detect_pptx_source_path_with_limits(
+            temporary.path(),
+            limits,
+        ) {
+            Ok(_) => panic!("generic input over the neutral ceiling must fail"),
             Err(error) => error,
         };
         assert!(matches!(
             error,
+            crate::detection_smart::detected::PptxSourcePathError::Opc(
+                crate::opc::OpcError::ReadLimit {
+                    resource: crate::opc::ReadResource::InputBytes,
+                    actual,
+                    maximum,
+                }
+            ) if actual == neutral_plus_one && maximum == neutral
+        ));
+
+        let public_error = match Presentation::open_with_limits(temporary.path(), limits) {
+            Ok(_) => panic!("generic input over the neutral ceiling must fail publicly"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            public_error,
             litchi_core::Error::ResourceLimit(limit)
                 if limit.resource == litchi_core::Resource::InputBytes
-                    && limit.observed == 4096
-                    && limit.limit == 1
+                    && limit.observed == neutral_plus_one
+                    && limit.limit == neutral
         ));
     }
 
@@ -2553,7 +2656,7 @@ mod source_pptx_path_tests {
 
     #[cfg(feature = "odp")]
     #[test]
-    fn source_probe_leaves_odp_and_non_opc_zip_to_existing_fallbacks() {
+    fn source_probe_returns_odp_owner_and_same_source_unknown_zip_fallback() {
         let mut writer = litchi_odf_common::core::PackageWriter::new();
         writer
             .set_mimetype(litchi_odf_common::constants::ODF_PRESENTATION)
@@ -2570,15 +2673,20 @@ mod source_pptx_path_tests {
             .tempfile()
             .expect("temporary ODP path");
         std::fs::write(odp_path.path(), odp).expect("write ODP");
-        assert!(
-            crate::detection_smart::detected::detect_pptx_source_path_with_limits(
-                odp_path.path(),
-                crate::pptx::ReadLimits::default(),
-            )
-            .expect("ODP source probe")
-            .is_none()
-        );
-        assert!(Presentation::open(odp_path.path()).is_ok());
+        let odp_detected = crate::detection_smart::detected::detect_pptx_source_path_with_limits(
+            odp_path.path(),
+            crate::pptx::ReadLimits::default(),
+        )
+        .expect("ODP source probe");
+        assert!(matches!(
+            odp_detected,
+            Some(crate::detection_smart::detected::PptxSourcePathDetection::Odp(_))
+        ));
+        let odp_presentation = Presentation::open(odp_path.path()).expect("open ODP");
+        assert!(matches!(
+            &odp_presentation.inner,
+            PresentationImpl::OdpSource(_)
+        ));
 
         let mut output = Cursor::new(Vec::new());
         let mut zip = zip::ZipWriter::new(&mut output);
@@ -2590,20 +2698,45 @@ mod source_pptx_path_tests {
         .unwrap();
         zip.write_all(b"not an Office package").unwrap();
         zip.finish().unwrap();
+        let unknown_bytes = output.into_inner();
         let unknown_path = tempfile::Builder::new()
             .suffix(".zip")
             .tempfile()
             .expect("temporary unknown ZIP path");
-        std::fs::write(unknown_path.path(), output.into_inner()).expect("write unknown ZIP");
+        std::fs::write(unknown_path.path(), &unknown_bytes).expect("write unknown ZIP");
         let detected = crate::detection_smart::detected::detect_pptx_source_path_with_limits(
             unknown_path.path(),
             crate::pptx::ReadLimits::default(),
         )
         .expect("extensionless ZIP fallback probe")
         .expect("same-source fallback bytes");
+        let crate::detection_smart::detected::PptxSourcePathDetection::Bytes(retained) = detected
+        else {
+            panic!("unknown ZIP did not retain same-source fallback bytes");
+        };
+        assert_eq!(retained, unknown_bytes);
+
+        let limits = crate::pptx::ReadLimits::builder()
+            .max_input_bytes(1)
+            .expect("positive input limit")
+            .build()
+            .expect("consistent input limit");
+        let error = match crate::detection_smart::detected::detect_pptx_source_path_with_limits(
+            unknown_path.path(),
+            limits,
+        ) {
+            Ok(_) => panic!("unknown ZIP must remain caller-limited"),
+            Err(error) => error,
+        };
         assert!(matches!(
-            detected,
-            crate::detection_smart::detected::PptxSourcePathDetection::Bytes(_)
+            error,
+            crate::detection_smart::detected::PptxSourcePathError::Opc(
+                crate::opc::OpcError::ReadLimit {
+                    resource: crate::opc::ReadResource::InputBytes,
+                    actual,
+                    maximum: 1,
+                }
+            ) if actual == u64::try_from(unknown_bytes.len()).unwrap()
         ));
         let error = match Presentation::open(unknown_path.path()) {
             Ok(_) => panic!("unknown ZIP must remain unsupported"),

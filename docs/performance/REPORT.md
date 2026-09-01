@@ -3813,3 +3813,40 @@ physical result buffer with typed fallible reservation and releases the part
 reservation on admission failure. This is correctness/resource safety only,
 with no performance or OOM claim. The final target was 1009 MiB;
 no speed, RSS, or OOM-prevention claim is made. See [Change 0356](changes/0356-docx-source-path-and-opc-errors.md).
+
+## Change 0357: workbook and presentation two-ceiling path policy
+
+This change is implemented correctness and resource-boundary hardening only
+(`performance_claim: none`). Workbook and Presentation filesystem paths now
+apply the caller's `ReadLimits`, capped by a neutral 2 GiB ceiling, to OOXML
+and uncertain/polyglot candidates. Ordinary canonical ODP/ODS, content-derived
+renamed ODP, OLE, and generic non-ZIP fallback use the finite neutral 2 GiB
+policy; unknown or missing-content-types ZIPs and ODF inputs with uncertain
+OOXML catalogs remain caller-limited. Explicit byte/source APIs are unchanged.
+
+PPTX, ODP, native PPT, and bounded `Bytes` arbitration share one
+`FileSource`/`SourceVersion` on filesystem paths, with freshness checked on the
+pinned source and no pathname reopen or unbounded read. Wrong-family
+`OtherOoxml`/`DisabledOtherOoxml` outcomes are terminal. The ODF catalog
+neutral-budget helper sets the checked input, compressed, entry, and total
+ceilings together.
+
+Serial validation passed `15/15` focused ODF detection tests with `260`
+filtered, `6/6` catalog arbitration tests, `82/82` `litchi` `pptx,odp,ppt`
+library tests, and `84/84` `litchi` `ods,xlsx` library tests; quiet `pptx`,
+`odp,ppt`, `odp`, `ppt`, and `xls,xlsx` checks passed. The initial constrained
+compile's two `Arc<FileSource>` to `Arc<dyn ReadAt>` coercion errors were
+corrected before final validation. All commands used one 8 GiB virtual-memory
+ceiling, one Cargo job, disabled incremental/debug compilation, one disk
+target, and one test thread. The target's final/peak observed footprint was
+1.3 GiB; host availability was approximately 14 GiB with 133 GiB disk free
+and exhausted swap. No parallel build or OOM occurred, and no speed, RSS,
+allocation, constant-memory, or OOM-prevention claim is made. See [Change
+0357](changes/0357-workbook-presentation-two-ceiling-policy.md).
+
+Residual scope includes the eager public `DetectedFormat`, fully materialized
+neutral fallback, flat ODF MIME decode before its strict bound, infallible
+Presentation aggregate `Vec`/`join`, portable same-size identity, native PPT
+probe-time mutation coverage, the `Current User` plus `Workbook` OLE
+classifier inconsistency, applicable prepared ODP reparsing,
+`parts_by_name` case lookup, and selected-Part materialization.
