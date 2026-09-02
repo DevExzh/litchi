@@ -803,6 +803,32 @@ fn lifecycle_patch_apply_inverse_and_foreign_source_conflict_are_exact() -> Test
 }
 
 #[test]
+fn no_op_patch_apply_preserves_the_exact_snapshot_without_reparse() -> TestResult {
+    let package = package()?;
+    let source = bytes(&package)?;
+    let current = package.soundtrack_items()?.unwrap()[0].clone();
+    let mut edit = package.edit_soundtrack_items()?;
+    // A caller-provided alias still reuses the package's canonical media
+    // record by digest, so the candidate becomes an exact no-op only after
+    // physical rewrite planning.
+    edit.replace(current.handle(), audio("caller-alias.wav", FIRST_AUDIO)?)?;
+    let commit = edit.commit()?;
+    assert!(commit.patch().is_noop());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.diagnostics().touched_components(), 0);
+    assert!(!commit.diagnostics().full_reparse_performed());
+
+    let applied = package.apply_soundtrack_items(commit.patch())?;
+    assert_eq!(bytes(applied.package())?, source);
+    assert!(applied.patch().is_noop());
+    assert!(!applied.diagnostics().changed());
+    assert_eq!(applied.diagnostics().touched_components(), 0);
+    assert!(!applied.diagnostics().full_reparse_performed());
+    assert_eq!(item_summary(applied.package())?, item_summary(&package)?);
+    Ok(())
+}
+
+#[test]
 fn empty_edit_and_invalid_positions_are_atomic() -> TestResult {
     let package = package()?;
     let source = bytes(&package)?;

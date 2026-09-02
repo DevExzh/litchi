@@ -15633,3 +15633,14 @@ legacy `litchi-iwa` item API remains retained until those gates pass. No
 dependency edge, ordered migration debt, or ADR 0028 deletion gate closes;
 soundtrack creation, broad media-asset CRUD, and durable patch history remain
 outside this increment.
+
+Exact byte no-ops now retain the original immutable package snapshot even when
+they become apparent only after canonical media-digest reuse (for example, a
+replacement whose caller-preferred filename differs but whose audio bytes are
+already the selected item). Such commits report zero touched components and no
+full reparse. Applying an exact no-op patch still authenticates the complete
+source artifact and semantic before-state, then returns the source snapshot
+without reopening its identical target. The bounded soundtrack lifecycle fuzz
+oracle covers this canonicalization case and models repeat application of an
+identity patch as valid. This source-level hardening does not add native
+certification or close an operation, dependency, debt, host, or deletion gate.

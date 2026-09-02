@@ -356,15 +356,23 @@ fn verify_commit(
         }
     );
     if operation != 3 {
-        assert!(patch.after().iter().any(|item| {
-            item.filename() == replacement.filename()
-                && item.byte_length() == replacement.byte_length()
-        }));
+        assert!(
+            patch
+                .after()
+                .iter()
+                .any(|item| item.byte_length() == replacement.byte_length())
+        );
     }
-    assert!(!patch.is_noop());
-    assert!(commit.diagnostics().changed());
-    assert!(commit.diagnostics().full_reparse_performed());
-    assert!(commit.diagnostics().touched_components() > 0);
+    if patch.is_noop() {
+        assert!(!commit.diagnostics().changed());
+        assert!(!commit.diagnostics().full_reparse_performed());
+        assert_eq!(commit.diagnostics().touched_components(), 0);
+        assert_eq!(target_bytes, source_bytes);
+    } else {
+        assert!(commit.diagnostics().changed());
+        assert!(commit.diagnostics().full_reparse_performed());
+        assert!(commit.diagnostics().touched_components() > 0);
+    }
     assert_positions(patch.after());
 
     // Candidate re-open and semantic projection are the first verification
@@ -381,10 +389,18 @@ fn verify_commit(
         .unwrap_or_else(|error| panic!("soundtrack item patch must apply: {error}"));
     assert_eq!(package_bytes(applied.package()), target_bytes);
     assert_eq!(package_bytes(source), source_bytes);
-    assert!(matches!(
-        commit.package().apply_soundtrack_items(&patch),
-        Err(ItemError::PatchConflict)
-    ));
+    if patch.is_noop() {
+        let reapplied = commit
+            .package()
+            .apply_soundtrack_items(&patch)
+            .unwrap_or_else(|error| panic!("no-op soundtrack patch must remain replayable: {error}"));
+        assert_eq!(package_bytes(reapplied.package()), source_bytes);
+    } else {
+        assert!(matches!(
+            commit.package().apply_soundtrack_items(&patch),
+            Err(ItemError::PatchConflict)
+        ));
+    }
 
     let inverse = patch.inverse();
     assert_eq!(inverse.inverse(), patch);

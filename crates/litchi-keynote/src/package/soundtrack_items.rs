@@ -1261,6 +1261,13 @@ impl Package {
         if !semantic_items_equal(&view.semantic_items()?, &patch.before) {
             return Err(Error::PatchConflict);
         }
+        if patch.is_noop() {
+            return Ok(Commit {
+                package: self.snapshot(),
+                patch: patch.clone(),
+                diagnostics: Diagnostics::unchanged(),
+            });
+        }
         let target = patch.artifacts.target();
         let candidate = Package::from_source_with_options(target, self.state.options)
             .map_err(|_| Error::PatchConflict)?;
@@ -1274,11 +1281,7 @@ impl Package {
         Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: if patch.is_noop() {
-                Diagnostics::unchanged()
-            } else {
-                Diagnostics::published(2)
-            },
+            diagnostics: Diagnostics::published(2),
         })
     }
 }
@@ -1355,10 +1358,19 @@ impl Edit<'_> {
                 OperationKind::Remove => OperationKind::Insert,
             },
         };
+        let is_noop = patch.is_noop();
         Ok(Commit {
-            package,
+            package: if is_noop {
+                self.source.snapshot()
+            } else {
+                package
+            },
             patch,
-            diagnostics: Diagnostics::published(2),
+            diagnostics: if is_noop {
+                Diagnostics::unchanged()
+            } else {
+                Diagnostics::published(2)
+            },
         })
     }
 }
