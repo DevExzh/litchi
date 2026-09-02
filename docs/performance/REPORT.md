@@ -1,5 +1,43 @@
 # Performance program phase report
 
+## Change 0368: ODT source-backed document catalog selectors
+
+Change 0368 is a harness-only evidence tranche. It adds the opt-in
+`odt_source_backed_catalog_open`, `odt_source_backed_catalog_list`, and
+`odt_source_backed_catalog_query` selectors without changing production code,
+the CRUD surface, or the default matrix. The selectable registry is **404**;
+the default remains **36 cases / 198 rows**.
+
+The fixed corpus has 10,008 entries, 13 ZIP members, and eight deterministic
+2 MiB `Pictures/*` members. Its archive is 16,811,815 bytes with SHA-256
+`d63726138d0a50c8ff7e150af4a86385df1a34d886bb5f61f985c78ac79b0220`. The
+open timer covers fresh `SourceBackedDocumentCatalog::from_read_at`; the list
+timer covers only `catalog()` after owner preparation; and the query timer
+covers only `block_at(5000)` after owner/index preparation. Semantic, topology,
+media-identity, and instrumented-source checks are untimed.
+
+The retained [machine-readable control report](results/odt-source-catalog-0368-control.json)
+contains 30 warmups and 500 samples per selector on CPU 2. Its binary SHA-256
+is `cc6f5a148f0788210814254f521c681238cf77ce9eba29ff3b29b5486d6c6ae8`; its
+revision is `14884ced9d8b29b7d2155134025986e9315ac771` with `dirty: true`.
+The report is therefore a descriptive current-control artifact, not a clean
+A/B comparison or speedup claim. The smoke passed but its JSON is not retained.
+
+The focused catalog oracle passed `1/1`, the selectable-count test passed
+`1/1`, and scoped Clippy passed with explicit allowances for unrelated
+existing lint classes. The initial standalone suite recorded `233 passed, 7
+failed, 1 ignored`; after the count assertion was fixed and re-passed, six
+unrelated failures remained: `docx_source_edit_is_deterministic_and_emits_complete_evidence`,
+`media_rich_odp_scalar_and_batch_text_box_replacements_are_matched`,
+`media_rich_odt_scalar_and_batch_resource_replacements_are_matched`,
+`xlsx_cell_values_matched_controls_are_deterministic_and_bounded`,
+`xlsx_row_visibility_matched_controls_cover_single_and_bounded_batch`, and
+`xlsx_vendor_extension_cell_crud_shape_is_opt_in_and_preserved`.
+
+`performance_claim: none`. No latency, throughput, physical-I/O, allocation,
+decompression, cold-cache, fixed-memory, RSS, OOM-prevention, or broad ODF
+claim follows from this evidence.
+
 ## Change 0367: XLSX selected merge streaming
 
 Change 0367 extends the selected worksheet scanner with valid direct active

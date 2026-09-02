@@ -675,6 +675,54 @@ remain outside timing.
 These additions bring the selectable matrix to 322 names while leaving the
 default 36 cases / 198 records unchanged; they provide correctness and phase
 evidence only and make no latency claim;
+
+## ODT source-backed document catalog selectors (change 0368)
+
+The harness exposes 404 selectable cases; the default matrix remains 36 cases and 198 rows.
+
+The three catalog-first ODT selectors are opt-in and use the same fixed
+large-media-rich corpus as the repeated-text controls:
+
+```text
+odt_source_backed_catalog_open
+odt_source_backed_catalog_list
+odt_source_backed_catalog_query
+```
+
+Run the complete catalog family with:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 15 \
+  --case odt_source_backed_catalog_open,odt_source_backed_catalog_list,odt_source_backed_catalog_query \
+  --json target/perf/odt-source-catalog.json
+```
+
+The corpus contains 10,000 visible text blocks, eight deterministic
+incompressible 2 MiB `Pictures/*` members, and exactly 13 ZIP members. The
+open selector times a fresh
+`SourceBackedDocumentCatalog::from_read_at`; the list selector prepares the
+owner outside timing and times only `catalog()`; the query selector prepares
+the owner outside timing and times only `block_at(5000)`. Semantic block
+ordering, paragraph text, catalog and selected-block SHA-256 digests, archive
+topology, and media payload identities are checked outside the timers.
+
+Every retained sample also has an untimed `InstrumentedSource` replay with
+total reads/bytes, total range overlap, `content.xml` overlap, untouched and
+Pictures reads, payload reads, and source-version observations. Open and
+query replays must read content; open also records the mandatory `mimetype`
+and manifest-member reads needed to prepare the source-backed package. List
+and query replays occur after preparation is reset: list requires all source,
+content, untouched, ordinary-payload, and Pictures counters to remain zero,
+while query requires content reads only and zero untouched, ordinary-payload,
+and Pictures reads. The timed list phase must perform zero source and payload
+reads; no phase may read a `Pictures/*` payload. Replay shapes and
+source-version observations must remain deterministic across samples.
+These records are evidence for the named catalog lifecycle only: they make no
+generic latency, physical-I/O, allocation, decompression, cold-cache,
+throughput, or broad ODF claim. The selectors add three selectable names but
+do not change the default 36 cases / 198 records.
+
 six additional matched simulated CFB selective-read cases
 (`cfb_selective_simulated_{mini,mini_4095,fat}_{legacy,shared}_read`) reuse the
 same deterministic final-position targets while applying the configured

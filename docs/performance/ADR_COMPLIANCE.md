@@ -1,5 +1,29 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0368 compliance update
+
+Change 0368 is harness-only and adds no production API, dependency edge,
+archive handle, raw type, runtime handle, lock, or unsafe storage. The
+selectors remain in the existing ODT performance harness and exercise the
+existing source-backed document catalog through its current owner boundary.
+Open, list, and selected-block query preparation remain explicitly separated
+from their timed scopes; semantic, source-freshness, and media-locality checks
+remain untimed evidence gates.
+
+The retained [control report](results/odt-source-catalog-0368-control.json)
+uses the 10,008-entry, 13-member corpus with eight deterministic 2 MiB
+`Pictures/*` members, CPU 2, 30 warmups, and 500 samples. Binary SHA-256 is
+`cc6f5a148f0788210814254f521c681238cf77ce9eba29ff3b29b5486d6c6ae8`; source
+revision is `14884ced9d8b29b7d2155134025986e9315ac771`; `dirty: true`. The
+artifact is descriptive current-control evidence only, not a clean A/B result.
+
+The focused catalog and count tests passed `1/1` each. The initial standalone
+harness context was `233 passed, 7 failed, 1 ignored`; the count assertion was
+corrected and its focused test re-passed, leaving six unrelated failures. The
+selectable registry is **404** and the default remains **36 cases / 198 rows**.
+`performance_claim: none`; no latency, throughput, physical-I/O, allocation,
+decompression, cold-cache, RSS, fixed-memory, or OOM-prevention claim follows.
+
 ## Change 0367 compliance update
 
 Change 0367 keeps direct active `mergeCells` handling in the owning
