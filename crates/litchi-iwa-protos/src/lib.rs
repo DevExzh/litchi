@@ -833,6 +833,29 @@ mod buffa_numbers_table_cell_currency_format_generated {
     ));
 }
 
+/// Private lazy-view roots for the scalar Numbers fraction-format envelope.
+/// The handwritten decoder owns strict field policy and keeps every unknown
+/// source span authoritative; this sidecar is parity-only.
+#[doc(hidden)]
+mod buffa_numbers_table_cell_fraction_format_generated {
+    #![allow(
+        clippy::all,
+        clippy::pedantic,
+        clippy::arbitrary_source_item_ordering,
+        clippy::allow_attributes_without_reason,
+        clippy::module_name_repetitions,
+        clippy::shadow_same,
+        elided_lifetimes_in_paths,
+        unreachable_pub,
+        non_snake_case,
+        reason = "buffa-build output is generated from the derived wire projection."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-numbers-table-cell-fraction-format/iwa_numbers_table_cell_fraction_format_buffa_protos.rs"
+    ));
+}
+
 /// Private lazy-view roots for Numbers formula dependency envelopes.
 #[doc(hidden)]
 mod buffa_numbers_table_cell_dependency_generated {
@@ -1670,6 +1693,12 @@ pub mod numbers_table_cell_percentage_format_codec;
 /// to the shared table-cell implementation.
 #[doc(hidden)]
 pub mod numbers_table_cell_currency_format_codec;
+
+/// Neutral strict native-fraction `FormatStructArchive` projection and
+/// measured source-preserving rewrite. Generated Buffa values remain private
+/// to the shared table-cell implementation.
+#[doc(hidden)]
+pub mod numbers_table_cell_fraction_format_codec;
 
 /// Neutral strict native-scientific `FormatStructArchive` projection and
 /// measured source-preserving rewrite. The four scalar fields use the shared

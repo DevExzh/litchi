@@ -191,6 +191,60 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
   -timeout=10 -rss_limit_mb=2048
 ```
 
+## Numbers Fraction cell-format codec
+
+`numbers_table_cell_fraction_format_codec` exercises the strict native
+Fraction variant of the borrowed `FormatStructArchive` seam. It covers native
+format type 262 and all nine denominator strategies: up to one, two, or three
+digits, halves, quarters, eighths, sixteenths, tenths, and hundredths. The
+legacy `requires_fraction_replacement` field 20 is accepted only as a
+canonical false marker; its exact source bytes are preserved by rewrites and
+the canonical writer never synthesizes it. A true value, duplicate,
+wrong-wire, or noncanonical field-20 value is rejected.
+
+Successful cases compare scalar and measured reads, retain a borrowed source,
+replay exact source-preserving rewrites, and keep unknown scalar, fixed-width,
+length-delimited, and balanced nested-group spans byte-for-byte in their wire
+order and multiplicity. Fixed recipes keep every selected field's missing,
+duplicate, wrong-wire, noncanonical, and invalid-domain path hot, together
+with Number/Percentage/Currency wrong-family and malformed-group refusals.
+Canonical writes and rewrites are retried against one-below exact output,
+field, work, depth, allocation, and retained-byte limits.
+
+The target accepts raw inputs up to 64 KiB and uses 128 KiB output, 16,384
+fields, 512 KiB of aggregate work, and nesting depth 64. Corpus entries are
+small hand-authored `hex:` wire recipes; they are not copied native Numbers
+package bytes.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check numbers_table_cell_fraction_format_codec
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build output
+outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-fraction-format-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+cp corpus/numbers_table_cell_fraction_format_codec/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  numbers_table_cell_fraction_format_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
 ## Numbers formula-archive codec
 
 `numbers_formula_archive` sends one bounded, caller-owned

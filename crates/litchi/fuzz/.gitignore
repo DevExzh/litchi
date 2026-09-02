@@ -30,6 +30,9 @@ target
 !/corpus/numbers_table_cell_scientific_format/
 !/corpus/numbers_table_cell_scientific_format/*
 !/corpus/numbers_table_cell_scientific_format/*.seed
+!/corpus/numbers_table_cell_fraction_format/
+!/corpus/numbers_table_cell_fraction_format/*
+!/corpus/numbers_table_cell_fraction_format/*.seed
 !/corpus/numbers_table_sort_order/
 !/corpus/numbers_table_sort_order/*
 !/corpus/numbers_table_relocation/

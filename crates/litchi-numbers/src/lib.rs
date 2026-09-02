@@ -108,6 +108,61 @@
 //! # }
 //! ```
 //!
+//! # Existing-cell Fraction-format transactions
+//!
+//! [`Package::table_cell_fraction_format`] reads the explicit Fraction
+//! display value for one existing cell. `None` means that no explicit
+//! Fraction format is stored and the cell uses inherited or automatic
+//! formatting. An explicit non-Fraction family is reported as a typed
+//! refusal rather than being interpreted as an automatic value.
+//!
+//! [`Package::edit_table_cell_fraction_format`] opens a selector-first edit
+//! against the exact source snapshot. [`cell::data_format::Fraction`] stores
+//! only its [`cell::data_format::FractionAccuracy`] denominator strategy;
+//! `set` stages an explicit value and `clear`/`reset` stages the inherited or
+//! automatic state. Committing an unchanged request is an exact no-op. A
+//! changed request validates the admitted source graph, stages the focused
+//! native members, reopens and rereads the candidate, and returns a
+//! reversible exact-source patch. [`Package::apply_table_cell_fraction_format`]
+//! accepts that patch only for its authorized source.
+//!
+//! Native identifiers, wire records, archive members, and transaction
+//! diagnostics remain below the semantic boundary. This is an existing-cell
+//! display-format owner: it does not create cells, author values or formulas,
+//! or provide general display-style editing. Focused test, fuzz, native-app,
+//! and artifact/hash evidence is tracked separately and is not implied by
+//! this API documentation.
+//!
+//! ```no_run
+//! use litchi_numbers::{
+//!     cell::data_format::{Fraction, FractionAccuracy},
+//!     CellPosition, Package, SheetSelector, TableSelector,
+//! };
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let package = Package::open("input.numbers")?;
+//! let sheet = SheetSelector::name("Summary");
+//! let table = TableSelector::name("Revenue");
+//! let position = CellPosition::from_a1("B3")?;
+//!
+//! let _before = package.table_cell_fraction_format(sheet, table, position)?;
+//! let commit = package
+//!     .edit_table_cell_fraction_format(sheet, table, position)?
+//!     .set(Fraction::new(FractionAccuracy::Halves))
+//!     .commit()?;
+//! let restored = commit
+//!     .package()
+//!     .apply_table_cell_fraction_format(&commit.patch().inverse())?;
+//!
+//! let mut original = Vec::new();
+//! package.write_to(&mut original)?;
+//! let mut restored_bytes = Vec::new();
+//! restored.package().write_to(&mut restored_bytes)?;
+//! assert_eq!(restored_bytes, original);
+//! # Ok(())
+//! # }
+//! ```
+//!
 //! # Table-title transactions
 //!
 //! Use [`table::title`] to read and transactionally update a single table

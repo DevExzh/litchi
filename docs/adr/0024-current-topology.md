@@ -3930,6 +3930,37 @@ workspace package, dependency declaration, canonical edge, or ordered-debt
 retirement; it removes no migration host and changes no monolith-deletion
 gate. The authoritative inventory remains 64 workspace packages, 237 internal
 dependency declarations, 226 canonical edges, 11 ordered migration debts with
-IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. Build,
-test/fuzz, native-validation, and final hash evidence are pending and tracked
-in ADR 0008; no topology fact is inferred from source visibility.
+IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
+Scientific build/test/fuzz and native-validation evidence is recorded in ADR
+0008; this topology record makes no package-wide or deletion-gate claim. No
+topology fact is inferred from source visibility.
+
+## 2026-09-02 amendment: Numbers existing-cell Fraction-format owner (topology unchanged)
+
+The current worktree adds a focused Fraction-format owner in `litchi-numbers`:
+an archive-free `Fraction` value with all nine `FractionAccuracy` strategies,
+selector-first existing-cell read/edit/apply transactions, and a private strict
+native type-262 codec. Handwritten field validation precedes the borrowed lazy
+Buffa view. Field 20 (`requires_fraction_replacement`) is preserved when absent
+or canonically encoded as `false` (absence remains absent); canonical `true` is
+rejected because replacement semantics are not implemented. Native identifiers,
+generated messages, Buffa views, archive members, and raw bytes remain below the
+public boundary.
+
+The owner binds exact-source patches and inverses to semantic sheet/table
+selectors and checked cell positions, uses copy-on-write/refcount closure,
+candidate reopen/readback and locality checks, and keeps the deprecated
+`litchi-iwa` methods as fail-closed compatibility delegates for admitted exact
+graphs. Focused source/build/test/fuzz evidence and operation-specific
+native-app E3/E4 evidence for a representative Eighths-to-Hundredths edit are
+recorded in ADR 0008. That record does not claim native UI acceptance for all
+nine accuracy variants, arbitrary-producer parity, native byte parity after
+Numbers normalization, or package-wide performance.
+
+This is an ownership seam in the existing package graph only. It adds no
+workspace package, dependency declaration, canonical edge, or ordered-debt
+retirement; it removes no migration host and changes no monolith-deletion gate.
+The authoritative inventory remains 64 workspace packages, 237 internal
+dependency declarations, 226 canonical edges, 11 ordered migration debts with
+IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. The
+Fraction slice closes no debt or gate.

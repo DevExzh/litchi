@@ -3167,6 +3167,184 @@ mod tests {
     }
 
     #[test]
+    fn fraction_format_uses_decimal_wire_metadata_and_preserves_cell_bytes() {
+        // Fraction is a distinct format-list family, but its BNC cell
+        // metadata is exactly the shared Number-or-Percentage decimal shape.
+        // Keep the source deliberately rich so the metadata transition cannot
+        // drop a formula/cache, style, comment, or opaque tail.
+        let mut fraction = BncCell::minimal();
+        fraction.prefix[2..].copy_from_slice(&[0x91, 0xa2, 0xb3, 0xc4, 0xd5, 0xe6]);
+        fraction.set_number(-0.125).unwrap();
+        fraction.set_formula_reference(71);
+        fraction
+            .fields
+            .insert(FORMULA_ERROR_FLAG, 73u32.to_le_bytes().to_vec());
+        fraction.set_style_identifier(Some(79));
+        fraction.set_text_style_identifier(Some(83));
+        fraction.set_conditional_style(Some(89), Some(97));
+        fraction.set_comment_identifier(Some(101));
+        fraction.tail.extend_from_slice(b"fraction-tail");
+
+        let original_prefix = fraction.prefix;
+        let original_value = value_fields(&fraction);
+        let original_cache = fraction.cached_scalar().unwrap();
+        let original_formula = fraction.formula_identifier().unwrap();
+        let original_formula_error = fraction.formula_error_identifier();
+        let original_style = fraction.style_identifier();
+        let original_text_style = fraction.text_style_identifier();
+        let original_conditional_style = fraction.conditional_style_identifier();
+        let original_conditional_rule = fraction.conditional_style_applied_rule();
+        let original_comment = fraction.comment_identifier();
+        let original_tail = fraction.tail.clone();
+
+        fraction
+            .set_number_or_percentage_format_identifier_preserving_value(Some(107))
+            .unwrap();
+
+        assert_eq!(fraction.prefix[0], original_prefix[0]);
+        assert_eq!(
+            fraction.prefix[2..EXPLICIT_FORMAT_FLAGS_START],
+            original_prefix[2..EXPLICIT_FORMAT_FLAGS_START]
+        );
+        assert_eq!(
+            fraction.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END],
+            EXPLICIT_DECIMAL_FORMAT.to_le_bytes()
+        );
+        assert_eq!(fraction.explicit_format_flags(), EXPLICIT_DECIMAL_FORMAT);
+        assert_eq!(fraction.cell_format_kind(), Some(DECIMAL_CELL_FORMAT_KIND));
+        assert_eq!(fraction.format_identifier(), Some(107));
+        assert_eq!(fraction.secondary_format_identifier(), None);
+        assert_eq!(fraction.control_cell_spec_identifier(), None);
+        assert!(fraction.has_only_decimal_format_metadata());
+
+        assert_eq!(
+            fraction.stored_value(),
+            StoredValue::Formula(original_formula)
+        );
+        assert_eq!(value_fields(&fraction), original_value);
+        assert_eq!(fraction.cached_scalar().unwrap(), original_cache);
+        assert_eq!(fraction.formula_error_identifier(), original_formula_error);
+        assert_eq!(fraction.style_identifier(), original_style);
+        assert_eq!(fraction.text_style_identifier(), original_text_style);
+        assert_eq!(
+            fraction.conditional_style_identifier(),
+            original_conditional_style
+        );
+        assert_eq!(
+            fraction.conditional_style_applied_rule(),
+            original_conditional_rule
+        );
+        assert_eq!(fraction.comment_identifier(), original_comment);
+        assert_eq!(fraction.tail, original_tail);
+
+        let mut cleared = BncCell::parse(&fraction.encode()).unwrap();
+        cleared
+            .set_number_or_percentage_format_identifier_preserving_value(None)
+            .unwrap();
+        assert_eq!(
+            cleared.stored_value(),
+            StoredValue::Formula(original_formula)
+        );
+        assert_eq!(cleared.cached_scalar().unwrap(), original_cache);
+        assert_eq!(cleared.explicit_format_flags(), 0);
+        assert_eq!(cleared.cell_format_kind(), None);
+        assert_eq!(cleared.format_identifier(), None);
+        assert_eq!(cleared.formula_error_identifier(), original_formula_error);
+        assert_eq!(cleared.style_identifier(), original_style);
+        assert_eq!(cleared.text_style_identifier(), original_text_style);
+        assert_eq!(
+            cleared.conditional_style_identifier(),
+            original_conditional_style
+        );
+        assert_eq!(
+            cleared.conditional_style_applied_rule(),
+            original_conditional_rule
+        );
+        assert_eq!(cleared.comment_identifier(), original_comment);
+        assert_eq!(cleared.tail, original_tail);
+        assert_eq!(value_fields(&cleared), original_value);
+    }
+
+    #[test]
+    fn fraction_format_preserves_empty_cells_and_has_no_wire_family_marker() {
+        let mut fraction = BncCell::minimal();
+        fraction.prefix[2..].copy_from_slice(&[0x21, 0x32, 0x43, 0x54, 0x65, 0x76]);
+        fraction.set_style_identifier(Some(109));
+        fraction.set_comment_identifier(Some(113));
+        fraction.tail.extend_from_slice(b"empty-fraction-tail");
+        let original_prefix = fraction.prefix;
+        let original_tail = fraction.tail.clone();
+
+        fraction
+            .set_number_or_percentage_format_identifier_preserving_value(Some(127))
+            .unwrap();
+        assert_eq!(fraction.stored_value(), StoredValue::Empty);
+        assert_eq!(fraction.cached_scalar().unwrap(), None);
+        assert_eq!(fraction.numeric_cell_type(), None);
+        assert_eq!(fraction.explicit_format_flags(), EXPLICIT_DECIMAL_FORMAT);
+        assert_eq!(fraction.cell_format_kind(), Some(DECIMAL_CELL_FORMAT_KIND));
+        assert_eq!(fraction.format_identifier(), Some(127));
+        assert_eq!(fraction.style_identifier(), Some(109));
+        assert_eq!(fraction.comment_identifier(), Some(113));
+        assert_eq!(fraction.tail, original_tail);
+        assert!(fraction.has_only_decimal_format_metadata());
+
+        let mut number = BncCell::minimal();
+        number.prefix[2..].copy_from_slice(&original_prefix[2..]);
+        number.set_style_identifier(Some(109));
+        number.set_comment_identifier(Some(113));
+        number.tail.extend_from_slice(&original_tail);
+        number
+            .set_number_or_percentage_format_identifier_preserving_value(Some(127))
+            .unwrap();
+
+        let mut percentage = BncCell::minimal();
+        percentage.prefix[2..].copy_from_slice(&original_prefix[2..]);
+        percentage.set_style_identifier(Some(109));
+        percentage.set_comment_identifier(Some(113));
+        percentage.tail.extend_from_slice(&original_tail);
+        percentage
+            .set_number_or_percentage_format_identifier_preserving_value(Some(127))
+            .unwrap();
+
+        let mut scientific = BncCell::minimal();
+        scientific.prefix[2..].copy_from_slice(&original_prefix[2..]);
+        scientific.set_style_identifier(Some(109));
+        scientific.set_comment_identifier(Some(113));
+        scientific.tail.extend_from_slice(&original_tail);
+        scientific
+            .set_number_or_percentage_format_identifier_preserving_value(Some(127))
+            .unwrap();
+
+        // The format-list payload, not the BNC cell, distinguishes Fraction
+        // from Number, Percentage, and Scientific. A wire-only reader must
+        // not infer a specific family from this identical decimal shape.
+        assert_eq!(fraction.encode(), number.encode());
+        assert_eq!(fraction.encode(), percentage.encode());
+        assert_eq!(fraction.encode(), scientific.encode());
+
+        let encoded = fraction.encode();
+        let mut cleared = BncCell::parse(&encoded).unwrap();
+        cleared
+            .set_number_or_percentage_format_identifier_preserving_value(None)
+            .unwrap();
+        assert_eq!(cleared.stored_value(), StoredValue::Empty);
+        assert_eq!(cleared.cached_scalar().unwrap(), None);
+        assert_eq!(cleared.numeric_cell_type(), None);
+        assert_eq!(cleared.explicit_format_flags(), 0);
+        assert_eq!(cleared.cell_format_kind(), None);
+        assert_eq!(cleared.format_identifier(), None);
+        assert_eq!(cleared.prefix[0], original_prefix[0]);
+        assert_eq!(
+            cleared.prefix[2..EXPLICIT_FORMAT_FLAGS_START],
+            original_prefix[2..EXPLICIT_FORMAT_FLAGS_START]
+        );
+        assert_eq!(cleared.style_identifier(), Some(109));
+        assert_eq!(cleared.comment_identifier(), Some(113));
+        assert_eq!(cleared.tail, original_tail);
+    }
+
+    #[test]
     fn slider_formats_match_native_number_and_currency_metadata() {
         let native_number =
             hex("0502000000000100013400001900000000000000000000000000403004000000010000000c000000");

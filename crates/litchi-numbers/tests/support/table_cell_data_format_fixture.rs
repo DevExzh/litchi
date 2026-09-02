@@ -74,7 +74,8 @@ pub(crate) const SECOND_CELL: (usize, usize) = (0, 1);
 
 /// Native format families represented by the deterministic fixture.
 ///
-/// Number, Percentage, and Scientific share the BNC decimal-cell kind.
+/// Number, Percentage, Scientific, and Fraction share the BNC decimal-cell
+/// kind.
 /// Currency uses the alternate-number BNC kind and can additionally carry a
 /// secondary generic format-list reference.  Their native family
 /// discriminator lives in the format-list payload, so keeping that
@@ -87,6 +88,7 @@ pub(crate) enum FormatFamily {
     Currency,
     Percentage,
     Scientific,
+    Fraction,
 }
 
 impl FormatFamily {
@@ -97,6 +99,7 @@ impl FormatFamily {
             Self::Currency => NATIVE_CURRENCY_FORMAT_TYPE,
             Self::Percentage => NATIVE_PERCENTAGE_FORMAT_TYPE,
             Self::Scientific => NATIVE_SCIENTIFIC_FORMAT_TYPE,
+            Self::Fraction => NATIVE_FRACTION_FORMAT_TYPE,
         }
     }
 }
@@ -109,6 +112,8 @@ pub(crate) const NATIVE_CURRENCY_FORMAT_TYPE: u32 = 257;
 pub(crate) const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
 /// Native Scientific format-list discriminator.
 pub(crate) const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
+/// Native Fraction format-list discriminator.
+pub(crate) const NATIVE_FRACTION_FORMAT_TYPE: u32 = 262;
 
 /// Whether the two cells initially share their format-list entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -139,6 +144,10 @@ pub(crate) enum Corruption {
     MalformedFormatPayload,
     /// Replace the selected BNC format key with the wrong native identifier.
     WrongCellFormatKey,
+    /// Add the native Fraction replacement marker with canonical false.
+    FractionReplacementMetadata,
+    /// Add the native Fraction replacement marker with true.
+    FractionReplacementMetadataTrue,
     /// Add an unterminated unknown group to the selected format payload.
     UnterminatedUnknownGroup,
     /// Give an unrelated message a typed field-level owner edge to the tile.
@@ -151,8 +160,8 @@ pub(crate) enum Corruption {
 /// extensions, preview bytes, and the unrelated member are all fixed.  `Shared`
 /// gives both cells a Number format with key one and refcount two;
 /// [`synthetic_package_for`] selects the corresponding Currency, Percentage,
-/// or Scientific family.  `Unshared` gives the second cell a Percentage
-/// format with key two and two refcount-one entries.
+/// Scientific, or Fraction family.  `Unshared` gives the second cell a
+/// Percentage format with key two and two refcount-one entries.
 pub(crate) fn synthetic_package(sharing: FormatSharing) -> FixtureResult<Vec<u8>> {
     synthetic_package_for(FormatFamily::Number, sharing)
 }
@@ -390,6 +399,23 @@ pub(crate) fn corrupted_package_for(
             row.cell_offsets = Some(offsets);
             Ok(())
         }),
+        Corruption::FractionReplacementMetadata => rewrite_format_list_raw(&source, |payload| {
+            let mut hostile = first_format_payload(payload)?;
+            // TSK FormatStructArchive field 20 is an optional native
+            // replacement marker. Canonical false is valid and must survive
+            // a focused Fraction rewrite.
+            append_varint_unchecked(&mut hostile, 20, 0);
+            replace_first_format_payload(payload, &hostile)
+        }),
+        Corruption::FractionReplacementMetadataTrue => {
+            rewrite_format_list_raw(&source, |payload| {
+                let mut hostile = first_format_payload(payload)?;
+                // Ordinary type-262 Fraction formats reject the marker when
+                // it is true.
+                append_varint_unchecked(&mut hostile, 20, 1);
+                replace_first_format_payload(payload, &hostile)
+            })
+        },
         Corruption::UnterminatedUnknownGroup => rewrite_format_list_raw(&source, |payload| {
             let mut hostile = first_format_payload(payload)?;
             hostile.extend_from_slice(&encode_varint(
@@ -529,9 +555,10 @@ fn tile_object(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<Ar
 fn tile_payload(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<tst::Tile> {
     let first_kind = match family {
         FormatFamily::Currency => CellDataFormatKind::Currency,
-        FormatFamily::Number | FormatFamily::Percentage | FormatFamily::Scientific => {
-            CellDataFormatKind::NumberOrPercentage
-        },
+        FormatFamily::Number
+        | FormatFamily::Percentage
+        | FormatFamily::Scientific
+        | FormatFamily::Fraction => CellDataFormatKind::NumberOrPercentage,
     };
     let first = formatted_cell(FIRST_FORMAT_KEY, first_kind, 1234.5)?;
     let second_key = match sharing {
@@ -586,6 +613,9 @@ fn sidecar_object(family: FormatFamily, sharing: FormatSharing) -> FixtureResult
         )],
         (FormatFamily::Scientific, FormatSharing::Shared) => {
             vec![scientific_format_entry(FIRST_FORMAT_KEY, 2)]
+        },
+        (FormatFamily::Fraction, FormatSharing::Shared) => {
+            vec![fraction_format_entry(FIRST_FORMAT_KEY, 2, 8)]
         },
         (FormatFamily::Currency, FormatSharing::Unshared) => vec![
             format_entry(FIRST_FORMAT_KEY, 1, NATIVE_NUMBER_FORMAT_TYPE, 2, 2, true),
@@ -705,6 +735,26 @@ fn scientific_format_entry(key: u32, refcount: u32) -> tst::table_data_list::Lis
     // as Number/Percentage, but its decimal options are canonical: fixed
     // precision, minus-sign negatives, and no thousands separator.
     format_entry(key, refcount, NATIVE_SCIENTIFIC_FORMAT_TYPE, 2, 0, false)
+}
+
+fn fraction_format_entry(
+    key: u32,
+    refcount: u32,
+    accuracy: u32,
+) -> tst::table_data_list::ListEntry {
+    // Fraction has its own native discriminator and stores the denominator
+    // strategy in `fraction_accuracy`; unlike decimal families it must not
+    // carry decimal-place, sign, or grouping fields.
+    tst::table_data_list::ListEntry {
+        key,
+        refcount,
+        format: Some(tsk::FormatStructArchive {
+            format_type: Some(NATIVE_FRACTION_FORMAT_TYPE),
+            fraction_accuracy: Some(accuracy),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
 }
 
 fn add_unknown_extension_to_format_payload(source: &[u8]) -> FixtureResult<Vec<u8>> {

@@ -15470,3 +15470,82 @@ parity, native byte parity after Numbers' own save normalization, generic
 display-format or rich-style support, package-wide performance/RSS behavior,
 migration-host exit, dependency-edge retirement, or an ADR 0028 deletion-gate
 closure.
+
+## 2026-09-02 amendment: Numbers existing-cell Fraction-format verification record
+
+The focused Fraction owner is
+`litchi_numbers::Package::{table_cell_fraction_format,
+edit_table_cell_fraction_format, apply_table_cell_fraction_format}`. Its
+selector-first API resolves a semantic `SheetSelector`, sheet-scoped
+`TableSelector`, and checked `CellPosition` against one exact source snapshot.
+The private adapter owns native type 262 and all nine checked
+`FractionAccuracy` strategies: `UpToOneDigit`, `UpToTwoDigits`, `UpToThreeDigits`,
+`Halves`, `Quarters`, `Eighths`, `Sixteenths`, `Tenths`, and `Hundredths`.
+Native IDs, format-list keys, BNC records, generated messages, archive members,
+and raw bytes remain below the package boundary.
+
+The strict Fraction codec runs handwritten preflight before its borrowed lazy
+Buffa view. Field 20 (`requires_fraction_replacement`) is accepted and
+preserved when absent or canonically encoded as `false`: absent remains absent,
+and canonical `false` remains byte-preserved. Canonical `true` is rejected
+because replacement semantics are not implemented by this owner. Unknown and
+unselected source spans remain authoritative. Selector-first exact-source
+transactions use copy-on-write/refcount closure, exact no-op/changed patches
+and inverses, candidate reopen/readback, physical locality checks, and typed
+failures. The legacy `litchi_iwa::NumbersEditor` route is a compatibility
+delegate for admitted exact graphs and fails closed after an exact-source owner
+rejection; source-built compatibility packages may retain the historical route.
+
+The frozen focused verification evidence records 22/22 package integration
+tests, 4/4 library codec tests, 3/3 direct codec tests, and 36/36 wire tests.
+The checked-in bounded fuzz corpora contain 44 proto seeds and 18 package seeds.
+The protocol and package targets each completed a 100-run AddressSanitizer
+smoke from isolated copies of those corpora, with no crash or invariant
+failure. These bounded runs do not claim exhaustive input coverage or broaden
+the native result below.
+
+Computer Use in Apple Numbers created B3 Fraction/Eighths from a disposable
+copy. The UI showed B2 text `Litchi native Numbers fixture`, B3 Actual `42`,
+Data Format `Fraction`, and Accuracy `Eighths`. The native source
+`/private/tmp/litchi-fraction-native-20260902/native-eighths.numbers` was a valid
+ZIP of 136,034 bytes with SHA-256
+`0fc39e6c8e77417208bb61621356cca8e3aa0740a26fe17ea14d857488730f68`.
+
+The Rust example changed B3 from Eighths to Hundredths and reported
+`changed=true`, `touched_components=2`, `full_reparse=true`, and
+`scalar_value=untouched`. The 136,034-byte candidate had SHA-256
+`552faec47bc3dd6cd913aa4b274d41eb738ff9fd3ad8c19586673c0ec0a2cf77`. Its
+inverse, and the Eighths no-op target/inverse, were byte-identical to the native
+source and retained its SHA-256; the no-op reported `changed=false`,
+`touched_components=0`, and `full_reparse=false`.
+
+Before opening the fresh Rust candidate in Numbers, exactly two uncompressed
+members differed from the native source: `Index/Tables/Tile.iwa` (228 bytes,
+unchanged size) and `Index/Tables/DataList-904498-2.iwa` (53 bytes, unchanged
+size). Entry names and order, and every other member payload, were identical.
+The broader package differences seen in a previously inspected candidate were
+Numbers' automatic normalization after opening it; that post-open file is not
+used for the locality claim.
+
+Numbers opened the Rust candidate without repair, recovery, or conversion UI;
+B2 was unchanged, B3 still showed Actual `42`, and the inspector showed
+Fraction/Hundredths. Numbers saved a duplicate, closed it, and reopened it with
+the same readback and no prompt. The valid-ZIP native-resaved artifact was
+135,994 bytes with SHA-256
+`973737b416bec7e57cc71f0e9b8f36e4ec2aedc670f66125b51615f5d54bc8cd`. A Rust
+name-selector no-op reread of that artifact reported `changed=false`,
+`touched_components=0`, and `full_reparse=false`; its target and inverse were
+byte-identical to that native-resaved hash.
+
+These facts establish operation-specific E3/E4 evidence for the representative
+Eighths-to-Hundredths existing-cell scenario only. They do not establish native
+UI acceptance for all nine accuracy variants, arbitrary-producer parity, native
+byte parity after Numbers normalization, or package-wide performance/RSS
+behavior. No topology, debt, host, or deletion gate is closed.
+
+This focused verification slice changes no workspace package, internal
+dependency declaration, canonical edge, ordered migration debt, migration host,
+or deletion gate. The topology remains 64 workspace packages, 237 internal
+dependency declarations, 226 canonical edges, 11 ordered debts with IDs
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. It closes no
+debt or ADR 0028 gate.

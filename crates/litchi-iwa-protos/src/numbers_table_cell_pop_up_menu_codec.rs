@@ -54,6 +54,7 @@ const FORMAT_SUPPRESS_TIME_FORMAT_FIELD: u32 = 13;
 const FORMAT_DATE_TIME_FORMAT_FIELD: u32 = 14;
 const FORMAT_DURATION_UNIT_LARGEST_FIELD: u32 = 15;
 const FORMAT_DURATION_UNIT_SMALLEST_FIELD: u32 = 16;
+const FORMAT_REQUIRES_FRACTION_REPLACEMENT_FIELD: u32 = 20;
 const FORMAT_CONTROL_MINIMUM_FIELD: u32 = 21;
 const FORMAT_CONTROL_MAXIMUM_FIELD: u32 = 22;
 const FORMAT_CONTROL_INCREMENT_FIELD: u32 = 23;
@@ -719,6 +720,36 @@ pub const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
 
 /// Native Numbers display-format discriminator for a scientific cell.
 pub const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
+
+/// Native Numbers display-format discriminator for a fraction cell.
+pub const NATIVE_FRACTION_FORMAT_TYPE: u32 = 262;
+
+/// Native fraction accuracy for a denominator with at most one digit.
+pub const NATIVE_FRACTION_UP_TO_ONE_DIGIT: u32 = u32::MAX;
+
+/// Native fraction accuracy for a denominator with at most two digits.
+pub const NATIVE_FRACTION_UP_TO_TWO_DIGITS: u32 = u32::MAX - 1;
+
+/// Native fraction accuracy for a denominator with at most three digits.
+pub const NATIVE_FRACTION_UP_TO_THREE_DIGITS: u32 = u32::MAX - 2;
+
+/// Native fraction accuracy for halves.
+pub const NATIVE_FRACTION_HALVES: u32 = 2;
+
+/// Native fraction accuracy for quarters.
+pub const NATIVE_FRACTION_QUARTERS: u32 = 4;
+
+/// Native fraction accuracy for eighths.
+pub const NATIVE_FRACTION_EIGHTHS: u32 = 8;
+
+/// Native fraction accuracy for sixteenths.
+pub const NATIVE_FRACTION_SIXTEENTHS: u32 = 16;
+
+/// Native fraction accuracy for tenths.
+pub const NATIVE_FRACTION_TENTHS: u32 = 10;
+
+/// Native fraction accuracy for hundredths.
+pub const NATIVE_FRACTION_HUNDREDTHS: u32 = 100;
 
 /// Native negative-number style used by scientific formats.
 pub const NATIVE_SCIENTIFIC_NEGATIVE_STYLE: u32 = 0;
@@ -1980,6 +2011,616 @@ fn verify_currency_format_candidate(
         || report.max_depth() != layout.max_depth
         || report.text_bytes() != requirements.text_bytes()
         || CurrencyFormatWrite::from_snapshot(snapshot) != write
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(())
+}
+
+/// Borrowed semantic facts for one strict native Fraction
+/// `FormatStructArchive`.
+///
+/// Fraction owns only the native discriminator and denominator strategy. The
+/// complete source payload remains available through [`Self::raw`], while
+/// unknown extension records remain source-authoritative for rewrites.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FractionFormatSnapshot<'source> {
+    source: &'source [u8],
+    format_type: u32,
+    fraction_accuracy: u32,
+    requires_fraction_replacement: Option<bool>,
+}
+
+impl<'source> FractionFormatSnapshot<'source> {
+    pub(crate) const fn raw(self) -> &'source [u8] {
+        self.source
+    }
+
+    pub(crate) const fn format_type(self) -> u32 {
+        self.format_type
+    }
+
+    pub(crate) const fn fraction_accuracy(self) -> u32 {
+        self.fraction_accuracy
+    }
+
+    /// Field 20 is a custom-number-format flag. An explicit canonical false
+    /// is retained in the snapshot and preserved by rewrites; true is rejected
+    /// because this seam cannot safely implement replacement semantics.
+    pub(crate) const fn requires_fraction_replacement(self) -> Option<bool> {
+        self.requires_fraction_replacement
+    }
+}
+
+/// Scalar values accepted by the strict native Fraction writer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FractionFormatWrite {
+    fraction_accuracy: u32,
+}
+
+impl FractionFormatWrite {
+    pub(crate) const fn new(fraction_accuracy: u32) -> Self {
+        Self { fraction_accuracy }
+    }
+
+    pub(crate) const fn from_snapshot(snapshot: FractionFormatSnapshot<'_>) -> Self {
+        Self {
+            fraction_accuracy: snapshot.fraction_accuracy,
+        }
+    }
+
+    pub(crate) const fn fraction_accuracy(self) -> u32 {
+        self.fraction_accuracy
+    }
+
+    pub(crate) const fn with_fraction_accuracy(mut self, value: u32) -> Self {
+        self.fraction_accuracy = value;
+        self
+    }
+}
+
+/// Prepared source-preserving native Fraction rewrite.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PreparedFractionFormatRewrite<'source> {
+    source: &'source [u8],
+    layout: FractionFormatLayout,
+    write: FractionFormatWrite,
+    requirements: RewriteExecutionRequirements,
+    candidate_work: usize,
+    verify_options: DecodeOptions,
+}
+
+impl PreparedFractionFormatRewrite<'_> {
+    pub(crate) const fn execution_requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    pub(crate) fn prepare_report(self) -> DecodeReport {
+        report_from_requirements(self.requirements)
+    }
+
+    pub(crate) fn execute(
+        self,
+        limits: RewriteExecutionLimits,
+    ) -> Result<RewriteOutput, DecodeError> {
+        check_requirements(self.requirements, limits)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.requirements.output_bytes)
+            .map_err(|_| {
+                DecodeError::limited(DecodeLimit::Allocation {
+                    requested: self.requirements.output_bytes,
+                })
+            })?;
+        emit_fraction_format_rewrite(&mut bytes, self.source, self.layout, self.write)?;
+        if bytes.len() != self.requirements.output_bytes {
+            return Err(DecodeError::invalid());
+        }
+        verify_fraction_format_candidate(
+            &bytes,
+            self.write,
+            self.verify_options,
+            self.layout,
+            self.requirements,
+            self.candidate_work,
+        )?;
+        Ok(RewriteOutput {
+            bytes,
+            report: report_from_requirements(self.requirements),
+        })
+    }
+}
+
+/// Prepared canonical native Fraction append.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PreparedFractionFormatWrite {
+    write: FractionFormatWrite,
+    requirements: RewriteExecutionRequirements,
+    verify_options: DecodeOptions,
+}
+
+impl PreparedFractionFormatWrite {
+    pub(crate) const fn execution_requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    pub(crate) fn prepare_report(self) -> DecodeReport {
+        report_from_requirements(self.requirements)
+    }
+
+    pub(crate) fn execute(
+        self,
+        limits: RewriteExecutionLimits,
+    ) -> Result<RewriteOutput, DecodeError> {
+        check_requirements(self.requirements, limits)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.requirements.output_bytes)
+            .map_err(|_| {
+                DecodeError::limited(DecodeLimit::Allocation {
+                    requested: self.requirements.output_bytes,
+                })
+            })?;
+        emit_fraction_format_canonical(&mut bytes, self.write)?;
+        if bytes.len() != self.requirements.output_bytes {
+            return Err(DecodeError::invalid());
+        }
+        let layout = FractionFormatLayout {
+            max_depth: 0,
+            spans: [None, None],
+        };
+        verify_fraction_format_candidate(
+            &bytes,
+            self.write,
+            self.verify_options,
+            layout,
+            self.requirements,
+            bytes
+                .len()
+                .checked_mul(2)
+                .ok_or_else(DecodeError::invalid)?,
+        )?;
+        Ok(RewriteOutput {
+            bytes,
+            report: report_from_requirements(self.requirements),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FractionFieldSpan {
+    slot: usize,
+    start: usize,
+    end: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FractionFormatLayout {
+    max_depth: u32,
+    spans: [Option<FractionFieldSpan>; 2],
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FractionFormatScanState {
+    format_type: Option<u32>,
+    fraction_accuracy: Option<u32>,
+    requires_fraction_replacement: Option<bool>,
+    spans: [Option<FractionFieldSpan>; 2],
+}
+
+impl FractionFormatScanState {
+    const fn new() -> Self {
+        Self {
+            format_type: None,
+            fraction_accuracy: None,
+            requires_fraction_replacement: None,
+            spans: [None, None],
+        }
+    }
+}
+
+/// Strictly decode one native Fraction `FormatStructArchive`.
+pub(crate) fn decode_fraction_format(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<FractionFormatSnapshot<'_>, DecodeError> {
+    Ok(decode_fraction_format_with_report(source, options)?.0)
+}
+
+/// Strictly decode one native Fraction format and return measured wire use.
+pub(crate) fn decode_fraction_format_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(FractionFormatSnapshot<'_>, DecodeReport), DecodeError> {
+    let (snapshot, _layout, report) = scan_fraction_format(source, options)?;
+    Ok((snapshot, report))
+}
+
+/// Prepare a source-preserving native Fraction rewrite.
+pub(crate) fn prepare_fraction_format_rewrite<'source>(
+    source: &'source [u8],
+    write: FractionFormatWrite,
+    options: DecodeOptions,
+) -> Result<PreparedFractionFormatRewrite<'source>, DecodeError> {
+    validate_fraction_format_write(write)?;
+    let (_snapshot, layout, source_report) = scan_fraction_format(source, options)?;
+    let output_bytes = fraction_format_rewrite_output_len(source, layout, write)?;
+    let old_selected_bytes = fraction_format_selected_source_len(layout)?;
+    let new_selected_bytes = fraction_format_canonical_output_len(write)?;
+    let source_parse_work = source_report
+        .work_bytes()
+        .checked_sub(source.len())
+        .ok_or_else(DecodeError::invalid)?;
+    let candidate_parse_work = source_parse_work
+        .checked_sub(old_selected_bytes)
+        .and_then(|work| work.checked_add(new_selected_bytes))
+        .ok_or_else(DecodeError::invalid)?;
+    let candidate_work = candidate_parse_work
+        .checked_add(output_bytes)
+        .ok_or_else(DecodeError::invalid)?;
+    let fields = source_report
+        .fields()
+        .checked_sub(fraction_format_selected_field_count(layout))
+        .and_then(|fields| fields.checked_add(fraction_format_field_count(write)))
+        .ok_or_else(DecodeError::invalid)?;
+    let requirements = RewriteExecutionRequirements {
+        output_bytes,
+        fields,
+        work_bytes: source_report
+            .work_bytes()
+            .checked_add(output_bytes)
+            .and_then(|work| work.checked_add(candidate_work))
+            .ok_or_else(DecodeError::invalid)?,
+        max_depth: layout.max_depth,
+        references: 0,
+        items: 0,
+        text_bytes: 0,
+        allocations: 1,
+        retained_bytes: source
+            .len()
+            .checked_add(output_bytes)
+            .ok_or_else(DecodeError::invalid)?,
+        scratch_bytes: 0,
+    };
+    check_options(requirements, options)?;
+    Ok(PreparedFractionFormatRewrite {
+        source,
+        layout,
+        write,
+        requirements,
+        candidate_work,
+        verify_options: options,
+    })
+}
+
+/// Rewrite one native Fraction format while preserving unknown source fields.
+pub(crate) fn rewrite_fraction_format(
+    source: &[u8],
+    write: FractionFormatWrite,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_fraction_format_rewrite(source, write, options)?;
+    prepared.execute(RewriteExecutionLimits::exact(
+        prepared.execution_requirements(),
+    ))
+}
+
+/// Prepare a canonical native Fraction format payload for a new list entry.
+pub(crate) fn prepare_fraction_format_write(
+    write: FractionFormatWrite,
+    options: DecodeOptions,
+) -> Result<PreparedFractionFormatWrite, DecodeError> {
+    validate_fraction_format_write(write)?;
+    let output_bytes = fraction_format_canonical_output_len(write)?;
+    let requirements = RewriteExecutionRequirements {
+        output_bytes,
+        fields: fraction_format_field_count(write),
+        work_bytes: output_bytes
+            .checked_mul(3)
+            .ok_or_else(DecodeError::invalid)?,
+        max_depth: 0,
+        references: 0,
+        items: 0,
+        text_bytes: 0,
+        allocations: 1,
+        retained_bytes: output_bytes,
+        scratch_bytes: 0,
+    };
+    check_options(requirements, options)?;
+    Ok(PreparedFractionFormatWrite {
+        write,
+        requirements,
+        verify_options: options,
+    })
+}
+
+/// Encode a canonical native Fraction format payload for a new list entry.
+pub(crate) fn canonical_fraction_format(
+    write: FractionFormatWrite,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_fraction_format_write(write, options)?;
+    prepared.execute(RewriteExecutionLimits::exact(
+        prepared.execution_requirements(),
+    ))
+}
+
+fn scan_fraction_format<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+) -> Result<
+    (
+        FractionFormatSnapshot<'source>,
+        FractionFormatLayout,
+        DecodeReport,
+    ),
+    DecodeError,
+> {
+    let mut budget = Budget::new(source, options)?;
+    let mut state = FractionFormatScanState::new();
+    let mut offset = 0usize;
+    while offset < source.len() {
+        let field = parse_one_field_limited(source, offset, 0, options.recursion_limit)?;
+        budget.field(field.raw.len(), 0)?;
+        budget.nested_fields(
+            field.nested_fields,
+            field.nested_work_bytes,
+            field.nested_max_depth,
+        )?;
+        inspect_fraction_root_field(offset, field, &mut state)?;
+        offset = field.end;
+    }
+    let format_type = state.format_type.ok_or_else(DecodeError::invalid)?;
+    let fraction_accuracy = state.fraction_accuracy.ok_or_else(DecodeError::invalid)?;
+    if format_type != NATIVE_FRACTION_FORMAT_TYPE
+        || !is_valid_fraction_accuracy(fraction_accuracy)
+        || state.spans[0].is_none()
+        || state.spans[1].is_none()
+    {
+        return Err(DecodeError::invalid());
+    }
+    let snapshot = FractionFormatSnapshot {
+        source,
+        format_type,
+        fraction_accuracy,
+        requires_fraction_replacement: state.requires_fraction_replacement,
+    };
+    buffa_fraction_format_parity(source, snapshot, &mut budget)?;
+    // Field 20 is reserved for custom-number formatting. An explicit false
+    // is a harmless legacy marker and remains source-authoritative; true
+    // requests replacement behavior that this seam cannot safely implement.
+    if snapshot.requires_fraction_replacement() == Some(true) {
+        return Err(DecodeError::invalid());
+    }
+    let report = budget.finish(0);
+    let layout = FractionFormatLayout {
+        max_depth: report.max_depth(),
+        spans: state.spans,
+    };
+    Ok((snapshot, layout, report))
+}
+
+fn inspect_fraction_root_field(
+    start: usize,
+    field: Field<'_>,
+    state: &mut FractionFormatScanState,
+) -> Result<(), DecodeError> {
+    match field.number {
+        FORMAT_TYPE_FIELD | FORMAT_FRACTION_ACCURACY_FIELD => {
+            let slot = if field.number == FORMAT_TYPE_FIELD {
+                0
+            } else {
+                1
+            };
+            if field.wire != 0 || state.spans[slot].is_some() {
+                return Err(DecodeError::invalid());
+            }
+            let value = u32::try_from(field.known_varint()?).map_err(|_| DecodeError::invalid())?;
+            state.spans[slot] = Some(FractionFieldSpan {
+                slot,
+                start,
+                end: field.end,
+            });
+            if slot == 0 {
+                state.format_type = Some(value);
+            } else {
+                state.fraction_accuracy = Some(value);
+            }
+        },
+        FORMAT_REQUIRES_FRACTION_REPLACEMENT_FIELD => {
+            if field.wire != 0 || state.requires_fraction_replacement.is_some() {
+                return Err(DecodeError::invalid());
+            }
+            let value = field.known_varint()?;
+            if value > 1 {
+                return Err(DecodeError::invalid());
+            }
+            state.requires_fraction_replacement = Some(value != 0);
+        },
+        number if number <= NUMBER_FORMAT_MAX_KNOWN_FIELD => {
+            // All other fields in TSK.FormatStructArchive belong to another
+            // display family (or to custom/control metadata) and are not
+            // safe to accept through the ordinary Fraction route.
+            return Err(DecodeError::invalid());
+        },
+        _ => {},
+    }
+    Ok(())
+}
+
+fn buffa_fraction_format_parity(
+    source: &[u8],
+    snapshot: FractionFormatSnapshot<'_>,
+    budget: &mut Budget,
+) -> Result<(), DecodeError> {
+    let options = budget.options;
+    let view: crate::buffa_numbers_table_cell_fraction_format_generated::LitchiIwaNumbersTableCellFractionFormatProjection::FormatStructArchiveLazyView<'_> = BuffaDecodeOptions::new()
+        .with_max_message_size(options.max_message_bytes)
+        .with_unknown_field_limit(options.max_fields)
+        .with_element_memory_limit(0)
+        .with_recursion_limit(options.recursion_limit)
+        .decode_lazy_view(source)
+        .map_err(|_| DecodeError::invalid())?;
+    if view.format_type != Some(snapshot.format_type)
+        || view.fraction_accuracy != Some(snapshot.fraction_accuracy)
+        || view.requires_fraction_replacement != snapshot.requires_fraction_replacement
+    {
+        return Err(DecodeError::invalid());
+    }
+    budget.work(source.len())?;
+    Ok(())
+}
+
+fn is_valid_fraction_accuracy(value: u32) -> bool {
+    matches!(
+        value,
+        NATIVE_FRACTION_UP_TO_ONE_DIGIT
+            | NATIVE_FRACTION_UP_TO_TWO_DIGITS
+            | NATIVE_FRACTION_UP_TO_THREE_DIGITS
+            | NATIVE_FRACTION_HALVES
+            | NATIVE_FRACTION_QUARTERS
+            | NATIVE_FRACTION_EIGHTHS
+            | NATIVE_FRACTION_SIXTEENTHS
+            | NATIVE_FRACTION_TENTHS
+            | NATIVE_FRACTION_HUNDREDTHS
+    )
+}
+
+fn validate_fraction_format_write(write: FractionFormatWrite) -> Result<(), DecodeError> {
+    if is_valid_fraction_accuracy(write.fraction_accuracy) {
+        Ok(())
+    } else {
+        Err(DecodeError::invalid())
+    }
+}
+
+fn fraction_format_field_count(_write: FractionFormatWrite) -> usize {
+    2
+}
+
+fn fraction_format_selected_field_count(layout: FractionFormatLayout) -> usize {
+    layout.spans.into_iter().filter(Option::is_some).count()
+}
+
+fn fraction_format_selected_source_len(layout: FractionFormatLayout) -> Result<usize, DecodeError> {
+    layout
+        .spans
+        .into_iter()
+        .flatten()
+        .try_fold(0usize, |length, span| {
+            length
+                .checked_add(
+                    span.end
+                        .checked_sub(span.start)
+                        .ok_or_else(DecodeError::invalid)?,
+                )
+                .ok_or_else(DecodeError::invalid)
+        })
+}
+
+fn fraction_format_rewrite_output_len(
+    source: &[u8],
+    layout: FractionFormatLayout,
+    write: FractionFormatWrite,
+) -> Result<usize, DecodeError> {
+    let old = fraction_format_selected_source_len(layout)?;
+    let new = fraction_format_canonical_output_len(write)?;
+    source
+        .len()
+        .checked_sub(old)
+        .and_then(|length| length.checked_add(new))
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn fraction_format_canonical_output_len(write: FractionFormatWrite) -> Result<usize, DecodeError> {
+    validate_fraction_format_write(write)?;
+    number_format_field_len(FORMAT_TYPE_FIELD, u64::from(NATIVE_FRACTION_FORMAT_TYPE))?
+        .checked_add(number_format_field_len(
+            FORMAT_FRACTION_ACCURACY_FIELD,
+            u64::from(write.fraction_accuracy),
+        )?)
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn emit_fraction_format_field(
+    output: &mut Vec<u8>,
+    slot: usize,
+    write: FractionFormatWrite,
+) -> Result<(), DecodeError> {
+    match slot {
+        0 => emit_varint_field(
+            output,
+            FORMAT_TYPE_FIELD,
+            u64::from(NATIVE_FRACTION_FORMAT_TYPE),
+        ),
+        1 => emit_varint_field(
+            output,
+            FORMAT_FRACTION_ACCURACY_FIELD,
+            u64::from(write.fraction_accuracy),
+        ),
+        _ => Err(DecodeError::invalid()),
+    }
+}
+
+fn emit_fraction_format_canonical(
+    output: &mut Vec<u8>,
+    write: FractionFormatWrite,
+) -> Result<(), DecodeError> {
+    validate_fraction_format_write(write)?;
+    emit_fraction_format_field(output, 0, write)?;
+    emit_fraction_format_field(output, 1, write)?;
+    Ok(())
+}
+
+fn emit_fraction_format_rewrite(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    layout: FractionFormatLayout,
+    write: FractionFormatWrite,
+) -> Result<(), DecodeError> {
+    validate_fraction_format_write(write)?;
+    let mut ordered = [
+        layout.spans[0].ok_or_else(DecodeError::invalid)?,
+        layout.spans[1].ok_or_else(DecodeError::invalid)?,
+    ];
+    for index in 1..ordered.len() {
+        let mut cursor = index;
+        while cursor > 0 && ordered[cursor].start < ordered[cursor - 1].start {
+            ordered.swap(cursor, cursor - 1);
+            cursor -= 1;
+        }
+    }
+    let mut source_offset = 0usize;
+    for span in ordered {
+        output.extend_from_slice(
+            source
+                .get(source_offset..span.start)
+                .ok_or_else(DecodeError::invalid)?,
+        );
+        emit_fraction_format_field(output, span.slot, write)?;
+        source_offset = span.end;
+    }
+    output.extend_from_slice(
+        source
+            .get(source_offset..)
+            .ok_or_else(DecodeError::invalid)?,
+    );
+    Ok(())
+}
+
+fn verify_fraction_format_candidate(
+    source: &[u8],
+    write: FractionFormatWrite,
+    options: DecodeOptions,
+    layout: FractionFormatLayout,
+    requirements: RewriteExecutionRequirements,
+    candidate_work: usize,
+) -> Result<(), DecodeError> {
+    let (snapshot, report) = decode_fraction_format_with_report(source, options)?;
+    if report.fields() != requirements.fields()
+        || report.work_bytes() != candidate_work
+        || report.max_depth() != layout.max_depth
+        || FractionFormatWrite::from_snapshot(snapshot) != write
     {
         return Err(DecodeError::invalid());
     }

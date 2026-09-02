@@ -3571,3 +3571,45 @@ The legacy editor remains a compatibility delegate; source-built packages may
 retain its generic route, while exact-source owner failures remain fail-closed.
 Native, fuzz, and test evidence is not implied by this semantic contract and is
 tracked separately in ADR 0008.
+
+## 2026-09-02 amendment: Numbers existing-cell Fraction-format semantic owner
+
+`litchi_numbers::cell::data_format::Fraction` is the archive-free semantic value
+for the focused Fraction display family. It carries one checked
+`FractionAccuracy`, chosen from `UpToOneDigit`, `UpToTwoDigits`, `UpToThreeDigits`,
+`Halves`, `Quarters`, `Eighths`, `Sixteenths`, `Tenths`, and `Hundredths`.
+`Option<Fraction>` keeps inherited/no-explicit absence distinct from an explicit
+accuracy, and `clear`/`reset` returns the cell to that inherited state. The
+semantic value introduces no native identifier, format-list key, BNC flag,
+protobuf/Buffa message, archive path, or raw-wire alias.
+
+`Package::{table_cell_fraction_format, edit_table_cell_fraction_format,
+apply_table_cell_fraction_format}` is selector-first and existing-cell-only.
+Callers provide a semantic `SheetSelector`, a sheet-scoped `TableSelector`, and a
+checked `CellPosition`; the package resolves those selectors against one
+immutable exact source before invoking its private native adapter. The
+transaction vocabulary exposes typed diagnostics, limits, patches, and
+inverses while retaining native type 262, format-list/refcount storage, wire
+framing, and package reassembly below the semantic boundary. Exact-source
+authorization, copy-on-write, candidate reread, and locality are implementation
+invariants rather than public raw-object handles.
+
+Fraction is a distinct family and refuses Number, Percentage, Currency,
+Scientific, controls, dates, durations, text, and other display families rather
+than silently converting them. Field 20 (`requires_fraction_replacement`) is
+accepted and preserved only when absent or canonically encoded as `false`; an
+absent field remains absent, canonical `false` remains byte-preserved, and
+`true` is rejected because replacement semantics are not owned here. Strict
+handwritten preflight precedes the private lazy Buffa view, so unknown and
+unselected source bytes remain authoritative. The legacy editor is only a
+fail-closed compatibility delegate for admitted exact graphs; source-built
+compatibility packages may retain the historical route.
+
+This semantic owner does not create cells, author values/formulas, mutate styles
+or table topology, or provide package authoring. Focused test/fuzz evidence and
+representative operation-specific native E3/E4 evidence are recorded separately
+in ADR 0008; they do not close a migration debt, topology edge, or ADR 0028
+deletion gate. The topology
+remains 64 workspace packages, 237 internal dependency declarations, 226
+canonical edges, 11 ordered migration debts with IDs `[1, 2, 4, 8, 10, 12, 13,
+14, 15, 16, 17]`, and one migration host.
