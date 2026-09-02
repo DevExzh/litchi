@@ -1058,6 +1058,7 @@ dependencies = [
  "chrono",
  "flate2",
  "litchi-core",
+ "memchr",
  "p256",
  "pbkdf2",
  "phf",
