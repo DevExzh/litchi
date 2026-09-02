@@ -1334,8 +1334,8 @@ impl Package {
         writer: W,
         commit: &crate::story_hyperlinks::Commit,
     ) -> Result<crate::story_hyperlinks::Report> {
-        let current = self.story_hyperlinks_only_snapshot_with_limits(commit.patch().limits())?;
-        commit.patch().validate_source(&current)?;
+        self.package.check_execution()?;
+        commit.patch().validate_source_identity(&self.package)?;
         let report = commit.report().clone();
         if report.effect().is_noop() {
             self.package.source_artifact().write_to_stream(writer)?;
