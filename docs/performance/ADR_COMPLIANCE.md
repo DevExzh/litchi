@@ -1,5 +1,31 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0370 compliance update
+
+Change 0370 is harness-only and adds no production API, dependency edge,
+archive handle, raw type, runtime handle, lock, or unsafe storage. The three
+opt-in ODP selectors exercise the existing source-backed catalog through its
+owning format boundary. The selectable registry is **407** and the default
+remains **36 cases / 198 rows**.
+
+The fixed corpus has 12 slides, 13 archive members, and eight deterministic
+2 MiB `Pictures/*` members; the archive is 16,785,912 bytes with SHA-256
+`661ae80396d4eda673d35e45d208443cc359052e4b9b27fed0ba6681602a913a`.
+Open, list, and query preparation remains outside the corresponding timed
+scopes: fresh catalog construction, `catalog()`, and the selected slide at
+index 6. Semantic, topology, source-replay, and media-locality checks remain
+untimed evidence gates.
+
+The [control report](results/odp-source-catalog-0370-control.json) uses CPU 2,
+30 warmups, and 500 samples. It is a dirty descriptive control from revision
+`f35486fb7085bb128eb89a4d2e9edd3ad1065f02` with binary SHA-256
+`08594839ede39d7f2ed0c143d818e41de0b7cdb77bc92fbcdd2a96083ca9966a`.
+`performance_claim: none`; `claim_authorized: false`; no clean A/B, latency,
+RSS, allocation, physical-I/O, or OOM-prevention claim follows. Strict Clippy
+exposed only 23 preexisting unrelated diagnostics and the scoped allow-list
+run passed; focused selector and enumeration tests passed `1/1` each, with no
+full suite run.
+
 ## Change 0369 compliance update
 
 The fused ODT catalog pass remains inside the owning `litchi-odt` source-backed

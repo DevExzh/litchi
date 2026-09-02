@@ -236,6 +236,7 @@ const ODT_REPEATED_TEXT_VERSION_OBSERVATIONS_PER_CALL: [u64; ODT_REPEATED_TEXT_C
 const ODT_REPEATED_TEXT_CACHE_VERSION_OBSERVATIONS_PER_CALL: [u64; ODT_REPEATED_TEXT_CALLS] =
     [2, 4, 2, 2];
 const ODT_SOURCE_BACKED_CATALOG_QUERY_INDEX: usize = 5_000;
+const ODP_SOURCE_BACKED_CATALOG_QUERY_INDEX: usize = SemanticShape::Medium.pptx_slides() / 2;
 const XLSX_REPEATED_PAGE_BREAK_CALLS: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_COUNT: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
@@ -1329,6 +1330,9 @@ enum Case {
     OdpFileSourceSelectedSlide,
     OdpSourceBackedRepeatedTextUncached,
     OdpSourceBackedRepeatedTextCached,
+    OdpSourceBackedCatalogOpen,
+    OdpSourceBackedCatalogList,
+    OdpSourceBackedCatalogQuery,
     OdsFileEagerOpen,
     OdsFileSourceOpen,
     OdsFileEagerSelectedCell,
@@ -1879,6 +1883,9 @@ impl Case {
             Self::OdpFileSourceSelectedSlide => "odp_file_source_selected_slide",
             Self::OdpSourceBackedRepeatedTextUncached => "odp_source_backed_repeated_text_uncached",
             Self::OdpSourceBackedRepeatedTextCached => "odp_source_backed_repeated_text_cached",
+            Self::OdpSourceBackedCatalogOpen => "odp_source_backed_catalog_open",
+            Self::OdpSourceBackedCatalogList => "odp_source_backed_catalog_list",
+            Self::OdpSourceBackedCatalogQuery => "odp_source_backed_catalog_query",
             Self::OdsFileEagerOpen => "ods_file_eager_open",
             Self::OdsFileSourceOpen => "ods_file_source_open",
             Self::OdsFileEagerSelectedCell => "ods_file_eager_selected_cell",
@@ -2753,6 +2760,15 @@ impl Case {
         matches!(
             self,
             Self::OdpSourceBackedRepeatedTextUncached | Self::OdpSourceBackedRepeatedTextCached
+        )
+    }
+
+    const fn is_odp_source_backed_catalog(self) -> bool {
+        matches!(
+            self,
+            Self::OdpSourceBackedCatalogOpen
+                | Self::OdpSourceBackedCatalogList
+                | Self::OdpSourceBackedCatalogQuery
         )
     }
 
@@ -3759,6 +3775,8 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     odp_repeated_text: Option<OdpRepeatedTextSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    odp_catalog: Option<OdpCatalogSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     odt_repeated_text: Option<OdtRepeatedTextSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odt_catalog: Option<OdtCatalogSummary>,
@@ -4403,6 +4421,91 @@ struct OdtCatalogSummary {
     observed_catalog_entries_sha256: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     observed_block_text_sha256: Vec<String>,
+}
+
+/// Untimed correctness and source-range evidence for the catalog-first ODP
+/// owner. The open selector measures a fresh catalog construction; list and
+/// query prepare the owner outside the timer and measure only `catalog()` or
+/// `slide_at(6)`. All source counters below come from an independent
+/// instrumented replay so the timed owner operations remain uninstrumented.
+#[derive(Clone, Debug, Default, Serialize)]
+struct OdpCatalogSummary {
+    implementation: &'static str,
+    operation: &'static str,
+    timing_scope: &'static str,
+    source_evidence_scope: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    selected_index: Option<usize>,
+    slide_count: usize,
+    catalog_entries_sha256: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    selected_slide_text_sha256: Option<String>,
+    archive_member_count: usize,
+    pictures_count: usize,
+    pictures_uncompressed_payload_bytes: u64,
+    canonical_text_sha256: String,
+    content_xml_sha256: String,
+    source_archive_bytes: u64,
+    source_archive_sha256: String,
+    pictures_uncompressed_payload_sha256: String,
+    semantic_parity_verified: bool,
+    archive_topology_verified: bool,
+    media_payloads_verified: bool,
+    source_ranges_verified: bool,
+    source_version_stability_verified: bool,
+    content_read_requirement_verified: bool,
+    list_zero_operation_reads_verified: bool,
+    zero_pictures_reads_verified: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_content_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_content_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_untouched_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_untouched_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_pictures_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_pictures_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_payload_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_payload_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_version_observations: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_range_overlap_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_content_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_content_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_untouched_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_untouched_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_pictures_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_pictures_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_payload_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_payload_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_version_observations: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    observed_catalog_entries_sha256: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    observed_slide_text_sha256: Vec<String>,
 }
 
 /// Unified-root ODT filesystem ingress evidence over the fixed large
@@ -8045,6 +8148,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.uses_odp_media()
                     && !case.is_odp_root_file()
                     && !case.is_odp_repeated_text()
+                    && !case.is_odp_source_backed_catalog()
                     && !case.is_ods_root_file()
                     && !case.is_xlsx_root_file()
                     && !case.is_xlsx_bytes_root_file()
@@ -9468,6 +9572,28 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_odp_source_backed_catalog())
+    {
+        let corpus = build_odp_media_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_odp_source_backed_catalog())
+        {
+            results.push(run_case_with_config(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+                options.range_simulation,
+            )?);
+        }
+    }
+
     if options.cases.iter().any(|case| case.is_ods_root_file()) {
         let corpus = build_ods_media_corpus()?;
         for case in options
@@ -10542,6 +10668,9 @@ fn parse_case(value: &str) -> Option<Case> {
             Some(Case::OdpSourceBackedRepeatedTextUncached)
         },
         "odp_source_backed_repeated_text_cached" => Some(Case::OdpSourceBackedRepeatedTextCached),
+        "odp_source_backed_catalog_open" => Some(Case::OdpSourceBackedCatalogOpen),
+        "odp_source_backed_catalog_list" => Some(Case::OdpSourceBackedCatalogList),
+        "odp_source_backed_catalog_query" => Some(Case::OdpSourceBackedCatalogQuery),
         "ods_file_eager_open" => Some(Case::OdsFileEagerOpen),
         "ods_file_source_open" => Some(Case::OdsFileSourceOpen),
         "ods_file_eager_selected_cell" => Some(Case::OdsFileEagerSelectedCell),
@@ -10938,6 +11067,9 @@ fn usage_text() -> String {
                                        odp_file_eager_selected_slide,odp_file_source_selected_slide,\n\
                                        odp_source_backed_repeated_text_uncached,\n\
                                        odp_source_backed_repeated_text_cached,\n\
+                                       odp_source_backed_catalog_open,\n\
+                                       odp_source_backed_catalog_list,\n\
+                                       odp_source_backed_catalog_query,\n\
                                        ods_file_eager_open,ods_file_source_open,\n\
                                        ods_file_eager_selected_cell,ods_file_source_selected_cell,\n\
                                        ods_file_eager_selected_media,ods_file_source_selected_media,\n\
@@ -19800,6 +19932,11 @@ fn run_case_with_config(
         },
         Case::OdpSourceBackedRepeatedTextUncached | Case::OdpSourceBackedRepeatedTextCached => {
             run_odp_repeated_text(case, corpus, warmup_iterations, samples)
+        },
+        Case::OdpSourceBackedCatalogOpen
+        | Case::OdpSourceBackedCatalogList
+        | Case::OdpSourceBackedCatalogQuery => {
+            run_odp_source_backed_catalog(case, corpus, warmup_iterations, samples)
         },
         Case::OdsFileEagerOpen
         | Case::OdsFileSourceOpen
@@ -33582,6 +33719,589 @@ fn run_odt_source_backed_catalog(
             ordinary_payload_read_calls: summary.source_replay_payload_read_calls.clone(),
             ordinary_payload_read_bytes: summary.source_replay_payload_read_bytes.clone(),
             odt_catalog: Some(summary),
+            ..SourceSummary::default()
+        },
+    ))
+}
+
+fn odp_catalog_entries_digest(entries: &[litchi_odp::SlideCatalogEntry]) -> String {
+    let mut digest = Sha256::new();
+    for entry in entries {
+        digest.update((entry.index() as u64).to_le_bytes());
+        if let Some(name) = entry.name() {
+            digest.update([1_u8]);
+            digest.update((name.len() as u64).to_le_bytes());
+            digest.update(name.as_bytes());
+        } else {
+            digest.update([0_u8]);
+        }
+    }
+    fingerprint_hex(&digest.finalize().into())
+}
+
+fn odp_expected_catalog_entries_digest(count: usize) -> String {
+    let mut digest = Sha256::new();
+    for index in 0..count {
+        let name = format!("page{}", index + 1);
+        digest.update((index as u64).to_le_bytes());
+        digest.update([1_u8]);
+        digest.update((name.len() as u64).to_le_bytes());
+        digest.update(name.as_bytes());
+    }
+    fingerprint_hex(&digest.finalize().into())
+}
+
+fn verify_odp_catalog_entries(
+    entries: &[litchi_odp::SlideCatalogEntry],
+    expected_count: usize,
+    expected_digest: &str,
+) -> Result<String, Box<dyn Error>> {
+    if entries.len() != expected_count
+        || entries.iter().enumerate().any(|(index, entry)| {
+            entry.index() != index || entry.name() != Some(format!("page{}", index + 1).as_str())
+        })
+    {
+        return Err("ODP source catalog entries differ from the deterministic slide oracle".into());
+    }
+    let digest = odp_catalog_entries_digest(entries);
+    if digest != expected_digest {
+        return Err("ODP source catalog digest differs from the deterministic slide oracle".into());
+    }
+    Ok(digest)
+}
+
+fn odp_catalog_case_parameters(
+    case: Case,
+) -> Result<(&'static str, Option<usize>), Box<dyn Error>> {
+    match case {
+        Case::OdpSourceBackedCatalogOpen => Ok(("open", None)),
+        Case::OdpSourceBackedCatalogList => Ok(("list", None)),
+        Case::OdpSourceBackedCatalogQuery => {
+            Ok(("query", Some(ODP_SOURCE_BACKED_CATALOG_QUERY_INDEX)))
+        },
+        _ => Err("non-catalog ODP case passed to catalog case parameters".into()),
+    }
+}
+
+fn run_odp_source_backed_catalog(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if !case.is_odp_source_backed_catalog() {
+        return Err("non-catalog ODP case passed to catalog runner".into());
+    }
+    if corpus.manifest.generator != ODP_MEDIA_CORPUS_GENERATOR {
+        return Err("ODP source catalog cases require the fixed media-rich corpus".into());
+    }
+    let (operation, selected_index) = odp_catalog_case_parameters(case)?;
+    let eager = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+    verify_semantic_odp(&eager, SemanticShape::Medium, false)?;
+    let expected_slides = eager.slides()?;
+    let expected_text = eager.text()?;
+    let expected_slide_count = expected_slides.len();
+    if expected_slide_count != SemanticShape::Medium.pptx_slides() {
+        return Err("ODP source catalog slide count differs from corpus shape".into());
+    }
+    if selected_index.is_some_and(|index| index >= expected_slide_count) {
+        return Err("ODP source catalog query index is outside the corpus".into());
+    }
+    let expected_catalog_digest = odp_expected_catalog_entries_digest(expected_slide_count);
+    let expected_selected_slide_text_sha256 = selected_index.map(|index| {
+        sha256_hex(
+            format!(
+                "{}\n{}",
+                semantic_odp_title(index, false),
+                semantic_odp_text(index, false)
+            )
+            .as_bytes(),
+        )
+    });
+    let content_xml = odf_content_xml(&corpus.archive)?;
+    let (content_range, untouched_ranges, picture_ranges, _untouched_names) =
+        odf_content_cow_ranges(&corpus.archive)?;
+    if content_range.is_empty()
+        || picture_ranges.len() != ODS_MEDIA_ENTRY_COUNT
+        || picture_ranges.iter().any(Range::is_empty)
+    {
+        return Err("ODP source catalog source ranges differ from the fixed corpus".into());
+    }
+    let archive_member_count = ArchiveReader::new(&corpus.archive)?.file_names().count();
+    if archive_member_count != corpus.manifest.archive_member_count || archive_member_count != 13 {
+        return Err("ODP source catalog archive member count differs from the fixed corpus".into());
+    }
+    verify_odp_media_archive(&corpus.archive, false)?;
+    let pictures_uncompressed_payload_bytes = u64::try_from(
+        ODS_MEDIA_ENTRY_COUNT
+            .checked_mul(ODS_MEDIA_ENTRY_BYTES)
+            .ok_or("ODP source catalog Pictures byte count overflows usize")?,
+    )?;
+    let pictures_uncompressed_payload_sha256 = odp_media_payload_digest();
+
+    let mut elapsed = Vec::new();
+    elapsed
+        .try_reserve_exact(samples)
+        .map_err(|error| format!("ODP source catalog elapsed allocation failed: {error}"))?;
+    let mut summary = OdpCatalogSummary {
+        implementation: "source_backed_presentation_catalog",
+        operation,
+        timing_scope: match operation {
+            "open" => {
+                "fresh SourceBackedPresentationCatalog::from_read_at inside timer; corpus, source allocation, semantic/archive/media gates, and instrumented replay outside timer"
+            },
+            "list" => {
+                "SourceBackedPresentationCatalog prepared outside timer; catalog() only inside timer; semantic/archive/media gates and instrumented replay outside timer"
+            },
+            "query" => {
+                "SourceBackedPresentationCatalog prepared outside timer; slide_at(6) only inside timer; semantic/archive/media gates and instrumented replay outside timer"
+            },
+            _ => unreachable!("catalog operation validated above"),
+        },
+        source_evidence_scope: "separate untimed InstrumentedSource replay per retained sample",
+        selected_index,
+        slide_count: expected_slide_count,
+        catalog_entries_sha256: expected_catalog_digest.clone(),
+        selected_slide_text_sha256: expected_selected_slide_text_sha256.clone(),
+        archive_member_count,
+        pictures_count: picture_ranges.len(),
+        pictures_uncompressed_payload_bytes,
+        canonical_text_sha256: sha256_hex(expected_text.as_bytes()),
+        content_xml_sha256: sha256_hex(&content_xml),
+        source_archive_bytes: u64::try_from(corpus.archive.len())?,
+        source_archive_sha256: corpus.manifest.archive_sha256.clone(),
+        pictures_uncompressed_payload_sha256,
+        ..OdpCatalogSummary::default()
+    };
+
+    macro_rules! reserve_odp_catalog_summary_vec {
+        ($field:ident, $label:literal) => {
+            summary.$field.try_reserve_exact(samples).map_err(|error| {
+                format!(
+                    concat!("ODP source catalog ", $label, " allocation failed: {}"),
+                    error
+                )
+            })?;
+        };
+    }
+    reserve_odp_catalog_summary_vec!(source_preparation_read_calls, "preparation-call");
+    reserve_odp_catalog_summary_vec!(source_preparation_read_bytes, "preparation-byte");
+    reserve_odp_catalog_summary_vec!(
+        source_preparation_content_read_calls,
+        "preparation-content-call"
+    );
+    reserve_odp_catalog_summary_vec!(
+        source_preparation_content_read_bytes,
+        "preparation-content-byte"
+    );
+    reserve_odp_catalog_summary_vec!(
+        source_preparation_untouched_read_calls,
+        "preparation-untouched-call"
+    );
+    reserve_odp_catalog_summary_vec!(
+        source_preparation_untouched_read_bytes,
+        "preparation-untouched-byte"
+    );
+    reserve_odp_catalog_summary_vec!(
+        source_preparation_pictures_read_calls,
+        "preparation-pictures-call"
+    );
+    reserve_odp_catalog_summary_vec!(
+        source_preparation_pictures_read_bytes,
+        "preparation-pictures-byte"
+    );
+    reserve_odp_catalog_summary_vec!(
+        source_preparation_payload_read_calls,
+        "preparation-payload-call"
+    );
+    reserve_odp_catalog_summary_vec!(
+        source_preparation_payload_read_bytes,
+        "preparation-payload-byte"
+    );
+    reserve_odp_catalog_summary_vec!(
+        source_preparation_version_observations,
+        "preparation-version"
+    );
+    reserve_odp_catalog_summary_vec!(source_replay_read_calls, "replay-call");
+    reserve_odp_catalog_summary_vec!(source_replay_read_bytes, "replay-byte");
+    reserve_odp_catalog_summary_vec!(source_replay_range_overlap_bytes, "replay-overlap");
+    reserve_odp_catalog_summary_vec!(source_replay_content_read_calls, "replay-content-call");
+    reserve_odp_catalog_summary_vec!(source_replay_content_read_bytes, "replay-content-byte");
+    reserve_odp_catalog_summary_vec!(source_replay_untouched_read_calls, "replay-untouched-call");
+    reserve_odp_catalog_summary_vec!(source_replay_untouched_read_bytes, "replay-untouched-byte");
+    reserve_odp_catalog_summary_vec!(source_replay_pictures_read_calls, "replay-pictures-call");
+    reserve_odp_catalog_summary_vec!(source_replay_pictures_read_bytes, "replay-pictures-byte");
+    reserve_odp_catalog_summary_vec!(source_replay_payload_read_calls, "replay-payload-call");
+    reserve_odp_catalog_summary_vec!(source_replay_payload_read_bytes, "replay-payload-byte");
+    reserve_odp_catalog_summary_vec!(source_replay_version_observations, "replay-version");
+    reserve_odp_catalog_summary_vec!(observed_catalog_entries_sha256, "catalog-digest");
+    reserve_odp_catalog_summary_vec!(observed_slide_text_sha256, "slide-digest");
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let (duration, observed_catalog_digest, observed_slide_digest) = match operation {
+            "open" => {
+                let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+                let started = Instant::now();
+                let catalog = litchi_odp::SourceBackedPresentationCatalog::from_read_at(source)?;
+                let duration = started.elapsed();
+                std::hint::black_box(&catalog);
+                let entries = catalog.catalog()?;
+                let digest = verify_odp_catalog_entries(
+                    entries,
+                    expected_slide_count,
+                    &expected_catalog_digest,
+                )?;
+                (duration, Some(digest), None)
+            },
+            "list" => {
+                let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+                let catalog = litchi_odp::SourceBackedPresentationCatalog::from_read_at(source)?;
+                let started = Instant::now();
+                let entries = catalog.catalog()?;
+                let duration = started.elapsed();
+                std::hint::black_box(entries);
+                let digest = verify_odp_catalog_entries(
+                    entries,
+                    expected_slide_count,
+                    &expected_catalog_digest,
+                )?;
+                (duration, Some(digest), None)
+            },
+            "query" => {
+                let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+                let catalog = litchi_odp::SourceBackedPresentationCatalog::from_read_at(source)?;
+                let query_index =
+                    selected_index.ok_or("ODP source catalog query has no selected index")?;
+                let started = Instant::now();
+                let slide = catalog.slide_at(query_index)?;
+                let duration = started.elapsed();
+                std::hint::black_box(&slide);
+                let slide = slide.ok_or("ODP source catalog query unexpectedly returned None")?;
+                let expected = format!(
+                    "{}\n{}",
+                    semantic_odp_title(query_index, false),
+                    semantic_odp_text(query_index, false)
+                );
+                if slide.index() != query_index || slide.all_text() != expected {
+                    return Err("ODP source catalog query differs from the slide oracle".into());
+                }
+                (
+                    duration,
+                    None,
+                    Some(sha256_hex(slide.all_text().as_bytes())),
+                )
+            },
+            _ => unreachable!("catalog operation validated above"),
+        };
+        if iteration >= warmup_iterations {
+            if let Some(digest) = observed_catalog_digest {
+                summary.observed_catalog_entries_sha256.push(digest);
+            }
+            if let Some(digest) = observed_slide_digest {
+                summary.observed_slide_text_sha256.push(digest);
+            }
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let mut expected_preparation: Option<(SourceSnapshot, u64)> = None;
+    let mut expected_replay: Option<(SourceSnapshot, u64)> = None;
+    let mut source_ranges_verified = true;
+    let mut source_version_stability_verified = true;
+    let mut content_read_requirement_verified = true;
+    let mut list_zero_operation_reads_verified = true;
+    let mut zero_pictures_reads_verified = true;
+
+    for _ in 0..samples {
+        let source = Arc::new(InstrumentedSource::new_odf(
+            corpus.archive.clone(),
+            vec![content_range.clone()],
+            untouched_ranges.clone(),
+            picture_ranges.clone(),
+        ));
+        let expected_source_version = source.version;
+        let catalog = litchi_odp::SourceBackedPresentationCatalog::from_read_at(source.clone())?;
+        let (preparation, preparation_versions) = if operation == "open" {
+            (None, 0)
+        } else {
+            let preparation = source.snapshot();
+            let preparation_versions = source.version_calls();
+            source.reset();
+            (Some(preparation), preparation_versions)
+        };
+        if let Some(preparation) = preparation {
+            let preparation_valid = preparation.read_calls > 0
+                && preparation.read_bytes > 0
+                && preparation.odf.content.read_calls > 0
+                && preparation.odf.content.read_bytes > 0
+                && preparation.odf.pictures.read_calls == 0
+                && preparation.odf.pictures.read_bytes == 0;
+            if !preparation_valid {
+                return Err("ODP source catalog preparation failed source-range gates".into());
+            }
+        }
+
+        let (replay, replay_versions, observed_catalog_digest, observed_slide_digest) =
+            match operation {
+                "open" => {
+                    let replay = source.snapshot();
+                    let replay_versions = source.version_calls();
+                    let entries = catalog.catalog()?;
+                    let digest = verify_odp_catalog_entries(
+                        entries,
+                        expected_slide_count,
+                        &expected_catalog_digest,
+                    )?;
+                    (replay, replay_versions, Some(digest), None)
+                },
+                "list" => {
+                    let entries = catalog.catalog()?;
+                    let digest = verify_odp_catalog_entries(
+                        entries,
+                        expected_slide_count,
+                        &expected_catalog_digest,
+                    )?;
+                    let replay = source.snapshot();
+                    let replay_versions = source.version_calls();
+                    (replay, replay_versions, Some(digest), None)
+                },
+                "query" => {
+                    let query_index =
+                        selected_index.ok_or("ODP source catalog query has no selected index")?;
+                    let slide = catalog.slide_at(query_index)?;
+                    let slide =
+                        slide.ok_or("ODP source catalog query unexpectedly returned None")?;
+                    let expected = format!(
+                        "{}\n{}",
+                        semantic_odp_title(query_index, false),
+                        semantic_odp_text(query_index, false)
+                    );
+                    if slide.index() != query_index || slide.all_text() != expected {
+                        return Err(
+                            "ODP source catalog replay query differs from the slide oracle".into(),
+                        );
+                    }
+                    let digest = sha256_hex(slide.all_text().as_bytes());
+                    let replay = source.snapshot();
+                    let replay_versions = source.version_calls();
+                    (replay, replay_versions, None, Some(digest))
+                },
+                _ => unreachable!("catalog operation validated above"),
+            };
+
+        let content_read_valid = if operation == "list" {
+            replay.odf.content.read_calls == 0 && replay.odf.content.read_bytes == 0
+        } else {
+            replay.odf.content.read_calls > 0 && replay.odf.content.read_bytes > 0
+        };
+        let no_pictures_reads = replay.odf.pictures.read_calls == 0
+            && replay.odf.pictures.read_bytes == 0
+            && preparation.is_none_or(|value| {
+                value.odf.pictures.read_calls == 0 && value.odf.pictures.read_bytes == 0
+            });
+        let list_zero_operation_reads = operation != "list"
+            || (replay.read_calls == 0
+                && replay.read_bytes == 0
+                && replay.ordinary_payload_read_calls == 0
+                && replay.ordinary_payload_read_bytes == 0);
+        let range_shape_valid = match operation {
+            "open" => {
+                replay.read_calls > 0
+                    && replay.read_bytes > 0
+                    && replay.odf.content.read_calls > 0
+                    && replay.odf.content.read_bytes > 0
+                    && replay.odf.untouched.read_calls > 0
+                    && replay.odf.untouched.read_bytes > 0
+                    && replay.ordinary_payload_read_calls > 0
+                    && replay.ordinary_payload_read_bytes > 0
+                    && replay.odf.pictures.read_calls == 0
+                    && replay.odf.pictures.read_bytes == 0
+            },
+            "list" => {
+                replay.read_calls == 0
+                    && replay.read_bytes == 0
+                    && replay.odf.content.read_calls == 0
+                    && replay.odf.content.read_bytes == 0
+                    && replay.odf.untouched.read_calls == 0
+                    && replay.odf.untouched.read_bytes == 0
+                    && replay.ordinary_payload_read_calls == 0
+                    && replay.ordinary_payload_read_bytes == 0
+                    && replay.odf.pictures.read_calls == 0
+                    && replay.odf.pictures.read_bytes == 0
+            },
+            "query" => {
+                replay.read_calls > 0
+                    && replay.read_bytes > 0
+                    && replay.odf.content.read_calls > 0
+                    && replay.odf.content.read_bytes > 0
+                    && replay.odf.untouched.read_calls > 0
+                    && replay.odf.untouched.read_bytes > 0
+                    && replay.ordinary_payload_read_calls > 0
+                    && replay.ordinary_payload_read_bytes > 0
+                    && replay.odf.pictures.read_calls == 0
+                    && replay.odf.pictures.read_bytes == 0
+            },
+            _ => unreachable!("catalog operation validated above"),
+        };
+        if !content_read_valid {
+            return Err("ODP source catalog content-read requirement failed".into());
+        }
+        if !list_zero_operation_reads {
+            return Err("ODP source catalog list performed a source read".into());
+        }
+        if !no_pictures_reads {
+            return Err("ODP source catalog source replay read a Pictures payload".into());
+        }
+        if !range_shape_valid {
+            return Err("ODP source catalog source-range shape failed".into());
+        }
+
+        let source_version_stable = source.version()? == expected_source_version
+            && catalog.source_version()? == expected_source_version;
+        if !source_version_stable {
+            return Err("ODP source catalog source version changed during replay".into());
+        }
+
+        let preparation_tuple = preparation.map(|value| (value, preparation_versions));
+        if let Some(expected) = expected_preparation.as_ref() {
+            if preparation_tuple.as_ref() != Some(expected) {
+                return Err("ODP source catalog preparation counters are not deterministic".into());
+            }
+        } else {
+            expected_preparation = preparation_tuple;
+        }
+        let replay_tuple = (replay, replay_versions);
+        if let Some(expected) = expected_replay {
+            if expected != replay_tuple {
+                return Err("ODP source catalog replay counters are not deterministic".into());
+            }
+        } else {
+            expected_replay = Some(replay_tuple);
+        }
+
+        if let Some(preparation) = preparation {
+            summary
+                .source_preparation_read_calls
+                .push(preparation.read_calls);
+            summary
+                .source_preparation_read_bytes
+                .push(preparation.read_bytes);
+            summary
+                .source_preparation_content_read_calls
+                .push(preparation.odf.content.read_calls);
+            summary
+                .source_preparation_content_read_bytes
+                .push(preparation.odf.content.read_bytes);
+            summary
+                .source_preparation_untouched_read_calls
+                .push(preparation.odf.untouched.read_calls);
+            summary
+                .source_preparation_untouched_read_bytes
+                .push(preparation.odf.untouched.read_bytes);
+            summary
+                .source_preparation_pictures_read_calls
+                .push(preparation.odf.pictures.read_calls);
+            summary
+                .source_preparation_pictures_read_bytes
+                .push(preparation.odf.pictures.read_bytes);
+            summary
+                .source_preparation_payload_read_calls
+                .push(preparation.ordinary_payload_read_calls);
+            summary
+                .source_preparation_payload_read_bytes
+                .push(preparation.ordinary_payload_read_bytes);
+            summary
+                .source_preparation_version_observations
+                .push(preparation_versions);
+        }
+        summary.source_replay_read_calls.push(replay.read_calls);
+        summary.source_replay_read_bytes.push(replay.read_bytes);
+        summary
+            .source_replay_range_overlap_bytes
+            .push(replay.read_range_overlap_bytes);
+        summary
+            .source_replay_content_read_calls
+            .push(replay.odf.content.read_calls);
+        summary
+            .source_replay_content_read_bytes
+            .push(replay.odf.content.read_bytes);
+        summary
+            .source_replay_untouched_read_calls
+            .push(replay.odf.untouched.read_calls);
+        summary
+            .source_replay_untouched_read_bytes
+            .push(replay.odf.untouched.read_bytes);
+        summary
+            .source_replay_pictures_read_calls
+            .push(replay.odf.pictures.read_calls);
+        summary
+            .source_replay_pictures_read_bytes
+            .push(replay.odf.pictures.read_bytes);
+        summary
+            .source_replay_payload_read_calls
+            .push(replay.ordinary_payload_read_calls);
+        summary
+            .source_replay_payload_read_bytes
+            .push(replay.ordinary_payload_read_bytes);
+        summary
+            .source_replay_version_observations
+            .push(replay_versions);
+        if let Some(digest) = observed_catalog_digest
+            && digest != expected_catalog_digest
+        {
+            return Err("ODP source catalog replay catalog digest differs from oracle".into());
+        }
+        if let Some(digest) = observed_slide_digest.as_ref()
+            && Some(digest) != expected_selected_slide_text_sha256.as_ref()
+        {
+            return Err("ODP source catalog replay slide digest differs from oracle".into());
+        }
+        source_ranges_verified &= range_shape_valid;
+        source_version_stability_verified &= source_version_stable;
+        content_read_requirement_verified &= content_read_valid;
+        list_zero_operation_reads_verified &= list_zero_operation_reads;
+        zero_pictures_reads_verified &= no_pictures_reads;
+    }
+
+    if summary.observed_catalog_entries_sha256.len()
+        != if operation == "query" { 0 } else { samples }
+        || summary.observed_slide_text_sha256.len()
+            != if operation == "query" { samples } else { 0 }
+    {
+        return Err("ODP source catalog digest evidence has unexpected cardinality".into());
+    }
+    summary.semantic_parity_verified = true;
+    summary.archive_topology_verified = archive_member_count == 13
+        && picture_ranges.len() == ODS_MEDIA_ENTRY_COUNT
+        && expected_slide_count == SemanticShape::Medium.pptx_slides();
+    summary.media_payloads_verified = true;
+    summary.source_ranges_verified = source_ranges_verified;
+    summary.source_version_stability_verified = source_version_stability_verified;
+    summary.content_read_requirement_verified = content_read_requirement_verified;
+    summary.list_zero_operation_reads_verified = list_zero_operation_reads_verified;
+    summary.zero_pictures_reads_verified = zero_pictures_reads_verified;
+    if !summary.archive_topology_verified
+        || !summary.semantic_parity_verified
+        || !summary.media_payloads_verified
+        || !summary.source_ranges_verified
+        || !summary.source_version_stability_verified
+        || !summary.content_read_requirement_verified
+        || !summary.list_zero_operation_reads_verified
+        || !summary.zero_pictures_reads_verified
+    {
+        return Err("ODP source catalog evidence gates are incomplete".into());
+    }
+
+    Ok(result_with_source(
+        case,
+        corpus,
+        elapsed,
+        SourceSummary {
+            read_calls: summary.source_replay_read_calls.clone(),
+            read_bytes: summary.source_replay_read_bytes.clone(),
+            ordinary_payload_read_calls: summary.source_replay_payload_read_calls.clone(),
+            ordinary_payload_read_bytes: summary.source_replay_payload_read_bytes.clone(),
+            odp_catalog: Some(summary),
             ..SourceSummary::default()
         },
     ))
@@ -50646,7 +51366,8 @@ mod tests {
     use super::{
         Case, CfbOpenStreamOperation, CfbSelectiveSimulationPhase, CfbSelectiveTarget, CorpusShape,
         CountingSeekSink, CountingSink, HashingDiscardSink, InstrumentedSource,
-        ODF_REPAIR_LOCAL_EXTRA, ODF_REPAIR_PUBLICATION_SCRATCH_BYTES, ODP_TEXT_BOX_BATCH_COUNT,
+        ODF_REPAIR_LOCAL_EXTRA, ODF_REPAIR_PUBLICATION_SCRATCH_BYTES, ODP_MEDIA_CORPUS_GENERATOR,
+        ODP_SOURCE_BACKED_CATALOG_QUERY_INDEX, ODP_TEXT_BOX_BATCH_COUNT, ODS_MEDIA_ENTRY_COUNT,
         ODT_RESOURCE_BATCH_COUNT, OOXML_TRACKER_CORPUS_GENERATOR, OpcCacheMode, PPT_PICTURE_BYTES,
         PPT_PICTURE_COUNT, PPT_PICTURES_CORPUS_GENERATOR, PPT_REPEATED_QUERY_COUNT,
         PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT, PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind,
@@ -51268,7 +51989,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 404);
+        assert_eq!(selectable_count, 407);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -55514,6 +56235,136 @@ mod tests {
         let source_json = serde_json::to_value(&results[1]).unwrap();
         assert!(source_json["source"]["odt_catalog"].is_object());
         assert!(source_json["source"]["odt_catalog"]["catalog_entries_sha256"].is_string());
+    }
+
+    #[test]
+    fn media_rich_odp_source_backed_catalog_selectors_are_opt_in_and_have_oracles() {
+        let cases = [
+            Case::OdpSourceBackedCatalogOpen,
+            Case::OdpSourceBackedCatalogList,
+            Case::OdpSourceBackedCatalogQuery,
+        ];
+        for case in cases {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(!Case::DEFAULT.contains(&case));
+            assert!(case.is_odp_source_backed_catalog());
+        }
+        assert_eq!(Case::DEFAULT.len(), 36);
+
+        let first = build_odp_media_corpus().unwrap();
+        let second = build_odp_media_corpus().unwrap();
+        assert_eq!(first.archive, second.archive);
+        assert_eq!(first.manifest.generator, ODP_MEDIA_CORPUS_GENERATOR);
+        assert_eq!(first.manifest.shape, "media-rich");
+        assert_eq!(first.manifest.entry_count, 12 + ODS_MEDIA_ENTRY_COUNT);
+        assert_eq!(first.manifest.archive_member_count, 13);
+        assert_eq!(first.manifest.entry_bytes, 2 * 1024 * 1024);
+
+        let results = cases
+            .into_iter()
+            .map(|case| run_case(case, &first, 0, 2).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            results.iter().map(|result| result.case).collect::<Vec<_>>(),
+            cases.map(Case::name).to_vec()
+        );
+
+        for (case, result) in cases.into_iter().zip(results.iter()) {
+            let evidence = result
+                .source
+                .as_ref()
+                .and_then(|source| source.odp_catalog.as_ref())
+                .expect("ODP catalog evidence is present");
+            assert_eq!(
+                evidence.operation,
+                case.name()
+                    .strip_prefix("odp_source_backed_catalog_")
+                    .unwrap()
+            );
+            assert_eq!(evidence.slide_count, 12);
+            assert_eq!(evidence.archive_member_count, 13);
+            assert_eq!(evidence.pictures_count, ODS_MEDIA_ENTRY_COUNT);
+            assert!(evidence.semantic_parity_verified);
+            assert!(evidence.archive_topology_verified);
+            assert!(evidence.media_payloads_verified);
+            assert!(evidence.source_ranges_verified);
+            assert!(evidence.source_version_stability_verified);
+            assert!(evidence.content_read_requirement_verified);
+            assert!(evidence.list_zero_operation_reads_verified);
+            assert!(evidence.zero_pictures_reads_verified);
+            assert_eq!(evidence.source_replay_read_calls.len(), 2);
+            assert_eq!(
+                evidence.source_replay_read_calls[0],
+                evidence.source_replay_read_calls[1]
+            );
+            assert_eq!(evidence.source_replay_read_bytes.len(), 2);
+            assert_eq!(
+                evidence.source_replay_read_bytes[0],
+                evidence.source_replay_read_bytes[1]
+            );
+            assert_eq!(evidence.source_replay_range_overlap_bytes.len(), 2);
+            assert_eq!(
+                evidence.source_replay_range_overlap_bytes[0],
+                evidence.source_replay_range_overlap_bytes[1]
+            );
+            assert_eq!(evidence.source_replay_version_observations.len(), 2);
+            assert_eq!(
+                evidence.source_replay_version_observations[0],
+                evidence.source_replay_version_observations[1]
+            );
+            assert_eq!(evidence.source_replay_pictures_read_calls, vec![0, 0]);
+            assert_eq!(evidence.source_replay_pictures_read_bytes, vec![0, 0]);
+            match case {
+                Case::OdpSourceBackedCatalogOpen | Case::OdpSourceBackedCatalogQuery => {
+                    assert!(evidence.source_replay_content_read_calls[0] > 0);
+                    assert!(evidence.source_replay_content_read_bytes[0] > 0);
+                    assert!(evidence.source_replay_untouched_read_calls[0] > 0);
+                    assert!(evidence.source_replay_untouched_read_bytes[0] > 0);
+                    assert!(evidence.source_replay_payload_read_calls[0] > 0);
+                    assert!(evidence.source_replay_payload_read_bytes[0] > 0);
+                },
+                Case::OdpSourceBackedCatalogList => {
+                    assert_eq!(evidence.source_replay_read_calls, vec![0, 0]);
+                    assert_eq!(evidence.source_replay_read_bytes, vec![0, 0]);
+                    assert_eq!(evidence.source_replay_content_read_calls, vec![0, 0]);
+                    assert_eq!(evidence.source_replay_content_read_bytes, vec![0, 0]);
+                    assert_eq!(evidence.source_replay_untouched_read_calls, vec![0, 0]);
+                    assert_eq!(evidence.source_replay_untouched_read_bytes, vec![0, 0]);
+                    assert_eq!(evidence.source_replay_payload_read_calls, vec![0, 0]);
+                    assert_eq!(evidence.source_replay_payload_read_bytes, vec![0, 0]);
+                },
+                _ => unreachable!("catalog case validated above"),
+            }
+            match case {
+                Case::OdpSourceBackedCatalogQuery => {
+                    assert_eq!(
+                        evidence.selected_index,
+                        Some(ODP_SOURCE_BACKED_CATALOG_QUERY_INDEX)
+                    );
+                    assert!(evidence.selected_slide_text_sha256.is_some());
+                    assert_eq!(evidence.observed_catalog_entries_sha256.len(), 0);
+                    assert_eq!(evidence.observed_slide_text_sha256.len(), 2);
+                    assert_eq!(
+                        evidence.observed_slide_text_sha256[0],
+                        evidence.observed_slide_text_sha256[1]
+                    );
+                },
+                Case::OdpSourceBackedCatalogOpen | Case::OdpSourceBackedCatalogList => {
+                    assert_eq!(evidence.selected_index, None);
+                    assert_eq!(evidence.selected_slide_text_sha256, None);
+                    assert_eq!(evidence.observed_catalog_entries_sha256.len(), 2);
+                    assert_eq!(
+                        evidence.observed_catalog_entries_sha256[0],
+                        evidence.observed_catalog_entries_sha256[1]
+                    );
+                    assert_eq!(evidence.observed_slide_text_sha256.len(), 0);
+                },
+                _ => unreachable!("catalog case validated above"),
+            }
+        }
+        let source_json = serde_json::to_value(&results[1]).unwrap();
+        assert!(source_json["source"]["odp_catalog"].is_object());
+        assert!(source_json["source"]["odp_catalog"]["catalog_entries_sha256"].is_string());
     }
 
     #[test]

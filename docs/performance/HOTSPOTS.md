@@ -1,5 +1,31 @@
 # Performance hotspot inventory
 
+## Change 0370 update
+
+Change 0370 establishes an ODP source-backed catalog measurement boundary,
+not an accepted hotspot. The three opt-in selectors cover fresh catalog open,
+catalog listing, and a selected slide query at index 6 over a fixed 12-slide,
+13-member corpus with eight deterministic 2 MiB `Pictures/*` members. The
+archive is 16,785,912 bytes with SHA-256
+`661ae80396d4eda673d35e45d208443cc359052e4b9b27fed0ba6681602a913a`.
+
+The open, list, and query timers isolate fresh source-backed catalog
+construction, `catalog()` after preparation, and the selected-slide projection
+after owner/index preparation respectively. Semantic, source-replay, and
+media-locality checks are untimed. The retained [dirty control report](results/odp-source-catalog-0370-control.json)
+uses CPU 2, 30 warmups, and 500 samples; revision is
+`f35486fb7085bb128eb89a4d2e9edd3ad1065f02` and binary SHA-256 is
+`08594839ede39d7f2ed0c143d818e41de0b7cdb77bc92fbcdd2a96083ca9966a`.
+Timings are open `57,538/61,057.616/76,884/88,020` ns, list
+`31/63.854/161/200` ns, and query `60,062/64,323.154/83,354/101,659` ns for
+p50/mean/p95/p99.
+
+The selectable registry is **407** and the default remains **36 cases / 198
+rows**. `performance_claim: none`; `claim_authorized: false`. The dirty
+control is not clean A/B evidence, so no hotspot ranking, latency, RSS,
+allocation, physical-I/O, or OOM-prevention claim follows. Focused selector
+and enumeration tests passed `1/1` each; no full suite was run.
+
 ## Change 0369 update
 
 The source-backed ODT catalog open path is now a measured, narrowly bounded
