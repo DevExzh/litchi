@@ -1,5 +1,56 @@
 # Performance program phase report
 
+## Change 0372: ODP source-backed catalog fused parse
+
+### Implementation boundary
+
+ODP source-backed catalog opening now validates and catalogs `content.xml` in
+one borrowing quick-xml pass. The shared validator runs before the ODP scanner
+for every event, and catalog-only errors are deferred until validation and
+tokenizer completion succeed. The shared namespace tracker now uses fallible
+growth for all input-dependent buffers and error context, and a 256 MiB
+materialized-size preflight runs before content allocation. Existing source,
+ZIP, MIME, publication, media, depth, namespace, page, and name fences remain.
+
+No public API, dependency edge, raw CRUD type, package identifier, archive
+handle, runtime handle, lock, or unsafe code is introduced.
+
+### Correctness and measurement
+
+Every executed locked/offline release target for `litchi-odf-common`,
+`litchi-odp`, and `litchi-odt` passed, with library totals of 282, 162, and
+557. Two exact pre-existing writer tests in unmodified code were excluded.
+Scoped Clippy passed with the pre-existing `large_enum_variant` lint allowed;
+the 64-package/240-declaration crate-boundary gate passed. Independent
+architecture, semantics, tests, safety, and final static reviews accepted the
+batch.
+
+Clean CPU-2 ABBA used one worker, 30 warmups, and 500 samples per leg over the
+fixed 16,785,912-byte ODP corpus, SHA-256
+`661ae80396d4eda673d35e45d208443cc359052e4b9b27fed0ba6681602a913a`.
+Control was `32290f7ce`/`7291b2...`; candidate was
+`922eb5e2c`/`9a26cd...`.
+
+| ABBA legs | open p50 | open mean | open p95 | open p99 |
+| --- | ---: | ---: | ---: | ---: |
+| A1/B1 reduction | 15.627% | 11.226% | -1.378% | -4.989% |
+| A2/B2 reduction | 17.327% | 17.038% | 14.361% | 17.307% |
+
+All untimed semantic and resource-locality gates passed. Candidate source
+version observations were 53 versus control's 51 due to two additional
+bounded preflight/version observations; identical observation counts are not
+claimed. The [machine-readable result](results/odp-source-catalog-0372-abba.json)
+records the full scope and provenance.
+
+### Interpretation
+
+Only fresh `SourceBackedPresentationCatalog::from_read_at` p50 latency on the
+recorded corpus is accepted. Open mean and tails are withheld for drift or
+inconsistent direction. List is rejected as unstable at tens of nanoseconds,
+and query is rejected because both comparisons regressed. No broad
+open-latency, list, query, all-ODP, allocation, RSS, fixed-memory,
+physical-I/O, cold-cache, throughput, or OOM-prevention claim follows.
+
 ## Change 0371: shared ODF content validation
 
 ### Implementation boundary

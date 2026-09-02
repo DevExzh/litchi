@@ -1,5 +1,31 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0372: ODP source-backed catalog fused parse
+
+Change 0372 fuses ODP `content.xml` validation and catalog scanning into one
+borrowing XML pass while preserving validation-before-catalog error
+precedence and all publication fences. It also makes input-dependent shared
+namespace-tracker allocation fallible and adds a 256 MiB materialized-size
+preflight before content allocation. Existing depth, declaration, page,
+name, source-freshness, ZIP, MIME, and media-locality bounds remain in force.
+
+Clean CPU-2 ABBA used one worker, 30 warmups, and 500 samples per leg over the
+16,785,912-byte deterministic media-rich ODP corpus, SHA-256
+`661ae80396d4eda673d35e45d208443cc359052e4b9b27fed0ba6681602a913a`.
+Control `32290f7ce`/`7291b2...` and candidate
+`922eb5e2c`/`9a26cd...` produced open p50 reductions of 15.627% and 17.327%;
+both p50 same-side drifts stayed below 5%. See [Change 0372](changes/0372-odp-source-catalog-fused-parse.md)
+and the [clean ABBA result](results/odp-source-catalog-0372-abba.json).
+
+The accepted claim is fresh `SourceBackedPresentationCatalog::from_read_at`
+p50 latency on this corpus only. Open mean and tails are withheld for drift
+or inconsistent direction; list is unstable at tens of nanoseconds; query
+regressed in both pairings. No broad open, list, query, all-ODP, RSS,
+allocation, fixed-memory, physical-I/O, cold-cache, throughput, or
+OOM-prevention claim follows. Focused release tests, scoped Clippy with one
+pre-existing allowed lint, crate boundaries, and independent static reviews
+passed subject to two exact pre-existing writer-test exclusions.
+
 ## Change 0371: shared ODF content validation
 
 Change 0371 extracts the checked plain-`Reader` namespace tracker and content
