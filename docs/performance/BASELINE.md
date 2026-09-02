@@ -1,5 +1,30 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0368: ODT source-backed document catalog evidence
+
+Change 0368 adds three opt-in source-backed ODT catalog selectors:
+`odt_source_backed_catalog_open`, `odt_source_backed_catalog_list`, and
+`odt_source_backed_catalog_query`. They reuse the fixed 10,008-entry,
+13-member corpus with eight deterministic 2 MiB `Pictures/*` members. The
+archive is 16,811,815 bytes with SHA-256
+`d63726138d0a50c8ff7e150af4a86385df1a34d886bb5f61f985c78ac79b0220`.
+
+The selectors time fresh catalog construction, `catalog()` after owner
+preparation, and `block_at(5000)` after owner/index preparation respectively.
+Semantic digests and instrumented-source replay gates are outside timing. The
+retained [control report](results/odt-source-catalog-0368-control.json) uses
+30 warmups and 500 samples on CPU 2, but comes from dirty revision
+`14884ced9d8b29b7d2155134025986e9315ac771` and is descriptive only. It is not
+a clean A/B comparison or speedup baseline.
+
+The focused catalog oracle and selectable-count tests passed `1/1` each; the
+initial standalone harness context was `233 passed, 7 failed, 1 ignored`,
+with the count assertion corrected afterward and six unrelated failures
+remaining. The selectable registry is **404** and the default remains **36
+cases / 198 rows**. `performance_claim: none`; no latency, throughput,
+physical-I/O, allocation, decompression, cold-cache, RSS, fixed-memory, or
+OOM-prevention claim follows. See [Change 0368](changes/0368-odt-source-backed-catalog-selectors.md).
+
 ## Change 0367: XLSX selected merge streaming
 
 Change 0367 extends the selected worksheet scanner with valid direct active

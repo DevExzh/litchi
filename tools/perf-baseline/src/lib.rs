@@ -235,6 +235,7 @@ const ODT_REPEATED_TEXT_VERSION_OBSERVATIONS_PER_CALL: [u64; ODT_REPEATED_TEXT_C
     [2, 2, 2, 2];
 const ODT_REPEATED_TEXT_CACHE_VERSION_OBSERVATIONS_PER_CALL: [u64; ODT_REPEATED_TEXT_CALLS] =
     [2, 4, 2, 2];
+const ODT_SOURCE_BACKED_CATALOG_QUERY_INDEX: usize = 5_000;
 const XLSX_REPEATED_PAGE_BREAK_CALLS: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_COUNT: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
@@ -1276,6 +1277,9 @@ enum Case {
     OdtContentCowPositional,
     OdtSourceBackedRepeatedTextUncached,
     OdtSourceBackedRepeatedTextCached,
+    OdtSourceBackedCatalogOpen,
+    OdtSourceBackedCatalogList,
+    OdtSourceBackedCatalogQuery,
     OdsSemanticOpen,
     OdsSemanticListSheets,
     OdsSemanticOneCell,
@@ -1642,9 +1646,7 @@ impl Case {
             Self::XlsSemanticOneEditSave => "xls_semantic_one_edit_save",
             Self::XlsSourceBackedOpen => "xls_source_backed_open",
             Self::XlsEagerOpenListWorksheets => "xls_eager_open_list_worksheets",
-            Self::XlsSourceBackedOpenListWorksheets => {
-                "xls_source_backed_open_list_worksheets"
-            },
+            Self::XlsSourceBackedOpenListWorksheets => "xls_source_backed_open_list_worksheets",
             Self::XlsEagerOpenOneCell => "xls_eager_open_one_cell",
             Self::XlsSourceBackedOpenOneCell => "xls_source_backed_open_one_cell",
             Self::XlsbSemanticOpen => "xlsb_semantic_open",
@@ -1825,6 +1827,9 @@ impl Case {
             Self::OdtContentCowPositional => "odt_content_cow_positional",
             Self::OdtSourceBackedRepeatedTextUncached => "odt_source_backed_repeated_text_uncached",
             Self::OdtSourceBackedRepeatedTextCached => "odt_source_backed_repeated_text_cached",
+            Self::OdtSourceBackedCatalogOpen => "odt_source_backed_catalog_open",
+            Self::OdtSourceBackedCatalogList => "odt_source_backed_catalog_list",
+            Self::OdtSourceBackedCatalogQuery => "odt_source_backed_catalog_query",
             Self::OdsSemanticOpen => "ods_semantic_open",
             Self::OdsSemanticListSheets => "ods_semantic_list_sheets",
             Self::OdsSemanticOneCell => "ods_semantic_one_cell",
@@ -2304,6 +2309,15 @@ impl Case {
         matches!(
             self,
             Self::OdtSourceBackedRepeatedTextUncached | Self::OdtSourceBackedRepeatedTextCached
+        )
+    }
+
+    const fn is_odt_source_backed_catalog(self) -> bool {
+        matches!(
+            self,
+            Self::OdtSourceBackedCatalogOpen
+                | Self::OdtSourceBackedCatalogList
+                | Self::OdtSourceBackedCatalogQuery
         )
     }
 
@@ -3747,6 +3761,8 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     odt_repeated_text: Option<OdtRepeatedTextSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    odt_catalog: Option<OdtCatalogSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     odt_root: Option<OdtFileRootSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ods_root: Option<OdsRootSourceSummary>,
@@ -4302,6 +4318,91 @@ struct OdtRepeatedTextSummary {
     source_replay_version_observations_per_call: Vec<Vec<u64>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     projection_text_sha256: Vec<String>,
+}
+
+/// Untimed correctness and source-range evidence for the catalog-first ODT
+/// owner. The open selector measures a fresh catalog construction; list and
+/// query prepare the owner outside the timer and measure only `catalog()` or
+/// `block_at(5000)`. All source counters below come from an independent
+/// instrumented replay so the timed owner operations remain uninstrumented.
+#[derive(Clone, Debug, Default, Serialize)]
+struct OdtCatalogSummary {
+    implementation: &'static str,
+    operation: &'static str,
+    timing_scope: &'static str,
+    source_evidence_scope: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    selected_index: Option<usize>,
+    text_block_count: usize,
+    catalog_entries_sha256: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    selected_block_text_sha256: Option<String>,
+    archive_member_count: usize,
+    pictures_count: usize,
+    pictures_uncompressed_payload_bytes: u64,
+    canonical_text_sha256: String,
+    content_xml_sha256: String,
+    source_archive_bytes: u64,
+    source_archive_sha256: String,
+    pictures_uncompressed_payload_sha256: String,
+    semantic_parity_verified: bool,
+    archive_topology_verified: bool,
+    media_payloads_verified: bool,
+    source_ranges_verified: bool,
+    source_version_stability_verified: bool,
+    content_read_requirement_verified: bool,
+    list_zero_payload_reads_verified: bool,
+    zero_pictures_reads_verified: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_content_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_content_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_untouched_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_untouched_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_pictures_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_pictures_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_payload_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_payload_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_preparation_version_observations: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_range_overlap_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_content_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_content_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_untouched_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_untouched_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_pictures_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_pictures_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_payload_read_calls: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_payload_read_bytes: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    source_replay_version_observations: Vec<u64>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    observed_catalog_entries_sha256: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    observed_block_text_sha256: Vec<String>,
 }
 
 /// Unified-root ODT filesystem ingress evidence over the fixed large
@@ -7017,11 +7118,7 @@ impl SourceSummary {
             .push(snapshot.xlsx.styles.read_bytes);
     }
 
-    fn record_xls(
-        &mut self,
-        snapshot: SourceSnapshot,
-        source: &XlsSourceIterationEvidence,
-    ) {
+    fn record_xls(&mut self, snapshot: SourceSnapshot, source: &XlsSourceIterationEvidence) {
         self.record(snapshot);
         let summary = self.xls.get_or_insert_with(XlsSourceSummary::default);
         summary.materialization_scope = source.materialization_scope;
@@ -7033,7 +7130,9 @@ impl SourceSummary {
             .push(source.complete_archive_materialized_bytes);
         summary.parsed_sheet_counts.push(source.parsed_sheet_count);
         summary.parsed_cell_counts.push(source.parsed_cell_count);
-        summary.source_version_checks.push(source.source_version_checks);
+        summary
+            .source_version_checks
+            .push(source.source_version_checks);
         summary
             .source_version_stability_verified
             .push(source.source_version_stability_verified);
@@ -7934,6 +8033,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.uses_semantic_odt()
                     && !case.uses_odt_media()
                     && !case.is_odt_repeated_text()
+                    && !case.is_odt_source_backed_catalog()
                     && !case.is_odt_root_file()
                     && !case.uses_odt_resource_batch()
                     && !case.uses_odf_content_cow()
@@ -9185,6 +9285,27 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_odt_source_backed_catalog())
+    {
+        let corpus = build_odt_repeated_text_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_odt_source_backed_catalog())
+        {
+            results.push(run_odt_source_backed_catalog(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
     if options.cases.iter().any(|case| case.is_odt_root_file()) {
         let corpus = build_odt_repeated_text_corpus()?;
         for case in options
@@ -10178,9 +10299,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "xls_semantic_one_edit_save" => Some(Case::XlsSemanticOneEditSave),
         "xls_source_backed_open" => Some(Case::XlsSourceBackedOpen),
         "xls_eager_open_list_worksheets" => Some(Case::XlsEagerOpenListWorksheets),
-        "xls_source_backed_open_list_worksheets" => {
-            Some(Case::XlsSourceBackedOpenListWorksheets)
-        },
+        "xls_source_backed_open_list_worksheets" => Some(Case::XlsSourceBackedOpenListWorksheets),
         "xls_eager_open_one_cell" => Some(Case::XlsEagerOpenOneCell),
         "xls_source_backed_open_one_cell" => Some(Case::XlsSourceBackedOpenOneCell),
         "xlsb_semantic_open" => Some(Case::XlsbSemanticOpen),
@@ -10369,6 +10488,9 @@ fn parse_case(value: &str) -> Option<Case> {
             Some(Case::OdtSourceBackedRepeatedTextUncached)
         },
         "odt_source_backed_repeated_text_cached" => Some(Case::OdtSourceBackedRepeatedTextCached),
+        "odt_source_backed_catalog_open" => Some(Case::OdtSourceBackedCatalogOpen),
+        "odt_source_backed_catalog_list" => Some(Case::OdtSourceBackedCatalogList),
+        "odt_source_backed_catalog_query" => Some(Case::OdtSourceBackedCatalogQuery),
         "ods_semantic_open" => Some(Case::OdsSemanticOpen),
         "ods_semantic_list_sheets" => Some(Case::OdsSemanticListSheets),
         "ods_semantic_one_cell" => Some(Case::OdsSemanticOneCell),
@@ -10781,6 +10903,9 @@ fn usage_text() -> String {
                                        odt_content_cow_owned_rebuild,odt_content_cow_positional,\n\
                                        odt_source_backed_repeated_text_uncached,\n\
                                        odt_source_backed_repeated_text_cached,\n\
+                                       odt_source_backed_catalog_open,\n\
+                                       odt_source_backed_catalog_list,\n\
+                                       odt_source_backed_catalog_query,\n\
                                        ods_semantic_open,\n\
                                        ods_semantic_list_sheets,ods_semantic_one_cell,\n\
                                        ods_semantic_cell_sweep,\n\
@@ -17912,7 +18037,9 @@ fn verify_xlsx_cell_crud_package_identity(
     if source_parts
         .iter()
         .any(|name| Some(name.as_str()) != removed_member && !candidate_parts.contains(name))
-        || candidate_parts.iter().any(|name| !source_parts.contains(name))
+        || candidate_parts
+            .iter()
+            .any(|name| !source_parts.contains(name))
     {
         return Err("XLSX cell CRUD output changed package part set".into());
     }
@@ -17922,11 +18049,7 @@ fn verify_xlsx_cell_crud_package_identity(
         allow_calculation_invalidation,
     )?;
     if let Some(chain) = removed_chain {
-        verify_xlsx_cell_crud_raw_calculation_chain_removal(
-            &corpus.archive,
-            output,
-            chain,
-        )?;
+        verify_xlsx_cell_crud_raw_calculation_chain_removal(&corpus.archive, output, chain)?;
     }
     let workbook_uri = PackURI::new("/xl/workbook.xml")?;
     let source_workbook = source.get_part(&workbook_uri)?;
@@ -17996,9 +18119,7 @@ fn xlsx_cell_crud_untouched_member_evidence(
     if source
         .keys()
         .any(|name| Some(name.as_str()) != removed_member && !candidate.contains_key(name))
-        || candidate
-            .keys()
-            .any(|name| !source.contains_key(name))
+        || candidate.keys().any(|name| !source.contains_key(name))
     {
         return Err("XLSX source CRUD raw ZIP member set differs from source".into());
     }
@@ -18013,19 +18134,11 @@ fn xlsx_cell_crud_untouched_member_evidence(
             calculation_closure.insert("xl/_rels/workbook.xml.rels".to_owned());
             calculation_closure.insert("[Content_Types].xml".to_owned());
             calculation_closure.insert(chain.target_member.clone());
-            verify_xlsx_cell_crud_raw_calculation_chain_removal(
-                &corpus.archive,
-                output,
-                chain,
-            )?;
+            verify_xlsx_cell_crud_raw_calculation_chain_removal(&corpus.archive, output, chain)?;
         }
     }
     if allow_calculation_invalidation {
-        verify_xlsx_cell_crud_workbook_calculation_closure(
-            corpus,
-            output,
-            true,
-        )?;
+        verify_xlsx_cell_crud_workbook_calculation_closure(corpus, output, true)?;
     }
     let mut all_members = source.keys().cloned().collect::<BTreeSet<_>>();
     all_members.extend(candidate.keys().cloned());
@@ -19621,6 +19734,11 @@ fn run_case_with_config(
         },
         Case::OdtSourceBackedRepeatedTextUncached | Case::OdtSourceBackedRepeatedTextCached => {
             run_odt_repeated_text(case, corpus, warmup_iterations, samples)
+        },
+        Case::OdtSourceBackedCatalogOpen
+        | Case::OdtSourceBackedCatalogList
+        | Case::OdtSourceBackedCatalogQuery => {
+            run_odt_source_backed_catalog(case, corpus, warmup_iterations, samples)
         },
         Case::OdsSemanticOpen
         | Case::OdsSemanticListSheets
@@ -22304,7 +22422,10 @@ fn cfb_collect_chain(
     let mut seen = BTreeSet::new();
     let mut current = start;
     loop {
-        if usize::try_from(current).ok().is_none_or(|value| value >= sector_count) {
+        if usize::try_from(current)
+            .ok()
+            .is_none_or(|value| value >= sector_count)
+        {
             return Err("CFB stream chain points outside the archive".into());
         }
         if !seen.insert(current) {
@@ -22453,11 +22574,8 @@ fn cfb_fat_and_directory(archive: &[u8]) -> Result<CfbArchiveLayout, Box<dyn Err
         structural_ranges.push(cfb_physical_sector_range(sector_size, sector)?);
         directory.extend_from_slice(&archive[cfb_sector_range(archive, sector_size, sector)?]);
     }
-    let mini_fat_sector_count = usize::try_from(cfb_read_u32(
-        archive,
-        64,
-        "MiniFAT sector count",
-    )?)?;
+    let mini_fat_sector_count =
+        usize::try_from(cfb_read_u32(archive, 64, "MiniFAT sector count")?)?;
     if mini_fat_sector_count != 0 {
         let mini_fat_start = cfb_read_u32(archive, 60, "MiniFAT start sector")?;
         let mini_fat_chain = cfb_collect_chain(&fat, sector_count, mini_fat_start)?;
@@ -22496,8 +22614,8 @@ fn cfb_workbook_chain(
         if entry[66] == 2 && name.eq_ignore_ascii_case("Workbook") {
             let start = u32::from_le_bytes([entry[116], entry[117], entry[118], entry[119]]);
             let size = u64::from_le_bytes([
-                entry[120], entry[121], entry[122], entry[123], entry[124], entry[125],
-                entry[126], entry[127],
+                entry[120], entry[121], entry[122], entry[123], entry[124], entry[125], entry[126],
+                entry[127],
             ]);
             workbook = Some((start, size));
             break;
@@ -22537,24 +22655,14 @@ fn cfb_opaque_payload_ranges(
     directory: &[u8],
 ) -> Result<Vec<Range<u64>>, Box<dyn Error>> {
     let sector_count = (archive.len() - 512) / sector_size;
-    let mini_stream_cutoff = u64::from(cfb_read_u32(
-        archive,
-        56,
-        "mini stream cutoff",
-    )?);
+    let mini_stream_cutoff = u64::from(cfb_read_u32(archive, 56, "mini stream cutoff")?);
     let mut opaque_ranges = Vec::new();
     let mut root_mini_stream = None;
     for entry in directory.chunks_exact(128) {
         let object_type = entry[66];
         let start = u32::from_le_bytes([entry[116], entry[117], entry[118], entry[119]]);
         let size = u64::from_le_bytes([
-            entry[120],
-            entry[121],
-            entry[122],
-            entry[123],
-            entry[124],
-            entry[125],
-            entry[126],
+            entry[120], entry[121], entry[122], entry[123], entry[124], entry[125], entry[126],
             entry[127],
         ]);
         if object_type == 5 {
@@ -22608,7 +22716,9 @@ fn parse_xls_bound_sheets(workbook: &[u8]) -> Result<(u64, Vec<XlsBoundSheet>), 
             let name_length = usize::from(payload[6]);
             let unicode = payload[7] & 0x01 != 0;
             let name_units = if unicode {
-                let byte_length = name_length.checked_mul(2).ok_or("XLS sheet name overflows")?;
+                let byte_length = name_length
+                    .checked_mul(2)
+                    .ok_or("XLS sheet name overflows")?;
                 payload
                     .get(8..8 + byte_length)
                     .ok_or("XLS Unicode sheet name exceeds BoundSheet8")?
@@ -22624,9 +22734,8 @@ fn parse_xls_bound_sheets(workbook: &[u8]) -> Result<(u64, Vec<XlsBoundSheet>), 
                     .collect::<Vec<_>>()
             };
             let name = String::from_utf16_lossy(&name_units);
-            global_end = Some(global_end.map_or(stream_offset, |current: u64| {
-                current.min(stream_offset)
-            }));
+            global_end =
+                Some(global_end.map_or(stream_offset, |current: u64| current.min(stream_offset)));
             bounds.push(XlsBoundSheet {
                 offset: stream_offset,
                 worksheet,
@@ -22642,7 +22751,11 @@ fn parse_xls_bound_sheets(workbook: &[u8]) -> Result<(u64, Vec<XlsBoundSheet>), 
         }
     }
     let global_end = global_end.ok_or("XLS Workbook globals have no BoundSheet8 records")?;
-    if bounds.is_empty() || bounds.windows(2).any(|pair| pair[0].offset >= pair[1].offset) {
+    if bounds.is_empty()
+        || bounds
+            .windows(2)
+            .any(|pair| pair[0].offset >= pair[1].offset)
+    {
         return Err("XLS BoundSheet8 offsets are not strictly increasing".into());
     }
     if bounds
@@ -22667,12 +22780,8 @@ fn build_xls_source_layout(corpus: &Corpus) -> Result<XlsSourceLayout, Box<dyn E
     let sector_size = cfb.sector_size;
     let fat = cfb.fat;
     let directory = cfb.directory;
-    let opaque_payload_ranges = cfb_opaque_payload_ranges(
-        &corpus.archive,
-        sector_size,
-        &fat,
-        &directory,
-    )?;
+    let opaque_payload_ranges =
+        cfb_opaque_payload_ranges(&corpus.archive, sector_size, &fat, &directory)?;
     if opaque_payload_ranges.is_empty() {
         return Err("XLS source-backed corpus has no opaque payload ranges".into());
     }
@@ -22923,8 +23032,7 @@ fn run_xls_source_backed_case(
             }
             validate_xls_measured_operation(&operation, &layout)?;
             let source_version_after = source.version()?;
-            let source_version_stability_verified =
-                source_version_before == source_version_after;
+            let source_version_stability_verified = source_version_before == source_version_after;
             if !source_version_stability_verified {
                 return Err("XLS source-backed source version changed during the operation".into());
             }
@@ -22945,10 +23053,8 @@ fn run_xls_source_backed_case(
                 implementation: "source-backed",
                 operation: operation_name,
                 timing_scope: operation_name,
-                source_counter_scope:
-                    "caller-provided ReadAt logical ranges: actual CFB metadata versus opaque payload",
-                materialization_scope:
-                    "complete archive only; parser-owned Workbook globals/SST are materialized but not counted",
+                source_counter_scope: "caller-provided ReadAt logical ranges: actual CFB metadata versus opaque payload",
+                materialization_scope: "complete archive only; parser-owned Workbook globals/SST are materialized but not counted",
                 source_retained_bytes: u64::try_from(corpus.archive.len())?,
                 complete_archive_materialized_bytes: 0,
                 parsed_sheet_count: layout.parsed_sheet_count,
@@ -23059,7 +23165,10 @@ fn run_xls_source_backed_case(
         }
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
-    if measured_digests.iter().any(|digest| digest != &expected_digest) {
+    if measured_digests
+        .iter()
+        .any(|digest| digest != &expected_digest)
+    {
         return Err("XLS source-backed lifecycle digest is unstable".into());
     }
     let mut output = result(case, corpus, elapsed, None);
@@ -29975,8 +30084,7 @@ fn run_semantic_ods_text_to_sink(
     if semantic_ods_full_cell_text(&spreadsheet, shape)? != expected_cells {
         return Err("semantic ODS sink oracle differs from full-cell semantics".into());
     }
-    let options =
-        litchi_core::TextOutputOptions::new("\n", "", expected_bytes, expected_objects);
+    let options = litchi_core::TextOutputOptions::new("\n", "", expected_bytes, expected_objects);
     let mut elapsed = Vec::with_capacity(samples);
     let mut summaries = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
@@ -32922,6 +33030,558 @@ fn run_odt_repeated_text(
             ordinary_payload_read_calls: vec![0; samples],
             ordinary_payload_read_bytes: vec![0; samples],
             odt_repeated_text: Some(summary),
+            ..SourceSummary::default()
+        },
+    ))
+}
+
+fn odt_catalog_entries_digest(entries: &[litchi_odt::TextBlockCatalogEntry]) -> String {
+    let mut digest = Sha256::new();
+    for entry in entries {
+        digest.update((entry.index() as u64).to_le_bytes());
+        digest.update([match entry.kind() {
+            litchi_odt::elements::text::Kind::Paragraph => 0_u8,
+            litchi_odt::elements::text::Kind::Heading => 1_u8,
+        }]);
+    }
+    fingerprint_hex(&digest.finalize().into())
+}
+
+fn odt_expected_catalog_entries_digest(count: usize) -> String {
+    let mut digest = Sha256::new();
+    for index in 0..count {
+        digest.update((index as u64).to_le_bytes());
+        digest.update([0_u8]);
+    }
+    fingerprint_hex(&digest.finalize().into())
+}
+
+fn verify_odt_catalog_entries(
+    entries: &[litchi_odt::TextBlockCatalogEntry],
+    expected_count: usize,
+    expected_digest: &str,
+) -> Result<String, Box<dyn Error>> {
+    if entries.len() != expected_count
+        || entries.iter().enumerate().any(|(index, entry)| {
+            entry.index() != index || entry.kind() != litchi_odt::elements::text::Kind::Paragraph
+        })
+    {
+        return Err("ODT source catalog entries differ from the deterministic block oracle".into());
+    }
+    let digest = odt_catalog_entries_digest(entries);
+    if digest != expected_digest {
+        return Err("ODT source catalog digest differs from the deterministic block oracle".into());
+    }
+    Ok(digest)
+}
+
+fn odt_catalog_case_parameters(
+    case: Case,
+) -> Result<(&'static str, Option<usize>), Box<dyn Error>> {
+    match case {
+        Case::OdtSourceBackedCatalogOpen => Ok(("open", None)),
+        Case::OdtSourceBackedCatalogList => Ok(("list", None)),
+        Case::OdtSourceBackedCatalogQuery => {
+            Ok(("query", Some(ODT_SOURCE_BACKED_CATALOG_QUERY_INDEX)))
+        },
+        _ => Err("non-catalog ODT case passed to catalog case parameters".into()),
+    }
+}
+
+fn run_odt_source_backed_catalog(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if !case.is_odt_source_backed_catalog() {
+        return Err("non-catalog ODT case passed to catalog runner".into());
+    }
+    if corpus.manifest.generator != ODT_REPEATED_TEXT_CORPUS_GENERATOR {
+        return Err("ODT source catalog cases require the fixed large media-rich corpus".into());
+    }
+    let (operation, selected_index) = odt_catalog_case_parameters(case)?;
+    let eager = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+    verify_semantic_odt(&eager, SemanticShape::Large, &[])?;
+    let expected_text = eager.text()?;
+    let expected_block_count = eager.paragraph_count()?;
+    if expected_block_count != SemanticShape::Large.docx_paragraphs() {
+        return Err("ODT source catalog paragraph count differs from corpus shape".into());
+    }
+    if selected_index.is_some_and(|index| index >= expected_block_count) {
+        return Err("ODT source catalog query index is outside the corpus".into());
+    }
+    let expected_catalog_digest = odt_expected_catalog_entries_digest(expected_block_count);
+    let expected_selected_block_text_sha256 =
+        selected_index.map(|index| sha256_hex(semantic_odt_text(index, false).as_bytes()));
+    let content_xml = odf_content_xml(&corpus.archive)?;
+    let (content_range, untouched_ranges, picture_ranges) = odt_repeated_text_ranges(corpus)?;
+    let archive_member_count = ArchiveReader::new(&corpus.archive)?.file_names().count();
+    if archive_member_count != corpus.manifest.archive_member_count || archive_member_count != 13 {
+        return Err("ODT source catalog archive member count differs from the fixed corpus".into());
+    }
+    verify_odt_repeated_text_archive(&corpus.archive)?;
+    let pictures_uncompressed_payload_bytes = u64::try_from(
+        ODS_MEDIA_ENTRY_COUNT
+            .checked_mul(ODS_MEDIA_ENTRY_BYTES)
+            .ok_or("ODT source catalog Pictures byte count overflows usize")?,
+    )?;
+    let pictures_uncompressed_payload_sha256 = odt_repeated_text_media_payload_digest();
+
+    let mut elapsed = Vec::new();
+    elapsed
+        .try_reserve_exact(samples)
+        .map_err(|error| format!("ODT source catalog elapsed allocation failed: {error}"))?;
+    let mut summary = OdtCatalogSummary {
+        implementation: "source_backed_document_catalog",
+        operation,
+        timing_scope: match operation {
+            "open" => {
+                "fresh SourceBackedDocumentCatalog::from_read_at inside timer; corpus, source allocation, semantic/archive/media gates, and instrumented replay outside timer"
+            },
+            "list" => {
+                "SourceBackedDocumentCatalog prepared outside timer; catalog() only inside timer; semantic/archive/media gates and instrumented replay outside timer"
+            },
+            "query" => {
+                "SourceBackedDocumentCatalog prepared outside timer; block_at(5000) only inside timer; semantic/archive/media gates and instrumented replay outside timer"
+            },
+            _ => unreachable!("catalog operation validated above"),
+        },
+        source_evidence_scope: "separate untimed InstrumentedSource replay per retained sample",
+        selected_index,
+        text_block_count: expected_block_count,
+        catalog_entries_sha256: expected_catalog_digest.clone(),
+        selected_block_text_sha256: expected_selected_block_text_sha256.clone(),
+        archive_member_count,
+        pictures_count: picture_ranges.len(),
+        pictures_uncompressed_payload_bytes,
+        canonical_text_sha256: sha256_hex(expected_text.as_bytes()),
+        content_xml_sha256: sha256_hex(&content_xml),
+        source_archive_bytes: u64::try_from(corpus.archive.len())?,
+        source_archive_sha256: corpus.manifest.archive_sha256.clone(),
+        pictures_uncompressed_payload_sha256,
+        ..OdtCatalogSummary::default()
+    };
+
+    macro_rules! reserve_catalog_summary_vec {
+        ($field:ident, $label:literal) => {
+            summary.$field.try_reserve_exact(samples).map_err(|error| {
+                format!(
+                    concat!("ODT source catalog ", $label, " allocation failed: {}"),
+                    error
+                )
+            })?;
+        };
+    }
+    reserve_catalog_summary_vec!(source_preparation_read_calls, "preparation-call");
+    reserve_catalog_summary_vec!(source_preparation_read_bytes, "preparation-byte");
+    reserve_catalog_summary_vec!(
+        source_preparation_content_read_calls,
+        "preparation-content-call"
+    );
+    reserve_catalog_summary_vec!(
+        source_preparation_content_read_bytes,
+        "preparation-content-byte"
+    );
+    reserve_catalog_summary_vec!(
+        source_preparation_untouched_read_calls,
+        "preparation-untouched-call"
+    );
+    reserve_catalog_summary_vec!(
+        source_preparation_untouched_read_bytes,
+        "preparation-untouched-byte"
+    );
+    reserve_catalog_summary_vec!(
+        source_preparation_pictures_read_calls,
+        "preparation-pictures-call"
+    );
+    reserve_catalog_summary_vec!(
+        source_preparation_pictures_read_bytes,
+        "preparation-pictures-byte"
+    );
+    reserve_catalog_summary_vec!(
+        source_preparation_payload_read_calls,
+        "preparation-payload-call"
+    );
+    reserve_catalog_summary_vec!(
+        source_preparation_payload_read_bytes,
+        "preparation-payload-byte"
+    );
+    reserve_catalog_summary_vec!(
+        source_preparation_version_observations,
+        "preparation-version"
+    );
+    reserve_catalog_summary_vec!(source_replay_read_calls, "replay-call");
+    reserve_catalog_summary_vec!(source_replay_read_bytes, "replay-byte");
+    reserve_catalog_summary_vec!(source_replay_range_overlap_bytes, "replay-overlap");
+    reserve_catalog_summary_vec!(source_replay_content_read_calls, "replay-content-call");
+    reserve_catalog_summary_vec!(source_replay_content_read_bytes, "replay-content-byte");
+    reserve_catalog_summary_vec!(source_replay_untouched_read_calls, "replay-untouched-call");
+    reserve_catalog_summary_vec!(source_replay_untouched_read_bytes, "replay-untouched-byte");
+    reserve_catalog_summary_vec!(source_replay_pictures_read_calls, "replay-pictures-call");
+    reserve_catalog_summary_vec!(source_replay_pictures_read_bytes, "replay-pictures-byte");
+    reserve_catalog_summary_vec!(source_replay_payload_read_calls, "replay-payload-call");
+    reserve_catalog_summary_vec!(source_replay_payload_read_bytes, "replay-payload-byte");
+    reserve_catalog_summary_vec!(source_replay_version_observations, "replay-version");
+    reserve_catalog_summary_vec!(observed_catalog_entries_sha256, "catalog-digest");
+    reserve_catalog_summary_vec!(observed_block_text_sha256, "block-digest");
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let (duration, observed_catalog_digest, observed_block_digest) = match operation {
+            "open" => {
+                let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+                let started = Instant::now();
+                let catalog = litchi_odt::SourceBackedDocumentCatalog::from_read_at(source)?;
+                let duration = started.elapsed();
+                std::hint::black_box(&catalog);
+                let entries = catalog.catalog()?;
+                let digest = verify_odt_catalog_entries(
+                    entries,
+                    expected_block_count,
+                    &expected_catalog_digest,
+                )?;
+                (duration, Some(digest), None)
+            },
+            "list" => {
+                let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+                let catalog = litchi_odt::SourceBackedDocumentCatalog::from_read_at(source)?;
+                let started = Instant::now();
+                let entries = catalog.catalog()?;
+                let duration = started.elapsed();
+                std::hint::black_box(entries);
+                let digest = verify_odt_catalog_entries(
+                    entries,
+                    expected_block_count,
+                    &expected_catalog_digest,
+                )?;
+                (duration, Some(digest), None)
+            },
+            "query" => {
+                let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+                let catalog = litchi_odt::SourceBackedDocumentCatalog::from_read_at(source)?;
+                let query_index =
+                    selected_index.ok_or("ODT source catalog query has no selected index")?;
+                let started = Instant::now();
+                let block = catalog.block_at(query_index)?;
+                let duration = started.elapsed();
+                std::hint::black_box(&block);
+                let block = block.ok_or("ODT source catalog query unexpectedly returned None")?;
+                if block.kind() != litchi_odt::elements::text::Kind::Paragraph
+                    || block.text()? != semantic_odt_text(query_index, false)
+                {
+                    return Err("ODT source catalog query differs from the block oracle".into());
+                }
+                (duration, None, Some(sha256_hex(block.text()?.as_bytes())))
+            },
+            _ => unreachable!("catalog operation validated above"),
+        };
+        if iteration >= warmup_iterations {
+            if let Some(digest) = observed_catalog_digest {
+                summary.observed_catalog_entries_sha256.push(digest);
+            }
+            if let Some(digest) = observed_block_digest {
+                summary.observed_block_text_sha256.push(digest);
+            }
+        }
+        record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
+    }
+
+    let mut expected_preparation: Option<(SourceSnapshot, u64)> = None;
+    let mut expected_replay: Option<(SourceSnapshot, u64)> = None;
+    let mut source_ranges_verified = true;
+    let mut source_version_stability_verified = true;
+    let mut content_read_requirement_verified = true;
+    let mut list_zero_payload_reads_verified = true;
+    let mut zero_pictures_reads_verified = true;
+
+    for _ in 0..samples {
+        let source = Arc::new(InstrumentedSource::new_odf(
+            corpus.archive.clone(),
+            vec![content_range.clone()],
+            untouched_ranges.clone(),
+            picture_ranges.clone(),
+        ));
+        let expected_source_version = source.version;
+        let catalog = litchi_odt::SourceBackedDocumentCatalog::from_read_at(source.clone())?;
+        let (preparation, preparation_versions) = if operation == "open" {
+            (None, 0)
+        } else {
+            let preparation = source.snapshot();
+            let preparation_versions = source.version_calls();
+            source.reset();
+            (Some(preparation), preparation_versions)
+        };
+        if let Some(preparation) = preparation {
+            let preparation_valid = preparation.read_calls > 0
+                && preparation.read_bytes > 0
+                && preparation.odf.content.read_calls > 0
+                && preparation.odf.content.read_bytes > 0
+                && preparation.odf.pictures.read_calls == 0
+                && preparation.odf.pictures.read_bytes == 0;
+            if !preparation_valid {
+                return Err("ODT source catalog preparation failed source-range gates".into());
+            }
+        }
+
+        let (replay, replay_versions, observed_catalog_digest, observed_block_digest) =
+            match operation {
+                "open" => {
+                    let replay = source.snapshot();
+                    let replay_versions = source.version_calls();
+                    let entries = catalog.catalog()?;
+                    let digest = verify_odt_catalog_entries(
+                        entries,
+                        expected_block_count,
+                        &expected_catalog_digest,
+                    )?;
+                    (replay, replay_versions, Some(digest), None)
+                },
+                "list" => {
+                    let entries = catalog.catalog()?;
+                    let digest = verify_odt_catalog_entries(
+                        entries,
+                        expected_block_count,
+                        &expected_catalog_digest,
+                    )?;
+                    let replay = source.snapshot();
+                    let replay_versions = source.version_calls();
+                    (replay, replay_versions, Some(digest), None)
+                },
+                "query" => {
+                    let query_index =
+                        selected_index.ok_or("ODT source catalog query has no selected index")?;
+                    let block = catalog.block_at(query_index)?;
+                    let block =
+                        block.ok_or("ODT source catalog query unexpectedly returned None")?;
+                    if block.kind() != litchi_odt::elements::text::Kind::Paragraph
+                        || block.text()? != semantic_odt_text(query_index, false)
+                    {
+                        return Err(
+                            "ODT source catalog instrumented query differs from the block oracle"
+                                .into(),
+                        );
+                    }
+                    let digest = sha256_hex(block.text()?.as_bytes());
+                    let replay = source.snapshot();
+                    let replay_versions = source.version_calls();
+                    (replay, replay_versions, None, Some(digest))
+                },
+                _ => unreachable!("catalog operation validated above"),
+            };
+
+        let content_read_valid = if operation == "list" {
+            replay.odf.content.read_calls == 0 && replay.odf.content.read_bytes == 0
+        } else {
+            replay.odf.content.read_calls > 0 && replay.odf.content.read_bytes > 0
+        };
+        let no_pictures_reads = replay.odf.pictures.read_calls == 0
+            && replay.odf.pictures.read_bytes == 0
+            && preparation.is_none_or(|value| {
+                value.odf.pictures.read_calls == 0 && value.odf.pictures.read_bytes == 0
+            });
+        let list_zero_payload_reads = operation != "list"
+            || (replay.read_calls == 0
+                && replay.read_bytes == 0
+                && replay.ordinary_payload_read_calls == 0
+                && replay.ordinary_payload_read_bytes == 0);
+        let range_shape_valid = match operation {
+            "open" => {
+                replay.read_calls > 0
+                    && replay.read_bytes > 0
+                    && replay.odf.content.read_calls > 0
+                    && replay.odf.content.read_bytes > 0
+                    && replay.odf.untouched.read_calls > 0
+                    && replay.odf.untouched.read_bytes > 0
+                    && replay.ordinary_payload_read_calls > 0
+                    && replay.ordinary_payload_read_bytes > 0
+                    && replay.odf.pictures.read_calls == 0
+                    && replay.odf.pictures.read_bytes == 0
+            },
+            "list" => {
+                replay.read_calls == 0
+                    && replay.read_bytes == 0
+                    && replay.odf.content.read_calls == 0
+                    && replay.odf.content.read_bytes == 0
+                    && replay.odf.untouched.read_calls == 0
+                    && replay.odf.untouched.read_bytes == 0
+                    && replay.ordinary_payload_read_calls == 0
+                    && replay.ordinary_payload_read_bytes == 0
+                    && replay.odf.pictures.read_calls == 0
+                    && replay.odf.pictures.read_bytes == 0
+            },
+            "query" => {
+                replay.read_calls > 0
+                    && replay.read_bytes > 0
+                    && replay.odf.content.read_calls > 0
+                    && replay.odf.content.read_bytes > 0
+                    && replay.odf.untouched.read_calls == 0
+                    && replay.odf.untouched.read_bytes == 0
+                    && replay.ordinary_payload_read_calls == 0
+                    && replay.ordinary_payload_read_bytes == 0
+                    && replay.odf.pictures.read_calls == 0
+                    && replay.odf.pictures.read_bytes == 0
+            },
+            _ => unreachable!("catalog operation validated above"),
+        };
+        if !content_read_valid {
+            return Err("ODT source catalog content-read requirement failed".into());
+        }
+        if !list_zero_payload_reads {
+            return Err("ODT source catalog list performed a timed payload read".into());
+        }
+        if !no_pictures_reads {
+            return Err("ODT source catalog source replay read a Pictures payload".into());
+        }
+        if !range_shape_valid {
+            return Err("ODT source catalog source-range shape failed".into());
+        }
+
+        let source_version_stable = source.version()? == expected_source_version
+            && catalog.source_version()? == expected_source_version;
+        if !source_version_stable {
+            return Err("ODT source catalog source version changed during replay".into());
+        }
+
+        let preparation_tuple = preparation.map(|value| (value, preparation_versions));
+        if let Some(expected) = expected_preparation.as_ref() {
+            if preparation_tuple.as_ref() != Some(expected) {
+                return Err("ODT source catalog preparation counters are not deterministic".into());
+            }
+        } else {
+            expected_preparation = preparation_tuple;
+        }
+        let replay_tuple = (replay, replay_versions);
+        if let Some(expected) = expected_replay {
+            if expected != replay_tuple {
+                return Err("ODT source catalog replay counters are not deterministic".into());
+            }
+        } else {
+            expected_replay = Some(replay_tuple);
+        }
+
+        if let Some(preparation) = preparation {
+            summary
+                .source_preparation_read_calls
+                .push(preparation.read_calls);
+            summary
+                .source_preparation_read_bytes
+                .push(preparation.read_bytes);
+            summary
+                .source_preparation_content_read_calls
+                .push(preparation.odf.content.read_calls);
+            summary
+                .source_preparation_content_read_bytes
+                .push(preparation.odf.content.read_bytes);
+            summary
+                .source_preparation_untouched_read_calls
+                .push(preparation.odf.untouched.read_calls);
+            summary
+                .source_preparation_untouched_read_bytes
+                .push(preparation.odf.untouched.read_bytes);
+            summary
+                .source_preparation_pictures_read_calls
+                .push(preparation.odf.pictures.read_calls);
+            summary
+                .source_preparation_pictures_read_bytes
+                .push(preparation.odf.pictures.read_bytes);
+            summary
+                .source_preparation_payload_read_calls
+                .push(preparation.ordinary_payload_read_calls);
+            summary
+                .source_preparation_payload_read_bytes
+                .push(preparation.ordinary_payload_read_bytes);
+            summary
+                .source_preparation_version_observations
+                .push(preparation_versions);
+        }
+        summary.source_replay_read_calls.push(replay.read_calls);
+        summary.source_replay_read_bytes.push(replay.read_bytes);
+        summary
+            .source_replay_range_overlap_bytes
+            .push(replay.read_range_overlap_bytes);
+        summary
+            .source_replay_content_read_calls
+            .push(replay.odf.content.read_calls);
+        summary
+            .source_replay_content_read_bytes
+            .push(replay.odf.content.read_bytes);
+        summary
+            .source_replay_untouched_read_calls
+            .push(replay.odf.untouched.read_calls);
+        summary
+            .source_replay_untouched_read_bytes
+            .push(replay.odf.untouched.read_bytes);
+        summary
+            .source_replay_pictures_read_calls
+            .push(replay.odf.pictures.read_calls);
+        summary
+            .source_replay_pictures_read_bytes
+            .push(replay.odf.pictures.read_bytes);
+        summary
+            .source_replay_payload_read_calls
+            .push(replay.ordinary_payload_read_calls);
+        summary
+            .source_replay_payload_read_bytes
+            .push(replay.ordinary_payload_read_bytes);
+        summary
+            .source_replay_version_observations
+            .push(replay_versions);
+        if let Some(digest) = observed_catalog_digest
+            && digest != expected_catalog_digest
+        {
+            return Err("ODT source catalog replay catalog digest differs from oracle".into());
+        }
+        if let Some(digest) = observed_block_digest.as_ref()
+            && Some(digest) != expected_selected_block_text_sha256.as_ref()
+        {
+            return Err("ODT source catalog replay block digest differs from oracle".into());
+        }
+        source_ranges_verified &= range_shape_valid;
+        source_version_stability_verified &= source_version_stable;
+        content_read_requirement_verified &= content_read_valid;
+        list_zero_payload_reads_verified &= list_zero_payload_reads;
+        zero_pictures_reads_verified &= no_pictures_reads;
+    }
+
+    if summary.observed_catalog_entries_sha256.len()
+        != if operation == "query" { 0 } else { samples }
+        || summary.observed_block_text_sha256.len()
+            != if operation == "query" { samples } else { 0 }
+    {
+        return Err("ODT source catalog digest evidence has unexpected cardinality".into());
+    }
+    summary.semantic_parity_verified = true;
+    summary.archive_topology_verified = archive_member_count == 13
+        && picture_ranges.len() == ODS_MEDIA_ENTRY_COUNT
+        && expected_block_count == 10_000;
+    summary.media_payloads_verified = true;
+    summary.source_ranges_verified = source_ranges_verified;
+    summary.source_version_stability_verified = source_version_stability_verified;
+    summary.content_read_requirement_verified = content_read_requirement_verified;
+    summary.list_zero_payload_reads_verified = list_zero_payload_reads_verified;
+    summary.zero_pictures_reads_verified = zero_pictures_reads_verified;
+    if !summary.archive_topology_verified
+        || !summary.semantic_parity_verified
+        || !summary.media_payloads_verified
+        || !summary.source_ranges_verified
+        || !summary.source_version_stability_verified
+        || !summary.content_read_requirement_verified
+        || !summary.list_zero_payload_reads_verified
+        || !summary.zero_pictures_reads_verified
+    {
+        return Err("ODT source catalog evidence gates are incomplete".into());
+    }
+
+    Ok(result_with_source(
+        case,
+        corpus,
+        elapsed,
+        SourceSummary {
+            read_calls: summary.source_replay_read_calls.clone(),
+            read_bytes: summary.source_replay_read_bytes.clone(),
+            ordinary_payload_read_calls: summary.source_replay_payload_read_calls.clone(),
+            ordinary_payload_read_bytes: summary.source_replay_payload_read_bytes.clone(),
+            odt_catalog: Some(summary),
             ..SourceSummary::default()
         },
     ))
@@ -45472,10 +46132,10 @@ fn xlsx_xml_tag_end(xml: &[u8], start: usize) -> Result<usize, Box<dyn Error>> {
     for (offset, byte) in xml.iter().enumerate().skip(start + 1) {
         match quote {
             Some(value) if *byte == value => quote = None,
-            Some(_) => {}
+            Some(_) => {},
             None if *byte == b'\'' || *byte == b'"' => quote = Some(*byte),
             None if *byte == b'>' => return Ok(offset + 1),
-            None => {}
+            None => {},
         }
     }
     Err(format!("unterminated XML tag at byte {start}").into())
@@ -45494,7 +46154,10 @@ fn xlsx_xml_next_token(
             return Ok(None);
         };
         let start = *cursor + relative_start;
-        if xml.get(start..).is_some_and(|value| value.starts_with(b"<!--")) {
+        if xml
+            .get(start..)
+            .is_some_and(|value| value.starts_with(b"<!--"))
+        {
             let end = xml
                 .get(start + 4..)
                 .and_then(|value| value.windows(3).position(|window| window == b"-->"))
@@ -45503,7 +46166,10 @@ fn xlsx_xml_next_token(
             *cursor = end;
             continue;
         }
-        if xml.get(start..).is_some_and(|value| value.starts_with(b"<![CDATA[")) {
+        if xml
+            .get(start..)
+            .is_some_and(|value| value.starts_with(b"<![CDATA["))
+        {
             let end = xml
                 .get(start + 9..)
                 .and_then(|value| value.windows(3).position(|window| window == b"]]>"))
@@ -45512,7 +46178,10 @@ fn xlsx_xml_next_token(
             *cursor = end;
             continue;
         }
-        if xml.get(start..).is_some_and(|value| value.starts_with(b"<?")) {
+        if xml
+            .get(start..)
+            .is_some_and(|value| value.starts_with(b"<?"))
+        {
             let end = xml
                 .get(start + 2..)
                 .and_then(|value| value.windows(2).position(|window| window == b"?>"))
@@ -45523,7 +46192,10 @@ fn xlsx_xml_next_token(
             *cursor = end;
             continue;
         }
-        if xml.get(start..).is_some_and(|value| value.starts_with(b"<!")) {
+        if xml
+            .get(start..)
+            .is_some_and(|value| value.starts_with(b"<!"))
+        {
             *cursor = xlsx_xml_tag_end(xml, start)?;
             continue;
         }
@@ -45543,9 +46215,10 @@ fn xlsx_xml_next_token(
             name_start += 1;
         }
         let mut name_end = name_start;
-        while xml.get(name_end).is_some_and(|byte| {
-            !byte.is_ascii_whitespace() && *byte != b'/' && *byte != b'>'
-        }) {
+        while xml
+            .get(name_end)
+            .is_some_and(|byte| !byte.is_ascii_whitespace() && *byte != b'/' && *byte != b'>')
+        {
             name_end += 1;
         }
         if name_end == name_start {
@@ -45583,9 +46256,10 @@ fn xlsx_xml_attribute_value<'a>(tag: &'a [u8], wanted: &[u8]) -> Option<&'a [u8]
     if tag.get(cursor) == Some(&b'/') {
         cursor += 1;
     }
-    while tag.get(cursor).is_some_and(|byte| {
-        !byte.is_ascii_whitespace() && *byte != b'/' && *byte != b'>'
-    }) {
+    while tag
+        .get(cursor)
+        .is_some_and(|byte| !byte.is_ascii_whitespace() && *byte != b'/' && *byte != b'>')
+    {
         cursor += 1;
     }
     while cursor < tag.len() {
@@ -45612,9 +46286,10 @@ fn xlsx_xml_attribute_value<'a>(tag: &'a [u8], wanted: &[u8]) -> Option<&'a [u8]
             cursor += 1;
         }
         if tag.get(cursor) != Some(&b'=') {
-            while tag.get(cursor).is_some_and(|byte| {
-                *byte != b'>' && !byte.is_ascii_whitespace()
-            }) {
+            while tag
+                .get(cursor)
+                .is_some_and(|byte| *byte != b'>' && !byte.is_ascii_whitespace())
+            {
                 cursor += 1;
             }
             continue;
@@ -45647,17 +46322,16 @@ fn xlsx_xml_attribute_value<'a>(tag: &'a [u8], wanted: &[u8]) -> Option<&'a [u8]
     None
 }
 
-fn xlsx_xml_namespace_declarations(
-    tag: &[u8],
-) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Box<dyn Error>> {
+fn xlsx_xml_namespace_declarations(tag: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Box<dyn Error>> {
     let mut declarations = Vec::new();
     let mut cursor = 1;
     if tag.get(cursor) == Some(&b'/') {
         cursor += 1;
     }
-    while tag.get(cursor).is_some_and(|byte| {
-        !byte.is_ascii_whitespace() && *byte != b'/' && *byte != b'>'
-    }) {
+    while tag
+        .get(cursor)
+        .is_some_and(|byte| !byte.is_ascii_whitespace() && *byte != b'/' && *byte != b'>')
+    {
         cursor += 1;
     }
     while cursor < tag.len() {
@@ -45684,9 +46358,10 @@ fn xlsx_xml_namespace_declarations(
             cursor += 1;
         }
         if tag.get(cursor) != Some(&b'=') {
-            while tag.get(cursor).is_some_and(|byte| {
-                *byte != b'>' && !byte.is_ascii_whitespace()
-            }) {
+            while tag
+                .get(cursor)
+                .is_some_and(|byte| *byte != b'>' && !byte.is_ascii_whitespace())
+            {
                 cursor += 1;
             }
             continue;
@@ -45815,8 +46490,7 @@ fn xlsx_xml_strip_direct_element(
                 if depth >= XLSX_XML_ORACLE_MAX_DEPTH {
                     return Err("XML normalization depth bound exceeded".into());
                 }
-                let declarations =
-                    xlsx_xml_namespace_declarations(&xml[token.start..token.end])?;
+                let declarations = xlsx_xml_namespace_declarations(&xml[token.start..token.end])?;
                 for (prefix, value) in &declarations {
                     allocated_bytes = allocated_bytes
                         .checked_add(prefix.len())
@@ -45827,21 +46501,15 @@ fn xlsx_xml_strip_direct_element(
                     return Err("XML normalization allocation bound exceeded".into());
                 }
                 namespace_frames.push(declarations);
-                let namespace =
-                    xlsx_xml_resolved_namespace(qualified_name, &namespace_frames);
-                if depth == 0
-                    && !xlsx_xml_namespace_matches(wanted_local_name, namespace)
-                {
-                    return Err(
-                        "XML root namespace is not canonical for the requested part".into(),
-                    );
+                let namespace = xlsx_xml_resolved_namespace(qualified_name, &namespace_frames);
+                if depth == 0 && !xlsx_xml_namespace_matches(wanted_local_name, namespace) {
+                    return Err("XML root namespace is not canonical for the requested part".into());
                 }
                 if depth == 1
                     && name == wanted_local_name
                     && xlsx_xml_namespace_matches(wanted_local_name, namespace)
                     && attribute.is_none_or(|(key, value)| {
-                        xlsx_xml_attribute_value(&xml[token.start..token.end], key)
-                            == Some(value)
+                        xlsx_xml_attribute_value(&xml[token.start..token.end], key) == Some(value)
                     })
                 {
                     if active_start.is_some() || removed.is_some() {
@@ -45850,7 +46518,7 @@ fn xlsx_xml_strip_direct_element(
                     active_start = Some(token.start);
                 }
                 depth += 1;
-            }
+            },
             XlsxXmlTokenKind::Empty => {
                 if depth == 0 {
                     if root_seen || root_closed {
@@ -45859,8 +46527,7 @@ fn xlsx_xml_strip_direct_element(
                     root_seen = true;
                     root_closed = true;
                 }
-                let declarations =
-                    xlsx_xml_namespace_declarations(&xml[token.start..token.end])?;
+                let declarations = xlsx_xml_namespace_declarations(&xml[token.start..token.end])?;
                 for (prefix, value) in &declarations {
                     allocated_bytes = allocated_bytes
                         .checked_add(prefix.len())
@@ -45871,21 +46538,15 @@ fn xlsx_xml_strip_direct_element(
                     return Err("XML normalization allocation bound exceeded".into());
                 }
                 namespace_frames.push(declarations);
-                let namespace =
-                    xlsx_xml_resolved_namespace(qualified_name, &namespace_frames);
-                if depth == 0
-                    && !xlsx_xml_namespace_matches(wanted_local_name, namespace)
-                {
-                    return Err(
-                        "XML root namespace is not canonical for the requested part".into(),
-                    );
+                let namespace = xlsx_xml_resolved_namespace(qualified_name, &namespace_frames);
+                if depth == 0 && !xlsx_xml_namespace_matches(wanted_local_name, namespace) {
+                    return Err("XML root namespace is not canonical for the requested part".into());
                 }
                 if depth == 1
                     && name == wanted_local_name
                     && xlsx_xml_namespace_matches(wanted_local_name, namespace)
                     && attribute.is_none_or(|(key, value)| {
-                        xlsx_xml_attribute_value(&xml[token.start..token.end], key)
-                            == Some(value)
+                        xlsx_xml_attribute_value(&xml[token.start..token.end], key) == Some(value)
                     })
                 {
                     if removed.is_some() {
@@ -45894,13 +46555,12 @@ fn xlsx_xml_strip_direct_element(
                     removed = Some((token.start, token.end));
                 }
                 namespace_frames.pop();
-            }
+            },
             XlsxXmlTokenKind::End => {
                 if depth == 0 {
                     return Err("unexpected XML closing tag".into());
                 }
-                let namespace =
-                    xlsx_xml_resolved_namespace(qualified_name, &namespace_frames);
+                let namespace = xlsx_xml_resolved_namespace(qualified_name, &namespace_frames);
                 if depth == 2 {
                     if let Some(start) = active_start.take() {
                         if name != wanted_local_name
@@ -45918,7 +46578,7 @@ fn xlsx_xml_strip_direct_element(
                 if namespace_frames.pop().is_none() {
                     return Err("XML namespace frame stack underflow".into());
                 }
-            }
+            },
         }
     }
     if !root_seen
@@ -45959,9 +46619,11 @@ fn xlsx_calc_chain_identity(
         .filter(|part| part.content_type() == XLSX_CALC_CHAIN_CONTENT_TYPE)
         .count();
     let mut result = None;
-    for relationship in workbook.rels().iter().filter(|relationship| {
-        xlsx_is_calc_chain_relationship_type(relationship.reltype())
-    }) {
+    for relationship in workbook
+        .rels()
+        .iter()
+        .filter(|relationship| xlsx_is_calc_chain_relationship_type(relationship.reltype()))
+    {
         if result.is_some() {
             return Err("XLSX package has multiple calculation-chain relationships".into());
         }
@@ -45985,7 +46647,7 @@ fn xlsx_calc_chain_identity(
         });
     }
     match (&result, calc_chain_part_count) {
-        (None, 0) | (Some(_), 1) => {}
+        (None, 0) | (Some(_), 1) => {},
         (None, _) => {
             return Err("XLSX package has an orphan calculation-chain part".into());
         },
@@ -46000,9 +46662,7 @@ fn xlsx_is_calc_chain_relationship_type(value: &str) -> bool {
     value == relationship_type::CALC_CHAIN || value == relationship_type::STRICT_CALC_CHAIN
 }
 
-fn xlsx_calc_chain_content_type_override_count(
-    xml: &[u8],
-) -> Result<usize, Box<dyn Error>> {
+fn xlsx_calc_chain_content_type_override_count(xml: &[u8]) -> Result<usize, Box<dyn Error>> {
     if xml.len() > XLSX_XML_ORACLE_MAX_BYTES {
         return Err("XML calculation-chain override input exceeds its byte bound".into());
     }
@@ -46266,7 +46926,10 @@ mod xlsx_cell_crud_oracle_tests {
         assert_eq!(source_count, 1);
         assert_eq!(candidate_count, 0);
         assert_eq!(source_without_override, candidate_content_types.as_slice());
-        assert_eq!(candidate_without_override, candidate_content_types.as_slice());
+        assert_eq!(
+            candidate_without_override,
+            candidate_content_types.as_slice()
+        );
 
         let foreign_content_types = br#"<t:Types xmlns:t="http://schemas.openxmlformats.org/package/2006/content-types" xmlns:f="urn:foreign"><f:Override PartName="/xl/calcChain.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml"/></t:Types>"#;
         let (_, foreign_count) = xlsx_xml_strip_direct_element(
@@ -46309,12 +46972,9 @@ mod xlsx_cell_crud_oracle_tests {
             local: vec![3],
             central_without_offset: vec![4],
         };
-        assert!(insert_raw_zip_member(
-            &mut members,
-            "xl/styles.xml".to_owned(),
-            duplicate,
-        )
-        .is_err());
+        assert!(
+            insert_raw_zip_member(&mut members, "xl/styles.xml".to_owned(), duplicate,).is_err()
+        );
     }
 }
 
@@ -50034,10 +50694,10 @@ mod tests {
         run_xlsx_edit_composition, run_xlsx_page_break_edit_save, run_xlsx_page_break_projection,
         run_xlsx_page_margin_edit_save, run_xlsx_page_setup_edit_save,
         run_xlsx_print_options_edit_save, run_xlsx_sheet_protection_edit_save, sha256_hex,
-        simulated_request_delay, statistics, updated_writer_text, usage_text, verify_xlsx_cells,
-        validate_xls_source_locality, validate_xls_source_options, writer_shape,
-        xls_source_family_dispatch_cases, xls_writer_semantic_dispatch_selected,
-        xlsb_cells_digest, xlsb_expected_cells, xlsx_cell_count, xlsx_spec,
+        simulated_request_delay, statistics, updated_writer_text, usage_text,
+        validate_xls_source_locality, validate_xls_source_options, verify_xlsx_cells, writer_shape,
+        xls_source_family_dispatch_cases, xls_writer_semantic_dispatch_selected, xlsb_cells_digest,
+        xlsb_expected_cells, xlsx_cell_count, xlsx_spec,
     };
 
     #[test]
@@ -50608,7 +51268,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 399);
+        assert_eq!(selectable_count, 404);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -51814,19 +52474,14 @@ mod tests {
         assert_eq!(layout.parsed_sheet_count, 2);
         assert!(layout.parsed_cell_count > 0);
         assert_eq!(layout.worksheet_names, ["Comments", "Untouched"]);
-        assert_eq!(
-            layout.archive_sha256,
-            corpus.manifest.archive_sha256
-        );
+        assert_eq!(layout.archive_sha256, corpus.manifest.archive_sha256);
         assert_eq!(
             layout.workbook_stream_sha256,
             corpus.manifest.target_payload_sha256
         );
         assert!(!layout.ranges.opaque_payload.is_empty());
-        let regression_source = InstrumentedSource::new_xls(
-            corpus.archive.clone(),
-            layout.ranges.clone(),
-        );
+        let regression_source =
+            InstrumentedSource::new_xls(corpus.archive.clone(), layout.ranges.clone());
         let opaque_range = layout.ranges.opaque_payload[0].clone();
         let mut opaque_byte = [0_u8; 1];
         regression_source
@@ -51835,15 +52490,13 @@ mod tests {
         let regression_metrics = regression_source.snapshot();
         assert!(regression_metrics.xls.opaque_payload.read_bytes > 0);
         assert!(
-            validate_xls_source_locality(Case::XlsSourceBackedOpen, &regression_metrics)
-                .is_err()
+            validate_xls_source_locality(Case::XlsSourceBackedOpen, &regression_metrics).is_err()
         );
 
         let eager_open = run_case(Case::XlsSemanticOpen, &corpus, 0, 1).unwrap();
         let source_open = run_case(Case::XlsSourceBackedOpen, &corpus, 0, 1).unwrap();
         assert_eq!(
-            eager_open.output_sha256,
-            source_open.output_sha256,
+            eager_open.output_sha256, source_open.output_sha256,
             "eager/source open corpus identity"
         );
         let source = source_open
@@ -51851,7 +52504,10 @@ mod tests {
             .as_ref()
             .and_then(|summary| summary.xls.as_ref())
             .expect("source-backed XLS open evidence");
-        assert_eq!(source.source_retained_bytes, vec![corpus.archive.len() as u64]);
+        assert_eq!(
+            source.source_retained_bytes,
+            vec![corpus.archive.len() as u64]
+        );
         assert_eq!(source.complete_archive_materialized_bytes, vec![0]);
         assert_eq!(source.parsed_sheet_counts, vec![2]);
         assert_eq!(source.parsed_cell_counts, vec![0]);
@@ -51868,10 +52524,7 @@ mod tests {
                 Case::XlsEagerOpenListWorksheets,
                 Case::XlsSourceBackedOpenListWorksheets,
             ),
-            (
-                Case::XlsEagerOpenOneCell,
-                Case::XlsSourceBackedOpenOneCell,
-            ),
+            (Case::XlsEagerOpenOneCell, Case::XlsSourceBackedOpenOneCell),
         ] {
             let eager = run_case(eager_case, &corpus, 0, 1).unwrap();
             let source = run_case(source_case, &corpus, 0, 1).unwrap();
@@ -51933,34 +52586,42 @@ mod tests {
             &[Case::XlsSemanticOpen]
         ));
 
-        assert!(validate_xls_source_options(
-            &selected,
-            CorpusShape::ALL.as_slice(),
-            PayloadKind::ALL.as_slice(),
-            WriterShape::ALL.as_slice(),
-        )
-        .is_ok());
-        assert!(validate_xls_source_options(
-            &selected,
-            &[CorpusShape::Tiny],
-            PayloadKind::ALL.as_slice(),
-            WriterShape::ALL.as_slice(),
-        )
-        .is_err());
-        assert!(validate_xls_source_options(
-            &selected,
-            CorpusShape::ALL.as_slice(),
-            &[PayloadKind::Compressible],
-            WriterShape::ALL.as_slice(),
-        )
-        .is_err());
-        assert!(validate_xls_source_options(
-            &selected,
-            CorpusShape::ALL.as_slice(),
-            PayloadKind::ALL.as_slice(),
-            &[WriterShape::Tiny],
-        )
-        .is_err());
+        assert!(
+            validate_xls_source_options(
+                &selected,
+                CorpusShape::ALL.as_slice(),
+                PayloadKind::ALL.as_slice(),
+                WriterShape::ALL.as_slice(),
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_xls_source_options(
+                &selected,
+                &[CorpusShape::Tiny],
+                PayloadKind::ALL.as_slice(),
+                WriterShape::ALL.as_slice(),
+            )
+            .is_err()
+        );
+        assert!(
+            validate_xls_source_options(
+                &selected,
+                CorpusShape::ALL.as_slice(),
+                &[PayloadKind::Compressible],
+                WriterShape::ALL.as_slice(),
+            )
+            .is_err()
+        );
+        assert!(
+            validate_xls_source_options(
+                &selected,
+                CorpusShape::ALL.as_slice(),
+                PayloadKind::ALL.as_slice(),
+                &[WriterShape::Tiny],
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -54684,6 +55345,178 @@ mod tests {
     }
 
     #[test]
+    fn large_odt_source_backed_catalog_selectors_are_opt_in_and_have_oracles() {
+        use super::{
+            ODS_MEDIA_ENTRY_COUNT, ODT_REPEATED_TEXT_CORPUS_GENERATOR,
+            ODT_SOURCE_BACKED_CATALOG_QUERY_INDEX, odt_repeated_text_ranges,
+        };
+
+        let cases = [
+            Case::OdtSourceBackedCatalogOpen,
+            Case::OdtSourceBackedCatalogList,
+            Case::OdtSourceBackedCatalogQuery,
+        ];
+        for case in cases {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(!Case::DEFAULT.contains(&case));
+            assert!(case.is_odt_source_backed_catalog());
+        }
+        assert_eq!(Case::DEFAULT.len(), 36);
+
+        let first = build_odt_repeated_text_corpus().unwrap();
+        let second = build_odt_repeated_text_corpus().unwrap();
+        assert_eq!(first.archive, second.archive);
+        assert_eq!(first.manifest.generator, ODT_REPEATED_TEXT_CORPUS_GENERATOR);
+        assert_eq!(first.manifest.shape, "large-media-rich");
+        assert_eq!(first.manifest.entry_count, 10_008);
+        assert_eq!(first.manifest.archive_member_count, 13);
+        assert_eq!(first.manifest.entry_bytes, 2 * 1024 * 1024);
+
+        let (content_range, untouched_ranges, picture_ranges) =
+            odt_repeated_text_ranges(&first).unwrap();
+        let source = Arc::new(InstrumentedSource::new_odf(
+            first.archive.clone(),
+            vec![content_range],
+            untouched_ranges,
+            picture_ranges,
+        ));
+        let catalog =
+            litchi_odt::SourceBackedDocumentCatalog::from_read_at(source.clone()).unwrap();
+        let before_out_of_range = source.snapshot();
+        assert!(catalog.block_at(usize::MAX).unwrap().is_none());
+        assert!(before_out_of_range == source.snapshot());
+
+        let results = cases
+            .into_iter()
+            .map(|case| run_case(case, &first, 0, 2).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            results.iter().map(|result| result.case).collect::<Vec<_>>(),
+            cases.map(Case::name).to_vec()
+        );
+
+        for (case, result) in cases.into_iter().zip(results.iter()) {
+            assert_eq!(result.case, case.name());
+            let evidence = result
+                .source
+                .as_ref()
+                .and_then(|source| source.odt_catalog.as_ref())
+                .expect("catalog evidence is present");
+            assert_eq!(
+                evidence.operation,
+                match case {
+                    Case::OdtSourceBackedCatalogOpen => "open",
+                    Case::OdtSourceBackedCatalogList => "list",
+                    Case::OdtSourceBackedCatalogQuery => "query",
+                    _ => unreachable!("catalog case validated above"),
+                }
+            );
+            assert_eq!(evidence.text_block_count, 10_000);
+            assert_eq!(evidence.archive_member_count, 13);
+            assert_eq!(evidence.pictures_count, ODS_MEDIA_ENTRY_COUNT);
+            assert!(evidence.semantic_parity_verified);
+            assert!(evidence.archive_topology_verified);
+            assert!(evidence.media_payloads_verified);
+            assert!(evidence.source_ranges_verified);
+            assert!(evidence.source_version_stability_verified);
+            assert!(evidence.content_read_requirement_verified);
+            assert!(evidence.list_zero_payload_reads_verified);
+            assert!(evidence.zero_pictures_reads_verified);
+            assert_eq!(evidence.source_replay_read_calls.len(), 2);
+            assert_eq!(
+                evidence.source_replay_read_calls[0],
+                evidence.source_replay_read_calls[1]
+            );
+            assert_eq!(evidence.source_replay_read_bytes.len(), 2);
+            assert_eq!(
+                evidence.source_replay_read_bytes[0],
+                evidence.source_replay_read_bytes[1]
+            );
+            assert_eq!(evidence.source_replay_range_overlap_bytes.len(), 2);
+            assert_eq!(
+                evidence.source_replay_range_overlap_bytes[0],
+                evidence.source_replay_range_overlap_bytes[1]
+            );
+            assert_eq!(evidence.source_replay_version_observations.len(), 2);
+            assert_eq!(
+                evidence.source_replay_version_observations[0],
+                evidence.source_replay_version_observations[1]
+            );
+            match case {
+                Case::OdtSourceBackedCatalogOpen | Case::OdtSourceBackedCatalogQuery => {
+                    assert_eq!(evidence.source_replay_content_read_calls.len(), 2);
+                    assert_eq!(
+                        evidence.source_replay_content_read_calls[0],
+                        evidence.source_replay_content_read_calls[1]
+                    );
+                    assert_eq!(evidence.source_replay_content_read_bytes.len(), 2);
+                    assert_eq!(
+                        evidence.source_replay_content_read_bytes[0],
+                        evidence.source_replay_content_read_bytes[1]
+                    );
+                },
+                Case::OdtSourceBackedCatalogList => {
+                    assert_eq!(evidence.source_replay_read_calls, vec![0, 0]);
+                    assert_eq!(evidence.source_replay_read_bytes, vec![0, 0]);
+                    assert_eq!(evidence.source_replay_payload_read_calls, vec![0, 0]);
+                    assert_eq!(evidence.source_replay_payload_read_bytes, vec![0, 0]);
+                },
+                _ => unreachable!("catalog case validated above"),
+            }
+            assert_eq!(evidence.source_replay_pictures_read_calls, vec![0, 0]);
+            assert_eq!(evidence.source_replay_pictures_read_bytes, vec![0, 0]);
+        }
+
+        let query = results[2]
+            .source
+            .as_ref()
+            .unwrap()
+            .odt_catalog
+            .as_ref()
+            .unwrap();
+        assert_eq!(
+            query.selected_index,
+            Some(ODT_SOURCE_BACKED_CATALOG_QUERY_INDEX)
+        );
+        assert!(query.selected_block_text_sha256.is_some());
+        assert_eq!(query.observed_catalog_entries_sha256.len(), 0);
+        assert_eq!(query.observed_block_text_sha256.len(), 2);
+        assert_eq!(
+            query.observed_block_text_sha256[0],
+            query.observed_block_text_sha256[1]
+        );
+        for (case, result) in cases.into_iter().zip(results.iter()) {
+            let evidence = result
+                .source
+                .as_ref()
+                .unwrap()
+                .odt_catalog
+                .as_ref()
+                .unwrap();
+            match case {
+                Case::OdtSourceBackedCatalogQuery => {
+                    assert_eq!(evidence.observed_block_text_sha256.len(), 2);
+                    assert_eq!(
+                        evidence.observed_block_text_sha256[0],
+                        evidence.observed_block_text_sha256[1]
+                    );
+                },
+                Case::OdtSourceBackedCatalogOpen | Case::OdtSourceBackedCatalogList => {
+                    assert_eq!(evidence.observed_catalog_entries_sha256.len(), 2);
+                    assert_eq!(
+                        evidence.observed_catalog_entries_sha256[0],
+                        evidence.observed_catalog_entries_sha256[1]
+                    );
+                },
+                _ => unreachable!("catalog case validated above"),
+            }
+        }
+        let source_json = serde_json::to_value(&results[1]).unwrap();
+        assert!(source_json["source"]["odt_catalog"].is_object());
+        assert!(source_json["source"]["odt_catalog"]["catalog_entries_sha256"].is_string());
+    }
+
+    #[test]
     fn large_odt_unified_root_filesystem_selectors_are_opt_in_and_matched() {
         let cases = [
             Case::OdtFileEagerOpen,
@@ -56491,12 +57324,9 @@ mod tests {
         styles.push(b' ');
         mutated.get_part_mut(&styles_uri).unwrap().set_blob(styles);
         let mutated_bytes = super::PackageWriter::to_bytes(&mutated).unwrap();
-        assert!(super::xlsx_cell_crud_untouched_member_evidence(
-            &first,
-            &mutated_bytes,
-            &[],
-        )
-        .is_err());
+        assert!(
+            super::xlsx_cell_crud_untouched_member_evidence(&first, &mutated_bytes, &[],).is_err()
+        );
         let candidate_package = super::OpcPackage::from_bytes(&expected).unwrap();
         super::verify_xlsx_vendor_extension_package(&candidate_package, true).unwrap();
 

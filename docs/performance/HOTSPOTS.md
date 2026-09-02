@@ -1,5 +1,25 @@
 # Performance hotspot inventory
 
+## Change 0368 update
+
+Change 0368 establishes an ODT catalog measurement boundary rather than an
+accepted hotspot. The three opt-in selectors isolate source-backed catalog
+open, catalog projection, and selected-block projection over one fixed
+10,008-entry, 13-member corpus with eight 2 MiB `Pictures/*` members. The
+control report records the source replay and media-locality gates needed for a
+future validation/block-scan fusion experiment, including zero Pictures reads
+and zero post-preparation reads for the list projection.
+
+The retained [control report](results/odt-source-catalog-0368-control.json)
+comes from dirty revision `14884ced9d8b29b7d2155134025986e9315ac771`, so its
+timings are descriptive and do not establish a hotspot ranking, speedup, or
+production baseline. The focused catalog and count tests passed `1/1` each;
+the initial full harness context was `233 passed, 7 failed, 1 ignored`, with
+the count assertion subsequently corrected and six unrelated failures
+remaining. The selectable registry is **404** and the default remains **36
+cases / 198 rows**. `performance_claim: none`; no latency, physical-I/O,
+allocation, RSS, fixed-memory, or OOM-prevention claim follows.
+
 ## Change 0367 update
 
 Change 0367 is a correctness and fallback-boundary update, not a measured
