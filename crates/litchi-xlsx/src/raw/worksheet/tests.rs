@@ -1670,3 +1670,349 @@ mod streaming_0364_dependency_metadata_tests {
         ));
     }
 }
+
+#[cfg(test)]
+mod streaming_0365_range_tests {
+    use std::io::Cursor;
+
+    use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
+    use litchi_sheet::{Cell as Address, Rect};
+
+    use super::super::model::MAX_CELL_STYLE;
+    use super::super::selected::{
+        NotEligibleReason, RangeScanOutcome, ScanOutcome, SelectedCells, scan, scan_range,
+    };
+    use crate::cell::{Cell, Value};
+
+    const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+    fn address(reference: &str) -> Address {
+        Address::from_a1(reference).expect("valid worksheet address")
+    }
+
+    fn worksheet(body: &str) -> String {
+        format!(r#"<worksheet xmlns="{SPREADSHEETML}">{body}</worksheet>"#)
+    }
+
+    fn scan_range_xml(
+        xml: &str,
+        reference: &str,
+    ) -> super::super::selected::StreamResult<RangeScanOutcome> {
+        let mut input = Cursor::new(xml.as_bytes());
+        scan_range(
+            &mut input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            Rect::from_a1(reference).expect("valid worksheet range"),
+        )
+    }
+
+    fn scan_xml(xml: &str, target: &str) -> super::super::selected::StreamResult<ScanOutcome> {
+        let mut input = Cursor::new(xml.as_bytes());
+        scan(
+            &mut input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            address(target),
+        )
+    }
+
+    fn eligible_range(xml: &str, reference: &str) -> SelectedCells {
+        match scan_range_xml(xml, reference) {
+            Ok(RangeScanOutcome::Eligible(selected)) => selected,
+            other => panic!("expected eligible range, got {other:?}"),
+        }
+    }
+
+    fn assert_range_not_eligible(xml: &str, expected: NotEligibleReason) {
+        match scan_range_xml(xml, "A1") {
+            Ok(RangeScanOutcome::NotEligible(actual)) => assert_eq!(actual, expected),
+            other => panic!("expected {expected:?}, got {other:?}"),
+        }
+    }
+
+    fn assert_number(cell: Option<&Cell>, expected: &str) {
+        match cell {
+            Some(Cell::Value(Value::Number(value))) => assert_eq!(value.as_str(), expected),
+            other => panic!("expected number {expected}, got {other:?}"),
+        }
+    }
+
+    fn assert_same_cell(left: Option<&Cell>, right: Option<&Cell>) {
+        match (left, right) {
+            (None, None) | (Some(Cell::Empty), Some(Cell::Empty)) => {},
+            (Some(Cell::Value(Value::Number(left))), Some(Cell::Value(Value::Number(right)))) => {
+                assert_eq!(left.as_str(), right.as_str())
+            },
+            (Some(Cell::Value(Value::Text(left))), Some(Cell::Value(Value::Text(right)))) => {
+                assert_eq!(left.as_str(), right.as_str());
+            },
+            other => panic!("single-cell and range results differ: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn streaming_0365_range_is_sparse_row_major_with_explicit_empty_records() {
+        let xml = worksheet(
+            r#"<sheetData>
+                <row r="1"><c r="C1"><v>31</v></c><c r="E1"/></row>
+                <row r="2"><c r="B2"><v>22</v></c></row>
+                <row r="4"><c r="A4" t="str"/></row>
+            </sheetData>"#,
+        );
+        let selected = eligible_range(&xml, "A1:E4");
+
+        assert_eq!(
+            selected
+                .cells
+                .iter()
+                .map(|record| record.address)
+                .collect::<Vec<_>>(),
+            vec![address("C1"), address("E1"), address("B2"), address("A4")]
+        );
+        assert_number(selected.cells[0].cell.as_ref(), "31");
+        assert!(matches!(selected.cells[1].cell.as_ref(), Some(Cell::Empty)));
+        assert_number(selected.cells[2].cell.as_ref(), "22");
+        assert!(matches!(
+            selected.cells[3].cell.as_ref(),
+            Some(Cell::Value(Value::Text(value))) if value.as_str().is_empty()
+        ));
+        assert!(
+            selected
+                .cells
+                .iter()
+                .all(|record| record.shared_string_index.is_none())
+        );
+    }
+
+    #[test]
+    fn streaming_0365_range_handles_first_last_grid_edges_and_empty_selection() {
+        let xml = worksheet(
+            r#"<sheetData>
+                <row r="1"><c r="A1"><v>1</v></c></row>
+                <row r="1048576"><c r="XFD1048576"><v>9</v></c></row>
+            </sheetData>"#,
+        );
+
+        let first = eligible_range(&xml, "A1:A1");
+        assert_eq!(first.cells.len(), 1);
+        assert_eq!(first.cells[0].address, address("A1"));
+        assert_number(first.cells[0].cell.as_ref(), "1");
+
+        let last = eligible_range(&xml, "XFD1048576:XFD1048576");
+        assert_eq!(last.cells.len(), 1);
+        assert_eq!(last.cells[0].address, address("XFD1048576"));
+        assert_number(last.cells[0].cell.as_ref(), "9");
+
+        let edge = eligible_range(&xml, "XFC1048575:XFD1048576");
+        assert_eq!(edge.cells.len(), 1);
+        assert_eq!(edge.cells[0].address, address("XFD1048576"));
+
+        let empty = eligible_range(&xml, "B2:C3");
+        assert!(empty.cells.is_empty());
+        assert_eq!(empty.dependencies, Default::default());
+    }
+
+    #[test]
+    fn streaming_0365_range_defers_multiple_shared_strings_and_keeps_global_maxima() {
+        let xml = worksheet(
+            r#"<sheetData>
+                <row r="1">
+                    <c r="A1" t="s" s="4"><v>3</v></c>
+                    <c r="B1" t="s" s="8"><v>9</v></c>
+                </row>
+                <row r="2">
+                    <c r="A2" t="s" s="12"><v>11</v></c>
+                    <c r="C2" s="37"><v>1</v></c>
+                </row>
+                <row r="3"><c r="D3" t="s"><v>19</v></c></row>
+            </sheetData>"#,
+        );
+        let selected = eligible_range(&xml, "A1:B2");
+
+        assert_eq!(selected.cells.len(), 3);
+        assert_eq!(
+            selected
+                .cells
+                .iter()
+                .map(|record| record.shared_string_index)
+                .collect::<Vec<_>>(),
+            vec![Some(3), Some(9), Some(11)]
+        );
+        assert!(selected.cells.iter().all(|record| record.cell.is_none()));
+        assert_eq!(selected.dependencies.max_shared_string_index, Some(19));
+        assert_eq!(selected.dependencies.max_direct_style_index, Some(37));
+        assert_eq!(selected.dependencies.target_shared_string_index, None);
+    }
+
+    #[test]
+    fn streaming_0365_single_cell_scan_wrapper_matches_one_cell_ranges() {
+        let xml = worksheet(
+            r#"<sheetData><row r="1">
+                <c r="A1"><v>7</v></c>
+                <c r="B1"/>
+                <c r="C1" t="str"/>
+                <c r="D1" t="s"><v>5</v></c>
+            </row></sheetData>"#,
+        );
+
+        for target in ["A1", "B1", "C1", "D1", "E1"] {
+            let range = match scan_range_xml(&xml, target).expect("one-cell range scan") {
+                RangeScanOutcome::Eligible(selected) => selected,
+                other => panic!("expected eligible one-cell range, got {other:?}"),
+            };
+            let single = match scan_xml(&xml, target).expect("single-cell scan") {
+                ScanOutcome::Eligible(selected) => selected,
+                other => panic!("expected eligible single-cell scan, got {other:?}"),
+            };
+
+            assert_eq!(range.dependencies, single.dependencies);
+            let range_record = range.cells.first();
+            assert_same_cell(
+                range_record.and_then(|record| record.cell.as_ref()),
+                single.cell.as_ref(),
+            );
+            if let Some(record) = range_record {
+                assert_eq!(record.address, single.address);
+                assert_eq!(
+                    record.shared_string_index,
+                    single.dependencies.target_shared_string_index
+                );
+            } else {
+                assert!(single.cell.is_none());
+                assert_eq!(single.dependencies.target_shared_string_index, None);
+            }
+        }
+    }
+
+    #[test]
+    fn streaming_0365_range_validates_global_duplicates_order_and_late_xml_errors() {
+        let duplicate_row =
+            worksheet(r#"<sheetData><row r="1"/><row r="2"/><row r="2"/></sheetData>"#);
+        assert!(scan_range_xml(&duplicate_row, "A1").is_err());
+
+        let duplicate_cell = worksheet(
+            r#"<sheetData><row r="1"/><row r="2"><c r="B2"/><c r="B2"/></row></sheetData>"#,
+        );
+        assert!(scan_range_xml(&duplicate_cell, "A1").is_err());
+
+        let decreasing_rows = worksheet(
+            r#"<sheetData><row r="2"><c r="A2"><v>2</v></c></row><row r="1"><c r="A1"><v>1</v></c></row></sheetData>"#,
+        );
+        match scan_range_xml(&decreasing_rows, "A1").expect("ordering stream") {
+            RangeScanOutcome::NotEligible(NotEligibleReason::Ordering) => {},
+            other => panic!("expected global row-order fallback, got {other:?}"),
+        }
+
+        let decreasing_cells = worksheet(
+            r#"<sheetData><row r="1"><c r="B1"><v>2</v></c><c r="A1"><v>1</v></c></row></sheetData>"#,
+        );
+        match scan_range_xml(&decreasing_cells, "A1").expect("cell ordering stream") {
+            RangeScanOutcome::NotEligible(NotEligibleReason::Ordering) => {},
+            other => panic!("expected global cell-order fallback, got {other:?}"),
+        }
+
+        let malformed_tail = format!(
+            "{}<tail>",
+            worksheet(r#"<sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData>"#)
+        );
+        let error = scan_range_xml(&malformed_tail, "A1").expect_err("late malformed XML");
+        assert!(matches!(
+            error,
+            StreamError::Mce {
+                error: MceError::NonConformant(_) | MceError::Xml(_),
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn streaming_0365_range_marks_merge_formula_and_inherited_styles_not_eligible() {
+        let cases = [
+            (
+                worksheet(
+                    r#"<mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells><sheetData/>"#,
+                ),
+                NotEligibleReason::MergeSemantics,
+            ),
+            (
+                worksheet(
+                    r#"<sheetData><row r="1"><c r="A1"><f t="shared" si="0" ref="A1:A2">A1+1</f><v>2</v></c></row></sheetData>"#,
+                ),
+                NotEligibleReason::FormulaSemantics,
+            ),
+            (
+                worksheet(
+                    r#"<sheetData><row r="1" s="1"><c r="A1"><v>1</v></c></row></sheetData>"#,
+                ),
+                NotEligibleReason::Styles,
+            ),
+            (
+                worksheet(r#"<cols><col min="1" max="1" style="1"/></cols><sheetData/>"#),
+                NotEligibleReason::Styles,
+            ),
+        ];
+
+        for (xml, expected) in cases {
+            assert_range_not_eligible(&xml, expected);
+        }
+    }
+
+    #[test]
+    fn streaming_0365_range_accepts_max_cell_style_and_falls_back_above_it() {
+        let valid = worksheet(&format!(
+            r#"<sheetData><row r="1"><c r="A1" s="{MAX_CELL_STYLE}"><v>1</v></c></row></sheetData>"#
+        ));
+        let selected = eligible_range(&valid, "A1");
+        assert_number(selected.cells[0].cell.as_ref(), "1");
+        assert_eq!(
+            selected.dependencies.max_direct_style_index,
+            Some(MAX_CELL_STYLE)
+        );
+
+        let too_large = MAX_CELL_STYLE + 1;
+        let invalid = worksheet(&format!(
+            r#"<sheetData><row r="1"><c r="A1" s="{too_large}"><v>1</v></c></row></sheetData>"#
+        ));
+        assert_range_not_eligible(&invalid, NotEligibleReason::Styles);
+    }
+
+    #[test]
+    fn streaming_0365_range_preserves_inline_and_escape_heavy_empty_boundaries() {
+        let xml = worksheet(
+            r#"<sheetData><row r="1">
+                <c r="A1" t="inlineStr"/>
+                <c r="B1" t="inlineStr"><is><t/></is></c>
+                <c r="C1" t="str"/>
+                <c r="D1" t="inlineStr"><is><t>_x0026__xD83D__xDE00__x003C__x0041_</t></is></c>
+            </row></sheetData>"#,
+        );
+        let selected = eligible_range(&xml, "A1:D1");
+
+        assert!(matches!(
+            selected.cells[0].cell.as_ref(),
+            Some(Cell::Value(Value::Text(value))) if value.as_str().is_empty()
+        ));
+        assert!(matches!(
+            selected.cells[1].cell.as_ref(),
+            Some(Cell::Value(Value::Text(value))) if value.as_str().is_empty()
+        ));
+        assert!(matches!(
+            selected.cells[2].cell.as_ref(),
+            Some(Cell::Value(Value::Text(value))) if value.as_str().is_empty()
+        ));
+        assert!(matches!(
+            selected.cells[3].cell.as_ref(),
+            Some(Cell::Value(Value::Text(value)))
+                if value.as_str() == "&😀<A" && value.as_str().chars().count() == 4
+        ));
+
+        let formula_without_inline_payload = worksheet(
+            r#"<sheetData><row r="1"><c r="A1" t="inlineStr"><f>1+1</f></c></row></sheetData>"#,
+        );
+        assert!(
+            scan_range_xml(&formula_without_inline_payload, "A1").is_err(),
+            "formula-bearing inlineStr without is must be rejected"
+        );
+    }
+}

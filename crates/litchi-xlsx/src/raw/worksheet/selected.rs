@@ -1,4 +1,4 @@
-//! Internal one-cell `SpreadsheetML` streaming selection.
+//! Internal sparse `SpreadsheetML` worksheet-range streaming selection.
 //!
 //! This is a source-reader foundation, not a public `SourceWorksheet` route.
 //! The scanner consumes the committed MCE stream together with the x14ac raw
@@ -8,20 +8,24 @@
 //! semantic validation. Callers must discard it and fall back to the existing
 //! materialized worksheet parser.
 //!
-//! The implementation retains at most the requested cell, one active-cell
-//! lexical scratch area, and bounded parser state. It makes no fixed-memory,
-//! RSS, or OOM-safety claim. quick-xml, the MCE stream, and observer callback
-//! allocations are outside this scanner's bounded-state description.
+//! The implementation retains only physical records inside the requested
+//! rectangle, one active-cell lexical scratch area, and bounded parser state.
+//! It makes no fixed-memory, RSS, or OOM-safety claim. quick-xml, the MCE
+//! stream, and observer callback allocations are outside this scanner's
+//! bounded-state description; event and input limits provide the aggregate
+//! bound for the stream.
 
 use std::io::BufRead;
 
 use litchi_ooxml_common::mce::{Capabilities, SemanticElement, SemanticEvent, StreamLimits};
-use litchi_sheet::Cell as Address;
+use litchi_sheet::{Cell as Address, Rect};
 
 use super::super::formula::Range as FormulaRange;
 use super::super::namespace::{SPREADSHEETML_NAMESPACE, STRICT_SPREADSHEETML_NAMESPACE};
 use super::super::strings::decode_spreadsheet_text;
-use super::model::{MAX_CELL_CHARACTERS, MAX_ENCODED_CELL_BYTES, MAX_FORMULA_CHARACTERS};
+use super::model::{
+    MAX_CELL_CHARACTERS, MAX_CELL_STYLE, MAX_ENCODED_CELL_BYTES, MAX_FORMULA_CHARACTERS,
+};
 use super::{parse_a1, parse_one_based_row, x14ac};
 use crate::cell::{Cell, ErrorValue, Number, Text, Value};
 use crate::error::{Result, allocation, invalid};
@@ -30,22 +34,51 @@ use crate::formula::{Cache, Formula, Kind};
 const MAX_XML_DEPTH: usize = 256;
 const X14AC_NAMESPACE: &[u8] = x14ac::NAMESPACE;
 
-/// One physical cell selection result.
+/// One-coordinate compatibility result from the worksheet range scanner.
 ///
-/// `None` means that the requested coordinate has no stored `<c>` record;
-/// `Some(Cell::Empty)` is an explicitly stored empty cell. A non-formula
-/// shared-string cell with a valid `<v>` is deferred instead: its `cell` is
-/// `None` and [`SelectedCell::dependencies`] retains its shared-string index.
+/// `cell: None` means that the requested coordinate has no stored `<c>` record
+/// or that a valid non-formula shared-string record was deferred. The latter
+/// is identified by [`SelectedCell::dependencies`] retaining its shared-string
+/// index. `Some(Cell::Empty)` is an explicitly stored empty cell. The range
+/// API exposes the same distinction directly through [`SelectedRecord`].
 #[derive(Debug)]
 pub struct SelectedCell {
     /// Requested coordinate, retained so later source readers can bind the
     /// result without reconstructing the selector.
     pub address: Address,
-    /// Stored semantic cell, or `None` when the coordinate has no `<c>`
-    /// record. An explicit empty record is represented by `Cell::Empty`.
+    /// Stored semantic cell. `None` means either that the coordinate has no
+    /// `<c>` record or that a valid non-formula shared-string record was
+    /// deferred; the dependency metadata identifies the latter. An explicit
+    /// empty record is represented by `Cell::Empty`.
     pub cell: Option<Cell>,
     /// Bounded dependency metadata observed while scanning the complete
     /// worksheet stream.
+    pub dependencies: SelectedDependencies,
+}
+
+/// One physical cell record retained by a rectangular worksheet selection.
+///
+/// The range scanner is sparse: absent coordinates do not produce records.
+/// An explicit empty `<c>` record is represented by `cell: Some(Cell::Empty)`.
+/// A valid non-formula shared-string record is deferred instead, with its
+/// index in [`Self::shared_string_index`] and `cell` set to `None`.
+#[derive(Debug)]
+pub struct SelectedRecord {
+    /// Physical worksheet coordinate of the stored `<c>` record.
+    pub address: Address,
+    /// Stored semantic cell, or `None` for a deferred shared-string record.
+    pub cell: Option<Cell>,
+    /// Zero-based shared-string index for a deferred `t="s"` record.
+    pub shared_string_index: Option<u32>,
+}
+
+/// Sparse physical records retained by an eligible rectangular scan.
+#[derive(Debug)]
+pub struct SelectedCells {
+    /// Stored `<c>` records inside the requested rectangle, in source order.
+    /// Missing coordinates are intentionally omitted.
+    pub cells: Vec<SelectedRecord>,
+    /// Dependency metadata observed across the complete worksheet stream.
     pub dependencies: SelectedDependencies,
 }
 
@@ -67,7 +100,9 @@ pub struct SelectedDependencies {
     /// Shared-string index referenced by the requested cell, when that cell is
     /// a valid non-formula `t="s"` cell. `Some` identifies a deferred selected
     /// cell and is distinct from a missing coordinate or an explicit empty
-    /// cell.
+    /// cell. For a range scan this compatibility field is populated only when
+    /// exactly one physical record was selected; use
+    /// [`SelectedRecord::shared_string_index`] for per-record indexes.
     pub target_shared_string_index: Option<u32>,
 }
 
@@ -108,6 +143,17 @@ pub enum ScanOutcome {
     NotEligible(NotEligibleReason),
 }
 
+/// Result of one bounded rectangular worksheet stream.
+#[derive(Debug)]
+pub enum RangeScanOutcome {
+    /// The selected physical records were scanned with the first-slice
+    /// semantics.
+    Eligible(SelectedCells),
+    /// Streaming XML/MCE/raw validation succeeded, but full worksheet
+    /// semantics were deferred; the caller must use the materialized parser.
+    NotEligible(NotEligibleReason),
+}
+
 /// Result returned by the selected worksheet stream.
 ///
 /// MCE, XML, raw x14ac, input, and allocation failures remain separate typed
@@ -127,12 +173,12 @@ pub type StreamResult<T> =
     clippy::result_large_err,
     reason = "The stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
 )]
-pub fn scan(
+pub fn scan_range(
     input: &mut dyn BufRead,
     capabilities: &Capabilities,
     limits: &StreamLimits,
-    requested: Address,
-) -> StreamResult<ScanOutcome> {
+    requested: Rect,
+) -> StreamResult<RangeScanOutcome> {
     let mut scanner = Scanner::new(requested);
     let result = x14ac::capture_stream_with_active(
         input,
@@ -151,6 +197,53 @@ pub fn scan(
                 })
         },
         Err(error) => Err(error),
+    }
+}
+
+/// Scan one requested coordinate through a source worksheet stream.
+///
+/// This compatibility wrapper uses the rectangular scanner with a one-cell
+/// rectangle. A successful eligible result contains `None` for a missing
+/// coordinate, `Some(Cell::Empty)` for an explicit empty record, or the
+/// deferred shared-string representation used by the original API. The
+/// result is published only after the shared MCE/XML stream reaches EOF.
+#[expect(
+    clippy::result_large_err,
+    reason = "The stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
+)]
+pub fn scan(
+    input: &mut dyn BufRead,
+    capabilities: &Capabilities,
+    limits: &StreamLimits,
+    requested: Address,
+) -> StreamResult<ScanOutcome> {
+    let outcome = scan_range(input, capabilities, limits, Rect::single(requested))?;
+    match outcome {
+        RangeScanOutcome::NotEligible(reason) => Ok(ScanOutcome::NotEligible(reason)),
+        RangeScanOutcome::Eligible(selected) => {
+            let mut records = selected.cells;
+            let record = match records.len() {
+                0 => None,
+                1 => records.pop(),
+                _ => {
+                    return Err(litchi_ooxml_common::mce::StreamError::Callback {
+                        raw_error: None,
+                        active_error: Some(invalid(
+                            "one-cell worksheet selection produced multiple records",
+                        )),
+                    });
+                },
+            };
+            let mut dependencies = selected.dependencies;
+            dependencies.target_shared_string_index = record
+                .as_ref()
+                .and_then(|record| record.shared_string_index);
+            Ok(ScanOutcome::Eligible(SelectedCell {
+                address: requested,
+                cell: record.and_then(|record| record.cell),
+                dependencies,
+            }))
+        },
     }
 }
 
@@ -197,7 +290,7 @@ impl CellKind {
 
 #[derive(Debug)]
 struct PendingCell {
-    selected: bool,
+    address: Address,
     kind: CellKind,
     saw_value: bool,
     value: String,
@@ -208,15 +301,14 @@ struct PendingCell {
     saw_inline: bool,
     inline: String,
     inline_bytes: usize,
-    inline_characters: usize,
     saw_inline_simple: bool,
     saw_inline_run: bool,
 }
 
 impl PendingCell {
-    fn new(selected: bool, kind: CellKind) -> Self {
+    fn new(address: Address, kind: CellKind) -> Self {
         Self {
-            selected,
+            address,
             kind,
             saw_value: false,
             value: String::new(),
@@ -227,7 +319,6 @@ impl PendingCell {
             saw_inline: false,
             inline: String::new(),
             inline_bytes: 0,
-            inline_characters: 0,
             saw_inline_simple: false,
             saw_inline_run: false,
         }
@@ -246,15 +337,16 @@ impl PendingCell {
     }
 
     fn append_inline(&mut self, text: &str) -> Result<()> {
-        append_bounded(
-            &mut self.inline,
-            &mut self.inline_bytes,
-            &mut self.inline_characters,
-            text,
-            MAX_ENCODED_CELL_BYTES,
-            MAX_CELL_CHARACTERS,
-            "selected worksheet inline text",
-        )
+        self.inline_bytes = self
+            .inline_bytes
+            .checked_add(text.len())
+            .filter(|length| *length <= MAX_ENCODED_CELL_BYTES)
+            .ok_or_else(|| invalid("selected worksheet inline text is too large"))?;
+        self.inline
+            .try_reserve(text.len())
+            .map_err(|source| allocation("selected worksheet inline text", source))?;
+        self.inline.push_str(text);
+        Ok(())
     }
 
     fn append_formula(&mut self, text: &str) -> Result<()> {
@@ -303,9 +395,7 @@ fn append_bounded(
 
 #[derive(Debug)]
 struct Scanner {
-    requested: Address,
-    target_row: u32,
-    target_column: u32,
+    requested: Rect,
     stack: Vec<Frame>,
     row: Option<(u32, u32)>,
     previous_row: u32,
@@ -313,16 +403,15 @@ struct Scanner {
     root_closed: bool,
     seen_sheet_data: bool,
     pending_cell: Option<PendingCell>,
-    selected: Option<Cell>,
+    selected: Vec<SelectedRecord>,
+    selected_count: usize,
     dependencies: SelectedDependencies,
     not_eligible: Option<NotEligibleReason>,
 }
 
 impl Scanner {
-    fn new(requested: Address) -> Self {
+    fn new(requested: Rect) -> Self {
         Self {
-            target_row: requested.row().get() + 1,
-            target_column: requested.column().get() + 1,
             requested,
             stack: Vec::new(),
             row: None,
@@ -331,15 +420,16 @@ impl Scanner {
             root_closed: false,
             seen_sheet_data: false,
             pending_cell: None,
-            selected: None,
+            selected: Vec::new(),
+            selected_count: 0,
             dependencies: SelectedDependencies::default(),
             not_eligible: None,
         }
     }
 
-    fn finish(self) -> Result<ScanOutcome> {
+    fn finish(self) -> Result<RangeScanOutcome> {
         if let Some(reason) = self.not_eligible {
-            return Ok(ScanOutcome::NotEligible(reason));
+            return Ok(RangeScanOutcome::NotEligible(reason));
         }
         if !self.root_seen || !self.root_closed || !self.stack.is_empty() {
             return Err(invalid(
@@ -349,10 +439,19 @@ impl Scanner {
         if !self.seen_sheet_data {
             return Err(invalid("worksheet XML is missing required sheetData"));
         }
-        Ok(ScanOutcome::Eligible(SelectedCell {
-            address: self.requested,
-            cell: self.selected,
-            dependencies: self.dependencies,
+        if self.selected_count != self.selected.len() {
+            return Err(invalid(
+                "selected worksheet record count lost synchronization",
+            ));
+        }
+        let target_shared_string_index = (self.selected.len() == 1)
+            .then(|| self.selected[0].shared_string_index)
+            .flatten();
+        let mut dependencies = self.dependencies;
+        dependencies.target_shared_string_index = target_shared_string_index;
+        Ok(RangeScanOutcome::Eligible(SelectedCells {
+            cells: self.selected,
+            dependencies,
         }))
     }
 
@@ -564,6 +663,10 @@ impl Scanner {
                 self.mark(NotEligibleReason::Styles);
                 return Ok(None);
             };
+            if style > MAX_CELL_STYLE {
+                self.mark(NotEligibleReason::Styles);
+                return Ok(None);
+            }
             self.dependencies.max_direct_style_index = Some(
                 self.dependencies
                     .max_direct_style_index
@@ -615,8 +718,9 @@ impl Scanner {
         if self.not_eligible.is_some() {
             return Ok(None);
         }
-        let selected = row == self.target_row && column == self.target_column;
-        self.pending_cell = Some(PendingCell::new(selected, kind));
+        let address = Address::at(row - 1, column - 1)
+            .map_err(|_error| invalid("worksheet cell address exceeds the grid"))?;
+        self.pending_cell = Some(PendingCell::new(address, kind));
         Ok(Some(Frame::Cell))
     }
 
@@ -707,18 +811,20 @@ impl Scanner {
             .pending_cell
             .take()
             .ok_or_else(|| invalid("missing worksheet cell"))?;
-        if cell.saw_inline && cell.saw_value {
+        let address = cell.address;
+        let effective_inline = cell.saw_inline || matches!(cell.kind, CellKind::InlineString);
+        if effective_inline && cell.saw_value {
             return Err(invalid(
                 "worksheet cell contains both inline text and a value",
             ));
         }
-        if cell.saw_inline && !matches!(cell.kind, CellKind::Untyped | CellKind::InlineString) {
+        if effective_inline && !matches!(cell.kind, CellKind::Untyped | CellKind::InlineString) {
             return Err(invalid("inline string has a non-inline cell type"));
         }
-        if matches!(cell.kind, CellKind::InlineString) {
-            cell.saw_inline = true;
-        }
         let formula = if let Some(formula) = cell.formula.take() {
+            if effective_inline {
+                return Err(invalid("formula cell cannot contain an inline string"));
+            }
             if formula.trim().is_empty() || formula.trim_start().starts_with('=') {
                 return Err(invalid(
                     "formula expression must be non-empty and omit the leading '='",
@@ -745,12 +851,16 @@ impl Scanner {
                 None
             };
         if let Some(index) = shared_string_index {
-            if cell.selected {
-                self.dependencies.target_shared_string_index = Some(index);
+            if self.requested.contains(address) {
+                self.retain_selected(SelectedRecord {
+                    address,
+                    cell: None,
+                    shared_string_index: Some(index),
+                })?;
             }
             return Ok(());
         }
-        let inline = if cell.saw_inline {
+        let inline = if effective_inline {
             if formula.is_some() {
                 return Err(invalid("formula cell cannot contain an inline string"));
             }
@@ -781,9 +891,25 @@ impl Scanner {
         } else {
             Cell::Empty
         };
-        if cell.selected {
-            self.selected = Some(semantic);
+        if self.requested.contains(address) {
+            self.retain_selected(SelectedRecord {
+                address,
+                cell: Some(semantic),
+                shared_string_index: None,
+            })?;
         }
+        Ok(())
+    }
+
+    fn retain_selected(&mut self, record: SelectedRecord) -> Result<()> {
+        self.selected_count = self
+            .selected_count
+            .checked_add(1)
+            .ok_or_else(|| invalid("selected worksheet record count overflow"))?;
+        self.selected
+            .try_reserve(1)
+            .map_err(|source| allocation("selected worksheet range records", source))?;
+        self.selected.push(record);
         Ok(())
     }
 

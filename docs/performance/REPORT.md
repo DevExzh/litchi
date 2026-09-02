@@ -1,5 +1,25 @@
 # Performance program phase report
 
+## XLSX source-worksheet range streaming (change 0365)
+
+Cold `SourceWorksheet::cells(area)` and staged `visit_cells(area)` now use a
+verified sparse raw range scan for eligible worksheets. Dependency scans reach
+XML/MCE/x14ac EOF, with ZIP CRC/size verification and source/execution fences
+completed before publication or callbacks. Sparse physical output omits
+missing coordinates while retaining explicit empty cells. The eligible cold
+path uses a multi-index SST stream and direct style-count stream without a
+worksheet `Store`, `PartData`, or semantic dependency cache; warm `Store`
+remains fast. `NotEligible` falls back eagerly only after the verified reader.
+
+Merges, shared/array/data-table formulas, row/column styles, rich, phonetic,
+extension, foreign, and general-reference cases remain eager, and
+`stored_extent` is unchanged. `visit_cells` stages an owned `Vec` sized by
+selected physical output. Focused validation passed `27/27`, full
+`litchi-xlsx` library validation passed `883/883`, and package Clippy passed
+with `-D warnings` apart from the unrelated `clippy::useless-asref` issue.
+No latency, RSS, fixed-memory, or OOM claim is made;
+`performance_claim: none`. See [Change 0365](changes/0365-xlsx-source-worksheet-range-streaming.md).
+
 ## XLSX selected-cell dependency streaming (change 0364)
 
 Change 0364 extends the selected-worksheet scan to track maximum shared-string

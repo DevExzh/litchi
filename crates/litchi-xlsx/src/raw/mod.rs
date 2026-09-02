@@ -19,16 +19,20 @@ pub mod web;
 pub(crate) mod worksheet;
 pub(crate) mod worksheet_property;
 
-/// Bounded source selection of one worksheet coordinate.
+/// Bounded source selection of one worksheet coordinate or rectangular range.
 ///
 /// This surface is an internal format-owner API. `NotEligible` is a
 /// capability result, not full worksheet validation; callers must fall back
 /// to the materialized worksheet parser whenever it is returned. Eligible
-/// results include [`selected_worksheet::SelectedDependencies`] for the zero-based shared-string
-/// and direct-cell-style indexes observed across the complete stream.
+/// range results are sparse physical records and include
+/// [`selected_worksheet::SelectedDependencies`] for the zero-based
+/// shared-string and direct-cell-style indexes observed across the complete
+/// stream. The one-cell [`selected_worksheet::scan`] function is retained as
+/// a compatibility wrapper around [`selected_worksheet::scan_range`].
 pub mod selected_worksheet {
     pub use super::worksheet::selected::{
-        NotEligibleReason, ScanOutcome, SelectedCell, SelectedDependencies, StreamResult, scan,
+        NotEligibleReason, RangeScanOutcome, ScanOutcome, SelectedCell, SelectedCells,
+        SelectedDependencies, SelectedRecord, StreamResult, scan, scan_range,
     };
 }
 

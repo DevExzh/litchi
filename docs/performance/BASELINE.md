@@ -1,5 +1,27 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Latest XLSX source-worksheet range streaming (change 0365)
+
+Change 0365 extends cold `SourceWorksheet::cells(area)` and staged
+`visit_cells(area)` with a verified sparse raw range scan for eligible
+worksheets. Dependency scans reach XML/MCE/x14ac EOF, then ZIP CRC/size
+verification and source/execution fences complete before publication or
+callbacks. Output is sparse physical output only: missing coordinates are
+omitted and explicit empty cells are retained. A multi-index SST stream and a
+direct style-count stream avoid worksheet `Store`, `PartData`, and semantic
+dependency-cache publication on the eligible cold path; warm `Store` remains
+fast. `visit_cells` stages an owned `Vec` sized by selected physical output,
+not a fixed-memory guarantee.
+
+`NotEligible` falls back eagerly only after the verified reader returns.
+Merges, shared/array/data-table formulas, row/column styles, rich, phonetic,
+extension, foreign, and general-reference cases remain eager, and
+`stored_extent` is unchanged. Focused validation passed `27/27`, full
+`litchi-xlsx` library validation passed `883/883`, and package Clippy passed
+with `-D warnings` apart from the unrelated `clippy::useless-asref` issue.
+No latency, RSS, fixed-memory, or OOM claim follows; `performance_claim: none`.
+See [Change 0365](changes/0365-xlsx-source-worksheet-range-streaming.md).
+
 ## Latest XLSX selected-cell dependency streaming (change 0364)
 
 Change 0364 extends the eligible cold selected-cell path with sequential,
