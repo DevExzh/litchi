@@ -243,30 +243,35 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
             ),
         ],
     )?;
-    editor.set_table_cell_number_format(table_id, ROW, NUMBER_COLUMN, numbers_format()?)?;
-    editor.set_table_cell_percentage_format(
+    editor.set_table_cell_data_format(
+        table_id,
+        ROW,
+        NUMBER_COLUMN,
+        litchi_numbers::cell::data_format::DataFormat::Number(numbers_format()?),
+    )?;
+    editor.set_table_cell_data_format(
         table_id,
         ROW,
         PERCENTAGE_COLUMN,
-        numbers_percentage_format()?,
+        litchi_numbers::cell::data_format::DataFormat::Percentage(numbers_percentage_format()?),
     )?;
-    editor.set_table_cell_currency_format(
+    editor.set_table_cell_data_format(
         table_id,
         ROW,
         CURRENCY_COLUMN,
-        numbers_currency_format()?,
+        litchi_numbers::cell::data_format::DataFormat::Currency(numbers_currency_format()?),
     )?;
-    editor.set_table_cell_scientific_format(
+    editor.set_table_cell_data_format(
         table_id,
         ROW,
         SCIENTIFIC_COLUMN,
-        numbers_scientific_format()?,
+        litchi_numbers::cell::data_format::DataFormat::Scientific(numbers_scientific_format()?),
     )?;
-    editor.set_table_cell_fraction_format(
+    editor.set_table_cell_data_format(
         table_id,
         ROW,
         FRACTION_COLUMN,
-        numbers_fraction_format(),
+        litchi_numbers::cell::data_format::DataFormat::Fraction(numbers_fraction_format()),
     )?;
     editor.set_table_cell_numeral_system_format(
         table_id,

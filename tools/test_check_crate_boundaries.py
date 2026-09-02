@@ -1959,38 +1959,6 @@ def add_numbers_table_cell_fraction_format_canonical_scaffold(
         "fn main() { package.edit_table_cell_fraction_format(); }\n",
         encoding="utf-8",
     )
-    host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_FRACTION_FORMAT_SOURCE[0]
-    host.write_text(
-        host.read_text(encoding="utf-8")
-        + "\n"
-        + "impl NumbersEditor {\n"
-        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        + "pub fn table_cell_fraction_format(&self, table_id: u64, row: usize, column: usize) -> Result<Option<Fraction>> {\n"
-        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
-        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
-        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
-        + "    package.table_cell_fraction_format(sheet, table, position)\n"
-        + "}\n"
-        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        + "pub fn set_table_cell_fraction_format(&mut self, table_id: u64, row: usize, column: usize, format: Fraction) -> Result<()> {\n"
-        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
-        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
-        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
-        + "    package.edit_table_cell_fraction_format(sheet, table, position).set(format).commit()\n"
-        + "}\n"
-        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        + "pub fn reset_table_cell_fraction_format(&mut self, table_id: u64, row: usize, column: usize) -> Result<bool> {\n"
-        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
-        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
-        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
-        + "    package.edit_table_cell_fraction_format(sheet, table, position).clear().commit()\n"
-        + "}\n"
-        + "}\n",
-        encoding="utf-8",
-    )
-
-
-
 def add_scientific_format_selector_context_host(
     root: Path,
     *,
@@ -2034,55 +2002,6 @@ def add_scientific_format_selector_context_host(
         "pub fn set_table_cell_scientific_format(&mut self, table_id: u64, row: usize, column: usize, format: Scientific) -> Result<()> { commit_focused_scientific_format() }\n"
         "#[deprecated(note = \"legacy compatibility shell\")]\n"
         "pub fn reset_table_cell_scientific_format(&mut self, table_id: u64, row: usize, column: usize) -> Result<bool> { commit_focused_scientific_format() }\n"
-        "}\n",
-        encoding="utf-8",
-    )
-
-
-
-def add_fraction_format_selector_context_host(
-    root: Path,
-    *,
-    typed_location: bool,
-) -> None:
-    """Replace the Fraction host with a helper-only selector route fixture."""
-
-    host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_FRACTION_FORMAT_SOURCE[0]
-    selector_fields = (
-        "sheet: litchi_numbers::SheetSelector<'static>, "
-        "table: litchi_numbers::TableSelector<'static>, "
-        "position: litchi_numbers::table::CellPosition,"
-        if typed_location
-        else "sheet: usize, table: usize, position: usize,"
-    )
-    host.write_text(
-        "use litchi_numbers::Package as FocusedNumbersPackage;\n"
-        "enum FocusedFractionFormatLocation {\n"
-        "    Owner { "
-        + selector_fields
-        + " source: FocusedNumbersPackage },\n"
-        "}\n"
-        "fn focused_fraction_format_location() -> Result<FocusedFractionFormatLocation> {\n"
-        "    let source = FocusedNumbersPackage::from_bytes(bytes)?;\n"
-        "    Ok(FocusedFractionFormatLocation::Owner { source, sheet, table, position })\n"
-        "}\n"
-        "fn focused_fraction_format() -> Result<Option<Fraction>> {\n"
-        "    let location = focused_fraction_format_location()?;\n"
-        "    let FocusedFractionFormatLocation::Owner { source, sheet, table, position } = location else { return Err(Unsupported); };\n"
-        "    source.table_cell_fraction_format(sheet, table, position)\n"
-        "}\n"
-        "fn commit_focused_fraction_format() -> Result<()> {\n"
-        "    let location = focused_fraction_format_location()?;\n"
-        "    let FocusedFractionFormatLocation::Owner { source, sheet, table, position } = location else { return Err(Unsupported); };\n"
-        "    source.edit_table_cell_fraction_format(sheet, table, position).set(format).commit()\n"
-        "}\n"
-        "impl NumbersEditor {\n"
-        "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        "pub fn table_cell_fraction_format(&self, table_id: u64, row: usize, column: usize) -> Result<Option<Fraction>> { focused_fraction_format() }\n"
-        "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        "pub fn set_table_cell_fraction_format(&mut self, table_id: u64, row: usize, column: usize, format: Fraction) -> Result<()> { commit_focused_fraction_format() }\n"
-        "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        "pub fn reset_table_cell_fraction_format(&mut self, table_id: u64, row: usize, column: usize) -> Result<bool> { commit_focused_fraction_format() }\n"
         "}\n",
         encoding="utf-8",
     )
@@ -33981,13 +33900,12 @@ fn rewrite_movie_title_operation(
             )
             self.assertTrue(any("corpus must be nonempty" in item for item in violations), violations)
 
-    def test_iwa_numbers_table_cell_fraction_format_requires_deprecated_selector_route(
-        self,
-    ) -> None:
+    def test_iwa_numbers_table_cell_fraction_format_retires_raw_id_methods(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             add_numbers_table_cell_fraction_format_canonical_scaffold(root)
-            add_fraction_format_selector_context_host(root, typed_location=True)
+            host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_FRACTION_FORMAT_SOURCE[0]
+            host.write_text("fn generic_fraction_helper() {}\n", encoding="utf-8")
             self.assertEqual(
                 boundaries.audit_iwa_numbers_table_cell_fraction_format_source_topology(
                     root
@@ -33995,45 +33913,38 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
-            add_fraction_format_selector_context_host(root, typed_location=False)
+            host.write_text(
+                "impl NumbersEditor {\n"
+                "pub fn table_cell_fraction_format(&self) {}\n"
+                "pub fn set_table_cell_fraction_format(&mut self) {}\n"
+                "pub fn reset_table_cell_fraction_format(&mut self) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
             violations = boundaries.audit_iwa_numbers_table_cell_fraction_format_source_topology(
                 root
             )
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_FRACTION_FORMAT_METHODS:
                 self.assertTrue(
                     any(
-                        "missing selector-first" in item and selector in item
+                        "raw-ID method returned" in item and method in item
                         for item in violations
                     ),
-                    (selector, violations),
+                    (method, violations),
                 )
 
-            host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_FRACTION_FORMAT_SOURCE[0]
-            complete = host.read_text(encoding="utf-8")
             host.write_text(
-                complete.replace(
-                    "#[deprecated(note = \"legacy compatibility shell\")]\n",
-                    "",
-                    1,
-                ),
+                "// pub fn table_cell_fraction_format() {}\n"
+                'const NOTE: &str = "set_table_cell_fraction_format";\n'
+                "fn table_cell_fraction_format_summary() {}\n",
                 encoding="utf-8",
             )
-            violations = boundaries.audit_iwa_numbers_table_cell_fraction_format_source_topology(
-                root
-            )
-            self.assertTrue(any("must remain deprecated" in item for item in violations), violations)
-
-            host.write_text(
-                complete.replace(
-                    "source.table_cell_fraction_format(sheet, table, position)",
-                    "self.table_cell_fraction_format(table_id, row, column)",
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_fraction_format_source_topology(
+                    root
                 ),
-                encoding="utf-8",
+                [],
             )
-            violations = boundaries.audit_iwa_numbers_table_cell_fraction_format_source_topology(
-                root
-            )
-            self.assertTrue(any("must delegate to focused Package" in item for item in violations), violations)
 
     def test_numbers_table_cell_fraction_format_shared_core_rejects_duplicate_writer(
         self,
