@@ -7342,3 +7342,31 @@ patch/inverse/conflict behavior, adversarial fuzz coverage, and native Keynote
 save/close/reopen acceptance for each operation. Soundtrack creation and
 general media-asset CRUD remain open debts, and no dependency edge or ordered
 migration debt is retired by this source-level ownership step.
+
+## 2026-09-03 amendment: Keynote soundtrack-item host cutover
+
+The focused `litchi-keynote::soundtrack::items` transaction now owns rooted
+soundtrack item read/add/insert/replace/remove. Its public vocabulary consists
+of semantic positions, opaque source-bound handles, validated audio sources,
+exact patches, and typed errors; native identifiers, generated messages,
+component topology, archive paths, and package bytes remain private. The
+physical adapter streams bounded Buffa-backed metadata projections, preserves
+producer-selected aggregate-only attribution, validates ordered payload/header
+references, and reopens candidates before publication. Identical audio reuses
+the unique canonical record only after exact byte, length, name, and media-type
+checks.
+
+The duplicate `litchi-iwa` item implementation, eager wire helper, raw-ID item
+type, compatibility example, and legacy-only tests are deleted, and the
+boundary checker rejects their return. The remaining low-level inspection
+example obtains semantic items through `litchi-keynote::Package`. Focused Rust
+coverage proves absent/empty distinction, ordered lifecycle operations, shared
+occurrences, malformed references, aggregate-only preservation, atomic errors,
+exact apply/inverse, and stale-source conflicts. A genuine replacement
+candidate also passed a Keynote save, close, and reopen probe without a repair
+warning; this is representative replacement evidence, not an operation-wide
+native certification claim.
+
+This retires one host surface, not the monolith. Soundtrack creation, general
+media assets, slide-owned media, builds, shapes, tables, charts, and other ADR
+0028 debts remain; no dependency edge or whole deletion gate closes here.

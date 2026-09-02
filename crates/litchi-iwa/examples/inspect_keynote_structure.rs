@@ -37,7 +37,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "soundtrack settings: {:?}",
         KeynotePackage::open(&path)?.soundtrack_settings()?
     );
-    println!("soundtrack items: {:?}", editor.soundtrack_items()?);
+    println!(
+        "soundtrack items: {:?}",
+        KeynotePackage::open(&path)?.soundtrack_items()?
+    );
     let media_assets = editor.media_assets()?;
     let package = IWorkPackage::open(path)?;
     let mut objects: HashMap<u64, (String, ArchiveObject)> = HashMap::new();

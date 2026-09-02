@@ -51,13 +51,14 @@ use crate::text::{
     TextLanguage, TextLanguageRun, TextLigatures, TextRange, TextScript, TextStorageId,
     TextStorageInfo, TextStyle,
 };
+#[cfg(test)]
+use crate::wire::parse_wire_fields;
 use crate::wire::{
-    append_repeated_length_delimited_field, parse_wire_fields, patch_fixed32_field,
-    patch_fixed64_field, patch_length_delimited_field, patch_nested_fixed32_field,
-    patch_nested_length_delimited_field, patch_varint_field,
-    remove_repeated_length_delimited_field_where, repeated_length_delimited_payloads,
-    rewrite_repeated_length_delimited_fields, transform_length_delimited_field,
-    transform_length_delimited_fields_at_path,
+    append_repeated_length_delimited_field, patch_fixed32_field, patch_fixed64_field,
+    patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
+    patch_varint_field, remove_repeated_length_delimited_field_where,
+    repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields,
+    transform_length_delimited_field, transform_length_delimited_fields_at_path,
 };
 use crate::{EmbeddedMediaAsset, Error, IWorkMediaEditor, IWorkPackage, Result};
 use litchi_iwa_index::ObjectId;
@@ -5379,8 +5380,6 @@ mod slide_movies;
 mod slide_preview;
 mod slide_shapes;
 mod slide_tables;
-mod soundtrack_items;
-mod soundtrack_wire;
 mod text_box_create;
 mod transition;
 
@@ -5419,7 +5418,6 @@ pub use slide_tables::{
     KeynoteTableCellValue, KeynoteTableCellVerticalAlignment, KeynoteTableDimension,
     KeynoteTableDimensionSize, KeynoteTablePoints, RemovedKeynoteSlideTable,
 };
-pub use soundtrack_items::KeynoteSoundtrackItemInfo;
 use transition::settings_from_projection;
 #[cfg(test)]
 mod operation_cache_tests;

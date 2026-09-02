@@ -7258,7 +7258,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 violations,
             )
 
-    def test_soundtrack_item_boundary_does_not_retire_legacy_host_early(self) -> None:
+    def test_soundtrack_item_boundary_retires_legacy_host(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             add_keynote_soundtrack_items_canonical_scaffold(root)
@@ -7272,17 +7272,76 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "pub fn remove_soundtrack_item() {}\n",
                 encoding="utf-8",
             )
-            self.assertEqual(
-                boundaries.audit_keynote_soundtrack_items_facade_source_topology(
-                    root
-                ),
-                [],
+            violations = boundaries.audit_iwa_keynote_soundtrack_items_source_topology(root)
+            self.assertIn(
+                "retired litchi-iwa Keynote soundtrack-item source returned: "
+                "crates/litchi-iwa/src/keynote/editor/soundtrack_items.rs",
+                violations,
             )
+            for method in boundaries.RETIRED_IWA_KEYNOTE_SOUNDTRACK_ITEMS_METHODS:
+                self.assertTrue(
+                    any(f"soundtrack-item method {method}:" in violation for violation in violations),
+                    method,
+                )
+
+    def test_soundtrack_item_retirement_rejects_wire_module_type_and_example(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            editor.parent.mkdir(parents=True)
+            editor.write_text(
+                "mod soundtrack_wire;\npub use elsewhere::KeynoteSoundtrackItemInfo;\n",
+                encoding="utf-8",
+            )
+            wire = root / boundaries.RETIRED_IWA_KEYNOTE_SOUNDTRACK_ITEMS_SOURCES[1]
+            wire.parent.mkdir(parents=True, exist_ok=True)
+            wire.write_text("fn helper() {}\n", encoding="utf-8")
+            example = root / boundaries.RETIRED_IWA_KEYNOTE_SOUNDTRACK_ITEMS_EXAMPLE
+            example.parent.mkdir(parents=True)
+            example.write_text("fn main() {}\n", encoding="utf-8")
+            violations = boundaries.audit_iwa_keynote_soundtrack_items_source_topology(root)
+            self.assertTrue(any("soundtrack-item source returned" in item for item in violations))
+            self.assertTrue(any("soundtrack-item example returned" in item for item in violations))
+            self.assertTrue(any("module soundtrack_wire" in item for item in violations))
+            self.assertTrue(any("type re-export" in item for item in violations))
+
+    def test_soundtrack_item_retirement_ignores_comments_strings_and_focused_calls(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            editor.parent.mkdir(parents=True)
+            editor.write_text(
+                "// mod soundtrack_items;\n"
+                'const NOTE: &str = "KeynoteSoundtrackItemInfo";\n'
+                "fn soundtrack_items_summary() {}\n"
+                "fn inspect() { let _ = KeynotePackage.soundtrack_items(); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_soundtrack_items_source_topology(root), []
+            )
+
+    def test_soundtrack_item_retirement_rejects_legacy_calls_outside_editor(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            example = root / "crates/litchi-iwa/examples/legacy.rs"
+            example.parent.mkdir(parents=True)
+            example.write_text(
+                "fn main() { editor.replace_soundtrack_item(0, b\"x\"); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_soundtrack_items_source_topology(root)
+            self.assertEqual(len(violations), 1)
+            self.assertIn("soundtrack-item call", violations[0])
 
     def test_keynote_soundtrack_items_audit_is_in_main_dispatch(self) -> None:
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
             "+ audit_keynote_soundtrack_items_facade_source_topology()",
+            main_source,
+        )
+        self.assertIn(
+            "+ audit_iwa_keynote_soundtrack_items_source_topology()",
             main_source,
         )
 
