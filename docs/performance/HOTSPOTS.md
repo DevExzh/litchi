@@ -1,5 +1,25 @@
 # Performance hotspot inventory
 
+## Change 0374 update
+
+Change 0374 is a narrowly measured DOCX source-backed story-hyperlink
+publication optimization. The planned validated `Snapshot` is retained in
+`ForwardOnlyPatch`; publication verifies execution, source version, lineage,
+the complete artifact fingerprint, the post-fingerprint source version, and
+equality with the snapshot's stored fingerprint before reusing it. The
+focused counter proof reports one `capture_source` and one `load_story` from
+planning through publication, independently of timing.
+
+Clean CPU-affinity-2 release ABBA used one logical CPU, one worker, 20 warmups,
+and 500 samples per case over the fixed seven-story corpus. No-op p50/mean and
+redaction p50/mean/p95/p99 are accepted for these exact cases and protocol;
+no-op p95/p99 are withheld for control tail drift. No reads, decompression,
+materialization, allocation, RSS, physical-I/O, cold-cache, throughput,
+fixed-memory, general OOM, all-DOCX, unmeasured-selector, or parallel claim
+follows. Serial validation, the `935/935` library result, `23/23` integration
+result, and the exact pre-existing exclusion are recorded in the [0374
+record](changes/0374-docx-story-hyperlink-retained-snapshot.md).
+
 ## Change 0373 update
 
 Change 0373 is a correctness and resource-safety hardening batch, not a

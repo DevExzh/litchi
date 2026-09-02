@@ -1,5 +1,80 @@
 # Performance program phase report
 
+## Change 0374: DOCX story-hyperlink retained snapshot
+
+### Implementation boundary
+
+The DOCX story-hyperlink `ForwardOnlyPatch` now retains the validated
+`Snapshot` created during planning. Publication checks the execution token,
+source version, source lineage, complete artifact fingerprint, post-fingerprint
+version, and equality with the planned snapshot's stored artifact fingerprint
+before writing. It no longer recaptures semantic story state. The existing
+`litchi-docx` owner and OPC
+publication substrate remain in place, with no public CRUD signature,
+dependency edge, raw package type, archive/runtime handle, lock, unsafe code,
+or parallel path added.
+
+Exact no-op corpus identity, redaction story/XML and relationship locality,
+deterministic output, source immutability, freshness, signature,
+cancellation, and failure-atomicity gates remain required. No-op output is
+the 9,900-byte corpus byte-for-byte; redaction emits 9,757 bytes in 125 writes.
+
+### Focused proof and serial validation
+
+`publication_reuses_the_planned_story_snapshot` passed `1/1` and kept
+`capture_source = 1` and `load_story = 1` unchanged from planning through
+publication. This is separate counter/static evidence, not a timing-derived
+allocation or RSS result.
+
+Validation used one Cargo process at a time, `CARGO_BUILD_JOBS=1`, disabled
+incremental/debug compilation, one test thread, an 8 GiB build VM cap, and a
+10 GiB `MemAvailable` admission gate. The `litchi-docx` library passed
+`935/935`; all other integration targets passed, including
+`source_backed_story_hyperlinks` `23/23`. The exact unrelated pre-existing
+`replacing_the_path_reports_source_changed_without_retargeting` test was
+excluded. Production-library Clippy passed with the five named pre-existing
+allowances; all-test Clippy additionally exposed unrelated pre-existing
+`needless_question_mark` and `needless_lifetimes` debt. The boundary gate
+passed. No parallel build/worktree lane was used.
+
+### Clean ABBA evidence
+
+The clean release run used CPU affinity 2, one logical CPU, one execution
+worker, 20 warmups, and 500 samples per case in `A1-B1-B2-A2` order. Control
+was `73fabbcf707279e09d7a4de62a8190cb4075dd41` / tree
+`bec7e7a2d2919d2f0bdfce4f50fd3a1cbfb82adc`, binary
+`1bf48f11ad9b600d0145dde0d30baee4bd05d25900cb77ff6721e7bcbba6f97e`; candidate
+was `7cb61e3938c040c01e4c48960d2ce881404cf63a` / tree
+`7d22585dfe8c6c66ae16d36452106acfde2988c0`, binary
+`7b9d807392cb6171ef53b78f9acd0a6325ac3d352e0a588e47155cdc3db62600`.
+All implementations and legs were clean.
+
+The fixed corpus has seven story kinds, 15 OPC Parts, 24 ZIP members, 9,900
+archive bytes, and 39,564 uncompressed bytes, with SHA-256
+`457421e8f86ec8eb52fbe181cebe7d0821ce1e794a08142ff01a4c4e03df0cac`.
+
+| Case and ABBA legs | p50 reduction | mean reduction | p95 reduction | p99 reduction |
+| --- | ---: | ---: | ---: | ---: |
+| No-op A1/B1 | 30.577956% | 29.506205% | 25.142442% | 20.667777% |
+| No-op A2/B2 | 30.390954% | 33.137655% | 37.435278% | 58.413028% |
+| Redaction A1/B1 | 16.592503% | 15.753115% | 15.442193% | 10.006419% |
+| Redaction A2/B2 | 18.591303% | 18.832824% | 22.640355% | 24.036492% |
+
+All 14 correctness/refusal gates were true in all eight rows. The complete
+raw-report hashes, run statistics, drifts, and output identities are in the
+[machine-readable ABBA result](results/docx-story-hyperlink-publication-0374-abba.json).
+
+### Interpretation
+
+The authorized claim is limited to this benchmark/corpus/protocol: no-op p50
+and mean, and redaction p50, mean, p95, and p99. No-op p95 and p99 are
+withheld because control tail drift exceeded the gate. Capture/load reuse is
+proven by the focused counter and static evidence, not inferred from timing.
+
+No claim is made for reads, decompression, materialization, allocation volume,
+RSS, physical I/O, cold-cache behavior, throughput, fixed memory, general OOM
+prevention, all DOCX inputs, unmeasured selectors, or parallel execution.
+
 ## Change 0373: ODF source allocation preflight
 
 ### Implementation boundary

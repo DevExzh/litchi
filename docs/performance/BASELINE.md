@@ -1,5 +1,39 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0374: DOCX story-hyperlink retained snapshot
+
+Change 0374 retains the validated story-hyperlink `Snapshot` inside
+`ForwardOnlyPatch` and reuses it during source-backed publication. Execution,
+source-version, lineage, complete artifact-fingerprint, post-fingerprint, and
+stored-fingerprint equality checks remain before output; semantic story
+capture is not repeated. Existing no-op identity, redaction locality, deterministic output,
+source immutability, freshness, signature, cancellation, and atomicity gates
+remain in force.
+
+The focused `publication_reuses_the_planned_story_snapshot` proof reports
+`capture_source = 1` and `load_story = 1` before and after publication. Serial
+validation passed `litchi-docx` `935/935` and integration target
+`source_backed_story_hyperlinks` `23/23`, subject only to the exact unrelated
+pre-existing `replacing_the_path_reports_source_changed_without_retargeting`
+exclusion. Production-library Clippy passed with five named pre-existing
+allowances; the all-test run exposed two additional unrelated pre-existing
+debt lints. The boundary gate passed.
+
+Clean CPU-affinity-2 release ABBA used one logical CPU, one worker, 20
+warmups, and 500 samples per case over the seven-story, 15-Part, 24-member
+corpus (9,900 archive bytes; SHA-256
+`457421e8f86ec8eb52fbe181cebe7d0821ce1e794a08142ff01a4c4e03df0cac`). The
+[compact result](results/docx-story-hyperlink-publication-0374-abba.json)
+records the clean control/candidate identities, raw-report hashes, output
+hashes, all 14 gates across eight rows, and full reductions/drifts. The
+authorized claim is no-op p50/mean and redaction p50/mean/p95/p99 on this
+benchmark/corpus/protocol only. No-op tails are withheld for control drift.
+
+`performance_claim: scoped`; no reads, decompression, materialization,
+allocation, RSS, physical-I/O, cold-cache, throughput, fixed-memory, general
+OOM, all-DOCX, unmeasured-selector, or parallel-execution claim follows.
+See [Change 0374](changes/0374-docx-story-hyperlink-retained-snapshot.md).
+
 ## Change 0373: ODF source allocation preflight
 
 Change 0373 closes known allocation-order gaps across ZIP materialization,

@@ -1,5 +1,42 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0374 compliance update
+
+Change 0374 keeps story-hyperlink capture and publication in the owning
+`litchi-docx` layer and reuses the existing OPC source/overlay boundary. The
+validated `Snapshot` is retained by `ForwardOnlyPatch`; publication verifies
+execution, source version, lineage, complete artifact fingerprints,
+post-fingerprint version, and equality with the snapshot's stored artifact
+fingerprint before output. No public CRUD
+signature, dependency edge, raw package type, archive/runtime handle, lock,
+unsafe code, or parallel execution path is introduced.
+
+Correctness and source safety take precedence over speed. Exact no-op bytes,
+redaction story/XML and relationship locality, source immutability,
+determinism, freshness, signature, cancellation, and failure atomicity remain
+publication fences. The focused `publication_reuses_the_planned_story_snapshot`
+test keeps `capture_source = 1` and `load_story = 1` from planning through
+publication; this is independent counter evidence and is not an allocation,
+RSS, or timing inference.
+
+Serial validation used one Cargo process at a time, one build job, disabled
+incremental/debug compilation, one test thread, an 8 GiB build cap, and a
+10 GiB available-memory admission gate. `litchi-docx` passed `935/935`, the
+story-hyperlink integration target passed `23/23`, the boundary gate passed,
+and production-library Clippy passed with five named pre-existing allowances.
+The exact unrelated pre-existing source-change test exclusion and the two
+additional all-test Clippy debt lints are recorded in [Change 0374](changes/0374-docx-story-hyperlink-retained-snapshot.md).
+
+The clean release ABBA used CPU affinity 2, one logical CPU, one worker, 20
+warmups, and 500 samples per case. It accepts only the named no-op p50/mean
+and redaction p50/mean/p95/p99 metrics on the fixed seven-story corpus. No-op
+tails are withheld for control drift. The [ABBA result](results/docx-story-hyperlink-publication-0374-abba.json)
+records all identities, raw hashes, output hashes, gates, and adjudication.
+
+`performance_claim: scoped`; no reads, decompression, materialization,
+allocation, RSS, physical-I/O, cold-cache, throughput, fixed-memory, general
+OOM, all-DOCX, unmeasured-selector, or parallel-execution claim follows.
+
 ## Change 0373 compliance update
 
 Change 0373 keeps generic archive allocation mechanics in `soapberry-zip`,
