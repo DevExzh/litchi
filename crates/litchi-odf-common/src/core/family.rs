@@ -519,7 +519,9 @@ pub fn validate_content_document_part(
     let mut reader = Reader::from_str(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
-    let mut tracker = BindingTracker::new();
+    let mut tracker = BindingTracker::new().map_err(|error| {
+        error.into_litchi_error_with_context(|| format!("invalid {family_name} content.xml"))
+    })?;
     let mut pending_pop = false;
 
     loop {
@@ -533,10 +535,17 @@ pub fn validate_content_document_part(
         match event {
             Event::Start(element) => {
                 tracker.push(&element).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid {family_name} content.xml: {error}"))
+                    error.into_litchi_error_with_context(|| {
+                        format!("invalid {family_name} content.xml")
+                    })
                 })?;
                 let office = if validator.needs_office_namespace() {
-                    let (namespace, _) = tracker.resolve_element(element.name());
+                    let (namespace, _) =
+                        tracker.resolve_element(element.name()).map_err(|error| {
+                            error.into_litchi_error_with_context(|| {
+                                format!("invalid {family_name} content.xml")
+                            })
+                        })?;
                     matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
                 } else {
                     false
@@ -545,10 +554,17 @@ pub fn validate_content_document_part(
             },
             Event::Empty(element) => {
                 tracker.push(&element).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid {family_name} content.xml: {error}"))
+                    error.into_litchi_error_with_context(|| {
+                        format!("invalid {family_name} content.xml")
+                    })
                 })?;
                 let office = if validator.needs_office_namespace() {
-                    let (namespace, _) = tracker.resolve_element(element.name());
+                    let (namespace, _) =
+                        tracker.resolve_element(element.name()).map_err(|error| {
+                            error.into_litchi_error_with_context(|| {
+                                format!("invalid {family_name} content.xml")
+                            })
+                        })?;
                     matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
                 } else {
                     false

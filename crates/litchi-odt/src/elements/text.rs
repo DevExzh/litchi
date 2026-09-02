@@ -1495,14 +1495,14 @@ fn may_declare_namespace(element: &BytesStart<'_>) -> bool {
 trait TextAttributeResolver {
     /// Resolve an attribute qualified name exactly like
     /// `NamespaceResolver::resolve_attribute`.
-    fn resolve_attribute<'n>(&self, name: QName<'n>) -> (ResolveResult<'_>, LocalName<'n>);
+    fn resolve_attribute<'n>(&self, name: QName<'n>) -> Result<(ResolveResult<'_>, LocalName<'n>)>;
     /// The driving reader's decoder, for attribute value normalization.
     fn decoder(&self) -> Decoder;
 }
 
 impl TextAttributeResolver for NsReader<&[u8]> {
-    fn resolve_attribute<'n>(&self, name: QName<'n>) -> (ResolveResult<'_>, LocalName<'n>) {
-        self.resolver().resolve_attribute(name)
+    fn resolve_attribute<'n>(&self, name: QName<'n>) -> Result<(ResolveResult<'_>, LocalName<'n>)> {
+        Ok(self.resolver().resolve_attribute(name))
     }
 
     fn decoder(&self) -> Decoder {
@@ -1521,8 +1521,10 @@ struct TrackedAttributes<'a> {
 }
 
 impl TextAttributeResolver for TrackedAttributes<'_> {
-    fn resolve_attribute<'n>(&self, name: QName<'n>) -> (ResolveResult<'_>, LocalName<'n>) {
-        self.tracker.resolve_attribute(name)
+    fn resolve_attribute<'n>(&self, name: QName<'n>) -> Result<(ResolveResult<'_>, LocalName<'n>)> {
+        self.tracker
+            .resolve_attribute(name)
+            .map_err(|error| error.into_litchi_error("invalid ODF text XML"))
     }
 
     fn decoder(&self) -> Decoder {
@@ -1598,7 +1600,9 @@ impl TextNamespaceMemo {
         // Miss: resolve directly, exactly as `resolve_event` does for element
         // events (`use_default = true`, baked into `resolve_prefix`).
         let is_text = matches!(
-            tracker.resolve_prefix(element.name().prefix()),
+            tracker
+                .resolve_prefix(element.name().prefix())
+                .map_err(|error| error.into_litchi_error("invalid ODF text XML"))?,
             ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE
         );
         self.has_prefix = prefix.is_some();
@@ -1643,7 +1647,8 @@ pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
     // drops the per-event buffer copy of `read_event_into`.
     let mut reader = Reader::from_str(xml_content);
     let decoder = reader.decoder();
-    let mut tracker = BindingTracker::new();
+    let mut tracker =
+        BindingTracker::new().map_err(|error| error.into_litchi_error("invalid ODF text XML"))?;
     let mut pending_pop = false;
     let mut blocks: Vec<Option<String>> = Vec::new();
     let mut active: Vec<ActiveTextBlockText> = Vec::new();
@@ -1696,9 +1701,9 @@ pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
         // consumed here), so only `Start`/`Empty` go through the memo.
         let text_namespace = match event {
             Event::Start(ref element) => {
-                tracker.push(element).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid ODF text XML: {error}"))
-                })?;
+                tracker
+                    .push(element)
+                    .map_err(|error| error.into_litchi_error("invalid ODF text XML"))?;
                 let declares = may_declare_namespace(element);
                 try_push(
                     &mut declared_stack,
@@ -1713,9 +1718,9 @@ pub(crate) fn parse_text_block_texts(xml_content: &str) -> Result<Vec<String>> {
                 memo.is_text_namespace(&tracker, content_version, element)?
             },
             Event::Empty(ref element) => {
-                tracker.push(element).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid ODF text XML: {error}"))
-                })?;
+                tracker
+                    .push(element)
+                    .map_err(|error| error.into_litchi_error("invalid ODF text XML"))?;
                 // The scope an `Empty` element opens closes immediately:
                 // defer its pop to the top of the next iteration.
                 pending_pop = true;
@@ -2162,7 +2167,9 @@ pub(crate) fn write_text_blocks_to_writer<'options, 'output, W: Write + ?Sized>(
 
     let mut reader = Reader::from_str(xml_content);
     let decoder = reader.decoder();
-    let mut tracker = BindingTracker::new();
+    let mut tracker = parse!(
+        BindingTracker::new().map_err(|error| error.into_litchi_error("invalid ODF text XML"))
+    );
     let mut pending_pop = false;
     let mut active: Vec<ActiveTextBlockText> = Vec::new();
     let mut pending = PendingSinkBlocks::new();
@@ -2191,9 +2198,11 @@ pub(crate) fn write_text_blocks_to_writer<'options, 'output, W: Write + ?Sized>(
         }
         let text_namespace = match event {
             Event::Start(ref element) => {
-                parse!(tracker.push(element).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid ODF text XML: {error}"))
-                }));
+                parse!(
+                    tracker
+                        .push(element)
+                        .map_err(|error| error.into_litchi_error("invalid ODF text XML"))
+                );
                 let declares = may_declare_namespace(element);
                 parse!(try_push(
                     &mut declared_stack,
@@ -2206,9 +2215,11 @@ pub(crate) fn write_text_blocks_to_writer<'options, 'output, W: Write + ?Sized>(
                 parse!(memo.is_text_namespace(&tracker, content_version, element))
             },
             Event::Empty(ref element) => {
-                parse!(tracker.push(element).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid ODF text XML: {error}"))
-                }));
+                parse!(
+                    tracker
+                        .push(element)
+                        .map_err(|error| error.into_litchi_error("invalid ODF text XML"))
+                );
                 pending_pop = true;
                 if may_declare_namespace(element) {
                     content_version += 1;
@@ -2726,7 +2737,7 @@ fn validate_text_block_attributes<R: TextAttributeResolver + ?Sized>(
         if attribute.key.as_ref() == b"xmlns" || attribute.key.as_ref().starts_with(b"xmlns:") {
             continue;
         }
-        let (namespace, local_name) = resolver.resolve_attribute(attribute.key);
+        let (namespace, local_name) = resolver.resolve_attribute(attribute.key)?;
         let local_name = std::str::from_utf8(local_name.as_ref()).map_err(|_error| {
             Error::InvalidFormat("non-UTF-8 ODF text attribute name".to_string())
         })?;
@@ -2848,7 +2859,7 @@ fn text_space_count<R: TextAttributeResolver + ?Sized>(
     for attribute in element.attributes() {
         let attribute = attribute
             .map_err(|error| Error::InvalidFormat(format!("invalid text:s attribute: {error}")))?;
-        let (namespace, local_name) = resolver.resolve_attribute(attribute.key);
+        let (namespace, local_name) = resolver.resolve_attribute(attribute.key)?;
         if matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE)
             && local_name.as_ref() == b"c"
         {
@@ -3664,7 +3675,7 @@ mod tests {
     fn assert_memo_classification_matches(xml: &str) {
         let mut reader = NsReader::from_str(xml);
         let mut buffer = Vec::new();
-        let mut tracker = BindingTracker::new();
+        let mut tracker = BindingTracker::new().expect("tracker allocation is available");
         let mut pending_pop = false;
         let mut memo = TextNamespaceMemo::new();
         let mut content_version = 0u64;
