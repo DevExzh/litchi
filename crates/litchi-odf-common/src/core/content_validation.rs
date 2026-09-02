@@ -26,6 +26,22 @@ pub struct ContentDocumentValidator {
 }
 
 impl ContentDocumentValidator {
+    /// Reject a declared materialized `content.xml` size above the common
+    /// family limit before the package entry is read into memory.
+    ///
+    /// The size is optional because callers may be validating detached XML
+    /// without package metadata.  Package-backed callers should pass the
+    /// value returned by `SourceBackedPackage::member_materialized_size`,
+    /// which represents plaintext bytes for encrypted entries.
+    pub fn check_materialized_size(size: Option<u64>, family_name: &str) -> Result<()> {
+        if size.is_some_and(|size| size > MAX_CONTENT_BYTES as u64) {
+            return Err(Error::InvalidFormat(format!(
+                "{family_name} content.xml exceeds the family limit"
+            )));
+        }
+        Ok(())
+    }
+
     /// Create a validator and apply the bounded `content.xml` size check.
     ///
     /// # Errors
@@ -34,11 +50,7 @@ impl ContentDocumentValidator {
     /// when the XML exceeds 256 MiB or the body marker is not an
     /// `office:`-qualified element marker.
     pub fn new(content_xml: &str, body_marker: &str, family_name: &str) -> Result<Self> {
-        if content_xml.len() > MAX_CONTENT_BYTES {
-            return Err(Error::InvalidFormat(format!(
-                "{family_name} content.xml exceeds the family limit"
-            )));
-        }
+        Self::check_materialized_size(Some(content_xml.len() as u64), family_name)?;
         let expected_local = body_marker
             .strip_prefix("<office:")
             .and_then(|marker| {

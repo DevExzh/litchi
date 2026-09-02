@@ -6,7 +6,7 @@
 //! `content.xml` catalog scan, selected slide XML, and optional `styles.xml`
 //! are temporary projections and are never retained by this owner.
 
-use std::{fmt, sync::Arc};
+use std::{borrow::Cow, fmt, sync::Arc};
 
 #[cfg(any(unix, windows))]
 use std::path::Path;
@@ -15,14 +15,18 @@ use std::path::Path;
 use litchi_core::FileSource;
 use litchi_core::{Error, ReadAt, Result, SourceVersion};
 use litchi_odf_common::{
-    core::{SourceBackedPackage, validate_content_document_part},
+    core::{
+        SourceBackedPackage,
+        private::{BindingTracker, BindingTrackerError, ContentDocumentValidator},
+    },
     package::resolve_package_path,
 };
 use quick_xml::{
     XmlVersion,
+    encoding::Decoder,
     events::{BytesStart, Event},
     name::{Namespace, ResolveResult},
-    reader::NsReader,
+    reader::Reader,
 };
 use zeroize::Zeroizing;
 
@@ -206,11 +210,11 @@ impl SourceBackedPresentationCatalog {
                     "expected {FAMILY_NAME} package MIME type '{ODF_PRESENTATION}', found '{mimetype}'"
                 )));
             }
+            ContentDocumentValidator::check_materialized_size(
+                package.member_materialized_size("content.xml")?,
+                FAMILY_NAME,
+            )?;
             let content = read_content(&package)?;
-            // The shared validator derives only the expected local name from
-            // this API marker and resolves the office namespace, so producer
-            // documents may use any valid prefix for `presentation`.
-            validate_content_document_part(&content, "<office:presentation", FAMILY_NAME)?;
             scan_catalog(&content)
         })();
         let entries = prefer_current(source.as_ref(), source_version, parsed)?;
@@ -370,138 +374,230 @@ fn read_styles(package: &SourceBackedPackage) -> Result<Option<String>> {
 }
 
 fn scan_catalog(xml: &str) -> Result<Vec<SlideCatalogEntry>> {
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
-    let mut buffer = Vec::new();
-    let mut depth = 0usize;
-    let mut root_seen = false;
-    let mut body_seen = false;
-    let mut body_depth = None;
-    let mut presentation_seen = false;
-    let mut presentation_depth = None;
-    let mut entries = Vec::new();
+    reader.config_mut().check_comments = true;
+    let mut validator = ContentDocumentValidator::new(xml, "<office:presentation", FAMILY_NAME)?;
+    let mut tracker = BindingTracker::new().map_err(tracker_error)?;
+    let mut scanner = CatalogScanner::default();
+    let mut pending_pop = false;
+    let mut scanner_error = None;
 
     loop {
-        match reader.read_event_into(&mut buffer).map_err(xml_error)? {
+        if pending_pop {
+            tracker.pop();
+            pending_pop = false;
+        }
+        let event = reader.read_event().map_err(xml_error)?;
+        match &event {
             Event::Start(element) => {
-                let parent_depth = depth;
-                depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| invalid("ODP content.xml nesting overflow"))?;
-                if parent_depth == 0 {
-                    if root_seen
-                        || !element_is(&reader, &element, OFFICE_NAMESPACE, b"document-content")
-                    {
-                        return Err(invalid(
-                            "ODP content.xml root is not office:document-content",
-                        ));
+                tracker.push(element).map_err(tracker_error)?;
+                let office = if validator.needs_office_namespace() {
+                    office_element(&tracker, element)?
+                } else {
+                    false
+                };
+                validator.on_event(office, &event)?;
+                if scanner_error.is_none() {
+                    if let Err(error) = scanner.on_start(&tracker, element, reader.decoder()) {
+                        scanner_error = Some(error);
                     }
-                    root_seen = true;
-                } else if parent_depth == 1
-                    && element_is(&reader, &element, OFFICE_NAMESPACE, b"body")
-                {
-                    if body_seen {
-                        return Err(invalid("duplicate office:body element in ODP content.xml"));
-                    }
-                    body_seen = true;
-                    body_depth = Some(depth);
-                } else if body_depth == Some(parent_depth)
-                    && element_is(&reader, &element, OFFICE_NAMESPACE, b"presentation")
-                {
-                    if presentation_seen {
-                        return Err(invalid(
-                            "duplicate office:presentation element in ODP content.xml",
-                        ));
-                    }
-                    presentation_seen = true;
-                    presentation_depth = Some(depth);
-                } else if presentation_depth == Some(parent_depth)
-                    && element_is(&reader, &element, DRAW_NAMESPACE, b"page")
-                {
-                    push_entry(&mut entries, &reader, &element)?;
-                } else if body_depth == Some(parent_depth) {
-                    return Err(invalid("ODP office:body must contain office:presentation"));
                 }
             },
             Event::Empty(element) => {
-                let parent_depth = depth;
-                if parent_depth == 0 {
-                    return Err(invalid(
-                        "ODP content.xml root office:document-content cannot be empty",
-                    ));
-                }
-                if parent_depth == 1 && element_is(&reader, &element, OFFICE_NAMESPACE, b"body") {
-                    if body_seen {
-                        return Err(invalid("duplicate office:body element in ODP content.xml"));
+                tracker.push(element).map_err(tracker_error)?;
+                let office = if validator.needs_office_namespace() {
+                    office_element(&tracker, element)?
+                } else {
+                    false
+                };
+                validator.on_event(office, &event)?;
+                if scanner_error.is_none() {
+                    if let Err(error) = scanner.on_empty(&tracker, element, reader.decoder()) {
+                        scanner_error = Some(error);
                     }
-                    body_seen = true;
-                } else if body_depth == Some(parent_depth)
-                    && element_is(&reader, &element, OFFICE_NAMESPACE, b"presentation")
-                {
-                    if presentation_seen {
-                        return Err(invalid(
-                            "duplicate office:presentation element in ODP content.xml",
-                        ));
-                    }
-                    presentation_seen = true;
-                } else if presentation_depth == Some(parent_depth)
-                    && element_is(&reader, &element, DRAW_NAMESPACE, b"page")
-                {
-                    push_entry(&mut entries, &reader, &element)?;
-                } else if body_depth == Some(parent_depth) {
-                    return Err(invalid("ODP office:body must contain office:presentation"));
                 }
+                pending_pop = true;
             },
             Event::End(element) => {
-                if depth == 0 {
-                    return Err(invalid("ODP content.xml depth underflow"));
+                validator.on_event(false, &event)?;
+                if scanner_error.is_none() {
+                    if let Err(error) = scanner.on_end(&tracker, element) {
+                        scanner_error = Some(error);
+                    }
                 }
-                if presentation_depth == Some(depth)
-                    && end_is(&reader, &element, OFFICE_NAMESPACE, b"presentation")
-                {
-                    presentation_depth = None;
-                }
-                if body_depth == Some(depth) && end_is(&reader, &element, OFFICE_NAMESPACE, b"body")
-                {
-                    body_depth = None;
-                }
-                depth -= 1;
+                pending_pop = true;
             },
-            Event::DocType(_) | Event::PI(_) => {
-                return Err(invalid("active XML declarations are prohibited"));
+            Event::Eof => {
+                validator.on_event(false, &event)?;
+                break;
             },
-            Event::Eof => break,
-            Event::Text(_)
-            | Event::CData(_)
-            | Event::Comment(_)
-            | Event::Decl(_)
-            | Event::GeneralRef(_) => {},
+            event => {
+                validator.on_event(false, event)?;
+                if scanner_error.is_none() {
+                    if let Err(error) = scanner.on_other(event) {
+                        scanner_error = Some(error);
+                    }
+                }
+            },
         }
-        buffer.clear();
     }
 
-    if depth != 0 {
-        return Err(invalid("unterminated ODP content.xml element"));
+    validator.finish()?;
+    if let Some(error) = scanner_error {
+        return Err(error);
     }
-    if !root_seen {
-        return Err(invalid(
-            "ODP content.xml has no office:document-content root",
-        ));
+    scanner.finish()
+}
+
+#[derive(Debug, Default)]
+struct CatalogScanner {
+    depth: usize,
+    root_seen: bool,
+    body_seen: bool,
+    body_depth: Option<usize>,
+    presentation_seen: bool,
+    presentation_depth: Option<usize>,
+    entries: Vec<SlideCatalogEntry>,
+}
+
+impl CatalogScanner {
+    fn on_start(
+        &mut self,
+        tracker: &BindingTracker,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+    ) -> Result<()> {
+        let parent_depth = self.depth;
+        self.depth = self
+            .depth
+            .checked_add(1)
+            .ok_or_else(|| invalid("ODP content.xml nesting overflow"))?;
+        if parent_depth == 0 {
+            if self.root_seen
+                || !element_is(tracker, element, OFFICE_NAMESPACE, b"document-content")?
+            {
+                return Err(invalid(
+                    "ODP content.xml root is not office:document-content",
+                ));
+            }
+            self.root_seen = true;
+        } else if parent_depth == 1 && element_is(tracker, element, OFFICE_NAMESPACE, b"body")? {
+            if self.body_seen {
+                return Err(invalid("duplicate office:body element in ODP content.xml"));
+            }
+            self.body_seen = true;
+            self.body_depth = Some(self.depth);
+        } else if self.body_depth == Some(parent_depth)
+            && element_is(tracker, element, OFFICE_NAMESPACE, b"presentation")?
+        {
+            if self.presentation_seen {
+                return Err(invalid(
+                    "duplicate office:presentation element in ODP content.xml",
+                ));
+            }
+            self.presentation_seen = true;
+            self.presentation_depth = Some(self.depth);
+        } else if self.presentation_depth == Some(parent_depth)
+            && element_is(tracker, element, DRAW_NAMESPACE, b"page")?
+        {
+            push_entry(&mut self.entries, tracker, element, decoder)?;
+        } else if self.body_depth == Some(parent_depth) {
+            return Err(invalid("ODP office:body must contain office:presentation"));
+        }
+        Ok(())
     }
-    if !body_seen {
-        return Err(invalid("ODP content.xml has no office:body"));
+
+    fn on_empty(
+        &mut self,
+        tracker: &BindingTracker,
+        element: &BytesStart<'_>,
+        decoder: Decoder,
+    ) -> Result<()> {
+        let parent_depth = self.depth;
+        if parent_depth == 0 {
+            return Err(invalid(
+                "ODP content.xml root office:document-content cannot be empty",
+            ));
+        }
+        if parent_depth == 1 && element_is(tracker, element, OFFICE_NAMESPACE, b"body")? {
+            if self.body_seen {
+                return Err(invalid("duplicate office:body element in ODP content.xml"));
+            }
+            self.body_seen = true;
+        } else if self.body_depth == Some(parent_depth)
+            && element_is(tracker, element, OFFICE_NAMESPACE, b"presentation")?
+        {
+            if self.presentation_seen {
+                return Err(invalid(
+                    "duplicate office:presentation element in ODP content.xml",
+                ));
+            }
+            self.presentation_seen = true;
+        } else if self.presentation_depth == Some(parent_depth)
+            && element_is(tracker, element, DRAW_NAMESPACE, b"page")?
+        {
+            push_entry(&mut self.entries, tracker, element, decoder)?;
+        } else if self.body_depth == Some(parent_depth) {
+            return Err(invalid("ODP office:body must contain office:presentation"));
+        }
+        Ok(())
     }
-    if !presentation_seen {
-        return Err(invalid("ODP content.xml has no office:presentation"));
+
+    fn on_end(
+        &mut self,
+        tracker: &BindingTracker,
+        element: &quick_xml::events::BytesEnd<'_>,
+    ) -> Result<()> {
+        if self.depth == 0 {
+            return Err(invalid("ODP content.xml depth underflow"));
+        }
+        if self.presentation_depth == Some(self.depth)
+            && end_is(tracker, element, OFFICE_NAMESPACE, b"presentation")?
+        {
+            self.presentation_depth = None;
+        }
+        if self.body_depth == Some(self.depth)
+            && end_is(tracker, element, OFFICE_NAMESPACE, b"body")?
+        {
+            self.body_depth = None;
+        }
+        self.depth -= 1;
+        Ok(())
     }
-    Ok(entries)
+
+    fn on_other(&mut self, event: &Event<'_>) -> Result<()> {
+        if matches!(event, Event::DocType(_) | Event::PI(_)) {
+            return Err(invalid("active XML declarations are prohibited"));
+        }
+        Ok(())
+    }
+
+    fn finish(self) -> Result<Vec<SlideCatalogEntry>> {
+        if self.depth != 0 {
+            return Err(invalid("unterminated ODP content.xml element"));
+        }
+        if !self.root_seen {
+            return Err(invalid(
+                "ODP content.xml has no office:document-content root",
+            ));
+        }
+        if !self.body_seen {
+            return Err(invalid("ODP content.xml has no office:body"));
+        }
+        if !self.presentation_seen {
+            return Err(invalid("ODP content.xml has no office:presentation"));
+        }
+        Ok(self.entries)
+    }
 }
 
 fn push_entry(
     entries: &mut Vec<SlideCatalogEntry>,
-    reader: &NsReader<&[u8]>,
+    tracker: &BindingTracker,
     element: &BytesStart<'_>,
+    decoder: Decoder,
 ) -> Result<()> {
     if entries.len() >= MAX_PAGES {
         return Err(invalid(format!(
@@ -511,7 +607,9 @@ fn push_entry(
     let mut name = None;
     for raw_attribute in element.attributes() {
         let attribute = raw_attribute.map_err(xml_error)?;
-        let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+        let (namespace, local) = tracker
+            .resolve_attribute(attribute.key)
+            .map_err(tracker_error)?;
         if matches!(namespace, ResolveResult::Bound(found) if found == Namespace(DRAW_NAMESPACE))
             && local.as_ref() == b"name"
         {
@@ -522,11 +620,26 @@ fn push_entry(
                 return Err(invalid("ODP draw:name exceeds 1 MiB"));
             }
             let value = attribute
-                .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                .map_err(xml_error)?
-                .into_owned();
-            validate_name(&value)?;
-            name = Some(value);
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+                .map_err(xml_error)?;
+            name = Some(match value {
+                Cow::Owned(value) => {
+                    validate_name(&value)?;
+                    value
+                },
+                Cow::Borrowed(value) => {
+                    validate_name(value)?;
+                    let mut owned = String::new();
+                    owned
+                        .try_reserve(value.len())
+                        .map_err(|source| Error::Allocation {
+                            resource: "ODP source catalog slide name",
+                            source,
+                        })?;
+                    owned.push_str(value);
+                    owned
+                },
+            });
         }
     }
     entries.try_reserve(1).map_err(|source| Error::Allocation {
@@ -556,33 +669,52 @@ fn validate_name(value: &str) -> Result<()> {
 }
 
 fn element_is(
-    reader: &NsReader<&[u8]>,
+    tracker: &BindingTracker,
     element: &BytesStart<'_>,
     namespace: &[u8],
     local: &[u8],
-) -> bool {
-    let (resolved, local_name) = reader.resolver().resolve_element(element.name());
-    matches!(resolved, ResolveResult::Bound(found) if found == Namespace(namespace))
-        && local_name.as_ref() == local
+) -> Result<bool> {
+    let (resolved, local_name) = tracker
+        .resolve_element(element.name())
+        .map_err(tracker_error)?;
+    Ok(
+        matches!(resolved, ResolveResult::Bound(found) if found == Namespace(namespace))
+            && local_name.as_ref() == local,
+    )
 }
 
 fn end_is(
-    reader: &NsReader<&[u8]>,
+    tracker: &BindingTracker,
     element: &quick_xml::events::BytesEnd<'_>,
     namespace: &[u8],
     local: &[u8],
-) -> bool {
-    let (resolved, local_name) = reader.resolver().resolve_element(element.name());
-    matches!(resolved, ResolveResult::Bound(found) if found == Namespace(namespace))
-        && local_name.as_ref() == local
+) -> Result<bool> {
+    let (resolved, local_name) = tracker
+        .resolve_element(element.name())
+        .map_err(tracker_error)?;
+    Ok(
+        matches!(resolved, ResolveResult::Bound(found) if found == Namespace(namespace))
+            && local_name.as_ref() == local,
+    )
 }
 
 fn read_xml_error(error: impl fmt::Display) -> Error {
-    invalid(format!("ODP content.xml XML parsing error: {error}"))
+    invalid(format!("invalid {FAMILY_NAME} content.xml: {error}"))
 }
 
 fn xml_error(error: impl fmt::Display) -> Error {
     read_xml_error(error)
+}
+
+fn tracker_error(error: BindingTrackerError) -> Error {
+    error.into_litchi_error_with_context(|| format!("invalid {FAMILY_NAME} content.xml"))
+}
+
+fn office_element(tracker: &BindingTracker, element: &BytesStart<'_>) -> Result<bool> {
+    let (namespace, _) = tracker
+        .resolve_element(element.name())
+        .map_err(tracker_error)?;
+    Ok(matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE))
 }
 
 fn invalid(message: impl Into<String>) -> Error {
@@ -602,5 +734,427 @@ fn prefer_current<T>(source: &dyn ReadAt, expected: SourceVersion, result: Resul
         Err(error) => Err(error.into()),
         Ok(observed) if observed != expected => Err(Error::SourceChanged { expected, observed }),
         Ok(_) => result,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_odf_common::core::validate_content_document_part;
+    use quick_xml::reader::NsReader;
+
+    fn outcome(
+        result: Result<Vec<SlideCatalogEntry>>,
+    ) -> std::result::Result<Vec<(usize, Option<String>)>, String> {
+        result
+            .map(|entries| {
+                entries
+                    .into_iter()
+                    .map(|entry| (entry.index, entry.name))
+                    .collect()
+            })
+            .map_err(|error| error.to_string())
+    }
+
+    fn sequential_oracle(xml: &str) -> Result<Vec<SlideCatalogEntry>> {
+        validate_content_document_part(xml, "<office:presentation", FAMILY_NAME)?;
+        legacy_scan_catalog(xml)
+    }
+
+    fn assert_matches_sequential_oracle(xml: &str) {
+        assert_eq!(outcome(scan_catalog(xml)), outcome(sequential_oracle(xml)));
+    }
+
+    #[test]
+    fn fused_catalog_preserves_alias_rebinding_empty_and_entity_names() {
+        let xml = format!(
+            r#"<o:document-content xmlns:o="{OFFICE_NAMESPACE_STR}" xmlns:d="{DRAW_NAMESPACE_STR}" xmlns:a="{DRAW_NAMESPACE_STR}"><o:body><o:presentation><a:page a:name="A &amp; B"/><d:page/><d:page xmlns:d="urn:other" d:name="ignored"/><d:page xmlns:d="" d:name="unbound"/><d:page xmlns:d="{DRAW_NAMESPACE_STR}" d:name="rebound"/></o:presentation></o:body></o:document-content>"#,
+            OFFICE_NAMESPACE_STR = std::str::from_utf8(OFFICE_NAMESPACE).expect("ASCII namespace"),
+            DRAW_NAMESPACE_STR = std::str::from_utf8(DRAW_NAMESPACE).expect("ASCII namespace"),
+        );
+
+        assert_matches_sequential_oracle(&xml);
+        let entries = scan_catalog(&xml).expect("catalog fixture is valid");
+        assert_eq!(
+            entries
+                .iter()
+                .map(|entry| (entry.index(), entry.name().map(str::to_owned)))
+                .collect::<Vec<_>>(),
+            vec![
+                (0, Some("A & B".to_owned())),
+                (1, None),
+                (2, Some("rebound".to_owned())),
+            ]
+        );
+    }
+
+    #[test]
+    fn fused_catalog_defers_catalog_only_forms_and_pi_errors() {
+        let forms = format!(
+            r#"<o:document-content xmlns:o="{OFFICE_NAMESPACE_STR}" xmlns:d="{DRAW_NAMESPACE_STR}"><o:body><o:forms/><o:presentation><d:page/></o:presentation></o:body></o:document-content>"#,
+            OFFICE_NAMESPACE_STR = std::str::from_utf8(OFFICE_NAMESPACE).expect("ASCII namespace"),
+            DRAW_NAMESPACE_STR = std::str::from_utf8(DRAW_NAMESPACE).expect("ASCII namespace"),
+        );
+        assert_matches_sequential_oracle(&forms);
+        assert_eq!(
+            scan_catalog(&forms)
+                .expect_err("office:forms must be a catalog error")
+                .to_string(),
+            "Invalid format: ODP office:body must contain office:presentation"
+        );
+
+        let pi = format!(
+            r#"<?catalog?><o:document-content xmlns:o="{OFFICE_NAMESPACE_STR}" xmlns:d="{DRAW_NAMESPACE_STR}"><o:body><o:presentation><d:page/></o:presentation></o:body></o:document-content>"#,
+            OFFICE_NAMESPACE_STR = std::str::from_utf8(OFFICE_NAMESPACE).expect("ASCII namespace"),
+            DRAW_NAMESPACE_STR = std::str::from_utf8(DRAW_NAMESPACE).expect("ASCII namespace"),
+        );
+        assert_matches_sequential_oracle(&pi);
+        assert_eq!(
+            scan_catalog(&pi)
+                .expect_err("processing instructions must be a catalog error")
+                .to_string(),
+            "Invalid format: active XML declarations are prohibited"
+        );
+
+        let empty_name = format!(
+            r#"<o:document-content xmlns:o="{OFFICE_NAMESPACE_STR}" xmlns:d="{DRAW_NAMESPACE_STR}"><o:body><o:presentation><d:page d:name=""/></o:presentation></o:body></o:document-content>"#,
+            OFFICE_NAMESPACE_STR = std::str::from_utf8(OFFICE_NAMESPACE).expect("ASCII namespace"),
+            DRAW_NAMESPACE_STR = std::str::from_utf8(DRAW_NAMESPACE).expect("ASCII namespace"),
+        );
+        assert_matches_sequential_oracle(&empty_name);
+        assert_eq!(
+            scan_catalog(&empty_name)
+                .expect_err("empty draw:name must be a catalog error")
+                .to_string(),
+            "Invalid format: draw:name cannot be empty"
+        );
+    }
+
+    #[test]
+    fn fused_catalog_name_decoding_matches_sequential_oracle() {
+        let cases = [
+            ("ampersand", "A &amp; B", Some("A & B")),
+            ("whitespace", "A\tB\nC\rD", Some("A B C D")),
+            ("decimal_reference", "&#65;&#66;", Some("AB")),
+            ("hex_reference", "&#x43;&#x44;", Some("CD")),
+            ("unknown_entity", "A &unknown;", None),
+            ("unterminated_entity", "A &broken", None),
+            ("invalid_character_reference", "A &#x110000;", None),
+        ];
+
+        for (label, name, expected) in cases {
+            let xml = format!(
+                r#"<o:document-content xmlns:o="{OFFICE_NAMESPACE_STR}" xmlns:d="{DRAW_NAMESPACE_STR}"><o:body><o:presentation><d:page d:name="{name}"/></o:presentation></o:body></o:document-content>"#,
+                OFFICE_NAMESPACE_STR =
+                    std::str::from_utf8(OFFICE_NAMESPACE).expect("ASCII namespace"),
+                DRAW_NAMESPACE_STR = std::str::from_utf8(DRAW_NAMESPACE).expect("ASCII namespace"),
+            );
+            let fused = outcome(scan_catalog(&xml));
+            let sequential = outcome(sequential_oracle(&xml));
+            assert_eq!(fused, sequential, "fused/oracle mismatch for {label}");
+            match (fused, expected) {
+                (Ok(entries), Some(expected)) => {
+                    assert_eq!(
+                        entries[0].1.as_deref(),
+                        Some(expected),
+                        "projection for {label}"
+                    );
+                },
+                (Err(error), None) => {
+                    assert!(
+                        error.starts_with("Invalid format: invalid ODP content.xml:"),
+                        "unexpected {label} error: {error}"
+                    );
+                },
+                (actual, expected) => {
+                    panic!("unexpected {label} result: {actual:?}, expected {expected:?}");
+                },
+            }
+        }
+    }
+
+    #[test]
+    fn later_validation_errors_beat_earlier_catalog_errors() {
+        let duplicate_body = format!(
+            r#"<o:document-content xmlns:o="{OFFICE_NAMESPACE_STR}" xmlns:d="{DRAW_NAMESPACE_STR}"><o:body><o:forms/><o:presentation/></o:body><o:body><o:presentation/></o:body></o:document-content>"#,
+            OFFICE_NAMESPACE_STR = std::str::from_utf8(OFFICE_NAMESPACE).expect("ASCII namespace"),
+            DRAW_NAMESPACE_STR = std::str::from_utf8(DRAW_NAMESPACE).expect("ASCII namespace"),
+        );
+        assert_matches_sequential_oracle(&duplicate_body);
+        assert_eq!(
+            scan_catalog(&duplicate_body)
+                .expect_err("duplicate body must beat forms")
+                .to_string(),
+            "Invalid format: ODP content.xml has duplicate office:body"
+        );
+
+        let malformed_tail = format!(
+            r#"<o:document-content xmlns:o="{OFFICE_NAMESPACE_STR}" xmlns:d="{DRAW_NAMESPACE_STR}"><o:body><o:forms/><o:presentation/></o:body><tail></o:document-content>"#,
+            OFFICE_NAMESPACE_STR = std::str::from_utf8(OFFICE_NAMESPACE).expect("ASCII namespace"),
+            DRAW_NAMESPACE_STR = std::str::from_utf8(DRAW_NAMESPACE).expect("ASCII namespace"),
+        );
+        assert_matches_sequential_oracle(&malformed_tail);
+        assert!(
+            scan_catalog(&malformed_tail)
+                .expect_err("reader errors must beat forms")
+                .to_string()
+                .starts_with("Invalid format: invalid ODP content.xml:")
+        );
+
+        let invalid_reserved_namespace = format!(
+            r#"<o:document-content xmlns:o="{OFFICE_NAMESPACE_STR}" xmlns:d="{DRAW_NAMESPACE_STR}"><o:body><o:forms/><o:presentation xmlns:xml="urn:wrong"/></o:body></o:document-content>"#,
+            OFFICE_NAMESPACE_STR = std::str::from_utf8(OFFICE_NAMESPACE).expect("ASCII namespace"),
+            DRAW_NAMESPACE_STR = std::str::from_utf8(DRAW_NAMESPACE).expect("ASCII namespace"),
+        );
+        assert_matches_sequential_oracle(&invalid_reserved_namespace);
+        assert_eq!(
+            scan_catalog(&invalid_reserved_namespace)
+                .expect_err("namespace errors must beat forms")
+                .to_string(),
+            "Invalid format: invalid ODP content.xml: the namespace prefix 'xml' cannot be bound to '\"urn:wrong\"'"
+        );
+    }
+
+    #[test]
+    fn fused_catalog_rejects_deep_content_with_shared_limit() {
+        const ORDINARY_ELEMENTS: usize = 4097;
+        let mut xml = format!(
+            r#"<o:document-content xmlns:o="{OFFICE_NAMESPACE_STR}"><o:body><o:presentation>"#,
+            OFFICE_NAMESPACE_STR = std::str::from_utf8(OFFICE_NAMESPACE).expect("ASCII namespace"),
+        );
+        for _ in 0..ORDINARY_ELEMENTS {
+            xml.push_str("<section>");
+        }
+        for _ in 0..ORDINARY_ELEMENTS {
+            xml.push_str("</section>");
+        }
+        xml.push_str("</o:presentation></o:body></o:document-content>");
+
+        assert_eq!(
+            scan_catalog(&xml)
+                .expect_err("the shared content depth limit must reject this fixture")
+                .to_string(),
+            "Invalid format: ODP content.xml nesting exceeds maximum depth of 4096"
+        );
+    }
+
+    fn legacy_scan_catalog(xml: &str) -> Result<Vec<SlideCatalogEntry>> {
+        let mut reader = NsReader::from_str(xml);
+        reader.config_mut().trim_text(false);
+        reader.config_mut().check_end_names = true;
+        reader.config_mut().check_comments = true;
+        let mut depth = 0usize;
+        let mut root_seen = false;
+        let mut body_seen = false;
+        let mut body_depth = None;
+        let mut presentation_seen = false;
+        let mut presentation_depth = None;
+        let mut entries = Vec::new();
+
+        loop {
+            match reader.read_event().map_err(xml_error)? {
+                Event::Start(element) => {
+                    let parent_depth = depth;
+                    depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("ODP content.xml nesting overflow"))?;
+                    if parent_depth == 0 {
+                        if root_seen
+                            || !legacy_element_is(
+                                &reader,
+                                &element,
+                                OFFICE_NAMESPACE,
+                                b"document-content",
+                            )
+                        {
+                            return Err(invalid(
+                                "ODP content.xml root is not office:document-content",
+                            ));
+                        }
+                        root_seen = true;
+                    } else if parent_depth == 1
+                        && legacy_element_is(&reader, &element, OFFICE_NAMESPACE, b"body")
+                    {
+                        if body_seen {
+                            return Err(invalid(
+                                "duplicate office:body element in ODP content.xml",
+                            ));
+                        }
+                        body_seen = true;
+                        body_depth = Some(depth);
+                    } else if body_depth == Some(parent_depth)
+                        && legacy_element_is(&reader, &element, OFFICE_NAMESPACE, b"presentation")
+                    {
+                        if presentation_seen {
+                            return Err(invalid(
+                                "duplicate office:presentation element in ODP content.xml",
+                            ));
+                        }
+                        presentation_seen = true;
+                        presentation_depth = Some(depth);
+                    } else if presentation_depth == Some(parent_depth)
+                        && legacy_element_is(&reader, &element, DRAW_NAMESPACE, b"page")
+                    {
+                        legacy_push_entry(&mut entries, &reader, &element)?;
+                    } else if body_depth == Some(parent_depth) {
+                        return Err(invalid("ODP office:body must contain office:presentation"));
+                    }
+                },
+                Event::Empty(element) => {
+                    let parent_depth = depth;
+                    if parent_depth == 0 {
+                        return Err(invalid(
+                            "ODP content.xml root office:document-content cannot be empty",
+                        ));
+                    }
+                    if parent_depth == 1
+                        && legacy_element_is(&reader, &element, OFFICE_NAMESPACE, b"body")
+                    {
+                        if body_seen {
+                            return Err(invalid(
+                                "duplicate office:body element in ODP content.xml",
+                            ));
+                        }
+                        body_seen = true;
+                    } else if body_depth == Some(parent_depth)
+                        && legacy_element_is(&reader, &element, OFFICE_NAMESPACE, b"presentation")
+                    {
+                        if presentation_seen {
+                            return Err(invalid(
+                                "duplicate office:presentation element in ODP content.xml",
+                            ));
+                        }
+                        presentation_seen = true;
+                    } else if presentation_depth == Some(parent_depth)
+                        && legacy_element_is(&reader, &element, DRAW_NAMESPACE, b"page")
+                    {
+                        legacy_push_entry(&mut entries, &reader, &element)?;
+                    } else if body_depth == Some(parent_depth) {
+                        return Err(invalid("ODP office:body must contain office:presentation"));
+                    }
+                },
+                Event::End(element) => {
+                    if depth == 0 {
+                        return Err(invalid("ODP content.xml depth underflow"));
+                    }
+                    if presentation_depth == Some(depth)
+                        && legacy_end_is(&reader, &element, OFFICE_NAMESPACE, b"presentation")
+                    {
+                        presentation_depth = None;
+                    }
+                    if body_depth == Some(depth)
+                        && legacy_end_is(&reader, &element, OFFICE_NAMESPACE, b"body")
+                    {
+                        body_depth = None;
+                    }
+                    depth -= 1;
+                },
+                Event::DocType(_) | Event::PI(_) => {
+                    return Err(invalid("active XML declarations are prohibited"));
+                },
+                Event::Eof => break,
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::GeneralRef(_) => {},
+            }
+        }
+
+        if depth != 0 {
+            return Err(invalid("unterminated ODP content.xml element"));
+        }
+        if !root_seen {
+            return Err(invalid(
+                "ODP content.xml has no office:document-content root",
+            ));
+        }
+        if !body_seen {
+            return Err(invalid("ODP content.xml has no office:body"));
+        }
+        if !presentation_seen {
+            return Err(invalid("ODP content.xml has no office:presentation"));
+        }
+        Ok(entries)
+    }
+
+    fn legacy_push_entry(
+        entries: &mut Vec<SlideCatalogEntry>,
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+    ) -> Result<()> {
+        if entries.len() >= MAX_PAGES {
+            return Err(invalid(format!(
+                "ODP content.xml holds more than {MAX_PAGES} slides"
+            )));
+        }
+        let mut name = None;
+        for raw_attribute in element.attributes() {
+            let attribute = raw_attribute.map_err(xml_error)?;
+            let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+            if matches!(namespace, ResolveResult::Bound(found) if found == Namespace(DRAW_NAMESPACE))
+                && local.as_ref() == b"name"
+            {
+                if name.is_some() {
+                    return Err(invalid("duplicate draw:name presentation page attribute"));
+                }
+                if attribute.value.len() > MAX_NAME_BYTES {
+                    return Err(invalid("ODP draw:name exceeds 1 MiB"));
+                }
+                let value = attribute
+                    .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                    .map_err(xml_error)?
+                    .into_owned();
+                legacy_validate_name(&value)?;
+                name = Some(value);
+            }
+        }
+        entries.try_reserve(1).map_err(|source| Error::Allocation {
+            resource: "ODP source catalog slide entries",
+            source,
+        })?;
+        entries.push(SlideCatalogEntry {
+            index: entries.len(),
+            name,
+        });
+        Ok(())
+    }
+
+    fn legacy_validate_name(value: &str) -> Result<()> {
+        if value.is_empty() {
+            return Err(invalid("draw:name cannot be empty"));
+        }
+        if value.len() > MAX_NAME_BYTES {
+            return Err(invalid("ODP draw:name exceeds 1 MiB"));
+        }
+        if value.chars().any(|character| {
+            character == '\0'
+                || (character.is_control() && !matches!(character, '\t' | '\n' | '\r'))
+        }) {
+            return Err(invalid("draw:name contains invalid XML characters"));
+        }
+        Ok(())
+    }
+
+    fn legacy_element_is(
+        reader: &NsReader<&[u8]>,
+        element: &BytesStart<'_>,
+        namespace: &[u8],
+        local: &[u8],
+    ) -> bool {
+        let (resolved, local_name) = reader.resolver().resolve_element(element.name());
+        matches!(resolved, ResolveResult::Bound(found) if found == Namespace(namespace))
+            && local_name.as_ref() == local
+    }
+
+    fn legacy_end_is(
+        reader: &NsReader<&[u8]>,
+        element: &quick_xml::events::BytesEnd<'_>,
+        namespace: &[u8],
+        local: &[u8],
+    ) -> bool {
+        let (resolved, local_name) = reader.resolver().resolve_element(element.name());
+        matches!(resolved, ResolveResult::Bound(found) if found == Namespace(namespace))
+            && local_name.as_ref() == local
     }
 }

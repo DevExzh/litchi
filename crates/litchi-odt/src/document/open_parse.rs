@@ -72,7 +72,8 @@ pub(crate) fn run_catalog(content_xml: &str) -> Result<Vec<Kind>> {
     let mut reader = Reader::from_str(content_xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
-    let mut tracker = BindingTracker::new();
+    let mut tracker = BindingTracker::new()
+        .map_err(|error| error.into_litchi_error("invalid ODT content.xml"))?;
     let mut pending_pop = false;
     loop {
         if pending_pop {
@@ -90,12 +91,16 @@ pub(crate) fn run_catalog(content_xml: &str) -> Result<Vec<Kind>> {
         match &event {
             Event::Start(element) => {
                 tracker.push(element).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid {FAMILY_NAME} content.xml: {error}"))
+                    error.into_litchi_error_with_context(|| {
+                        format!("invalid {FAMILY_NAME} content.xml")
+                    })
                 })?;
             },
             Event::Empty(element) => {
                 tracker.push(element).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid {FAMILY_NAME} content.xml: {error}"))
+                    error.into_litchi_error_with_context(|| {
+                        format!("invalid {FAMILY_NAME} content.xml")
+                    })
                 })?;
                 pending_pop = true;
             },
@@ -105,7 +110,11 @@ pub(crate) fn run_catalog(content_xml: &str) -> Result<Vec<Kind>> {
 
         let (office, text_namespace) = match &event {
             Event::Start(element) | Event::Empty(element) => {
-                let (namespace, _) = tracker.resolve_element(element.name());
+                let (namespace, _) = tracker.resolve_element(element.name()).map_err(|error| {
+                    error.into_litchi_error_with_context(|| {
+                        format!("invalid {FAMILY_NAME} content.xml")
+                    })
+                })?;
                 match namespace {
                     ResolveResult::Bound(Namespace(uri)) => (
                         validate.needs_office_namespace() && uri == OFFICE_NAMESPACE,
@@ -159,7 +168,8 @@ impl OpenParse {
         let mut reader = Reader::from_str(content_xml);
         reader.config_mut().check_end_names = true;
         reader.config_mut().check_comments = true;
-        let mut tracker = BindingTracker::new();
+        let mut tracker = BindingTracker::new()
+            .map_err(|error| error.into_litchi_error("invalid ODT content.xml"))?;
         let mut pending_pop = false;
         loop {
             // Borrowing read: events borrow `content_xml` directly, avoiding
@@ -193,12 +203,16 @@ impl OpenParse {
                     // `quick_xml::Error::Namespace` forwards to, so this
                     // message is byte-identical to the `NsReader` failure.
                     tracker.push(element).map_err(|error| {
-                        Error::InvalidFormat(format!("invalid {FAMILY_NAME} content.xml: {error}"))
+                        error.into_litchi_error_with_context(|| {
+                            format!("invalid {FAMILY_NAME} content.xml")
+                        })
                     })?;
                 },
                 Event::Empty(element) => {
                     tracker.push(element).map_err(|error| {
-                        Error::InvalidFormat(format!("invalid {FAMILY_NAME} content.xml: {error}"))
+                        error.into_litchi_error_with_context(|| {
+                            format!("invalid {FAMILY_NAME} content.xml")
+                        })
                     })?;
                     pending_pop = true;
                 },
@@ -219,7 +233,12 @@ impl OpenParse {
                 Event::Start(element) | Event::Empty(element)
                     if validate.needs_office_namespace() =>
                 {
-                    let (namespace, _) = tracker.resolve_element(element.name());
+                    let (namespace, _) =
+                        tracker.resolve_element(element.name()).map_err(|error| {
+                            error.into_litchi_error_with_context(|| {
+                                format!("invalid {FAMILY_NAME} content.xml")
+                            })
+                        })?;
                     matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
                 },
                 _ => false,
@@ -995,7 +1014,8 @@ mod tests {
         let mut reader = Reader::from_str(xml);
         reader.config_mut().check_end_names = true;
         reader.config_mut().check_comments = true;
-        let mut tracker = BindingTracker::new();
+        let mut tracker =
+            BindingTracker::new().map_err(|error| format!("invalid ODT content.xml: {error}"))?;
         let mut pending_pop = false;
         let mut resolutions = Vec::new();
         loop {
@@ -1011,28 +1031,28 @@ mod tests {
                     if let Err(error) = tracker.push(element) {
                         return Err(format!("invalid ODT content.xml: {error}"));
                     }
-                    resolutions.push(format!(
-                        "start:{:?}",
-                        tracker.resolve_element(element.name()).0
-                    ));
+                    let resolution = tracker
+                        .resolve_element(element.name())
+                        .map_err(|error| format!("invalid ODT content.xml: {error}"))?;
+                    resolutions.push(format!("start:{:?}", resolution.0));
                 },
                 quick_xml::events::Event::Empty(element) => {
                     if let Err(error) = tracker.push(element) {
                         return Err(format!("invalid ODT content.xml: {error}"));
                     }
-                    resolutions.push(format!(
-                        "empty:{:?}",
-                        tracker.resolve_element(element.name()).0
-                    ));
+                    let resolution = tracker
+                        .resolve_element(element.name())
+                        .map_err(|error| format!("invalid ODT content.xml: {error}"))?;
+                    resolutions.push(format!("empty:{:?}", resolution.0));
                     pending_pop = true;
                 },
                 quick_xml::events::Event::End(element) => {
                     // The scope pop is deferred to the next read, so the end
                     // tag still resolves in its own scope.
-                    resolutions.push(format!(
-                        "end:{:?}",
-                        tracker.resolve_element(element.name()).0
-                    ));
+                    let resolution = tracker
+                        .resolve_element(element.name())
+                        .map_err(|error| format!("invalid ODT content.xml: {error}"))?;
+                    resolutions.push(format!("end:{:?}", resolution.0));
                     pending_pop = true;
                 },
                 quick_xml::events::Event::Eof => break,
