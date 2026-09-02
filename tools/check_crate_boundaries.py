@@ -26273,221 +26273,24 @@ def audit_iwa_numbers_table_cell_scientific_format_source_topology(
 def audit_iwa_numbers_table_cell_fraction_format_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Keep raw-ID Fraction methods deprecated and focused-owner first."""
+    """Keep retired raw-ID Numbers Fraction methods out of the host."""
 
     if not _numbers_table_cell_fraction_format_owner_present(root):
         return []
 
     violations: list[str] = []
-    production_sources, records = _numbers_table_cell_percentage_format_host_function_records(
-        root
-    )
-
-    def body(path: Path, name: str) -> str | None:
-        record = records.get((path, name))
-        return record[0] if record is not None else None
-
-    def route(path: Path, start_name: str) -> tuple[str, set[tuple[Path, int, int]]]:
-        first = records.get((path, start_name))
-        if first is None:
-            return "", set()
-        pending = [(path, start_name, first[0], first[1], first[2])]
-        visited: set[tuple[Path, str]] = set()
-        chunks: list[str] = []
-        ranges: set[tuple[Path, int, int]] = set()
-        while pending:
-            current_path, current_name, current_body, start, end = pending.pop()
-            key = (current_path, current_name)
-            if key in visited:
-                continue
-            visited.add(key)
-            chunks.append(current_body)
-            ranges.add((current_path, start, end))
-            code = _mask_rust_non_code(current_body)
-            for (candidate_path, candidate_name), candidate in records.items():
-                if candidate_name == current_name and candidate_path == current_path:
-                    continue
-                if re.search(
-                    rf"(?<![A-Za-z0-9_:#])(?:r#)?{re.escape(candidate_name)}\s*\(",
-                    code,
-                ) is None:
-                    continue
-                pending.append(
-                    (
-                        candidate_path,
-                        candidate_name,
-                        candidate[0],
-                        candidate[1],
-                        candidate[2],
-                    )
+    source_root = root / IWA_NUMBERS_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    for path in sorted(source_root.rglob("*.rs")):
+        relative = path.relative_to(root)
+        source = path.read_text(encoding="utf-8")
+        for name, line_number in _rust_function_declarations(source):
+            if name in RETIRED_IWA_NUMBERS_TABLE_CELL_FRACTION_FORMAT_METHOD_SET:
+                violations.append(
+                    "retired litchi-iwa Numbers Fraction-format raw-ID method returned "
+                    f"{name}: {relative}:{line_number}"
                 )
-        return "\n".join(chunks), ranges
-
-    def route_selector_context(path: Path, route_text: str) -> str:
-        """Include selectors carried by the focused Fraction location."""
-
-        if "FocusedFractionFormatLocation" not in route_text:
-            return route_text
-        source = _mask_rust_non_code(production_sources[path])
-        declaration = re.search(
-            r"(?<![A-Za-z0-9_])(?:enum|struct|type)[ \t\r\n]+"
-            r"FocusedFractionFormatLocation\b",
-            source,
-        )
-        if declaration is None:
-            return route_text
-        opening = source.find("{", declaration.end())
-        semicolon = source.find(";", declaration.end())
-        if opening < 0 or (semicolon >= 0 and semicolon < opening):
-            return route_text
-        depth = 1
-        cursor = opening + 1
-        while cursor < len(source) and depth:
-            if source[cursor] == "{":
-                depth += 1
-            elif source[cursor] == "}":
-                depth -= 1
-            cursor += 1
-        if depth:
-            return route_text
-        return f"{route_text}\n{source[declaration.start():cursor - 1]}"
-
-    def deprecated_names(source: str) -> frozenset[str]:
-        code = _mask_rust_non_code(source)
-        declaration = re.compile(
-            r"(?<![A-Za-z0-9_#])pub(?:[ \t]*\([^()]*\))?[ \t\r\n]+fn[ \t\r\n]+"
-            r"(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
-        )
-        attributes = re.compile(r"#[ \t]*\[(?P<body>[^\]]*)\]")
-        result: set[str] = set()
-        for match in declaration.finditer(code):
-            name = match.group("name")
-            if name not in RETIRED_IWA_NUMBERS_TABLE_CELL_FRACTION_FORMAT_METHOD_SET:
-                continue
-            prefix = code[: match.start()]
-            for attribute in attributes.finditer(prefix):
-                suffix = prefix[attribute.end() :]
-                if not re.fullmatch(
-                    r"[ \t\r\n]*(?:#[ \t]*\[[^\]]*\][ \t\r\n]*)*", suffix
-                ):
-                    continue
-                if re.match(r"[ \t\r\n]*deprecated\b", attribute.group("body")):
-                    result.add(name)
-                    break
-        return frozenset(result)
-
-    def has_owner(route_text: str) -> bool:
-        if re.search(
-            r"\b(?:litchi_numbers\s*::\s*Package|FocusedNumbersPackage|"
-            r"focused_fraction_format_package|focused_number_format_package|"
-            r"focused_numbers_package|focused_package)\b",
-            route_text,
-        ) is None:
-            return False
-        return re.search(
-            r"\b(?:package|source|focused_package|focused_fraction_format_package|"
-            r"focused_number_format_package|focused_numbers_package)\s*\.\s*"
-            r"(?:table_cell_fraction_format|edit_table_cell_fraction_format|"
-            r"apply_table_cell_fraction_format)\s*\(",
-            route_text,
-        ) is not None
-
-    focused_ranges: set[tuple[Path, int, int]] = set()
-    for path, source in production_sources.items():
-        if not source:
-            continue
-        for method in RETIRED_IWA_NUMBERS_TABLE_CELL_FRACTION_FORMAT_METHODS:
-            if (path, method) in records:
-                _route, ranges = route(path, method)
-                focused_ranges.update(ranges)
-
-    for path, production in production_sources.items():
-        if not production:
-            continue
-        code = _mask_rust_non_code(production)
-        deprecated = deprecated_names(production)
-        for declaration, line_number in _rust_public_declarations(production):
-            identifiers = {
-                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
-            }
-            retired = identifiers & RETIRED_IWA_NUMBERS_TABLE_CELL_FRACTION_FORMAT_METHOD_SET
-            for method in sorted(retired):
-                if method not in deprecated:
-                    violations.append(
-                        "litchi-iwa Numbers Fraction-format compatibility method must "
-                        f"remain deprecated {method}: {path.relative_to(root)}:{line_number}"
-                    )
-                current_body = body(path, method)
-                if current_body is None:
-                    continue
-                route_text, _ranges = route(path, method)
-                route_text = route_selector_context(path, route_text)
-                if not has_owner(route_text):
-                    violations.append(
-                        "litchi-iwa Numbers Fraction-format compatibility method must "
-                        f"delegate to focused Package {method}: {path.relative_to(root)}:{line_number}"
-                    )
-                for selector in ("SheetSelector", "TableSelector", "CellPosition"):
-                    if re.search(rf"\b{re.escape(selector)}\b", route_text) is None:
-                        violations.append(
-                            "litchi-iwa Numbers Fraction-format compatibility route is "
-                            f"missing selector-first {selector}: {path.relative_to(root)}:{line_number}"
-                        )
-                if method != "table_cell_fraction_format" and ".commit(" not in route_text:
-                    violations.append(
-                        "litchi-iwa Numbers Fraction-format compatibility mutation must "
-                        f"commit through focused Package {method}: {path.relative_to(root)}:{line_number}"
-                    )
-                fallback = "LegacyFallback" in route_text or any(
-                    re.search(
-                        rf"(?<![A-Za-z0-9_#])(?:r#)?{re.escape(helper)}\s*\(",
-                        route_text,
-                    )
-                    is not None
-                    for helper in RETIRED_IWA_NUMBERS_TABLE_CELL_FRACTION_FORMAT_HELPERS
-                )
-                if fallback:
-                    if "source_is_exact" not in route_text or "source_built" not in route_text:
-                        violations.append(
-                            "litchi-iwa Numbers Fraction-format compatibility fallback is "
-                            f"missing exact-source provenance gate {method}: {path.relative_to(root)}:{line_number}"
-                        )
-                    if method != "table_cell_fraction_format" and (
-                        "WrongFormatFamily" not in route_text
-                        or "allow_family_replacement" not in route_text
-                    ):
-                        violations.append(
-                            "litchi-iwa Numbers Fraction-format compatibility mutation is "
-                            f"missing the narrow family-replacement exception {method}: {path.relative_to(root)}:{line_number}"
-                        )
-
-        for match in IWA_NUMBERS_TABLE_CELL_FRACTION_FORMAT_LEGACY_CALL.finditer(code):
-            line_start = code.rfind("\n", 0, match.start()) + 1
-            line_end = code.find("\n", match.end())
-            if line_end < 0:
-                line_end = len(code)
-            line = code[line_start:line_end]
-            if re.search(
-                rf"\bfn\s+(?:r#)?{re.escape(match.group('method'))}\b", line
-            ):
-                continue
-            method = match.group("method")
-            if method == "table_cell_fraction_format" and any(
-                candidate_path == path
-                and start <= match.start() < end
-                for candidate_path, start, end in focused_ranges
-            ) and re.search(
-                r"\b(?:package|source|focused_package|focused_fraction_format_package|"
-                r"focused_number_format_package|focused_numbers_package)\s*\.\s*"
-                r"table_cell_fraction_format\s*\(",
-                line,
-            ) is not None:
-                continue
-            line_number = code.count("\n", 0, match.start("method")) + 1
-            violations.append(
-                "unscoped litchi-iwa Numbers Fraction-format raw-ID production call "
-                f"{method}: {path.relative_to(root)}:{line_number}"
-            )
 
     return sorted(set(violations))
 

@@ -2451,63 +2451,6 @@ mod tests {
     }
 
     #[test]
-    fn source_built_table_roundtrips_reuses_and_resets_fraction_formats() {
-        let mut editor = NumbersDocumentBuilder::new()
-            .table_name("Fractions")
-            .table_dimensions(3, 3)
-            .build()
-            .unwrap();
-        let table_id = editor.tables().unwrap()[0].object_id;
-        let fraction = Fraction::new(FractionAccuracy::Eighths);
-        crate::numbers::editor::set_cell_fixture(
-            &mut editor,
-            table_id,
-            1,
-            1,
-            CellValue::number(-12.375).expect("finite test number"),
-        )
-        .unwrap();
-        editor
-            .set_table_cell_fraction_format(table_id, 1, 1, fraction)
-            .unwrap();
-        editor
-            .set_table_cell_fraction_format(table_id, 1, 2, fraction)
-            .unwrap();
-
-        let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
-        let formats = resolve_format_table(editor.package(), &location).unwrap();
-        assert_eq!(formats.entries.len(), 1);
-        assert_eq!(formats.entries[0].entry.refcount, 2);
-
-        let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-        assert_eq!(
-            reopened.table_cell_fraction_format(table_id, 1, 1).unwrap(),
-            Some(fraction)
-        );
-        assert!(
-            reopened
-                .reset_table_cell_fraction_format(table_id, 1, 1)
-                .unwrap()
-        );
-        assert_eq!(
-            reopened.table_cell_fraction_format(table_id, 1, 2).unwrap(),
-            Some(fraction)
-        );
-        assert!(
-            reopened
-                .reset_table_cell_fraction_format(table_id, 1, 2)
-                .unwrap()
-        );
-        let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
-        assert!(
-            resolve_format_table(reopened.package(), &location)
-                .unwrap()
-                .entries
-                .is_empty()
-        );
-    }
-
-    #[test]
     fn source_built_table_roundtrips_reuses_and_resets_scientific_formats() {
         let mut editor = NumbersDocumentBuilder::new()
             .table_name("Scientific")

@@ -7370,3 +7370,27 @@ native certification claim.
 This retires one host surface, not the monolith. Soundtrack creation, general
 media assets, slide-owned media, builds, shapes, tables, charts, and other ADR
 0028 debts remain; no dependency edge or whole deletion gate closes here.
+
+## 2026-09-03 amendment: Numbers Fraction raw-ID convenience cutover
+
+The focused `litchi-numbers::Package` remains the canonical owner for
+existing-cell Fraction read/edit/apply transactions through semantic sheet and
+table selectors plus checked cell positions. The dedicated migration-host
+convenience methods
+`NumbersEditor::{table_cell_fraction_format,set_table_cell_fraction_format,reset_table_cell_fraction_format}`
+and their focused-location/fallback bridge tests are now removed. A boundary
+ratchet rejects their reintroduction. Existing exact-package callers use the
+focused package owner directly.
+
+This cutover deliberately does not remove generic source-built
+`DataFormat::Fraction` mutation or the attached-table helpers still used by
+Pages and Keynote. Fresh legacy builders are not falsely promoted to admitted
+exact focused sources. The existing strict type-262 preflight, lazy Buffa view,
+22-case package suite, codec/wire/fuzz evidence, and representative native
+Eighths-to-Hundredths E3/E4 record remain the evidence for the focused owner;
+this change does not broaden that evidence.
+
+No package, dependency edge, ordered migration debt, host, or whole-monolith
+deletion gate closes. The current topology remains 64 workspace packages, 238
+internal dependency declarations, 227 canonical edges, 11 development-only
+edges, 11 ordered migration debts, and one migration host.
