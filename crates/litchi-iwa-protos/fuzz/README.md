@@ -967,6 +967,57 @@ the exact same binary source in each path. Invalid or oversized recipes are
 skipped. The finite per-source policy is 8,192 fields, 256 KiB of work, 1,024
 references, 64 KiB of text, and recursion depth 64.
 
+## PackageMetadata media metadata codec
+
+`package_metadata_media_codec` exercises the bounded, source-preserving
+PackageMetadata media metadata scanner and rewrite seam. It runs both the
+report-only and streaming visitor routes, retaining only topology counters in
+the harness so wide repeated DataInfo/component-owner records do not become an
+eager nested allocation. A valid seed drives prepared and one-shot rewrites
+through DataInfo add/remove and owner add/remove transitions, then re-inspects
+each candidate. Every successful rewrite is retried with each non-zero exact
+execution limit one below its requirement; failed attempts must leave the
+borrowed source unchanged. The checked-in corpus covers empty and populated
+roots, shared owners, optional DataInfo fields, unknown fields, duplicate
+identities, versioned components, data-metadata-map presence, unsafe names,
+zero IDs, and malformed/noncanonical wire inputs. This target deliberately does
+not claim package data-member or audio-byte lifecycle coverage.
+
+The target accepts raw inputs up to 64 KiB, caps rewrite output at 128 KiB, and
+applies finite limits of 16,384 fields, 512 KiB of work, 4,096 components,
+8,192 DataInfo records, 16,384 owners, 20 digest bytes, 4,096 filename bytes,
+and depth 64. Corpus entries are small hand-authored `hex:` wire recipes and
+are not copied native package bytes.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check package_metadata_media_codec
+```
+
+Run a bounded smoke with mutable corpus, artifacts, and build output outside
+the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-package-metadata-media-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+cp corpus/package_metadata_media_codec/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  package_metadata_media_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
 ## Corpus provenance
 
 The seeds are hand-authored protobuf wire encodings from

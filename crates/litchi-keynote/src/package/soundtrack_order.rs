@@ -3382,9 +3382,11 @@ mod tests {
             },
             0,
         ));
+        let mut offset_only_central = before_central;
+        put_u32(&mut offset_only_central, 42, 8);
         assert!(central_record_preserved_except_offset(
             &before_central,
-            &after_central,
+            &offset_only_central,
             1,
         ));
     }

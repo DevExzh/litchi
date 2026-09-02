@@ -269,7 +269,7 @@ impl Write for OutputBuffer<'_> {
 pub struct ReassemblyExecutionLimits {
     /// Maximum final ZIP bytes that may be retained by execution.
     pub max_output_bytes: usize,
-    /// Maximum number of physical-entry local-offset slots.
+    /// Maximum number of retained and inserted local-offset slots.
     pub max_offset_count: usize,
     /// Maximum scratch bytes, including local-offset storage.
     pub max_scratch_bytes: usize,
@@ -316,7 +316,7 @@ impl ReassemblyExecutionRequirements {
         self.output_bytes
     }
 
-    /// Exact number of physical-entry local-offset slots required.
+    /// Exact number of retained and inserted local-offset slots required.
     #[must_use]
     pub const fn offset_count(self) -> usize {
         self.offset_count
@@ -367,6 +367,8 @@ pub struct PreparedReassembly<'source> {
     shape: Option<ReassemblyShape>,
     prepared: HashMap<usize, PreparedEdit<'source>>,
     deleted: HashSet<usize>,
+    insertions: Vec<PreparedInsertion<'source>>,
+    limits: Limits,
     output_size: usize,
     requirements: ReassemblyExecutionRequirements,
 }
@@ -408,13 +410,22 @@ impl PreparedReassembly<'_> {
         })?;
 
         let physical_count = archive.physical_entries().count();
+        let offset_count = physical_count
+            .checked_add(self.insertions.len())
+            .ok_or_else(|| {
+                Error::Reassembly(
+                    "reassembled ZIP offset count overflows during execution".to_owned(),
+                )
+            })?;
         let mut local_offsets = Vec::new();
         local_offsets
-            .try_reserve_exact(physical_count)
+            .try_reserve_exact(offset_count)
             .map_err(|_error| Error::Allocation {
                 resource: "reassembled ZIP local offsets",
-                amount: physical_count,
+                amount: offset_count,
             })?;
+        local_offsets.resize(offset_count, None);
+        let mut insertion_cursor = 0usize;
 
         let mut output = Vec::new();
         output
@@ -432,20 +443,60 @@ impl PreparedReassembly<'_> {
             });
         output.extend_from_slice(&self.source[..prelude_end]);
 
+        let mut logical_position = 0usize;
         for (index, physical) in archive.physical_entries().enumerate() {
+            if !physical.is_directory() {
+                append_inserted_locals_at(
+                    &mut output,
+                    &self.insertions,
+                    logical_position,
+                    &mut insertion_cursor,
+                    physical_count,
+                    &mut local_offsets,
+                )?;
+            }
             if self.deleted.contains(&index) {
-                local_offsets.push(None);
+                if !physical.is_directory() {
+                    logical_position = logical_position.checked_add(1).ok_or_else(|| {
+                        Error::Reassembly(
+                            "logical ZIP member position overflows during publication".to_owned(),
+                        )
+                    })?;
+                }
                 continue;
             }
             let local_offset = u64::try_from(output.len()).map_err(|_error| {
                 Error::InvalidBundle("reassembled local offset does not fit u64".to_owned())
             })?;
-            local_offsets.push(Some(local_offset));
+            let offset = local_offsets.get_mut(index).ok_or_else(|| {
+                Error::Reassembly("reassembled local offset slot is missing".to_owned())
+            })?;
+            *offset = Some(local_offset);
             if let Some(edit) = self.prepared.get(&index) {
                 append_edited_local(&mut output, self.source, physical, edit)?;
             } else {
                 output.extend_from_slice(&self.source[physical.local_record()]);
             }
+            if !physical.is_directory() {
+                logical_position = logical_position.checked_add(1).ok_or_else(|| {
+                    Error::Reassembly(
+                        "logical ZIP member position overflows during publication".to_owned(),
+                    )
+                })?;
+            }
+        }
+        append_inserted_locals_at(
+            &mut output,
+            &self.insertions,
+            logical_position,
+            &mut insertion_cursor,
+            physical_count,
+            &mut local_offsets,
+        )?;
+        if insertion_cursor != self.insertions.len() {
+            return Err(Error::Reassembly(
+                "prepared inserted positions were not fully published".to_owned(),
+            ));
         }
 
         let new_directory_offset = u64::try_from(output.len()).map_err(|_error| {
@@ -476,6 +527,22 @@ impl PreparedReassembly<'_> {
                 shape.base_offset,
             )?;
         }
+        for (insertion_index, insertion) in self.insertions.iter().enumerate() {
+            let local_offset = local_offsets
+                .get(physical_count.checked_add(insertion_index).ok_or_else(|| {
+                    Error::Reassembly(
+                        "reassembled inserted offset index overflows during publication".to_owned(),
+                    )
+                })?)
+                .copied()
+                .flatten();
+            append_inserted_central(
+                &mut output,
+                insertion.request,
+                local_offset,
+                shape.base_offset,
+            )?;
+        }
         let new_directory_size = output
             .len()
             .checked_sub(usize::try_from(new_directory_offset).map_err(|_error| {
@@ -486,8 +553,11 @@ impl PreparedReassembly<'_> {
             })?;
         let retained_count = physical_count
             .checked_sub(self.deleted.len())
+            .and_then(|count| count.checked_add(self.insertions.len()))
             .ok_or_else(|| {
-                Error::Reassembly("deleted ZIP entry count exceeds physical entry count".to_owned())
+                Error::Reassembly(
+                    "reassembled ZIP entry count overflows during publication".to_owned(),
+                )
             })?;
         let tail_start = output.len();
         output.extend_from_slice(&self.source[archive.eocd_offset()..]);
@@ -504,6 +574,16 @@ impl PreparedReassembly<'_> {
                 self.output_size,
                 output.len()
             )));
+        }
+        if !self.insertions.is_empty() {
+            verify_inserted_reassembly(
+                &output,
+                &archive,
+                &self.prepared,
+                &self.deleted,
+                &self.insertions,
+                self.limits,
+            )?;
         }
         Ok(output)
     }
@@ -785,6 +865,88 @@ impl<'a> EntryEdit<'a> {
     pub const fn data(self) -> &'a [u8] {
         self.data
     }
+}
+
+/// Insert one new stored ZIP member during a bounded physical reassembly.
+///
+/// The request is deliberately separate from [`EntryEdit`] and deletion
+/// names: an insertion can never silently turn into a replacement or a
+/// delete-and-recreate operation. `new` appends after all existing logical
+/// members. [`Self::at`] injects the member before the existing logical member
+/// at the supplied zero-based position. Positions refer to the source
+/// snapshot before edits or deletions are applied; equal positions retain the
+/// request order. Directory records are not logical members and remain in
+/// their original physical positions.
+///
+/// Inserted records use a canonical UTF-8 Store header with no extra fields,
+/// descriptor, or comment. Existing records are copied byte-for-byte except
+/// for the offset and archive-count fields that ZIP requires after a local
+/// record is injected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EntryInsertion<'a> {
+    name: &'a str,
+    data: &'a [u8],
+    position: Option<usize>,
+}
+
+impl<'a> EntryInsertion<'a> {
+    /// Build an insertion appended after every existing logical member.
+    #[must_use]
+    pub const fn new(name: &'a str, data: &'a [u8]) -> Self {
+        Self {
+            name,
+            data,
+            position: None,
+        }
+    }
+
+    /// Build an insertion before the source logical member at `position`.
+    ///
+    /// `position == 0` inserts before the first logical member, while a
+    /// position equal to the source logical-member count is equivalent to an
+    /// append. The position is checked against the source during preparation;
+    /// this constructor is allocation-free and cannot fail.
+    #[must_use]
+    pub const fn at(position: usize, name: &'a str, data: &'a [u8]) -> Self {
+        Self {
+            name,
+            data,
+            position: Some(position),
+        }
+    }
+
+    /// Build an explicitly named append request.
+    ///
+    /// This spelling is useful at call sites that construct a mixed list of
+    /// positioned and appended requests.
+    #[must_use]
+    pub const fn append(name: &'a str, data: &'a [u8]) -> Self {
+        Self::new(name, data)
+    }
+
+    /// Return the requested normalized member name.
+    #[must_use]
+    pub const fn name(self) -> &'a str {
+        self.name
+    }
+
+    /// Borrow the decoded payload that will be stored in the new member.
+    #[must_use]
+    pub const fn data(self) -> &'a [u8] {
+        self.data
+    }
+
+    /// Return the source logical-member position, or `None` for append.
+    #[must_use]
+    pub const fn position(self) -> Option<usize> {
+        self.position
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PreparedInsertion<'a> {
+    position: usize,
+    request: EntryInsertion<'a>,
 }
 
 /// A process-local pair of exact immutable shared-slice artifacts.
@@ -1855,7 +2017,55 @@ impl Catalog {
     /// selects an unsupported method, or the source layout cannot be safely
     /// patched without losing physical metadata.
     pub fn reassemble_to_bytes(&self, edits: &[EntryEdit<'_>], limits: Limits) -> Result<Vec<u8>> {
-        self.reassemble_with_deletions_to_bytes(edits, &[], limits)
+        self.reassemble_with_changes_to_bytes(&[], edits, &[], limits)
+    }
+
+    /// Reassemble a flat package after appending or injecting new stored
+    /// members.
+    ///
+    /// Insertions are validated as a distinct operation. They cannot replace
+    /// an existing member, and an insertion name that is already present (or
+    /// appears more than once in the request) is rejected. The resulting local
+    /// record is injected at the requested logical position while its central
+    /// record is appended after the preserved central-directory records.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an insertion name or position is invalid, a name
+    /// is ambiguous, a physical/resource limit is exceeded, or the source
+    /// layout cannot be safely patched.
+    pub fn reassemble_with_insertions_to_bytes(
+        &self,
+        insertions: &[EntryInsertion<'_>],
+        limits: Limits,
+    ) -> Result<Vec<u8>> {
+        self.reassemble_with_changes_to_bytes(insertions, &[], &[], limits)
+    }
+
+    /// Reassemble a flat package after applying insertions, replacements, and
+    /// deletions as one bounded physical transaction.
+    ///
+    /// Insertions are positioned relative to the original logical member
+    /// sequence. Existing local records are copied in source order and
+    /// existing central records retain their source order and metadata; only
+    /// the ZIP offsets, counts, and required edited payload fields change.
+    /// The candidate is parsed and checked before this method returns.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when any request is ambiguous or unsupported, a
+    /// physical/resource limit is exceeded, or candidate verification fails.
+    pub fn reassemble_with_changes_to_bytes(
+        &self,
+        insertions: &[EntryInsertion<'_>],
+        edits: &[EntryEdit<'_>],
+        deleted_names: &[&str],
+        limits: Limits,
+    ) -> Result<Vec<u8>> {
+        let prepared =
+            self.prepare_reassembly_with_changes(insertions, edits, deleted_names, limits)?;
+        let execution_limits = prepared.execution_requirements().exact_limits();
+        prepared.execute(execution_limits)
     }
 
     /// Reassemble a flat package into a reversible, exact-source patch.
@@ -1934,7 +2144,17 @@ impl Catalog {
         edits: &'source [EntryEdit<'source>],
         limits: Limits,
     ) -> Result<PreparedReassembly<'source>> {
-        self.prepare_reassembly_with_deletions(edits, &[], limits)
+        self.prepare_reassembly_with_changes(&[], edits, &[], limits)
+    }
+
+    /// Prepare an insertion-only transaction without allocating its final ZIP
+    /// output.
+    pub fn prepare_reassembly_with_insertions<'source>(
+        &'source self,
+        insertions: &'source [EntryInsertion<'source>],
+        limits: Limits,
+    ) -> Result<PreparedReassembly<'source>> {
+        self.prepare_reassembly_with_changes(insertions, &[], &[], limits)
     }
 
     /// Reassemble a flat package after replacing and deleting existing
@@ -1968,9 +2188,7 @@ impl Catalog {
         deleted_names: &[&str],
         limits: Limits,
     ) -> Result<Vec<u8>> {
-        let prepared = self.prepare_reassembly_with_deletions(edits, deleted_names, limits)?;
-        let execution_limits = prepared.execution_requirements().exact_limits();
-        prepared.execute(execution_limits)
+        self.reassemble_with_changes_to_bytes(&[], edits, deleted_names, limits)
     }
 
     /// Prepare a replacement/deletion transaction without allocating the
@@ -1992,13 +2210,32 @@ impl Catalog {
         deleted_names: &'source [&'source str],
         limits: Limits,
     ) -> Result<PreparedReassembly<'source>> {
+        self.prepare_reassembly_with_changes(&[], edits, deleted_names, limits)
+    }
+
+    /// Prepare a transaction containing new-member insertions, replacements,
+    /// and deletions without allocating the final ZIP output.
+    ///
+    /// All request names, positions, source selections, compression output,
+    /// member and aggregate sizes, physical ZIP shape, and final output
+    /// offsets are checked before a caller can execute the returned plan.
+    /// Insertions are sorted by source position in the plan; ties retain their
+    /// request order, making local injection deterministic without depending
+    /// on hash-map iteration.
+    pub fn prepare_reassembly_with_changes<'source>(
+        &'source self,
+        insertions: &'source [EntryInsertion<'source>],
+        edits: &'source [EntryEdit<'source>],
+        deleted_names: &'source [&'source str],
+        limits: Limits,
+    ) -> Result<PreparedReassembly<'source>> {
         let checked_limits = limits.validate()?;
         let source_size = u64::try_from(self.source.len()).map_err(|_error| {
             Error::InvalidBundle("catalog source length does not fit u64".to_owned())
         })?;
         checked_limits.check_input_size(source_size, "catalog source")?;
 
-        if edits.is_empty() && deleted_names.is_empty() {
+        if insertions.is_empty() && edits.is_empty() && deleted_names.is_empty() {
             self.check_source_total(checked_limits)?;
             checked_limits.check_output_size(source_size)?;
             return Ok(PreparedReassembly {
@@ -2007,12 +2244,15 @@ impl Catalog {
                 shape: None,
                 prepared: HashMap::new(),
                 deleted: HashSet::new(),
+                insertions: Vec::new(),
+                limits: checked_limits,
                 output_size: self.source.len(),
                 requirements: reassembly_execution_requirements(self.source.len(), 0, true)?,
             });
         }
 
-        if deleted_names.is_empty()
+        if insertions.is_empty()
+            && deleted_names.is_empty()
             && !edits.is_empty()
             && identical_edits_are_noop(&self.entries, edits, checked_limits)?
         {
@@ -2024,6 +2264,8 @@ impl Catalog {
                 shape: None,
                 prepared: HashMap::new(),
                 deleted: HashSet::new(),
+                insertions: Vec::new(),
+                limits: checked_limits,
                 output_size: self.source.len(),
                 requirements: reassembly_execution_requirements(self.source.len(), 0, true)?,
             });
@@ -2041,20 +2283,62 @@ impl Catalog {
         let shape = validate_reassembly_shape(&archive)?;
         let (prepared, deleted) =
             prepare_mutations(&archive, edits, deleted_names, checked_limits)?;
-        let output_size = reassembled_output_size(&archive, &prepared, &deleted)?;
+        let (insertions, insertion_total) =
+            prepare_insertions(&archive, insertions, checked_limits)?;
+        let output_size = reassembled_output_size(&archive, &prepared, &deleted, &insertions)?;
         checked_limits.check_output_size(output_size)?;
         let output_len = usize::try_from(output_size).map_err(|_error| {
             Error::InvalidBundle("reassembled ZIP length does not fit usize".to_owned())
         })?;
         let physical_count = archive.physical_entries().count();
+        validate_inserted_output_shape(&archive, &prepared, &deleted, &insertions, output_size)?;
+        let existing_total = self.source_total_uncompressed;
+        let deleted_bytes = deleted
+            .iter()
+            .filter_map(|index| archive.physical_entry(*index))
+            .try_fold(0_u64, |sum, physical| {
+                sum.checked_add(physical.uncompressed_size())
+                    .ok_or_else(|| Error::Reassembly("deleted ZIP bytes overflow u64".to_owned()))
+            })?;
+        let edited_old = prepared.iter().try_fold(0_u64, |sum, (index, _edit)| {
+            archive.physical_entry(*index).map_or(Ok(sum), |physical| {
+                sum.checked_add(physical.uncompressed_size())
+                    .ok_or_else(|| Error::Reassembly("edited ZIP bytes overflow u64".to_owned()))
+            })
+        })?;
+        let edited_new = prepared.values().try_fold(0_u64, |sum, edit| {
+            sum.checked_add(edit.uncompressed_size)
+                .ok_or_else(|| Error::Reassembly("edited ZIP bytes overflow u64".to_owned()))
+        })?;
+        let final_total = existing_total
+            .checked_sub(deleted_bytes)
+            .and_then(|value| value.checked_sub(edited_old))
+            .and_then(|value| value.checked_add(edited_new))
+            .and_then(|value| value.checked_add(insertion_total))
+            .ok_or_else(|| {
+                Error::Reassembly("reassembled ZIP total size overflows u64".to_owned())
+            })?;
+        if final_total > checked_limits.max_total_bytes() {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::TotalBytes,
+                observed: final_total,
+                maximum: checked_limits.max_total_bytes(),
+            });
+        }
+        let insertion_count = insertions.len();
+        let offset_count = physical_count.checked_add(insertion_count).ok_or_else(|| {
+            Error::Reassembly("reassembled ZIP offset count overflows".to_owned())
+        })?;
         Ok(PreparedReassembly {
             source: self.source.as_ref(),
             archive: Some(archive),
             shape: Some(shape),
             prepared,
             deleted,
+            insertions,
+            limits: checked_limits,
             output_size: output_len,
-            requirements: reassembly_execution_requirements(output_len, physical_count, false)?,
+            requirements: reassembly_execution_requirements(output_len, offset_count, false)?,
         })
     }
 
@@ -2083,10 +2367,23 @@ impl Catalog {
     pub fn write_reassembled_to<W: Write>(
         &self,
         edits: &[EntryEdit<'_>],
+        sink: W,
+        limits: Limits,
+    ) -> Result<()> {
+        self.write_reassembled_with_changes_to(&[], edits, &[], sink, limits)
+    }
+
+    /// Materialize one insertion/replacement/deletion transaction before
+    /// touching the caller-owned sink.
+    pub fn write_reassembled_with_changes_to<W: Write>(
+        &self,
+        insertions: &[EntryInsertion<'_>],
+        edits: &[EntryEdit<'_>],
+        deleted_names: &[&str],
         mut sink: W,
         limits: Limits,
     ) -> Result<()> {
-        if edits.is_empty() {
+        if insertions.is_empty() && edits.is_empty() && deleted_names.is_empty() {
             let checked_limits = limits.validate()?;
             let source_size = u64::try_from(self.source.len()).map_err(|_error| {
                 Error::InvalidBundle("catalog source length does not fit u64".to_owned())
@@ -2097,7 +2394,8 @@ impl Catalog {
             self.write_to(&mut sink)?;
             return Ok(());
         }
-        let bytes = self.reassemble_to_bytes(edits, limits)?;
+        let bytes =
+            self.reassemble_with_changes_to_bytes(insertions, edits, deleted_names, limits)?;
         sink.write_all(&bytes)?;
         Ok(())
     }
@@ -2107,6 +2405,30 @@ impl crate::SourceCatalog {
     /// Reassemble this source snapshot after replacing existing members.
     pub fn reassemble_to_bytes(&self, edits: &[EntryEdit<'_>], limits: Limits) -> Result<Vec<u8>> {
         self.package().reassemble_to_bytes(edits, limits)
+    }
+
+    /// Reassemble this source snapshot after appending or injecting new
+    /// members.
+    pub fn reassemble_with_insertions_to_bytes(
+        &self,
+        insertions: &[EntryInsertion<'_>],
+        limits: Limits,
+    ) -> Result<Vec<u8>> {
+        self.package()
+            .reassemble_with_insertions_to_bytes(insertions, limits)
+    }
+
+    /// Reassemble this source snapshot after applying insertions,
+    /// replacements, and deletions in one transaction.
+    pub fn reassemble_with_changes_to_bytes(
+        &self,
+        insertions: &[EntryInsertion<'_>],
+        edits: &[EntryEdit<'_>],
+        deleted_names: &[&str],
+        limits: Limits,
+    ) -> Result<Vec<u8>> {
+        self.package()
+            .reassemble_with_changes_to_bytes(insertions, edits, deleted_names, limits)
     }
 
     /// Reassemble this source snapshot after replacing and deleting members.
@@ -2133,6 +2455,16 @@ impl crate::SourceCatalog {
         self.package().prepare_reassembly(edits, limits)
     }
 
+    /// Prepare an insertion-only transaction against this source snapshot.
+    pub fn prepare_reassembly_with_insertions<'source>(
+        &'source self,
+        insertions: &'source [EntryInsertion<'source>],
+        limits: Limits,
+    ) -> Result<PreparedReassembly<'source>> {
+        self.package()
+            .prepare_reassembly_with_insertions(insertions, limits)
+    }
+
     /// Prepare a replacement/deletion transaction against this source
     /// snapshot.
     pub fn prepare_reassembly_with_deletions<'source>(
@@ -2143,6 +2475,19 @@ impl crate::SourceCatalog {
     ) -> Result<PreparedReassembly<'source>> {
         self.package()
             .prepare_reassembly_with_deletions(edits, deleted_names, limits)
+    }
+
+    /// Prepare an insertion/replacement/deletion transaction against this
+    /// source snapshot.
+    pub fn prepare_reassembly_with_changes<'source>(
+        &'source self,
+        insertions: &'source [EntryInsertion<'source>],
+        edits: &'source [EntryEdit<'source>],
+        deleted_names: &'source [&'source str],
+        limits: Limits,
+    ) -> Result<PreparedReassembly<'source>> {
+        self.package()
+            .prepare_reassembly_with_changes(insertions, edits, deleted_names, limits)
     }
 }
 
@@ -2712,6 +3057,290 @@ fn prepare_mutations<'data>(
     Ok((prepared, deleted))
 }
 
+fn prepare_insertions<'data>(
+    archive: &ZipArchive<'_>,
+    requests: &'data [EntryInsertion<'data>],
+    limits: Limits,
+) -> Result<(Vec<PreparedInsertion<'data>>, u64)> {
+    let physical_count = archive.physical_entries().count();
+    let final_physical_count = physical_count
+        .checked_add(requests.len())
+        .ok_or_else(|| Error::Reassembly("ZIP entry count overflows usize".to_owned()))?;
+    if final_physical_count > limits.max_entries() {
+        return Err(Error::Limit {
+            kind: crate::LimitKind::Entries,
+            observed: u64::try_from(final_physical_count).unwrap_or(u64::MAX),
+            maximum: u64::try_from(limits.max_entries()).unwrap_or(u64::MAX),
+        });
+    }
+
+    let logical_count = archive
+        .physical_entries()
+        .filter(|physical| !physical.is_directory())
+        .count();
+    let zip_limits = limits.zip_limits();
+    let mut names = HashSet::new();
+    names
+        .try_reserve(requests.len())
+        .map_err(|_error| Error::Allocation {
+            resource: "ZIP insertion names",
+            amount: requests.len(),
+        })?;
+    let mut prepared = Vec::new();
+    prepared
+        .try_reserve_exact(requests.len())
+        .map_err(|_error| Error::Allocation {
+            resource: "prepared ZIP insertions",
+            amount: requests.len(),
+        })?;
+    let mut total_data = 0_u64;
+
+    for &request in requests {
+        let name_bytes = request.name().as_bytes();
+        let position = request.position().unwrap_or(logical_count);
+        if position > logical_count {
+            return Err(Error::Reassembly(format!(
+                "inserted member position {position} exceeds the {logical_count} logical members"
+            )));
+        }
+        if !is_exact_portable_raw_name(name_bytes) {
+            return Err(Error::Reassembly(format!(
+                "inserted member name is not an exact portable ZIP path: {:?}",
+                request.name()
+            )));
+        }
+        let name_len = u64::try_from(name_bytes.len()).map_err(|_error| {
+            Error::InvalidBundle("inserted member name length does not fit u64".to_owned())
+        })?;
+        if name_len > zip_limits.max_member_name_bytes {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::MemberNameBytes,
+                observed: name_len,
+                maximum: zip_limits.max_member_name_bytes,
+            });
+        }
+        if name_bytes.len() > usize::from(u16::MAX) {
+            return Err(Error::Reassembly(
+                "inserted member name requires ZIP64 filename fields".to_owned(),
+            ));
+        }
+        if !names.insert(request.name()) {
+            return Err(Error::Reassembly(format!(
+                "inserted member is requested more than once: {}",
+                request.name()
+            )));
+        }
+        if archive
+            .physical_entries()
+            .any(|physical| physical.name() == request.name())
+        {
+            return Err(Error::Reassembly(format!(
+                "inserted member duplicates an existing ZIP member: {}",
+                request.name()
+            )));
+        }
+
+        let data_len = u64::try_from(request.data().len()).map_err(|_error| {
+            Error::InvalidBundle("inserted member length does not fit u64".to_owned())
+        })?;
+        if data_len > limits.max_entry_bytes() {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::EntryBytes,
+                observed: data_len,
+                maximum: limits.max_entry_bytes(),
+            });
+        }
+        if data_len > zip_limits.max_compressed_size {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::CompressedEntryBytes,
+                observed: data_len,
+                maximum: zip_limits.max_compressed_size,
+            });
+        }
+        if request.data().len() > usize::try_from(u32::MAX).unwrap_or(usize::MAX) {
+            return Err(Error::Reassembly(
+                "inserted member requires ZIP64 size fields".to_owned(),
+            ));
+        }
+        total_data = total_data
+            .checked_add(data_len)
+            .ok_or_else(|| Error::Reassembly("inserted ZIP total size overflows u64".to_owned()))?;
+        prepared.push(PreparedInsertion { position, request });
+    }
+
+    // A stable sort makes equal-position requests deterministic while keeping
+    // the caller's explicit order. This is done before any output buffer is
+    // allocated and the compact request records retain borrowed payloads.
+    prepared.sort_by_key(|insertion| insertion.position);
+
+    let source_metadata = archive.directory_index_report()?.metadata_bytes;
+    let added_metadata = requests.iter().try_fold(0_u64, |sum, request| {
+        let name_len = u64::try_from(request.name().len()).map_err(|_error| {
+            Error::InvalidBundle("inserted member name length does not fit u64".to_owned())
+        })?;
+        let doubled_name_len = name_len.checked_mul(2).ok_or_else(|| {
+            Error::Reassembly("inserted ZIP metadata length overflows u64".to_owned())
+        })?;
+        sum.checked_add(doubled_name_len).ok_or_else(|| {
+            Error::Reassembly("inserted ZIP metadata length overflows u64".to_owned())
+        })
+    })?;
+    let metadata_total = source_metadata.checked_add(added_metadata).ok_or_else(|| {
+        Error::Reassembly("reassembled ZIP metadata length overflows u64".to_owned())
+    })?;
+    if metadata_total > zip_limits.max_metadata_bytes {
+        return Err(Error::Limit {
+            kind: crate::LimitKind::MetadataBytes,
+            observed: metadata_total,
+            maximum: zip_limits.max_metadata_bytes,
+        });
+    }
+
+    Ok((prepared, total_data))
+}
+
+fn insertion_local_size(request: EntryInsertion<'_>) -> Result<usize> {
+    30usize
+        .checked_add(request.name().len())
+        .and_then(|size| size.checked_add(request.data().len()))
+        .ok_or_else(|| Error::Reassembly("inserted local record length overflows usize".to_owned()))
+}
+
+fn insertion_central_size(request: EntryInsertion<'_>) -> Result<usize> {
+    46usize.checked_add(request.name().len()).ok_or_else(|| {
+        Error::Reassembly("inserted central record length overflows usize".to_owned())
+    })
+}
+
+fn append_inserted_locals_at(
+    output: &mut Vec<u8>,
+    insertions: &[PreparedInsertion<'_>],
+    position: usize,
+    insertion_cursor: &mut usize,
+    offset_base: usize,
+    offsets: &mut [Option<u64>],
+) -> Result<()> {
+    while *insertion_cursor < insertions.len() && insertions[*insertion_cursor].position == position
+    {
+        let insertion = insertions[*insertion_cursor];
+        let request = insertion.request;
+        let record_size = insertion_local_size(request)?;
+        let end = output.len().checked_add(record_size).ok_or_else(|| {
+            Error::Reassembly("inserted local record offset overflows".to_owned())
+        })?;
+        if end > output.capacity() {
+            return Err(Error::Reassembly(
+                "prepared ZIP output capacity is smaller than an inserted local record".to_owned(),
+            ));
+        }
+        let offset = u64::try_from(output.len()).map_err(|_error| {
+            Error::Reassembly("inserted local record offset does not fit u64".to_owned())
+        })?;
+        append_inserted_local(output, request)?;
+        let offset_index = offset_base.checked_add(*insertion_cursor).ok_or_else(|| {
+            Error::Reassembly("inserted local offset index overflows usize".to_owned())
+        })?;
+        let offset_slot = offsets
+            .get_mut(offset_index)
+            .ok_or_else(|| Error::Reassembly("inserted local offset slot is missing".to_owned()))?;
+        *offset_slot = Some(offset);
+        *insertion_cursor = (*insertion_cursor).checked_add(1).ok_or_else(|| {
+            Error::Reassembly("inserted local record count overflows usize".to_owned())
+        })?;
+    }
+    Ok(())
+}
+
+fn append_inserted_local(output: &mut Vec<u8>, request: EntryInsertion<'_>) -> Result<()> {
+    let name = request.name().as_bytes();
+    let name_len = u16::try_from(name.len()).map_err(|_error| {
+        Error::Reassembly("inserted member name does not fit ZIP header".to_owned())
+    })?;
+    let data_len = u32::try_from(request.data().len()).map_err(|_error| {
+        Error::Reassembly("inserted member data does not fit ZIP header".to_owned())
+    })?;
+    let crc32 = soapberry_zip::crc32(request.data());
+    let record_size = insertion_local_size(request)?;
+    let end = output
+        .len()
+        .checked_add(record_size)
+        .ok_or_else(|| Error::Reassembly("inserted local record range overflows".to_owned()))?;
+    if end > output.capacity() {
+        return Err(Error::Reassembly(
+            "prepared ZIP output capacity is smaller than an inserted local record".to_owned(),
+        ));
+    }
+    output.extend_from_slice(&0x0403_4b50u32.to_le_bytes());
+    output.extend_from_slice(&20u16.to_le_bytes());
+    output.extend_from_slice(&0x0800u16.to_le_bytes());
+    output.extend_from_slice(&0u16.to_le_bytes());
+    output.extend_from_slice(&0u16.to_le_bytes());
+    output.extend_from_slice(&0u16.to_le_bytes());
+    output.extend_from_slice(&crc32.to_le_bytes());
+    output.extend_from_slice(&data_len.to_le_bytes());
+    output.extend_from_slice(&data_len.to_le_bytes());
+    output.extend_from_slice(&name_len.to_le_bytes());
+    output.extend_from_slice(&0u16.to_le_bytes());
+    output.extend_from_slice(name);
+    output.extend_from_slice(request.data());
+    debug_assert_eq!(output.len(), end);
+    Ok(())
+}
+
+fn append_inserted_central(
+    output: &mut Vec<u8>,
+    request: EntryInsertion<'_>,
+    local_offset: Option<u64>,
+    base_offset: u64,
+) -> Result<()> {
+    let local_offset = local_offset.ok_or_else(|| {
+        Error::Reassembly("inserted central record has no local-record offset".to_owned())
+    })?;
+    let relative_offset = local_offset.checked_sub(base_offset).ok_or_else(|| {
+        Error::Reassembly("inserted local offset has an invalid ZIP base".to_owned())
+    })?;
+    let relative_offset = u32::try_from(relative_offset)
+        .map_err(|_error| Error::Reassembly("inserted local offset requires ZIP64".to_owned()))?;
+    let name = request.name().as_bytes();
+    let name_len = u16::try_from(name.len()).map_err(|_error| {
+        Error::Reassembly("inserted member name does not fit ZIP header".to_owned())
+    })?;
+    let data_len = u32::try_from(request.data().len()).map_err(|_error| {
+        Error::Reassembly("inserted member data does not fit ZIP header".to_owned())
+    })?;
+    let crc32 = soapberry_zip::crc32(request.data());
+    let record_size = insertion_central_size(request)?;
+    let end = output
+        .len()
+        .checked_add(record_size)
+        .ok_or_else(|| Error::Reassembly("inserted central record range overflows".to_owned()))?;
+    if end > output.capacity() {
+        return Err(Error::Reassembly(
+            "prepared ZIP output capacity is smaller than an inserted central record".to_owned(),
+        ));
+    }
+    output.extend_from_slice(&0x0201_4b50u32.to_le_bytes());
+    output.extend_from_slice(&20u16.to_le_bytes());
+    output.extend_from_slice(&20u16.to_le_bytes());
+    output.extend_from_slice(&0x0800u16.to_le_bytes());
+    output.extend_from_slice(&0u16.to_le_bytes());
+    output.extend_from_slice(&0u16.to_le_bytes());
+    output.extend_from_slice(&0u16.to_le_bytes());
+    output.extend_from_slice(&crc32.to_le_bytes());
+    output.extend_from_slice(&data_len.to_le_bytes());
+    output.extend_from_slice(&data_len.to_le_bytes());
+    output.extend_from_slice(&name_len.to_le_bytes());
+    output.extend_from_slice(&0u16.to_le_bytes());
+    output.extend_from_slice(&0u16.to_le_bytes());
+    output.extend_from_slice(&0u16.to_le_bytes());
+    output.extend_from_slice(&0u16.to_le_bytes());
+    output.extend_from_slice(&0u32.to_le_bytes());
+    output.extend_from_slice(&relative_offset.to_le_bytes());
+    output.extend_from_slice(name);
+    debug_assert_eq!(output.len(), end);
+    Ok(())
+}
+
 fn descriptor_start(physical: &PhysicalEntry, suffix: &[u8]) -> Result<Option<usize>> {
     if physical.central_header().flags & 0x0008 == 0 {
         return Ok(None);
@@ -2772,6 +3401,7 @@ fn reassembled_output_size(
     archive: &ZipArchive<'_>,
     prepared: &HashMap<usize, PreparedEdit<'_>>,
     deleted: &HashSet<usize>,
+    insertions: &[PreparedInsertion<'_>],
 ) -> Result<u64> {
     let source = archive.source();
     let prelude_end = archive
@@ -2782,8 +3412,34 @@ fn reassembled_output_size(
         });
     let mut size = u64::try_from(prelude_end)
         .map_err(|_error| Error::Reassembly("ZIP prelude length does not fit u64".to_owned()))?;
+    let mut insertion_cursor = 0usize;
+    let mut logical_position = 0usize;
     for (index, physical) in archive.physical_entries().enumerate() {
+        if !physical.is_directory() {
+            while insertion_cursor < insertions.len()
+                && insertions[insertion_cursor].position == logical_position
+            {
+                let insertion_size = insertion_local_size(insertions[insertion_cursor].request)?;
+                size = size
+                    .checked_add(u64::try_from(insertion_size).map_err(|_error| {
+                        Error::Reassembly(
+                            "inserted ZIP local record length does not fit u64".to_owned(),
+                        )
+                    })?)
+                    .ok_or_else(|| {
+                        Error::Reassembly("reassembled ZIP length overflows u64".to_owned())
+                    })?;
+                insertion_cursor = insertion_cursor.checked_add(1).ok_or_else(|| {
+                    Error::Reassembly("inserted ZIP position overflows usize".to_owned())
+                })?;
+            }
+        }
         if deleted.contains(&index) {
+            if !physical.is_directory() {
+                logical_position = logical_position.checked_add(1).ok_or_else(|| {
+                    Error::Reassembly("logical ZIP member position overflows usize".to_owned())
+                })?;
+            }
             continue;
         }
         let local_len = if let Some(edit) = prepared.get(&index) {
@@ -2811,6 +3467,29 @@ fn reassembled_output_size(
                 Error::Reassembly("reassembled local record length does not fit u64".to_owned())
             })?)
             .ok_or_else(|| Error::Reassembly("reassembled ZIP length overflows u64".to_owned()))?;
+        if !physical.is_directory() {
+            logical_position = logical_position.checked_add(1).ok_or_else(|| {
+                Error::Reassembly("logical ZIP member position overflows usize".to_owned())
+            })?;
+        }
+    }
+    while insertion_cursor < insertions.len()
+        && insertions[insertion_cursor].position == logical_position
+    {
+        let insertion_size = insertion_local_size(insertions[insertion_cursor].request)?;
+        size = size
+            .checked_add(u64::try_from(insertion_size).map_err(|_error| {
+                Error::Reassembly("inserted ZIP local record length does not fit u64".to_owned())
+            })?)
+            .ok_or_else(|| Error::Reassembly("reassembled ZIP length overflows u64".to_owned()))?;
+        insertion_cursor = insertion_cursor
+            .checked_add(1)
+            .ok_or_else(|| Error::Reassembly("inserted ZIP position overflows usize".to_owned()))?;
+    }
+    if insertion_cursor != insertions.len() {
+        return Err(Error::Reassembly(
+            "inserted ZIP positions do not match the source member sequence".to_owned(),
+        ));
     }
     let mut central_size = 0usize;
     for physical_index in archive.physical_indices_in_central_order() {
@@ -2826,6 +3505,13 @@ fn reassembled_output_size(
                 Error::Reassembly("reassembled central directory length overflows usize".to_owned())
             })?;
     }
+    for insertion in insertions {
+        central_size = central_size
+            .checked_add(insertion_central_size(insertion.request)?)
+            .ok_or_else(|| {
+                Error::Reassembly("inserted central directory length overflows usize".to_owned())
+            })?;
+    }
     let tail_size = source
         .len()
         .checked_sub(archive.eocd_offset())
@@ -2837,6 +3523,285 @@ fn reassembled_output_size(
         .and_then(|value| value.checked_add(u64::try_from(tail_size).ok()?))
         .ok_or_else(|| Error::Reassembly("reassembled ZIP length overflows u64".to_owned()))?;
     Ok(size)
+}
+
+fn validate_inserted_output_shape(
+    archive: &ZipArchive<'_>,
+    prepared: &HashMap<usize, PreparedEdit<'_>>,
+    deleted: &HashSet<usize>,
+    insertions: &[PreparedInsertion<'_>],
+    expected_output_size: u64,
+) -> Result<()> {
+    let physical_count = archive.physical_entries().count();
+    let final_count = physical_count
+        .checked_sub(deleted.len())
+        .and_then(|count| count.checked_add(insertions.len()))
+        .ok_or_else(|| Error::Reassembly("reassembled ZIP entry count overflows".to_owned()))?;
+    if final_count > usize::from(u16::MAX) {
+        return Err(Error::Reassembly(
+            "reassembled ZIP entry count requires ZIP64".to_owned(),
+        ));
+    }
+
+    let source = archive.source();
+    let prelude_end = archive
+        .physical_entries()
+        .next()
+        .map_or(archive.directory_offset(), |entry| {
+            entry.local_record().start
+        });
+    let mut cursor = u64::try_from(prelude_end)
+        .map_err(|_error| Error::Reassembly("ZIP prelude length does not fit u64".to_owned()))?;
+    let base_offset = archive.base_offset();
+    let mut insertion_cursor = 0usize;
+    let mut logical_position = 0usize;
+
+    let check_offset = |offset: u64| -> Result<()> {
+        let relative = offset.checked_sub(base_offset).ok_or_else(|| {
+            Error::Reassembly("reassembled local offset has an invalid base".to_owned())
+        })?;
+        if relative > u64::from(u32::MAX) {
+            return Err(Error::Reassembly(
+                "reassembled local offset requires ZIP64".to_owned(),
+            ));
+        }
+        Ok(())
+    };
+    let add_length = |cursor: &mut u64, length: usize| -> Result<()> {
+        *cursor = cursor
+            .checked_add(u64::try_from(length).map_err(|_error| {
+                Error::Reassembly("reassembled ZIP record length does not fit u64".to_owned())
+            })?)
+            .ok_or_else(|| Error::Reassembly("reassembled ZIP length overflows u64".to_owned()))?;
+        Ok(())
+    };
+
+    for (index, physical) in archive.physical_entries().enumerate() {
+        if !physical.is_directory() {
+            while insertion_cursor < insertions.len()
+                && insertions[insertion_cursor].position == logical_position
+            {
+                check_offset(cursor)?;
+                add_length(
+                    &mut cursor,
+                    insertion_local_size(insertions[insertion_cursor].request)?,
+                )?;
+                insertion_cursor = insertion_cursor.checked_add(1).ok_or_else(|| {
+                    Error::Reassembly("inserted ZIP position overflows usize".to_owned())
+                })?;
+            }
+        }
+        if !deleted.contains(&index) {
+            check_offset(cursor)?;
+            let local_len = if let Some(edit) = prepared.get(&index) {
+                let header_len = physical
+                    .compressed_data_range()
+                    .start
+                    .checked_sub(physical.local_record().start)
+                    .ok_or_else(|| {
+                        Error::Reassembly("ZIP local header range is invalid".to_owned())
+                    })?;
+                let suffix_len = physical
+                    .local_record()
+                    .end
+                    .checked_sub(physical.compressed_data_range().end)
+                    .ok_or_else(|| {
+                        Error::Reassembly("ZIP descriptor range is invalid".to_owned())
+                    })?;
+                header_len
+                    .checked_add(edit.compressed_size)
+                    .and_then(|value| value.checked_add(suffix_len))
+                    .ok_or_else(|| {
+                        Error::Reassembly("reassembled local record overflows usize".to_owned())
+                    })?
+            } else {
+                source[physical.local_record()].len()
+            };
+            add_length(&mut cursor, local_len)?;
+        }
+        if !physical.is_directory() {
+            logical_position = logical_position.checked_add(1).ok_or_else(|| {
+                Error::Reassembly("logical ZIP member position overflows usize".to_owned())
+            })?;
+        }
+    }
+    while insertion_cursor < insertions.len()
+        && insertions[insertion_cursor].position == logical_position
+    {
+        check_offset(cursor)?;
+        add_length(
+            &mut cursor,
+            insertion_local_size(insertions[insertion_cursor].request)?,
+        )?;
+        insertion_cursor = insertion_cursor
+            .checked_add(1)
+            .ok_or_else(|| Error::Reassembly("inserted ZIP position overflows usize".to_owned()))?;
+    }
+    if insertion_cursor != insertions.len() {
+        return Err(Error::Reassembly(
+            "inserted ZIP positions do not match the source member sequence".to_owned(),
+        ));
+    }
+
+    let directory_offset = cursor;
+    check_offset(directory_offset)?;
+    let mut central_size = 0usize;
+    for physical_index in archive.physical_indices_in_central_order() {
+        if deleted.contains(&physical_index) {
+            continue;
+        }
+        let physical = archive.physical_entry(physical_index).ok_or_else(|| {
+            Error::Reassembly("central order references a missing ZIP entry".to_owned())
+        })?;
+        central_size = central_size
+            .checked_add(physical.central_record().len())
+            .ok_or_else(|| {
+                Error::Reassembly("central directory length overflows usize".to_owned())
+            })?;
+    }
+    for insertion in insertions {
+        central_size = central_size
+            .checked_add(insertion_central_size(insertion.request)?)
+            .ok_or_else(|| {
+                Error::Reassembly("central directory length overflows usize".to_owned())
+            })?;
+    }
+    if central_size > usize::try_from(u32::MAX).unwrap_or(usize::MAX) {
+        return Err(Error::Reassembly(
+            "reassembled central directory requires ZIP64".to_owned(),
+        ));
+    }
+    let tail_size = source
+        .len()
+        .checked_sub(archive.eocd_offset())
+        .ok_or_else(|| Error::Reassembly("ZIP tail range is invalid".to_owned()))?;
+    let final_size = directory_offset
+        .checked_add(u64::try_from(central_size).map_err(|_error| {
+            Error::Reassembly("central directory length does not fit u64".to_owned())
+        })?)
+        .and_then(|value| value.checked_add(u64::try_from(tail_size).ok()?))
+        .ok_or_else(|| Error::Reassembly("reassembled ZIP length overflows u64".to_owned()))?;
+    if final_size != expected_output_size {
+        return Err(Error::Reassembly(format!(
+            "reassembled ZIP numeric preflight disagrees with measured size (expected {expected_output_size}, observed {final_size})"
+        )));
+    }
+    Ok(())
+}
+
+fn verify_inserted_reassembly(
+    output: &[u8],
+    source_archive: &ZipArchive<'_>,
+    prepared: &HashMap<usize, PreparedEdit<'_>>,
+    deleted: &HashSet<usize>,
+    insertions: &[PreparedInsertion<'_>],
+    limits: Limits,
+) -> Result<()> {
+    let candidate = ZipArchive::new_with_limits(output, limits)?;
+    validate_reassembly_shape(&candidate)?;
+    let expected_count = source_archive
+        .physical_entries()
+        .count()
+        .checked_sub(deleted.len())
+        .and_then(|count| count.checked_add(insertions.len()))
+        .ok_or_else(|| Error::Reassembly("candidate ZIP entry count overflows".to_owned()))?;
+    if candidate.physical_entries().count() != expected_count {
+        return Err(Error::Reassembly(
+            "candidate ZIP entry count disagrees with the prepared transaction".to_owned(),
+        ));
+    }
+
+    for insertion in insertions {
+        let request = insertion.request;
+        let mut matches = candidate
+            .physical_entries()
+            .filter(|physical| physical.raw_name() == request.name().as_bytes());
+        let entry = matches.next().ok_or_else(|| {
+            Error::Reassembly(format!(
+                "candidate ZIP is missing inserted member: {}",
+                request.name()
+            ))
+        })?;
+        if matches.next().is_some()
+            || entry.local_header().name.as_ref() != request.name().as_bytes()
+            || entry.central_header().compression_method != 0
+            || entry.local_header().compression_method != 0
+        {
+            return Err(Error::Reassembly(format!(
+                "candidate ZIP inserted member is ambiguous or noncanonical: {}",
+                request.name()
+            )));
+        }
+        if candidate.read_entry(entry)? != request.data() {
+            return Err(Error::Reassembly(format!(
+                "candidate ZIP inserted payload disagrees with the request: {}",
+                request.name()
+            )));
+        }
+    }
+
+    for (&index, edit) in prepared {
+        if deleted.contains(&index) {
+            return Err(Error::Reassembly(
+                "candidate verification found an edited/deleted overlap".to_owned(),
+            ));
+        }
+        let source = source_archive.physical_entry(index).ok_or_else(|| {
+            Error::Reassembly("candidate verification references a missing source entry".to_owned())
+        })?;
+        let candidate_entry = candidate
+            .physical_entries()
+            .find(|physical| physical.name() == source.name())
+            .ok_or_else(|| {
+                Error::Reassembly(format!(
+                    "candidate ZIP is missing edited member: {}",
+                    source.name()
+                ))
+            })?;
+        if candidate.read_entry(candidate_entry)? != edit.data {
+            return Err(Error::Reassembly(format!(
+                "candidate ZIP edited payload disagrees with the request: {}",
+                source.name()
+            )));
+        }
+    }
+
+    // Existing local records are the preservation authority. Compare every
+    // retained unedited record after the candidate parser has recalculated its
+    // ranges; insertion shifts offsets but must not rewrite these bytes.
+    for (index, source) in source_archive.physical_entries().enumerate() {
+        if deleted.contains(&index) || prepared.contains_key(&index) {
+            continue;
+        }
+        let candidate_entry = candidate
+            .physical_entries()
+            .find(|physical| physical.raw_name() == source.raw_name())
+            .ok_or_else(|| {
+                Error::Reassembly(format!(
+                    "candidate ZIP is missing retained member: {}",
+                    source.name()
+                ))
+            })?;
+        let candidate_local = candidate
+            .source()
+            .get(candidate_entry.local_record())
+            .ok_or_else(|| {
+                Error::Reassembly("candidate local record range is truncated".to_owned())
+            })?;
+        let source_local = source_archive
+            .source()
+            .get(source.local_record())
+            .ok_or_else(|| {
+                Error::Reassembly("source local record range is truncated".to_owned())
+            })?;
+        if candidate_local.len() != source_local.len() || candidate_local != source_local {
+            return Err(Error::Reassembly(format!(
+                "candidate ZIP rewrote retained local record: {}",
+                source.name()
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn append_edited_local(
@@ -5792,6 +6757,380 @@ mod tests {
             })
         ));
         assert_eq!(limited_sink, original_sink);
+        Ok(())
+    }
+
+    #[test]
+    fn inserts_at_append_front_middle_and_equal_positions_deterministically() -> Result<()> {
+        let source = zip(&[("Data/a", b"a"), ("Data/b", b"b"), ("Data/c", b"c")])?;
+        let catalog = Catalog::from_bytes(&source)?;
+
+        let append = catalog.reassemble_with_insertions_to_bytes(
+            &[EntryInsertion::new("Data/append", b"append")],
+            Limits::default(),
+        )?;
+        assert_eq!(
+            Catalog::from_bytes(&append)?
+                .iter()
+                .map(Entry::name)
+                .collect::<Vec<_>>(),
+            ["Data/a", "Data/b", "Data/c", "Data/append"]
+        );
+
+        let front = catalog.reassemble_with_insertions_to_bytes(
+            &[EntryInsertion::at(0, "Data/front", b"front")],
+            Limits::default(),
+        )?;
+        assert_eq!(
+            Catalog::from_bytes(&front)?
+                .iter()
+                .map(Entry::name)
+                .collect::<Vec<_>>(),
+            ["Data/front", "Data/a", "Data/b", "Data/c"]
+        );
+
+        let middle = catalog.reassemble_with_insertions_to_bytes(
+            &[EntryInsertion::at(1, "Data/middle", b"middle")],
+            Limits::default(),
+        )?;
+        assert_eq!(
+            Catalog::from_bytes(&middle)?
+                .iter()
+                .map(Entry::name)
+                .collect::<Vec<_>>(),
+            ["Data/a", "Data/middle", "Data/b", "Data/c"]
+        );
+
+        let equal = catalog.reassemble_with_insertions_to_bytes(
+            &[
+                EntryInsertion::at(1, "Data/first", b"first"),
+                EntryInsertion::at(1, "Data/second", b"second"),
+                EntryInsertion::at(1, "Data/third", b"third"),
+            ],
+            Limits::default(),
+        )?;
+        assert_eq!(
+            Catalog::from_bytes(&equal)?
+                .iter()
+                .map(Entry::name)
+                .collect::<Vec<_>>(),
+            [
+                "Data/a",
+                "Data/first",
+                "Data/second",
+                "Data/third",
+                "Data/b",
+                "Data/c",
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn insertion_preserves_untouched_raw_records_and_metadata() -> Result<()> {
+        let source = physical_two_entry_zip();
+        let catalog = Catalog::from_bytes(&source)?;
+        let before = catalog.iter().collect::<Vec<_>>();
+        let rebuilt = catalog.reassemble_with_insertions_to_bytes(
+            &[EntryInsertion::at(0, "Data/new", b"new payload")],
+            Limits::default(),
+        )?;
+        let after_catalog = Catalog::from_bytes(&rebuilt)?;
+        let after = after_catalog.iter().collect::<Vec<_>>();
+
+        assert_eq!(
+            after.iter().map(|entry| entry.name()).collect::<Vec<_>>(),
+            ["Data/new", "Untouched/a", "Opaque/entry.bin"]
+        );
+        assert_eq!(after[0].data(), b"new payload");
+        for (before, after) in before.iter().zip(after[1..].iter()) {
+            assert_eq!(after.data(), before.data());
+            assert_eq!(after.raw_name(), before.raw_name());
+            assert_eq!(after.metadata().local(), before.metadata().local());
+            assert_eq!(
+                after.metadata().central().name(),
+                before.metadata().central().name()
+            );
+            assert_eq!(
+                after.metadata().central().extra(),
+                before.metadata().central().extra()
+            );
+            assert_eq!(
+                after.metadata().central().comment(),
+                before.metadata().central().comment()
+            );
+            assert_eq!(
+                after.raw_record().local_record(),
+                before.raw_record().local_record()
+            );
+
+            let old_central = before.raw_record().central_directory_record();
+            let new_central = after.raw_record().central_directory_record();
+            assert_eq!(&new_central[..42], &old_central[..42]);
+            assert_eq!(&new_central[46..], &old_central[46..]);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn insertion_combines_with_edit_and_delete_in_one_transaction() -> Result<()> {
+        let source = physical_two_entry_zip();
+        let catalog = Catalog::from_bytes(&source)?;
+        let rebuilt = catalog.reassemble_with_changes_to_bytes(
+            &[EntryInsertion::at(0, "Data/new", b"new")],
+            &[EntryEdit::new("Opaque/entry.bin", b"edited")],
+            &["Untouched/a"],
+            Limits::default(),
+        )?;
+        let after = Catalog::from_bytes(&rebuilt)?;
+        assert_eq!(
+            after.iter().map(Entry::name).collect::<Vec<_>>(),
+            ["Data/new", "Opaque/entry.bin"]
+        );
+        assert_eq!(after.iter().next().map(Entry::data), Some(&b"new"[..]));
+        assert_eq!(after.iter().nth(1).map(Entry::data), Some(&b"edited"[..]));
+        Ok(())
+    }
+
+    #[test]
+    fn insertion_supports_a_deflated_source_and_keeps_existing_compression() -> Result<()> {
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_deflated("Compressed/data", b"old deflate payload")?;
+        writer.write_stored("Untouched/data", b"old stored payload")?;
+        let source = writer.finish_to_bytes()?;
+        let catalog = Catalog::from_bytes(&source)?;
+        let rebuilt = catalog.reassemble_with_insertions_to_bytes(
+            &[EntryInsertion::new("Data/new", b"new")],
+            Limits::default(),
+        )?;
+        let after = Catalog::from_bytes(&rebuilt)?;
+        let entries = after.iter().collect::<Vec<_>>();
+        assert_eq!(
+            entries.iter().map(|entry| entry.name()).collect::<Vec<_>>(),
+            ["Compressed/data", "Untouched/data", "Data/new"]
+        );
+        assert_eq!(entries[0].metadata().central().compression_method(), 8);
+        assert_eq!(entries[1].metadata().central().compression_method(), 0);
+        assert_eq!(entries[2].metadata().central().compression_method(), 0);
+        assert_eq!(entries[0].data(), b"old deflate payload");
+        assert_eq!(entries[1].data(), b"old stored payload");
+        assert_eq!(entries[2].data(), b"new");
+        Ok(())
+    }
+
+    #[test]
+    fn insertion_rejects_collisions_unsafe_names_and_invalid_positions() -> Result<()> {
+        let source = zip(&[("Data/a", b"a"), ("Data/b", b"b")])?;
+        let catalog = Catalog::from_bytes(&source)?;
+
+        assert!(matches!(
+            catalog.reassemble_with_insertions_to_bytes(
+                &[EntryInsertion::new("Data/a", b"duplicate")],
+                Limits::default()
+            ),
+            Err(Error::Reassembly(message)) if message.contains("duplicates")
+        ));
+        assert!(matches!(
+            catalog.reassemble_with_insertions_to_bytes(
+                &[
+                    EntryInsertion::new("Data/new", b"one"),
+                    EntryInsertion::new("Data/new", b"two"),
+                ],
+                Limits::default()
+            ),
+            Err(Error::Reassembly(message)) if message.contains("requested more than once")
+        ));
+        for name in [
+            "",
+            "/absolute",
+            "../escape",
+            "Data//empty",
+            "Data/./dot",
+            "Data\\slash",
+        ] {
+            assert!(matches!(
+                catalog.reassemble_with_insertions_to_bytes(
+                    &[EntryInsertion::new(name, b"payload")],
+                    Limits::default()
+                ),
+                Err(Error::Reassembly(message)) if message.contains("portable ZIP path")
+            ));
+        }
+        assert!(matches!(
+            catalog.reassemble_with_insertions_to_bytes(
+                &[EntryInsertion::at(3, "Data/new", b"payload")],
+                Limits::default()
+            ),
+            Err(Error::Reassembly(message)) if message.contains("exceeds")
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn insertion_preflights_entry_name_data_total_and_output_limits() -> Result<()> {
+        let source = zip(&[("Data/a", b"a"), ("Data/b", b"b")])?;
+        let catalog = Catalog::from_bytes(&source)?;
+        let source_size = u64::try_from(source.len()).map_err(|_error| {
+            Error::InvalidBundle("test ZIP length does not fit u64".to_owned())
+        })?;
+
+        let entry_limit = Limits::new(source_size + 1_000, 10, 1, 4_096, 1_024)?;
+        assert!(matches!(
+            catalog.reassemble_with_insertions_to_bytes(
+                &[EntryInsertion::new("Data/new", b"too long")],
+                entry_limit
+            ),
+            Err(Error::Limit {
+                kind: crate::LimitKind::EntryBytes,
+                ..
+            })
+        ));
+
+        let name_limit = Limits::new(source_size, 10, 4_096, 4_096, 1_024)?;
+        let long_name = format!("Data/{}", "x".repeat(source.len()));
+        assert!(matches!(
+            catalog.reassemble_with_insertions_to_bytes(
+                &[EntryInsertion::new(&long_name, b"payload")],
+                name_limit
+            ),
+            Err(Error::Limit {
+                kind: crate::LimitKind::MemberNameBytes,
+                ..
+            })
+        ));
+
+        let count_limit = Limits::new(source_size + 1_000, 2, 4_096, 4_096, 1_024)?;
+        assert!(matches!(
+            catalog.reassemble_with_insertions_to_bytes(
+                &[EntryInsertion::new("Data/new", b"payload")],
+                count_limit
+            ),
+            Err(Error::Limit {
+                kind: crate::LimitKind::Entries,
+                ..
+            })
+        ));
+
+        let total_limit = Limits::new(source_size + 1_000, 10, 4_096, 1, 1_024)?;
+        assert!(matches!(
+            catalog.reassemble_with_insertions_to_bytes(
+                &[EntryInsertion::new("Data/new", b"payload")],
+                total_limit
+            ),
+            Err(Error::Limit {
+                kind: crate::LimitKind::TotalBytes,
+                ..
+            })
+        ));
+
+        let output_limit = Limits::new(source_size, 10, 4_096, 4_096, 1_024)?;
+        assert!(matches!(
+            catalog.reassemble_with_insertions_to_bytes(
+                &[EntryInsertion::new("Data/new", b"payload")],
+                output_limit
+            ),
+            Err(Error::Limit {
+                kind: crate::LimitKind::OutputBytes,
+                ..
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_insertions_report_and_enforce_allocation_requirements() -> Result<()> {
+        let source = zip(&[("Data/a", b"a"), ("Data/b", b"b")])?;
+        let catalog = Catalog::from_bytes(&source)?;
+        let insertions = [EntryInsertion::at(1, "Data/new", b"payload")];
+        let prepared =
+            catalog.prepare_reassembly_with_insertions(&insertions, Limits::default())?;
+        let requirements = prepared.execution_requirements();
+        assert_eq!(requirements.offset_count(), 3);
+        assert_eq!(requirements.scratch_bytes(), 3 * size_of::<Option<u64>>());
+        assert_eq!(requirements.allocations(), 2);
+        let output = prepared.execute(requirements.exact_limits())?;
+        assert_eq!(Catalog::from_bytes(&output)?.len(), 3);
+
+        let prepared =
+            catalog.prepare_reassembly_with_insertions(&insertions, Limits::default())?;
+        let requirements = prepared.execution_requirements();
+        let mut limits = requirements.exact_limits();
+        limits.max_output_bytes = requirements.output_bytes() - 1;
+        assert!(matches!(
+            prepared.execute(limits),
+            Err(Error::Limit {
+                kind: crate::LimitKind::OutputBytes,
+                ..
+            })
+        ));
+
+        let prepared =
+            catalog.prepare_reassembly_with_insertions(&insertions, Limits::default())?;
+        let requirements = prepared.execution_requirements();
+        let mut limits = requirements.exact_limits();
+        limits.max_offset_count = requirements.offset_count() - 1;
+        assert!(matches!(
+            prepared.execute(limits),
+            Err(Error::Allocation {
+                resource: "reassembled ZIP local offsets",
+                ..
+            })
+        ));
+
+        let prepared =
+            catalog.prepare_reassembly_with_insertions(&insertions, Limits::default())?;
+        let requirements = prepared.execution_requirements();
+        let mut limits = requirements.exact_limits();
+        limits.max_scratch_bytes = requirements.scratch_bytes() - 1;
+        assert!(matches!(
+            prepared.execute(limits),
+            Err(Error::Allocation {
+                resource: "reassembled ZIP scratch bytes",
+                ..
+            })
+        ));
+
+        let prepared =
+            catalog.prepare_reassembly_with_insertions(&insertions, Limits::default())?;
+        let mut limits = prepared.execution_requirements().exact_limits();
+        limits.max_allocations = 1;
+        assert!(matches!(
+            prepared.execute(limits),
+            Err(Error::Allocation {
+                resource: "reassembled ZIP allocation events",
+                ..
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn insertion_failures_leave_sink_and_source_untouched_and_empty_is_exact_noop() -> Result<()> {
+        let source = zip(&[("Data/a", b"a"), ("Data/b", b"b")])?;
+        let catalog = Catalog::from_bytes(&source)?;
+        let original_sink = vec![0xde, 0xad, 0xbe, 0xef];
+        let mut sink = original_sink.clone();
+        assert!(matches!(
+            catalog.write_reassembled_with_changes_to(
+                &[EntryInsertion::new("../bad", b"payload")],
+                &[],
+                &[],
+                &mut sink,
+                Limits::default()
+            ),
+            Err(Error::Reassembly(_))
+        ));
+        assert_eq!(sink, original_sink);
+        assert_eq!(catalog.to_bytes()?, source);
+
+        assert_eq!(
+            catalog.reassemble_with_insertions_to_bytes(&[], Limits::default())?,
+            source
+        );
+        let prepared = catalog.prepare_reassembly_with_insertions(&[], Limits::default())?;
+        assert_eq!(prepared.execution_requirements().offset_count(), 0);
+        let requirements = prepared.execution_requirements();
+        assert_eq!(prepared.execute(requirements.exact_limits())?, source);
         Ok(())
     }
 }
