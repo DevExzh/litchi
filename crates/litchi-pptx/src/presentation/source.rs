@@ -95,6 +95,25 @@ impl SourcePart {
         }
     }
 
+    fn from_binding(binding: &PartBinding, data: PartData) -> Self {
+        let mut rels = Relationships::new(binding.uri.base_uri().to_string());
+        for relationship in binding.relationships.iter() {
+            rels.add_relationship(
+                relationship.kind.clone(),
+                relationship.target.clone(),
+                relationship.id.clone(),
+                relationship.mode == TargetMode::External,
+            );
+        }
+        Self {
+            partname: binding.uri.clone(),
+            content_type: binding.content_type.clone(),
+            data,
+            replacement: None,
+            rels,
+        }
+    }
+
     pub(super) fn source_data(&self) -> &PartData {
         &self.data
     }
@@ -540,6 +559,43 @@ pub struct SourceBackedSlideBatchPatch {
 pub struct SourceBackedSlideBatchCommit {
     snapshot: SourceBackedSlideBatchSnapshot,
     patch: SourceBackedSlideBatchPatch,
+}
+
+enum FastApply<T> {
+    Applied(T),
+    Recapture,
+}
+
+#[cfg(test)]
+thread_local! {
+    static TEST_SEMANTIC_SCENE_READS: Cell<usize> = const { Cell::new(0) };
+    static TEST_SEMANTIC_SLIDE_PART_READS: Cell<usize> = const { Cell::new(0) };
+}
+
+#[cfg(test)]
+fn reset_test_semantic_scene_reads() {
+    TEST_SEMANTIC_SCENE_READS.with(|count| count.set(0));
+    TEST_SEMANTIC_SLIDE_PART_READS.with(|count| count.set(0));
+}
+
+#[cfg(test)]
+fn test_semantic_scene_reads() -> usize {
+    TEST_SEMANTIC_SCENE_READS.with(Cell::get)
+}
+
+#[cfg(test)]
+fn test_semantic_slide_part_reads() -> usize {
+    TEST_SEMANTIC_SLIDE_PART_READS.with(Cell::get)
+}
+
+#[cfg(test)]
+fn record_test_semantic_scene_read() {
+    TEST_SEMANTIC_SCENE_READS.with(|count| count.set(count.get().saturating_add(1)));
+}
+
+#[cfg(test)]
+fn record_test_semantic_slide_part_read() {
+    TEST_SEMANTIC_SLIDE_PART_READS.with(|count| count.set(count.get().saturating_add(1)));
 }
 
 impl SourceBackedPresentation {
@@ -1296,16 +1352,28 @@ impl SourceBackedPresentationEditor {
         commit: &SourceBackedSlideCommit,
     ) -> Result<SourceBackedSlideSnapshot> {
         self.package.check_execution()?;
-        let current = self.slide_snapshot_for(
-            commit.patch.source().position,
-            "publish_slide_commit_to_stream",
-        )?;
-        let target = commit.patch.apply(&current)?;
+        let current = self
+            .publication_raw_slide_snapshot_from_retained_catalog(commit.patch.source().position)?;
+        let publication_uri = current.part_uri.clone();
+        let target = match commit.patch.try_apply_fast(&current)? {
+            FastApply::Applied(target) => {
+                drop(current);
+                target
+            },
+            FastApply::Recapture => {
+                drop(current);
+                let current = self.slide_snapshot_for(
+                    commit.patch.source().position,
+                    "publish_slide_commit_to_stream",
+                )?;
+                commit.patch.apply(&current)?
+            },
+        };
         self.package.check_execution()?;
         if let Some(replacement) = target.xml.edited_bytes() {
             self.package.write_part_overlay_shared_to_stream(
                 writer,
-                &current.part_uri,
+                &publication_uri,
                 replacement,
             )?;
         } else {
@@ -1336,15 +1404,35 @@ impl SourceBackedPresentationEditor {
                 source,
             })?;
         for source in commit.patch.source().slides() {
-            slides.push(self.slide_snapshot_from_retained_catalog(
-                source.position,
-                "publish_slide_batch_commit_to_stream",
-            )?);
+            match self.publication_raw_slide_snapshot_from_retained_catalog(source.position) {
+                Ok(snapshot) => slides.push(snapshot),
+                Err(error) if slides.is_empty() => return Err(error),
+                Err(error) => {
+                    let raw_read_count = slides.len();
+                    let original_error = error;
+                    for snapshot in slides.drain(..).take(raw_read_count) {
+                        self.validate_retained_raw_slide_snapshot(
+                            snapshot,
+                            "publish_slide_batch_commit_to_stream",
+                        )?;
+                    }
+                    return Err(original_error);
+                },
+            }
         }
         let current = SourceBackedSlideBatchSnapshot {
             slides: slides.into_boxed_slice(),
         };
-        let target = commit.patch.apply(&current)?;
+        let target = match commit.patch.try_apply_fast(&current)? {
+            FastApply::Applied(target) => {
+                drop(current);
+                target
+            },
+            FastApply::Recapture => {
+                drop(current);
+                self.recapture_and_apply_slide_batch(&commit.patch)?
+            },
+        };
         self.package.check_execution()?;
         let mut replacements = Vec::new();
         let changed_slides = target
@@ -1367,6 +1455,108 @@ impl SourceBackedPresentationEditor {
         self.package
             .write_part_overlays_shared_to_stream(writer, replacements)?;
         Ok(target)
+    }
+
+    fn recapture_and_apply_slide_batch(
+        &self,
+        patch: &SourceBackedSlideBatchPatch,
+    ) -> Result<SourceBackedSlideBatchSnapshot> {
+        let mut slides = Vec::new();
+        slides
+            .try_reserve_exact(patch.source().slide_count())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed slide batch publication snapshot",
+                source,
+            })?;
+        for source in patch.source().slides() {
+            slides.push(self.slide_snapshot_from_retained_catalog(
+                source.position,
+                "publish_slide_batch_commit_to_stream",
+            )?);
+        }
+        let current = SourceBackedSlideBatchSnapshot {
+            slides: slides.into_boxed_slice(),
+        };
+        patch.apply(&current)
+    }
+
+    fn validate_retained_raw_slide_snapshot(
+        &self,
+        snapshot: SourceBackedSlideSnapshot,
+        operation: &'static str,
+    ) -> Result<()> {
+        self.package.check_execution()?;
+        let SourceBackedSlideSnapshot { closure, xml, .. } = snapshot;
+        let SourcePayload::Original(raw) = xml else {
+            return Err(Error::UnsafeEdit {
+                operation,
+                reason: "publication raw snapshot must retain original source bytes",
+            });
+        };
+        let part = SourcePart::from_binding(&closure.slide.slide, raw);
+        #[cfg(test)]
+        record_test_semantic_slide_part_read();
+        SlidePart::from_part(&part)?;
+        #[cfg(test)]
+        record_test_semantic_scene_read();
+        let scene = crate::shape::Scene::read(part.source_data().as_bytes())?;
+        self.package.check_execution()?;
+        let _source_version = self.package.source_version()?;
+        if scene.is_rewritten() {
+            return Err(Error::UnsafeEdit {
+                operation,
+                reason: "source-backed slide edits do not support markup-compatibility branch selection",
+            });
+        }
+        Ok(())
+    }
+
+    fn publication_raw_slide_snapshot_from_retained_catalog(
+        &self,
+        position: usize,
+    ) -> Result<SourceBackedSlideSnapshot> {
+        self.package.check_execution()?;
+        let data = self
+            .slides
+            .get(position)
+            .ok_or(Error::SlideIndexOutOfBounds {
+                index: position,
+                len: self.slides.len(),
+            })?;
+        let view = self.package.part(&data.part_uri)?;
+        let raw = view.data()?;
+        self.package.check_execution()?;
+        let lineage = self.package.source_lineage();
+        let context = self.package.execution_context();
+        let source_version = match self.package.source_version() {
+            Ok(source_version) => source_version,
+            Err(error) => {
+                let part = SourcePart::from_view(&view, raw.clone());
+                #[cfg(test)]
+                record_test_semantic_slide_part_read();
+                SlidePart::from_part(&part)?;
+                #[cfg(test)]
+                record_test_semantic_scene_read();
+                let _scene = crate::shape::Scene::read(raw.as_bytes())?;
+                self.package.check_execution()?;
+                return Err(error.into());
+            },
+        };
+        Ok(SourceBackedSlideSnapshot {
+            position,
+            part_uri: data.part_uri.clone(),
+            xml: SourcePayload::Original(raw),
+            closure: SlideClosure {
+                package_relationships: self.package_relationships.clone(),
+                presentation: self.presentation_binding.clone(),
+                presentation_xml: self._presentation.data.clone(),
+                slide: data.binding.clone(),
+            },
+            max_output_bytes: source_slide_output_limit(self.limits),
+            source_version,
+            lineage,
+            context,
+        })
     }
 
     fn slide_snapshot_for(
@@ -1399,7 +1589,11 @@ impl SourceBackedPresentationEditor {
         let lineage = self.package.source_lineage();
         let context = self.package.execution_context();
         let part = SourcePart::from_view(&view, raw.clone());
+        #[cfg(test)]
+        record_test_semantic_slide_part_read();
         SlidePart::from_part(&part)?;
+        #[cfg(test)]
+        record_test_semantic_scene_read();
         let scene = crate::shape::Scene::read(raw.as_bytes())?;
         self.package.check_execution()?;
         let source_version = self.package.source_version()?;
@@ -1652,6 +1846,16 @@ impl SourceBackedSlidePatch {
         }
     }
 
+    fn try_apply_fast(
+        &self,
+        source: &SourceBackedSlideSnapshot,
+    ) -> Result<FastApply<SourceBackedSlideSnapshot>> {
+        if !source.same_source(&self.before) {
+            return Ok(FastApply::Recapture);
+        }
+        self.apply(source).map(FastApply::Applied)
+    }
+
     /// Apply only to the exact raw slide source captured by this patch.
     pub fn apply(&self, source: &SourceBackedSlideSnapshot) -> Result<SourceBackedSlideSnapshot> {
         self.before.check_execution()?;
@@ -1864,6 +2068,16 @@ impl SourceBackedSlideBatchPatch {
             before: self.after.clone(),
             after: self.before.clone(),
         }
+    }
+
+    fn try_apply_fast(
+        &self,
+        source: &SourceBackedSlideBatchSnapshot,
+    ) -> Result<FastApply<SourceBackedSlideBatchSnapshot>> {
+        if !source.same_source(&self.before) {
+            return Ok(FastApply::Recapture);
+        }
+        self.apply(source).map(FastApply::Applied)
     }
 
     /// Apply only to the exact selected slide set captured by this patch.
@@ -2713,8 +2927,11 @@ mod tests {
     use tempfile::NamedTempFile;
 
     use super::{
-        SourceBackedPresentation, SourceBackedPresentationEditor, SourceImageTarget,
-        reset_source_catalog_builds, source_catalog_builds,
+        SourceBackedPresentation, SourceBackedPresentationEditor, SourceBackedSlideBatchCommit,
+        SourceBackedSlideBatchPatch, SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit,
+        SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceImageTarget, SourcePayload,
+        reset_source_catalog_builds, reset_test_semantic_scene_reads, source_catalog_builds,
+        test_semantic_scene_reads, test_semantic_slide_part_reads,
     };
     use crate::Error;
 
@@ -2938,6 +3155,61 @@ mod tests {
             .write_stored("ppt/slides/slide2.xml", second.as_bytes())
             .unwrap();
         writer.finish_to_bytes().unwrap()
+    }
+
+    fn changed_slide_snapshots(
+        editor: &SourceBackedPresentationEditor,
+        position: usize,
+        old: &str,
+        new: &str,
+    ) -> (SourceBackedSlideSnapshot, SourceBackedSlideSnapshot) {
+        let before = editor.slide_snapshot(position).unwrap();
+        let source = String::from_utf8(before.xml.as_bytes().to_vec()).unwrap();
+        let after_xml = source.replacen(old, new, 1).into_bytes();
+        assert_ne!(after_xml, before.xml.as_bytes());
+        let after = SourceBackedSlideSnapshot {
+            position: before.position,
+            part_uri: before.part_uri.clone(),
+            xml: SourcePayload::Edited(Arc::new(after_xml)),
+            closure: before.closure.clone(),
+            max_output_bytes: before.max_output_bytes,
+            source_version: before.source_version,
+            lineage: before.lineage.clone(),
+            context: before.context.clone(),
+        };
+        (before, after)
+    }
+
+    fn changed_slide_commit(
+        editor: &SourceBackedPresentationEditor,
+        position: usize,
+        old: &str,
+        new: &str,
+    ) -> SourceBackedSlideCommit {
+        let (before, after) = changed_slide_snapshots(editor, position, old, new);
+        SourceBackedSlideCommit {
+            snapshot: after.clone(),
+            patch: SourceBackedSlidePatch { before, after },
+        }
+    }
+
+    fn changed_slide_batch_commit(
+        editor: &SourceBackedPresentationEditor,
+    ) -> SourceBackedSlideBatchCommit {
+        let (before_first, after_first) =
+            changed_slide_snapshots(editor, 0, "First slide", "Updated slide");
+        let (before_second, after_second) =
+            changed_slide_snapshots(editor, 1, "Second slide", "Changed slide");
+        let before = SourceBackedSlideBatchSnapshot {
+            slides: vec![before_first, before_second].into_boxed_slice(),
+        };
+        let after = SourceBackedSlideBatchSnapshot {
+            slides: vec![after_first, after_second].into_boxed_slice(),
+        };
+        SourceBackedSlideBatchCommit {
+            snapshot: after.clone(),
+            patch: SourceBackedSlideBatchPatch { before, after },
+        }
     }
 
     fn source_backed_pptx_with_core_properties() -> Vec<u8> {
@@ -3251,6 +3523,70 @@ mod tests {
             .unwrap();
         assert_eq!(source_catalog_builds(), 1);
         assert_eq!(output, archive);
+    }
+
+    #[test]
+    fn changed_single_publication_reuses_semantic_snapshot() {
+        reset_test_semantic_scene_reads();
+        let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+        let commit = changed_slide_commit(&editor, 0, "First slide", "Updated slide");
+        assert_eq!(test_semantic_scene_reads(), 1);
+        assert_eq!(test_semantic_slide_part_reads(), 1);
+
+        let mut output = Vec::new();
+        editor
+            .publish_slide_commit_to_stream(&mut output, &commit)
+            .unwrap();
+        assert_eq!(test_semantic_scene_reads(), 1);
+        assert_eq!(test_semantic_slide_part_reads(), 1);
+    }
+
+    #[test]
+    fn changed_multi_slide_batch_publication_reuses_semantic_snapshots() {
+        reset_test_semantic_scene_reads();
+        let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+        let commit = changed_slide_batch_commit(&editor);
+        assert_eq!(test_semantic_scene_reads(), 2);
+        assert_eq!(test_semantic_slide_part_reads(), 2);
+
+        let mut output = Vec::new();
+        editor
+            .publish_slide_batch_commit_to_stream(&mut output, &commit)
+            .unwrap();
+        assert_eq!(test_semantic_scene_reads(), 2);
+        assert_eq!(test_semantic_slide_part_reads(), 2);
+    }
+
+    #[test]
+    fn foreign_identical_source_recaptures_semantically_before_rejecting() {
+        reset_test_semantic_scene_reads();
+        let archive = source_backed_pptx();
+        let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            archive.clone(),
+        )))
+        .unwrap();
+        let commit = changed_slide_commit(&editor, 0, "First slide", "Updated slide");
+        assert_eq!(test_semantic_scene_reads(), 1);
+        assert_eq!(test_semantic_slide_part_reads(), 1);
+
+        reset_test_semantic_scene_reads();
+        let foreign =
+            SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(archive)))
+                .unwrap();
+        let mut output = Vec::new();
+        assert!(matches!(
+            foreign.publish_slide_commit_to_stream(&mut output, &commit),
+            Err(Error::StaleSource)
+        ));
+        assert_eq!(test_semantic_scene_reads(), 1);
+        assert_eq!(test_semantic_slide_part_reads(), 1);
+        assert!(output.is_empty());
     }
 
     #[test]
