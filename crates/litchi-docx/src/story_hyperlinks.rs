@@ -658,23 +658,6 @@ impl Snapshot {
             },
         })
     }
-
-    fn exact_source_matches(&self, other: &Self) -> bool {
-        self.source_lineage == other.source_lineage
-            && self.source_version == other.source_version
-            && self.source_fingerprint == other.source_fingerprint
-            && self.stories.len() == other.stories.len()
-            && self
-                .stories
-                .iter()
-                .zip(other.stories.iter())
-                .all(|(left, right)| {
-                    left.part == right.part
-                        && left.kind == right.kind
-                        && left.xml.as_bytes() == right.xml.as_bytes()
-                        && left.relationships.as_ref() == right.relationships.as_ref()
-                })
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -867,16 +850,29 @@ pub(crate) struct ForwardOnlyPatch {
 }
 
 impl ForwardOnlyPatch {
-    pub(crate) fn validate_source(&self, current: &Snapshot) -> Result<()> {
-        if self.source.exact_source_matches(current) {
-            Ok(())
-        } else {
-            Err(Error::ExternalHyperlinkRedactionConflict)
+    pub(crate) fn validate_source_identity(&self, package: &SourceBackedPackage) -> Result<()> {
+        package.check_execution()?;
+        let current_version = package.source_version()?;
+        if self.source.source_version != current_version
+            || self.source.source_lineage != package.source_lineage()
+        {
+            return Err(Error::ExternalHyperlinkRedactionConflict);
         }
-    }
 
-    pub(crate) const fn limits(&self) -> Limits {
-        self.source.limits
+        let current_fingerprint = package.source_artifact().fingerprint()?;
+        let observed_version = package.source_version()?;
+        if observed_version != current_version {
+            return Err(litchi_opc::OpcError::SourceChanged {
+                expected: current_version,
+                actual: observed_version,
+            }
+            .into());
+        }
+        if self.source.source_fingerprint != current_fingerprint {
+            return Err(Error::ExternalHyperlinkRedactionConflict);
+        }
+        package.check_execution()?;
+        Ok(())
     }
 }
 
@@ -920,8 +916,42 @@ pub(crate) fn publication_parts(commit: &Commit) -> Result<Vec<(PackURI, Vec<u8>
     Ok(parts)
 }
 
+#[cfg(test)]
+thread_local! {
+    static TEST_CAPTURE_COUNTS: std::cell::Cell<(usize, usize)> =
+        const { std::cell::Cell::new((0, 0)) };
+}
+
+#[cfg(test)]
+fn reset_capture_test_counts() {
+    TEST_CAPTURE_COUNTS.with(|counts| counts.set((0, 0)));
+}
+
+#[cfg(test)]
+fn capture_test_counts() -> (usize, usize) {
+    TEST_CAPTURE_COUNTS.with(|counts| counts.get())
+}
+
+#[cfg(test)]
+fn record_capture_source_call() {
+    TEST_CAPTURE_COUNTS.with(|counts| {
+        let (captures, stories) = counts.get();
+        counts.set((captures.saturating_add(1), stories));
+    });
+}
+
+#[cfg(test)]
+fn record_load_story_call() {
+    TEST_CAPTURE_COUNTS.with(|counts| {
+        let (captures, stories) = counts.get();
+        counts.set((captures, stories.saturating_add(1)));
+    });
+}
+
 /// Capture the exact source closure behind the public source-backed methods.
 pub(crate) fn capture_source(package: &SourceBackedPackage, limits: Limits) -> Result<Snapshot> {
+    #[cfg(test)]
+    record_capture_source_call();
     let limits = limits.validate()?;
     package.check_execution()?;
     let source_version = package.source_version()?;
@@ -1315,6 +1345,8 @@ fn load_story(
     limits: Limits,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Result<StorySource> {
+    #[cfg(test)]
+    record_load_story_call();
     // Keep the bounded PartData handle intact.  In particular, managed
     // source-backed packages reject `into_arc()` so the execution-budget
     // reservation cannot escape with an untracked allocation.
@@ -2127,6 +2159,51 @@ fn limit(resource: &'static str, maximum: usize, actual: usize) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_opc::Part;
+
+    fn source_backed_test_package() -> crate::source_backed::Package {
+        let mut package = litchi_opc::OpcPackage::new();
+        let mut main = litchi_opc::BlobPart::new(
+            PackURI::new("/word/document.xml").unwrap(),
+            litchi_opc::constants::content_type::WML_DOCUMENT_MAIN.to_owned(),
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p><w:hyperlink r:id="rLink"><w:r><w:t>text</w:t></w:r></w:hyperlink></w:p></w:body></w:document>"#.to_vec(),
+        );
+        main.rels_mut()
+            .try_add_relationship(
+                litchi_opc::constants::relationship_type::HYPERLINK.to_owned(),
+                "https://capture.invalid/".to_owned(),
+                "rLink".to_owned(),
+                litchi_opc::TargetMode::External,
+            )
+            .unwrap();
+        package.try_add_part(Box::new(main)).unwrap();
+        package.relate_to(
+            "word/document.xml",
+            litchi_opc::constants::relationship_type::OFFICE_DOCUMENT,
+        );
+        let bytes = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
+        crate::source_backed::Package::from_read_at(Arc::new(litchi_core::OwnedSource::new(bytes)))
+            .unwrap()
+    }
+
+    #[test]
+    fn publication_reuses_the_planned_story_snapshot() {
+        let package = source_backed_test_package();
+        reset_capture_test_counts();
+        let commit = package
+            .plan_story_hyperlink_redaction(&["https://capture.invalid/"], Mode::Strict)
+            .unwrap()
+            .apply()
+            .unwrap();
+        assert_eq!(capture_test_counts(), (1, 1));
+
+        let mut output = Vec::new();
+        package
+            .publish_story_hyperlink_redaction_to_stream(&mut output, &commit)
+            .unwrap();
+        assert!(!output.is_empty());
+        assert_eq!(capture_test_counts(), (1, 1));
+    }
 
     fn story(part_name: &str) -> StoryInfo {
         StoryInfo {
