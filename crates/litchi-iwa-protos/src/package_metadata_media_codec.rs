@@ -211,6 +211,14 @@ pub struct DecodeError {
 }
 
 impl DecodeError {
+    /// Construct a content-free invalid-source error for a strict adapter
+    /// visitor that cannot retain a richer parser diagnostic.
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn invalid_for_adapter() -> Self {
+        Self::invalid(InvalidReason::Verification)
+    }
+
     #[must_use]
     pub const fn resource_limit(self) -> Option<DecodeLimit> {
         self.limit
@@ -1965,6 +1973,62 @@ fn owner_removal_conflicts_with_addition(
     })
 }
 
+fn owner_update_duplicate(
+    updates: &[DataReferenceOwnerCountUpdate<'_>],
+    index: usize,
+    update: DataReferenceOwnerCountUpdate<'_>,
+) -> bool {
+    updates[..index].iter().any(|candidate| {
+        same_component(candidate.component, update.component)
+            && candidate.data_identifier == update.data_identifier
+            && candidate.object_identifier == update.object_identifier
+    })
+}
+
+fn owner_update_conflicts_with_addition(
+    update: DataReferenceOwnerCountUpdate<'_>,
+    additions: &[DataReferenceOwnerAddition<'_>],
+) -> bool {
+    additions.iter().any(|addition| {
+        same_component(addition.component, update.component)
+            && addition.data_identifier == update.data_identifier
+            && addition.object_identifier == update.object_identifier
+    })
+}
+
+fn owner_update_conflicts_with_removal(
+    update: DataReferenceOwnerCountUpdate<'_>,
+    removals: &[DataReferenceOwnerRemoval<'_>],
+) -> bool {
+    removals.iter().any(|removal| {
+        same_component(removal.component, update.component)
+            && removal.data_identifier == update.data_identifier
+            && removal.object_identifier == update.object_identifier
+    })
+}
+
+fn owner_addition_conflicts_with_update(
+    addition: DataReferenceOwnerAddition<'_>,
+    updates: &[DataReferenceOwnerCountUpdate<'_>],
+) -> bool {
+    updates.iter().any(|update| {
+        same_component(addition.component, update.component)
+            && addition.data_identifier == update.data_identifier
+            && addition.object_identifier == update.object_identifier
+    })
+}
+
+fn owner_removal_conflicts_with_update(
+    removal: DataReferenceOwnerRemoval<'_>,
+    updates: &[DataReferenceOwnerCountUpdate<'_>],
+) -> bool {
+    updates.iter().any(|update| {
+        same_component(removal.component, update.component)
+            && removal.data_identifier == update.data_identifier
+            && removal.object_identifier == update.object_identifier
+    })
+}
+
 fn data_present_after(
     source_count: usize,
     identifier: u64,
@@ -1995,6 +2059,7 @@ fn validate_batch(
         .checked_add(batch.data_removals.len())
         .and_then(|value| value.checked_add(batch.owner_additions.len()))
         .and_then(|value| value.checked_add(batch.owner_removals.len()))
+        .and_then(|value| value.checked_add(batch.owner_updates.len()))
         .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
     if operation_count > options.max_fields {
         return Err(RewriteError::limited(DecodeLimit::Fields {
@@ -2058,6 +2123,7 @@ fn validate_batch(
         }
         if owner_addition_duplicate(batch.owner_additions, index, addition)
             || owner_addition_conflicts_with_removal(addition, batch.owner_removals)
+            || owner_addition_conflicts_with_update(addition, batch.owner_updates)
         {
             return Err(RewriteError::invalid(InvalidReason::DuplicateOperation));
         }
@@ -2104,6 +2170,7 @@ fn validate_batch(
         }
         if owner_removal_duplicate(batch.owner_removals, index, removal)
             || owner_removal_conflicts_with_addition(removal, batch.owner_additions)
+            || owner_removal_conflicts_with_update(removal, batch.owner_updates)
         {
             return Err(RewriteError::invalid(InvalidReason::DuplicateOperation));
         }
@@ -2124,6 +2191,55 @@ fn validate_batch(
         }
         if facts.owners != 1 || facts.owner_count != removal.expected_count as usize {
             return Err(RewriteError::invalid(InvalidReason::ExistingOwnerCollision));
+        }
+    }
+
+    for (index, update) in batch.owner_updates.iter().copied().enumerate() {
+        validate_nonzero(update.component.identifier)?;
+        validate_nonzero(update.data_identifier)?;
+        validate_nonzero(update.object_identifier)?;
+        if update.expected_count == 0 || update.new_count == 0 {
+            return Err(RewriteError::invalid(InvalidReason::InvalidIdentifier));
+        }
+        if owner_update_duplicate(batch.owner_updates, index, update)
+            || owner_update_conflicts_with_addition(update, batch.owner_additions)
+            || owner_update_conflicts_with_removal(update, batch.owner_removals)
+        {
+            return Err(RewriteError::invalid(InvalidReason::ConflictingOperation));
+        }
+        let (components, unknown) = operation_component_matches(source, update.component, options)?;
+        if components == 0 {
+            return Err(RewriteError::invalid(InvalidReason::ComponentNotFound));
+        }
+        if unknown {
+            return Err(RewriteError::invalid(InvalidReason::UnknownSelectedRecord));
+        }
+        let facts = owner_matches(
+            source,
+            update.component,
+            update.data_identifier,
+            update.object_identifier,
+        )?;
+        if facts.components == 0 {
+            return Err(RewriteError::invalid(InvalidReason::ComponentNotFound));
+        }
+        if facts.component_unknown || facts.parent_unknown {
+            return Err(RewriteError::invalid(InvalidReason::UnknownSelectedRecord));
+        }
+        if facts.parents == 0 || facts.owners == 0 {
+            return Err(RewriteError::invalid(InvalidReason::OwnerNotFound));
+        }
+        if facts.owners != 1 || facts.owner_count != update.expected_count as usize {
+            return Err(RewriteError::invalid(InvalidReason::ExistingOwnerCollision));
+        }
+        let (data_count, _unknown) = data_info_matches(source, update.data_identifier, options)?;
+        if !data_present_after(
+            data_count,
+            update.data_identifier,
+            batch.data_additions,
+            batch.data_removals,
+        ) {
+            return Err(RewriteError::invalid(InvalidReason::DataInfoNotFound));
         }
     }
     Ok(())
@@ -2153,6 +2269,18 @@ fn owner_removals_for<'a>(
     })
 }
 
+fn owner_updates_for<'a>(
+    updates: &'a [DataReferenceOwnerCountUpdate<'a>],
+    component: ComponentSnapshot<'a>,
+    data_identifier: u64,
+) -> impl Iterator<Item = DataReferenceOwnerCountUpdate<'a>> + 'a {
+    updates.iter().copied().filter(move |update| {
+        update.component.identifier == component.identifier
+            && update.component.locator == component.effective_locator()
+            && update.data_identifier == data_identifier
+    })
+}
+
 fn component_rewrite_needed(
     component: ComponentSnapshot<'_>,
     batch: MediaRewriteBatch<'_>,
@@ -2163,6 +2291,9 @@ fn component_rewrite_needed(
     }) || batch.owner_removals.iter().any(|removal| {
         removal.component.identifier == component.identifier
             && removal.component.locator == component.effective_locator()
+    }) || batch.owner_updates.iter().any(|update| {
+        update.component.identifier == component.identifier
+            && update.component.locator == component.effective_locator()
     })
 }
 
@@ -2182,6 +2313,47 @@ fn original_parent_exists(payload: &[u8], data_identifier: u64) -> Result<bool, 
         }
     }
     Ok(found)
+}
+
+/// Rewrite only the selected owner count while retaining the source ordering
+/// and byte representation of every other known field.  Selected owner
+/// records with unknown fields are rejected during validation, so this helper
+/// never has to guess how an extension interacts with the count transition.
+fn emit_rewritten_owner<S: Sink>(
+    sink: &mut S,
+    payload: &[u8],
+    update: DataReferenceOwnerCountUpdate<'_>,
+    maximum: usize,
+) -> Result<(), RewriteError> {
+    let mut inner = CountSink { len: 0 };
+    for result in fields(payload) {
+        let field = result.map_err(map_decode)?;
+        if field.number == OWNER_COUNT_FIELD {
+            emit_varint_field(
+                &mut inner,
+                OWNER_COUNT_FIELD,
+                u64::from(update.new_count),
+                usize::MAX,
+            )?;
+        } else {
+            inner.emit(field_bytes(payload, field), usize::MAX)?;
+        }
+    }
+    emit_field_header(sink, OWNER_COUNT_FIELD, 2, inner.len, maximum)?;
+    for result in fields(payload) {
+        let field = result.map_err(map_decode)?;
+        if field.number == OWNER_COUNT_FIELD {
+            emit_varint_field(
+                sink,
+                OWNER_COUNT_FIELD,
+                u64::from(update.new_count),
+                maximum,
+            )?;
+        } else {
+            sink.emit(field_bytes(payload, field), maximum)?;
+        }
+    }
+    Ok(())
 }
 
 fn emit_rewritten_data_reference<S: Sink>(
@@ -2213,6 +2385,17 @@ fn emit_rewritten_data_reference<S: Sink>(
             retained_owners = retained_owners
                 .checked_add(1)
                 .ok_or_else(|| RewriteError::invalid(InvalidReason::MalformedWire))?;
+            if let Some(update) =
+                owner_updates_for(batch.owner_updates, component, facts.data_identifier).find(
+                    |update| {
+                        update.object_identifier == owner.object_identifier
+                            && update.expected_count == owner.count
+                    },
+                )
+            {
+                emit_rewritten_owner(&mut inner, field.payload(payload), update, usize::MAX)?;
+                continue;
+            }
         }
         inner.emit(field_bytes(payload, field), usize::MAX)?;
     }
@@ -2238,6 +2421,17 @@ fn emit_rewritten_data_reference<S: Sink>(
                         && removal.expected_count == owner.count
                 });
             if remove {
+                continue;
+            }
+            if let Some(update) =
+                owner_updates_for(batch.owner_updates, component, facts.data_identifier).find(
+                    |update| {
+                        update.object_identifier == owner.object_identifier
+                            && update.expected_count == owner.count
+                    },
+                )
+            {
+                emit_rewritten_owner(sink, field.payload(payload), update, maximum)?;
                 continue;
             }
         }
@@ -2311,6 +2505,9 @@ fn rewrite_component<S: Sink>(
                     .next()
                     .is_some()
                     || owner_removals_for(batch.owner_removals, component, facts.data_identifier)
+                        .next()
+                        .is_some()
+                    || owner_updates_for(batch.owner_updates, component, facts.data_identifier)
                         .next()
                         .is_some();
             if has_ops {
@@ -2443,6 +2640,21 @@ fn verify_postconditions(
             return Err(RewriteError::invalid(InvalidReason::Verification));
         }
     }
+    for update in batch.owner_updates.iter().copied() {
+        let facts = owner_matches(
+            candidate,
+            update.component,
+            update.data_identifier,
+            update.object_identifier,
+        )?;
+        if facts.components != 1
+            || facts.parents != 1
+            || facts.owners != 1
+            || facts.owner_count != update.new_count as usize
+        {
+            return Err(RewriteError::invalid(InvalidReason::Verification));
+        }
+    }
     Ok(())
 }
 
@@ -2518,6 +2730,7 @@ impl PreparedPackageMetadataMediaRewrite<'_> {
                 data_removals: self.batch.data_removals.len(),
                 owner_additions: self.batch.owner_additions.len(),
                 owner_removals: self.batch.owner_removals.len(),
+                owner_updates: self.batch.owner_updates.len(),
                 allocations: 1,
                 retained_bytes: self.output_size,
                 scratch_bytes: 0,
@@ -2598,7 +2811,8 @@ pub fn prepare_package_metadata_media_rewrite<'source>(
     let fields = source_report
         .fields
         .saturating_mul(3)
-        .saturating_add(batch.data_additions.len().saturating_mul(5));
+        .saturating_add(batch.data_additions.len().saturating_mul(5))
+        .saturating_add(batch.owner_updates.len().saturating_mul(5));
     // Preparation scans the source once, sizes the raw-preserving stream,
     // and execution writes plus verifies one candidate.  Charge the source
     // scan and two output-width passes; this is finite, deterministic, and
@@ -2622,7 +2836,10 @@ pub fn prepare_package_metadata_media_rewrite<'source>(
     if !batch.data_additions.is_empty() {
         candidate_depth = candidate_depth.max(2);
     }
-    if !batch.owner_additions.is_empty() || !batch.owner_removals.is_empty() {
+    if !batch.owner_additions.is_empty()
+        || !batch.owner_removals.is_empty()
+        || !batch.owner_updates.is_empty()
+    {
         candidate_depth = candidate_depth.max(4);
     }
     if candidate_depth > options.max_depth {
@@ -2840,6 +3057,64 @@ impl<'source> DataReferenceOwnerRemoval<'source> {
     }
 }
 
+/// One exact ComponentDataReference owner count transition.
+///
+/// The source owner must match `expected_count` exactly and the resulting
+/// count must remain non-zero.  A transition to zero is represented by
+/// [`DataReferenceOwnerRemoval`], which lets the rewriter retain its existing
+/// parent-removal semantics and avoids emitting an invalid zero-count owner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DataReferenceOwnerCountUpdate<'source> {
+    component: ComponentSelector<'source>,
+    data_identifier: u64,
+    object_identifier: u64,
+    expected_count: u32,
+    new_count: u32,
+}
+
+impl<'source> DataReferenceOwnerCountUpdate<'source> {
+    /// Construct a compare-and-update request.  Zero counts are rejected
+    /// during preparation, keeping this constructor allocation-free and
+    /// consistent with the other borrowed batch operations.
+    #[must_use]
+    pub const fn new(
+        component: ComponentSelector<'source>,
+        data_identifier: u64,
+        object_identifier: u64,
+        expected_count: u32,
+        new_count: u32,
+    ) -> Self {
+        Self {
+            component,
+            data_identifier,
+            object_identifier,
+            expected_count,
+            new_count,
+        }
+    }
+
+    #[must_use]
+    pub const fn component(self) -> ComponentSelector<'source> {
+        self.component
+    }
+    #[must_use]
+    pub const fn data_identifier(self) -> u64 {
+        self.data_identifier
+    }
+    #[must_use]
+    pub const fn object_identifier(self) -> u64 {
+        self.object_identifier
+    }
+    #[must_use]
+    pub const fn expected_count(self) -> u32 {
+        self.expected_count
+    }
+    #[must_use]
+    pub const fn new_count(self) -> u32 {
+        self.new_count
+    }
+}
+
 /// One atomic metadata-media transaction.  Each request is evaluated against
 /// one source snapshot and either all selected records are published or no
 /// bytes escape.
@@ -2849,6 +3124,7 @@ pub struct MediaRewriteBatch<'source> {
     data_removals: &'source [DataInfoRemoval],
     owner_additions: &'source [DataReferenceOwnerAddition<'source>],
     owner_removals: &'source [DataReferenceOwnerRemoval<'source>],
+    owner_updates: &'source [DataReferenceOwnerCountUpdate<'source>],
 }
 
 impl<'source> MediaRewriteBatch<'source> {
@@ -2864,7 +3140,50 @@ impl<'source> MediaRewriteBatch<'source> {
             data_removals,
             owner_additions,
             owner_removals,
+            owner_updates: &[],
         }
+    }
+
+    /// Construct a batch including exact non-zero owner count transitions.
+    ///
+    /// [`Self::new`] remains the four-slice constructor for source
+    /// compatibility; callers that need count transitions can use this
+    /// constructor or [`Self::with_owner_updates`].
+    #[must_use]
+    pub const fn new_with_owner_updates(
+        data_additions: &'source [DataInfoAddition<'source>],
+        data_removals: &'source [DataInfoRemoval],
+        owner_additions: &'source [DataReferenceOwnerAddition<'source>],
+        owner_removals: &'source [DataReferenceOwnerRemoval<'source>],
+        owner_updates: &'source [DataReferenceOwnerCountUpdate<'source>],
+    ) -> Self {
+        Self {
+            data_additions,
+            data_removals,
+            owner_additions,
+            owner_removals,
+            owner_updates,
+        }
+    }
+
+    /// Return a copy of this batch with exact owner count transitions.
+    #[must_use]
+    pub const fn with_owner_updates(
+        mut self,
+        owner_updates: &'source [DataReferenceOwnerCountUpdate<'source>],
+    ) -> Self {
+        self.owner_updates = owner_updates;
+        self
+    }
+
+    /// Alias emphasizing that these are count transitions rather than owner
+    /// additions or removals.
+    #[must_use]
+    pub const fn with_owner_count_updates(
+        self,
+        owner_updates: &'source [DataReferenceOwnerCountUpdate<'source>],
+    ) -> Self {
+        self.with_owner_updates(owner_updates)
     }
 
     #[must_use]
@@ -2888,6 +3207,14 @@ impl<'source> MediaRewriteBatch<'source> {
     pub const fn owner_removals(self) -> &'source [DataReferenceOwnerRemoval<'source>] {
         self.owner_removals
     }
+    #[must_use]
+    pub const fn owner_updates(self) -> &'source [DataReferenceOwnerCountUpdate<'source>] {
+        self.owner_updates
+    }
+    #[must_use]
+    pub const fn owner_count_updates(self) -> &'source [DataReferenceOwnerCountUpdate<'source>] {
+        self.owner_updates
+    }
 
     #[must_use]
     pub const fn is_empty(self) -> bool {
@@ -2895,6 +3222,7 @@ impl<'source> MediaRewriteBatch<'source> {
             && self.data_removals.is_empty()
             && self.owner_additions.is_empty()
             && self.owner_removals.is_empty()
+            && self.owner_updates.is_empty()
     }
 }
 
@@ -3021,6 +3349,7 @@ pub struct RewriteReport {
     data_removals: usize,
     owner_additions: usize,
     owner_removals: usize,
+    owner_updates: usize,
     allocations: usize,
     retained_bytes: usize,
     scratch_bytes: usize,
@@ -3074,6 +3403,10 @@ impl RewriteReport {
     #[must_use]
     pub const fn owner_removals(self) -> usize {
         self.owner_removals
+    }
+    #[must_use]
+    pub const fn owner_updates(self) -> usize {
+        self.owner_updates
     }
     #[must_use]
     pub const fn allocations(self) -> usize {
@@ -3360,6 +3693,32 @@ mod tests {
         source
     }
 
+    fn source_with_owner(count: u32, owner_unknown: bool) -> Vec<u8> {
+        let mut owner = Vec::new();
+        varint_field(&mut owner, OWNER_OBJECT_IDENTIFIER_FIELD, 77);
+        varint_field(&mut owner, OWNER_COUNT_FIELD, u64::from(count));
+        if owner_unknown {
+            varint_field(&mut owner, 99, 1);
+        }
+
+        let mut reference = Vec::new();
+        varint_field(&mut reference, DATA_IDENTIFIER_FIELD, 1);
+        bytes_field(&mut reference, OWNER_COUNT_FIELD, &owner);
+
+        let mut component = Vec::new();
+        varint_field(&mut component, COMPONENT_IDENTIFIER_FIELD, 9);
+        bytes_field(
+            &mut component,
+            COMPONENT_PREFERRED_LOCATOR_FIELD,
+            b"Document",
+        );
+        bytes_field(&mut component, COMPONENT_DATA_REFERENCE_FIELD, &reference);
+
+        let mut source = source();
+        bytes_field(&mut source, ROOT_COMPONENT_FIELD, &component);
+        source
+    }
+
     #[test]
     fn strict_scan_rejects_noncanonical_varints() {
         let source = [0x08, 0x80, 0x00];
@@ -3398,5 +3757,82 @@ mod tests {
         )
         .expect("exact DataInfo removal");
         assert_eq!(restored.bytes(), source.as_slice());
+    }
+
+    #[test]
+    fn owner_count_transition_is_exact_reversible_and_width_safe() {
+        let source = source_with_owner(127, false);
+        let selector = ComponentSelector::new(9, "Document");
+        let forward = [DataReferenceOwnerCountUpdate::new(
+            selector, 1, 77, 127, 128,
+        )];
+        let changed = rewrite_package_metadata_media(
+            &source,
+            MediaRewriteBatch::empty().with_owner_count_updates(&forward),
+            DecodeOptions::for_source(&source).with_max_output_bytes(source.len() + 2),
+        )
+        .expect("count transition grows nested varint lengths safely");
+        assert_eq!(changed.report().owner_updates(), 1);
+        let facts = owner_matches(changed.bytes(), selector, 1, 77)
+            .expect("rewritten owner remains canonical");
+        assert_eq!(facts.owner_count, 128);
+
+        let inverse = [DataReferenceOwnerCountUpdate::new(
+            selector, 1, 77, 128, 127,
+        )];
+        let restored = rewrite_package_metadata_media(
+            changed.bytes(),
+            MediaRewriteBatch::empty().with_owner_updates(&inverse),
+            DecodeOptions::for_source(changed.bytes()),
+        )
+        .expect("inverse count transition");
+        assert_eq!(restored.bytes(), source.as_slice());
+    }
+
+    #[test]
+    fn owner_count_transition_rejects_stale_zero_unknown_and_conflicting_requests() {
+        let source = source_with_owner(2, false);
+        let selector = ComponentSelector::new(9, "Document");
+        for update in [
+            DataReferenceOwnerCountUpdate::new(selector, 1, 77, 3, 1),
+            DataReferenceOwnerCountUpdate::new(selector, 1, 77, 2, 0),
+            DataReferenceOwnerCountUpdate::new(selector, 1, 77, 0, 1),
+        ] {
+            let error = rewrite_package_metadata_media(
+                &source,
+                MediaRewriteBatch::empty().with_owner_updates(std::slice::from_ref(&update)),
+                DecodeOptions::for_source(&source),
+            )
+            .expect_err("invalid compare-and-set request must be atomic");
+            assert!(matches!(
+                error.invalid_reason(),
+                Some(InvalidReason::ExistingOwnerCollision | InvalidReason::InvalidIdentifier)
+            ));
+        }
+
+        let unknown_source = source_with_owner(2, true);
+        let update = [DataReferenceOwnerCountUpdate::new(selector, 1, 77, 2, 1)];
+        let error = rewrite_package_metadata_media(
+            &unknown_source,
+            MediaRewriteBatch::empty().with_owner_updates(&update),
+            DecodeOptions::for_source(&unknown_source),
+        )
+        .expect_err("unknown selected owner fields must fail closed");
+        assert_eq!(
+            error.invalid_reason(),
+            Some(InvalidReason::UnknownSelectedRecord)
+        );
+
+        let removal = [DataReferenceOwnerRemoval::new(selector, 1, 77, 2)];
+        let error = rewrite_package_metadata_media(
+            &source,
+            MediaRewriteBatch::new(&[], &[], &[], &removal).with_owner_updates(&update),
+            DecodeOptions::for_source(&source),
+        )
+        .expect_err("one owner cannot be removed and updated together");
+        assert_eq!(
+            error.invalid_reason(),
+            Some(InvalidReason::DuplicateOperation)
+        );
     }
 }
