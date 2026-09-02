@@ -2112,6 +2112,45 @@ leave the source unchanged.
 This is a bounded correctness/refusal contract only. It makes no zero-copy,
 allocation-count, peak-RSS, latency, throughput, or whole-package memory claim,
 and it does not transfer wire or package-resource ownership for other display
-families, values/formulas, styles, or table topology. Focused test/fuzz and
-native app evidence, including any artifact hashes, remains pending and must be
-recorded in ADR 0008 before it is described as certification.
+families, values/formulas, styles, or table topology. Scientific focused
+test/fuzz and native-app evidence is recorded in ADR 0008; this resource record
+still makes no package-wide performance/RSS or certification claim.
+
+## 2026-09-02 amendment: Numbers existing-cell Fraction-format resource record
+
+The Fraction transaction is a bounded source-preserving operation over one
+selected cell, its BNC format reference, and the admitted type-262
+format-list/refcount closure. The strict codec validates required fields,
+canonical varints, all nine `FractionAccuracy` strategies, duplicate/cardinality
+rules, length-delimited and group framing, nesting, and work before constructing
+its private borrowed lazy Buffa view. Buffa is an inspection/parity layer only;
+owned generated messages and normal-Prost whole-message re-encoding are not the
+source of preservation. Field 20 (`requires_fraction_replacement`) is preserved
+when absent or canonically encoded as `false` (absence remains absent); a
+canonical `true` is rejected because replacement semantics are unsupported.
+
+The operation-local budget charges package input/output, physical entries and
+payloads, decoded objects/messages/references, wire bytes/fields/nesting/work,
+retained and scratch bytes, compressed output, staging allocations, and total
+transaction work. Checked cursor/size arithmetic and fallible reservations
+guard every publication boundary. Exact no-ops do not construct a candidate;
+changed selector-first exact-source edits use copy-on-write, preserve unknown and
+unselected bytes, reopen and read back the selected Fraction value, and compare
+complete physical locality for untouched members. Malformed, wrong-family,
+noncanonical field-20, over-budget, allocation, lock, candidate-verification,
+or locality failures leave the source unchanged. The legacy host delegate is
+fail-closed after an exact-source owner rejection.
+
+The focused evidence records 22/22 package integration tests, 4/4 library codec
+tests, 3/3 direct codec tests, and 36/36 wire tests, with 44 proto fuzz corpus
+seeds and 18 package fuzz corpus seeds; both targets completed 100-run
+AddressSanitizer smokes. These are bounded correctness and refusal claims only:
+no zero-copy, allocation-count, peak-RSS, latency, throughput, or whole-package
+memory claim is made. The owner does not transfer wire or package-resource
+ownership for other display families, values/formulas, styles, or table
+topology. ADR 0008 separately records representative operation-specific native
+E3/E4 and artifact/hash evidence; neither record closes a topology, debt, host,
+or ADR 0028 gate. The topology
+remains 64 workspace packages, 237 internal dependency declarations, 226
+canonical edges, 11 ordered migration debts with IDs `[1, 2, 4, 8, 10, 12, 13,
+14, 15, 16, 17]`, and one migration host.

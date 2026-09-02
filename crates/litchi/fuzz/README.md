@@ -234,6 +234,19 @@ transaction boundary; the checked-in recipes under
 `corpus/numbers_table_cell_scientific_format/` are small command inputs rather
 than native package copies.
 
+`numbers_table_cell_fraction_format` is the focused selector-first
+Fraction-format lifecycle target. It replays bounded command bytes against a
+source-built Fraction graph and real Number, Percentage, Scientific, and
+Currency wrong-family sources, covering name/index selectors, all nine
+`FractionAccuracy` values, no-op/set/clear/reset, strict family refusal,
+locked and malformed ownership, exact patch apply/inverse/stale/foreign
+conflicts, copy-on-write format-list refcounts, bounded ingress/semantic/
+transaction limits, and candidate scalar, non-format-wire, and exact-source
+locality invariants. The target uses only archive-free Fraction values and
+public `Package` operations at the transaction boundary; the checked-in
+recipes under `corpus/numbers_table_cell_fraction_format/` are small command
+inputs rather than native package copies.
+
 `numbers_table_cell_control` is the unified selector-first cell-control
 lifecycle target. It drives Checkbox, StarRating, Slider, Stepper, and
 Pop-Up Menu values through `Package::{table_cell_control_format,
@@ -750,6 +763,15 @@ seeds:
 ```sh
 cargo +nightly fuzz run numbers_table_cell_scientific_format \
   corpus/numbers_table_cell_scientific_format -- \
+  -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Numbers table-cell Fraction-format target with its command
+seeds:
+
+```sh
+cargo +nightly fuzz run numbers_table_cell_fraction_format \
+  corpus/numbers_table_cell_fraction_format -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 

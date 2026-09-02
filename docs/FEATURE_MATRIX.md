@@ -62,16 +62,21 @@ claims. Shared `litchi-iwa-*` crates are substrate, not a fourth format. Capabil
 only in the legacy `litchi-iwa` migration host do not count as focused-owner support unless the
 relevant detailed matrix labels them explicitly as host-only.
 
-The current iWork migration inventory is 64 workspace packages, 237 internal dependency
-declarations, 226 canonical edges, 11 ordered migration debts, and one migration host. These are
-topology facts, not evidence that the concrete format owners or the monolith deletion gate are
-complete.
+The current iWork migration inventory remains 64 workspace packages, 237 internal dependency
+declarations, 226 canonical edges, 11 ordered migration debts `[1, 2, 4, 8, 10, 12, 13, 14, 15,
+16, 17]`, and one migration host. These are topology facts, not evidence that the concrete format
+owners or the monolith deletion gate are complete; the Fraction slice closes no debt or gate.
 
-The Numbers matrix now records bounded existing-cell Number, Percentage, Currency, and Scientific
-display-format owners. Currency and Scientific support are operation-specific and remain separate
-from generic display format or rich-style support; suite-wide/native general-format acceptance
-and the ADR 0028 deletion gate remain open. Scientific has focused build, test, fuzz, and native
-Numbers evidence recorded in ADR 0008, without broadening that operation-specific claim.
+The Numbers matrix now records bounded existing-cell Number, Percentage, Currency, Scientific, and
+Fraction display-format owners. Currency, Scientific, and Fraction support are operation-specific
+and remain separate from generic display format or rich-style support; suite-wide/native
+general-format acceptance and the ADR 0028 deletion gate remain open. Scientific has focused build,
+test, fuzz, and native Numbers evidence recorded in ADR 0008. Fraction has source/build/test/fuzz
+evidence for native type 262 and all nine accuracy strategies, plus operation-specific native
+Numbers E3/E4 evidence for the representative Eighths-to-Hundredths edit. The source, candidate,
+and native-resaved hashes are recorded in ADR 0008; this does not claim native UI acceptance for all
+nine variants, arbitrary-producer parity, native byte parity, or package-wide performance. Neither
+operation-specific record broadens its scope.
 
 For XLSB sparklines, the detailed XLSB matrix records the strict, bounded Worksheet-ABNF support
 for [MS-XLSB] §2.1.7.62 and records §2.4.228-230, §2.4.581-583, and §2.4.806. The common

@@ -11,6 +11,8 @@ pub mod currency;
 pub mod custom;
 pub mod date_time;
 pub mod duration;
+/// Fraction display values and selector-first transactions for existing cells.
+pub mod fraction;
 pub mod number;
 pub mod numeral_system;
 /// Percentage display values and exact-source transactions for existing cells.
@@ -24,9 +26,9 @@ pub use currency::{Currency, CurrencyCode, CurrencyStyle};
 pub use custom::Custom;
 pub use date_time::DateTime;
 pub use duration::Duration;
+pub use fraction::{Fraction, FractionAccuracy};
 pub use number::{
-    DecimalPlaces, FixedDecimalPlaces, Fraction, FractionAccuracy, NegativeStyle, Number,
-    Percentage, ThousandsSeparator,
+    DecimalPlaces, FixedDecimalPlaces, NegativeStyle, Number, Percentage, ThousandsSeparator,
 };
 pub use numeral_system::NumeralSystem;
 pub use pop_up_menu::PopUpMenu;

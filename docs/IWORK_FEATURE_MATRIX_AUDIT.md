@@ -1,7 +1,7 @@
 # iWork Feature-Matrix Audit
 
 > Source audit starting at committed `d33f30f41` (2026-09-01) and including the focused
-> Scientific-format owner work from that baseline. This document records the rationale and
+> Scientific- and Fraction-format owner work from that baseline. This document records the rationale and
 > cross-suite gaps behind the three authoritative app matrices and does not replace them.
 
 ## Matrix state
@@ -17,7 +17,7 @@ The repository's matrix contract says detailed per-format matrices are the sourc
 | Current implementation certification | ❌ [FORMAT_IMPLEMENTATION_REVIEW.md](FORMAT_IMPLEMENTATION_REVIEW.md#scope-and-rubric) explicitly excludes all iWork |
 | iWork matrix evidence links | ✅ the matrices contain direct focused-source, test, fixture, and audit-evidence links |
 | Root index wording | ✅ stale matrix-count wording was removed when the iWork owners were registered |
-| Current migration topology | ✅ 64 workspace packages, 237 internal dependency declarations, 226 canonical edges, 11 ordered debts, one migration host |
+| Current migration topology | ✅ 64 workspace packages, 237 internal dependency declarations, 226 canonical edges, 11 ordered debts `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, one migration host; no Fraction debt/gate closure |
 
 Status used below: ✅ fully supports the precisely stated bounded scope; 🟡 partial, metadata-only, preservation-only, host-only, or otherwise constrained; ❌ unsupported; N/A not applicable. A generated schema or detached value type alone receives no semantic-support credit.
 
@@ -36,6 +36,15 @@ type-259 codec, green focused tests, bounded sanitizer smokes, and a frozen oper
 native ledger. Numbers 14.4 opened, saved, closed, and reopened the Rust candidate without repair;
 strict reread verified the requested precision and emitted an exact no-op. This is narrowly scoped
 E3/E4 evidence, not a broad-format claim.
+The Fraction owner now has an archive-free value, a selector-first exact-source transaction,
+strict native type-262 preflight with a lazy Buffa view, and focused source/build/test/fuzz
+evidence. It covers all nine `FractionAccuracy` strategies. The optional native field
+`requires_fraction_replacement` (field 20) is accepted and preserved when absent or canonically
+encoded as `false`; a canonical `true` is rejected because replacement semantics are not owned by
+this seam. Computer Use additionally established operation-specific native E3/E4 evidence for a
+representative Eighths-to-Hundredths edit; source, candidate, and native-resaved hashes are frozen
+in ADR 0008. This does not promote all nine native UI variants, arbitrary-producer parity, native
+byte parity, or package-wide performance.
 Exact current and historical results are recorded in [IWORK_PROGRESS_AUDIT.md](IWORK_PROGRESS_AUDIT.md#current-worktree-verification).
 
 ## Shared IWA capabilities
@@ -122,7 +131,8 @@ Primary references: [package boundary](../crates/litchi-keynote/src/package.rs#L
 | Existing-cell Number/Percentage display formats | 🟡 | ✅ | 🟡 | Selector-first existing-cell Number and Percentage read/set/reset operations preserve the scalar value and unrelated bytes. Number has operation-specific native evidence; Percentage focused/synthetic coverage is green, and ADR 0008 records a disposable native Numbers open/save/close/reopen plus strict Rust semantic no-op readback. The artifact/ledger is not frozen, so Percentage E3/E4 remain pending. See the [Numbers matrix](../crates/litchi-numbers/docs/FEATURE_MATRIX.md#cells-formulas-controls-and-annotations). |
 | Existing-cell Currency display formats | 🟡 | ✅ | 🟡 | Selector-first existing-cell Currency read/set/clear/reset operations expose checked currency code, decimal, negative, thousands-separator, and Standard/Accounting settings while preserving the scalar value and unrelated bytes. The focused codec filter passes 4/4, the `litchi-numbers-wire` library passes 32/32, and the latest package target passes 22/22 after native BNC flag handling became shape-dependent: plain no-secondary Currency uses `0x0802`, while a Currency record carrying a secondary Number ID uses `0x0803` (`0x0802 | EXPLICIT_DECIMAL_FORMAT`, with `EXPLICIT_DECIMAL_FORMAT = 0x0001`). Standard versus Accounting does not choose this flag. ADR 0008 records operation-specific E3/E4 evidence: a clean native open, native save/close/reopen with the same scalar/settings/text, strict Rust no-op reread, exact inverse restoration, and exact candidate/native-resaved hashes. Bounded fuzz evidence remains separately scoped; no broad-format or deletion-gate claim is made. See the [Numbers matrix](../crates/litchi-numbers/docs/FEATURE_MATRIX.md#cells-formulas-controls-and-annotations). |
 | Existing-cell Scientific display formats | 🟡 | ✅ | 🟡 | Selector-first [`table_cell_scientific_format`](../crates/litchi-numbers/src/package/table_cell_scientific_format.rs#L382) and archive-free [`Scientific`](../crates/litchi-numbers/src/cell/data_format/scientific.rs#L1) cover one existing cell's fixed decimal precision, native minus-sign negatives, and hidden thousands separator with explicit-to-automatic reset semantics. The package target passed 19/19, strict Buffa type-259 codec 4/4, wire library 34/34, and filtered legacy bridge 6/6; bounded codec/package sanitizer smokes each completed 100 executions. Numbers 14.4 opened, saved, closed, and reopened the precision-7 candidate without repair while preserving B2 text and B3 scalar 42, and strict reread was byte-identical. [ADR 0008](adr/0008-migration-and-verification.md#2026-09-01-amendment-numbers-existing-cell-scientific-format-native-validation-record) freezes the hashes and limits this to operation-specific E3/E4 evidence. |
-| Other generic display formats and rich styles | ❌ | ❌ | ❌ | Outside the focused Number/Percentage/Currency/Scientific operations above, no general package getter or formatting transaction is exposed; date, duration, text, custom, and rich-style families remain unsupported at this owner boundary. |
+| Existing-cell Fraction display formats | 🟡 | ✅ | 🟡 | Selector-first [`table_cell_fraction_format`](../crates/litchi-numbers/src/package/table_cell_fraction_format.rs#L389) and archive-free [`Fraction`](../crates/litchi-numbers/src/cell/data_format/fraction.rs#L1) expose all nine `FractionAccuracy` denominator strategies for one existing cell, with explicit-to-inherited clearing. The native type-262 codec performs strict preflight before a lazy Buffa view; field 20 (`requires_fraction_replacement`) is preserved when absent or canonical `false` and rejects `true`. The focused package integration run passed 22/22, library codec tests 4/4, direct codec tests 3/3, and wire tests 36/36; checked-in fuzz corpora contain 44 proto seeds and 18 package seeds, and both targets completed 100-run AddressSanitizer smokes. Computer Use recorded operation-specific native E3/E4 evidence for a disposable Eighths source and Eighths→Hundredths edit; before native opening, exactly two uncompressed members differed while entry names/order and every other member payload matched. Exact source/candidate/native-resaved hashes are in ADR 0008. This does not promote all nine native UI variants, arbitrary-producer parity, native byte parity after Numbers normalization, package-wide performance, or a deletion-gate claim. |
+| Other generic display formats and rich styles | ❌ | ❌ | ❌ | Outside the focused Number/Percentage/Currency/Scientific/Fraction operations above, no general package getter or formatting transaction is exposed; date, duration, text, custom, and rich-style families remain unsupported at this owner boundary. |
 | Cell comments/replies | 🟡 | 🟡 | 🟡 | Text-only, strict rooted/co-located ownership; no broad threads, authors, mentions, or attachments; current integration tests are red |
 | Charts/shapes/text boxes/media | ❌ | ❌ | ❌ | No focused semantic/package owner |
 | Filters/categories/groups/pivots | ❌ | ❌ | ❌ | Detection/refusal or schema presence only; no semantic CRUD |
@@ -176,6 +186,17 @@ native E3/E4 evidence. Numbers 14.4 retained the requested precision, text, and 
 open/save/close/reopen, and strict Rust reread produced an exact no-op. This promotes only the
 recorded existing-cell Scientific operation; it does not establish arbitrary-producer parity,
 generic formatting support, or any ADR 0028 deletion-gate closure.
+The Fraction row has focused source/build evidence and the following bounded verification record:
+22/22 package integration tests, 4/4 library codec tests, 3/3 direct codec tests, and 36/36 wire
+tests. Its checked-in fuzz corpora contain 44 proto seeds and 18 package seeds, and both targets
+completed 100-run AddressSanitizer smokes. The codec rejects
+malformed/noncanonical field-20 encodings and `true`; it preserves an absent field 20 as absent and
+canonical encoded `false` byte-for-byte. Computer Use established operation-specific E3/E4
+evidence for the representative Eighths-to-Hundredths scenario; before native opening, exactly two
+uncompressed members differed and every other member payload/name/order matched. The source,
+candidate, and native-resaved hashes are recorded in ADR 0008. No ADR 0028 deletion-gate closure is
+implied. This does not promote all nine native UI variants, arbitrary-producer parity, native byte
+parity after Numbers normalization, or package-wide performance.
 
 ## Matrix maintenance requirements
 

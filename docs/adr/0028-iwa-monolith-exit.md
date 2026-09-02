@@ -7233,7 +7233,46 @@ None of the six monolith-exit gates closes. No package, dependency edge, or
 ordered migration debt is retired, `litchi-iwa` remains the one migration host,
 and the documented topology remains 64 packages, 237 internal dependency
 declarations, 226 canonical edges, and debt IDs `[1, 2, 4, 8, 10, 12, 13, 14,
-15, 16, 17]`. Build/test/fuzz and native app evidence are intentionally not
-claimed until the pending ADR 0008 ledger is frozen; this source-level seam is
-not evidence of host independence, arbitrary-producer parity, native byte
-parity, or package-wide performance/RSS behavior.
+15, 16, 17]`. Scientific build/test/fuzz and native-app evidence is recorded in
+ADR 0008; this source-level seam is not evidence of host independence,
+arbitrary-producer parity, native byte parity, or package-wide performance/RSS
+behavior.
+
+## 2026-09-02 amendment: Numbers existing-cell Fraction-format focused-owner slice (not a monolith-exit gate)
+
+The current Fraction slice gives `litchi-numbers` a bounded owner for the
+explicit Fraction format of one existing table cell. The selector-first package
+surface uses semantic sheet/table selectors and a checked cell position; the
+private adapter owns native type 262, all nine `FractionAccuracy` strategies,
+strict wire preflight, lazy Buffa inspection, format-list identity/refcounts,
+copy-on-write, exact-source patches/inverses, candidate reopen/readback, and
+physical locality. Native IDs, generated messages, archive members, and raw
+bytes remain private.
+
+Field 20 (`requires_fraction_replacement`) is accepted and preserved when
+absent or canonically encoded as `false`; absence remains absent, canonical
+`false` remains byte-preserved, and canonical `true` is rejected because
+replacement semantics are not implemented. Fraction remains deliberately
+separate from Number, Percentage, Currency, Scientific, controls, and other
+display families. It supports existing-cell display metadata and
+explicit-to-inherited reset only; it does not create cells, author values or
+formulas, mutate styles or table topology, or provide package authoring. The
+legacy host methods are fail-closed compatibility delegates for admitted exact
+graphs, while source-built compatibility packages may retain their historical
+route.
+
+The focused source/build/test/fuzz evidence is recorded in ADR 0008: 22/22
+package integration tests, 4/4 library codec tests, 3/3 direct codec tests,
+36/36 wire tests, 44 proto fuzz corpus seeds, and 18 package fuzz corpus seeds;
+both fuzz targets completed 100-run AddressSanitizer smokes.
+ADR 0008 also records operation-specific native E3/E4 evidence for a
+representative Eighths-to-Hundredths edit, including source, candidate, and
+native-resaved hashes. This does not claim native UI acceptance for all nine
+accuracy variants, arbitrary-producer parity, native byte parity after Numbers
+normalization, package-wide performance, or host independence.
+
+None of the six monolith-exit gates closes. No package, dependency edge, or
+ordered migration debt is retired, `litchi-iwa` remains the one migration host,
+and the documented topology remains 64 packages, 237 internal dependency
+declarations, 226 canonical edges, and 11 ordered debts with IDs `[1, 2, 4, 8,
+10, 12, 13, 14, 15, 16, 17]`. In particular, no ADR 0028 deletion gate closes.

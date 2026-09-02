@@ -366,6 +366,7 @@ pub(super) fn data_format_from_native(native: &FormatStructArchive) -> Result<Da
             || native.date_time_format.is_some()
             || native.suppress_date_format.is_some()
             || native.suppress_time_format.is_some()
+            || native.requires_fraction_replacement == Some(true)
         {
             return Err(Error::InvalidFormat(
                 "Fraction cell format contains non-canonical decimal options".to_owned(),
@@ -565,5 +566,25 @@ fn fraction_accuracy_from_native(value: u32) -> Result<FractionAccuracy> {
         _ => Err(Error::InvalidFormat(format!(
             "Fraction cell format has invalid accuracy {value}"
         ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fraction_replacement_true_is_rejected_but_false_remains_compatible() {
+        let expected = DataFormat::Fraction(Fraction::new(FractionAccuracy::Eighths));
+        let mut native = data_format_to_native(&expected).expect("canonical Fraction format");
+
+        native.requires_fraction_replacement = Some(false);
+        assert_eq!(
+            data_format_from_native(&native).expect("legacy false marker"),
+            expected
+        );
+
+        native.requires_fraction_replacement = Some(true);
+        assert!(data_format_from_native(&native).is_err());
     }
 }

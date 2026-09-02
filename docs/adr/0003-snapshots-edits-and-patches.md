@@ -1801,3 +1801,49 @@ not create cells, author values or formulas, convert Number/Percentage/Currency
 or other display families, mutate styles or table topology, or add durable or
 composable patch history. Verification and evidence status are tracked in ADR
 0008.
+
+## 2026-09-02 amendment: Numbers existing-cell Fraction-format transactions
+
+The focused Numbers owner now applies the snapshot/edit/patch contract to the
+explicit `Fraction` format of one existing table cell. The archive-free value is
+`litchi_numbers::cell::data_format::Fraction`, paired with the nine checked
+`FractionAccuracy` strategies: `UpToOneDigit`, `UpToTwoDigits`, `UpToThreeDigits`,
+`Halves`, `Quarters`, `Eighths`, `Sixteenths`, `Tenths`, and `Hundredths`. At the
+cell-format boundary, `None` means inherited/no explicit Fraction and `Some` is
+an explicit checked accuracy. A semantic `SheetSelector`, sheet-scoped
+`TableSelector`, and checked `CellPosition` resolve the cell before physical
+planning; native IDs, generated messages, format-list keys, BNC records,
+archive members, and raw bytes remain below the package boundary.
+
+The public existing-object-only surface is
+`Package::{table_cell_fraction_format, edit_table_cell_fraction_format,
+apply_table_cell_fraction_format}`. Each edit is bound to one immutable exact
+source snapshot. Exact no-ops share the source without candidate publication;
+changed edits validate the native type-262 payload, strict Fraction wire shape,
+format-list identity and refcount closure, then apply copy-on-write, reopen the
+candidate, read back the same selector, and publish atomically. The patch is
+source-authorized and reversible; stale, foreign, replayed, wrong-family,
+malformed, locked, over-budget, ambiguous, or locality-failing sources are
+rejected before publication.
+
+The private Fraction codec performs strict handwritten wire preflight before its
+borrowed lazy Buffa view. Field 20 (`requires_fraction_replacement`) is accepted
+only when absent or canonically encoded as `false`: absence stays absent and a
+canonical encoded `false` stays byte-preserved through rewrites. A canonical
+`true` is rejected because replacement semantics are not implemented by this
+owner. Unknown extension spans, unselected fields, scalar cell data, metadata,
+previews, and unrelated archive members remain source-authoritative. The
+deprecated `litchi_iwa::NumbersEditor` route is only a compatibility delegate
+for admitted exact graphs; an exact-source owner rejection cannot escape to a
+generic fallback, while source-built compatibility packages may retain the
+historical route.
+
+This slice does not create cells, author values or formulas, mutate general
+styles or table topology, or add durable/composable patch history. Its focused
+source/build/test/fuzz evidence and representative operation-specific
+native-app E3/E4 and artifact/hash evidence are recorded in ADR 0008. Those
+records make no package-topology, migration-debt, or ADR 0028 deletion-gate
+claim. The topology remains 64 workspace packages, 237
+internal dependency declarations, 226 canonical edges, 11 ordered migration
+debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration
+host; this slice closes no debt or gate.

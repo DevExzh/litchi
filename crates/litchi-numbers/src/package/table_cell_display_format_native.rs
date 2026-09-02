@@ -1,15 +1,16 @@
 //! Private native owner for focused decimal display-format transactions.
 //!
-//! Number, Percentage, and Scientific cells use the same BNC decimal cell kind
-//! and the same format-list graph. This module keeps that graph surgery in one
-//! route while retaining a typed family boundary at every codec and semantic
-//! conversion.
+//! Number, Percentage, Scientific, and Fraction cells use the same BNC decimal
+//! cell kind and the same format-list graph. This module keeps that graph
+//! surgery in one route while retaining a typed family boundary at every
+//! codec and semantic conversion.
 //! It intentionally exposes no native identifiers or arbitrary format-type
 //! input to the package API.
 
 use litchi_iwa_protos::{
     numbers_table_cell_control_codec as control_codec,
     numbers_table_cell_currency_format_codec as currency_codec,
+    numbers_table_cell_fraction_format_codec as fraction_codec,
     numbers_table_cell_number_format_codec as number_codec,
     numbers_table_cell_percentage_format_codec as percentage_codec,
     numbers_table_cell_scientific_format_codec as scientific_codec,
@@ -25,14 +26,15 @@ use super::{
 };
 use crate::cell::data_format::currency::{Currency, CurrencyCode, CurrencyStyle};
 use crate::cell::data_format::number::{
-    DecimalPlaces, FixedDecimalPlaces, NegativeStyle, Number, Percentage, Scientific,
-    ThousandsSeparator,
+    DecimalPlaces, FixedDecimalPlaces, Fraction, FractionAccuracy, NegativeStyle, Number,
+    Percentage, Scientific, ThousandsSeparator,
 };
 
 const NUMBER_FORMAT_TYPE: u32 = number_codec::NATIVE_NUMBER_FORMAT_TYPE;
 const CURRENCY_FORMAT_TYPE: u32 = currency_codec::NATIVE_CURRENCY_FORMAT_TYPE;
 const PERCENTAGE_FORMAT_TYPE: u32 = percentage_codec::NATIVE_PERCENTAGE_FORMAT_TYPE;
 const SCIENTIFIC_FORMAT_TYPE: u32 = scientific_codec::NATIVE_SCIENTIFIC_FORMAT_TYPE;
+const FRACTION_FORMAT_TYPE: u32 = fraction_codec::NATIVE_FRACTION_FORMAT_TYPE;
 
 /// The only display families admitted by the focused decimal owner.
 ///
@@ -45,6 +47,7 @@ pub(super) enum DisplayFormatFamily {
     Currency,
     Percentage,
     Scientific,
+    Fraction,
 }
 
 impl DisplayFormatFamily {
@@ -54,6 +57,7 @@ impl DisplayFormatFamily {
             Self::Currency => CURRENCY_FORMAT_TYPE,
             Self::Percentage => PERCENTAGE_FORMAT_TYPE,
             Self::Scientific => SCIENTIFIC_FORMAT_TYPE,
+            Self::Fraction => FRACTION_FORMAT_TYPE,
         }
     }
 }
@@ -122,12 +126,26 @@ impl From<Error> for ScientificFormatReadError {
     }
 }
 
+/// Typed native failure returned to the Fraction package facade.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum FractionFormatReadError {
+    WrongFormatFamily,
+    Native(Error),
+}
+
+impl From<Error> for FractionFormatReadError {
+    fn from(error: Error) -> Self {
+        Self::Native(error)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NativeDisplayValue {
     Number(Number),
     Currency(Currency),
     Percentage(Percentage),
     Scientific(Scientific),
+    Fraction(Fraction),
 }
 
 impl NativeDisplayValue {
@@ -137,31 +155,7 @@ impl NativeDisplayValue {
             Self::Currency(_) => DisplayFormatFamily::Currency,
             Self::Percentage(_) => DisplayFormatFamily::Percentage,
             Self::Scientific(_) => DisplayFormatFamily::Scientific,
-        }
-    }
-
-    const fn decimal_parts(self) -> (DecimalPlaces, NegativeStyle, ThousandsSeparator) {
-        match self {
-            Self::Number(value) => (
-                value.decimal_places(),
-                value.negative_style(),
-                value.thousands_separator(),
-            ),
-            Self::Currency(value) => (
-                value.decimal_places(),
-                value.negative_style(),
-                value.thousands_separator(),
-            ),
-            Self::Percentage(value) => (
-                value.decimal_places(),
-                value.negative_style(),
-                value.thousands_separator(),
-            ),
-            Self::Scientific(value) => (
-                DecimalPlaces::Fixed(value.decimal_places()),
-                NegativeStyle::MinusSign,
-                ThousandsSeparator::Hidden,
-            ),
+            Self::Fraction(_) => DisplayFormatFamily::Fraction,
         }
     }
 
@@ -238,6 +232,7 @@ impl NativeDisplayValue {
                 }
                 NativeDisplayValue::Scientific(Scientific::new(decimal_places))
             },
+            DisplayFormatFamily::Fraction => return Err(Error::InvalidSource { path }),
         };
         Ok(value)
     }
@@ -263,7 +258,8 @@ fn rewrite_display_cell_metadata(
         .ok_or(Error::InvalidSource { path })?;
     let allocations = litchi_numbers_wire::MAX_OWNED_BNC_PARSE_ALLOCATIONS
         .checked_mul(2)
-        // One encoded output and the two ordinary decimal metadata buffers.
+        // One encoded output and the two shared decimal-family metadata
+        // buffers.
         .and_then(|amount| amount.checked_add(3))
         .ok_or(Error::InvalidSource { path })?;
     budget.charge_allocations(allocations, path)?;
@@ -301,6 +297,16 @@ fn rewrite_display_cell_metadata(
         desired_identifier,
     )?;
     Ok(output)
+}
+
+fn charge_owned_bnc_parse(
+    source_len: usize,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<(), Error> {
+    budget.charge_allocations(litchi_numbers_wire::MAX_OWNED_BNC_PARSE_ALLOCATIONS, path)?;
+    budget.charge_scratch_bytes(source_len, path)?;
+    budget.charge_transaction_work(source_len, path)
 }
 
 fn verify_display_cell_metadata(
@@ -504,6 +510,7 @@ pub(super) fn read_number_format_with_budget(
         Ok(Some(NativeDisplayValue::Currency(_)))
         | Ok(Some(NativeDisplayValue::Percentage(_)))
         | Ok(Some(NativeDisplayValue::Scientific(_)))
+        | Ok(Some(NativeDisplayValue::Fraction(_)))
         | Err(DisplayReadError::WrongFormatFamily) => Err(NumberFormatReadError::WrongFormatFamily),
         Err(DisplayReadError::Native(error)) => Err(NumberFormatReadError::Native(error)),
     }
@@ -539,6 +546,7 @@ pub(super) fn read_currency_format_with_budget(
         Ok(Some(NativeDisplayValue::Number(_)))
         | Ok(Some(NativeDisplayValue::Percentage(_)))
         | Ok(Some(NativeDisplayValue::Scientific(_)))
+        | Ok(Some(NativeDisplayValue::Fraction(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(CurrencyFormatReadError::WrongFormatFamily)
         },
@@ -576,6 +584,7 @@ pub(super) fn read_percentage_format_with_budget(
         Ok(Some(NativeDisplayValue::Number(_)))
         | Ok(Some(NativeDisplayValue::Currency(_)))
         | Ok(Some(NativeDisplayValue::Scientific(_)))
+        | Ok(Some(NativeDisplayValue::Fraction(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(PercentageFormatReadError::WrongFormatFamily)
         },
@@ -613,10 +622,49 @@ pub(super) fn read_scientific_format_with_budget(
         Ok(Some(NativeDisplayValue::Number(_)))
         | Ok(Some(NativeDisplayValue::Currency(_)))
         | Ok(Some(NativeDisplayValue::Percentage(_)))
+        | Ok(Some(NativeDisplayValue::Fraction(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(ScientificFormatReadError::WrongFormatFamily)
         },
         Err(DisplayReadError::Native(error)) => Err(ScientificFormatReadError::Native(error)),
+    }
+}
+
+/// Read one existing Fraction format with a fresh transaction ledger.
+pub(super) fn read_fraction_format(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+) -> Result<Option<Fraction>, FractionFormatReadError> {
+    let mut budget = TransactionBudget::for_cell_control(source);
+    read_fraction_format_with_budget(source, target, path, &mut budget)
+}
+
+/// Read one existing Fraction format against a caller-owned transaction
+/// ledger.
+pub(super) fn read_fraction_format_with_budget(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Option<Fraction>, FractionFormatReadError> {
+    match read_display_format_with_budget(
+        DisplayFormatFamily::Fraction,
+        source,
+        target,
+        path,
+        budget,
+    ) {
+        Ok(None) => Ok(None),
+        Ok(Some(NativeDisplayValue::Fraction(value))) => Ok(Some(value)),
+        Ok(Some(NativeDisplayValue::Number(_)))
+        | Ok(Some(NativeDisplayValue::Currency(_)))
+        | Ok(Some(NativeDisplayValue::Percentage(_)))
+        | Ok(Some(NativeDisplayValue::Scientific(_)))
+        | Err(DisplayReadError::WrongFormatFamily) => {
+            Err(FractionFormatReadError::WrongFormatFamily)
+        },
+        Err(DisplayReadError::Native(error)) => Err(FractionFormatReadError::Native(error)),
     }
 }
 
@@ -697,6 +745,26 @@ pub(super) fn rewrite_scientific_format(
         target,
         before.copied().map(NativeDisplayValue::Scientific),
         after.copied().map(NativeDisplayValue::Scientific),
+        path,
+        budget,
+    )
+}
+
+/// Rewrite one ordinary Fraction cell without manufacturing a CellSpec graph.
+pub(super) fn rewrite_fraction_format(
+    source: &Package,
+    target: CellTarget,
+    before: Option<&Fraction>,
+    after: Option<&Fraction>,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<native::NativeControlOutput, Error> {
+    rewrite_display_format(
+        DisplayFormatFamily::Fraction,
+        source,
+        target,
+        before.copied().map(NativeDisplayValue::Fraction),
+        after.copied().map(NativeDisplayValue::Fraction),
         path,
         budget,
     )
@@ -787,6 +855,7 @@ fn read_display_format_with_budget(
         target.position.column(),
     )
     .map_err(|_| Error::InvalidSource { path })?;
+    charge_owned_bnc_parse(cell_source.len(), path, budget)?;
     let cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
     let format_identifier = cell.format_identifier();
     if cell.control_cell_spec_identifier().is_some() {
@@ -798,7 +867,8 @@ fn read_display_format_with_budget(
         (
             DisplayFormatFamily::Number
             | DisplayFormatFamily::Percentage
-            | DisplayFormatFamily::Scientific,
+            | DisplayFormatFamily::Scientific
+            | DisplayFormatFamily::Fraction,
             Some(litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND),
         ) => {
             if secondary_identifier.is_some() || !cell.has_only_decimal_format_metadata() {
@@ -1050,6 +1120,7 @@ fn rewrite_display_format(
         target.position.column(),
     )
     .map_err(|_| Error::InvalidSource { path })?;
+    charge_owned_bnc_parse(cell_source.len(), path, budget)?;
     let cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
     let old_format = cell.format_identifier();
     let old_secondary = cell.secondary_format_identifier();
@@ -1061,7 +1132,8 @@ fn rewrite_display_format(
         (
             DisplayFormatFamily::Number
             | DisplayFormatFamily::Percentage
-            | DisplayFormatFamily::Scientific,
+            | DisplayFormatFamily::Scientific
+            | DisplayFormatFamily::Fraction,
             Some(identifier),
             Some(litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND),
         ) if identifier != 0 => {
@@ -1210,7 +1282,8 @@ fn rewrite_display_format(
             },
             DisplayFormatFamily::Number
             | DisplayFormatFamily::Percentage
-            | DisplayFormatFamily::Scientific => litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT,
+            | DisplayFormatFamily::Scientific
+            | DisplayFormatFamily::Fraction => litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT,
         };
         if explicit_flags == expected_explicit {
             if before != Some(current) {
@@ -1544,6 +1617,20 @@ fn decode_display_payload(
             )?;
             Ok(value)
         },
+        DisplayFormatFamily::Fraction => {
+            let (snapshot, report) =
+                match fraction_codec::decode_fraction_format_with_report(source, options) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return Err(classify_decode_failure(family, source, budget, path, error));
+                    },
+                };
+            native::charge_control_decode_report(budget, report, path)?;
+            Ok(NativeDisplayValue::Fraction(fraction_from_native_accuracy(
+                snapshot.fraction_accuracy(),
+                path,
+            )?))
+        },
     }
 }
 
@@ -1556,9 +1643,9 @@ fn classify_decode_failure(
 ) -> DisplayReadError {
     // The family-specific strict decoder intentionally rejects the sibling
     // discriminator. Probe with the broader strict projection only after a
-    // failure, so successful Number/Percentage/Scientific reads retain their
-    // existing resource accounting. A malformed payload remains a native
-    // error.
+    // failure, so successful Number/Percentage/Scientific/Fraction reads
+    // retain their existing resource accounting. A malformed payload remains
+    // a native error.
     let Ok((broad, report)) = control_codec::decode_control_format_with_report(
         source,
         native::control_codec_options(source.len(), budget),
@@ -1581,19 +1668,18 @@ fn prepare_display_rewrite(
     budget: &mut TransactionBudget,
     path: Path,
 ) -> Result<Vec<u8>, Error> {
-    let (decimal_places, negative_style, thousands_separator) = value.decimal_parts();
     let options = native::control_codec_options(source.len(), budget);
     match family {
         DisplayFormatFamily::Number => {
-            let NativeDisplayValue::Number(_) = value else {
+            let NativeDisplayValue::Number(value) = value else {
                 return Err(Error::UnsupportedDependency { path });
             };
             let prepared = number_codec::prepare_number_format_rewrite(
                 source,
                 number_codec::NumberFormatWrite::new(
-                    native_decimal_places(decimal_places),
-                    native_negative_style(negative_style),
-                    matches!(thousands_separator, ThousandsSeparator::Shown),
+                    native_decimal_places(value.decimal_places()),
+                    native_negative_style(value.negative_style()),
+                    matches!(value.thousands_separator(), ThousandsSeparator::Shown),
                 ),
                 options,
             )
@@ -1620,15 +1706,15 @@ fn prepare_display_rewrite(
             execute_currency_rewrite(prepared, budget, path)
         },
         DisplayFormatFamily::Percentage => {
-            let NativeDisplayValue::Percentage(_) = value else {
+            let NativeDisplayValue::Percentage(value) = value else {
                 return Err(Error::UnsupportedDependency { path });
             };
             let prepared = percentage_codec::prepare_percentage_format_rewrite(
                 source,
                 percentage_codec::PercentageFormatWrite::new(
-                    native_decimal_places(decimal_places),
-                    native_negative_style(negative_style),
-                    matches!(thousands_separator, ThousandsSeparator::Shown),
+                    native_decimal_places(value.decimal_places()),
+                    native_negative_style(value.negative_style()),
+                    matches!(value.thousands_separator(), ThousandsSeparator::Shown),
                 ),
                 options,
             )
@@ -1649,6 +1735,20 @@ fn prepare_display_rewrite(
             .map_err(|error| native::map_control_error(error, path))?;
             execute_scientific_rewrite(prepared, budget, path)
         },
+        DisplayFormatFamily::Fraction => {
+            let NativeDisplayValue::Fraction(value) = value else {
+                return Err(Error::UnsupportedDependency { path });
+            };
+            let prepared = fraction_codec::prepare_fraction_format_rewrite(
+                source,
+                fraction_codec::FractionFormatWrite::new(native_fraction_accuracy(
+                    value.accuracy(),
+                )),
+                options,
+            )
+            .map_err(|error| native::map_control_error(error, path))?;
+            execute_fraction_rewrite(prepared, budget, path)
+        },
     }
 }
 
@@ -1659,18 +1759,17 @@ fn prepare_display_append(
     budget: &mut TransactionBudget,
     path: Path,
 ) -> Result<Vec<u8>, Error> {
-    let (decimal_places, negative_style, thousands_separator) = value.decimal_parts();
     let options = native::control_codec_options(source_len, budget);
     match family {
         DisplayFormatFamily::Number => {
-            let NativeDisplayValue::Number(_) = value else {
+            let NativeDisplayValue::Number(value) = value else {
                 return Err(Error::UnsupportedDependency { path });
             };
             let prepared = number_codec::prepare_number_format_write(
                 number_codec::NumberFormatWrite::new(
-                    native_decimal_places(decimal_places),
-                    native_negative_style(negative_style),
-                    matches!(thousands_separator, ThousandsSeparator::Shown),
+                    native_decimal_places(value.decimal_places()),
+                    native_negative_style(value.negative_style()),
+                    matches!(value.thousands_separator(), ThousandsSeparator::Shown),
                 ),
                 options,
             )
@@ -1696,14 +1795,14 @@ fn prepare_display_append(
             execute_currency_append(prepared, budget, path)
         },
         DisplayFormatFamily::Percentage => {
-            let NativeDisplayValue::Percentage(_) = value else {
+            let NativeDisplayValue::Percentage(value) = value else {
                 return Err(Error::UnsupportedDependency { path });
             };
             let prepared = percentage_codec::prepare_percentage_format_write(
                 percentage_codec::PercentageFormatWrite::new(
-                    native_decimal_places(decimal_places),
-                    native_negative_style(negative_style),
-                    matches!(thousands_separator, ThousandsSeparator::Shown),
+                    native_decimal_places(value.decimal_places()),
+                    native_negative_style(value.negative_style()),
+                    matches!(value.thousands_separator(), ThousandsSeparator::Shown),
                 ),
                 options,
             )
@@ -1723,6 +1822,19 @@ fn prepare_display_append(
             .map_err(|error| native::map_control_error(error, path))?;
             execute_scientific_append(prepared, budget, path)
         },
+        DisplayFormatFamily::Fraction => {
+            let NativeDisplayValue::Fraction(value) = value else {
+                return Err(Error::UnsupportedDependency { path });
+            };
+            let prepared = fraction_codec::prepare_fraction_format_write(
+                fraction_codec::FractionFormatWrite::new(native_fraction_accuracy(
+                    value.accuracy(),
+                )),
+                options,
+            )
+            .map_err(|error| native::map_control_error(error, path))?;
+            execute_fraction_append(prepared, budget, path)
+        },
     }
 }
 
@@ -1730,6 +1842,36 @@ fn native_decimal_places(value: DecimalPlaces) -> u32 {
     match value {
         DecimalPlaces::Automatic => 253,
         DecimalPlaces::Fixed(value) => u32::from(value.value()),
+    }
+}
+
+fn fraction_from_native_accuracy(value: u32, path: Path) -> Result<Fraction, Error> {
+    let accuracy = match value {
+        fraction_codec::NATIVE_FRACTION_UP_TO_ONE_DIGIT => FractionAccuracy::UpToOneDigit,
+        fraction_codec::NATIVE_FRACTION_UP_TO_TWO_DIGITS => FractionAccuracy::UpToTwoDigits,
+        fraction_codec::NATIVE_FRACTION_UP_TO_THREE_DIGITS => FractionAccuracy::UpToThreeDigits,
+        fraction_codec::NATIVE_FRACTION_HALVES => FractionAccuracy::Halves,
+        fraction_codec::NATIVE_FRACTION_QUARTERS => FractionAccuracy::Quarters,
+        fraction_codec::NATIVE_FRACTION_EIGHTHS => FractionAccuracy::Eighths,
+        fraction_codec::NATIVE_FRACTION_SIXTEENTHS => FractionAccuracy::Sixteenths,
+        fraction_codec::NATIVE_FRACTION_TENTHS => FractionAccuracy::Tenths,
+        fraction_codec::NATIVE_FRACTION_HUNDREDTHS => FractionAccuracy::Hundredths,
+        _ => return Err(Error::InvalidSource { path }),
+    };
+    Ok(Fraction::new(accuracy))
+}
+
+const fn native_fraction_accuracy(value: FractionAccuracy) -> u32 {
+    match value {
+        FractionAccuracy::UpToOneDigit => fraction_codec::NATIVE_FRACTION_UP_TO_ONE_DIGIT,
+        FractionAccuracy::UpToTwoDigits => fraction_codec::NATIVE_FRACTION_UP_TO_TWO_DIGITS,
+        FractionAccuracy::UpToThreeDigits => fraction_codec::NATIVE_FRACTION_UP_TO_THREE_DIGITS,
+        FractionAccuracy::Halves => fraction_codec::NATIVE_FRACTION_HALVES,
+        FractionAccuracy::Quarters => fraction_codec::NATIVE_FRACTION_QUARTERS,
+        FractionAccuracy::Eighths => fraction_codec::NATIVE_FRACTION_EIGHTHS,
+        FractionAccuracy::Sixteenths => fraction_codec::NATIVE_FRACTION_SIXTEENTHS,
+        FractionAccuracy::Tenths => fraction_codec::NATIVE_FRACTION_TENTHS,
+        FractionAccuracy::Hundredths => fraction_codec::NATIVE_FRACTION_HUNDREDTHS,
     }
 }
 
@@ -1783,6 +1925,20 @@ fn execute_scientific_rewrite(
         .execute(scientific_codec::RewriteExecutionLimits::exact(
             requirements,
         ))
+        .map_err(|error| native::map_control_error(error, path))?;
+    native::verify_control_report(output.report(), requirements, path)?;
+    Ok(output.into_bytes())
+}
+
+fn execute_fraction_rewrite(
+    prepared: fraction_codec::PreparedFractionFormatRewrite<'_>,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let requirements = prepared.execution_requirements();
+    native::charge_control_requirements(budget, requirements, path)?;
+    let output = prepared
+        .execute(fraction_codec::RewriteExecutionLimits::exact(requirements))
         .map_err(|error| native::map_control_error(error, path))?;
     native::verify_control_report(output.report(), requirements, path)?;
     Ok(output.into_bytes())
@@ -1843,6 +1999,20 @@ fn execute_scientific_append(
         .execute(scientific_codec::RewriteExecutionLimits::exact(
             requirements,
         ))
+        .map_err(|error| native::map_control_error(error, path))?;
+    native::verify_control_report(output.report(), requirements, path)?;
+    Ok(output.into_bytes())
+}
+
+fn execute_fraction_append(
+    prepared: fraction_codec::PreparedFractionFormatWrite,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let requirements = prepared.execution_requirements();
+    native::charge_control_requirements(budget, requirements, path)?;
+    let output = prepared
+        .execute(fraction_codec::RewriteExecutionLimits::exact(requirements))
         .map_err(|error| native::map_control_error(error, path))?;
     native::verify_control_report(output.report(), requirements, path)?;
     Ok(output.into_bytes())
