@@ -4347,3 +4347,24 @@ certification. The authoritative boundary inventory is 64 workspace packages,
 238 internal dependency declarations, 227 canonical edges, 11 development-only
 edges, 11 ordered migration debts with IDs
 `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
+
+## 2026-09-03 amendment: Keynote soundtrack-item lifecycle owner staged
+
+The focused Keynote crate now has a dedicated semantic namespace at
+`litchi_keynote::soundtrack::items`. Its public vocabulary is limited to
+semantic item summaries, an owned/validated audio source, opaque package-local
+handles, and one-operation add/insert/replace/remove transactions. Native data
+identifiers, PackageMetadata records, IWA objects, archive member names, wire
+messages, and package bytes remain private to the package adapter. The focused
+owner is kept separate from `soundtrack::order` (reference ordering) and
+`soundtrack::{Mode, Settings}` (playback settings).
+
+This is an ownership ratchet and migration increment, not a host cutover. The
+legacy `litchi-iwa` soundtrack-item CRUD surface remains retained until the
+focused implementation proves strict source selection, lazy Buffa/wire
+validation, bounded data/metadata closure, exact candidate preservation and
+inverse behavior, failure atomicity, fuzz coverage, and native Keynote
+save/close/reopen evidence for each operation. No dependency edge, ordered
+migration debt, or ADR 0028 deletion gate closes here. Soundtrack creation,
+general media-asset CRUD, and durable patch serialization remain outside this
+increment.

@@ -7,6 +7,32 @@ package deliberately depends only on the root crate with the `iwork` feature;
 it must not acquire a dependency on the legacy `litchi-iwa` migration host or
 on an internal archive, protobuf, Buffa, or concrete-format crate.
 
+`keynote_soundtrack_items` is the focused selector-first soundtrack media
+lifecycle target. It first offers arbitrary bytes to bounded Keynote ingress,
+then reuses a bounded command prefix against source-built packages with an
+absent soundtrack, an existing empty soundtrack, and one or two materialized
+WAV items. The deterministic package builder is kept in the target itself;
+the command corpus under `corpus/keynote_soundtrack_items/` contains no native
+package bytes. The lifecycle calls use only `litchi::keynote` semantic values:
+positions and opaque item handles select entries, while IDs, archive names,
+generated messages, and raw package bytes remain below the facade. Successful
+add/insert/replace/remove operations are reopened, replayed through exact
+patches, inverted byte-for-byte, and checked for source immutability. Invalid
+audio names/data, absent-vs-empty boundaries, malformed ingress, limits, and
+foreign/conflicting patches are observed as bounded redacted failures.
+
+Run a short local campaign with the same finite input and resource ceilings as
+the neighboring Keynote targets:
+
+```text
+cargo fuzz run keynote_soundtrack_items -- -max_len=4096 -timeout=10 -rss_limit_mb=2048
+```
+
+The target caps the command stream at 1 KiB even when libFuzzer receives a
+larger input, and it uses fresh package parses for each deterministic
+operation so a static fixture is never mutated or reused as transaction
+state.
+
 `keynote_slide_text` is the focused title/body robustness target. It first
 offers arbitrary bytes to the bounded Keynote package ingress, then uses those
 same bytes as commands against the repository's native `basic.key` seed. This

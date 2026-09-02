@@ -15612,3 +15612,24 @@ The current topology is 64 workspace packages, 238 internal dependency
 declarations, 227 canonical edges, 11 development-only edges, 11 ordered
 migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
 migration host. No debt, edge, host, or ADR 0028 deletion gate closes.
+
+## 2026-09-03 amendment: Keynote soundtrack-item lifecycle verification status
+
+The Keynote migration now stages a focused `soundtrack::items` semantic
+surface for bounded item summaries, owned audio sources, opaque package-local
+handles, and one-operation add/insert/replace/remove transactions. The
+companion package owner is responsible for strict root/show/soundtrack
+selection, lazy Buffa-backed validation, metadata/data-reference closure,
+fresh data allocation, exact ZIP/IWA preservation, candidate reopen/readback,
+and atomic failure behavior. The public API intentionally does not expose
+native IDs, archive names, generated messages, or package bytes.
+
+This amendment records source ownership only. The focused lifecycle is not
+native-certified: each operation still requires independent source-level
+tests for absent-versus-empty roots, duplicate/shared references, malformed
+and unknown fields, resource limits, exact locality, patch conflict/inverse,
+and fuzz coverage, followed by a real Keynote save/close/reopen probe. The
+legacy `litchi-iwa` item API remains retained until those gates pass. No
+dependency edge, ordered migration debt, or ADR 0028 deletion gate closes;
+soundtrack creation, broad media-asset CRUD, and durable patch history remain
+outside this increment.
