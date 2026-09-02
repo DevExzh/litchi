@@ -293,6 +293,57 @@
 //! );
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
+//!
+//! # Physically sort one existing table
+//!
+//! Physical table sorting is separate from editing the persisted sort
+//! configuration. The operation executes the selected table's existing
+//! order, moves body rows as complete admitted row envelopes, and keeps
+//! headers and footers fixed. Full-table execution requires a persisted
+//! [`slide::table::sort::Scope::EntireTable`] order; selected-row execution
+//! requires [`slide::table::sort::Scope::SelectedRows`] and takes a checked,
+//! body-relative half-open [`slide::table::physical_sort::RowRange`].
+//!
+//! The current owner is intentionally narrow: every addressed key must be
+//! present, and each rule must see one scalar kind across the selected rows.
+//! The admitted kinds are text, finite number, boolean, date, and duration.
+//! Text uses Rust's ordinal string ordering, booleans sort `false < true`,
+//! and numeric/date/duration values use deterministic `f64::total_cmp`
+//! ordering except that signed zeroes compare equal and retain source order.
+//! Formulas, errors, rich text, unsupported values, mixed kinds,
+//! unsupported row-affine features, and unsupported table topologies fail
+//! before publication. This is not a general table editor or a guarantee of
+//! native Keynote acceptance for arbitrary producer-authored packages.
+//!
+//! ```no_run
+//! use litchi_keynote::{Package, SlideSelector, TableSelector};
+//! use litchi_keynote::slide::table::physical_sort::RowRange;
+//!
+//! let package = Package::open("input.key")?;
+//! let commit = package.execute_slide_table_sort_order(
+//!     SlideSelector::name("Data"),
+//!     TableSelector::index(0),
+//! )?;
+//! assert!(commit.diagnostics().full_reparse_performed() || commit.patch().is_noop());
+//!
+//! // A patch is exact-source bound. Its inverse is accepted by the committed
+//! // candidate and restores the original package artifact.
+//! let restored = commit
+//!     .package()
+//!     .apply_slide_table_physical_sort(&commit.patch().inverse())?;
+//! let mut bytes = Vec::new();
+//! restored.package().write_to(&mut bytes)?;
+//! assert!(!bytes.is_empty());
+//!
+//! // For a persisted SelectedRows order, use a body-relative range instead:
+//! // let commit = package.execute_slide_table_sort_order_to_rows(
+//! //     SlideSelector::name("Data"),
+//! //     TableSelector::index(0),
+//! //     RowRange::new(0, 10)?,
+//! // )?;
+//! # let _ = RowRange::new(0, 1)?;
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
 
 #![forbid(unsafe_code)]
 
@@ -338,18 +389,18 @@ pub use package::{
     ChartLegendVisibilityDiagnostics, ChartLegendVisibilityEdit, ChartLegendVisibilityError,
     ChartLegendVisibilityLimitKind, ChartLegendVisibilityPatch, ChartTitleCommit,
     ChartTitleDiagnostics, ChartTitleEdit, ChartTitleError, ChartTitleLimitKind, ChartTitlePatch,
-    Commit, Diagnostics, Edit, EditError, Limits, MAX_OBJECTS, MAX_REFERENCES, MAX_SLIDES,
-    MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package, Patch, PayloadLimitKind,
-    ReadError, ReadOptions, SaveError, SemanticLimitKind, SemanticLimits, SemanticLimitsError,
-    SemanticPath, SlideBackgroundCommit, SlideBackgroundDiagnostics, SlideBackgroundEdit,
-    SlideBackgroundError, SlideBackgroundLimitKind, SlideBackgroundPatch, SlideMovieCaptionCommit,
-    SlideMovieCaptionDiagnostics, SlideMovieCaptionEdit, SlideMovieCaptionError,
-    SlideMovieCaptionLimitKind, SlideMovieCaptionPatch, SlideMovieGeometryCommit,
-    SlideMovieGeometryDiagnostics, SlideMovieGeometryEdit, SlideMovieGeometryError,
-    SlideMovieGeometryLimitKind, SlideMovieGeometryPatch, SlideMoviePlaybackCommit,
-    SlideMoviePlaybackDiagnostics, SlideMoviePlaybackEdit, SlideMoviePlaybackError,
-    SlideMoviePlaybackLimitKind, SlideMoviePlaybackPatch, SlideMovieTitleCommit,
-    SlideMovieTitleDiagnostics, SlideMovieTitleEdit, SlideMovieTitleError,
+    Commit, Diagnostics, Edit, EditError, KEYNOTE_PHYSICAL_SORT_OWNER_ACTIVE, Limits, MAX_OBJECTS,
+    MAX_REFERENCES, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package,
+    Patch, PayloadLimitKind, ReadError, ReadOptions, SaveError, SemanticLimitKind, SemanticLimits,
+    SemanticLimitsError, SemanticPath, SlideBackgroundCommit, SlideBackgroundDiagnostics,
+    SlideBackgroundEdit, SlideBackgroundError, SlideBackgroundLimitKind, SlideBackgroundPatch,
+    SlideMovieCaptionCommit, SlideMovieCaptionDiagnostics, SlideMovieCaptionEdit,
+    SlideMovieCaptionError, SlideMovieCaptionLimitKind, SlideMovieCaptionPatch,
+    SlideMovieGeometryCommit, SlideMovieGeometryDiagnostics, SlideMovieGeometryEdit,
+    SlideMovieGeometryError, SlideMovieGeometryLimitKind, SlideMovieGeometryPatch,
+    SlideMoviePlaybackCommit, SlideMoviePlaybackDiagnostics, SlideMoviePlaybackEdit,
+    SlideMoviePlaybackError, SlideMoviePlaybackLimitKind, SlideMoviePlaybackPatch,
+    SlideMovieTitleCommit, SlideMovieTitleDiagnostics, SlideMovieTitleEdit, SlideMovieTitleError,
     SlideMovieTitleLimitKind, SlideMovieTitlePatch, SlideNotesCommit, SlideNotesDiagnostics,
     SlideNotesEdit, SlideNotesError, SlideNotesLimitKind, SlideNotesPatch, SlideOrderCommit,
     SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind, SlideOrderPatch,
@@ -364,12 +415,15 @@ pub use package::{
     SlideTableLockStateEdit, SlideTableLockStateError, SlideTableLockStateLimitKind,
     SlideTableLockStatePatch, SlideTableLockStatePath, SlideTableNameCommit,
     SlideTableNameDiagnostics, SlideTableNameEdit, SlideTableNameError, SlideTableNameLimitKind,
-    SlideTableNamePatch, SlideTableNamePath, SlideTableSortCommit, SlideTableSortDiagnostics,
-    SlideTableSortEdit, SlideTableSortError, SlideTableSortLimitKind, SlideTableSortPatch,
-    SlideTableSortPath, SlideTableTitleCommit, SlideTableTitleDiagnostics, SlideTableTitleEdit,
-    SlideTableTitleError, SlideTableTitleLimitKind, SlideTableTitlePatch, SlideTextCommit,
-    SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind, SlideTextPatch, Stats,
-    TextStorageFailure, WriteError,
+    SlideTableNamePatch, SlideTableNamePath, SlideTablePhysicalSortCommit,
+    SlideTablePhysicalSortDiagnostics, SlideTablePhysicalSortEdit, SlideTablePhysicalSortError,
+    SlideTablePhysicalSortLimitKind, SlideTablePhysicalSortPatch, SlideTablePhysicalSortPath,
+    SlideTableSortCommit, SlideTableSortDiagnostics, SlideTableSortEdit, SlideTableSortError,
+    SlideTableSortLimitKind, SlideTableSortPatch, SlideTableSortPath, SlideTableTitleCommit,
+    SlideTableTitleDiagnostics, SlideTableTitleEdit, SlideTableTitleError,
+    SlideTableTitleLimitKind, SlideTableTitlePatch, SlideTextCommit, SlideTextDiagnostics,
+    SlideTextEdit, SlideTextError, SlideTextLimitKind, SlideTextPatch, Stats, TextStorageFailure,
+    WriteError,
 };
 pub use package::{
     ChartValueAxisCommit, ChartValueAxisDiagnostics, ChartValueAxisEdit, ChartValueAxisError,

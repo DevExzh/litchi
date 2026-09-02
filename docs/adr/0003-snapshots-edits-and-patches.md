@@ -1847,3 +1847,49 @@ claim. The topology remains 64 workspace packages, 237
 internal dependency declarations, 226 canonical edges, 11 ordered migration
 debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration
 host; this slice closes no debt or gate.
+
+## 2026-09-02 amendment: Keynote physical table `Sort Now` transactions
+
+The focused `litchi-keynote` package now owns a bounded physical row-movement
+transaction for an existing slide table. `Package::execute_slide_table_sort_order`
+and `..._to_rows` consume the persisted sort order as read-only input; the
+selector-first `SlideSelector`/`TableSelector` resolution happens before
+physical admission. `RowRange` is body-relative and half-open, so header/footer
+rows are never selected. Public values expose no native IDs, generated
+messages, archive members, or raw bytes.
+
+The owner admits only the canonical type-6001 table-model route and explicitly
+proven tile, data-list, header, UID, and empty pre-BNC sentinel shapes, together
+with scalar sort keys: text, number, boolean, date, and duration. Text compares
+with Rust lexical ordering; numeric/date/duration values use deterministic
+`f64::total_cmp` ordering; booleans use ordinary ordering; and mixed domains
+fail closed. Duplicate keys preserve deterministic source-row ordering. There
+is no public row/value reader. Admitted writes move complete tile-row
+envelopes, sparse row headers, and row/column UID mappings; cross-tile/cross-
+bucket moves and unproven row-affine dependencies refuse atomically.
+Formula/error, rich text, comments, merges, filters, groups, categories,
+pivots, spills, conditional styles, hidden/non-positional state,
+imported/provenance data, non-empty stroke, unknown mutable fields, and other
+unproven state are not silently normalized.
+
+The transaction is source-bound. Exact no-ops share the immutable source and
+retain previews. Changed commits stage one local physical rewrite, invalidate
+only the selected root previews, reopen and semantically verify the candidate,
+and return a content-free diagnostics value with an exact-source patch and
+inverse. Stale/foreign/replayed or otherwise unproven sources fail before
+publication. Strict handwritten wire preflight precedes the private lazy Buffa
+projection; source bytes remain preservation authority. The legacy
+`litchi-iwa` method remains a compatibility route, not a second semantic owner.
+
+Native Keynote open/save/close/reopen acceptance and artifact hashes are
+intentionally not claimed by this amendment. A disposable Computer Use probe
+opened a pre-hardening candidate, but the current strict owner rejects its
+app-authored source because model field 39 identifies an unowned conditional-
+style CalculationEngine dependency graph. That external run is exploratory
+evidence only; the
+operation-specific E3/E4 record remains pending until a current-admitted native
+source is rerun. The current topology is 64 workspace packages, 238 internal
+dependency declarations, 227 canonical edges, 11 development-only edges, 11
+ordered migration debts with IDs
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. No debt,
+edge, host, or ADR 0028 deletion gate closes.

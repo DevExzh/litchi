@@ -162,8 +162,17 @@ impl DecodeError {
         }
     }
 
-    pub(crate) const fn invalid() -> Self {
+    /// Construct a structural failure reported by a caller-owned visitor.
+    ///
+    /// Visitors use this only while staging validation state; the enclosing
+    /// decode remains rollback-free and publishes no partial mutation.
+    #[must_use]
+    pub const fn invalid_visitor_result() -> Self {
         Self { limit: None }
+    }
+
+    pub(crate) const fn invalid() -> Self {
+        Self::invalid_visitor_result()
     }
 
     /// Construct a typed failure for a caller-owned visitor staging

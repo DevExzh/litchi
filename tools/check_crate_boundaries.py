@@ -2371,6 +2371,404 @@ KEYNOTE_SLIDE_TABLE_SORT_PACKAGE_MARKER_GROUPS = {
         "deleted_previews",
     ),
 }
+
+# The persisted field-44 owner above is deliberately not the physical
+# "Sort Now" owner. Keep the eventual hand-off behind an explicit,
+# production-only activation token so a partial implementation cannot silently
+# retire the compatibility executor. The physical owner is intentionally
+# stricter than the persisted owner: it must prove every row-affine structure
+# it admits before moving a single tile row.
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_SEMANTIC_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "slide" / "table" / "physical_sort.rs"
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "slide_table_physical_sort.rs"
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CANONICAL_TYPES = frozenset(
+    {
+        "SlideTablePhysicalSortCommit",
+        "SlideTablePhysicalSortDiagnostics",
+        "SlideTablePhysicalSortEdit",
+        "SlideTablePhysicalSortError",
+        "SlideTablePhysicalSortLimitKind",
+        "SlideTablePhysicalSortPatch",
+        "SlideTablePhysicalSortPath",
+    }
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_SELECTOR_TYPES = frozenset(
+    {"SlideSelector", "TableSelector"}
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_PACKAGE_METHODS = frozenset(
+    {
+        "execute_slide_table_sort_order",
+        "execute_slide_table_sort_order_to_rows",
+        "apply_slide_table_physical_sort",
+    }
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_EDIT_METHODS = frozenset(
+    {"rows", "order", "commit"}
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FLAT_ALIASES = frozenset(
+    {
+        "PhysicalSortCommit",
+        "PhysicalSortDiagnostics",
+        "PhysicalSortEdit",
+        "PhysicalSortError",
+        "PhysicalSortLimitKind",
+        "PhysicalSortPatch",
+        "PhysicalSortPath",
+        "TablePhysicalSortCommit",
+        "TablePhysicalSortDiagnostics",
+        "TablePhysicalSortEdit",
+        "TablePhysicalSortError",
+        "TablePhysicalSortLimitKind",
+        "TablePhysicalSortPatch",
+        "TablePhysicalSortPath",
+    }
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ColumnRowUIDMapArchive",
+        "ComponentCatalog",
+        "DataStoreArchive",
+        "EntryEdit",
+        "ExactArtifacts",
+        "HeaderStorageArchive",
+        "HeaderStorageBucketArchive",
+        "HiddenStatesArchive",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "Resolved",
+        "SnappyStream",
+        "SourceCatalog",
+        "StrokeSidecarArchive",
+        "TableDataListArchive",
+        "TableInfoArchive",
+        "TableModelArchive",
+        "TileArchive",
+        "TileRowInfoArchive",
+        "TileStorageArchive",
+    }
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_WIRE_TYPES = frozenset(
+    {
+        # The hidden codec's borrowed snapshots/plans are implementation
+        # values too. Listing them explicitly prevents a public re-export
+        # from smuggling low-level objects through an otherwise innocuous
+        # package alias; the stable facade exposes only the transaction
+        # wrappers below the package boundary.
+        "BncCellView",
+        "BuffaDecodeOptions",
+        "Budget",
+        "ColumnRowUidMapSnapshot",
+        "DecodeError",
+        "DecodeLimit",
+        "DecodeOptions",
+        "DecodeReport",
+        "Field",
+        "FieldSpan",
+        "HeaderRecord",
+        "HeaderRowMove",
+        "HeaderSnapshot",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "ParseItem",
+        "PreparedColumnRowUidMapRewrite",
+        "PreparedHeaderRowsRewrite",
+        "PreparedTableModelPhysicalSortRewrite",
+        "PreparedTablePhysicalSortRewrite",
+        "PreparedTileRowsRewrite",
+        "RawWireView",
+        "RewriteReport",
+        "RewriteExecutionLimits",
+        "RewriteExecutionRequirements",
+        "RewriteRequirements",
+        "RowMove",
+        "RowUidPermutation",
+        "StoredValue",
+        "TileRowInfoSnapshot",
+        "TileRowRecord",
+        "TileSnapshot",
+        "PhysicalTableSortSnapshot",
+        "LitchiIwaTablePhysicalSortProjection",
+        "TablePhysicalSortSnapshot",
+        "Uuid",
+        "Value",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_PROTO_ORIGINS = frozenset(
+    {
+        "Buffa",
+        "buffa",
+        "Prost",
+        "ProstTypes",
+        "prost",
+        "prost_types",
+        "kn",
+        "tst",
+        "tsp",
+        "tsd",
+        "litchi_iwa_protos",
+    }
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_ACTIVATION = re.compile(
+    r"(?<![A-Za-z0-9_])KEYNOTE_PHYSICAL_SORT_OWNER_ACTIVE(?![A-Za-z0-9_])"
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/numbers_table_physical_sort_codec.rs"
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_MODULES = (
+    "numbers_table_physical_sort_codec",
+    "table_physical_sort_codec",
+)
+# Keep codec API checks tolerant of a neutral table_* alias while still
+# requiring the prepared, lazy rewrite lifecycle. The first spelling is the
+# canonical one used by the focused owner and by the boundary fixtures.
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_REQUIRED_APIS = {
+    "snapshot": (
+        "TileSnapshot",
+        "HeaderSnapshot",
+        "ColumnRowUidMapSnapshot",
+        "PhysicalTableSortSnapshot",
+        "TablePhysicalSortSnapshot",
+    ),
+    "uid-map decode": ("decode_column_row_uid_map",),
+    "tile-row plan": ("plan_tile_rows_rewrite",),
+    "header-row plan": ("plan_header_storage_bucket_rows",),
+    "uid-map plan": ("plan_column_row_uid_map_rewrite",),
+    "tile-row execute": ("execute_tile_rows_rewrite",),
+    "header-row execute": ("execute_header_storage_bucket_rows",),
+    "uid-map execute": ("execute_column_row_uid_map_rewrite",),
+    "decode": (
+        "decode_tile_for_rewrite",
+        "decode_header_bucket_for_rewrite",
+        "decode_table_physical_sort_with_report",
+        "decode_table_model_physical_sort_with_report",
+    ),
+    "prepared rewrite": (
+        "plan_tile_rows_rewrite",
+        "plan_header_storage_bucket_rows",
+        "plan_column_row_uid_map_rewrite",
+        "prepare_table_physical_sort_rewrite",
+        "prepare_table_model_physical_sort_rewrite",
+    ),
+    "prepared type": (
+        "PreparedTileRowsRewrite",
+        "PreparedHeaderRowsRewrite",
+        "PreparedColumnRowUidMapRewrite",
+        "PreparedTablePhysicalSortRewrite",
+        "PreparedTableModelPhysicalSortRewrite",
+    ),
+    "execution requirements": (
+        "RewriteExecutionRequirements",
+        "RewriteRequirements",
+    ),
+    "execution limits": ("RewriteExecutionLimits", "DecodeOptions"),
+}
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_FLOW_MARKERS = {
+    "borrowed/lazy projection": re.compile(
+        r"\b(?:Buffa|buffa|WireView|BncCellView|decode_lazy_view|lazy|borrowed)\b"
+    ),
+    "strict admission": re.compile(
+        r"\b(?:preflight|validate|strict|reject|Unsupported)\w*\b"
+    ),
+    "prepared execution": re.compile(
+        r"\b(?:execution_requirements|requirements|exact_limits|"
+        r"execute(?:_[A-Za-z0-9_]+)?)\s*\("
+    ),
+    "raw-preserving rewrite": re.compile(
+        r"\b(?:replace_message_preserving|NestedFieldReplacement|"
+        r"preserv(?:e|ing)_unknown|unknown_fields|replace_nested_varint|"
+        r"assemble_(?:tile|header|uid)|FieldSpan)\w*\b"
+    ),
+}
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_MARKER_GROUPS = {
+    "selector-first exact admission": (
+        re.compile(r"\bselect_table\s*\("),
+        re.compile(r"\b(?:SlideSelector|TableSelector)\b"),
+        re.compile(r"\b(?:exact_source|source_fingerprint|same_target)\b"),
+    ),
+    "shared bounded budget": (
+        re.compile(r"\b(?:Budget|TransactionBudget|PhysicalSortBudget)\b"),
+        re.compile(r"\b(?:try_reserve|reserve_exact|charge_|max_rows)\w*\b"),
+        re.compile(r"\b(?:PhysicalRows|PhysicalColumns|KeyCells)\b"),
+    ),
+    "exact patch and inverse": (
+        re.compile(r"\bExactArtifacts\b"),
+        re.compile(r"\binverse\s*\("),
+        re.compile(r"\bPatchConflict\b"),
+        re.compile(r"\b(?:source|target)_fingerprint\b"),
+    ),
+    "candidate verification": (
+        re.compile(r"\b(?:candidate|reopen)\b"),
+        re.compile(r"\b(?:validate|verify)\w*\s*\("),
+        re.compile(r"\b(?:prepare_reassembly|reassembly)\b"),
+    ),
+    "exact locality allowlist": (
+        # The physical owner uses a distinct helper because its allowlist
+        # admits several changed component members.  Keep the generic helper
+        # spelling accepted for synthetic boundary fixtures while recognizing
+        # the canonical physical spelling as well.
+        re.compile(r"\bverify_(?:physical_)?locality\s*\("),
+        re.compile(
+            r"\b(?:LocalityAllowlist|locality|allowlist|allowed_members|"
+            r"touched_members|touched_components)\w*\b"
+        ),
+        re.compile(
+            r"\b(?:with_model_component|changed_components|same_target|"
+            r"exact_target)\b"
+        ),
+    ),
+    "preview invalidation/preservation": (
+        # Changed physical rows invalidate the root previews, while an exact
+        # no-op must report that no preview was deleted. Require both sides of
+        # that contract in the owner rather than accepting a stale zero-only
+        # diagnostic.
+        re.compile(r"\broot_preview_deletions\b"),
+        re.compile(r"\bdeleted_previews\b"),
+    ),
+    "tile row affinity": (
+        re.compile(r"\b(?:TileStorage|TileArchive|TileRowInfo(?:Snapshot)?)\b"),
+        re.compile(r"\b(?:rowInfos|row_infos|tile_row_index|numrows)\b"),
+        re.compile(r"\b(?:row_coverage|row_permutation|permutation)\w*\b"),
+    ),
+    "sparse header affinity": (
+        re.compile(
+            r"\b(?:HeaderStorage|HeaderStorageBucket|Header(?:Snapshot)?|"
+            r"HeaderRowMove)\b"
+        ),
+        re.compile(
+            r"\b(?:row_header_indices|header_index|header_indices|sparse_headers)\b"
+        ),
+        re.compile(r"\b(?:bucket|bucket_index)\w*\b"),
+    ),
+    "row UID bijection": (
+        re.compile(
+            r"\b(?:ColumnRowUIDMap|row_uid|uid_for_index|index_for_uid)\w*\b"
+        ),
+        re.compile(r"\b(?:bijection|inverse_consistent|uid_map)\w*\b"),
+        re.compile(r"\b(?:row_count|number_of_rows|body_rows)\b"),
+    ),
+    "border/stroke affinity": (
+        # Stroke sidecars are validated by the shared physical admission
+        # routine before the owner receives its topology.  Accept that
+        # canonical delegation alongside the historical explicit sidecar
+        # vocabulary; the remaining markers still require the topology-based
+        # locality fence and mutable-component census in the owner.
+        re.compile(
+            r"\b(?:StrokeSidecar|StrokeLayer|StrokeRun|stroke_sidecar|"
+            r"admit_physical_table)\b"
+        ),
+        re.compile(
+            r"\b(?:row_layer|top_row|bottom_row|stroke_rows|"
+            r"ensure_component_local|with_physical_topology)\w*\b"
+        ),
+        re.compile(
+            r"\b(?:run|runs|candidate\.component|component\.as_ref|"
+            r"mutable_component_count)\w*\b"
+        ),
+    ),
+    "hidden-axis affinity": (
+        re.compile(
+            r"\b(?:HiddenStates|hidden_states|user_hidden|hiding_state)\w*\b"
+        ),
+        re.compile(r"\b(?:row_uid|column_uid|positional)\w*\b"),
+        re.compile(r"\b(?:restore|snapshot|hidden)\w*\b"),
+    ),
+    "explicit dependency refusals": (
+        re.compile(r"\b(?:UnsupportedDependency|unsupported_dependency)\b"),
+        re.compile(
+            r"\b(?:formula|formula_error|merge|conditional|filtered|"
+            r"pivot|spill|group)\w*\b"
+        ),
+        re.compile(r"\b(?:reject|refuse|unsupported)\w*\b"),
+    ),
+}
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FORBIDDEN_OWNER_PATTERNS = (
+    (
+        "eager Prost/generated decode",
+        re.compile(
+            r"\bprost\s*::\s*Message\b|"
+            r"\b(?:kn|tst|tsp|tsd)\s*::\s*[A-Za-z_][A-Za-z0-9_]*\s*::\s*decode\s*\("
+        ),
+    ),
+    (
+        "direct legacy Numbers writer",
+        re.compile(
+            r"(?<![A-Za-z0-9_])(?:crate\s*::\s*numbers\s*::\s*editor\s*::\s*)?"
+            r"apply_table_sort_order(?:_to_rows)?_in_package\s*\("
+        ),
+    ),
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_LEGACY_WRITER_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:crate\s*::\s*numbers\s*::\s*editor\s*::\s*)?"
+    r"apply_table_sort_order(?:_to_rows)?_in_package\s*\("
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_LEGACY_WRITER_IMPORT = re.compile(
+    r"(?m)\buse\s+[^;\n]*\b(?:numbers\s*::\s*editor\s*::\s*)?"
+    r"apply_table_sort_order(?:_to_rows)?_in_package\b\s+as\s+"
+    r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)"
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_HOST_SOURCE_ROOT = IWA_KEYNOTE_SOURCE_ROOT
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_PUBLIC_RAW_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|native_id|object_id|model_id|"
+    r"component_id|member_id|archive_id|message_id|uuid|source_bytes|bytes|"
+    r"raw_message|raw_bytes)"
+    r"[ \t\r\n]*:[ \t\r\n]*(?:u64|u32|usize|i64|i32|&\s*\[\s*u8\s*\])"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_TEST_SOURCES = (
+    Path("crates/litchi-keynote/tests/slide_table_physical_sort.rs"),
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FUZZ_SOURCES = (
+    Path(
+        "crates/litchi-iwa-protos/fuzz/fuzz_targets/keynote_table_physical_sort_codec.rs"
+    ),
+    Path("crates/litchi/fuzz/fuzz_targets/keynote_slide_table_physical_sort.rs"),
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FUZZ_CORPORA = (
+    Path("crates/litchi-iwa-protos/fuzz/corpus/keynote_table_physical_sort_codec"),
+    Path("crates/litchi/fuzz/corpus/keynote_slide_table_physical_sort"),
+)
+# A short-lived neutral spelling was used by the first physical-sort handoff.
+# Accept it only as an explicit compatibility location while the focused
+# Keynote target remains the canonical evidence path above. This keeps a
+# partially migrated checkout auditable without weakening the requirement for
+# two independent fuzz harnesses and non-empty corpora.
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FUZZ_CODEC_ALTERNATES = (
+    (
+        Path(
+            "crates/litchi-iwa-protos/fuzz/fuzz_targets/numbers_table_physical_sort_codec.rs"
+        ),
+        Path("crates/litchi-iwa-protos/fuzz/corpus/numbers_table_physical_sort_codec"),
+    ),
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_DOC_SOURCES = (
+    Path("docs/adr/0008-migration-and-verification.md"),
+    Path("docs/adr/0028-iwa-monolith-exit.md"),
+    Path("crates/litchi-keynote/docs/FEATURE_MATRIX.md"),
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_DOC_MARKERS = (
+    re.compile(r"(?i)Keynote[^\n]{0,120}(?:physical|Sort Now)"),
+    re.compile(r"(?i)(?:physical|Sort Now)[^\n]{0,160}Keynote"),
+    re.compile(r"execute_slide_table_sort_order"),
+)
 KEYNOTE_SLIDE_TABLE_SORT_FORBIDDEN_OWNER_PATTERNS = (
     (
         "local SortBudget",
@@ -19736,7 +20134,9 @@ def audit_numbers_table_appearance_facade_source_topology(
 
     lib_path = root / NUMBERS_TABLE_APPEARANCE_EXPORT_SOURCES[0]
     lib_source = (
-        _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        )
         if lib_path.is_file()
         else ""
     )
@@ -42711,6 +43111,723 @@ def audit_keynote_slide_table_sort_resource_source_topology(
     return sorted(set(violations))
 
 
+def _keynote_slide_table_physical_sort_owner_present(root: Path) -> bool:
+    """Return whether the physical Keynote Sort Now hand-off is active.
+
+    The source file and private module declaration are intentionally not
+    enough to activate this gate.  A production-only token makes activation
+    explicit and keeps an incomplete owner dormant while the compatibility
+    executor is still being migrated.
+    """
+
+    owner_path = root / KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE
+    package_path = root / KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_EXPORT_SOURCES[0]
+    if not owner_path.is_file() or not package_path.is_file():
+        return False
+    owner = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    )
+    package = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+    )
+    return (
+        KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_ACTIVATION.search(owner) is not None
+        and re.search(
+            r"(?m)^(?:pub[ \t]*\([ \t]*crate[ \t]*\)[ \t]+)?"
+            r"mod[ \t]+slide_table_physical_sort\s*;",
+            package,
+        )
+        is not None
+    )
+
+
+def _keynote_slide_table_physical_sort_masked_sources(
+    root: Path,
+) -> dict[Path, str]:
+    """Read the physical-sort source set with cfg(test) items removed."""
+
+    paths = (
+        root / KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE,
+        root / KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_SEMANTIC_SOURCE,
+        root / KEYNOTE_SLIDE_TABLE_SORT_SELECTOR_SOURCE,
+        *(root / path for path in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_EXPORT_SOURCES),
+    )
+    return {
+        path: _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        if path.is_file()
+        else ""
+        for path in paths
+    }
+
+
+def _keynote_slide_table_physical_sort_public_leak(
+    identifier: str,
+) -> str | None:
+    """Classify an identifier that must stay private to the physical owner."""
+
+    # The archive-free stable permutation planner is the one shared semantic
+    # dependency intentionally allowed in the public semantic module.
+    if identifier == "litchi_iwa_common":
+        return None
+    if identifier in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if (
+        identifier == "wire"
+        or identifier in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_WIRE_TYPES
+    ):
+        return "wire type"
+    return _iwork_public_leak(identifier)
+
+
+def audit_keynote_slide_table_physical_sort_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first physical Keynote Sort Now facade.
+
+    This audit is dormant until the explicit production activation token is
+    present. Once active, it checks the complete public surface separately
+    from the persisted field-44 sort-order owner: the physical owner must
+    expose selectors and typed transactions, while all archives, wire views,
+    generated messages, IDs, and byte slices remain private.
+    """
+
+    if not _keynote_slide_table_physical_sort_owner_present(root):
+        return []
+
+    owner_path = root / KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE
+    semantic_path = root / KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_SEMANTIC_SOURCE
+    selector_path = root / KEYNOTE_SLIDE_TABLE_SORT_SELECTOR_SOURCE
+    package_path, lib_path = (
+        root / path for path in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_EXPORT_SOURCES
+    )
+    sources = _keynote_slide_table_physical_sort_masked_sources(root)
+    code = {path: _mask_rust_non_code(source) for path, source in sources.items()}
+    violations: list[str] = []
+
+    for path, label in (
+        (owner_path, "private package owner source"),
+        (semantic_path, "semantic source"),
+        (selector_path, "selector source"),
+        (package_path, "package export source"),
+        (lib_path, "crate export source"),
+    ):
+        if not path.is_file():
+            violations.append(
+                "focused litchi-keynote physical slide-table sort is missing "
+                f"{label}: {path.relative_to(root)}"
+            )
+
+    package_code = code[package_path]
+    module_matches = list(
+        re.finditer(
+            r"(?m)^(?P<indent>\s*)(?P<public>pub(?:\([^()]*\))?\s+)?"
+            r"mod\s+slide_table_physical_sort\s*;",
+            package_code,
+        )
+    )
+    if not module_matches:
+        violations.append(
+            "focused litchi-keynote physical slide-table sort is missing private "
+            f"owner module: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_EXPORT_SOURCES[0]}"
+        )
+    elif any(match.group("public") for match in module_matches):
+        line_number = package_code.count("\n", 0, module_matches[0].start()) + 1
+        violations.append(
+            "focused litchi-keynote physical slide-table sort owner module must remain "
+            f"private: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_EXPORT_SOURCES[0]}:{line_number}"
+        )
+
+    owner_source = sources[owner_path]
+    semantic_source = sources[semantic_path]
+    package_source = sources[package_path]
+    lib_source = sources[lib_path]
+    owner_code = code[owner_path]
+    semantic_code = code[semantic_path]
+
+    for name in sorted(KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CANONICAL_TYPES):
+        for path in (owner_path, package_path, lib_path):
+            if name not in _rust_canonical_exports(
+                sources[path], KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CANONICAL_TYPES
+            ):
+                violations.append(
+                    "focused litchi-keynote physical slide-table sort public API is "
+                    f"missing canonical type {name}: {path.relative_to(root)}"
+                )
+
+    if re.search(r"(?m)^\s*pub\s+mod\s+transaction\b", semantic_code) is None:
+        violations.append(
+            "focused litchi-keynote physical slide-table sort semantic API is missing "
+            f"transaction module: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_SEMANTIC_SOURCE}"
+        )
+    for marker in ("Order", "Rule", "Scope", "RowRange"):
+        if re.search(rf"\b{marker}\b", semantic_code) is None:
+            violations.append(
+                "focused litchi-keynote physical slide-table sort semantic API is "
+                f"missing {marker}: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_SEMANTIC_SOURCE}"
+            )
+
+    for name in sorted(KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_SELECTOR_TYPES):
+        if name not in _rust_canonical_exports(
+            sources[selector_path] + sources[lib_path],
+            KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_SELECTOR_TYPES,
+        ):
+            violations.append(
+                "focused litchi-keynote physical slide-table sort public API is "
+                f"missing selector {name}: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_EXPORT_SOURCES[1]}"
+            )
+    if re.search(
+        r"impl[ \t\r\n]+(?:[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*)?"
+        r"TableSelector\b[\s\S]*?\bpub[ \t]+(?:const[ \t]+)?fn[ \t]+"
+        r"(?:index|position)\b",
+        code[selector_path],
+    ) is None:
+        violations.append(
+            "focused litchi-keynote physical slide-table sort selector must expose "
+            f"checked TableSelector::index/position: {KEYNOTE_SLIDE_TABLE_SORT_SELECTOR_SOURCE}"
+        )
+
+    owner_methods = {
+        name: (declaration, line_number)
+        for name, declaration, line_number in _rust_public_methods_in_impl(
+            owner_source, "Package"
+        )
+    }
+    for name in sorted(KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_PACKAGE_METHODS):
+        record = owner_methods.get(name)
+        if record is None:
+            violations.append(
+                "focused litchi-keynote physical slide-table sort Package method is "
+                f"missing {name}: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE}"
+            )
+            continue
+        declaration, line_number = record
+        if name == "apply_slide_table_physical_sort":
+            if "SlideTablePhysicalSortPatch" not in declaration:
+                violations.append(
+                    "focused litchi-keynote physical slide-table sort apply method must "
+                    "accept SlideTablePhysicalSortPatch: "
+                    f"{KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE}:{line_number}"
+                )
+        else:
+            for selector in ("SlideSelector", "TableSelector"):
+                if re.search(rf"\b{selector}\b", declaration) is None:
+                    violations.append(
+                        "focused litchi-keynote physical slide-table sort Package method "
+                        f"{name} must accept selector-first {selector}: "
+                        f"{KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE}:{line_number}"
+                    )
+            if (
+                name == "execute_slide_table_sort_order_to_rows"
+                and re.search(r"\bRowRange\b", declaration) is None
+            ):
+                violations.append(
+                    "focused litchi-keynote physical slide-table sort selected-row "
+                    "method must accept RowRange: "
+                    f"{KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE}:{line_number}"
+                )
+        raw_identifier = KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_PUBLIC_RAW_PARAMETER.search(
+            declaration
+        )
+        if raw_identifier is not None:
+            violations.append(
+                "focused litchi-keynote physical slide-table sort Package method exposes "
+                f"raw parameter {raw_identifier.group(0).strip()}: "
+                f"{KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE}:{line_number}"
+            )
+        if re.search(r"\bu64\b|&\s*\[\s*u8\s*\]", declaration):
+            violations.append(
+                "focused litchi-keynote physical slide-table sort Package method exposes "
+                f"raw physical type: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE}:{line_number}"
+            )
+
+    edit_methods = {
+        name
+        for name, _declaration, _line_number in _rust_public_methods_in_impl(
+            owner_source, "SlideTablePhysicalSortEdit"
+        )
+    }
+    for name in sorted(KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_EDIT_METHODS - edit_methods):
+        violations.append(
+            "focused litchi-keynote physical slide-table sort edit is missing "
+            f"{name}: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE}"
+        )
+
+    facade_names = (
+        KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CANONICAL_TYPES
+        | KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_SELECTOR_TYPES
+        | KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_PACKAGE_METHODS
+        | KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FLAT_ALIASES
+        | {"Order", "Rule", "Scope", "RowRange", "transaction"}
+    )
+    for path in (owner_path, semantic_path, selector_path, package_path, lib_path):
+        dedicated = path in {owner_path, semantic_path}
+        for declaration, line_number in _rust_public_declarations(sources[path]):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            # A broad package/lib re-export can hide every low-level symbol
+            # behind `*`, leaving no canonical identifier for the ordinary
+            # facade filter to find. Force declarations that mention this
+            # physical-sort path or any protobuf/wire origin through the leak
+            # scanner before applying the narrower unrelated-item filter.
+            physical_reexport = (
+                "pub use" in declaration
+                and re.search(
+                    r"\b(?:slide_table_physical_sort|physical_sort|"
+                    r"numbers_table_physical_sort_codec|table_physical_sort_codec|"
+                    r"keynote_table_physical_sort_codec|litchi_iwa_protos|"
+                    r"buffa|prost(?:_types)?)\b",
+                    declaration,
+                )
+                is not None
+            )
+            if not dedicated and not physical_reexport and not identifiers.intersection(
+                facade_names
+            ):
+                continue
+            for identifier in sorted(identifiers):
+                reason = _keynote_slide_table_physical_sort_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-keynote physical slide-table sort public API "
+                        f"exposes {reason} {identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+                if identifier in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-keynote physical slide-table sort public API "
+                        f"retains flat alias {identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                violations.append(
+                    "focused litchi-keynote physical slide-table sort public API exposes "
+                    f"raw byte slice {byte_slice}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_PUBLIC_RAW_PARAMETER.finditer(
+                declaration
+            ):
+                violations.append(
+                    "focused litchi-keynote physical slide-table sort public API exposes "
+                    f"raw parameter {match.group(0).strip()}: {path.relative_to(root)}:{line_number}"
+                )
+            if "pub use" in declaration and "*" in declaration:
+                violations.append(
+                    "focused litchi-keynote physical slide-table sort public API retains "
+                    f"a glob re-export: {path.relative_to(root)}:{line_number}"
+                )
+
+    # A physical owner may use the infrastructure crates privately, but it
+    # cannot fall back to generated Prost decoding. Keep this scan source-local
+    # and production-only so test fixtures can retain adversarial decoys.
+    for path, source in ((owner_path, owner_source), (semantic_path, semantic_source)):
+        masked = _mask_rust_non_code(source)
+        for label, pattern in KEYNOTE_NO_EAGER_PROST_SOURCE_PATTERNS:
+            for match in pattern.finditer(masked):
+                line_number = masked.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "focused litchi-keynote physical slide-table sort owner retains "
+                    f"{label}: {path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
+def _keynote_slide_table_physical_sort_manifest_dependencies(
+    root: Path,
+) -> tuple[dict[str, int], dict[str, int]]:
+    """Return normal and dev dependency names with source line numbers."""
+
+    path = root / KEYNOTE_PACKAGE_MANIFEST
+    if not path.is_file():
+        return {}, {}
+    normal: dict[str, int] = {}
+    dev: dict[str, int] = {}
+    section: str | None = None
+    for line_number, line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            section = stripped[1:-1]
+            continue
+        is_normal_section = section == "dependencies" or (
+            section.startswith("target.") and section.endswith(".dependencies")
+        )
+        is_dev_section = section == "dev-dependencies" or (
+            section.startswith("target.") and section.endswith(".dev-dependencies")
+        )
+        if not (is_normal_section or is_dev_section):
+            continue
+        match = re.match(r"([A-Za-z0-9_-]+)\s*=", stripped)
+        if match is None:
+            continue
+        # Cargo accepts underscores and hyphens interchangeably in package
+        # keys; compare the canonical hyphenated spelling so an alias cannot
+        # bypass the dependency policy.
+        dependency = match.group(1).replace("_", "-")
+        (normal if is_normal_section else dev)[dependency] = line_number
+    return normal, dev
+
+
+def _audit_keynote_slide_table_physical_sort_codec(
+    root: Path,
+) -> list[str]:
+    """Require the hidden lazy Buffa projection/rewrite and fuzz harness."""
+
+    violations: list[str] = []
+    codec_path = root / KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_SOURCE
+    if not codec_path.is_file():
+        violations.append(
+            "focused litchi-keynote physical slide-table sort is missing strict "
+            f"codec source: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_SOURCE}"
+        )
+        return violations
+
+    raw_codec = codec_path.read_text(encoding="utf-8")
+    codec_source = _mask_rust_cfg_test_items(raw_codec)
+    codec_code = _mask_rust_non_code(codec_source)
+    for label, names in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_REQUIRED_APIS.items():
+        if any(
+            re.search(
+                rf"\b(?:pub\s+)?(?:fn|struct|enum|type)\s+{re.escape(name)}\b",
+                codec_code,
+            )
+            is not None
+            for name in names
+        ):
+            continue
+        violations.append(
+            "focused litchi-keynote physical slide-table sort hidden codec is missing "
+            f"{label}: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_SOURCE}"
+        )
+    for label, marker in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_FLOW_MARKERS.items():
+        if marker.search(codec_code) is None:
+            violations.append(
+                "focused litchi-keynote physical slide-table sort hidden codec is "
+                f"missing {label}: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_SOURCE}"
+            )
+
+    lib_path = root / KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_PUBLIC_SOURCE
+    lib_source = (
+        _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    for module in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_MODULES:
+        if re.search(
+            rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+            rf"pub\s+mod\s+{re.escape(module)}\b",
+            lib_source,
+        ) is None:
+            violations.append(
+                "focused litchi-keynote physical slide-table sort is missing hidden "
+                f"codec module {module}: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_PUBLIC_SOURCE}"
+            )
+
+    if re.search(r"(?m)#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\]", raw_codec) is None:
+        violations.append(
+            "focused litchi-keynote physical slide-table sort hidden codec is missing "
+            f"cfg(test) coverage: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_SOURCE}"
+        )
+    elif re.search(r"(?m)#\s*\[\s*test\s*\]", raw_codec) is None:
+        violations.append(
+            "focused litchi-keynote physical slide-table sort hidden codec is missing "
+            f"#[test] coverage: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_SOURCE}"
+        )
+
+    for label, pattern in KEYNOTE_NO_EAGER_PROST_SOURCE_PATTERNS:
+        for match in pattern.finditer(codec_code):
+            line_number = codec_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-keynote physical slide-table sort codec retains "
+                f"{label}: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_SOURCE}:{line_number}"
+            )
+
+    for fuzz_index, fuzz_path in enumerate(
+        KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FUZZ_SOURCES
+    ):
+        absolute = root / fuzz_path
+        # The codec target briefly used a neutral Numbers spelling during the
+        # handoff. Prefer the canonical Keynote target whenever it exists;
+        # otherwise accept one explicitly listed compatibility target so an
+        # otherwise complete checkout does not fail solely on that rename.
+        if not absolute.is_file() and fuzz_index == 0:
+            for alternate_target, _alternate_corpus in (
+                KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FUZZ_CODEC_ALTERNATES
+            ):
+                candidate = root / alternate_target
+                if candidate.is_file():
+                    absolute = candidate
+                    break
+        if not absolute.is_file():
+            violations.append(
+                "focused litchi-keynote physical slide-table sort is missing fuzz target: "
+                f"{fuzz_path}"
+            )
+        elif "fuzz_target!" not in absolute.read_text(encoding="utf-8"):
+            violations.append(
+                "focused litchi-keynote physical slide-table sort fuzz target is missing "
+                f"fuzz_target! harness: {fuzz_path}"
+            )
+    for corpus_index, corpus in enumerate(
+        KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FUZZ_CORPORA
+    ):
+        absolute = root / corpus
+        if not absolute.is_dir() and corpus_index == 0:
+            for _alternate_target, alternate_corpus in (
+                KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FUZZ_CODEC_ALTERNATES
+            ):
+                candidate = root / alternate_corpus
+                if candidate.is_dir():
+                    absolute = candidate
+                    break
+        if not absolute.is_dir():
+            violations.append(
+                "focused litchi-keynote physical slide-table sort is missing fuzz corpus: "
+                f"{corpus}"
+            )
+        elif not any(absolute.iterdir()):
+            violations.append(
+                "focused litchi-keynote physical slide-table sort fuzz corpus is empty: "
+                f"{corpus}"
+            )
+    return violations
+
+
+def audit_keynote_slide_table_physical_sort_resource_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require full physical ownership, evidence, and dependency gates."""
+
+    if not _keynote_slide_table_physical_sort_owner_present(root):
+        return []
+
+    owner_path = root / KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE
+    semantic_path = root / KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_SEMANTIC_SOURCE
+    codec_path = root / KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_SOURCE
+    owner = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+        )
+        if owner_path.is_file()
+        else ""
+    )
+    semantic = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(semantic_path.read_text(encoding="utf-8"))
+        )
+        if semantic_path.is_file()
+        else ""
+    )
+    codec = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(codec_path.read_text(encoding="utf-8"))
+        )
+        if codec_path.is_file()
+        else ""
+    )
+    violations: list[str] = []
+
+    for label, markers in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_MARKER_GROUPS.items():
+        # The row-affine admission proof belongs to the package owner. Do not
+        # let a generic codec helper or semantic type name satisfy an owner
+        # marker; otherwise removing an admitted structure from the actual
+        # transaction could silently pass because the codec mentions it.
+        if not all(marker.search(owner) is not None for marker in markers):
+            violations.append(
+                "focused litchi-keynote physical slide-table sort owner is missing "
+                f"{label} marker: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE}"
+            )
+
+    for label, pattern in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FORBIDDEN_OWNER_PATTERNS:
+        match = pattern.search(owner)
+        if match is not None:
+            line_number = owner.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-keynote physical slide-table sort owner must not retain "
+                f"{label}: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE}:{line_number}"
+            )
+
+    # Exact/native packages must not call the old Numbers mutation writer once
+    # the owner is active. The sole temporary exception is the marker-proven
+    # KeynoteDocumentBuilder compatibility graph, including its save/reopen
+    # form; its writer is isolated behind one guarded dispatcher. Scan all
+    # production Keynote helpers, including split child modules, while masking
+    # cfg(test) bodies to avoid fixture decoys.
+    host_root = root / KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_HOST_SOURCE_ROOT
+    if host_root.is_dir():
+        for path in sorted(host_root.rglob("*.rs")):
+            # `slide_tables.rs` includes `slide_tables/tests.rs` from an outer
+            # cfg(test) module. The child file has no local attribute for the
+            # item masker to see, so treat conventional Rust test modules as
+            # test-only at the file boundary as well.
+            if path.name == "tests.rs":
+                continue
+            production_source = _mask_rust_cfg_test_items(
+                path.read_text(encoding="utf-8")
+            )
+            source_built_probe = _rust_named_function_body(
+                production_source, "source_built_compatibility_package"
+            )
+            source_built_dispatch = _rust_named_function_body(
+                production_source, "execute_table_sort_selection"
+            )
+            source_built_fallback = _rust_named_function_body(
+                production_source, "execute_source_built_table_sort"
+            )
+            guarded_source_built_fallback = (
+                source_built_probe is not None
+                and source_built_dispatch is not None
+                and source_built_fallback is not None
+                and all(
+                    token in source_built_probe[0]
+                    for token in (
+                        "source_is_exact",
+                        "template_identifier",
+                        "SOURCE_BUILT_TEMPLATE",
+                        "DOCUMENT_MESSAGE_TYPE",
+                    )
+                )
+                and all(
+                    token in source_built_dispatch[0]
+                    for token in (
+                        "source_built_compatibility_package",
+                        "execute_source_built_table_sort",
+                        "execute_focused_table_sort",
+                    )
+                )
+            )
+            source_for_writer_scan = production_source
+            if guarded_source_built_fallback:
+                source_for_writer_scan = _rust_mask_named_function_bodies(
+                    production_source,
+                    frozenset({"execute_source_built_table_sort"}),
+                )
+                calls_outside_dispatch = _mask_rust_non_code(
+                    _rust_mask_named_function_bodies(
+                        production_source,
+                        frozenset(
+                            {
+                                "execute_source_built_table_sort",
+                                "execute_table_sort_selection",
+                            }
+                        ),
+                    )
+                )
+                if re.search(
+                    r"(?<![A-Za-z0-9_])execute_source_built_table_sort\s*\(",
+                    calls_outside_dispatch,
+                ) is not None:
+                    violations.append(
+                        "retired litchi-iwa Keynote physical sort source-built "
+                        f"fallback escapes its guarded dispatcher: {path.relative_to(root)}"
+                    )
+            source = _mask_rust_non_code(source_for_writer_scan)
+            legacy_aliases = {
+                match.group("alias")
+                for match in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_LEGACY_WRITER_IMPORT.finditer(
+                    source
+                )
+            }
+            for match in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_LEGACY_WRITER_CALL.finditer(
+                source
+            ):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote physical sort retains legacy Numbers "
+                    f"writer call: {path.relative_to(root)}:{line_number}"
+                )
+            for alias in sorted(legacy_aliases):
+                for match in re.finditer(
+                    rf"(?<![A-Za-z0-9_]){re.escape(alias)}\s*\(", source
+                ):
+                    line_number = source.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        "retired litchi-iwa Keynote physical sort retains aliased "
+                        f"legacy Numbers writer call: {path.relative_to(root)}:{line_number}"
+                    )
+
+    normal, dev = _keynote_slide_table_physical_sort_manifest_dependencies(root)
+    manifest_path = root / KEYNOTE_PACKAGE_MANIFEST
+    if not manifest_path.is_file():
+        violations.append(
+            "focused litchi-keynote physical slide-table sort is missing package "
+            f"manifest: {KEYNOTE_PACKAGE_MANIFEST}"
+        )
+    else:
+        for dependency in ("litchi-iwa", "litchi-numbers", "prost", "prost-types"):
+            if dependency in normal:
+                violations.append(
+                    "focused litchi-keynote physical slide-table sort must not add "
+                    f"normal dependency {dependency}: {KEYNOTE_PACKAGE_MANIFEST}:{normal[dependency]}"
+                )
+        for dependency in ("litchi-iwa-common", "litchi-iwa-protos"):
+            if dependency not in normal:
+                violations.append(
+                    "focused litchi-keynote physical slide-table sort requires normal "
+                    f"dependency {dependency}: {KEYNOTE_PACKAGE_MANIFEST}"
+                )
+        # A dev-only Prost dependency is acceptable for legacy/generated
+        # fixture tests; it must never leak into production ownership.
+        _ = dev
+
+    violations.extend(_audit_keynote_slide_table_physical_sort_codec(root))
+
+    for test_path in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_TEST_SOURCES:
+        absolute = root / test_path
+        if not absolute.is_file():
+            violations.append(
+                "focused litchi-keynote physical slide-table sort is missing integration "
+                f"test: {test_path}"
+            )
+            continue
+        raw_test = absolute.read_text(encoding="utf-8")
+        test_source = _mask_rust_cfg_test_items(raw_test)
+        test_code = _mask_rust_non_code(test_source)
+        if re.search(r"(?m)#\s*\[\s*test\s*\]", test_code) is None:
+            violations.append(
+                "focused litchi-keynote physical slide-table sort integration test is "
+                f"missing #[test] coverage: {test_path}"
+            )
+        for marker in (
+            "execute_slide_table_sort_order",
+            "apply_slide_table_physical_sort",
+            "inverse",
+            "PatchConflict",
+            "reopen",
+        ):
+            if re.search(rf"\b{re.escape(marker)}\b", test_code, re.IGNORECASE) is None:
+                violations.append(
+                    "focused litchi-keynote physical slide-table sort integration test "
+                    f"is missing {marker} evidence: {test_path}"
+                )
+        if re.search(r"(?i)\b(?:native|keynote|sort\s+now)\b", test_code) is None:
+            violations.append(
+                "focused litchi-keynote physical slide-table sort integration test is "
+                f"missing native Keynote evidence: {test_path}"
+            )
+
+    for relative in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_DOC_SOURCES:
+        path = root / relative
+        if not path.is_file():
+            violations.append(
+                "focused litchi-keynote physical slide-table sort is missing documentation "
+                f"gate: {relative}"
+            )
+            continue
+        source = path.read_text(encoding="utf-8")
+        for marker in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_DOC_MARKERS:
+            if marker.search(source) is None:
+                violations.append(
+                    "focused litchi-keynote physical slide-table sort documentation is "
+                    f"missing {marker.pattern}: {relative}"
+                )
+
+    return sorted(set(violations))
+
+
 def _keynote_slide_table_lock_state_owner_present(root: Path) -> bool:
     """Return whether the Wave105 persisted lock owner is active."""
 
@@ -44110,7 +45227,7 @@ def _iwa_keynote_config_call_is_legacy(source: str, match_start: int) -> bool:
     if re.search(
         r"\b(?:package|keynote_package|focused_package|sort_package|"
         r"title_package|lock_package|name_package|table_name_package|"
-        r"focused_keynote)\s*(?:\(\))?\s*\.\s*$",
+        r"verified_package|focused_keynote)\s*(?:\(\))?\s*\.\s*$",
         prefix,
     ):
         return False
@@ -44121,7 +45238,7 @@ def _iwa_keynote_config_call_is_legacy(source: str, match_start: int) -> bool:
     if re.search(
         r"\b(?:package|keynote_package|focused_package|sort_package|"
         r"title_package|lock_package|name_package|table_name_package|"
-        r"focused_keynote)\s*\n[ \t]*\.\s*$",
+        r"verified_package|focused_keynote)\s*\n[ \t]*\.\s*$",
         lookback,
     ):
         return False
@@ -47508,6 +48625,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_slide_table_title_source_topology()
         + audit_keynote_slide_table_sort_facade_source_topology()
         + audit_keynote_slide_table_sort_resource_source_topology()
+        + audit_keynote_slide_table_physical_sort_facade_source_topology()
+        + audit_keynote_slide_table_physical_sort_resource_source_topology()
         + audit_iwa_keynote_slide_table_sort_source_topology()
         + audit_keynote_slide_table_dimension_facade_source_topology()
         + audit_iwa_keynote_slide_table_dimension_source_topology()

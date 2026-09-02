@@ -3613,3 +3613,45 @@ deletion gate. The topology
 remains 64 workspace packages, 237 internal dependency declarations, 226
 canonical edges, 11 ordered migration debts with IDs `[1, 2, 4, 8, 10, 12, 13,
 14, 15, 16, 17]`, and one migration host.
+
+## 2026-09-02 amendment: Keynote physical table sorting API
+
+The focused physical table sorter is a separate semantic surface from
+persisted sort configuration. Existing tables are selected with `SlideSelector`
+and `TableSelector`; optional body-relative `RowRange` is checked before any
+physical read or write. The public methods are
+`Package::{execute_slide_table_sort_order,execute_slide_table_sort_order_to_rows,
+edit_slide_table_physical_sort,apply_slide_table_physical_sort}`, and
+transaction aliases are under `slide::table::physical_sort::transaction`.
+Native IDs, generated messages, BNC records, archive paths, and raw bytes
+remain below the boundary.
+
+The semantic key domain is intentionally scalar-only: text, number, boolean,
+date, and duration. Text ordering is Rust lexical; numeric/date/duration uses
+`f64::total_cmp`-based deterministic ordering; duplicate-key stability is
+source-row deterministic; mixed kinds, missing keys, unsupported/rich values,
+or unsupported table topology produce typed refusals. The owner admits only
+the canonical type-6001 table-model route and explicitly proven tile, data-list,
+header, UID, and empty pre-BNC sentinel shapes. It exposes no public row/value
+reader, moves row envelopes, sparse headers, and UID maps as one exact-source
+operation, and preserves header/footer rows outside the body range.
+
+Patches are source-authorized and reversible. Exact no-ops retain the source
+allocation; changed candidates are reopened, reread through the same semantic
+selector, checked for locality, and invalidate only root previews. Strict
+preflight and private lazy Buffa views are implementation details; unknown
+unselected bytes stay source-authoritative. Formula/error/rich/comment/merge/
+filter/group/category/pivot/spill/conditional/hidden/imported/stroke and other
+unproven dependencies are fail-closed, including unknown mutable fields,
+imported/provenance data, non-empty stroke, and cross-tile/cross-bucket
+movement. A disposable Computer Use probe opened a pre-hardening candidate,
+but the current strict owner rejects its app-authored source because model field
+39 identifies an unowned conditional-style CalculationEngine dependency graph.
+The run is exploratory external
+evidence only. Native Keynote E3/E4 acceptance and artifact hashes are pending
+and are not implied by the preceding host-owned physical-sort record. This
+owner transfer closes no debt or deletion gate; the authoritative topology
+remains 64 workspace packages, 238 internal dependency
+declarations, 227 canonical edges, 11 development-only edges, 11 ordered
+migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
+migration host.

@@ -30,6 +30,7 @@ pub(crate) mod slide_table_dimension;
 pub(crate) mod slide_table_headers;
 pub(crate) mod slide_table_lock_state;
 pub(crate) mod slide_table_name;
+mod slide_table_physical_sort;
 pub(crate) mod slide_table_sort_order;
 mod slide_table_title;
 
@@ -161,6 +162,11 @@ pub use slide_table_lock_state::{
 pub use slide_table_name::{
     SlideTableNameCommit, SlideTableNameDiagnostics, SlideTableNameEdit, SlideTableNameError,
     SlideTableNameLimitKind, SlideTableNamePatch, SlideTableNamePath,
+};
+pub use slide_table_physical_sort::{
+    KEYNOTE_PHYSICAL_SORT_OWNER_ACTIVE, SlideTablePhysicalSortCommit,
+    SlideTablePhysicalSortDiagnostics, SlideTablePhysicalSortEdit, SlideTablePhysicalSortError,
+    SlideTablePhysicalSortLimitKind, SlideTablePhysicalSortPatch, SlideTablePhysicalSortPath,
 };
 pub use slide_table_sort_order::{
     SlideTableSortCommit, SlideTableSortDiagnostics, SlideTableSortEdit, SlideTableSortError,

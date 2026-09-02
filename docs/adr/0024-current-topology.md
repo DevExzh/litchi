@@ -3964,3 +3964,35 @@ The authoritative inventory remains 64 workspace packages, 237 internal
 dependency declarations, 226 canonical edges, 11 ordered migration debts with
 IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. The
 Fraction slice closes no debt or gate.
+
+## 2026-09-02 amendment: Keynote physical table-sort owner
+
+`litchi-keynote` now contains the focused physical `Sort Now` owner for an
+existing slide table. The selector-first transaction consumes persisted sort
+order, exposes no public row/value reader, and admits only the canonical
+type-6001 table-model route plus explicitly proven tile, data-list, header, UID,
+and empty pre-BNC sentinel shapes. Scalar text/number/boolean/date/duration
+keys use Rust lexical text ordering and `f64::total_cmp`-based deterministic
+ordering for numeric-like values; mixed kinds and unproven row-affine
+dependencies fail closed. It moves admitted tile-row envelopes, sparse row
+headers, and UID mappings within a body-relative range; strict wire preflight
+precedes private lazy Buffa inspection, and exact source patches/inverses,
+candidate reopen/readback, locality, and preview invalidation remain the
+transaction boundary.
+
+Its one normal `litchi-keynote -> litchi-numbers-wire` edge is the private BNC
+scalar adapter used by the owner; no BNC type is re-exported through the
+semantic facade. The edge does not transfer package ownership to the shared
+wire crate, retire a migration host, or close a debt. A disposable Computer Use
+probe opened a pre-hardening candidate, but the current strict owner rejects
+the app-authored source because model field 39 identifies an unowned
+conditional-style CalculationEngine dependency graph. That run is external
+exploratory evidence only. Native Keynote E3/E4
+acceptance and artifact hashes for the current owner are intentionally pending,
+and earlier host-owned physical-sort evidence is not evidence for this focused
+owner.
+
+The current inventory is 64 workspace packages, 238 internal dependency
+declarations, 227 canonical edges, 11 development-only edges, 11 ordered
+migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
+migration host. No debt, host, or monolith-deletion gate closes.

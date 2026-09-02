@@ -95,6 +95,23 @@ admission and source-preserving codec behavior remain covered by the neutral
 `table_sort_order_codec` fuzz target. The command recipes under
 `corpus/keynote_slide_table_sort_order/` are not native package fixtures.
 
+`keynote_slide_table_physical_sort` is the selector-first physical row-reorder
+target. It stages a checked semantic sort order, then drives the Keynote
+physical owner through whole-table and body-relative selected-row execution.
+Successful commits are reopened and checked through exact-source patch apply,
+inverse restoration, and stale/conflicting replay; failures must leave the
+immutable source byte stream unchanged. Malformed selectors, scope/range
+mismatches, locked tables, unsupported row-affine dependencies, and bounded
+package/semantic/transaction limits are observed as typed redacted errors.
+The target uses the source-built and locked table packages shared with the
+neighboring table targets plus bounded in-memory canonical table fixtures
+with scalar BNC rows and row-affine metadata. Deterministic variants cover
+padded offset tails, paired pre-BNC buffers, and the legacy UID-map type as
+accepted compatibility paths; populated string sidecars, duplicate UID
+aliases, unknown mutable tile/header roots, malformed model fields 39/45/84/93,
+aggregate cell-count drift, wide/pre-BNC disagreement, and unknown model roots
+must reject atomically. Its corpus contains command recipes only.
+
 `keynote_chart_title` is the focused selector-first chart-title target. It
 drives tiny source-built packages through positional and exact-name chart
 selectors, visible-empty and hidden-stale title states, set/clear/no-op
@@ -406,6 +423,11 @@ semantic profile. Sort commands consume at most 1 KiB after optional `hex:`
 decoding; keep `-max_len` at 4 KiB so malformed ingress and both source-built
 package variants receive every command stream.
 
+`keynote_slide_table_physical_sort` uses the same finite Keynote physical and
+semantic profile. Physical-sort commands consume at most 1 KiB after optional
+`hex:` decoding; keep `-max_len` at 4 KiB so malformed ingress and both
+source-built plus synthetic table variants receive every command stream.
+
 `keynote_chart_title` uses the same finite Keynote physical and semantic
 profile. Chart-title command bytes consume at most 1 KiB; keep `-max_len` at
 1 KiB so malformed ingress and every source-built chart transaction receive
@@ -653,6 +675,14 @@ Run the focused Keynote persisted-sort target with its command seeds:
 ```sh
 cargo +nightly fuzz run keynote_slide_table_sort_order \
   corpus/keynote_slide_table_sort_order -- \
+  -max_len=4096 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Keynote physical-sort target with its command seeds:
+
+```sh
+cargo +nightly fuzz run keynote_slide_table_physical_sort \
+  corpus/keynote_slide_table_physical_sort -- \
   -max_len=4096 -timeout=10 -rss_limit_mb=2048
 ```
 

@@ -4323,3 +4323,27 @@ internal dependency declarations, 226 canonical edges, and 11 ordered
 migration debts with orders `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, with
 one migration host. Debt 005 is removed; debt 002, the relevant host/edge, and
 the remaining host logic stay open.
+
+## 2026-09-02 amendment: Keynote physical table-sort codec edge
+
+The focused Keynote physical `Sort Now` owner now consumes the low-level
+`litchi-numbers-wire` BNC adapter through one normal canonical
+`litchi-keynote -> litchi-numbers-wire` edge. The edge is private substrate use:
+`BncCellView`/`StoredValue` are not re-exported through Keynote’s semantic
+facade, and native IDs, generated values, and wire records do not enter
+ordinary user-facing signatures. Strict physical-table wire ownership remains
+in the hidden `litchi-iwa-protos` codec; `litchi-numbers-wire` supplies only
+borrowed scalar cell inspection.
+
+This edge enables a vertical owner seam and does not retire the migration host,
+an ordered debt, or any monolith gate. The physical owner remains limited to
+the canonical type-6001 route and explicitly proven tile, data-list, header,
+UID, and empty pre-BNC sentinel shapes; it exposes no public row/value reader.
+The current strict admission rejects the app-authored native probe because
+model field 39 identifies an unowned conditional-style CalculationEngine
+dependency graph. Any pre-hardening Computer Use result is exploratory
+external evidence, not current-owner E3/E4
+certification. The authoritative boundary inventory is 64 workspace packages,
+238 internal dependency declarations, 227 canonical edges, 11 development-only
+edges, 11 ordered migration debts with IDs
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.

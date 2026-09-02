@@ -127,6 +127,7 @@ pub(crate) const FIELD_LAYOUT: &[(u32, usize)] = &[
     (0x0008_0000, 4),
     (0x0010_0000, 4),
 ];
+const RESERVED_KNOWN_FIELD_FLAG: u32 = 0x0010_0000;
 const FIELD_COUNT: usize = FIELD_LAYOUT.len();
 
 /// Conservative allocation count for one owned [`BncCell::parse`].
@@ -526,6 +527,13 @@ impl BncCell {
     #[must_use]
     pub fn comment_identifier(&self) -> Option<u32> {
         self.u32_field(COMMENT_FLAG)
+    }
+
+    /// Returns the raw rich-text key carried by the cell, regardless of its
+    /// native cell type. Presence is reported even when the key is zero.
+    #[must_use]
+    pub fn rich_text_identifier(&self) -> Option<u32> {
+        self.u32_field(RICH_TEXT_FLAG)
     }
 
     #[must_use]
@@ -1343,12 +1351,152 @@ impl<'a> BncCellView<'a> {
         self.cached_scalar
     }
 
+    /// Returns the native numeric representation when this cell is numeric.
+    ///
+    /// The alternate-number representation is used by native Currency cells;
+    /// it is still exposed as [`StoredValue::Number`] by the semantic value
+    /// classifier.  Keeping this distinction available on the borrowed view
+    /// lets a package owner validate native format/storage coherence without
+    /// materializing an owned cell.
+    #[must_use]
+    pub fn numeric_cell_type(&self) -> Option<NumericCellType> {
+        match self.cell_type {
+            CELL_TYPE_NUMBER => Some(NumericCellType::Number),
+            CELL_TYPE_ALTERNATE_NUMBER => Some(NumericCellType::AlternateNumber),
+            _ => None,
+        }
+    }
+
     /// Return the interned string key used as a formula display cache.
     #[must_use]
     pub fn formula_text_key(&self) -> Option<u32> {
         matches!(self.stored_value(), StoredValue::Formula(_))
             .then(|| self.u32_field(STRING_FLAG))
             .flatten()
+    }
+
+    /// Returns the native cell-style table identifier, when present.
+    ///
+    /// The identifier is borrowed metadata: this view never resolves or
+    /// allocates for the referenced style object.  A package owner must prove
+    /// the referenced style table separately before treating it as admissible
+    /// graph state.
+    #[must_use]
+    pub fn style_identifier(&self) -> Option<u32> {
+        self.u32_field(STYLE_FLAG)
+    }
+
+    /// Returns the native text-style table identifier, when present.
+    #[must_use]
+    pub fn text_style_identifier(&self) -> Option<u32> {
+        self.u32_field(TEXT_STYLE_FLAG)
+    }
+
+    /// Returns the conditional-style table identifier, when present.
+    ///
+    /// Conditional styles are row-affine dependencies for physical sorting;
+    /// the focused Keynote owner should reject them rather than merely move
+    /// this identifier with the cell.
+    #[must_use]
+    pub fn conditional_style_identifier(&self) -> Option<u32> {
+        self.u32_field(CONDITIONAL_STYLE_FLAG)
+    }
+
+    /// Returns the conditional-style applied-rule identifier, when present.
+    #[must_use]
+    pub fn conditional_style_applied_rule(&self) -> Option<u32> {
+        self.u32_field(CONDITIONAL_STYLE_APPLIED_RULE_FLAG)
+    }
+
+    /// Returns the explicit display-format marker stored in the BNC prefix.
+    #[must_use]
+    pub const fn explicit_format_flags(&self) -> u16 {
+        u16::from_le_bytes([
+            self.prefix[EXPLICIT_FORMAT_FLAGS_START],
+            self.prefix[EXPLICIT_FORMAT_FLAGS_START + 1],
+        ])
+    }
+
+    /// Returns the native cell-format family marker, when present.
+    #[must_use]
+    pub fn cell_format_kind(&self) -> Option<u32> {
+        self.u32_field(CELL_FORMAT_KIND_FLAG)
+    }
+
+    /// Returns the interactive control-cell identifier, when present.
+    ///
+    /// A non-empty control identifier denotes a row-carried dependency on a
+    /// control registry.  Physical row sorting should reject that graph until
+    /// the corresponding registry/refcount movement is proven.
+    #[must_use]
+    pub fn control_cell_spec_identifier(&self) -> Option<u32> {
+        self.u32_field(CONTROL_CELL_SPEC_FLAG)
+    }
+
+    /// Returns the format-table identifier selected by the native format
+    /// family, when present.
+    #[must_use]
+    pub fn format_identifier(&self) -> Option<u32> {
+        match self.cell_format_kind() {
+            Some(CURRENCY_CELL_FORMAT_KIND) => self.u32_field(CURRENCY_FORMAT_IDENTIFIER_FLAG),
+            Some(DATE_TIME_CELL_FORMAT_KIND) => self.u32_field(DATE_TIME_FORMAT_IDENTIFIER_FLAG),
+            Some(DURATION_CELL_FORMAT_KIND) => self.u32_field(DURATION_FORMAT_IDENTIFIER_FLAG),
+            Some(TEXT_CELL_FORMAT_KIND) => self.u32_field(TEXT_FORMAT_IDENTIFIER_FLAG),
+            Some(CHECKBOX_CELL_FORMAT_KIND) => self.u32_field(CHECKBOX_FORMAT_IDENTIFIER_FLAG),
+            _ => self.u32_field(CELL_FORMAT_IDENTIFIER_FLAG),
+        }
+    }
+
+    /// Returns a secondary generic format identifier used by native Currency
+    /// and Duration cells, when present.
+    #[must_use]
+    pub fn secondary_format_identifier(&self) -> Option<u32> {
+        match self.cell_format_kind() {
+            Some(CURRENCY_CELL_FORMAT_KIND | DURATION_CELL_FORMAT_KIND) => {
+                self.u32_field(CELL_FORMAT_IDENTIFIER_FLAG)
+            },
+            _ => None,
+        }
+    }
+
+    /// Reports whether every present display-metadata field belongs to the
+    /// ordinary decimal shape.
+    ///
+    /// Number, Percentage, and Scientific cells may carry only the shared
+    /// format kind and primary format identifier.  This check deliberately
+    /// does not prove that an identifier resolves; the owning package must
+    /// validate the format-table graph separately.
+    #[must_use]
+    pub fn has_only_decimal_format_metadata(&self) -> bool {
+        FIELD_LAYOUT
+            .iter()
+            .zip(self.fields.iter())
+            .all(|((field, _size), value)| {
+                value.is_none()
+                    || FORMAT_METADATA_FLAGS & field == 0
+                    || matches!(*field, CELL_FORMAT_KIND_FLAG | CELL_FORMAT_IDENTIFIER_FLAG)
+            })
+    }
+
+    /// Returns the unparsed bytes after the final known fixed-width field.
+    ///
+    /// The bytes are opaque and remain borrowed from the source.  A physical
+    /// row owner may preserve them by moving the complete cell/row envelope,
+    /// but must not interpret them as safe row-affine state without a focused
+    /// producer proof.
+    #[must_use]
+    pub const fn opaque_tail(&self) -> &'a [u8] {
+        self.tail
+    }
+
+    /// Reports whether the cell carries the reserved known BNC v5 field.
+    ///
+    /// The parser retains this fixed-width field for byte preservation, but
+    /// its semantics are intentionally unmodeled.  Focused physical owners
+    /// should reject it unless they have a producer-specific proof.
+    #[must_use]
+    pub const fn has_reserved_known_field(&self) -> bool {
+        self.flags & RESERVED_KNOWN_FIELD_FLAG != 0
     }
 
     /// Return whether applying one scalar replacement would leave the public
@@ -1634,6 +1782,13 @@ impl<'a> BncCellView<'a> {
     #[must_use]
     pub fn comment_identifier(&self) -> Option<u32> {
         self.u32_field(COMMENT_FLAG)
+    }
+
+    /// Returns the raw rich-text key carried by the cell, regardless of its
+    /// native cell type. Presence is reported even when the key is zero.
+    #[must_use]
+    pub fn rich_text_identifier(&self) -> Option<u32> {
+        self.u32_field(RICH_TEXT_FLAG)
     }
 
     fn encode_scalar(&self, value: ScalarValue) -> Result<EncodedScalar> {
@@ -2481,6 +2636,63 @@ mod tests {
     }
 
     #[test]
+    fn rich_text_identifier_reports_stray_flags_for_non_rich_cell_types() {
+        let mut number = BncCell::minimal();
+        number.set_number(1.5).unwrap();
+
+        let mut date = BncCell::minimal();
+        date.set_date(2.5).unwrap();
+
+        let mut boolean = BncCell::minimal();
+        boolean.set_boolean(true);
+
+        let mut duration = BncCell::minimal();
+        duration.set_duration(3.5).unwrap();
+
+        let mut text = BncCell::minimal();
+        text.set_string(3);
+
+        for (mut cell, expected) in [
+            (number, StoredValue::Number),
+            (date, StoredValue::Date),
+            (boolean, StoredValue::Boolean),
+            (duration, StoredValue::Duration),
+            (text, StoredValue::Text(3)),
+        ] {
+            cell.fields
+                .insert(RICH_TEXT_FLAG, 17u32.to_le_bytes().to_vec());
+            let bytes = cell.encode();
+            let owned = BncCell::parse(&bytes).unwrap();
+            let view = BncCellView::parse(&bytes).unwrap();
+
+            assert_eq!(owned.rich_text_identifier(), Some(17));
+            assert_eq!(view.rich_text_identifier(), Some(17));
+            assert_eq!(view.stored_value(), expected);
+        }
+    }
+
+    #[test]
+    fn rich_text_identifier_preserves_zero_presence() {
+        let mut cell = BncCell::minimal();
+        cell.set_number(1.0).unwrap();
+        let without_rich_text_bytes = cell.encode();
+        let without_rich_text = BncCellView::parse(&without_rich_text_bytes).unwrap();
+        assert_eq!(without_rich_text.rich_text_identifier(), None);
+
+        cell.fields
+            .insert(RICH_TEXT_FLAG, 0u32.to_le_bytes().to_vec());
+        let bytes = cell.encode();
+        assert_eq!(
+            BncCell::parse(&bytes).unwrap().rich_text_identifier(),
+            Some(0)
+        );
+        assert_eq!(
+            BncCellView::parse(&bytes).unwrap().rich_text_identifier(),
+            Some(0)
+        );
+    }
+
+    #[test]
     fn bounded_comment_clear_preserves_value_metadata_and_tail() {
         let mut cell = BncCell::minimal();
         cell.set_number(42.5).unwrap();
@@ -2545,6 +2757,68 @@ mod tests {
         assert_eq!(cleared.style_identifier(), Some(7));
         assert_eq!(cleared.text_style_identifier(), None);
         assert_eq!(cleared.stored_value(), StoredValue::Text(3));
+    }
+
+    #[test]
+    fn borrowed_view_exposes_native_metadata_and_opaque_tail() {
+        let mut cell = BncCell::minimal();
+        cell.prefix[2..].copy_from_slice(&[0xa1, 0xb2, 0xc3, 0xd4, 0xe5, 0xf6]);
+        cell.set_number(42.25).unwrap();
+        cell.set_style_identifier(Some(7));
+        cell.set_text_style_identifier(Some(11));
+        cell.set_comment_identifier(Some(13));
+        cell.set_conditional_style(Some(17), Some(19));
+        cell.set_data_format_identifier(23, CellDataFormatKind::NumberOrPercentage, None)
+            .unwrap();
+        cell.tail.extend_from_slice(b"opaque-tail");
+
+        let bytes = cell.encode();
+        let view = BncCellView::parse(&bytes).unwrap();
+        assert_eq!(view.numeric_cell_type(), Some(NumericCellType::Number));
+        assert_eq!(view.style_identifier(), Some(7));
+        assert_eq!(view.text_style_identifier(), Some(11));
+        assert_eq!(view.comment_identifier(), Some(13));
+        assert_eq!(view.conditional_style_identifier(), Some(17));
+        assert_eq!(view.conditional_style_applied_rule(), Some(19));
+        assert_eq!(view.explicit_format_flags(), EXPLICIT_DECIMAL_FORMAT);
+        assert_eq!(view.cell_format_kind(), Some(DECIMAL_CELL_FORMAT_KIND));
+        assert_eq!(view.format_identifier(), Some(23));
+        assert_eq!(view.secondary_format_identifier(), None);
+        assert_eq!(view.control_cell_spec_identifier(), None);
+        assert!(view.has_only_decimal_format_metadata());
+        assert_eq!(view.opaque_tail(), b"opaque-tail");
+        assert_eq!(view.opaque_tail().len(), cell.tail.len());
+        assert_eq!(view.stored_value(), StoredValue::Number);
+    }
+
+    #[test]
+    fn borrowed_view_distinguishes_currency_secondary_and_reserved_metadata() {
+        let mut cell = BncCell::minimal();
+        cell.set_number(42.25).unwrap();
+        cell.set_currency_format_identifier_preserving_value(Some(23))
+            .unwrap();
+        cell.fields
+            .insert(CELL_FORMAT_IDENTIFIER_FLAG, 19u32.to_le_bytes().to_vec());
+        cell.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
+            .copy_from_slice(&EXPLICIT_CURRENCY_WITH_NUMBER_FORMAT.to_le_bytes());
+        cell.fields
+            .insert(RESERVED_KNOWN_FIELD_FLAG, 29u32.to_le_bytes().to_vec());
+
+        let bytes = cell.encode();
+        let view = BncCellView::parse(&bytes).unwrap();
+        assert_eq!(
+            view.numeric_cell_type(),
+            Some(NumericCellType::AlternateNumber)
+        );
+        assert_eq!(
+            view.explicit_format_flags(),
+            EXPLICIT_CURRENCY_WITH_NUMBER_FORMAT
+        );
+        assert_eq!(view.cell_format_kind(), Some(CURRENCY_CELL_FORMAT_KIND));
+        assert_eq!(view.format_identifier(), Some(23));
+        assert_eq!(view.secondary_format_identifier(), Some(19));
+        assert!(view.has_reserved_known_field());
+        assert!(!view.has_only_decimal_format_metadata());
     }
 
     #[test]

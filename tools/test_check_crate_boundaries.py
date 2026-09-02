@@ -3001,6 +3001,220 @@ def add_keynote_slide_table_sort_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_keynote_slide_table_physical_sort_canonical_scaffold(
+    root: Path,
+    *,
+    activate: bool = True,
+) -> None:
+    """Install a complete synthetic physical Sort Now owner.
+
+    The fixture deliberately puts adversarial examples behind cfg(test) in the
+    tests below; the boundary implementation must mask those items without
+    truncating later production declarations.
+    """
+
+    semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub mod transaction {\n"
+        "    pub struct Edit; pub struct Patch; pub struct Commit; pub struct Diagnostics;\n"
+        "    pub struct Error; pub struct LimitKind; pub struct Path;\n"
+        "}\n"
+        "pub use litchi_iwa_common::table::sort::{ColumnIndex, Direction, Order, RowRange, Rule, Scope};\n",
+        encoding="utf-8",
+    )
+
+    selector = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_SELECTOR_SOURCE
+    selector.parent.mkdir(parents=True, exist_ok=True)
+    selector.write_text(
+        "pub struct SlideSelector;\n"
+        "pub struct TableSelector;\n"
+        "impl TableSelector {\n"
+        "    pub const fn index(index: usize) -> Self { let _ = index; Self }\n"
+        "    pub const fn position(index: usize) -> Self { let _ = index; Self }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    owner = root / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    activation = (
+        "const KEYNOTE_PHYSICAL_SORT_OWNER_ACTIVE: bool = true;\n"
+        if activate
+        else ""
+    )
+    owner.write_text(
+        activation
+        + "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CANONICAL_TYPES
+        )
+        + "use super::slide_table_core::{Budget, select_table, same_target, verify_physical_locality};\n"
+        + "fn admission() {\n"
+        + "    let _ = (Budget, SlideSelector, TableSelector);\n"
+        + "    select_table(); same_target(); verify_physical_locality();\n"
+        + "    let _ = (exact_source, source_fingerprint, PhysicalRows, PhysicalColumns, KeyCells, try_reserve);\n"
+        + "}\n"
+        + "fn rows() {\n"
+        + "    let _ = (TileRowInfoSnapshot, rowInfos, tile_row_index, numrows, row_permutation);\n"
+        + "    let _ = (HeaderRowMove, row_header_indices, bucket_index);\n"
+        + "    let _ = (ColumnRowUIDMap, row_uid, uid_for_index, index_for_uid, bijection, inverse_consistent, uid_map, row_count, body_rows);\n"
+        + "    let _ = (admit_physical_table, with_physical_topology, mutable_component_count);\n"
+        + "    let _ = (hiding_state, column_uid, positional, restore, snapshot);\n"
+        + "    let _ = (BncCellView, StoredValue);\n"
+        + "}\n"
+        + "fn refusal() {\n"
+        + "    let _ = (UnsupportedDependency, formula, formula_error, merge, conditional, filtered, pivot, spill, group, reject_formula, refuse_merge, unsupported_dependency);\n"
+        + "}\n"
+        + "fn transaction() {\n"
+        + "    let _ = (ExactArtifacts, PatchConflict, source_fingerprint, target_fingerprint, is_noop);\n"
+        + "    inverse(); candidate; reopen(); validate(); verify(); prepare_reassembly(); reassembly();\n"
+        + "    let _ = (Locality, LocalityAllowlist, locality, allowlist, allowed_members, touched_members, touched_components, with_model_component, changed_components, same_target, exact_target);\n"
+        + "    let deleted_previews: usize = 0; let _ = (deleted_previews, root_preview_deletions);\n"
+        + "}\n"
+        + "fn strict_codec() {\n"
+        + "    let _ = (numbers_table_physical_sort_codec, table_physical_sort_codec, Buffa, WireView, BncCellView, lazy, borrowed);\n"
+        + "}\n"
+        + "impl Package {\n"
+        + "    pub fn execute_slide_table_sort_order<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<SlideTablePhysicalSortCommit, SlideTablePhysicalSortError> { let _ = (slide, table); todo!() }\n"
+        + "    pub fn execute_slide_table_sort_order_to_rows<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>, rows: RowRange) -> Result<SlideTablePhysicalSortCommit, SlideTablePhysicalSortError> { let _ = (slide, table, rows); todo!() }\n"
+        + "    pub fn apply_slide_table_physical_sort(&self, patch: &SlideTablePhysicalSortPatch) -> Result<SlideTablePhysicalSortCommit, SlideTablePhysicalSortError> { let _ = patch; todo!() }\n"
+        + "}\n"
+        + "impl SlideTablePhysicalSortEdit {\n"
+        + "    pub fn rows(&self) -> Option<RowRange> { todo!() }\n"
+        + "    pub fn order(&self) -> Option<&Order> { todo!() }\n"
+        + "    pub fn commit(self) -> Result<SlideTablePhysicalSortCommit, SlideTablePhysicalSortError> { todo!() }\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+
+    package_export = root / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_EXPORT_SOURCES[0]
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "mod slide_table_physical_sort;\n"
+        "pub use slide_table_physical_sort::{"
+        + ", ".join(
+            sorted(boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CANONICAL_TYPES)
+        )
+        + "};\n",
+        encoding="utf-8",
+    )
+    lib_export = root / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_EXPORT_SOURCES[1]
+    lib_export.write_text(
+        "pub use package::{"
+        + ", ".join(
+            sorted(boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CANONICAL_TYPES)
+        )
+        + "};\n"
+        "pub use selector::SlideSelector;\n"
+        "pub use slide::table::TableSelector;\n"
+        "pub use slide::table::physical_sort::{ColumnIndex, Direction, Order, RowRange, Rule, Scope};\n",
+        encoding="utf-8",
+    )
+
+    codec = root / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "pub struct PhysicalTableSortSnapshot; pub struct TileSnapshot; pub struct HeaderSnapshot; pub struct ColumnRowUidMapSnapshot;\n"
+        "pub struct PreparedTablePhysicalSortRewrite;\n"
+        "pub struct PreparedTileRowsRewrite; pub struct PreparedHeaderRowsRewrite; pub struct PreparedColumnRowUidMapRewrite;\n"
+        "pub struct RewriteRequirements;\n"
+        "pub struct RewriteExecutionRequirements;\n"
+        "pub struct RewriteExecutionLimits;\n"
+        "pub fn decode_column_row_uid_map() {}\n"
+        "pub fn plan_tile_rows_rewrite() {}\n"
+        "pub fn plan_header_storage_bucket_rows() {}\n"
+        "pub fn plan_column_row_uid_map_rewrite() {}\n"
+        "pub fn execute_tile_rows_rewrite() {}\n"
+        "pub fn execute_header_storage_bucket_rows() {}\n"
+        "pub fn execute_column_row_uid_map_rewrite() {}\n"
+        "fn decode_tile_for_rewrite() {}\n"
+        "pub fn decode_table_physical_sort_with_report() {}\n"
+        "pub fn prepare_table_physical_sort_rewrite() {}\n"
+        "fn lazy_projection() { let _ = (Buffa, WireView, BncCellView, borrowed, lazy); }\n"
+        "fn strict_admission() { let _ = (preflight, validate, strict, reject, Unsupported); }\n"
+        "fn execute_prepared() { execution_requirements(); exact_limits(); execute(); }\n"
+        "fn preserve_wire() { replace_message_preserving(); NestedFieldReplacement; preserve_unknown_fields; unknown_fields; }\n"
+        "#[cfg(test)]\n"
+        "mod tests { #[test] fn malformed_wire_is_rejected() {} }\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_PUBLIC_SOURCE
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        "pub mod numbers_table_physical_sort_codec;\n"
+        "#[doc(hidden)]\n"
+        "pub mod table_physical_sort_codec;\n",
+        encoding="utf-8",
+    )
+
+    manifest = root / boundaries.KEYNOTE_PACKAGE_MANIFEST
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(
+        "[package]\nname = \"litchi-keynote\"\n\n"
+        "[dependencies]\n"
+        "litchi-core = { workspace = true }\n"
+        "litchi-iwa-common = { workspace = true }\n"
+        "litchi-iwa-protos = { workspace = true }\n\n"
+        "[dev-dependencies]\n"
+        "prost = { workspace = true }\n",
+        encoding="utf-8",
+    )
+
+    integration = root / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_TEST_SOURCES[0]
+    integration.parent.mkdir(parents=True, exist_ok=True)
+    integration.write_text(
+        "#[test]\n"
+        "fn native_keynote_sort_now_round_trip() {\n"
+        "    let _ = (native, Keynote, SortNow);\n"
+        "    package.execute_slide_table_sort_order(slide, table);\n"
+        "    package.execute_slide_table_sort_order_to_rows(slide, table, rows);\n"
+        "    package.apply_slide_table_physical_sort(&patch);\n"
+        "    patch.inverse(); PatchConflict; reopen();\n"
+        "}\n"
+        "#[cfg(test)]\n"
+        "mod adversarial_decoys {\n"
+        "    pub fn raw(model_id: u64, bytes: &[u8]) { let _ = (model_id, bytes); }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    for fuzz_path in boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FUZZ_SOURCES:
+        absolute = root / fuzz_path
+        absolute.parent.mkdir(parents=True, exist_ok=True)
+        absolute.write_text(
+            "fuzz_target!(|input: &[u8]| { let _ = input; });\n",
+            encoding="utf-8",
+        )
+    for corpus in boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FUZZ_CORPORA:
+        absolute = root / corpus
+        absolute.mkdir(parents=True, exist_ok=True)
+        (absolute / "malformed.seed").write_bytes(b"sort")
+
+    for relative in boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_DOC_SOURCES:
+        absolute = root / relative
+        absolute.parent.mkdir(parents=True, exist_ok=True)
+        absolute.write_text(
+            "Keynote physical Sort Now evidence: execute_slide_table_sort_order; "
+            "native open and reopen; row-affine locality and inverse patch. "
+            "Physical Sort Now for Keynote is covered by the native evidence.\n",
+            encoding="utf-8",
+        )
+
+    host = (
+        root
+        / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_HOST_SOURCE_ROOT
+        / "editor"
+        / "slide_tables"
+        / "sort.rs"
+    )
+    host.parent.mkdir(parents=True, exist_ok=True)
+    host.write_text(
+        "fn physical() { package.execute_slide_table_sort_order(slide, table); }\n",
+        encoding="utf-8",
+    )
+
+
 def add_keynote_slide_table_lock_state_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_LOCK_STATE_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -4540,7 +4754,7 @@ class BoundaryPolicyTests(unittest.TestCase):
         all_policy_edges = self.policy.canonical_edges | self.policy.migration_edges
 
         self.assertEqual(len(self.policy.packages), 64)
-        self.assertEqual(len(all_policy_edges), 237)
+        self.assertEqual(len(all_policy_edges), 238)
         self.assertEqual(len(self.policy.migration_debt), 11)
         self.assertEqual(
             [item.order for item in self.policy.migration_debt],
@@ -15983,7 +16197,11 @@ fn rewrite_movie_title_operation(
                 "pub fn execute_slide_table_sort_order(&mut self, slide: SlideSelector, table: TableSelector) {}\n"
                 "pub fn execute_slide_table_sort_order_to_rows(&mut self, slide: SlideSelector, table: TableSelector, rows: RowRange) {}\n"
                 "fn physical() { editor.execute_slide_table_sort_order(slide, table); editor.execute_slide_table_sort_order_to_rows(slide, table, rows); }\n"
-                "fn focused() { package.slide_table_sort_order(slide, table); package.edit_slide_table_sort_order(slide, table); package.apply_slide_table_sort_order(&patch); }\n",
+                "fn focused() {\n"
+                "    let after = verified_package\n"
+                "        .slide_table_sort_order(slide, table);\n"
+                "    let _ = after;\n"
+                "}\n",
                 encoding="utf-8",
             )
             self.assertEqual(
@@ -16260,6 +16478,325 @@ fn rewrite_movie_title_operation(
         for expression in (
             "+ audit_keynote_slide_table_sort_facade_source_topology()",
             "+ audit_keynote_slide_table_sort_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_slide_table_physical_sort_is_dormant_then_active(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_physical_sort_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_physical_sort_resource_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            add_keynote_slide_table_physical_sort_canonical_scaffold(
+                root, activate=False
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_physical_sort_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_physical_sort_resource_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE
+            owner.write_text(
+                "const KEYNOTE_PHYSICAL_SORT_OWNER_ACTIVE: bool = true;\n"
+                + owner.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_physical_sort_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_physical_sort_resource_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_keynote_slide_table_physical_sort_facade_rejects_raw_and_cfg_decoys(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_physical_sort_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\n"
+                + "pub fn decoy(model_id: u64, bytes: &[u8]) {}\n"
+                + "pub fn raw_sort_after_decoy(bytes: &[u8], model_id: u64) -> ArchiveObject { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = (
+                boundaries.audit_keynote_slide_table_physical_sort_facade_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("raw parameter" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+            package = root / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_EXPORT_SOURCES[0]
+            package.write_text(
+                package.read_text(encoding="utf-8")
+                + "pub use slide_table_physical_sort::*;\n"
+                + "pub use litchi_iwa_protos::table_physical_sort_codec::*;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_physical_sort_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("glob re-export" in item for item in violations), violations)
+            self.assertTrue(any("protobuf type" in item for item in violations), violations)
+
+    def test_keynote_slide_table_physical_sort_requires_selector_patch_and_rows(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_physical_sort_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            source = source.replace("SlideSelector<'slide>", "usize")
+            source = source.replace("TableSelector>", "u64>")
+            source = source.replace(", rows: RowRange", "")
+            source = source.replace(
+                "&SlideTablePhysicalSortPatch",
+                "&[u8]",
+            )
+            owner.write_text(source, encoding="utf-8")
+            violations = (
+                boundaries.audit_keynote_slide_table_physical_sort_facade_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("selector-first SlideSelector" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("selector-first TableSelector" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("selected-row method must accept RowRange" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("SlideTablePhysicalSortPatch" in item for item in violations),
+                violations,
+            )
+
+    def test_keynote_slide_table_physical_sort_requires_row_affine_proof_markers(
+        self,
+    ) -> None:
+        removals = (
+            (("TileRowInfoSnapshot", "rowInfos", "tile_row_index"), "tile row affinity"),
+            (("HeaderRowMove", "row_header_indices", "bucket_index"), "sparse header affinity"),
+            (("ColumnRowUIDMap", "row_uid", "uid_for_index", "index_for_uid"), "row UID bijection"),
+            (("admit_physical_table", "with_physical_topology", "mutable_component_count"), "border/stroke affinity"),
+            (("hiding_state", "column_uid", "positional"), "hidden-axis affinity"),
+            (("UnsupportedDependency", "unsupported_dependency"), "explicit dependency refusals"),
+        )
+        for tokens, label in removals:
+            with self.subTest(tokens=tokens):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    add_keynote_slide_table_physical_sort_canonical_scaffold(root)
+                    owner = root / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE
+                    source = owner.read_text(encoding="utf-8")
+                    for token in tokens:
+                        source = source.replace(token, "")
+                    owner.write_text(source, encoding="utf-8")
+                    violations = (
+                        boundaries.audit_keynote_slide_table_physical_sort_resource_source_topology(
+                            root
+                        )
+                    )
+                    self.assertTrue(
+                        any(f"missing {label} marker" in item for item in violations),
+                        violations,
+                    )
+
+    def test_keynote_slide_table_physical_sort_requires_codec_evidence_and_docs(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_physical_sort_canonical_scaffold(root)
+            codec = root / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_SOURCE
+            codec_source = codec.read_text(encoding="utf-8")
+            for api in (
+                "plan_tile_rows_rewrite",
+                "plan_header_storage_bucket_rows",
+                "plan_column_row_uid_map_rewrite",
+                "prepare_table_physical_sort_rewrite",
+                "prepare_table_model_physical_sort_rewrite",
+            ):
+                codec_source = codec_source.replace(api, "missing_prepare")
+            codec.write_text(codec_source, encoding="utf-8")
+            docs = root / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_DOC_SOURCES[0]
+            docs.write_text("Keynote physical Sort Now only.\n", encoding="utf-8")
+            violations = (
+                boundaries.audit_keynote_slide_table_physical_sort_resource_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(any("prepared rewrite" in item for item in violations), violations)
+            self.assertTrue(
+                any("documentation is missing" in item for item in violations),
+                violations,
+            )
+
+    def test_keynote_slide_table_physical_sort_rejects_legacy_writer_and_dependency(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_physical_sort_canonical_scaffold(root)
+            host = (
+                root
+                / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_HOST_SOURCE_ROOT
+                / "editor"
+                / "slide_tables"
+                / "sort.rs"
+            )
+            host.write_text(
+                "use crate::numbers::editor::apply_table_sort_order_in_package as legacy_writer;\n"
+                "fn legacy() { crate::numbers::editor::apply_table_sort_order_in_package(package); }\n"
+                "fn aliased() { legacy_writer(package); }\n",
+                encoding="utf-8",
+            )
+            manifest = root / boundaries.KEYNOTE_PACKAGE_MANIFEST
+            manifest.write_text(
+                manifest.read_text(encoding="utf-8")
+                .replace("[dev-dependencies]", "[dependencies]\nprost = \"1\"\n\n[dev-dependencies]"),
+                encoding="utf-8",
+            )
+            violations = (
+                boundaries.audit_keynote_slide_table_physical_sort_resource_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(any("legacy Numbers writer call" in item for item in violations), violations)
+            self.assertTrue(any("normal dependency prost" in item for item in violations), violations)
+
+    def test_keynote_slide_table_physical_sort_allows_only_guarded_source_built_fallback(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_physical_sort_canonical_scaffold(root)
+            host = (
+                root
+                / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_HOST_SOURCE_ROOT
+                / "editor"
+                / "slide_tables"
+                / "sort.rs"
+            )
+            guarded = (
+                "fn source_built_compatibility_package() {\n"
+                "    let _ = (source_is_exact, template_identifier, "
+                "SOURCE_BUILT_TEMPLATE, DOCUMENT_MESSAGE_TYPE);\n"
+                "}\n"
+                "fn execute_table_sort_selection() {\n"
+                "    if source_built_compatibility_package() {\n"
+                "        execute_source_built_table_sort();\n"
+                "    } else { execute_focused_table_sort(); }\n"
+                "}\n"
+                "fn execute_source_built_table_sort() {\n"
+                "    crate::numbers::editor::apply_table_sort_order_in_package(package);\n"
+                "}\n"
+            )
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(guarded, encoding="utf-8")
+            violations = (
+                boundaries.audit_keynote_slide_table_physical_sort_resource_source_topology(
+                    root
+                )
+            )
+            self.assertFalse(
+                any("legacy Numbers writer call" in item for item in violations),
+                violations,
+            )
+            self.assertFalse(
+                any("fallback escapes its guarded dispatcher" in item for item in violations),
+                violations,
+            )
+
+            host.write_text(
+                guarded + "fn bypass() { execute_source_built_table_sort(); }\n",
+                encoding="utf-8",
+            )
+            violations = (
+                boundaries.audit_keynote_slide_table_physical_sort_resource_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("fallback escapes its guarded dispatcher" in item for item in violations),
+                violations,
+            )
+
+    def test_keynote_slide_table_physical_sort_masks_cfg_test_codec_decoys(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_physical_sort_canonical_scaffold(root)
+            codec = root / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8")
+                + "#[cfg(test)]\n"
+                + "pub fn decoy(bytes: &[u8]) { let _ = prost::Message::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            test_module = (
+                root
+                / boundaries.KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_HOST_SOURCE_ROOT
+                / "editor"
+                / "slide_tables"
+                / "tests.rs"
+            )
+            test_module.parent.mkdir(parents=True, exist_ok=True)
+            test_module.write_text(
+                "fn decoy() { crate::numbers::editor::apply_table_sort_order_in_package(package); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_physical_sort_resource_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_keynote_slide_table_physical_sort_audits_are_in_main_dispatch(
+        self,
+    ) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_slide_table_physical_sort_facade_source_topology()",
+            "+ audit_keynote_slide_table_physical_sort_resource_source_topology()",
         ):
             self.assertIn(expression, main_source)
 
