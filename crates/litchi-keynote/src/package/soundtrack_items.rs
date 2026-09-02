@@ -188,14 +188,13 @@ impl metadata_codec::PackageMetadataMediaVisitor for MetadataVisitor<'_> {
     ) -> Result<(), metadata_codec::DecodeError> {
         let digest = <[u8; SHA1_BYTES]>::try_from(data_info.digest())
             .map_err(|_| metadata_codec::DecodeError::invalid_for_adapter())?;
-        let materialized_length = usize::try_from(
-            data_info
-                .materialized_length()
-                .ok_or_else(metadata_codec::DecodeError::invalid_for_adapter)?,
-        )
-        .map_err(|_| metadata_codec::DecodeError::invalid_for_adapter())?;
+        let materialized_length = data_info
+            .materialized_length()
+            .and_then(|length| usize::try_from(length).ok())
+            .unwrap_or(0);
         let current_name = data_info
             .file_name()
+            .filter(|name| !name.is_empty())
             .unwrap_or_else(|| data_info.preferred_file_name());
         self.facts
             .data

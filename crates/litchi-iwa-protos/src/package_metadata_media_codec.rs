@@ -970,7 +970,7 @@ fn parse_data_info(
                     return Err(DecodeError::invalid(InvalidReason::DuplicateField));
                 }
                 let value = utf8(payload, field)?;
-                validate_name(value, options)?;
+                validate_required_name(value, options)?;
                 preferred_file_name = Some(value);
             },
             DATA_FILE_NAME_FIELD => {
@@ -978,7 +978,7 @@ fn parse_data_info(
                     return Err(DecodeError::invalid(InvalidReason::DuplicateField));
                 }
                 let value = utf8(payload, field)?;
-                validate_name(value, options)?;
+                validate_optional_name(value, options)?;
                 file_name = Some(value);
             },
             DATA_MATERIALIZED_LENGTH_FIELD => {
@@ -1058,7 +1058,7 @@ fn parse_component(
                     return Err(DecodeError::invalid(InvalidReason::DuplicateField));
                 }
                 let value = utf8(payload, field)?;
-                validate_name(value, options)?;
+                validate_required_name(value, options)?;
                 preferred_locator = Some(value);
             },
             COMPONENT_LOCATOR_FIELD => {
@@ -1066,7 +1066,7 @@ fn parse_component(
                     return Err(DecodeError::invalid(InvalidReason::DuplicateField));
                 }
                 let value = utf8(payload, field)?;
-                validate_name(value, options)?;
+                validate_optional_name(value, options)?;
                 locator = Some(value);
             },
             4 | 5 | 14 | 15 | 20 => validate_packed_varints(bytes(payload, field)?)?,
@@ -1301,8 +1301,15 @@ fn validate_packed_varints(payload: &[u8]) -> Result<(), DecodeError> {
     Ok(())
 }
 
-fn validate_name(name: &str, options: DecodeOptions) -> Result<(), DecodeError> {
-    if name.is_empty() || name.len() > options.max_name_bytes {
+fn validate_required_name(name: &str, options: DecodeOptions) -> Result<(), DecodeError> {
+    if name.is_empty() {
+        return Err(DecodeError::invalid(InvalidReason::InvalidName));
+    }
+    validate_optional_name(name, options)
+}
+
+fn validate_optional_name(name: &str, options: DecodeOptions) -> Result<(), DecodeError> {
+    if name.len() > options.max_name_bytes {
         return Err(DecodeError::limited(DecodeLimit::NameBytes {
             observed: name.len(),
             maximum: options.max_name_bytes,
@@ -1340,9 +1347,9 @@ fn validate_addition(
     if addition.digest.len() != SHA1_DIGEST_BYTES {
         return Err(RewriteError::invalid(InvalidReason::InvalidDigest));
     }
-    validate_name(addition.preferred_file_name, options).map_err(map_decode)?;
+    validate_required_name(addition.preferred_file_name, options).map_err(map_decode)?;
     if let Some(file_name) = addition.file_name {
-        validate_name(file_name, options).map_err(map_decode)?;
+        validate_optional_name(file_name, options).map_err(map_decode)?;
     }
     Ok(())
 }
@@ -3725,6 +3732,26 @@ mod tests {
         let error = inspect_package_metadata_media(&source, DecodeOptions::for_source(&source))
             .expect_err("overlong root identifier must be rejected");
         assert_eq!(error.invalid_reason(), Some(InvalidReason::MalformedWire));
+    }
+
+    #[test]
+    fn native_legacy_data_info_allows_explicit_empty_optional_name_and_missing_length() {
+        let digest = [0x42; SHA1_DIGEST_BYTES];
+        let mut record = Vec::new();
+        varint_field(&mut record, DATA_IDENTIFIER_FIELD, 7);
+        bytes_field(&mut record, DATA_DIGEST_FIELD, &digest);
+        bytes_field(&mut record, DATA_PREFERRED_NAME_FIELD, b"native.jpg");
+        bytes_field(&mut record, DATA_FILE_NAME_FIELD, b"");
+        varint_field(&mut record, 99, 1);
+
+        let mut source = Vec::new();
+        varint_field(&mut source, ROOT_LAST_IDENTIFIER_FIELD, 10);
+        bytes_field(&mut source, ROOT_DATA_INFO_FIELD, &record);
+
+        let report = inspect_package_metadata_media(&source, DecodeOptions::for_source(&source))
+            .expect("unselected native legacy DataInfo remains inspectable");
+        assert_eq!(report.data_records(), 1);
+        assert_eq!(report.unknown_records(), 1);
     }
 
     #[test]
