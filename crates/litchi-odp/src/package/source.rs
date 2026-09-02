@@ -21,7 +21,8 @@ use litchi_core::{
     TextOutputReport,
 };
 use litchi_odf_common::core::{
-    Meta, SourceBackedPackage, SourcePackageLimits, validate_content_part,
+    Meta, SourceBackedPackage, SourcePackageLimits, private::ContentDocumentValidator,
+    validate_content_part,
 };
 use zeroize::Zeroizing;
 
@@ -202,39 +203,56 @@ impl SourceBackedPresentation {
         // its archive/source consistency window and avoids a plaintext
         // password surviving any facade-side probe before zeroization.
         let source_version = package.source_version()?;
-        let mimetype = package.mimetype()?;
-        if mimetype != ODF_PRESENTATION {
-            return Err(Error::InvalidFormat(format!(
-                "expected {FAMILY_NAME} package MIME type '{ODF_PRESENTATION}', found '{mimetype}'"
-            )));
-        }
+        let parsed = (|| {
+            let mimetype = package.mimetype()?;
+            if mimetype != ODF_PRESENTATION {
+                return Err(Error::InvalidFormat(format!(
+                    "expected {FAMILY_NAME} package MIME type '{ODF_PRESENTATION}', found '{mimetype}'"
+                )));
+            }
 
-        let content_xml = String::from_utf8(package.get_file("content.xml")?).map_err(|error| {
-            Error::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))
-        })?;
-        validate_content_part(&content_xml, BODY_MARKER, FAMILY_NAME)?;
+            // Check the ZIP or manifest-declared materialized size before
+            // reading content.xml. For encrypted entries this is plaintext
+            // metadata, so a hostile ciphertext cannot force allocation first.
+            ContentDocumentValidator::check_materialized_size(
+                package.member_materialized_size("content.xml")?,
+                FAMILY_NAME,
+            )?;
+            let content_xml =
+                String::from_utf8(package.get_file("content.xml")?).map_err(|error| {
+                    Error::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))
+                })?;
+            validate_content_part(&content_xml, BODY_MARKER, FAMILY_NAME)?;
 
-        let styles_xml = if package.has_file("styles.xml")? {
-            Some(
-                String::from_utf8(package.get_file("styles.xml")?).map_err(|error| {
-                    Error::InvalidFormat(format!("{FAMILY_NAME} styles.xml is not UTF-8: {error}"))
-                })?,
-            )
-        } else {
-            None
-        };
+            let styles_xml = if package.has_file("styles.xml")? {
+                Some(
+                    String::from_utf8(package.get_file("styles.xml")?).map_err(|error| {
+                        Error::InvalidFormat(format!(
+                            "{FAMILY_NAME} styles.xml is not UTF-8: {error}"
+                        ))
+                    })?,
+                )
+            } else {
+                None
+            };
 
-        // Match the ordinary family package's mandatory metadata validation:
-        // a malformed optional meta.xml must not become observable only after
-        // a source-backed facade is opened.
-        let metadata = if package.has_file("meta.xml")? {
-            Some(Meta::from_bytes(&package.get_file("meta.xml")?)?.try_extract_metadata()?)
-        } else {
-            None
-        };
+            // Match the ordinary family package's mandatory metadata
+            // validation: a malformed optional meta.xml must not become
+            // observable only after a source-backed facade is opened.
+            let metadata = if package.has_file("meta.xml")? {
+                Some(Meta::from_bytes(&package.get_file("meta.xml")?)?.try_extract_metadata()?)
+            } else {
+                None
+            };
 
-        let observed = source.version()?;
-        ensure_current(source_version, observed)?;
+            Ok((content_xml, styles_xml, metadata))
+        })();
+
+        // Reconcile the source before exposing any secondary parse error. This
+        // keeps stale-source errors authoritative across the whole open pass,
+        // including pure validation and UTF-8/metadata parsing work.
+        let (content_xml, styles_xml, metadata) =
+            reconcile_source(source.as_ref(), source_version, parsed)?;
 
         Ok(Self {
             package,
@@ -574,10 +592,54 @@ fn clone_text_result(text: &str) -> Result<String> {
     Ok(result)
 }
 
+fn reconcile_source<T>(
+    source: &dyn ReadAt,
+    expected: SourceVersion,
+    result: Result<T>,
+) -> Result<T> {
+    let observed = source.version()?;
+    ensure_current(expected, observed)?;
+    result
+}
+
 fn ensure_current(expected: SourceVersion, observed: SourceVersion) -> Result<()> {
     if expected == observed {
         Ok(())
     } else {
         Err(Error::SourceChanged { expected, observed })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io;
+
+    use super::*;
+
+    struct FixedSource;
+
+    impl ReadAt for FixedSource {
+        fn len(&self) -> io::Result<u64> {
+            Ok(0)
+        }
+
+        fn read_at(&self, _offset: u64, _output: &mut [u8]) -> io::Result<usize> {
+            Ok(0)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            Ok(SourceVersion::new(0x4f44_5301, 1))
+        }
+    }
+
+    #[test]
+    fn source_reconciliation_precedes_secondary_parse_errors() {
+        let expected = SourceVersion::new(0x4f44_5301, 0);
+        let secondary: Result<()> = Err(Error::InvalidFormat("secondary parse error".to_string()));
+
+        assert!(matches!(
+            reconcile_source(&FixedSource, expected, secondary),
+            Err(Error::SourceChanged { .. })
+        ));
     }
 }

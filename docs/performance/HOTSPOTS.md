@@ -1,5 +1,29 @@
 # Performance hotspot inventory
 
+## Change 0373 update
+
+Change 0373 is a correctness and resource-safety hardening batch, not a
+measured hotspot. It removes ordinary `Vec` growth from the declared-size
+overrun sentinel in ZIP materialization and ODF Deflate decryption by using
+checked `size + 1` bounds and fallible full-capacity reservation. Encrypted
+ODF members now fail manifest, Store, password, and plaintext-size preflight
+before payload reads.
+
+Source-backed ODP and ODS owners now reject `content.xml` above the shared
+256 MiB family limit using metadata-only materialized size before reading the
+payload. This includes encrypted manifest plaintext size. ODP final freshness
+reconciliation precedes exposure of secondary parse errors. Existing CRC,
+size, ZIP, MIME, and publication checks are retained.
+
+Focused and broader release suites passed for all four touched crates;
+scoped Clippy passed with six named pre-existing allowances, crate boundaries
+passed, and independent reviewers accepted the batch. See the [0373
+record](changes/0373-odf-source-allocation-preflight.md).
+
+`performance_claim: none`; no hotspot rank, latency, allocation-volume, RSS,
+physical-I/O, cold-cache, throughput, fixed-memory, or system-level OOM claim
+follows.
+
 ## Change 0372 update
 
 The fresh ODP source-backed catalog open is now a narrowly measured hotspot.

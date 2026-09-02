@@ -24,7 +24,7 @@ use std::path::Path;
 use litchi_core::FileSource;
 use litchi_core::{Error, ReadAt, Result, SourceVersion};
 use litchi_odf_common::{
-    core::SourceBackedPackage,
+    core::{SourceBackedPackage, private::ContentDocumentValidator},
     package::{is_media_path, resolve_package_path},
 };
 use quick_xml::{
@@ -464,6 +464,10 @@ fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
 }
 
 fn read_content(package: &SourceBackedPackage) -> Result<String> {
+    ContentDocumentValidator::check_materialized_size(
+        package.member_materialized_size("content.xml")?,
+        FAMILY_NAME,
+    )?;
     let bytes = package.get_file("content.xml")?;
     String::from_utf8(bytes).map_err(|error| {
         Error::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))

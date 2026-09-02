@@ -1650,12 +1650,31 @@ impl<'data> ArchiveReader<'data> {
                         ),
                     })
                 })?;
-                let mut decompressed = Vec::new();
-                decompressed.try_reserve_exact(size).map_err(|error| {
+                let read_limit = info.uncompressed_size.checked_add(1).ok_or_else(|| {
                     Error::from(ErrorKind::InvalidInput {
-                        msg: format!("could not allocate {size} bytes for archive entry: {error}"),
+                        msg: format!(
+                            "archive entry size {} cannot be bounded with an overrun sentinel",
+                            info.uncompressed_size
+                        ),
                     })
                 })?;
+                let read_capacity = usize::try_from(read_limit).map_err(|_| {
+                    Error::from(ErrorKind::InvalidInput {
+                        msg: format!(
+                            "archive entry size {} plus an overrun sentinel does not fit this platform",
+                            info.uncompressed_size
+                        ),
+                    })
+                })?;
+                let mut decompressed = Vec::new();
+                decompressed
+                    .try_reserve_exact(read_capacity)
+                    .map_err(|source| {
+                        Error::from(ErrorKind::Allocation {
+                            resource: "archive entry output",
+                            source,
+                        })
+                    })?;
 
                 let (result, compressed_read, produced) = {
                     let mut compressed = CountingReader::new(data);
@@ -1664,7 +1683,7 @@ impl<'data> ArchiveReader<'data> {
                         let mut produced_reader = CountingReader::new(&mut decoder);
                         let verifier = entry.verifying_reader(&mut produced_reader);
                         let result = verifier
-                            .take(info.uncompressed_size.saturating_add(1))
+                            .take(read_limit)
                             .read_to_end(&mut decompressed)
                             .map_err(Error::from);
                         let produced_count = produced_reader.count();
@@ -2956,11 +2975,31 @@ where
                 ),
             })
         })?;
+        let read_limit = indexed
+            .info
+            .uncompressed_size
+            .checked_add(1)
+            .ok_or_else(|| {
+                Error::from(ErrorKind::InvalidInput {
+                    msg: format!(
+                        "archive entry size {} cannot be bounded with an overrun sentinel",
+                        indexed.info.uncompressed_size
+                    ),
+                })
+            })?;
+        let read_capacity = usize::try_from(read_limit).map_err(|_| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: format!(
+                    "archive entry size {} plus an overrun sentinel does not fit this platform",
+                    indexed.info.uncompressed_size
+                ),
+            })
+        })?;
         let mut output = Vec::new();
-        output.try_reserve_exact(size).map_err(|error| {
+        output.try_reserve_exact(read_capacity).map_err(|source| {
             Error::from(ErrorKind::Allocation {
                 resource: "indexed archive entry output",
-                source: error,
+                source,
             })
         })?;
 
@@ -2969,7 +3008,7 @@ where
                 let mut source = CountingReader::new(entry.reader());
                 let result = entry
                     .verifying_reader(&mut source)
-                    .take(indexed.info.uncompressed_size.saturating_add(1))
+                    .take(read_limit)
                     .read_to_end(&mut output)
                     .map_err(Error::from);
                 let accounting_result = accounting
@@ -2994,7 +3033,7 @@ where
                         let mut produced_reader = CountingReader::new(&mut decoder);
                         let result = entry
                             .verifying_reader(&mut produced_reader)
-                            .take(indexed.info.uncompressed_size.saturating_add(1))
+                            .take(read_limit)
                             .read_to_end(&mut output)
                             .map_err(Error::from);
                         let produced_count = produced_reader.count();
@@ -7641,6 +7680,36 @@ mod tests {
     }
 
     #[test]
+    fn materialized_reads_reject_truncated_and_overlong_store_and_deflate_members() {
+        for deflated in [false, true] {
+            for (payload, declared_size) in
+                [(b"abc".as_slice(), 4_u32), (b"abcde".as_slice(), 4_u32)]
+            {
+                let mut writer = StreamingArchiveWriter::new();
+                if deflated {
+                    writer.write_deflated("member.bin", payload).unwrap();
+                } else {
+                    writer.write_stored("member.bin", payload).unwrap();
+                }
+                let mut bytes = writer.finish_to_bytes().unwrap();
+                rewrite_uncompressed_size(&mut bytes, b"member.bin", declared_size);
+
+                {
+                    let reader =
+                        ArchiveReader::new_with_limits(&bytes, ArchiveLimits::UNBOUNDED).unwrap();
+                    let error = reader.read("member.bin").unwrap_err();
+                    assert_materialized_size_error(error);
+                }
+
+                let archive = indexed_archive_result(bytes, ArchiveLimits::UNBOUNDED).unwrap();
+                let entry_id = archive.entry_id("member.bin").unwrap();
+                let error = archive.read_entry(entry_id).unwrap_err();
+                assert_materialized_size_error(error);
+            }
+        }
+    }
+
+    #[test]
     fn indexed_read_to_supports_zip64_member_metadata_and_short_writes() {
         let bytes = include_bytes!("../assets/zip64.zip").to_vec();
         let archive = indexed_archive_result(bytes, ArchiveLimits::UNBOUNDED).unwrap();
@@ -10646,6 +10715,24 @@ mod tests {
                 assert_eq!(*actual, actual_crc);
             },
             other => panic!("expected zero-CRC checksum error, got {other:?}"),
+        }
+    }
+
+    fn assert_materialized_size_error(error: Error) {
+        match error.kind() {
+            ErrorKind::InvalidSize { .. } => {},
+            ErrorKind::IO(io_error) | ErrorKind::Io(io_error) => {
+                let source = io_error
+                    .get_ref()
+                    .and_then(|source| source.downcast_ref::<Error>());
+                match source {
+                    Some(source) => {
+                        assert!(matches!(source.kind(), ErrorKind::InvalidSize { .. }));
+                    },
+                    None => panic!("expected nested ZIP size error, got {io_error}"),
+                }
+            },
+            other => panic!("expected materialized size error, got {other:?}"),
         }
     }
 

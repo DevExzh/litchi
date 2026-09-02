@@ -1,5 +1,47 @@
 # Performance program phase report
 
+## Change 0373: ODF source allocation preflight
+
+### Implementation boundary
+
+ZIP borrowing/indexed materializers and ODF Deflate decryption now use
+checked overrun-sentinel arithmetic and fallibly reserve the full `size + 1`
+capacity before materializing output. Encrypted ODF package reads resolve and
+validate manifest aliases, Store compression, password, plaintext size, and
+the encrypted-plaintext ceiling before reading the payload, while retaining
+decrypt-time checks as defense in depth.
+
+ODP full-source and ODS full/selective opening enforce the shared 256 MiB
+content limit through metadata-only inspection before `content.xml` reads.
+For encrypted members that value is the manifest plaintext size. ODP performs
+its final freshness reconciliation before returning any secondary parse
+error. The work remains split across the existing ZIP substrate, ODF common
+owner, and concrete family owners, without public API or dependency changes.
+
+### Verification
+
+Validation ran serially in one target with one build job, one test thread,
+incremental compilation disabled, an 8 GiB process cap, and a greater-than-
+10 GiB available-memory launch gate. All focused regressions passed. Broader
+release suites passed `320/320` ZIP, `284/284` ODF-common, `163/163` ODP, and
+`199/199` ODS library tests plus every executed integration target. Two exact
+pre-existing unmodified writer tests were skipped.
+
+Scoped Clippy passed with the six recorded pre-existing allowances. The
+crate-boundary gate passed for 64 packages and 240 declarations with 14
+existing debt entries. Independent implementation, test, allocation-safety,
+family-semantics, architecture, and final reviews accepted the batch. The
+detailed evidence is in the [Change 0373
+record](changes/0373-odf-source-allocation-preflight.md).
+
+### Interpretation
+
+`performance_claim: none`; `claim_authorized: false`. The validation proves
+the specific checked/fallible sentinel and preflight-before-payload behavior,
+not a broad performance or operational result. No latency, allocation-volume,
+RSS, physical-I/O, cold-cache, throughput, fixed-memory, or general
+OOM-prevention claim follows.
+
 ## Change 0372: ODP source-backed catalog fused parse
 
 ### Implementation boundary

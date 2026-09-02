@@ -1,5 +1,37 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0373 compliance update
+
+Change 0373 keeps generic archive allocation mechanics in `soapberry-zip`,
+manifest/encryption/plaintext policy in `litchi-odf-common`, and family
+`content.xml` policy in the ODP/ODS owners through the doc-hidden shared
+validator. It adds no public API, dependency edge, raw CRUD type, package
+identifier, archive handle, runtime handle, lock, or unsafe code.
+
+Correctness and bounded hostile-input handling take precedence over speed.
+ZIP and encrypted-Deflate materializers use checked `size + 1` arithmetic,
+fallible platform conversion, fallible capacity reservation, and bounded
+reads while retaining exact size and CRC verification. Encrypted ODF package
+reads reject alias, compression, password, missing-size, and plaintext-limit
+errors before payload reads, with final decryption checks retained.
+
+ODP full-source and ODS full/selective owners enforce the shared 256 MiB
+family limit using metadata-only materialized size before content reads;
+encrypted entries use manifest plaintext size. Source freshness remains an
+outer publication fence, and ODP explicitly reconciles it before exposing
+secondary parse failures. No unsupported input is silently truncated or
+approximated.
+
+Focused and broader locked/offline release validation passed across all four
+touched crates, subject only to two exact pre-existing writer-test skips.
+Scoped Clippy passed with six named pre-existing allowances, crate boundaries
+passed `64/240` with 14 existing debt entries, and independent static reviews
+accepted the batch. See [Change 0373](changes/0373-odf-source-allocation-preflight.md).
+
+`performance_claim: none`; `claim_authorized: false`. No latency,
+allocation-volume, RSS, physical-I/O, cold-cache, throughput, fixed-memory,
+or general OOM-prevention claim follows.
+
 ## Change 0372 compliance update
 
 The fused catalog parser remains within the owning `litchi-odp` package layer

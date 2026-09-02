@@ -849,12 +849,11 @@ impl SourceBackedPackage {
         let result = (|| {
             self.ensure_current()?;
             let path = normalize_member_path(path)?;
-            let bytes = self.read_entry(path)?;
             let Some(entry) = manifest_entry_for_path(&self.manifest, path)? else {
-                return Ok(bytes);
+                return self.read_entry(path);
             };
             let Some(encryption) = &entry.encryption else {
-                return Ok(bytes);
+                return self.read_entry(path);
             };
             if !self.is_stored(path)? {
                 return Err(Error::InvalidFormat(format!(
@@ -871,6 +870,8 @@ impl SourceBackedPackage {
                     "Encrypted ODF entry '{path}' has no plaintext size"
                 ))
             })?;
+            super::encryption::validate_plaintext_size(size)?;
+            let bytes = self.read_entry(path)?;
             super::encryption::decrypt_entry(&bytes, password, encryption, size)
         })();
         prefer_current(self.source.as_ref(), self.source_version, result)
@@ -1783,15 +1784,17 @@ impl<'data> Package<'data> {
     /// package requirements, or cannot be decrypted.
     pub fn get_file(&self, path: &str) -> Result<Vec<u8>> {
         let path = normalize_member_path(path)?;
-        let bytes = self.archive.read(path).map_err(|error| match error {
-            limit @ Error::ResourceLimit(_) => limit,
-            error => Error::InvalidFormat(format!("File not found: {path}: {error}")),
-        })?;
         let Some(entry) = manifest_entry_for_path(&self.manifest, path)? else {
-            return Ok(bytes);
+            return self.archive.read(path).map_err(|error| match error {
+                limit @ Error::ResourceLimit(_) => limit,
+                error => Error::InvalidFormat(format!("File not found: {path}: {error}")),
+            });
         };
         let Some(encryption) = &entry.encryption else {
-            return Ok(bytes);
+            return self.archive.read(path).map_err(|error| match error {
+                limit @ Error::ResourceLimit(_) => limit,
+                error => Error::InvalidFormat(format!("File not found: {path}: {error}")),
+            });
         };
         if !self.archive.is_stored(path).map_err(|error| match error {
             limit @ Error::ResourceLimit(_) => limit,
@@ -1812,6 +1815,11 @@ impl<'data> Package<'data> {
             Error::InvalidFormat(format!(
                 "Encrypted ODF entry '{path}' has no plaintext size"
             ))
+        })?;
+        super::encryption::validate_plaintext_size(size)?;
+        let bytes = self.archive.read(path).map_err(|error| match error {
+            limit @ Error::ResourceLimit(_) => limit,
+            error => Error::InvalidFormat(format!("File not found: {path}: {error}")),
         })?;
         super::encryption::decrypt_entry(&bytes, password, encryption, size)
     }
@@ -2151,6 +2159,68 @@ mod tests {
             package.member_materialized_size("content.xml").unwrap(),
             Some(u64::try_from(plaintext.len()).unwrap())
         );
+        assert_eq!(source.read_count(), after_open);
+    }
+
+    #[test]
+    fn source_backed_encrypted_preflight_rejects_without_payload_read() {
+        let mut writer = PackageWriter::new();
+        writer
+            .set_mimetype("application/vnd.oasis.opendocument.text")
+            .unwrap();
+        writer
+            .set_encryption("source-password", Profile::compatible())
+            .unwrap();
+        writer
+            .add_file(
+                "content.xml",
+                b"<office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\"><office:body><office:text/></office:body></office:document-content>",
+            )
+            .unwrap();
+        let data = writer.finish_to_bytes().unwrap();
+
+        let source = CountingSource::new(data);
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let after_open = source.read_count();
+        assert!(matches!(
+            package.get_file("content.xml"),
+            Err(Error::InvalidFormat(message)) if message.contains("Password required")
+        ));
+        assert_eq!(source.read_count(), after_open);
+    }
+
+    #[test]
+    fn source_backed_encrypted_plaintext_ceiling_is_checked_before_payload_read() {
+        use std::io::Write;
+
+        let oversized = 512_u64 * 1024 * 1024 + 1;
+        let manifest = format!(
+            r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="application/vnd.oasis.opendocument.text"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml" m:size="{oversized}"><m:encryption-data><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/><m:start-key-generation m:start-key-generation-name="http://www.w3.org/2001/04/xmlenc#sha256" m:key-size="32"/><m:key-derivation m:key-derivation-name="PBKDF2" m:salt="AQ==" m:iteration-count="1000" m:key-size="32"/></m:encryption-data></m:file-entry></m:manifest>"#
+        );
+        let mut data = Vec::new();
+        {
+            let mut zip = zip::ZipWriter::new(Cursor::new(&mut data));
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            zip.start_file("mimetype", options).unwrap();
+            zip.write_all(b"application/vnd.oasis.opendocument.text")
+                .unwrap();
+            zip.start_file("META-INF/manifest.xml", options).unwrap();
+            zip.write_all(manifest.as_bytes()).unwrap();
+            zip.start_file("content.xml", options).unwrap();
+            zip.write_all(b"ciphertext").unwrap();
+            zip.finish().unwrap();
+        }
+
+        let source = CountingSource::new(data);
+        let package =
+            SourceBackedPackage::from_read_at_with_password(source.clone(), "source-password")
+                .unwrap();
+        let after_open = source.read_count();
+        assert!(matches!(
+            package.get_file("content.xml"),
+            Err(Error::InvalidFormat(message)) if message.contains("exceeding the limit")
+        ));
         assert_eq!(source.read_count(), after_open);
     }
 
