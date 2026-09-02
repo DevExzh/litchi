@@ -1,5 +1,23 @@
 # Performance hotspot inventory
 
+## Change 0377 update
+
+Change 0377 is a correctness and CRUD-completeness batch, not a measured
+hotspot. The XLSX guarded source-backed cell-value editor now has an explicit
+numeric-only absent-owner `Insert` operation with existing/new-row ordering,
+dimension expansion, calculation invalidation, exact inverse restoration, and
+bounded refusal semantics. Existing-owner updates remain separate.
+
+Focused, broad, and doctest validation passed subject only to the four exact
+pre-existing row-visibility exclusions recorded in the [0377 change
+record](changes/0377-xlsx-source-backed-missing-numeric-insert.md). Production
+Clippy passed with one named pre-existing allowance; crate boundaries and
+independent production/test reviews passed.
+
+`performance_claim: none`; `claim_authorized: false`. This change establishes
+no hotspot rank, latency, allocation-volume, RSS, I/O, throughput,
+fixed-memory, or system-level OOM result.
+
 ## Change 0376 update
 
 Change 0376 is a correctness and CRUD-completeness batch, not a measured

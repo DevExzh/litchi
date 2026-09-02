@@ -1,5 +1,73 @@
 # Performance program phase report
 
+## Change 0377: XLSX source-backed missing numeric insert
+
+### Implementation boundary
+
+`CellValueEdit::Insert` and matching single/multi-sheet convenience methods
+create only finite numeric values at physically absent coordinates. Existing
+`Set`, formula, `Clear`, and `Remove` semantics remain
+existing-owner-only. The shared cell validator now applies the existing
+32,767-character SpreadsheetML payload ceiling to numeric lexical values as
+well as textual payloads.
+
+Insertion eligibility rejects every physical owner, any merge range, and
+array/data-table/shared-formula owned ranges, including physical holes.
+The existing source closure continues to refuse tables, worksheet
+relationships, MCE/opaque markup, unknown cells, and cell metadata. The raw
+worksheet action writer retains deterministic row/cell ordering, creates
+missing rows, and expands an existing dimension without introducing a new
+package topology path.
+
+Effective insertion follows the established workbook calculation-state and
+calculation-chain invalidation path. Publication remains source-bound,
+clone-staged, fully reparsed, failure-atomic, signature-aware, and reversible;
+inverse application restores the exact original worksheet bytes and physical
+cell absence.
+
+### Verification
+
+The focused `source_backed_cell_values` target passed `59/59` tests. The
+complete locked XLSX library/integration gate passed 58 suites and
+`1213/1213` executed tests with four exact pre-existing tests in unmodified
+row-visibility code excluded:
+
+- `changed_publication_reuses_matched_provenance_without_selected_reload`
+- `managed_changed_publication_preserves_unknown_members_and_releases_budget`
+- `managed_signature_noop_and_changed_protection_contracts_remain_fail_closed`
+- `unsafe_xml_macros_and_signatures_fail_closed`
+
+The first assumes one physical callback after matched semantic provenance; the
+OPC topology writer may need multiple callbacks for an oversized
+cache-bypassed replacement. The next two omit the existing physical-member
+lookup reservation and consequently expect a later preservation/signature
+outcome instead of the earlier resource limit. The fourth expects all
+formula-bearing worksheets to be refused although the shared cell-value
+closure intentionally accepts scalar formulas. Static causal review confirmed
+that none reaches the new `Insert` operation.
+
+XLSX doctests passed `2/2`. Production-library Clippy passed with the
+single pre-existing `clippy::useless_asref` allowance in unmodified
+hyperlink snapshot code. The crate-boundary gate passed for 64 workspace
+packages and 240 internal declarations with 14 existing debt entries.
+Independent production/API, safety, and test reviews accepted the final
+implementation.
+
+All Cargo work used one process at a time, `CARGO_BUILD_JOBS=1`, one
+dedicated target, disabled incremental state, one test thread, an
+available-memory launch guard, and a 6 GiB per-process virtual-memory cap.
+These are operational safeguards, not OOM-prevention evidence.
+
+### Interpretation
+
+`performance_claim: none`; `claim_authorized: false`. The evidence proves only
+the bounded numeric absent-owner lifecycle, ownership/range refusal, numeric
+limit, ordering/dimension, calculation invalidation, atomicity, source
+identity, signature, and inverse behaviors exercised above. There is no
+timing, allocation-volume, RSS, physical-I/O, throughput, fixed-memory, broad
+XLSX, or general OOM-prevention claim. Detailed evidence is in the [Change
+0377 record](changes/0377-xlsx-source-backed-missing-numeric-insert.md).
+
 ## Change 0376: XLSB Single Cell Tables lifecycle
 
 ### Implementation boundary
