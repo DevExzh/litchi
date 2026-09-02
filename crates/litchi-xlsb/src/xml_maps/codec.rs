@@ -68,6 +68,16 @@ impl SingleCellsSource {
         &self.source
     }
 
+    pub(crate) fn ensure_removal_lossless(&self) -> Result<()> {
+        if self.has_opaque {
+            return Err(Error::UnsupportedFeature(
+                "cannot losslessly edit Single Cell Tables containing opaque or FRT records"
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Inert `dwConnID` values aligned with [`Self::value`].
     #[allow(
         dead_code,

@@ -28,6 +28,7 @@ const WORKBOOK_PART: &str = "/xl/workbook.bin";
 const WORKSHEET_PART: &str = "/xl/worksheets/sheet1.bin";
 const MAP_INFO_PART: &str = "/xl/xmlMaps.xml";
 const SINGLE_CELLS_PART: &str = "/xl/tables/singleCells1.bin";
+const CREATED_SINGLE_CELLS_PART: &str = "/xl/tables/tableSingleCells1.bin";
 const TABLE_PART: &str = "/xl/tables/table1.bin";
 const SIGNATURE_ORIGIN_PART: &str = "/_xmlsignatures/origin.sigs";
 
@@ -988,7 +989,7 @@ fn catalog_create_remove_dependency_edit_and_conformance_are_reversible() {
 }
 
 #[test]
-fn public_binding_crud_missing_part_refusal_and_inverse_are_exact() {
+fn public_binding_crud_create_last_remove_and_inverse_are_exact() {
     let mut workbook = open(valid_package());
     let before = physical_state(&workbook);
     let mut replace = workbook.xml_maps().unwrap().edit();
@@ -1053,9 +1054,12 @@ fn public_binding_crud_missing_part_refusal_and_inverse_are_exact() {
     let restore = remove.patch().inverse();
     workbook.apply_xml_maps(&remove).unwrap();
     assert!(workbook.xml_maps().unwrap().mapped_tables().is_empty());
-    assert_eq!(
-        workbook.xml_maps().unwrap().single_cell_bindings(0),
-        Some(&[][..])
+    assert!(
+        workbook
+            .xml_maps()
+            .unwrap()
+            .single_cell_bindings(0)
+            .is_none()
     );
     assert_eq!(
         part_bytes(&workbook, TABLE_PART),
@@ -1071,9 +1075,19 @@ fn public_binding_crud_missing_part_refusal_and_inverse_are_exact() {
             .contains_part(&PackURI::new(TABLE_PART).unwrap())
     );
     assert!(
-        workbook
+        !workbook
             .opc_package()
             .contains_part(&PackURI::new(SINGLE_CELLS_PART).unwrap())
+    );
+    let worksheet = workbook
+        .opc_package()
+        .get_part(&PackURI::new(WORKSHEET_PART).unwrap())
+        .unwrap();
+    assert!(
+        !worksheet
+            .rels()
+            .iter()
+            .any(|relationship| relationship.reltype() == SINGLE_CELLS_REL)
     );
     workbook.apply_xml_maps_patch(&restore).unwrap();
     assert_eq!(physical_state(&workbook), before);
@@ -1095,8 +1109,8 @@ fn public_binding_crud_missing_part_refusal_and_inverse_are_exact() {
                 .unwrap(),
             )
             .unwrap_err(),
-        "creating a new tableSingleCells part",
-        "missing singleton part",
+        "binary XML bindings require a MapInfo catalog",
+        "missing XML Maps catalog",
     );
     assert_error_contains(
         missing
@@ -1134,6 +1148,499 @@ fn public_binding_crud_missing_part_refusal_and_inverse_are_exact() {
         error,
         "column 99 is absent from physical table ID 2",
         "absent physical column",
+    );
+}
+
+#[test]
+fn single_cell_first_binding_creates_canonical_part_reads_back_and_inverts_exactly() {
+    let mut package = valid_package();
+    remove_relationship_of_type(&mut package, WORKSHEET_PART, SINGLE_CELLS_REL);
+    package.remove_part(&PackURI::new(SINGLE_CELLS_PART).unwrap());
+    let mut workbook = open(package);
+    let before = physical_state(&workbook);
+    let binding = SingleCellBinding::new(
+        1,
+        1,
+        CellReference::new(0, 0).unwrap(),
+        7,
+        XmlDataType::new(1).unwrap(),
+        XPath::new("/root/value").unwrap(),
+    )
+    .unwrap();
+
+    let mut transaction = workbook.xml_maps().unwrap().edit();
+    assert!(
+        transaction
+            .put_single_cell_binding(0, binding.clone())
+            .unwrap()
+    );
+    let commit = transaction.commit().unwrap();
+    let inverse = commit.patch().inverse();
+    workbook.apply_xml_maps(&commit).unwrap();
+
+    assert_eq!(
+        workbook.xml_maps().unwrap().single_cell_bindings(0),
+        Some(std::slice::from_ref(&binding))
+    );
+    assert_eq!(
+        mapping_flags(&part_bytes(&workbook, CREATED_SINGLE_CELLS_PART)),
+        2
+    );
+
+    let package = workbook.opc_package();
+    let workbook_part = package
+        .get_part(&PackURI::new(WORKBOOK_PART).unwrap())
+        .unwrap();
+    let maps_rel = workbook_part
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == XML_MAPS_REL)
+        .unwrap();
+    assert!(!maps_rel.is_external());
+    assert_eq!(
+        maps_rel.target_partname().unwrap(),
+        PackURI::new(MAP_INFO_PART).unwrap()
+    );
+    let maps_part = package
+        .get_part(&maps_rel.target_partname().unwrap())
+        .unwrap();
+    assert_eq!(
+        maps_part.content_type(),
+        litchi_ooxml_common::spreadsheet_xml_maps::CONTENT_TYPE
+    );
+
+    let worksheet_part = package
+        .get_part(&PackURI::new(WORKSHEET_PART).unwrap())
+        .unwrap();
+    let single_rel = worksheet_part
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == SINGLE_CELLS_REL)
+        .unwrap();
+    assert!(!single_rel.is_external());
+    assert_eq!(
+        single_rel.target_partname().unwrap(),
+        PackURI::new(CREATED_SINGLE_CELLS_PART).unwrap()
+    );
+    let single_part = package
+        .get_part(&single_rel.target_partname().unwrap())
+        .unwrap();
+    assert_eq!(single_part.content_type(), SINGLE_CELLS_CONTENT_TYPE);
+    assert!(single_part.rels().is_empty());
+
+    workbook.apply_xml_maps_patch(&inverse).unwrap();
+    assert_eq!(physical_state(&workbook), before);
+}
+
+#[test]
+fn single_cell_first_binding_failure_is_atomic_and_retryable() {
+    let mut package = valid_package();
+    remove_relationship_of_type(&mut package, WORKSHEET_PART, SINGLE_CELLS_REL);
+    package.remove_part(&PackURI::new(SINGLE_CELLS_PART).unwrap());
+    let mut workbook = open(package);
+    let before = physical_state(&workbook);
+    let mut transaction = workbook.xml_maps().unwrap().edit();
+    let invalid = SingleCellBinding::new(
+        1,
+        1,
+        CellReference::new(0, 0).unwrap(),
+        999,
+        XmlDataType::new(1).unwrap(),
+        XPath::new("/root/value").unwrap(),
+    )
+    .unwrap();
+    let error = transaction.put_single_cell_binding(0, invalid).unwrap_err();
+    assert_error_contains(error, "absent XML map ID", "invalid first binding");
+    assert_eq!(physical_state(&workbook), before);
+
+    let valid = SingleCellBinding::new(
+        1,
+        1,
+        CellReference::new(1, 0).unwrap(),
+        7,
+        XmlDataType::new(1).unwrap(),
+        XPath::new("/root/value").unwrap(),
+    )
+    .unwrap();
+    assert!(
+        transaction
+            .put_single_cell_binding(0, valid.clone())
+            .unwrap()
+    );
+    let commit = transaction.commit().unwrap();
+    workbook.apply_xml_maps(&commit).unwrap();
+    assert_eq!(
+        workbook.xml_maps().unwrap().single_cell_bindings(0),
+        Some(std::slice::from_ref(&valid))
+    );
+}
+
+#[test]
+fn existing_empty_single_cell_part_remains_an_exact_no_op() {
+    let package = package_with(
+        MAP_INFO_XML.to_vec(),
+        remove_first_record_pair(
+            &single_cell_vector(&BindingWire::default(), 2),
+            BRT_BEGIN_LIST,
+            BRT_END_LIST,
+        ),
+        normal_table_vector(
+            &BindingWire {
+                flags: 0,
+                data_type: 13,
+                ..BindingWire::default()
+            },
+            0,
+        ),
+        Shape::default(),
+    );
+    let mut workbook = open(package);
+    let before = physical_state(&workbook);
+    assert_eq!(
+        workbook.xml_maps().unwrap().single_cell_bindings(0),
+        Some(&[][..])
+    );
+
+    let mut transaction = workbook.xml_maps().unwrap().edit();
+    assert!(
+        transaction
+            .remove_single_cell_binding(0, 99)
+            .unwrap()
+            .is_none()
+    );
+    let commit = transaction.commit().unwrap();
+    assert!(commit.patch().is_empty());
+    workbook.apply_xml_maps(&commit).unwrap();
+    assert_eq!(physical_state(&workbook), before);
+    assert!(
+        workbook
+            .opc_package()
+            .contains_part(&PackURI::new(SINGLE_CELLS_PART).unwrap())
+    );
+    assert_eq!(
+        workbook.xml_maps().unwrap().single_cell_bindings(0),
+        Some(&[][..])
+    );
+}
+
+#[test]
+fn opaque_single_cell_last_removal_is_refused_without_mutation() {
+    let workbook = open(opaque_package());
+    let before = physical_state(&workbook);
+    let mut transaction = workbook.xml_maps().unwrap().edit();
+    assert!(
+        transaction
+            .remove_single_cell_binding(0, 1)
+            .unwrap()
+            .is_some()
+    );
+    let error = transaction.commit().unwrap_err();
+    assert_error_contains(
+        error,
+        "losslessly edit Single Cell Tables",
+        "opaque singleton removal",
+    );
+    assert_eq!(physical_state(&workbook), before);
+}
+
+#[test]
+fn single_cell_last_remove_rejects_foreign_and_unowned_sources_atomically() {
+    let source = open(valid_package());
+    let mut transaction = source.xml_maps().unwrap().edit();
+    assert!(
+        transaction
+            .remove_single_cell_binding(0, 1)
+            .unwrap()
+            .is_some()
+    );
+    let commit = transaction.commit().unwrap();
+
+    let mut foreign = open(valid_package());
+    foreign
+        .edit_opc(|package| {
+            let uri = PackURI::new(SINGLE_CELLS_PART)?;
+            let changed = replace_utf16(
+                package.get_part(&uri)?.blob().to_vec(),
+                "/root/value",
+                "/root/other",
+            );
+            package.get_part_mut(&uri)?.set_blob(changed);
+            Ok(())
+        })
+        .unwrap();
+    assert_failed_apply(&mut foreign, &commit, "stale");
+
+    let mut inbound = open(valid_package());
+    inbound
+        .edit_opc(|package| {
+            let mut owner = BlobPart::new(
+                PackURI::new("/custom/sct-owner.bin")?,
+                "application/octet-stream".to_owned(),
+                Vec::new(),
+            );
+            owner.rels_mut().add_relationship(
+                "urn:litchi:fixture:dependency".to_owned(),
+                "../xl/tables/singleCells1.bin".to_owned(),
+                "rIdSctDependency".to_owned(),
+                false,
+            );
+            package.add_part(Box::new(owner));
+            Ok(())
+        })
+        .unwrap();
+    let mut inbound_transaction = inbound.xml_maps().unwrap().edit();
+    assert!(
+        inbound_transaction
+            .remove_single_cell_binding(0, 1)
+            .unwrap()
+            .is_some()
+    );
+    let inbound_commit = inbound_transaction.commit().unwrap();
+    assert_failed_apply(&mut inbound, &inbound_commit, "another part references");
+}
+
+#[test]
+fn single_cell_last_remove_rejects_package_root_inbound_reference_atomically() {
+    let mut workbook = open(valid_package());
+    workbook
+        .edit_opc(|package| {
+            package.rels_mut().add_relationship(
+                "urn:litchi:fixture:root-dependency".to_owned(),
+                "xl/tables/singleCells1.bin".to_owned(),
+                "rIdRootSctDependency".to_owned(),
+                false,
+            );
+            Ok(())
+        })
+        .unwrap();
+    let mut transaction = workbook.xml_maps().unwrap().edit();
+    assert!(
+        transaction
+            .remove_single_cell_binding(0, 1)
+            .unwrap()
+            .is_some()
+    );
+    let commit = transaction.commit().unwrap();
+    assert_failed_apply(&mut workbook, &commit, "another part references");
+}
+
+#[test]
+fn single_cell_last_remove_rejects_case_equivalent_internal_target_atomically() {
+    let mut workbook = open(valid_package());
+    workbook
+        .edit_opc(|package| {
+            let mut owner = BlobPart::new(
+                PackURI::new("/custom/case-owner.bin")?,
+                "application/octet-stream".to_owned(),
+                Vec::new(),
+            );
+            owner.rels_mut().add_relationship(
+                "urn:litchi:fixture:dependency".to_owned(),
+                "../XL/TABLES/SINGLECELLS1.BIN".to_owned(),
+                "rIdCaseSctDependency".to_owned(),
+                false,
+            );
+            package.add_part(Box::new(owner));
+            Ok(())
+        })
+        .unwrap();
+    let mut transaction = workbook.xml_maps().unwrap().edit();
+    assert!(
+        transaction
+            .remove_single_cell_binding(0, 1)
+            .unwrap()
+            .is_some()
+    );
+    let commit = transaction.commit().unwrap();
+    assert_failed_apply(&mut workbook, &commit, "another part references");
+}
+
+#[test]
+fn single_cell_last_remove_accepts_absolute_equivalent_worksheet_target() {
+    let mut package = valid_package();
+    remove_relationship_of_type(&mut package, WORKSHEET_PART, SINGLE_CELLS_REL);
+    package
+        .get_part_mut(&PackURI::new(WORKSHEET_PART).unwrap())
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            SINGLE_CELLS_REL.to_owned(),
+            "/xl/tables/singleCells1.bin".to_owned(),
+            "rIdSingleCellsAbsolute".to_owned(),
+            false,
+        );
+    let mut workbook = open(package);
+    let mut transaction = workbook.xml_maps().unwrap().edit();
+    assert!(
+        transaction
+            .remove_single_cell_binding(0, 1)
+            .unwrap()
+            .is_some()
+    );
+    let commit = transaction.commit().unwrap();
+    workbook.apply_xml_maps(&commit).unwrap();
+    assert!(
+        workbook
+            .xml_maps()
+            .unwrap()
+            .single_cell_bindings(0)
+            .is_none()
+    );
+    assert!(
+        !workbook
+            .opc_package()
+            .contains_part(&PackURI::new(SINGLE_CELLS_PART).unwrap())
+    );
+    assert!(
+        !workbook
+            .opc_package()
+            .get_part(&PackURI::new(WORKSHEET_PART).unwrap())
+            .unwrap()
+            .rels()
+            .iter()
+            .any(|relationship| relationship.reltype() == SINGLE_CELLS_REL)
+    );
+}
+
+#[test]
+fn single_cell_first_binding_allocates_around_case_equivalent_part_name() {
+    let mut package = valid_package();
+    remove_relationship_of_type(&mut package, WORKSHEET_PART, SINGLE_CELLS_REL);
+    package.remove_part(&PackURI::new(SINGLE_CELLS_PART).unwrap());
+    package.add_part(Box::new(BlobPart::new(
+        PackURI::new("/xl/tables/TABLESINGLECELLS1.BIN").unwrap(),
+        "application/octet-stream".to_owned(),
+        vec![0],
+    )));
+    let mut workbook = open(package);
+    let binding = SingleCellBinding::new(
+        1,
+        1,
+        CellReference::new(0, 0).unwrap(),
+        7,
+        XmlDataType::new(1).unwrap(),
+        XPath::new("/root/value").unwrap(),
+    )
+    .unwrap();
+    let mut transaction = workbook.xml_maps().unwrap().edit();
+    assert!(transaction.put_single_cell_binding(0, binding).unwrap());
+    workbook
+        .apply_xml_maps(&transaction.commit().unwrap())
+        .unwrap();
+
+    let worksheet = workbook
+        .opc_package()
+        .get_part(&PackURI::new(WORKSHEET_PART).unwrap())
+        .unwrap();
+    let single_rel = worksheet
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == SINGLE_CELLS_REL)
+        .unwrap();
+    let allocated = single_rel.target_partname().unwrap();
+    assert_eq!(
+        allocated,
+        PackURI::new("/xl/tables/tableSingleCells2.bin").unwrap()
+    );
+    assert!(workbook.opc_package().contains_part(&allocated));
+    assert!(
+        workbook
+            .opc_package()
+            .contains_part(&PackURI::new("/xl/tables/TABLESINGLECELLS1.BIN").unwrap())
+    );
+}
+
+#[test]
+fn single_cell_first_binding_rejects_dangling_case_equivalent_root_alias_atomically() {
+    let mut package = valid_package();
+    remove_relationship_of_type(&mut package, WORKSHEET_PART, SINGLE_CELLS_REL);
+    package.remove_part(&PackURI::new(SINGLE_CELLS_PART).unwrap());
+    package.rels_mut().add_relationship(
+        "urn:litchi:fixture:root-dependency".to_owned(),
+        "xl/tables/TABLESINGLECELLS1.BIN".to_owned(),
+        "rIdDanglingSctAlias".to_owned(),
+        false,
+    );
+    let mut workbook = open(package);
+    let before = physical_state(&workbook);
+    let binding = SingleCellBinding::new(
+        1,
+        1,
+        CellReference::new(0, 0).unwrap(),
+        7,
+        XmlDataType::new(1).unwrap(),
+        XPath::new("/root/value").unwrap(),
+    )
+    .unwrap();
+    let mut transaction = workbook.xml_maps().unwrap().edit();
+    assert!(transaction.put_single_cell_binding(0, binding).unwrap());
+    let commit = transaction.commit().unwrap();
+    let error = workbook.apply_xml_maps(&commit).unwrap_err();
+    assert_error_contains(
+        error,
+        "another part references",
+        "dangling inbound addition",
+    );
+    assert_eq!(physical_state(&workbook), before);
+}
+
+#[test]
+fn signed_single_cell_last_remove_unsigns_and_inverse_restores_payloads_only() {
+    let mut shape = Shape::default();
+    shape.signed = true;
+    let mut workbook = open(package_with(
+        MAP_INFO_XML.to_vec(),
+        single_cell_vector(&BindingWire::default(), 2),
+        normal_table_vector(
+            &BindingWire {
+                flags: 0,
+                data_type: 13,
+                ..BindingWire::default()
+            },
+            0,
+        ),
+        shape,
+    ));
+    let original_single = part_bytes(&workbook, SINGLE_CELLS_PART);
+    let original_table = part_bytes(&workbook, TABLE_PART);
+    let mut transaction = workbook.xml_maps().unwrap().edit();
+    assert!(
+        transaction
+            .remove_single_cell_binding(0, 1)
+            .unwrap()
+            .is_some()
+    );
+    let commit = transaction.commit().unwrap();
+    let inverse = commit.patch().inverse();
+
+    assert!(workbook.is_signed());
+    workbook.apply_xml_maps(&commit).unwrap();
+    assert!(!workbook.is_signed());
+    assert!(
+        !workbook
+            .opc_package()
+            .contains_part(&PackURI::new(SIGNATURE_ORIGIN_PART).unwrap())
+    );
+    assert!(
+        workbook
+            .xml_maps()
+            .unwrap()
+            .single_cell_bindings(0)
+            .is_none()
+    );
+
+    workbook.apply_xml_maps_patch(&inverse).unwrap();
+    assert!(!workbook.is_signed());
+    assert_eq!(part_bytes(&workbook, SINGLE_CELLS_PART), original_single);
+    assert_eq!(part_bytes(&workbook, TABLE_PART), original_table);
+    assert_eq!(
+        workbook
+            .xml_maps()
+            .unwrap()
+            .single_cell_bindings(0)
+            .unwrap()
+            .len(),
+        1
     );
 }
 
