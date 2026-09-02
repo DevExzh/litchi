@@ -1,5 +1,27 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0366 compliance update
+
+Change 0366 remains in the owning `litchi-xlsx::raw` selected-worksheet layer:
+the canonical bounded general-reference decoder adds no dependency edge or
+public API. Predefined references remain eligible in formula, value, and inline
+scalar payloads; decimal/hex numeric references are limited to ASCII formula and
+value tokens of at most 12 bytes. Numeric inline, overlong/non-ASCII, or
+XML-1.0-`Char`-invalid numeric scalar cases become `NotEligible` and use the
+verified eager fallback, while malformed, custom, and out-of-range references
+remain MCE/typed errors. The scanner still drains XML/MCE/x14ac and the OPC
+reader to verified EOF before publication or callback, preserving failure and
+verification ordering. Eligible cold `cell`, `cells`, and `visit_cells` paths
+retain no `Store`, `PartData`, or semantic caches.
+
+No public accepted-input behavior or API surface changes; the pre-existing
+eager/shared-string XML-legality residual is out of scope. Focused validation
+passed `9/9`, full `litchi-xlsx` library validation passed `892/892`, and scoped
+Clippy passed with `-D warnings`, with only the unrelated
+`clippy::useless-asref` issue allowed. This is correctness/boundary evidence
+only: `performance_claim: none`, with no latency, RSS, fixed-memory, or OOM
+claim.
+
 ## Change 0365 compliance update
 
 Change 0365 keeps source-worksheet range selection in the owning `litchi-xlsx`

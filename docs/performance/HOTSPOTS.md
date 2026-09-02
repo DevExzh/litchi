@@ -1,5 +1,26 @@
 # Performance hotspot inventory
 
+## Change 0366 update
+
+Change 0366 extends the selected worksheet single/range scanner's eligible
+scalar payloads with bounded XML general-reference decoding through the
+canonical helper. Predefined `amp`, `lt`, `gt`, `quot`, and `apos` references
+are eligible in formula, value, and inline payloads. Decimal and hexadecimal
+numeric references are eligible only in formula/value payloads when ASCII and
+the complete token is at most 12 bytes. Numeric inline references, overlong or
+non-ASCII numeric spellings, and numeric scalars outside the XML 1.0 `Char`
+production return `NotEligible` and use verified eager fallback; malformed,
+custom, and out-of-range references remain MCE/typed errors.
+
+The scanner continues to drain XML/MCE/x14ac and the OPC reader to verified EOF
+before publishing or invoking callbacks. Eligible cold `cell`, `cells`, and
+`visit_cells` paths retain no `Store`, `PartData`, or semantic caches. No API or
+public accepted-input change is made. The pre-existing eager/shared-string
+XML-legality residual remains out of scope. Focused `9/9`, full `litchi-xlsx`
+library `892/892`, and scoped Clippy with `-D warnings` passed, with only the
+unrelated `clippy::useless-asref` issue allowed. No latency, RSS, fixed-memory,
+or OOM claim follows; `performance_claim: none`.
+
 ## XLSX source-worksheet range streaming boundary (change 0365)
 
 Change 0365 is a correctness/ownership integration, not a measured hotspot

@@ -3147,4 +3147,270 @@ mod tests {
             assert!(sheet.data.cells.get().is_none());
         }
     }
+
+    mod streaming_0366_tests {
+        use std::sync::Arc;
+
+        use litchi_opc::SourceCacheDiagnostics;
+
+        use super::super::SourceCell;
+        use super::streaming_0364_tests::dependency_xlsx;
+        use super::{CountingSource, SourceBackedWorkbook, SourceCellView};
+        use crate::{Cell, Value};
+
+        const SPREADSHEETML_NAMESPACE: &str =
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+        fn worksheet_xml(sheet_data: &str) -> String {
+            let first = std::str::from_utf8(super::FIRST_MARKER).unwrap();
+            let second = std::str::from_utf8(super::SECOND_MARKER).unwrap();
+            format!(
+                r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><!--{first} {second}-->{sheet_data}</worksheet>"#,
+            )
+        }
+
+        fn source_workbook(worksheet: &str) -> (Arc<CountingSource>, SourceBackedWorkbook) {
+            let source = Arc::new(CountingSource::new(dependency_xlsx(worksheet, None, None)));
+            let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+            (source, workbook)
+        }
+
+        fn reference_fixture() -> String {
+            worksheet_xml(
+                r#"<sheetData>
+                    <row r="1">
+                        <c r="A1" t="inlineStr"><is><t>inline&amp;&lt;&gt;&apos;&quot;</t></is></c>
+                        <c r="C1" t="str"><v>value&amp;&lt;&gt;&apos;&quot;</v></c>
+                        <c r="E1"><f>A1&amp;C1&lt;&gt;D1</f><v>1</v></c>
+                    </row>
+                    <row r="3">
+                        <c r="A3"><f>A1&#x2b;C1</f><v>3&#x2e;5</v></c>
+                        <c r="D3"><v>42&#x2e;25</v></c>
+                    </row>
+                </sheetData>"#,
+            )
+        }
+
+        fn addresses(cells: &[SourceCell]) -> Vec<String> {
+            cells.iter().map(|cell| cell.address.a1()).collect()
+        }
+
+        fn assert_no_part_cache_admission(
+            before: SourceCacheDiagnostics,
+            after: SourceCacheDiagnostics,
+        ) {
+            assert_eq!(after.cold_loads, before.cold_loads);
+            assert_eq!(after.successful_loads, before.successful_loads);
+            assert_eq!(after.retained_entries, before.retained_entries);
+            assert_eq!(after.retained_bytes, before.retained_bytes);
+        }
+
+        #[test]
+        fn cold_cell_0366_decodes_references_with_exact_eager_parity() {
+            let (_source, workbook) = source_workbook(&reference_fixture());
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let before = workbook.cache_diagnostics();
+            let references = ["A1", "C1", "E1", "A3", "D3"];
+
+            let cold = references
+                .into_iter()
+                .map(|reference| sheet.cell(reference).unwrap())
+                .collect::<Vec<_>>();
+
+            assert!(matches!(
+                &cold[0],
+                SourceCellView::Stored(Cell::Value(Value::Text(value)))
+                    if value.as_str() == "inline&<>'\""
+            ));
+            assert!(matches!(
+                &cold[1],
+                SourceCellView::Stored(Cell::Value(Value::Text(value)))
+                    if value.as_str() == "value&<>'\""
+            ));
+            assert!(matches!(
+                &cold[2],
+                SourceCellView::Stored(Cell::Formula(formula))
+                    if formula.text() == "A1&C1<>D1"
+            ));
+            assert!(matches!(
+                &cold[3],
+                SourceCellView::Stored(Cell::Formula(formula))
+                    if formula.text() == "A1+C1"
+            ));
+            assert!(matches!(
+                &cold[4],
+                SourceCellView::Stored(Cell::Value(Value::Number(value)))
+                    if value.as_str() == "42.25"
+            ));
+            assert!(sheet.data.cells.get().is_none());
+            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(workbook.inner.styles.get().is_none());
+            assert_no_part_cache_admission(before, workbook.cache_diagnostics());
+
+            sheet.stored_extent().unwrap();
+            let eager = ["A1", "C1", "E1", "A3", "D3"]
+                .into_iter()
+                .map(|reference| sheet.cell(reference).unwrap())
+                .collect::<Vec<_>>();
+            assert_eq!(cold, eager);
+        }
+
+        #[test]
+        fn cold_cells_0366_are_sparse_row_major_and_stay_cold() {
+            let (_source, workbook) = source_workbook(&reference_fixture());
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let before = workbook.cache_diagnostics();
+
+            let cold = sheet.cells("A1:E3").unwrap();
+            assert_eq!(
+                addresses(&cold),
+                vec![
+                    "A1".to_owned(),
+                    "C1".to_owned(),
+                    "E1".to_owned(),
+                    "A3".to_owned(),
+                    "D3".to_owned(),
+                ]
+            );
+            assert!(sheet.data.cells.get().is_none());
+            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(workbook.inner.styles.get().is_none());
+            assert_no_part_cache_admission(before, workbook.cache_diagnostics());
+
+            sheet.stored_extent().unwrap();
+            let eager = sheet.cells("A1:E3").unwrap();
+            assert_eq!(cold, eager);
+        }
+
+        #[test]
+        fn cold_visit_cells_0366_stages_decoded_callbacks_without_admission() {
+            let (_source, workbook) = source_workbook(&reference_fixture());
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let before = workbook.cache_diagnostics();
+            let mut visited = Vec::new();
+
+            let count = sheet
+                .visit_cells("A1:E3", |address, cell| {
+                    visited.push((address, cell.clone()));
+                    Ok(())
+                })
+                .unwrap();
+
+            assert_eq!(count, visited.len());
+            assert_eq!(
+                visited
+                    .iter()
+                    .map(|(address, _)| address.a1())
+                    .collect::<Vec<_>>(),
+                vec![
+                    "A1".to_owned(),
+                    "C1".to_owned(),
+                    "E1".to_owned(),
+                    "A3".to_owned(),
+                    "D3".to_owned(),
+                ]
+            );
+            assert!(sheet.data.cells.get().is_none());
+            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(workbook.inner.styles.get().is_none());
+            assert_no_part_cache_admission(before, workbook.cache_diagnostics());
+
+            sheet.stored_extent().unwrap();
+            let eager = sheet
+                .cells("A1:E3")
+                .unwrap()
+                .into_iter()
+                .map(|cell| (cell.address, cell.cell))
+                .collect::<Vec<_>>();
+            assert_eq!(visited, eager);
+        }
+
+        fn assert_eager_fallback_parity(reference: &str, literal: &str) {
+            let (_source, fallback_workbook) = source_workbook(reference);
+            let fallback_sheet = fallback_workbook.sheet("Sheet1").unwrap().unwrap();
+            let before = fallback_workbook.cache_diagnostics();
+
+            let (_source, eager_workbook) = source_workbook(literal);
+            let eager_sheet = eager_workbook.sheet("Sheet1").unwrap().unwrap();
+            eager_sheet.stored_extent().unwrap();
+            let expected = eager_sheet.cell("A1").unwrap();
+
+            let actual = fallback_sheet.cell("A1").unwrap();
+            assert_eq!(actual, expected);
+            assert!(fallback_sheet.data.cells.get().is_some());
+            let after = fallback_workbook.cache_diagnostics();
+            assert!(after.successful_loads > before.successful_loads);
+            assert!(after.retained_entries > before.retained_entries);
+        }
+
+        #[test]
+        fn valid_overlong_and_numeric_inline_refs_0366_require_eager_fallback() {
+            assert_eager_fallback_parity(
+                &worksheet_xml(
+                    r#"<sheetData><row r="1"><c r="A1" t="str"><v>&#00000000065;</v></c></row></sheetData>"#,
+                ),
+                &worksheet_xml(
+                    r#"<sheetData><row r="1"><c r="A1" t="str"><v>A</v></c></row></sheetData>"#,
+                ),
+            );
+            assert_eager_fallback_parity(
+                &worksheet_xml(
+                    r#"<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>&#65;</t></is></c></row></sheetData>"#,
+                ),
+                &worksheet_xml(
+                    r#"<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>A</t></is></c></row></sheetData>"#,
+                ),
+            );
+        }
+
+        fn assert_zero_callbacks_without_publication(bytes: Vec<u8>) {
+            let source = Arc::new(CountingSource::new(bytes));
+            let workbook = SourceBackedWorkbook::from_read_at(source).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let before = workbook.cache_diagnostics();
+            let mut callbacks = 0usize;
+
+            let result = sheet.visit_cells("A1:E3", |_address, _cell| {
+                callbacks += 1;
+                Ok(())
+            });
+
+            assert!(result.is_err());
+            assert_eq!(callbacks, 0);
+            assert!(sheet.data.cells.get().is_none());
+            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(workbook.inner.styles.get().is_none());
+            assert_no_part_cache_admission(before, workbook.cache_diagnostics());
+        }
+
+        #[test]
+        fn malformed_reference_tail_and_crc_0366_have_no_callbacks_or_publication() {
+            assert_zero_callbacks_without_publication(dependency_xlsx(
+                &worksheet_xml(
+                    r#"<sheetData><row r="1"><c r="A1" t="str"><v>&unknown;</v></c></row></sheetData>"#,
+                ),
+                None,
+                None,
+            ));
+
+            let malformed_tail = format!(
+                "{}<tail>",
+                worksheet_xml(r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>"#,)
+            );
+            assert_zero_callbacks_without_publication(dependency_xlsx(&malformed_tail, None, None));
+
+            let mut crc = dependency_xlsx(
+                &worksheet_xml(r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>"#),
+                None,
+                None,
+            );
+            let marker = b"<v>7</v>";
+            let offset = crc
+                .windows(marker.len())
+                .position(|window| window == marker)
+                .unwrap();
+            crc[offset + 3] = b'8';
+            assert_zero_callbacks_without_publication(crc);
+        }
+    }
 }

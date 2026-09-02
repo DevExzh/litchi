@@ -1,5 +1,27 @@
 # Performance program phase report
 
+## Change 0366: XLSX selected general-reference decoding
+
+The selected worksheet single/range scanner now decodes bounded XML general
+references in scalar payloads through the canonical decode helper. Predefined
+`amp`, `lt`, `gt`, `quot`, and `apos` references are eligible in formula, value,
+and inline payloads. Decimal and hexadecimal numeric references are eligible in
+formula/value payloads only when ASCII and the complete token is at most 12
+bytes. Numeric inline references, overlong or non-ASCII numeric spellings, and
+numeric scalars outside the XML 1.0 `Char` production return `NotEligible` and
+use verified eager fallback; malformed, custom, and out-of-range references
+remain MCE/typed errors.
+
+XML/MCE/x14ac and the OPC reader still drain to verified EOF before result
+publication or callbacks. The eligible cold `cell`, `cells`, and `visit_cells`
+paths retain no `Store`, `PartData`, or semantic caches. There is no API change
+or public accepted-input change. The pre-existing eager/shared-string
+XML-legality residual is explicitly out of scope. Focused validation passed
+`9/9`; the full `litchi-xlsx` library passed `892/892`; and scoped Clippy passed
+with `-D warnings`, with only the unrelated `clippy::useless-asref` issue
+allowed. This is correctness and boundary evidence only: `performance_claim:
+none`, with no latency, RSS, fixed-memory, or OOM claim.
+
 ## XLSX source-worksheet range streaming (change 0365)
 
 Cold `SourceWorksheet::cells(area)` and staged `visit_cells(area)` now use a

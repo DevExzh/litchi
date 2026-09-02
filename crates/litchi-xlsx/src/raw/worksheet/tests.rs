@@ -2016,3 +2016,230 @@ mod streaming_0365_range_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod streaming_0366_general_reference_tests {
+    use std::fmt::Debug;
+    use std::io::Cursor;
+
+    use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
+    use litchi_sheet::{Cell as Address, Rect};
+
+    use super::super::selected::{
+        NotEligibleReason, RangeScanOutcome, ScanOutcome, SelectedCell, scan, scan_range,
+    };
+    use crate::cell::{Cell, Value};
+    use crate::formula::Cache;
+
+    const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+    type StreamResult<T> = super::super::selected::StreamResult<T>;
+
+    fn address(reference: &str) -> Address {
+        Address::from_a1(reference).expect("valid worksheet address")
+    }
+
+    fn worksheet(body: &str) -> String {
+        format!(r#"<worksheet xmlns="{SPREADSHEETML}">{body}</worksheet>"#)
+    }
+
+    fn value_worksheet(value: &str) -> String {
+        worksheet(&format!(
+            r#"<sheetData><row r="1"><c r="A1" t="str"><v>{value}</v></c></row></sheetData>"#
+        ))
+    }
+
+    fn unselected_value_worksheet(value: &str) -> String {
+        worksheet(&format!(
+            r#"<sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1" t="str"><v>{value}</v></c></row></sheetData>"#
+        ))
+    }
+
+    fn scan_xml(xml: &str, target: &str) -> StreamResult<ScanOutcome> {
+        let mut input = Cursor::new(xml.as_bytes());
+        scan(
+            &mut input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            address(target),
+        )
+    }
+
+    fn scan_range_xml(xml: &str, reference: &str) -> StreamResult<RangeScanOutcome> {
+        let mut input = Cursor::new(xml.as_bytes());
+        scan_range(
+            &mut input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            Rect::from_a1(reference).expect("valid worksheet range"),
+        )
+    }
+
+    fn eligible(xml: &str, target: &str) -> SelectedCell {
+        match scan_xml(xml, target) {
+            Ok(ScanOutcome::Eligible(selected)) => selected,
+            other => panic!("expected eligible selection, got {other:?}"),
+        }
+    }
+
+    fn assert_text(selected: SelectedCell, expected: &str) {
+        match selected.cell {
+            Some(Cell::Value(Value::Text(value))) => assert_eq!(value.as_str(), expected),
+            other => panic!("expected text {expected:?}, got {other:?}"),
+        }
+    }
+
+    fn assert_formula(selected: SelectedCell, expected_formula: &str, expected_cached: &str) {
+        let Some(Cell::Formula(formula)) = selected.cell else {
+            panic!("expected formula cell")
+        };
+        assert_eq!(formula.text(), expected_formula);
+        assert!(matches!(
+            formula.cached().map(Cache::value),
+            Some(Value::Text(value)) if value.as_str() == expected_cached
+        ));
+    }
+
+    fn assert_not_eligible(xml: &str, target: &str, expected: NotEligibleReason) {
+        match scan_xml(xml, target) {
+            Ok(ScanOutcome::NotEligible(actual)) => assert_eq!(actual, expected),
+            other => panic!("expected {expected:?}, got {other:?}"),
+        }
+    }
+
+    fn assert_not_eligible_range(xml: &str, reference: &str, expected: NotEligibleReason) {
+        match scan_range_xml(xml, reference) {
+            Ok(RangeScanOutcome::NotEligible(actual)) => assert_eq!(actual, expected),
+            other => panic!("expected {expected:?}, got {other:?}"),
+        }
+    }
+
+    fn assert_one_cell_parity(xml: &str, target: &str) {
+        let range = match scan_range_xml(xml, target).expect("one-cell range scan") {
+            RangeScanOutcome::Eligible(selected) => selected,
+            other => panic!("expected eligible one-cell range, got {other:?}"),
+        };
+        let single = match scan_xml(xml, target).expect("single-cell scan") {
+            ScanOutcome::Eligible(selected) => selected,
+            other => panic!("expected eligible single-cell scan, got {other:?}"),
+        };
+
+        assert_eq!(range.dependencies, single.dependencies);
+        match range.cells.as_slice() {
+            [] => {
+                assert!(single.cell.is_none());
+                assert_eq!(single.dependencies.target_shared_string_index, None);
+            },
+            [record] => {
+                assert_eq!(record.address, single.address);
+                assert_eq!(
+                    record.shared_string_index,
+                    single.dependencies.target_shared_string_index
+                );
+                assert_eq!(record.cell.as_ref(), single.cell.as_ref());
+            },
+            other => panic!("one-cell range retained multiple records: {other:?}"),
+        }
+    }
+
+    fn assert_mce_xml_error<T: Debug>(result: StreamResult<T>) {
+        match result {
+            Err(StreamError::Mce {
+                error: MceError::Xml(_),
+                ..
+            }) => {},
+            other => panic!("expected typed XML stream error, got {other:?}"),
+        }
+    }
+
+    fn assert_mce_nonconformant<T: Debug>(result: StreamResult<T>) {
+        match result {
+            Err(StreamError::Mce {
+                error: MceError::NonConformant(_),
+                ..
+            }) => {},
+            other => panic!("expected typed MCE conformance error, got {other:?}"),
+        }
+    }
+
+    fn assert_mce_error<T: Debug>(result: StreamResult<T>) {
+        match result {
+            Err(StreamError::Mce {
+                error: MceError::Xml(_) | MceError::NonConformant(_),
+                ..
+            }) => {},
+            other => panic!("expected typed MCE stream error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn streaming_0366_accepts_predefined_and_numeric_references_in_scalar_payloads() {
+        let xml = worksheet(
+            r#"<sheetData><row r="1">
+                <c r="A1" t="str"><v>value &amp; &lt; &gt; &apos; &quot;</v></c>
+                <c r="B1" t="str"><f>CONCAT(&quot;A&quot;,&quot;B&quot;)</f><v>cached &amp; value</v></c>
+                <c r="C1" t="inlineStr"><is><t>inline &amp; &lt; &gt; &apos; &quot;</t></is></c>
+                <c r="D1" t="str"><v>decimal &#65; hex &#x42;</v></c>
+                <c r="E1" t="str"><f>CONCAT(&#34;A&#34;,&#x22;B&#x22;)</f><v>cached &#67; &#x44;</v></c>
+            </row></sheetData>"#,
+        );
+
+        assert_text(eligible(&xml, "A1"), "value & < > ' \"");
+        assert_formula(
+            eligible(&xml, "B1"),
+            "CONCAT(\"A\",\"B\")",
+            "cached & value",
+        );
+        assert_text(eligible(&xml, "C1"), "inline & < > ' \"");
+        assert_text(eligible(&xml, "D1"), "decimal A hex B");
+        assert_formula(eligible(&xml, "E1"), "CONCAT(\"A\",\"B\")", "cached C D");
+
+        for target in ["A1", "B1", "C1", "D1", "E1", "F1"] {
+            assert_one_cell_parity(&xml, target);
+        }
+    }
+
+    #[test]
+    fn streaming_0366_bounds_valid_general_reference_tokens() {
+        let twelve = value_worksheet("prefix&#x00000041;suffix");
+        assert_text(eligible(&twelve, "A1"), "prefixAsuffix");
+
+        let thirteen = value_worksheet("prefix&#x000000041;suffix");
+        assert_not_eligible(&thirteen, "A1", NotEligibleReason::GeneralReference);
+        assert_not_eligible_range(&thirteen, "A1", NotEligibleReason::GeneralReference);
+
+        let xml_illegal = value_worksheet("prefix&#x1;suffix");
+        assert_not_eligible(&xml_illegal, "A1", NotEligibleReason::GeneralReference);
+
+        let xml_legal = value_worksheet("prefix&#x20;suffix");
+        assert_text(eligible(&xml_legal, "A1"), "prefix suffix");
+    }
+
+    #[test]
+    fn streaming_0366_rejects_numeric_inline_references_as_not_eligible() {
+        let xml = worksheet(
+            r#"<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>inline &#65;</t></is></c></row></sheetData>"#,
+        );
+        assert_not_eligible(&xml, "A1", NotEligibleReason::GeneralReference);
+        assert_not_eligible_range(&xml, "A1", NotEligibleReason::GeneralReference);
+    }
+
+    #[test]
+    fn streaming_0366_keeps_invalid_references_as_typed_errors_without_early_publication() {
+        assert_mce_xml_error(scan_xml(&value_worksheet("bad &#xZZ;"), "A1"));
+        assert_mce_nonconformant(scan_xml(&value_worksheet("bad &custom;"), "A1"));
+        assert_mce_xml_error(scan_xml(&value_worksheet("bad &#x110000;"), "A1"));
+
+        assert_mce_xml_error(scan_xml(&unselected_value_worksheet("bad &#xZZ;"), "A1"));
+        assert_mce_nonconformant(scan_xml(&unselected_value_worksheet("bad &custom;"), "A1"));
+        assert_mce_xml_error(scan_xml(
+            &unselected_value_worksheet("bad &#x110000;"),
+            "A1",
+        ));
+
+        let late_tail = worksheet(
+            r#"<sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData><future>&#xZZ;</future>"#,
+        );
+        assert_mce_error(scan_xml(&late_tail, "A1"));
+    }
+}

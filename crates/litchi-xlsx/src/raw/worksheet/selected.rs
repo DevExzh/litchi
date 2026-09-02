@@ -19,6 +19,7 @@ use std::io::BufRead;
 
 use litchi_ooxml_common::mce::{Capabilities, SemanticElement, SemanticEvent, StreamLimits};
 use litchi_sheet::{Cell as Address, Rect};
+use quick_xml::events::BytesRef;
 
 use super::super::formula::Range as FormulaRange;
 use super::super::namespace::{SPREADSHEETML_NAMESPACE, STRICT_SPREADSHEETML_NAMESPACE};
@@ -32,6 +33,10 @@ use crate::error::{Result, allocation, invalid};
 use crate::formula::{Cache, Formula, Kind};
 
 const MAX_XML_DEPTH: usize = 256;
+const MAX_GENERAL_REFERENCE_TOKEN_BYTES: usize = 12;
+// The 12-byte cap keeps 8192 * 12 formula bytes and 32767 * 12 value bytes
+// below MAX_ENCODED_CELL_BYTES (458738); inline numeric refs stay ineligible
+// because `_xHHHH_` decoding could otherwise compose around the encoded bound.
 const X14AC_NAMESPACE: &[u8] = x14ac::NAMESPACE;
 
 /// One-coordinate compatibility result from the worksheet range scanner.
@@ -464,12 +469,10 @@ impl Scanner {
             SemanticEvent::Empty(element) => self.start(element, true),
             SemanticEvent::End(element) => self.end(element),
             SemanticEvent::Text(text) | SemanticEvent::CData(text) => self.text(text.text()),
-            SemanticEvent::GeneralRef(_) => {
-                if self.in_payload() {
-                    self.mark(NotEligibleReason::GeneralReference);
-                }
-                Ok(())
+            SemanticEvent::GeneralRef(reference) if self.in_payload() => {
+                self.general_reference(reference)
             },
+            SemanticEvent::GeneralRef(_) => Ok(()),
             SemanticEvent::Comment(_) | SemanticEvent::Decl(_) => Ok(()),
             _ => Ok(()),
         }
@@ -944,6 +947,36 @@ impl Scanner {
         }
     }
 
+    fn general_reference(
+        &mut self,
+        reference: &litchi_ooxml_common::mce::SemanticGeneralRef<'_>,
+    ) -> Result<()> {
+        let name = reference.name.as_ref();
+        let Some(token_bytes) = name.len().checked_add(2) else {
+            self.mark(NotEligibleReason::GeneralReference);
+            return Ok(());
+        };
+        if !name.is_ascii() || token_bytes > MAX_GENERAL_REFERENCE_TOKEN_BYTES {
+            self.mark(NotEligibleReason::GeneralReference);
+            return Ok(());
+        }
+        if matches!(self.stack.last(), Some(Frame::InlineText)) && name.starts_with(b"#") {
+            self.mark(NotEligibleReason::GeneralReference);
+            return Ok(());
+        }
+        let Ok(name) = std::str::from_utf8(name) else {
+            self.mark(NotEligibleReason::GeneralReference);
+            return Ok(());
+        };
+        let reference = BytesRef::new(name);
+        let decoded = litchi_ooxml_common::xml::decode_xml_reference(&reference)?;
+        if name.starts_with('#') && decoded.chars().any(|character| !is_xml_10_char(character)) {
+            self.mark(NotEligibleReason::GeneralReference);
+            return Ok(());
+        }
+        self.text(&decoded)
+    }
+
     fn in_payload(&self) -> bool {
         matches!(
             self.stack.last(),
@@ -1030,6 +1063,13 @@ fn parse_value(kind: CellKind, value: &str) -> Result<Option<Value>> {
             Err(invalid("unsupported worksheet cell value type"))
         },
     }
+}
+
+fn is_xml_10_char(character: char) -> bool {
+    matches!(
+        character as u32,
+        0x9 | 0xA | 0xD | 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF
+    )
 }
 
 fn unqualified_attribute<'a>(element: &'a SemanticElement<'_>, local: &str) -> Option<&'a str> {
