@@ -476,13 +476,13 @@ pub(crate) fn select_soundtrack<'a>(
         validate_selected_metadata(root, root_message_index)?;
         validate_selected_metadata(show, show_message_index)?;
         validate_selected_metadata(soundtrack, soundtrack_message_index)?;
-        validate_object_reference_metadata(
+        validate_unmodified_object_reference_metadata(
             root,
             root_message_index,
             show_identifier,
             DOCUMENT_SHOW_FIELD,
         )?;
-        validate_object_reference_metadata(
+        validate_unmodified_object_reference_metadata(
             show,
             show_message_index,
             soundtrack_identifier,
@@ -808,6 +808,25 @@ pub(crate) fn validate_object_reference_metadata(
     identifier: u64,
     path: u32,
 ) -> Result<(), Error> {
+    validate_object_reference_metadata_with_policy(object, index, identifier, path, true)
+}
+
+fn validate_unmodified_object_reference_metadata(
+    object: &ArchiveObject,
+    index: usize,
+    identifier: u64,
+    path: u32,
+) -> Result<(), Error> {
+    validate_object_reference_metadata_with_policy(object, index, identifier, path, false)
+}
+
+fn validate_object_reference_metadata_with_policy(
+    object: &ArchiveObject,
+    index: usize,
+    identifier: u64,
+    path: u32,
+    require_selected_path: bool,
+) -> Result<(), Error> {
     if identifier == 0 {
         return Err(Error::InvalidSource);
     }
@@ -839,7 +858,7 @@ pub(crate) fn validate_object_reference_metadata(
             return Err(Error::InvalidSource);
         }
     }
-    if !selected_path {
+    if require_selected_path && !selected_path {
         return Err(Error::InvalidSource);
     }
     Ok(())
