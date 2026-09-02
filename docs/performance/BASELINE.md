@@ -1,5 +1,28 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0376: XLSB Single Cell Tables lifecycle
+
+Change 0376 closes the opened-document lifecycle gap for canonical XLSB
+`tableSingleCells` owners. Adding the first binding to a worksheet without
+that owner now creates one collision-free canonical part, content-type entry,
+and internal worksheet relationship. Deleting the final binding removes that
+exact relationship and part only after lossless ownership and inbound-reference
+validation. Existing empty owners remain exact no-ops, and ordinary-table
+part lifecycle plus noncanonical or unsafe topology remain refused.
+
+The focused XML Maps integration target passed `30/30` executed tests with
+one exact pre-existing ordinary-table expectation excluded. The broader
+locked XLSB library/test gate passed 15 suites and `726/726` executed tests
+with two exact pre-existing exclusions. Strict production-library Clippy
+passed without allowances; crate boundaries passed for 64 packages and 240
+internal declarations with 14 existing debt entries. Independent topology,
+publication-safety, and test reviews accepted the bounded change. See
+[Change 0376](changes/0376-xlsb-table-single-cells-lifecycle.md).
+
+`performance_claim: none`; `claim_authorized: false`. No benchmark, latency,
+allocation-volume, RSS, physical-I/O, throughput, fixed-memory, or general
+OOM-prevention claim follows.
+
 ## Change 0375: PPTX selected-slide retained snapshot
 
 Change 0375 retains validated source-backed PPTX selected-slide semantic

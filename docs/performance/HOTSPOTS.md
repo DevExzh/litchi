@@ -1,5 +1,23 @@
 # Performance hotspot inventory
 
+## Change 0376 update
+
+Change 0376 is a correctness and CRUD-completeness batch, not a measured
+hotspot. Opened XLSB XML Maps transactions can now create the first canonical
+Single Cell Tables binding owner and remove that owner after its final binding,
+while preserving exact no-ops and refusing noncanonical, opaque, shared,
+orphan, foreign, external, malformed, or dangling topology.
+
+Focused and broader serialized XLSB tests passed subject only to the two exact
+pre-existing exclusions recorded in the [0376 change
+record](changes/0376-xlsb-table-single-cells-lifecycle.md). Strict Clippy,
+the crate-boundary gate, and independent topology, safety, and test reviews
+also passed.
+
+`performance_claim: none`; `claim_authorized: false`. This change establishes
+no hotspot rank, latency, allocation-volume, RSS, I/O, throughput,
+fixed-memory, or system-level OOM result.
+
 ## Change 0375 update
 
 The source-backed PPTX selected-slide publication path now carries validated
