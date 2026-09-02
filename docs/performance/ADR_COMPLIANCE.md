@@ -1,5 +1,32 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0377 compliance update
+
+Change 0377 keeps SpreadsheetML cell ownership in `litchi-xlsx`, reuses the
+existing typed sheet vocabulary, and delegates physical worksheet rewriting
+and package publication to their established private/raw and OPC boundaries.
+It adds no dependency edge, public raw type, package identifier, archive or
+runtime handle, lock, or unsafe code.
+
+The public operation is explicit rather than silently broadening `Set`.
+Insertion is numeric-only, validates the shared SpreadsheetML payload ceiling,
+proves physical absence plus range ownership, and refuses unsupported
+semantics before staging. Existing source freshness, caller limits,
+calculation invalidation, clone-staged reparse, exact no-op/signature policy,
+effective-change signature refusal, atomic output, and owned-state inverse
+contracts remain intact.
+
+Focused and complete serialized XLSX validation plus doctests passed with only
+the four exact pre-existing row-visibility exclusions documented in the
+[Change 0377
+record](changes/0377-xlsx-source-backed-missing-numeric-insert.md).
+Production Clippy passed with one named pre-existing allowance; crate
+boundaries and independent production/API, safety, and test reviews passed.
+
+`performance_claim: none`; `claim_authorized: false`. No latency,
+allocation-volume, RSS, physical-I/O, throughput, fixed-memory, broad XLSX, or
+general OOM-prevention claim follows.
+
 ## Change 0376 compliance update
 
 Change 0376 keeps BIFF12 Single Cell Tables ownership and opened-workbook

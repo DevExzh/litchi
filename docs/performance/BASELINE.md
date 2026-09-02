@@ -1,5 +1,28 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0377: XLSX source-backed missing numeric insert
+
+Change 0377 closes the missing create verb in the guarded source-backed XLSX
+cell-value owner. An explicit numeric-only `Insert` remains distinct from
+existing-owner `Set`, `Clear`, and `Remove`. It creates a physical
+cell in an existing row or a new ordered row, expands an existing worksheet
+dimension, invalidates calculation state, and retains source-bound exact
+inverse behavior. Existing owners, formula-owned ranges, and unsupported
+worksheet surfaces fail closed.
+
+The focused source-backed cell-value target passed `59/59`. The broader
+locked XLSX gate passed 58 suites and `1213/1213` executed tests with four
+exact audited pre-existing row-visibility exclusions. Doctests passed
+`2/2`. Production Clippy passed with one named pre-existing
+`clippy::useless_asref` allowance. Crate boundaries passed for 64 packages
+and 240 internal declarations with 14 existing debt entries. Independent
+production, API, safety, and test reviews accepted the bounded change. See
+[Change 0377](changes/0377-xlsx-source-backed-missing-numeric-insert.md).
+
+`performance_claim: none`; `claim_authorized: false`. No benchmark, latency,
+allocation-volume, RSS, physical-I/O, throughput, fixed-memory, or general
+OOM-prevention claim follows.
+
 ## Change 0376: XLSB Single Cell Tables lifecycle
 
 Change 0376 closes the opened-document lifecycle gap for canonical XLSB
