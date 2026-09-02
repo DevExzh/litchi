@@ -1,5 +1,30 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0367 compliance update
+
+Change 0367 keeps direct active `mergeCells` handling in the owning
+`litchi-xlsx::raw` selected-worksheet scanner and uses the existing verified
+worksheet/dependency/ZIP/source/execution fences. Exact count, nonempty `ref`,
+reference-grid, singleton, placement/direct-child, and overlap validation are
+performed before the canonical transient `merge::Index` is used. A fenced
+single-cell non-anchor returns `Covered`; anchors retain `Stored`/`Missing`.
+
+Range `cells` and `visit` continue to expose sparse physical records,
+including merge followers, without synthetic covered cells; `stored_extent`
+is unchanged. The retained merge range cap is 16,384 with `try_reserve`; a
+16,385th range drains through verified EOF and then requires eager fallback.
+Unknown merge attributes, children, or payload likewise fall back after
+draining; malformed structure is a hard typed error. Eligible cold paths
+publish no `Store`, `PartData`, or semantic caches.
+
+The transient index's internal `BTreeMap` and heap allocations are bounded by
+the cap but not individually fallible, so no fixed-memory, RSS, or OOM claim
+is made. No public API, dependency edge, or `stored_extent` contract changes.
+Focused validation passed `14/14`, full `litchi-xlsx` library validation passed
+`906/906`, and scoped Clippy passed with only the unrelated
+`clippy::useless-asref` issue allowed. `performance_claim: none`; no latency
+claim follows. See [Change 0367](changes/0367-xlsx-selected-merge-streaming.md).
+
 ## Change 0366 compliance update
 
 Change 0366 remains in the owning `litchi-xlsx::raw` selected-worksheet layer:
