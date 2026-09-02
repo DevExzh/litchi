@@ -65,9 +65,9 @@ pub(crate) fn parse(content: &[u8]) -> Result<Box<[Text]>> {
 pub(crate) struct Selected {
     /// Number of active direct `si` items in the selected semantic stream.
     pub(crate) count: usize,
-    /// The requested plain item, if the requested index exists and is safely
-    /// representable as plain text.
-    pub(crate) requested: Option<Text>,
+    /// Requested plain items that exist and are safely representable as plain
+    /// text, in requested-index order.
+    pub(crate) requested: Vec<(usize, Text)>,
     /// Whether the active stream contained a rich, extension, or foreign
     /// construct that this dependency scan does not model.
     pub(crate) unsupported_rich: bool,
@@ -75,7 +75,7 @@ pub(crate) struct Selected {
 
 /// Scan one MCE-selected shared-string part without materializing its table.
 ///
-/// The stream is consumed through EOF.  Only the requested plain item is
+/// The stream is consumed through EOF.  Only requested plain items are
 /// retained; every active item is still structurally and text-bound validated.
 /// Unsupported rich, phonetic, extension, and foreign constructs are reported
 /// in [`Selected::unsupported_rich`] rather than approximated as plain text.
@@ -84,9 +84,17 @@ pub(crate) fn stream_selected(
     input: &mut dyn BufRead,
     capabilities: &Capabilities,
     limits: &StreamLimits,
-    requested: Option<usize>,
+    requested: &[usize],
 ) -> std::result::Result<Selected, StreamError<crate::Error, crate::Error>> {
-    let mut parser = SelectedParser::new(requested);
+    validate_requested_indexes(requested).map_err(|error| StreamError::Callback {
+        raw_error: None,
+        active_error: Some(error),
+    })?;
+    let requested_limit = requested
+        .len()
+        .min(limits.processing.max_input_bytes)
+        .min(limits.max_events);
+    let mut parser = SelectedParser::new(requested, requested_limit);
     let _report = process_markup_compatibility_stream_with_observers(
         input,
         capabilities,
@@ -101,25 +109,29 @@ pub(crate) fn stream_selected(
 }
 
 #[derive(Debug)]
-struct SelectedParser {
+struct SelectedParser<'a> {
     stack: Vec<Context>,
     item: Option<SelectedItem>,
     count: usize,
-    requested_index: Option<usize>,
-    requested: Option<Text>,
+    requested_indexes: &'a [usize],
+    next_requested: usize,
+    requested_limit: usize,
+    requested: Vec<(usize, Text)>,
     root_seen: bool,
     closed_root: bool,
     unsupported_rich: bool,
 }
 
-impl SelectedParser {
-    fn new(requested_index: Option<usize>) -> Self {
+impl<'a> SelectedParser<'a> {
+    fn new(requested_indexes: &'a [usize], requested_limit: usize) -> Self {
         Self {
             stack: Vec::new(),
             item: None,
             count: 0,
-            requested_index,
-            requested: None,
+            requested_indexes,
+            next_requested: 0,
+            requested_limit,
+            requested: Vec::new(),
             root_seen: false,
             closed_root: false,
             unsupported_rich: false,
@@ -193,10 +205,11 @@ impl SelectedParser {
                 .count
                 .checked_add(1)
                 .ok_or_else(|| invalid("shared-string item count overflow"))?;
-            self.item = Some(SelectedItem::new(
-                index,
-                self.requested_index == Some(index),
-            ));
+            let retain_text = self.requested_indexes.get(self.next_requested) == Some(&index);
+            if retain_text {
+                self.next_requested += 1;
+            }
+            self.item = Some(SelectedItem::new(index, retain_text));
             return Ok(Context::Item);
         }
         if parent == Context::Item && is_spreadsheetml_element(element, b"t") {
@@ -303,7 +316,7 @@ impl SelectedParser {
             .take()
             .ok_or_else(|| invalid("missing shared-string item"))?;
         item.text_state.finish()?;
-        if item.index != self.requested_index.unwrap_or(usize::MAX) || item.unsupported {
+        if item.text.is_none() || item.unsupported {
             return Ok(());
         }
         let text = item
@@ -316,7 +329,13 @@ impl SelectedParser {
                 "shared string exceeds {MAX_CELL_CHARACTERS} characters"
             )));
         }
-        self.requested = Some(text.into());
+        if self.requested.len() >= self.requested_limit {
+            return Err(invalid("shared-string requested output limit exceeded"));
+        }
+        self.requested
+            .try_reserve(1)
+            .map_err(|source| allocation("shared-string requested items", source))?;
+        self.requested.push((item.index, text.into()));
         Ok(())
     }
 
@@ -357,6 +376,15 @@ impl SelectedParser {
             unsupported_rich: self.unsupported_rich,
         })
     }
+}
+
+fn validate_requested_indexes(requested: &[usize]) -> Result<()> {
+    if requested.windows(2).any(|window| window[0] >= window[1]) {
+        return Err(invalid(
+            "requested shared-string indexes must be sorted and strictly unique",
+        ));
+    }
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -877,7 +905,7 @@ mod tests {
         content: &[u8],
         capabilities: &Capabilities,
         limits: &StreamLimits,
-        requested: Option<usize>,
+        requested: &[usize],
     ) -> std::result::Result<Selected, StreamError<crate::Error, crate::Error>> {
         let mut input = Cursor::new(content);
         stream_selected(&mut input, capabilities, limits, requested)
@@ -886,7 +914,7 @@ mod tests {
     #[allow(clippy::result_large_err)]
     fn streaming_0364_default(
         content: &[u8],
-        requested: Option<usize>,
+        requested: &[usize],
     ) -> std::result::Result<Selected, StreamError<crate::Error, crate::Error>> {
         streaming_0364_run(
             content,
@@ -904,18 +932,24 @@ mod tests {
             <si><t>last</t></si>
         </sst>"#;
 
-        let first = streaming_0364_default(xml, Some(0)).expect("first shared string");
+        let first = streaming_0364_default(xml, &[0]).expect("first shared string");
         assert_eq!(first.count, 3);
-        assert_eq!(first.requested.as_ref().map(Text::as_str), Some("first"));
+        assert_eq!(
+            first.requested.first().map(|(_, text)| text.as_str()),
+            Some("first")
+        );
         assert!(!first.unsupported_rich);
 
-        let last = streaming_0364_default(xml, Some(2)).expect("last shared string");
+        let last = streaming_0364_default(xml, &[2]).expect("last shared string");
         assert_eq!(last.count, 3);
-        assert_eq!(last.requested.as_ref().map(Text::as_str), Some("last"));
+        assert_eq!(
+            last.requested.first().map(|(_, text)| text.as_str()),
+            Some("last")
+        );
 
-        let missing = streaming_0364_default(xml, Some(3)).expect("missing shared string");
+        let missing = streaming_0364_default(xml, &[3]).expect("missing shared string");
         assert_eq!(missing.count, 3);
-        assert!(missing.requested.is_none());
+        assert!(missing.requested.is_empty());
     }
 
     #[test]
@@ -925,12 +959,15 @@ mod tests {
             <si><t>A&amp;B&#x21;</t></si>
         </sst>"#;
 
-        let split = streaming_0364_default(xml, Some(0)).expect("split SpreadsheetML escape");
-        assert_eq!(split.requested.as_ref().map(Text::as_str), Some("😀"));
-
-        let references = streaming_0364_default(xml, Some(1)).expect("XML references");
+        let split = streaming_0364_default(xml, &[0]).expect("split SpreadsheetML escape");
         assert_eq!(
-            references.requested.as_ref().map(Text::as_str),
+            split.requested.first().map(|(_, text)| text.as_str()),
+            Some("😀")
+        );
+
+        let references = streaming_0364_default(xml, &[1]).expect("XML references");
+        assert_eq!(
+            references.requested.first().map(|(_, text)| text.as_str()),
             Some("A&B!")
         );
     }
@@ -946,13 +983,16 @@ mod tests {
         </sst>"#;
 
         for index in 1..5 {
-            let selected = streaming_0364_default(xml, Some(index)).expect("unsupported item");
+            let selected = streaming_0364_default(xml, &[index]).expect("unsupported item");
             assert_eq!(selected.count, 5);
-            assert!(selected.requested.is_none(), "requested index {index}");
+            assert!(selected.requested.is_empty(), "requested index {index}");
             assert!(selected.unsupported_rich);
         }
-        let safe = streaming_0364_default(xml, Some(0)).expect("plain item");
-        assert_eq!(safe.requested.as_ref().map(Text::as_str), Some("safe"));
+        let safe = streaming_0364_default(xml, &[0]).expect("plain item");
+        assert_eq!(
+            safe.requested.first().map(|(_, text)| text.as_str()),
+            Some("safe")
+        );
         assert!(safe.unsupported_rich);
     }
 
@@ -967,20 +1007,23 @@ mod tests {
             </mc:AlternateContent>
         </sst>"#;
 
-        let fallback = streaming_0364_default(xml, Some(0)).expect("fallback branch");
+        let fallback = streaming_0364_default(xml, &[0]).expect("fallback branch");
         assert_eq!(fallback.count, 1);
         assert_eq!(
-            fallback.requested.as_ref().map(Text::as_str),
+            fallback.requested.first().map(|(_, text)| text.as_str()),
             Some("fallback")
         );
         assert!(!fallback.unsupported_rich);
 
         let mut capabilities = Capabilities::default();
         capabilities.understand_namespace("urn:choice");
-        let choice = streaming_0364_run(xml, &capabilities, &StreamLimits::default(), Some(0))
+        let choice = streaming_0364_run(xml, &capabilities, &StreamLimits::default(), &[0])
             .expect("choice branch");
         assert_eq!(choice.count, 1);
-        assert_eq!(choice.requested.as_ref().map(Text::as_str), Some("choice"));
+        assert_eq!(
+            choice.requested.first().map(|(_, text)| text.as_str()),
+            Some("choice")
+        );
         assert!(!choice.unsupported_rich);
     }
 
@@ -989,15 +1032,15 @@ mod tests {
         let malformed_tail =
             br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
             <si><t>requested</t></si><si><t>broken</si></sst>"#;
-        assert!(streaming_0364_default(malformed_tail, Some(0)).is_err());
+        assert!(streaming_0364_default(malformed_tail, &[0]).is_err());
 
         let wrong_root =
             br#"<notSst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#;
-        assert!(streaming_0364_default(wrong_root, Some(0)).is_err());
+        assert!(streaming_0364_default(wrong_root, &[0]).is_err());
 
         let trailing_root =
             br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/><tail/>"#;
-        assert!(streaming_0364_default(trailing_root, None).is_err());
+        assert!(streaming_0364_default(trailing_root, &[]).is_err());
     }
 
     #[test]
@@ -1006,46 +1049,134 @@ mod tests {
 
         let mut input_exact = StreamLimits::default();
         input_exact.processing.max_input_bytes = empty.len();
-        assert!(streaming_0364_run(empty, &Capabilities::default(), &input_exact, None).is_ok());
+        assert!(streaming_0364_run(empty, &Capabilities::default(), &input_exact, &[]).is_ok());
         input_exact.processing.max_input_bytes = empty.len() - 1;
-        assert!(streaming_0364_run(empty, &Capabilities::default(), &input_exact, None).is_err());
+        assert!(streaming_0364_run(empty, &Capabilities::default(), &input_exact, &[]).is_err());
 
         let mut event_exact = StreamLimits::default();
         event_exact.max_event_bytes = empty.len();
-        assert!(streaming_0364_run(empty, &Capabilities::default(), &event_exact, None).is_ok());
+        assert!(streaming_0364_run(empty, &Capabilities::default(), &event_exact, &[]).is_ok());
         event_exact.max_event_bytes = empty.len() - 1;
-        assert!(streaming_0364_run(empty, &Capabilities::default(), &event_exact, None).is_err());
+        assert!(streaming_0364_run(empty, &Capabilities::default(), &event_exact, &[]).is_err());
 
         let exact_text = "_xD83D__xDE00_".repeat(MAX_CELL_CHARACTERS);
         let exact_xml = format!(
             r#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>{exact_text}</t></si></sst>"#
         );
-        assert!(streaming_0364_default(exact_xml.as_bytes(), None).is_ok());
+        assert!(streaming_0364_default(exact_xml.as_bytes(), &[]).is_ok());
 
         let too_many_chars = "a".repeat(MAX_CELL_CHARACTERS + 1);
         let too_many_xml = format!(
             r#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>{too_many_chars}</t></si></sst>"#
         );
-        assert!(streaming_0364_default(too_many_xml.as_bytes(), None).is_err());
+        assert!(streaming_0364_default(too_many_xml.as_bytes(), &[]).is_err());
 
         let over_encoded = format!("{exact_text}_xD83D__xDE00_");
         let over_encoded_xml = format!(
             r#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>{over_encoded}</t></si></sst>"#
         );
-        assert!(streaming_0364_default(over_encoded_xml.as_bytes(), None).is_err());
+        assert!(streaming_0364_default(over_encoded_xml.as_bytes(), &[]).is_err());
     }
 
     #[test]
     fn streaming_0364_accepts_advisory_count_mismatches_and_rejects_bad_hints() {
         let mismatch = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="0" uniqueCount="2"><si><t>x</t></si></sst>"#;
-        let selected = streaming_0364_default(mismatch, None).expect("advisory mismatch");
+        let selected = streaming_0364_default(mismatch, &[]).expect("advisory mismatch");
         assert_eq!(selected.count, 1);
 
         let invalid = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" uniqueCount="NaN"/>"#;
-        assert!(streaming_0364_default(invalid, None).is_err());
+        assert!(streaming_0364_default(invalid, &[]).is_err());
 
         let excessive = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="2147483648"/>"#;
-        assert!(streaming_0364_default(excessive, None).is_err());
+        assert!(streaming_0364_default(excessive, &[]).is_err());
+    }
+
+    fn streaming_0365_entries(selected: &Selected) -> Vec<(usize, &str)> {
+        selected
+            .requested
+            .iter()
+            .map(|(index, text)| (*index, text.as_str()))
+            .collect()
+    }
+
+    #[test]
+    fn streaming_0365_accepts_empty_request_without_retaining_items() {
+        let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>first</t></si><si><t>middle</t></si></sst>"#;
+
+        let selected = streaming_0364_default(xml, &[]).expect("empty request");
+        assert_eq!(selected.count, 2);
+        assert!(selected.requested.is_empty());
+        assert!(!selected.unsupported_rich);
+    }
+
+    #[test]
+    fn streaming_0365_returns_first_middle_last_in_request_order() {
+        let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>first</t></si><si><t>ignored</t></si><si><t>middle</t></si><si><t>ignored too</t></si><si><t>last</t></si></sst>"#;
+
+        let selected = streaming_0364_default(xml, &[0, 2, 4]).expect("ordered selection");
+        assert_eq!(selected.count, 5);
+        assert_eq!(
+            streaming_0365_entries(&selected),
+            vec![(0, "first"), (2, "middle"), (4, "last")]
+        );
+    }
+
+    #[test]
+    fn streaming_0365_omits_missing_and_out_of_range_indexes() {
+        let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>first</t></si><si><t>middle</t></si><si><t>last</t></si></sst>"#;
+
+        let selected =
+            streaming_0364_default(xml, &[0, 3, usize::MAX]).expect("out-of-range selection");
+        assert_eq!(selected.count, 3);
+        assert_eq!(streaming_0365_entries(&selected), vec![(0, "first")]);
+    }
+
+    #[test]
+    fn streaming_0365_rejects_unsorted_and_duplicate_requests() {
+        let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#;
+
+        assert!(streaming_0364_default(xml, &[1, 0]).is_err());
+        assert!(streaming_0364_default(xml, &[1, 1]).is_err());
+    }
+
+    #[test]
+    fn streaming_0365_reports_rich_items_for_requested_and_unrequested_indexes() {
+        let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>safe</t></si><si><r><t>rich</t></r></si></sst>"#;
+
+        let requested_rich = streaming_0364_default(xml, &[1]).expect("requested rich item");
+        assert_eq!(requested_rich.count, 2);
+        assert!(requested_rich.requested.is_empty());
+        assert!(requested_rich.unsupported_rich);
+
+        let unrequested_rich = streaming_0364_default(xml, &[0]).expect("unrequested rich item");
+        assert_eq!(streaming_0365_entries(&unrequested_rich), vec![(0, "safe")]);
+        assert!(unrequested_rich.unsupported_rich);
+    }
+
+    #[test]
+    fn streaming_0365_drains_malformed_tail_after_selected_items() {
+        let malformed_tail = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>first</t></si><si><t>middle</t></si><si><t>broken</si></sst>"#;
+
+        assert!(streaming_0364_default(malformed_tail, &[0, 1]).is_err());
+    }
+
+    #[test]
+    fn streaming_0365_accepts_exact_input_event_and_request_bounds() {
+        let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si/><si/></sst>"#;
+        let limits = StreamLimits {
+            processing: litchi_ooxml_common::mce::Limits {
+                max_input_bytes: xml.len(),
+                ..StreamLimits::default().processing
+            },
+            max_events: 4,
+            ..StreamLimits::default()
+        };
+
+        let selected = streaming_0364_run(xml, &Capabilities::default(), &limits, &[0, 1])
+            .expect("exact bounded selection");
+        assert_eq!(selected.count, 2);
+        assert_eq!(selected.requested.len(), 2);
+        assert_eq!(streaming_0365_entries(&selected), vec![(0, ""), (1, "")]);
     }
 
     #[test]

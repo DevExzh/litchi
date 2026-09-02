@@ -1,5 +1,28 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0365 compliance update
+
+Change 0365 keeps source-worksheet range selection in the owning `litchi-xlsx`
+semantic path and uses the existing verified-reader boundary. Eligible cold
+`SourceWorksheet::cells(area)` and staged `visit_cells(area)` use a sparse raw
+scan whose dependency scans reach XML/MCE/x14ac EOF before ZIP CRC/size
+verification and source/execution fences permit publication or callbacks. A
+multi-index SST stream and direct style-count stream avoid publishing a
+worksheet `Store`, `PartData`, or semantic dependency cache on that cold path;
+warm `Store` behavior remains unchanged. No public raw reader, package handle,
+or dependency edge is exposed, and `stored_extent` is unchanged.
+
+Missing coordinates are omitted while explicit empty cells are preserved.
+`NotEligible` requires eager fallback only after verified-reader completion,
+so merges, shared/array/data-table formulas, row/column styles, rich, phonetic,
+extension, foreign, and general-reference cases retain eager semantics.
+`visit_cells` stages an owned `Vec` proportional to selected physical output;
+this is not a fixed-memory or OOM claim. Focused validation passed `27/27`,
+full `litchi-xlsx` library validation passed `883/883`, and package Clippy
+passed with `-D warnings` apart from the unrelated `clippy::useless-asref`
+issue. No latency or RSS claim follows; `performance_claim: none`. See
+[Change 0365](changes/0365-xlsx-source-worksheet-range-streaming.md).
+
 ## Change 0364 compliance update
 
 Change 0364 keeps selected-cell dependency resolution in the owning

@@ -1,5 +1,26 @@
 # Performance hotspot inventory
 
+## XLSX source-worksheet range streaming boundary (change 0365)
+
+Change 0365 is a correctness/ownership integration, not a measured hotspot
+(`performance_claim: none`). Cold `SourceWorksheet::cells(area)` and staged
+`visit_cells(area)` use the verified sparse raw range scan only for eligible
+worksheets. Dependency scans reach XML/MCE/x14ac EOF, and ZIP CRC/size plus
+source/execution fences complete before publication or callbacks. The result
+is sparse physical output: missing coordinates are omitted and explicit empty
+cells remain. A multi-index SST stream and direct style-count stream avoid
+worksheet `Store`, `PartData`, and semantic dependency-cache publication;
+warm `Store` remains fast.
+
+`NotEligible` falls back to the eager reader only after verified-reader
+completion. Merges, shared/array/data-table formulas, row/column styles, rich,
+phonetic, extension, foreign, and general-reference cases remain eager;
+`stored_extent` is unchanged. `visit_cells` stages an owned `Vec` that scales
+with selected physical output, so this is not fixed-memory, OOM, latency, or
+RSS evidence. Focused validation passed `27/27`, full `litchi-xlsx` library
+validation passed `883/883`, and package Clippy passed with `-D warnings`
+apart from the unrelated `clippy::useless-asref` issue. See [Change 0365](changes/0365-xlsx-source-worksheet-range-streaming.md).
+
 ## XLSX selected-cell dependency streaming boundary (change 0364)
 
 Change 0364 extends the selected-cell path with sequential, verified
