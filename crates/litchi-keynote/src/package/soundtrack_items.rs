@@ -21,8 +21,7 @@ use litchi_iwa_common::media::Type as MediaType;
 use litchi_iwa_common::varint::{encode_varint_into, encoded_len};
 use litchi_iwa_common::wire::WireView;
 use litchi_iwa_core::{
-    Archive, CanonicalFieldDataReferenceOperation, CanonicalFieldDataReferenceTransition,
-    DataReferenceTransition, FieldDataReferenceTransition, RawMessage, SnappyStream,
+    Archive, DataReferenceTransition, FieldDataReferenceTransition, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::package_metadata_media_codec as metadata_codec;
 use sha1::{Digest, Sha1};
@@ -382,11 +381,10 @@ fn source_view<'a>(
             owner_count,
         });
     }
-    // PackageMetadata stores a component's data-reference set, while the
-    // soundtrack payload stores the ordered playback sequence.  The two
-    // representations intentionally have different cardinality/order when a
-    // media item is repeated or a new item is appended.  Require a canonical
-    // metadata set and prove every selected occurrence resolves through it.
+    // PackageMetadata stores a component's unique data-reference set, while
+    // the soundtrack payload stores the ordered playback sequence and may
+    // repeat an identifier. Require a canonical metadata set and prove every
+    // selected occurrence resolves through it.
     for (index, identifier) in metadata.selected_data_references.iter().enumerate() {
         if metadata.selected_data_references[index + 1..]
             .iter()
@@ -577,6 +575,25 @@ fn project_ids(
 }
 
 fn allocate_identifier(catalog: &SourceCatalog, metadata: &MetadataFacts) -> Result<u64, Error> {
+    // Data identifiers and object identifiers are independent native
+    // namespaces. Keynote keeps media IDs near the existing DataInfo range;
+    // allocating above the package object watermark can make TSPDataManager
+    // reject the package even when every reference is otherwise consistent.
+    let mut candidate = metadata
+        .data
+        .iter()
+        .map(|data| data.identifier)
+        .max()
+        .unwrap_or(0)
+        .checked_add(1)
+        .ok_or(Error::InvalidSource)?;
+    if candidate == 0 {
+        return Err(Error::InvalidSource);
+    }
+
+    // Retain a package-wide collision guard: the next media-space value must
+    // not alias any object or reference identifier already present in an IWA
+    // header, even though those identifiers normally occupy another range.
     let mut used = HashSet::new();
     used.try_reserve(
         catalog
@@ -587,22 +604,18 @@ fn allocate_identifier(catalog: &SourceCatalog, metadata: &MetadataFacts) -> Res
             .saturating_add(metadata.data.len()),
     )
     .map_err(|_| Error::Allocation { amount: 1 })?;
-    let mut high = 1_u64;
     for component in catalog.components().iter() {
         for object in &component.archive().objects {
             if let Some(identifier) = object.archive_info.identifier {
                 used.insert(identifier);
-                high = high.max(identifier);
             }
             for info in &object.archive_info.message_infos {
                 for identifier in info.data_references.iter().chain(&info.object_references) {
                     used.insert(*identifier);
-                    high = high.max(*identifier);
                 }
                 for field in &info.field_infos {
                     for identifier in field.data_references.iter().chain(&field.object_references) {
                         used.insert(*identifier);
-                        high = high.max(*identifier);
                     }
                 }
             }
@@ -610,13 +623,10 @@ fn allocate_identifier(catalog: &SourceCatalog, metadata: &MetadataFacts) -> Res
     }
     for data in &metadata.data {
         used.insert(data.identifier);
-        high = high.max(data.identifier);
     }
     for identifier in &metadata.selected_data_references {
         used.insert(*identifier);
-        high = high.max(*identifier);
     }
-    let mut candidate = high.checked_add(1).ok_or(Error::InvalidSource)?;
     while used.contains(&candidate) {
         candidate = candidate.checked_add(1).ok_or(Error::InvalidSource)?;
     }
@@ -624,6 +634,41 @@ fn allocate_identifier(catalog: &SourceCatalog, metadata: &MetadataFacts) -> Res
         return Err(Error::InvalidSource);
     }
     Ok(candidate)
+}
+
+fn existing_data_for_digest<'a>(
+    metadata: &'a MetadataFacts,
+    digest: &[u8; SHA1_BYTES],
+) -> Result<Option<&'a DataRecord>, Error> {
+    let mut matching = metadata.data.iter().filter(|data| &data.digest == digest);
+    let first = matching.next();
+    if matching.next().is_some() {
+        return Err(Error::InvalidSource);
+    }
+    Ok(first)
+}
+
+fn validate_reusable_data<'a>(
+    catalog: &'a SourceCatalog,
+    data: &DataRecord,
+    audio: &AudioSource,
+) -> Result<&'a [u8], Error> {
+    let current_name = validate_existing_name(data)?;
+    let full_name = format!("{DATA_PREFIX}{current_name}");
+    let mut matching = catalog
+        .package()
+        .iter()
+        .filter(|entry| entry.name() == full_name);
+    let entry = matching.next().ok_or(Error::InvalidSource)?;
+    if matching.next().is_some()
+        || entry.is_opaque()
+        || data.materialized_length != audio.byte_length()
+        || entry.data() != audio.bytes()
+        || MediaType::from_bytes(entry.data()) != MediaType::Audio
+    {
+        return Err(Error::InvalidSource);
+    }
+    Ok(entry.data())
 }
 
 fn generated_name(
@@ -824,16 +869,27 @@ fn rewrite_package(
         },
         _ => None,
     };
-    let (source_audio, new_identifier, current_name, digest) = match operation {
+    let (source_audio, new_identifier, current_name, digest, reuse_existing) = match operation {
         StagedOperation::Add(audio)
         | StagedOperation::Insert { source: audio, .. }
         | StagedOperation::Replace { source: audio, .. } => {
-            let identifier = allocate_identifier(catalog, &view.metadata)?;
-            let name = generated_name(audio.filename(), identifier, catalog)?;
             let digest: [u8; SHA1_BYTES] = Sha1::digest(audio.bytes()).into();
-            (Some(audio), Some(identifier), Some(name), Some(digest))
+            if let Some(data) = existing_data_for_digest(&view.metadata, &digest)? {
+                validate_reusable_data(catalog, data, audio)?;
+                (Some(audio), Some(data.identifier), None, None, true)
+            } else {
+                let identifier = allocate_identifier(catalog, &view.metadata)?;
+                let name = generated_name(audio.filename(), identifier, catalog)?;
+                (
+                    Some(audio),
+                    Some(identifier),
+                    Some(name),
+                    Some(digest),
+                    false,
+                )
+            }
         },
-        StagedOperation::Remove { .. } => (None, None, None, None),
+        StagedOperation::Remove { .. } => (None, None, None, None, false),
     };
     let before_ids = view
         .items
@@ -914,18 +970,6 @@ fn rewrite_package(
                 },
                 archive_limits,
             ),
-        [] if !after_ids.is_empty() => object
-            .replace_message_transitioning_data_references_with_canonical_field_preserving_header_with_limits(
-            view.selection.soundtrack_message_index,
-            replacement,
-            CanonicalFieldDataReferenceTransition {
-                aggregate_before: &before_ids,
-                aggregate_after: &after_ids,
-                field_path: &[SOUNDTRACK_MEDIA_FIELD],
-                operation: CanonicalFieldDataReferenceOperation::Insert,
-            },
-            archive_limits,
-        ),
         [] => object.replace_message_transitioning_data_references_preserving_header_with_limits(
             view.selection.soundtrack_message_index,
             replacement,
@@ -938,7 +982,7 @@ fn rewrite_package(
         ),
         _ => return Err(Error::InvalidSource),
     }
-        .map_err(|_| Error::InvalidSource)?;
+    .map_err(|_| Error::InvalidSource)?;
     let serialized_soundtrack = archive
         .to_bytes_with_limits(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
@@ -958,6 +1002,30 @@ fn rewrite_package(
         .metadata
         .selected_component_identifier
         .ok_or(Error::InvalidSource)?;
+    if reuse_existing && old.is_none_or(|old| old.identifier != new_identifier.unwrap_or(0)) {
+        let identifier = new_identifier.ok_or(Error::InvalidSource)?;
+        let owner = view.metadata.owners.iter().find(|owner| {
+            owner.selected
+                && owner.data_identifier == identifier
+                && owner.object_identifier == view.selection.soundtrack_identifier
+        });
+        if let Some(owner) = owner {
+            owner_updates.push(metadata_codec::DataReferenceOwnerCountUpdate::new(
+                metadata_codec::ComponentSelector::new(component_identifier, locator),
+                identifier,
+                view.selection.soundtrack_identifier,
+                owner.count,
+                owner.count.checked_add(1).ok_or(Error::InvalidSource)?,
+            ));
+        } else {
+            owner_additions.push(metadata_codec::DataReferenceOwnerAddition::new(
+                metadata_codec::ComponentSelector::new(component_identifier, locator),
+                identifier,
+                view.selection.soundtrack_identifier,
+                1,
+            ));
+        }
+    }
     if let (Some(audio), Some(identifier), Some(name), Some(digest)) = (
         source_audio,
         new_identifier,
@@ -978,7 +1046,9 @@ fn rewrite_package(
             1,
         ));
     }
-    if let Some(old) = old {
+    if let Some(old) = old
+        && old.identifier != new_identifier.unwrap_or(0)
+    {
         let selector = metadata_codec::ComponentSelector::new(component_identifier, locator);
         if old.owner_count > 1 {
             owner_updates.push(metadata_codec::DataReferenceOwnerCountUpdate::new(
@@ -1010,7 +1080,8 @@ fn rewrite_package(
         .as_deref()
         .map(|name| format!("{DATA_PREFIX}{name}"));
     let mut insertions = Vec::new();
-    if let (Some(audio), Some(name)) = (source_audio, insertion_name.as_deref()) {
+    if !reuse_existing && let (Some(audio), Some(name)) = (source_audio, insertion_name.as_deref())
+    {
         insertions.push(EntryInsertion::new(name, audio.bytes()));
     }
     let insertion_refs = insertions;
@@ -1063,11 +1134,21 @@ fn expected_items_after(
         .map_err(|_| Error::Allocation {
             amount: view.items.len(),
         })?;
+    let canonical_filename = identifier
+        .and_then(|identifier| {
+            view.metadata
+                .data
+                .iter()
+                .find(|data| data.identifier == identifier)
+        })
+        .map(|data| data.preferred_name.as_ref())
+        .or_else(|| audio.map(AudioSource::filename))
+        .unwrap_or("");
     let new_item = || {
         Item::new(
             lineage,
             position,
-            audio.map_or("", AudioSource::filename),
+            canonical_filename,
             audio.map_or(0, AudioSource::byte_length),
         )
     };

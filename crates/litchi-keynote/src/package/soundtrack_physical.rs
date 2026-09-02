@@ -454,7 +454,7 @@ pub(crate) fn select_soundtrack<'a>(
     validate_soundtrack_media_references(
         soundtrack_payload,
         limits,
-        info.data_references.len(),
+        &info.data_references,
         budget,
     )?;
     let selection = Selection {
@@ -745,7 +745,7 @@ pub(crate) fn preflight_soundtrack_payload(
 pub(crate) fn validate_soundtrack_media_references(
     source: &[u8],
     limits: WireLimits,
-    expected: usize,
+    expected: &[u64],
     budget: &mut Budget,
 ) -> Result<(), Error> {
     let _ = preflight_soundtrack_payload(source, limits, budget)?;
@@ -763,12 +763,13 @@ pub(crate) fn validate_soundtrack_media_references(
         }
         field.validate_canonical_framing().map_err(map_wire_error)?;
         let reference = strict_reference(field.payload(), limits, budget)?;
-        if reference.is_external() {
+        if reference.is_external() || expected.get(observed).copied() != Some(reference.identifier)
+        {
             return Err(Error::InvalidSource);
         }
         observed = observed.checked_add(1).ok_or(Error::InvalidSource)?;
     }
-    if observed != expected {
+    if observed != expected.len() {
         return Err(Error::InvalidSource);
     }
     Ok(())
@@ -1366,9 +1367,11 @@ pub(crate) fn validate_soundtrack_metadata(
             return Err(Error::InvalidSource);
         }
     }
-    if !media_path && !info.data_references.is_empty() {
-        return Err(Error::InvalidSource);
-    }
+    // Native Keynote may omit field-local attribution and carry the complete
+    // soundtrack media list only in MessageInfo.data_references. The item
+    // writer preserves that producer-selected omission while transitioning
+    // the aggregate list. Any present field remains strict and unique, and no
+    // unrelated field may alias a soundtrack data reference.
     Ok(())
 }
 
@@ -2240,7 +2243,7 @@ mod tests {
         validate_soundtrack_media_references(
             &source,
             WireLimits::default(),
-            2,
+            &[7, 9],
             &mut transaction_budget,
         )
         .expect("media records are valid");
@@ -2250,7 +2253,7 @@ mod tests {
             validate_soundtrack_media_references(
                 &source,
                 WireLimits::default(),
-                1,
+                &[7],
                 &mut transaction_budget,
             ),
             Err(Error::InvalidSource)
@@ -2267,11 +2270,28 @@ mod tests {
             validate_soundtrack_media_references(
                 &source,
                 WireLimits::default(),
-                1,
+                &[7],
                 &mut transaction_budget,
             ),
             Err(Error::InvalidSource)
         ));
+    }
+
+    #[test]
+    fn media_records_reject_identifier_or_order_mismatch() {
+        let source = soundtrack_payload(&[7, 9]);
+        for expected in [&[7, 8][..], &[9, 7][..]] {
+            let mut transaction_budget = budget();
+            assert!(matches!(
+                validate_soundtrack_media_references(
+                    &source,
+                    WireLimits::default(),
+                    expected,
+                    &mut transaction_budget,
+                ),
+                Err(Error::InvalidSource)
+            ));
+        }
     }
 
     #[test]
