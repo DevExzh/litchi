@@ -5355,6 +5355,69 @@ class BoundaryPolicyTests(unittest.TestCase):
             inspect.getsource(boundaries.main),
         )
 
+    def test_iwa_pages_table_model_discovery_requires_borrowed_codec(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PAGES_TABLE_MODEL_DISCOVERY_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "use litchi_iwa_protos::table_model_discovery_codec::{"
+                "decode_table_model, DecodeOptions, TableModelSnapshot};\n"
+                "fn decode(bytes: &[u8]) -> TableModelSnapshot<'_> {\n"
+                "    decode_table_model(bytes, DecodeOptions::for_source(bytes)).unwrap()\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_model_discovery_source_topology(root),
+                [],
+            )
+
+            source.write_text(
+                "use prost::Message;\n"
+                "fn decode(bytes: &[u8]) { TableModelArchive::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            violations = (
+                boundaries.audit_iwa_pages_table_model_discovery_source_topology(root)
+            )
+            self.assertTrue(
+                any("TableModelArchive::decode" in item for item in violations),
+                violations,
+            )
+            for marker in boundaries.IWA_PAGES_TABLE_MODEL_DISCOVERY_REQUIRED_MARKERS:
+                self.assertTrue(
+                    any(f"marker {marker}" in item for item in violations), violations
+                )
+
+    def test_iwa_pages_table_model_discovery_masks_non_production_decoys(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PAGES_TABLE_MODEL_DISCOVERY_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "use litchi_iwa_protos::table_model_discovery_codec::{"
+                "decode_table_model, DecodeOptions, TableModelSnapshot};\n"
+                "fn decode(bytes: &[u8]) -> TableModelSnapshot<'_> {\n"
+                "    decode_table_model(bytes, DecodeOptions::for_source(bytes)).unwrap()\n"
+                "}\n"
+                "// TableModelArchive::decode(bytes);\n"
+                'const NOTE: &str = "TableModelArchive::decode(bytes)";\n'
+                "#[cfg(test)]\n"
+                "fn eager_decoy(bytes: &[u8]) { TableModelArchive::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_table_model_discovery_source_topology(root),
+                [],
+            )
+
+    def test_iwa_pages_table_model_discovery_audit_is_in_main_dispatch(self) -> None:
+        self.assertIn(
+            "+ audit_iwa_pages_table_model_discovery_source_topology()",
+            inspect.getsource(boundaries.main),
+        )
+
     def test_litchi_semantic_facades_require_complete_checked_exports(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

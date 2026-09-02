@@ -1,19 +1,22 @@
 //! Validation boundary for reachable Pages table identities.
 
 use super::*;
-use prost::Message;
+
+use litchi_iwa_protos::table_model_discovery_codec::{
+    DecodeOptions, TableModelSnapshot, decode_table_model,
+};
 
 use crate::archive::RawMessage;
-use crate::protobuf::tst::TableModelArchive;
 
-/// Decode the unique typed table-model payload carried by a table object.
+/// Strictly project the table-model facts needed by body-table discovery.
 pub(super) fn decode_table_models<'a>(
     messages: impl Iterator<Item = &'a RawMessage>,
     model_id: u64,
-) -> Result<Vec<TableModelArchive>> {
+) -> Result<Vec<TableModelSnapshot<'a>>> {
     messages
         .map(|message| {
-            TableModelArchive::decode(message.data.as_slice()).map_err(|error| {
+            let source = message.data.as_slice();
+            decode_table_model(source, DecodeOptions::for_source(source)).map_err(|error| {
                 Error::InvalidFormat(format!(
                     "Pages table model {model_id} contains malformed table-model payload: {error}"
                 ))
