@@ -85,9 +85,13 @@ Data Connection must exist; they are never contacted or refreshed. Fresh writers
 applicable graph before emitting MapInfo, mapped columns on existing XML tables, and at most one
 canonical Single Cell Tables part per sheet; canonical single-cell output uses `dwConnID=0`.
 Transactions can create/replace/remove a dependency-free catalog, edit maps/conformance, edit
-columns only in an already mapped table, and edit bindings only in an already present single-cell
-part; they do not create/remove that part, add a first binding to an otherwise unmodeled table, or
-remove an ordinary table part. Exact no-ops preserve bytes and signatures; changed publication is
+columns only in an already mapped table, and add/replace/remove single-cell bindings. Adding the
+first binding on a worksheet without a Single Cell Tables part creates one collision-free canonical
+part and internal worksheet relationship; deleting the final binding removes that relationship and
+part after lossless ownership validation. Transactions do not create or remove ordinary table
+parts, and changed Single Cell Tables edits refuse noncanonical/opaque records and unsafe
+shared/orphan/foreign/external/malformed/dangling topology. An untouched existing empty part is
+preserved exactly. Exact no-ops preserve bytes and signatures; changed publication is
 clone-staged through full workbook reparse, removes signatures, rejects stale semantic/owned graph
 state, and has an inverse for owned data/topology but not signatures. Because the vendored §2.1.7.46
 conversion contains a build-path placeholder instead of `Biff12SingleCellTablesGrammar.abnf`, the

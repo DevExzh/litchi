@@ -1,5 +1,52 @@
 # Performance program phase report
 
+## Change 0376: XLSB Single Cell Tables lifecycle
+
+### Implementation boundary
+
+Opened `litchi-xlsb` XML Maps transactions now support the complete canonical
+Single Cell Tables owner transition. A first binding allocates a URI-equivalent
+collision-free `/xl/tables/tableSingleCells{N}.bin`, emits canonical BIFF12,
+and adds the internal worksheet relationship and content type. Removing the
+last binding removes the exact owning relationship and part after checking
+lossless source form and all package-root/part inbound relationships.
+
+The transaction distinguishes absent, present-empty, and present-nonempty
+owners. Untouched empty owners remain byte-preserved. Changed opaque/FRT or
+noncanonical owners and shared, orphan, foreign, external, malformed, or
+dangling topology return typed refusal. Publication remains clone-staged,
+fully reparsed, source-bound, stale-safe, reversible for owned payload/topology,
+and signature-invalidating only for effective changes. Ordinary table-part
+creation/removal remains outside this change.
+
+### Verification
+
+The focused `xml_maps_public` target passed `30/30` executed tests with
+`malformed_ordinary_table_vectors_fail_in_the_base_workbook_layer` excluded as
+a pre-existing stale error-context expectation. The complete locked XLSB
+library/test gate passed 15 suites and `726/726` executed tests with that test
+and `checked_in_unique_standard_drawing_corpus_transfers_every_anchor`
+excluded. The latter's test and four corpus fixtures are byte-identical to
+`HEAD`; its pre-existing census expects six anchors while the checked-in corpus
+produces five.
+
+Strict production-library Clippy passed without allowances. The crate-boundary
+gate passed for 64 workspace packages and 240 internal declarations with 14
+existing debt entries. Independent topology, publication-safety, and test
+reviews accepted the implementation. Cargo validation was serialized with one
+build job, one test thread, one target, disabled incremental state, guarded
+available-memory preflight, and at most an 8 GiB per-process virtual-memory cap.
+
+### Interpretation
+
+`performance_claim: none`; `claim_authorized: false`. The evidence proves only
+the bounded canonical lifecycle, preservation/refusal, atomicity, topology,
+signature, source-identity, and reversible-patch behavior exercised above.
+There is no timing, allocation-volume, RSS, physical-I/O, throughput,
+fixed-memory, broad XLSB, or general OOM-prevention claim. Detailed evidence is
+in the [Change 0376
+record](changes/0376-xlsb-table-single-cells-lifecycle.md).
+
 ## Change 0375: PPTX selected-slide retained snapshot
 
 ### Implementation boundary

@@ -1,5 +1,32 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0376 compliance update
+
+Change 0376 keeps BIFF12 Single Cell Tables ownership and opened-workbook
+publication in `litchi-xlsb`; shared XML Maps vocabulary remains in
+`litchi-ooxml-common`, and OPC graph mutation remains behind the existing
+package API. It adds no public dependency edge, raw CRUD type, package
+identifier, archive/runtime handle, lock, or unsafe code.
+
+First-owner creation uses a canonical part and internal worksheet relationship.
+Final-owner removal requires an exact owning relationship, lossless canonical
+source, and a package-wide inbound-reference preflight. URI-equivalent
+collisions, shared/orphan/foreign/external/malformed/dangling ownership, and
+opaque/FRT or noncanonical changes fail closed with typed errors. Clone-staged
+publication, complete reparse, source freshness, exact no-op/signature
+preservation, effective-change signature invalidation, and owned-state inverse
+semantics remain intact.
+
+Focused and complete serialized XLSB validation passed with only the two exact
+pre-existing exclusions documented in the [Change 0376
+record](changes/0376-xlsb-table-single-cells-lifecycle.md). Strict Clippy,
+crate boundaries, and independent topology, publication-safety, and test
+reviews passed.
+
+`performance_claim: none`; `claim_authorized: false`. No latency,
+allocation-volume, RSS, physical-I/O, throughput, fixed-memory, broad XLSB, or
+general OOM-prevention claim follows.
+
 ## Change 0375 compliance update
 
 litchi-pptx remains the sole owner of the selected-slide source-backed
