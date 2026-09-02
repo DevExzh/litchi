@@ -59,6 +59,10 @@
 //! - ODF Toolkit: ODFDOM package classes
 //! - ZIP format: PKZIP Application Note
 
+/// Borrowing namespace binding tracking for bounded XML scanners.
+mod binding_tracker;
+/// Shared content-document validation state machine.
+mod content_validation;
 /// ODF package-entry decryption.
 mod encryption;
 /// Shared ownership for simple packaged ODF families.
@@ -81,6 +85,13 @@ pub mod xml_splice;
 // Re-export main types for convenience
 // Manifest is internal to the package system
 pub use crate::package::ArchiveLimits;
+/// Hidden, unstable cross-family implementation plumbing.
+#[doc(hidden)]
+pub mod private {
+    pub use super::binding_tracker::{BindingTracker, BindingTrackerError};
+    pub use super::content_validation::ContentDocumentValidator;
+}
+
 pub use encryption::{Cipher, Kdf, Profile, StartKey};
 pub use family::{Package, PreparedPackage, validate_content_document_part, validate_content_part};
 #[allow(

@@ -8,8 +8,8 @@ mod model;
 mod validation;
 
 use super::element::{Element, ElementBase, try_owned_string, try_prefixed_name};
-use crate::binding_tracker::BindingTracker;
 use litchi_core::{Error, Result, SequentialTextWriter, TextObjectKind, TextOutputError};
+use litchi_odf_common::core::private::BindingTracker;
 use memchr::memmem;
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;

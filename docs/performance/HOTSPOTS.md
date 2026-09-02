@@ -1,5 +1,22 @@
 # Performance hotspot inventory
 
+## Change 0371 update
+
+Change 0371 is a correctness and security-hardening prerequisite, not a
+measured hotspot. It centralizes the plain-`Reader` ODF namespace tracker and
+content validator in `litchi-odf-common`, migrates `litchi-odt` to the shared
+substrate, and removes the local duplicate. Checked `u32` depth, a 4,096
+content-depth limit, a 256-declarations-per-element limit, and the existing
+256 MiB input limit bound hostile XML without entering quick-xml's `u16`
+namespace-depth path.
+
+Focused locked/offline release tests passed apart from two named pre-existing
+writer-test failures in unmodified code. Scoped Clippy passed with only one
+pre-existing `large_enum_variant` lint allowed, and crate boundaries passed.
+`performance_claim: none`; no hotspot rank, latency, allocation, RSS,
+physical-I/O, fixed-memory, or OOM-prevention claim follows. See the [0371
+record](changes/0371-odf-shared-content-validation.md).
+
 ## Change 0370 update
 
 Change 0370 establishes an ODP source-backed catalog measurement boundary,

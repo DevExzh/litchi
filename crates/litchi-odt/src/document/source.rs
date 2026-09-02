@@ -34,7 +34,6 @@ use crate::elements::text::{Paragraph as ElementParagraph, TextElements};
 pub type ReadLimits = SourcePackageLimits;
 
 pub(super) const FAMILY_NAME: &str = "ODT";
-pub(super) const CONTENT_ROOT: &str = "<office:text";
 const MAX_CONTENT_BYTES: u64 = 256 * 1024 * 1024;
 const TEXT_CACHE_QUERY_THRESHOLD: usize = 2;
 const TEXT_CACHE_MAX_BYTES: usize = 16 * 1024 * 1024;
