@@ -537,6 +537,77 @@ fn append_external_reference(source: &[u8]) -> TestResult<Vec<u8>> {
     Err("soundtrack payload was not found in fixture".into())
 }
 
+fn without_soundtrack_field_info(source: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source)?;
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let stream = SnappyStream::decompress(entry.data())?;
+        let mut archive = Archive::parse(stream.as_bytes())?;
+        let Some(object) = archive.objects.iter_mut().find(|object| {
+            object.archive_info.identifier == Some(SOUNDTRACK_OBJECT)
+                && object.messages.iter().any(|message| message.type_ == 21)
+        }) else {
+            continue;
+        };
+        let index = object
+            .messages
+            .iter()
+            .position(|message| message.type_ == 21)
+            .ok_or("soundtrack message was absent")?;
+        let info = object
+            .archive_info
+            .message_infos
+            .get_mut(index)
+            .ok_or("soundtrack message info was absent")?;
+        info.field_infos
+            .retain(|field| field.path.as_slice() != [3]);
+        let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+        return Ok(catalog.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                entry.name(),
+                &compressed,
+            )],
+            Limits::default(),
+        )?);
+    }
+    Err("soundtrack object was not found in fixture".into())
+}
+
+fn soundtrack_has_field_info(source: &[u8]) -> TestResult<bool> {
+    let catalog = Catalog::from_bytes(source)?;
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let stream = SnappyStream::decompress(entry.data())?;
+        let archive = Archive::parse(stream.as_bytes())?;
+        for object in &archive.objects {
+            if object.archive_info.identifier != Some(SOUNDTRACK_OBJECT) {
+                continue;
+            }
+            let Some(index) = object
+                .messages
+                .iter()
+                .position(|message| message.type_ == 21)
+            else {
+                continue;
+            };
+            let info = object
+                .archive_info
+                .message_infos
+                .get(index)
+                .ok_or("soundtrack message info was absent")?;
+            return Ok(info
+                .field_infos
+                .iter()
+                .any(|field| field.path.as_slice() == [3]));
+        }
+    }
+    Err("soundtrack object was not found in fixture".into())
+}
+
 #[test]
 fn absent_and_existing_empty_soundtracks_are_distinct() -> TestResult {
     let absent = Package::from_bytes(&fixture_without_soundtrack()?)?;
@@ -634,13 +705,22 @@ fn read_add_insert_replace_remove_are_ordered_and_semantic() -> TestResult {
     let mut insert = added.package().edit_soundtrack_items()?;
     insert.insert(Position::new(0), audio("inserted.wav", THIRD_AUDIO)?)?;
     let inserted = insert.commit()?;
+    let inserted_bytes = bytes(inserted.package())?;
+    assert_eq!(
+        Catalog::from_bytes(&inserted_bytes)?
+            .iter()
+            .filter(|entry| entry.name().starts_with("Data/"))
+            .count(),
+        4,
+        "reusing identical media must not insert another physical member"
+    );
     assert_eq!(
         item_summary(inserted.package())?
             .iter()
             .map(|(_, name, _)| name.as_str())
             .collect::<Vec<_>>(),
         [
-            "inserted.wav",
+            "appended.wav",
             "soundtrack-first.wav",
             "soundtrack-second.wav",
             "appended.wav"
@@ -650,7 +730,7 @@ fn read_add_insert_replace_remove_are_ordered_and_semantic() -> TestResult {
     let mut replace = inserted.package().edit_soundtrack_items()?;
     replace.replace(Position::new(1), audio("replacement.wav", THIRD_AUDIO)?)?;
     let replaced = replace.commit()?;
-    assert_eq!(item_summary(replaced.package())?[1].1, "replacement.wav");
+    assert_eq!(item_summary(replaced.package())?[1].1, "appended.wav");
     assert_eq!(item_summary(replaced.package())?[1].2, THIRD_AUDIO.len());
 
     let mut remove = replaced.package().edit_soundtrack_items()?;
@@ -661,7 +741,7 @@ fn read_add_insert_replace_remove_are_ordered_and_semantic() -> TestResult {
             .iter()
             .map(|(_, name, _)| name.as_str())
             .collect::<Vec<_>>(),
-        ["inserted.wav", "soundtrack-second.wav", "appended.wav"]
+        ["appended.wav", "soundtrack-second.wav", "appended.wav"]
     );
     Ok(())
 }
@@ -814,5 +894,27 @@ fn malformed_external_reference_fails_before_publication() -> TestResult {
         },
     }
     assert_eq!(bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn aggregate_only_native_metadata_is_admitted_and_preserved_on_write() -> TestResult {
+    let source = without_soundtrack_field_info(&fixture()?)?;
+    let package = Package::from_bytes(&source)?;
+    let items = package
+        .soundtrack_items()?
+        .ok_or("aggregate-only soundtrack was reported absent")?;
+    assert_eq!(items.len(), 2);
+
+    let mut edit = package.edit_soundtrack_items()?;
+    edit.replace(Position::new(0), audio("replacement.wav", THIRD_AUDIO)?)?;
+    let commit = edit.commit()?;
+    assert_eq!(commit.package().soundtrack_items()?.unwrap().len(), 2);
+    assert!(!soundtrack_has_field_info(&bytes(commit.package())?)?);
+
+    let restored = commit
+        .package()
+        .apply_soundtrack_items(&commit.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, source);
     Ok(())
 }
