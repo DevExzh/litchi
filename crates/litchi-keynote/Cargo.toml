@@ -25,6 +25,7 @@ litchi-numbers-wire = { workspace = true }
 once_cell         = { workspace = true }
 plist             = { workspace = true }
 serde             = { workspace = true }
+sha1              = { workspace = true }
 thiserror = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]

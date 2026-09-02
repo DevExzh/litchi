@@ -14,6 +14,9 @@ use crate::Package;
 /// Exact-source transactions for changing soundtrack playback order.
 pub mod order;
 
+/// Semantic soundtrack media-item values and exact lifecycle transactions.
+pub mod items;
+
 const PLAY_ONCE_MODE: i32 = 0;
 const LOOP_MODE: i32 = 1;
 const DO_NOT_PLAY_MODE: i32 = 2;
