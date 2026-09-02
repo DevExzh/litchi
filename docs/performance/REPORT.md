@@ -1,5 +1,77 @@
 # Performance program phase report
 
+## Change 0375: PPTX selected-slide retained snapshot
+
+### Implementation boundary
+
+Change 0375 retains each validated source-backed PPTX selected-slide semantic
+snapshot through publication. The publisher reads current raw selected bytes
+and proves execution, version, lineage, URI, limits, complete retained
+selected-slide closure, and exact selected-byte identity before applying the
+edit against the retained snapshot rather than reparsing semantic slide state.
+An identity mismatch takes the exact old semantic-recapture path; later raw
+errors do not retry or publish, and the retained earlier bytes are checked in
+their existing order, including the post-parse version fence.
+
+The owner is litchi-pptx; the existing bounded OPC publisher remains the
+publication substrate. No dependency edge, public API, archive/runtime
+handle, lock, unsafe code, or parallel execution path changed. The three
+existing selectors are pptx_source_backed_one_edit_save,
+pptx_source_backed_batch_edit_save, and
+pptx_source_backed_multi_slide_batch_edit_save.
+
+### Focused proof and validation
+
+changed_single_publication_reuses_semantic_snapshot holds SlidePart and Scene
+counters at 1/1 before and after publication.
+changed_multi_slide_batch_publication_reuses_semantic_snapshots holds both
+counters at 2/2 before and after publication.
+foreign_identical_source_recaptures_semantically_before_rejecting performs
+one semantic recapture, returns StaleSource, and emits zero bytes. These are
+independent counter/source/safety proofs, not timing or memory inferences.
+
+The serialized validation discipline used one Cargo process at a time with
+CARGO_BUILD_JOBS=1, CARGO_INCREMENTAL=0, an 8 GiB build cap, and one run
+process at a time with a 4 GiB cap. The library suite passed 533/533;
+source_backed_edit passed 21/21; other integrations passed with exactly three
+unrelated pre-existing stale expectation exclusions:
+opened::tests::stale_and_unsupported_raw_xml_fail_before_publication,
+pptx_malformed_presentation::malformed_presentation_children_are_reported_by_their_owner,
+and pptx_table_styles::noncanonical_style_target_survives_transactional_raw_save.
+These are stale expectations around stricter direct sldIdLst owner validation
+and never enter the Change 0375 publication path. Production library Clippy,
+the 64-package/240-declaration boundary gate, and independent
+equivalence/safety/test reviews passed.
+
+### Clean ABBA evidence
+
+The release ABBA used Rust 1.95.0, Linux AMD EPYC 9575F, CPU affinity 2, one
+logical CPU, one execution worker, 20 warmups, 500 samples per case, fresh
+isolated children, and no instrumentation. Control and candidate binaries
+were clean and all four raw report hashes and sizes are in
+[the compact result](results/pptx-selected-slide-retained-snapshot-0375-abba.json).
+The corpus has 200 slides, 1,600 text boxes, eight inert 2 MiB PNGs, 229 OPC
+entries, 445 ZIP members, 17,017,139 archive bytes, and 17,568,429
+uncompressed bytes. Outputs and source counters were stable on every leg.
+
+The timing vectors are observations only. The one-edit, batch, and
+multi-slide directions conflict across paired legs and the required
+p50/mean/p95/p99 drift gates do not pass as a package; raw reports serialize
+zero correctness, semantic, preservation, refusal, and error booleans across
+all 12 rows. Exit 0 therefore proves only harness completion, and output-hash
+equality proves generated-output byte identity rather than semantic validity.
+performance_claim is none.
+
+### Claim boundary
+
+No latency, allocation/RSS/heap, reads, decompression/materialization,
+physical-I/O, cold-cache, throughput, scaling, fixed-memory, general-OOM,
+all-PPTX, real-producer, topology/media/notes/theme/chart, parallel, semantic
+reopen, preservation, refusal, or reversibility claim follows. The retained
+selected-slide snapshot is supported only by the focused counter and
+source/safety evidence. Temporary raw reports are deleted after the compact
+evidence commit. See [Change 0375](changes/0375-pptx-selected-slide-retained-snapshot.md).
+
 ## Change 0374: DOCX story-hyperlink retained snapshot
 
 ### Implementation boundary

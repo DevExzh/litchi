@@ -1,0 +1,434 @@
+{
+  "schema_version": 1,
+  "change": 375,
+  "operation": "pptx_selected_slide_retained_snapshot",
+  "status": "implemented",
+  "performance_claim": "none",
+  "protocol": {
+    "order": [
+      "A1_control",
+      "B1_candidate",
+      "B2_candidate",
+      "A2_control"
+    ],
+    "selectors": [
+      "pptx_source_backed_one_edit_save",
+      "pptx_source_backed_batch_edit_save",
+      "pptx_source_backed_multi_slide_batch_edit_save"
+    ],
+    "profile": "release",
+    "rust_version": "1.95.0",
+    "host": "Linux AMD EPYC 9575F",
+    "cpu_affinity": [
+      2
+    ],
+    "logical_cpus_available": 1,
+    "execution_workers": [
+      1
+    ],
+    "warmups": 20,
+    "samples_per_case": 500,
+    "instrumentation": "none",
+    "fresh_isolated_child_per_sample": true,
+    "build": {
+      "one_cargo_process_at_a_time": true,
+      "cargo_build_jobs": 1,
+      "cargo_incremental": false,
+      "virtual_memory_cap_bytes": 8589934592
+    },
+    "run": {
+      "one_process_at_a_time": true,
+      "virtual_memory_cap_bytes": 4294967296,
+      "process_global_thread_count": "unavailable",
+      "cold_requested_is_not_cold_cache_proof": true
+    }
+  },
+  "implementations": {
+    "control": {
+      "revision": "53cbdbd085bd0f6905a3a8987acb7deb284ff717",
+      "git_tree": "0829a1006c1e351c6408f5c758e67de942807110",
+      "git_tree_recorded_externally": true,
+      "binary_sha256": "d4679bd0b3791a8d1146da165858fbfe4ada32a0d77c1f39e73e57e69733c4f0",
+      "binary_bytes": 53346160,
+      "dirty": false
+    },
+    "candidate": {
+      "revision": "b4f83ae0c65738f99c605395bdb5020a0660257d",
+      "git_tree": "3bec111713710835bdc3fad8c39e6f2490d44e10",
+      "git_tree_recorded_externally": true,
+      "binary_sha256": "91d334142f87596d5c267afa616ac66391e125ffe892d161ac303e34572ce3b5",
+      "binary_bytes": 53399176,
+      "dirty": false
+    }
+  },
+  "raw_reports": {
+    "A1_control": {
+      "sha256": "af70712032490f66af7e6ef33e2dfd0af13a496c767dea26ce5ed3c029440faf",
+      "bytes": 537466,
+      "dirty": false
+    },
+    "B1_candidate": {
+      "sha256": "47d99b5661265beabc1d81b20abff5a0c091d4275ed6695f32ea0796ea7b19d3",
+      "bytes": 537438,
+      "dirty": false
+    },
+    "B2_candidate": {
+      "sha256": "850a70715fae2ccbcaddb5f863e4a44676abd49bf4c946debbee86e4b4010097",
+      "bytes": 537420,
+      "dirty": false
+    },
+    "A2_control": {
+      "sha256": "fed3533fa0e16af714b1be57a02651fdbbed483ac4931700a5420e076ea0dd85",
+      "bytes": 537443,
+      "dirty": false
+    }
+  },
+  "corpus": {
+    "generator": "litchi-pptx-source-edit-media-v1",
+    "slides": 200,
+    "text_boxes_per_slide": 8,
+    "text_boxes_total": 1600,
+    "inert_png_payloads": 8,
+    "inert_png_bytes_each": 2097152,
+    "opc_entries": 229,
+    "zip_members": 445,
+    "archive_bytes": 17017139,
+    "uncompressed_bytes": 17568429,
+    "sha256": "61b2b99083ca27ebd37955db600955e3f41289b93dba71951983164239eff757",
+    "target_slide": 100,
+    "target_shape": 0,
+    "target_payload_sha256": "26c9e1dffc347568407eb56d54c87d5fddb8cdb895a867fffb3cd9f302be18e6"
+  },
+  "outputs": {
+    "one_edit": {
+      "sha256": "bcfd05dc7590051137db64810db2d822ac814417c03c50d8a7fc33f429e50d61",
+      "accepted_bytes": 17017144,
+      "writes": 2295,
+      "largest_write_bytes": 32768
+    },
+    "batch_edit": {
+      "sha256": "8371618225b8478d7ea606f13d21d3453e7960f5cb09935975ac672320001755",
+      "accepted_bytes": 17017138,
+      "writes": 2295,
+      "largest_write_bytes": 32768
+    },
+    "multi_slide_batch_edit": {
+      "sha256": "23d6d7b8dd433ff453307ee56485efadc34d6b18b455a6858d9f565c4b1b6cd9",
+      "accepted_bytes": 17017145,
+      "writes": 2309,
+      "largest_write_bytes": 32768
+    },
+    "stable_on_every_leg": true,
+    "equal_between_control_and_candidate": true
+  },
+  "source_counters": {
+    "one_edit": {
+      "reads": 3387,
+      "bytes": 17197089,
+      "ordinary_payload_reads": 742,
+      "ordinary_payload_bytes": 16909038,
+      "materializations": 2,
+      "max_in_flight": 1
+    },
+    "batch_edit": {
+      "reads": 3387,
+      "bytes": 17197089,
+      "ordinary_payload_reads": 742,
+      "ordinary_payload_bytes": 16909038,
+      "materializations": 2,
+      "max_in_flight": 1
+    },
+    "multi_slide_batch_edit": {
+      "reads": 3415,
+      "bytes": 17196933,
+      "ordinary_payload_reads": 742,
+      "ordinary_payload_bytes": 16909038,
+      "materializations": 9,
+      "max_in_flight": 1
+    },
+    "reduction_claim": false
+  },
+  "timing_ns": {
+    "one_edit": {
+      "A1_control": {
+        "p50": 8130384,
+        "mean": 8162705.370000003,
+        "p95": 8666762,
+        "p99": 9585289
+      },
+      "B1_candidate": {
+        "p50": 7802666,
+        "mean": 7852895.689999998,
+        "p95": 8451470,
+        "p99": 9076819
+      },
+      "B2_candidate": {
+        "p50": 7906217,
+        "mean": 7938815.914000001,
+        "p95": 8492833,
+        "p99": 9115880
+      },
+      "A2_control": {
+        "p50": 7769673,
+        "mean": 7846690.510000001,
+        "p95": 8435502,
+        "p99": 9099945
+      }
+    },
+    "batch_edit": {
+      "A1_control": {
+        "p50": 6627600,
+        "mean": 6634725.029999999,
+        "p95": 8416407,
+        "p99": 8776854
+      },
+      "B1_candidate": {
+        "p50": 6898245,
+        "mean": 6423976.839999999,
+        "p95": 8187567,
+        "p99": 8729883
+      },
+      "B2_candidate": {
+        "p50": 7975409,
+        "mean": 8006707.028,
+        "p95": 8439423,
+        "p99": 8986315
+      },
+      "A2_control": {
+        "p50": 6732293,
+        "mean": 6519061.140000002,
+        "p95": 8315197,
+        "p99": 9206003
+      }
+    },
+    "multi_slide_batch_edit": {
+      "A1_control": {
+        "p50": 9104324,
+        "mean": 8261872.376000001,
+        "p95": 10091305,
+        "p99": 10722857
+      },
+      "B1_candidate": {
+        "p50": 8698609,
+        "mean": 7808560.489999998,
+        "p95": 9598702,
+        "p99": 10349135
+      },
+      "B2_candidate": {
+        "p50": 9110262,
+        "mean": 9148102.508000005,
+        "p95": 9658260,
+        "p99": 10023394
+      },
+      "A2_control": {
+        "p50": 8610373,
+        "mean": 7963378.383999998,
+        "p95": 9795976,
+        "p99": 10249811
+      }
+    }
+  },
+  "signed_percent_change_b_minus_a": {
+    "one_edit": {
+      "A1_B1": {
+        "p50": -4.030781326,
+        "mean": -3.795428917,
+        "p95": -2.484111136,
+        "p99": -5.304691387
+      },
+      "A2_B2": {
+        "p50": 1.757396997,
+        "mean": 1.174067002,
+        "p95": 0.679639457,
+        "p99": 0.175110948
+      }
+    },
+    "batch_edit": {
+      "A1_B1": {
+        "p50": 4.083604925,
+        "mean": -3.176441963,
+        "p95": -2.718974974,
+        "p99": -0.53516898
+      },
+      "A2_B2": {
+        "p50": 18.464971741,
+        "mean": 22.819940725,
+        "p95": 1.493963402,
+        "p99": -2.386355946
+      }
+    },
+    "multi_slide_batch_edit": {
+      "A1_B1": {
+        "p50": -4.456289122,
+        "mean": -5.486793615,
+        "p95": -4.881459831,
+        "p99": -3.485283819
+      },
+      "A2_B2": {
+        "p50": 5.805660219,
+        "mean": 14.877154731,
+        "p95": -1.405842562,
+        "p99": -2.208987073
+      }
+    }
+  },
+  "absolute_same_implementation_drift_percent": {
+    "one_edit": {
+      "control_A1_A2": {
+        "p50": 4.436580117,
+        "mean": 3.871447586,
+        "p95": 2.668355263,
+        "p99": 5.063425839
+      },
+      "candidate_B1_B2": {
+        "p50": 1.327123319,
+        "mean": 1.094121549,
+        "p95": 0.489417817,
+        "p99": 0.430337985
+      }
+    },
+    "batch_edit": {
+      "control_A1_A2": {
+        "p50": 1.579651759,
+        "mean": 1.743310981,
+        "p95": 1.202532149,
+        "p99": 4.88955382
+      },
+      "candidate_B1_B2": {
+        "p50": 15.615044116,
+        "mean": 24.637856384,
+        "p95": 3.076078645,
+        "p99": 2.937404774
+      }
+    },
+    "multi_slide_batch_edit": {
+      "control_A1_A2": {
+        "p50": 5.425454982,
+        "mean": 3.612909743,
+        "p95": 2.926568962,
+        "p99": 4.411566805
+      },
+      "candidate_B1_B2": {
+        "p50": 4.732400318,
+        "mean": 17.154788257,
+        "p95": 0.620479727,
+        "p99": 3.147519092
+      }
+    }
+  },
+  "stability_gates_percent": {
+    "p50": 5,
+    "mean": 5,
+    "p95": 10,
+    "p99": 15,
+    "result": "failed"
+  },
+  "focused_snapshot_reuse": [
+    {
+      "test": "changed_single_publication_reuses_semantic_snapshot",
+      "before": {
+        "SlidePart": 1,
+        "Scene": 1
+      },
+      "after": {
+        "SlidePart": 1,
+        "Scene": 1
+      }
+    },
+    {
+      "test": "changed_multi_slide_batch_publication_reuses_semantic_snapshots",
+      "before": {
+        "SlidePart": 2,
+        "Scene": 2
+      },
+      "after": {
+        "SlidePart": 2,
+        "Scene": 2
+      }
+    },
+    {
+      "test": "foreign_identical_source_recaptures_semantically_before_rejecting",
+      "semantic_recaptures": 1,
+      "result": "StaleSource",
+      "output_bytes": 0
+    }
+  ],
+  "correctness_evidence": {
+    "raw_report_rows": 12,
+    "raw_report_correctness_booleans_present": false,
+    "raw_report_exit_code_zero": true,
+    "exit_code_scope": "successful harness completion only",
+    "output_hash_equality_scope": "byte identity between measured implementations for generated outputs only",
+    "semantic_reopen_proven": false,
+    "preservation_proven": false,
+    "refusal_proven": false,
+    "reversibility_proven": false
+  },
+  "validation": {
+    "litchi_pptx_library": {
+      "passed": 533,
+      "total": 533,
+      "excluded_preexisting_tests": [
+        "opened::tests::stale_and_unsupported_raw_xml_fail_before_publication"
+      ]
+    },
+    "integration_targets": {
+      "status": "passed except named exclusions",
+      "source_backed_edit": {
+        "passed": 21,
+        "total": 21
+      },
+      "excluded_preexisting_tests": [
+        "pptx_malformed_presentation::malformed_presentation_children_are_reported_by_their_owner",
+        "pptx_table_styles::noncanonical_style_target_survives_transactional_raw_save"
+      ]
+    },
+    "exclusion_reason": "All three are stale expectations around stricter direct sldIdLst owner validation and never enter Change 0375 publication.",
+    "production_library_clippy": {
+      "status": "passed",
+      "preexisting_allowances": [
+        "clippy::nonminimal_bool (opened/xml.rs)",
+        "clippy::clone_on_copy (presentation/order.rs)",
+        "clippy::needless_lifetimes (presentation/order.rs)"
+      ]
+    },
+    "crate_boundary_gate": {
+      "packages": 64,
+      "declarations": 240,
+      "explicit_debt_items": 14,
+      "status": "passed"
+    },
+    "independent_reviews": {
+      "equivalence": "ACCEPT",
+      "safety": "ACCEPT",
+      "tests": "ACCEPT"
+    },
+    "raw_report_lifecycle": "Temporary raw reports are deleted after the compact evidence commit."
+  },
+  "adjudication": {
+    "authorized_metrics": [],
+    "performance_claim": "none",
+    "timing_status": "observations only; paired direction and/or stability gates fail",
+    "withheld_claims": [
+      "latency",
+      "allocation",
+      "RSS",
+      "heap",
+      "reads",
+      "decompression",
+      "materialization",
+      "physical I/O",
+      "cold cache",
+      "throughput",
+      "scaling",
+      "fixed memory",
+      "general OOM prevention",
+      "all PPTX inputs",
+      "real-producer breadth",
+      "topology/media/notes/theme/chart behavior",
+      "parallel execution",
+      "ABBA semantic/refusal correctness"
+    ],
+    "scope": "Focused snapshot-reuse and source/safety evidence only; no performance claim is authorized."
+  }
+}
