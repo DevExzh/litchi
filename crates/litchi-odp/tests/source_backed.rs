@@ -80,10 +80,8 @@ impl ReadAt for CountingSource {
         output[..amount].copy_from_slice(&input[..amount]);
         self.bytes_read.fetch_add(amount, Ordering::Relaxed);
         if amount != 0 {
-            self.ranges
-                .lock()
-                .unwrap()
-                .push((offset, offset + u64::try_from(amount).unwrap()));
+            let end = offset + u64::try_from(amount).unwrap();
+            self.ranges.lock().unwrap().push((offset, end));
         }
         Ok(amount)
     }
@@ -184,12 +182,16 @@ fn incompressible_media() -> Vec<u8> {
 }
 
 fn media_range(bytes: &[u8]) -> (u64, u64) {
+    member_range(bytes, b"Media/clip.bin")
+}
+
+fn member_range(bytes: &[u8], path: &[u8]) -> (u64, u64) {
     let archive = soapberry_zip::ZipArchive::from_slice(bytes).unwrap();
     archive
         .entries()
         .filter_map(|entry| {
             let entry = entry.ok()?;
-            if entry.file_path().as_ref() != b"Media/clip.bin" {
+            if entry.file_path().as_ref() != path {
                 return None;
             }
             Some(
@@ -201,6 +203,56 @@ fn media_range(bytes: &[u8]) -> (u64, u64) {
         })
         .next()
         .unwrap()
+}
+
+fn content_with_body(body: &str) -> String {
+    format!(
+        r#"<office:document-content xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:text="{TEXT}"><office:body><office:presentation>{body}</office:presentation></office:body></office:document-content>"#
+    )
+}
+
+fn oversized_content_package() -> Vec<u8> {
+    let content = content_with_body(
+        r#"<draw:page><draw:frame><draw:text-box><text:p>small</text:p></draw:text-box></draw:frame></draw:page>"#,
+    );
+    let manifest = format!(
+        r#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="{MIME}"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#
+    );
+    let mut archive = StreamingArchiveWriter::new();
+    archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
+    archive
+        .write_deflated("content.xml", content.as_bytes())
+        .unwrap();
+    archive
+        .write_deflated("META-INF/manifest.xml", manifest.as_bytes())
+        .unwrap();
+    let mut bytes = archive.finish_to_bytes().unwrap();
+    let name = b"content.xml";
+    let declared_size = u32::try_from(256 * 1024 * 1024 + 1).unwrap();
+    let central_offset = bytes
+        .windows(46 + name.len())
+        .position(|window| {
+            window.starts_with(b"PK\x01\x02")
+                && u16::from_le_bytes([window[28], window[29]]) as usize == name.len()
+                && &window[46..] == name
+        })
+        .unwrap();
+    bytes[central_offset + 24..central_offset + 28].copy_from_slice(&declared_size.to_le_bytes());
+    bytes
+}
+
+fn encrypted_oversized_content_package() -> Vec<u8> {
+    let declared_size = 256_u64 * 1024 * 1024 + 1;
+    let manifest = format!(
+        r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="{MIME}"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml" m:size="{declared_size}"><m:encryption-data><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/><m:start-key-generation m:start-key-generation-name="http://www.w3.org/2001/04/xmlenc#sha256" m:key-size="32"/><m:key-derivation m:key-derivation-name="PBKDF2" m:salt="AQ==" m:iteration-count="1000" m:key-size="32"/></m:encryption-data></m:file-entry></m:manifest>"#
+    );
+    let mut archive = StreamingArchiveWriter::new();
+    archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
+    archive.write_stored("content.xml", &[0_u8; 32]).unwrap();
+    archive
+        .write_deflated("META-INF/manifest.xml", manifest.as_bytes())
+        .unwrap();
+    archive.finish_to_bytes().unwrap()
 }
 
 fn overlaps(left: (u64, u64), right: (u64, u64)) -> bool {
@@ -369,6 +421,44 @@ fn source_facade_applies_physical_source_limits() {
     );
 
     assert!(SourceBackedPresentation::from_read_at_with_limits(source, limits).is_err());
+}
+
+#[test]
+fn source_facade_rejects_oversized_content_before_materialization() {
+    let bytes = oversized_content_package();
+    let content_range = member_range(&bytes, b"content.xml");
+    let source = Arc::new(CountingSource::new(bytes));
+
+    assert!(matches!(
+        SourceBackedPresentation::from_read_at(source.clone()),
+        Err(Error::InvalidFormat(message)) if message.contains("content.xml exceeds the family limit")
+    ));
+    assert!(
+        source
+            .ranges()
+            .into_iter()
+            .all(|range| !overlaps(range, content_range)),
+        "declared oversized content must be rejected before its payload is read"
+    );
+}
+
+#[test]
+fn source_facade_rejects_encrypted_oversized_plaintext_before_materialization() {
+    let bytes = encrypted_oversized_content_package();
+    let content_range = member_range(&bytes, b"content.xml");
+    let source = Arc::new(CountingSource::new(bytes));
+
+    assert!(matches!(
+        SourceBackedPresentation::from_read_at(source.clone()),
+        Err(Error::InvalidFormat(message)) if message.contains("content.xml exceeds the family limit")
+    ));
+    assert!(
+        source
+            .ranges()
+            .into_iter()
+            .all(|range| !overlaps(range, content_range)),
+        "oversized encrypted plaintext must be rejected before ciphertext is read"
+    );
 }
 
 #[test]

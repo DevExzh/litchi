@@ -369,17 +369,22 @@ fn encrypt_blowfish_cfb8(plaintext: &[u8], key: &[u8], iv: [u8; 8]) -> Result<Ve
     Ok(ciphertext)
 }
 
+pub(crate) fn validate_plaintext_size(plaintext_size: u64) -> Result<()> {
+    if plaintext_size > MAX_PLAINTEXT_ENTRY_SIZE {
+        return Err(Error::InvalidFormat(format!(
+            "Encrypted ODF entry declares {plaintext_size} plaintext bytes, exceeding the limit"
+        )));
+    }
+    Ok(())
+}
+
 pub(crate) fn decrypt_entry(
     ciphertext: &[u8],
     password: &str,
     descriptor: &ManifestEncryption,
     plaintext_size: u64,
 ) -> Result<Vec<u8>> {
-    if plaintext_size > MAX_PLAINTEXT_ENTRY_SIZE {
-        return Err(Error::InvalidFormat(format!(
-            "Encrypted ODF entry declares {plaintext_size} plaintext bytes, exceeding the limit"
-        )));
-    }
+    validate_plaintext_size(plaintext_size)?;
     if ciphertext.is_empty() || ciphertext.len() > MAX_ENCRYPTED_ENTRY_SIZE {
         return Err(encryption_failure());
     }
@@ -469,14 +474,20 @@ pub(crate) fn decrypt_entry(
             "ODF entry size does not fit this platform: {error}"
         ))
     })?;
+    let read_limit = plaintext_size
+        .checked_add(1)
+        .ok_or_else(encryption_failure)?;
+    let read_capacity = expected_size
+        .checked_add(1)
+        .ok_or_else(encryption_failure)?;
     let mut plaintext = Vec::new();
     plaintext
-        .try_reserve_exact(expected_size)
+        .try_reserve_exact(read_capacity)
         .map_err(|error| {
             Error::InvalidFormat(format!("Could not allocate decrypted ODF entry: {error}"))
         })?;
     DeflateDecoder::new(compressed.as_slice())
-        .take(plaintext_size.saturating_add(1))
+        .take(read_limit)
         .read_to_end(&mut plaintext)
         .map_err(encryption_failure_from)?;
     if plaintext.len() != expected_size {

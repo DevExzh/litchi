@@ -1,11 +1,16 @@
+use std::io::{Cursor, Read, Write};
 use std::sync::{
-    Arc,
+    Arc, Mutex,
     atomic::{AtomicU64, Ordering},
 };
 
 use litchi_core::{Error, OwnedSource, ReadAt, SourceVersion};
+use litchi_odf_common::core::{PackageWriter, Profile};
 use litchi_odf_common::signature::{DocumentSigner, SignatureAlgorithm};
-use litchi_ods::{ReadLimits, SourceBackedSpreadsheetCatalog, Spreadsheet};
+use litchi_ods::{
+    ReadLimits, SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog, Spreadsheet,
+};
+use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
 
 mod support;
 
@@ -23,7 +28,7 @@ fn package() -> Vec<u8> {
     let content = format!(
         r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}" xmlns:text="{TEXT}"><office:body><office:spreadsheet><table:table table:name="First"><table:table-row><table:table-cell office:value-type="string"><text:p>first</text:p></table:table-cell></table:table-row></table:table><table:table table:name="Selected"><table:table-row><table:table-cell office:value-type="string"><text:p>middle</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="42"/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#
     );
-    let mut writer = litchi_odf_common::core::PackageWriter::new();
+    let mut writer = PackageWriter::new();
     writer.set_mimetype(MIME).expect("ODS MIME");
     writer
         .set_document_signer(
@@ -57,7 +62,7 @@ fn aliased_package() -> Vec<u8> {
     let content = format!(
         r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TABLE}" xmlns:x="{TEXT}"><o:body><o:spreadsheet><t:table t:name="Alias"><t:table-row><t:table-cell o:value-type="string"><x:p>alias</x:p></t:table-cell></t:table-row></t:table><t:table t:name="Empty"/></o:spreadsheet></o:body></o:document-content>"#
     );
-    let mut writer = litchi_odf_common::core::PackageWriter::new();
+    let mut writer = PackageWriter::new();
     writer.set_mimetype(MIME).expect("ODS MIME");
     writer
         .add_file("content.xml", content.as_bytes())
@@ -69,9 +74,169 @@ fn package_with_content(content: &str) -> Vec<u8> {
     support::raw_package(&[("content.xml", content.as_bytes(), "text/xml")])
 }
 
+fn oversized_declared_content_package() -> (Vec<u8>, (u64, u64)) {
+    let mut bytes = raw_deflated_package(b"<office:document-content/>");
+    let content_range = member_range(&bytes, "content.xml");
+    let declared_size = (256 * 1024 * 1024 + 1) as u32;
+    let mut offset = 0;
+    let mut patched = false;
+    while let Some(relative) = bytes[offset..]
+        .windows(4)
+        .position(|window| window == b"PK\x01\x02")
+    {
+        let central = offset + relative;
+        let name_length =
+            u16::from_le_bytes(bytes[central + 28..central + 30].try_into().unwrap()) as usize;
+        let extra_length =
+            u16::from_le_bytes(bytes[central + 30..central + 32].try_into().unwrap()) as usize;
+        let comment_length =
+            u16::from_le_bytes(bytes[central + 32..central + 34].try_into().unwrap()) as usize;
+        let name_start = central + 46;
+        let name_end = name_start + name_length;
+        if &bytes[name_start..name_end] == b"content.xml" {
+            bytes[central + 24..central + 28].copy_from_slice(&declared_size.to_le_bytes());
+            patched = true;
+            break;
+        }
+        offset = name_end + extra_length + comment_length;
+    }
+    assert!(patched, "raw test package has no content.xml central entry");
+    (bytes, content_range)
+}
+
+fn raw_deflated_package(content: &[u8]) -> Vec<u8> {
+    let manifest = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.3"><manifest:file-entry manifest:full-path="/" manifest:media-type="{MIME}"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#
+    );
+    let mut output = Cursor::new(Vec::new());
+    {
+        let mut archive = ZipWriter::new(&mut output);
+        let stored =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let deflated =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        archive
+            .start_file("mimetype", stored)
+            .expect("raw mimetype");
+        archive
+            .write_all(MIME.as_bytes())
+            .expect("raw mimetype bytes");
+        archive
+            .start_file("content.xml", deflated)
+            .expect("raw content");
+        archive.write_all(content).expect("raw content bytes");
+        archive
+            .start_file("META-INF/manifest.xml", deflated)
+            .expect("raw manifest");
+        archive
+            .write_all(manifest.as_bytes())
+            .expect("raw manifest bytes");
+        archive.finish().expect("raw package finish");
+    }
+    output.into_inner()
+}
+
+fn oversized_encrypted_content_package() -> (Vec<u8>, (u64, u64)) {
+    let content = format!(
+        r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}"><office:body><office:spreadsheet/></office:body></office:document-content>"#
+    );
+    let mut writer = PackageWriter::new();
+    writer.set_mimetype(MIME).expect("ODS MIME");
+    writer
+        .set_encryption("catalog-password", Profile::compatible())
+        .expect("encryption profile");
+    writer
+        .add_file("content.xml", content.as_bytes())
+        .expect("encrypted content");
+    let bytes = rewrite_manifest_size(
+        &writer.finish_to_bytes().expect("encrypted package"),
+        u64::from((256 * 1024 * 1024 + 1) as u32),
+    );
+    let content_range = member_range(&bytes, "content.xml");
+    (bytes, content_range)
+}
+
+fn rewrite_manifest_size(bytes: &[u8], size: u64) -> Vec<u8> {
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("encrypted ZIP");
+    let mut output = Cursor::new(Vec::new());
+    {
+        let mut writer = ZipWriter::new(&mut output);
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        for index in 0..archive.len() {
+            let (name, mut data) = {
+                let mut entry = archive.by_index(index).expect("ZIP entry");
+                let name = entry.name().to_owned();
+                let mut data = Vec::new();
+                entry.read_to_end(&mut data).expect("ZIP entry bytes");
+                (name, data)
+            };
+            if name == "META-INF/manifest.xml" {
+                let manifest = String::from_utf8(data).expect("manifest UTF-8");
+                let marker = r#"manifest:size=""#;
+                let value_start =
+                    manifest.find(marker).expect("encrypted size metadata") + marker.len();
+                let value_end = value_start
+                    + manifest[value_start..]
+                        .find('"')
+                        .expect("encrypted size terminator");
+                let mut rewritten = String::new();
+                rewritten.push_str(&manifest[..value_start]);
+                rewritten.push_str(&size.to_string());
+                rewritten.push_str(&manifest[value_end..]);
+                data = rewritten.into_bytes();
+            }
+            writer.start_file(name, options).expect("ZIP entry");
+            writer.write_all(&data).expect("ZIP entry bytes");
+        }
+        writer.finish().expect("rewritten ZIP");
+    }
+    output.into_inner()
+}
+
+fn member_range(bytes: &[u8], name: &str) -> (u64, u64) {
+    let mut offset = 0;
+    while let Some(relative) = bytes[offset..]
+        .windows(4)
+        .position(|window| window == b"PK\x01\x02")
+    {
+        let central = offset + relative;
+        let compressed_size = u64::from(u32::from_le_bytes(
+            bytes[central + 20..central + 24].try_into().unwrap(),
+        ));
+        let name_length =
+            u16::from_le_bytes(bytes[central + 28..central + 30].try_into().unwrap()) as usize;
+        let extra_length =
+            u16::from_le_bytes(bytes[central + 30..central + 32].try_into().unwrap()) as usize;
+        let comment_length =
+            u16::from_le_bytes(bytes[central + 32..central + 34].try_into().unwrap()) as usize;
+        let name_start = central + 46;
+        let name_end = name_start + name_length;
+        if &bytes[name_start..name_end] == name.as_bytes() {
+            let local = usize::try_from(u32::from_le_bytes(
+                bytes[central + 42..central + 46].try_into().unwrap(),
+            ))
+            .unwrap();
+            let local_name_length =
+                u16::from_le_bytes(bytes[local + 26..local + 28].try_into().unwrap()) as usize;
+            let local_extra_length =
+                u16::from_le_bytes(bytes[local + 28..local + 30].try_into().unwrap()) as usize;
+            let start = u64::try_from(local + 30 + local_name_length + local_extra_length).unwrap();
+            return (start, start + compressed_size);
+        }
+        offset = name_end + extra_length + comment_length;
+    }
+    panic!("ZIP member {name} not found")
+}
+
+fn overlaps(left: (u64, u64), right: (u64, u64)) -> bool {
+    left.0 < right.1 && right.0 < left.1
+}
+
 struct ProbeSource {
     source: OwnedSource,
     revision: AtomicU64,
+    ranges: Mutex<Vec<(u64, u64)>>,
 }
 
 impl ProbeSource {
@@ -79,11 +244,16 @@ impl ProbeSource {
         Arc::new(Self {
             source: OwnedSource::new(bytes),
             revision: AtomicU64::new(0),
+            ranges: Mutex::new(Vec::new()),
         })
     }
 
     fn bump(&self) {
         self.revision.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn ranges(&self) -> Vec<(u64, u64)> {
+        self.ranges.lock().expect("range lock").clone()
     }
 }
 
@@ -93,7 +263,17 @@ impl ReadAt for ProbeSource {
     }
 
     fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
-        self.source.read_at(offset, output)
+        let read = self.source.read_at(offset, output)?;
+        if read != 0 {
+            self.ranges
+                .lock()
+                .map_err(|_| std::io::Error::other("range lock poisoned"))?
+                .push((
+                    offset,
+                    offset + u64::try_from(read).expect("read length fits u64"),
+                ));
+        }
+        Ok(read)
     }
 
     fn version(&self) -> std::io::Result<SourceVersion> {
@@ -199,6 +379,77 @@ fn catalog_preserves_limits_and_source_version_lifecycle() {
         catalog.sheet_at(0),
         Err(Error::SourceChanged { .. })
     ));
+}
+
+#[test]
+fn source_owners_reject_oversized_content_before_payload_read() {
+    let (bytes, content_range) = oversized_declared_content_package();
+    let source = ProbeSource::new(bytes);
+    let error = SourceBackedSpreadsheet::from_read_at(source.clone())
+        .expect_err("full source owner must reject oversized content");
+    assert!(matches!(
+        error,
+        Error::InvalidFormat(message) if message == "ODS content.xml exceeds the family limit"
+    ));
+    assert!(
+        source
+            .ranges()
+            .iter()
+            .all(|range| !overlaps(*range, content_range)),
+        "full source open must not read oversized content.xml"
+    );
+
+    let (bytes, content_range) = oversized_declared_content_package();
+    let source = ProbeSource::new(bytes);
+    let error = SourceBackedSpreadsheetCatalog::from_read_at(source.clone())
+        .expect_err("catalog source owner must reject oversized content");
+    assert!(matches!(
+        error,
+        Error::InvalidFormat(message) if message == "ODS content.xml exceeds the family limit"
+    ));
+    assert!(
+        source
+            .ranges()
+            .iter()
+            .all(|range| !overlaps(*range, content_range)),
+        "catalog open must not read oversized content.xml"
+    );
+
+    let (bytes, content_range) = oversized_encrypted_content_package();
+    let source = ProbeSource::new(bytes);
+    let error =
+        SourceBackedSpreadsheet::from_read_at_with_password(source.clone(), "catalog-password")
+            .expect_err("full source owner must reject oversized encrypted content");
+    assert!(matches!(
+        error,
+        Error::InvalidFormat(message) if message == "ODS content.xml exceeds the family limit"
+    ));
+    assert!(
+        source
+            .ranges()
+            .iter()
+            .all(|range| !overlaps(*range, content_range)),
+        "full source open must not read oversized encrypted content.xml"
+    );
+
+    let (bytes, content_range) = oversized_encrypted_content_package();
+    let source = ProbeSource::new(bytes);
+    let error = SourceBackedSpreadsheetCatalog::from_read_at_with_password(
+        source.clone(),
+        "catalog-password",
+    )
+    .expect_err("catalog source owner must reject oversized encrypted content");
+    assert!(matches!(
+        error,
+        Error::InvalidFormat(message) if message == "ODS content.xml exceeds the family limit"
+    ));
+    assert!(
+        source
+            .ranges()
+            .iter()
+            .all(|range| !overlaps(*range, content_range)),
+        "catalog open must not read oversized encrypted content.xml"
+    );
 }
 
 #[test]

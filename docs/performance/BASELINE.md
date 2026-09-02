@@ -1,5 +1,34 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0373: ODF source allocation preflight
+
+Change 0373 closes known allocation-order gaps across ZIP materialization,
+ODF decryption, and source-backed ODP/ODS opening. ZIP materializers and ODF
+Deflate decryption now compute the overrun sentinel with checked arithmetic
+and fallibly reserve the complete `size + 1` capacity before `read_to_end`.
+Encrypted package reads validate manifest ambiguity, Store compression,
+password, plaintext-size presence, and the 512 MiB plaintext ceiling before
+reading payload bytes.
+
+ODP full-source and ODS full/selective owners now enforce the shared 256 MiB
+`content.xml` limit through metadata-only materialized-size inspection before
+payload materialization. Encrypted members use manifest plaintext size. ODP
+also reconciles freshness before exposing secondary parse errors. CRC, size,
+ZIP, MIME, family validation, and publication behavior remain in force.
+
+Focused regressions and broader locked/offline release suites passed:
+`soapberry-zip` `320/320`, ODF-common `284/284` plus integrations, ODP
+`163/163` plus integrations, and ODS `199/199` plus integrations. Two exact
+pre-existing writer tests were skipped. Scoped Clippy passed with six named
+pre-existing allowances, crate boundaries passed `64/240` with 14 existing
+debt entries, and independent static reviews accepted the batch. See [Change
+0373](changes/0373-odf-source-allocation-preflight.md).
+
+`performance_claim: none`; `claim_authorized: false`. The specific checked-
+allocation and preflight-before-read invariants are established, but no
+latency, allocation-volume, RSS, physical-I/O, cold-cache, throughput, fixed-
+memory, or general OOM-prevention claim follows.
+
 ## Change 0372: ODP source-backed catalog fused parse
 
 Change 0372 fuses ODP `content.xml` validation and catalog scanning into one

@@ -23,7 +23,10 @@ use litchi_core::{
     TextOutputError, TextOutputOptions, TextOutputReport,
 };
 use litchi_odf_common::{
-    core::{SourceBackedPackage, SourcePackageLimits, validate_content_part},
+    core::{
+        SourceBackedPackage, SourcePackageLimits, private::ContentDocumentValidator,
+        validate_content_part,
+    },
     package::{is_media_path, resolve_package_path},
 };
 #[cfg(any(unix, windows))]
@@ -210,6 +213,10 @@ impl SourceBackedSpreadsheet {
                 )));
             }
 
+            ContentDocumentValidator::check_materialized_size(
+                package.member_materialized_size("content.xml")?,
+                FAMILY_NAME,
+            )?;
             let content_xml =
                 String::from_utf8(package.get_file("content.xml")?).map_err(|error| {
                     Error::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))
