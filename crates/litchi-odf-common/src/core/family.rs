@@ -3,10 +3,11 @@
 use super::{
     Content, Meta, OwnedPackage, SourcePackageLimits, Styles, package::zeroizing_password,
 };
+use super::{binding_tracker::BindingTracker, content_validation::ContentDocumentValidator};
 use litchi_core::{Error, Metadata, Result};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::NsReader;
+use quick_xml::reader::Reader;
 use std::{fs, path::Path, sync::Arc};
 
 const MAX_CONTENT_BYTES: usize = 256 * 1024 * 1024;
@@ -513,196 +514,60 @@ pub fn validate_content_document_part(
     body_marker: &str,
     family_name: &str,
 ) -> Result<()> {
-    if xml.len() > MAX_CONTENT_BYTES {
-        return Err(Error::InvalidFormat(format!(
-            "{family_name} content.xml exceeds the family limit"
-        )));
-    }
-    let expected_local = body_marker
-        .strip_prefix("<office:")
-        .and_then(|marker| {
-            marker
-                .split(|character: char| !character.is_ascii_alphanumeric() && character != '-')
-                .next()
-        })
-        .filter(|local| !local.is_empty())
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!("{family_name} content.xml has no expected body"))
-        })?;
+    let mut validator = ContentDocumentValidator::new(xml, body_marker, family_name)?;
     const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = Reader::from_str(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
-    let mut depth = 0usize;
-    let mut root_closed = false;
-    let mut body_seen = false;
-    let mut expected_seen = false;
-    let mut in_body = false;
-    let mut declaration_seen = false;
-    let mut first_event = true;
+    let mut tracker = BindingTracker::new();
+    let mut pending_pop = false;
 
     loop {
-        // Borrowing read: events borrow `xml` directly, avoiding the
-        // per-event buffer copy of the `_into` API. Binding push/pop still
-        // runs inside `read_event` for every event, so prefix-rebinding
-        // semantics and the tokenization error stream are unchanged.
+        if pending_pop {
+            tracker.pop();
+            pending_pop = false;
+        }
         let event = reader.read_event().map_err(|error| {
             Error::InvalidFormat(format!("invalid {family_name} content.xml: {error}"))
         })?;
-        // The resolved namespace is consumed only by the Start/Empty arms at
-        // depth <= 2 below (root, `office:body`, `office:forms`/family
-        // element); deeper arms use `local_name()` only, and bindings declared
-        // at depth >= 3 scope just their own subtree, so no consumed
-        // resolution can change. Resolve only where the result is observable.
-        let office = match &event {
-            Event::Start(element) | Event::Empty(element) if depth <= 2 => {
-                let (namespace, _) = reader.resolver().resolve_element(element.name());
-                matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
-            },
-            _ => false,
-        };
         match event {
             Event::Start(element) => {
-                if root_closed {
-                    return Err(Error::InvalidFormat(format!(
-                        "{family_name} content.xml has content after its root"
-                    )));
-                }
-                let local = element.local_name();
-                match depth {
-                    0 if office && local.as_ref() == b"document-content" => depth = 1,
-                    0 => {
-                        return Err(Error::InvalidFormat(format!(
-                            "{family_name} content.xml has the wrong root"
-                        )));
-                    },
-                    1 if office && local.as_ref() == b"body" && !body_seen => {
-                        body_seen = true;
-                        in_body = true;
-                        depth = 2;
-                    },
-                    1 if office && local.as_ref() == b"body" => {
-                        return Err(Error::InvalidFormat(format!(
-                            "{family_name} content.xml has duplicate office:body"
-                        )));
-                    },
-                    1 => {
-                        depth = depth.checked_add(1).ok_or_else(|| {
-                            Error::InvalidFormat(format!(
-                                "{family_name} content.xml nesting overflows"
-                            ))
-                        })?
-                    },
-                    2 if in_body && office && local.as_ref() == b"forms" && !expected_seen => {
-                        depth = 3;
-                    },
-                    2 if in_body
-                        && office
-                        && local.as_ref() == expected_local.as_bytes()
-                        && !expected_seen =>
-                    {
-                        expected_seen = true;
-                        depth = 3;
-                    },
-                    2 if in_body => {
-                        return Err(Error::InvalidFormat(format!(
-                            "{family_name} content.xml has the wrong office body"
-                        )));
-                    },
-                    _ => {
-                        depth = depth.checked_add(1).ok_or_else(|| {
-                            Error::InvalidFormat(format!(
-                                "{family_name} content.xml nesting overflows"
-                            ))
-                        })?
-                    },
-                }
+                tracker.push(&element).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid {family_name} content.xml: {error}"))
+                })?;
+                let office = if validator.needs_office_namespace() {
+                    let (namespace, _) = tracker.resolve_element(element.name());
+                    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
+                } else {
+                    false
+                };
+                validator.on_event(office, &Event::Start(element))?;
             },
             Event::Empty(element) => {
-                if root_closed || depth == 0 {
-                    return Err(Error::InvalidFormat(format!(
-                        "{family_name} content.xml has an invalid empty root"
-                    )));
-                }
-                let local = element.local_name();
-                if depth == 1 {
-                    if office && local.as_ref() == b"body" && !body_seen {
-                        body_seen = true;
-                    } else if office && local.as_ref() == b"body" {
-                        return Err(Error::InvalidFormat(format!(
-                            "{family_name} content.xml has duplicate office:body"
-                        )));
-                    }
-                } else if in_body
-                    && depth == 2
-                    && office
-                    && local.as_ref() == b"forms"
-                    && !expected_seen
-                {
-                    // `office:forms` may precede the family body.
-                } else if in_body
-                    && depth == 2
-                    && office
-                    && local.as_ref() == expected_local.as_bytes()
-                    && !expected_seen
-                {
-                    expected_seen = true;
-                } else if in_body && depth == 2 {
-                    return Err(Error::InvalidFormat(format!(
-                        "{family_name} content.xml has the wrong office body"
-                    )));
-                }
-            },
-            Event::End(_) => {
-                depth = depth.checked_sub(1).ok_or_else(|| {
-                    Error::InvalidFormat(format!("{family_name} content.xml has an unexpected end"))
+                tracker.push(&element).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid {family_name} content.xml: {error}"))
                 })?;
-                if depth == 0 {
-                    root_closed = true;
-                } else if in_body && depth == 1 {
-                    in_body = false;
-                }
+                let office = if validator.needs_office_namespace() {
+                    let (namespace, _) = tracker.resolve_element(element.name());
+                    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
+                } else {
+                    false
+                };
+                validator.on_event(office, &Event::Empty(element))?;
+                pending_pop = true;
             },
-            Event::Text(text) => {
-                if (depth == 0 || root_closed) && !text.iter().all(u8::is_ascii_whitespace) {
-                    return Err(Error::InvalidFormat(format!(
-                        "{family_name} content.xml has unexpected text outside its root"
-                    )));
-                }
+            Event::End(element) => {
+                validator.on_event(false, &Event::End(element))?;
+                pending_pop = true;
             },
-            Event::CData(_) | Event::GeneralRef(_) if depth == 0 || root_closed => {
-                return Err(Error::InvalidFormat(format!(
-                    "{family_name} content.xml has content outside its root"
-                )));
+            Event::Eof => {
+                validator.on_event(false, &Event::Eof)?;
+                break;
             },
-            Event::DocType(_) => {
-                return Err(Error::InvalidFormat(format!(
-                    "{family_name} content.xml must not contain a doctype"
-                )));
-            },
-            Event::GeneralRef(reference) if !crate::validation::valid_xml_reference(&reference) => {
-                return Err(Error::InvalidFormat(format!(
-                    "{family_name} content.xml has an invalid character or entity reference"
-                )));
-            },
-            Event::Decl(_) if declaration_seen || !first_event || depth != 0 || root_closed => {
-                return Err(Error::InvalidFormat(format!(
-                    "{family_name} content.xml has an XML declaration outside its prologue"
-                )));
-            },
-            Event::Decl(_) => declaration_seen = true,
-            Event::Eof => break,
-            Event::Comment(_) | Event::PI(_) | Event::CData(_) | Event::GeneralRef(_) => {},
+            event => validator.on_event(false, &event)?,
         }
-        first_event = false;
     }
-
-    if !root_closed || depth != 0 || !body_seen || !expected_seen {
-        return Err(Error::InvalidFormat(format!(
-            "{family_name} content.xml has no complete expected body"
-        )));
-    }
-    Ok(())
+    validator.finish()
 }
 
 #[cfg(test)]
@@ -775,6 +640,39 @@ mod tests {
             },
         };
         assert!(error.contains("ODG content.xml has no expected body"));
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_deep_content_with_a_typed_error_without_panicking() -> TestResult {
+        const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+        const ORDINARY_ELEMENTS: usize = 4097;
+        let mut xml = format!(
+            r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE}"><office:body><office:presentation>"#
+        );
+        for _ in 0..ORDINARY_ELEMENTS {
+            xml.push_str("<section>");
+        }
+        for _ in 0..ORDINARY_ELEMENTS {
+            xml.push_str("</section>");
+        }
+        xml.push_str("</office:presentation></office:body></office:document-content>");
+
+        let outcome = std::panic::catch_unwind(|| {
+            validate_content_document_part(&xml, "<office:presentation", "ODP")
+        });
+        let error = match outcome.expect("deep content validation must not panic") {
+            Ok(()) => {
+                return Err(
+                    std::io::Error::other("expected the depth limit to reject input").into(),
+                );
+            },
+            Err(error) => error.to_string(),
+        };
+        assert_eq!(
+            error,
+            "Invalid format: ODP content.xml nesting exceeds maximum depth of 4096"
+        );
         Ok(())
     }
 

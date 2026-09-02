@@ -38,26 +38,23 @@
 //!
 //! Both facades run this fused parse: the source-backed
 //! [`crate::document::SourceBackedDocument`] and, since change 0222, the
-//! owned [`crate::document::Document`] open path. The standalone
-//! `validate_content_document_part` stays byte-identical in
-//! litchi-odf-common, and the historical sequential sequence survives as
-//! cfg(test) equivalence oracles (the `sequential` helper in this module's
+//! owned [`crate::document::Document`] open path. The shared
+//! `validate_content_document_part` preserves the historical contract below
+//! the intentional 4,096-depth ceiling, and the sequential sequence survives
+//! as cfg(test) equivalence oracles (the `sequential` helper in this module's
 //! tests and the owned-path oracle in `super::package`'s tests).
 
 use litchi_core::{Error, Result};
-use quick_xml::events::{BytesRef, Event};
+use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::Reader;
 
-use super::source::{CONTENT_ROOT, FAMILY_NAME};
-use crate::binding_tracker::BindingTracker;
+use super::source::FAMILY_NAME;
 use crate::elements::element::Element;
 use crate::elements::style::{Style, StyleRegistry};
 use crate::elements::text::{Kind, TEXT_NAMESPACE, TextBlockKindHandler};
+use litchi_odf_common::core::private::{BindingTracker, ContentDocumentValidator};
 
-// Parity with the `validate_content_document_part` pre-scan limit in
-// litchi-odf-common (`MAX_CONTENT_BYTES` there is crate-private).
-const MAX_CONTENT_BYTES: usize = 256 * 1024 * 1024;
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 
 /// Validate the ODT content root and build its visible text-block catalog in
@@ -68,12 +65,7 @@ const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1
 /// later reader or validation/finish error preserves the historical
 /// validate-then-scan precedence.
 pub(crate) fn run_catalog(content_xml: &str) -> Result<Vec<Kind>> {
-    if content_xml.len() > MAX_CONTENT_BYTES {
-        return Err(Error::InvalidFormat(format!(
-            "{FAMILY_NAME} content.xml exceeds the family limit"
-        )));
-    }
-    let mut validate = ValidateHandler::new()?;
+    let mut validate = ContentDocumentValidator::new(content_xml, "<office:text", "ODT")?;
     let mut catalog = TextBlockKindHandler::new();
     let mut catalog_error = None;
 
@@ -116,7 +108,7 @@ pub(crate) fn run_catalog(content_xml: &str) -> Result<Vec<Kind>> {
                 let (namespace, _) = tracker.resolve_element(element.name());
                 match namespace {
                     ResolveResult::Bound(Namespace(uri)) => (
-                        validate.depth <= 2 && uri == OFFICE_NAMESPACE,
+                        validate.needs_office_namespace() && uri == OFFICE_NAMESPACE,
                         uri == TEXT_NAMESPACE,
                     ),
                     _ => (false, false),
@@ -160,12 +152,7 @@ impl OpenParse {
     /// error is only recorded; [`OpenParse::finish`] reports it after the
     /// `styles.xml` parse, matching the historical pass order.
     pub(crate) fn run(content_xml: &str) -> Result<Self> {
-        if content_xml.len() > MAX_CONTENT_BYTES {
-            return Err(Error::InvalidFormat(format!(
-                "{FAMILY_NAME} content.xml exceeds the family limit"
-            )));
-        }
-        let mut validate = ValidateHandler::new()?;
+        let mut validate = ContentDocumentValidator::new(content_xml, "<office:text", "ODT")?;
         let mut styles = StyleHandler::default();
         let mut style_error = None;
 
@@ -218,8 +205,8 @@ impl OpenParse {
                 Event::End(_) => pending_pop = true,
                 _ => {},
             }
-            // The ValidateHandler consumes the resolved namespace only in its
-            // Start/Empty arms at depth <= 2 (root, `office:body`,
+            // The ContentDocumentValidator consumes the resolved namespace
+            // only in its Start/Empty arms at depth <= 2 (root, `office:body`,
             // `office:forms`/family element — the same arms as the standalone
             // validator); the StyleHandler matches raw qualified names and
             // never resolves. Bindings declared at depth >= 3 scope just their
@@ -229,7 +216,9 @@ impl OpenParse {
             // bindings (and its byte-exact error stream) for every event at
             // any depth, as `NsReader` did.
             let office = match &event {
-                Event::Start(element) | Event::Empty(element) if validate.depth <= 2 => {
+                Event::Start(element) | Event::Empty(element)
+                    if validate.needs_office_namespace() =>
+                {
                     let (namespace, _) = tracker.resolve_element(element.name());
                     matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == OFFICE_NAMESPACE)
                 },
@@ -267,229 +256,6 @@ impl OpenParse {
         }
         Ok(self.registry)
     }
-}
-
-/// Streaming event handler replicating `validate_content_document_part` for
-/// the ODT root (`office:document-content`), body (`office:body`), and family
-/// element (`office:text`, derived from [`CONTENT_ROOT`]).
-///
-/// Every check, error message, and error position matches the standalone
-/// pass, which keeps its own inline loop for the other callers.
-#[derive(Debug)]
-struct ValidateHandler {
-    expected_local: String,
-    depth: usize,
-    root_closed: bool,
-    body_seen: bool,
-    expected_seen: bool,
-    in_body: bool,
-    declaration_seen: bool,
-    first_event: bool,
-}
-
-impl ValidateHandler {
-    fn new() -> Result<Self> {
-        // Same marker derivation as the standalone pass; unreachable for the
-        // fixed ODT root but kept at the same position.
-        let expected_local = CONTENT_ROOT
-            .strip_prefix("<office:")
-            .and_then(|marker| {
-                marker
-                    .split(|character: char| !character.is_ascii_alphanumeric() && character != '-')
-                    .next()
-            })
-            .filter(|local| !local.is_empty())
-            .ok_or_else(|| {
-                Error::InvalidFormat(format!("{FAMILY_NAME} content.xml has no expected body"))
-            })?;
-        Ok(Self {
-            expected_local: expected_local.to_string(),
-            depth: 0,
-            root_closed: false,
-            body_seen: false,
-            expected_seen: false,
-            in_body: false,
-            declaration_seen: false,
-            first_event: true,
-        })
-    }
-
-    fn on_event(&mut self, office: bool, event: &Event<'_>) -> Result<()> {
-        match event {
-            Event::Start(element) => {
-                if self.root_closed {
-                    return Err(Error::InvalidFormat(format!(
-                        "{FAMILY_NAME} content.xml has content after its root"
-                    )));
-                }
-                let local = element.local_name();
-                match self.depth {
-                    0 if office && local.as_ref() == b"document-content" => self.depth = 1,
-                    0 => {
-                        return Err(Error::InvalidFormat(format!(
-                            "{FAMILY_NAME} content.xml has the wrong root"
-                        )));
-                    },
-                    1 if office && local.as_ref() == b"body" && !self.body_seen => {
-                        self.body_seen = true;
-                        self.in_body = true;
-                        self.depth = 2;
-                    },
-                    1 if office && local.as_ref() == b"body" => {
-                        return Err(Error::InvalidFormat(format!(
-                            "{FAMILY_NAME} content.xml has duplicate office:body"
-                        )));
-                    },
-                    1 => {
-                        self.depth = self.depth.checked_add(1).ok_or_else(|| {
-                            Error::InvalidFormat(format!(
-                                "{FAMILY_NAME} content.xml nesting overflows"
-                            ))
-                        })?;
-                    },
-                    2 if self.in_body
-                        && office
-                        && local.as_ref() == b"forms"
-                        && !self.expected_seen =>
-                    {
-                        self.depth = 3;
-                    },
-                    2 if self.in_body
-                        && office
-                        && local.as_ref() == self.expected_local.as_bytes()
-                        && !self.expected_seen =>
-                    {
-                        self.expected_seen = true;
-                        self.depth = 3;
-                    },
-                    2 if self.in_body => {
-                        return Err(Error::InvalidFormat(format!(
-                            "{FAMILY_NAME} content.xml has the wrong office body"
-                        )));
-                    },
-                    _ => {
-                        self.depth = self.depth.checked_add(1).ok_or_else(|| {
-                            Error::InvalidFormat(format!(
-                                "{FAMILY_NAME} content.xml nesting overflows"
-                            ))
-                        })?;
-                    },
-                }
-            },
-            Event::Empty(element) => {
-                if self.root_closed || self.depth == 0 {
-                    return Err(Error::InvalidFormat(format!(
-                        "{FAMILY_NAME} content.xml has an invalid empty root"
-                    )));
-                }
-                let local = element.local_name();
-                if self.depth == 1 {
-                    if office && local.as_ref() == b"body" && !self.body_seen {
-                        self.body_seen = true;
-                    } else if office && local.as_ref() == b"body" {
-                        return Err(Error::InvalidFormat(format!(
-                            "{FAMILY_NAME} content.xml has duplicate office:body"
-                        )));
-                    }
-                } else if self.in_body
-                    && self.depth == 2
-                    && office
-                    && local.as_ref() == b"forms"
-                    && !self.expected_seen
-                {
-                    // `office:forms` may precede the family body.
-                } else if self.in_body
-                    && self.depth == 2
-                    && office
-                    && local.as_ref() == self.expected_local.as_bytes()
-                    && !self.expected_seen
-                {
-                    self.expected_seen = true;
-                } else if self.in_body && self.depth == 2 {
-                    return Err(Error::InvalidFormat(format!(
-                        "{FAMILY_NAME} content.xml has the wrong office body"
-                    )));
-                }
-            },
-            Event::End(_) => {
-                self.depth = self.depth.checked_sub(1).ok_or_else(|| {
-                    Error::InvalidFormat(format!("{FAMILY_NAME} content.xml has an unexpected end"))
-                })?;
-                if self.depth == 0 {
-                    self.root_closed = true;
-                } else if self.in_body && self.depth == 1 {
-                    self.in_body = false;
-                }
-            },
-            Event::Text(text) => {
-                if (self.depth == 0 || self.root_closed)
-                    && !text.iter().all(u8::is_ascii_whitespace)
-                {
-                    return Err(Error::InvalidFormat(format!(
-                        "{FAMILY_NAME} content.xml has unexpected text outside its root"
-                    )));
-                }
-            },
-            Event::CData(_) | Event::GeneralRef(_) if self.depth == 0 || self.root_closed => {
-                return Err(Error::InvalidFormat(format!(
-                    "{FAMILY_NAME} content.xml has content outside its root"
-                )));
-            },
-            Event::DocType(_) => {
-                return Err(Error::InvalidFormat(format!(
-                    "{FAMILY_NAME} content.xml must not contain a doctype"
-                )));
-            },
-            Event::GeneralRef(reference) if !valid_xml_reference(reference) => {
-                return Err(Error::InvalidFormat(format!(
-                    "{FAMILY_NAME} content.xml has an invalid character or entity reference"
-                )));
-            },
-            Event::Decl(_)
-                if self.declaration_seen
-                    || !self.first_event
-                    || self.depth != 0
-                    || self.root_closed =>
-            {
-                return Err(Error::InvalidFormat(format!(
-                    "{FAMILY_NAME} content.xml has an XML declaration outside its prologue"
-                )));
-            },
-            Event::Decl(_) => self.declaration_seen = true,
-            Event::Eof => {},
-            Event::Comment(_) | Event::PI(_) | Event::CData(_) | Event::GeneralRef(_) => {},
-        }
-        self.first_event = false;
-        Ok(())
-    }
-
-    fn finish(self) -> Result<()> {
-        if !self.root_closed || self.depth != 0 || !self.body_seen || !self.expected_seen {
-            return Err(Error::InvalidFormat(format!(
-                "{FAMILY_NAME} content.xml has no complete expected body"
-            )));
-        }
-        Ok(())
-    }
-}
-
-// Byte-identical replication of the crate-private reference predicate in
-// litchi-odf-common (`validation::valid_xml_reference`), which the standalone
-// validation pass applies to general entity and character references.
-fn valid_xml_reference(reference: &BytesRef<'_>) -> bool {
-    let bytes: &[u8] = reference;
-    matches!(bytes, b"amp" | b"lt" | b"gt" | b"apos" | b"quot")
-        || (reference.is_char_ref()
-            && reference
-                .resolve_char_ref()
-                .ok()
-                .flatten()
-                .is_some_and(xml10_character))
-}
-
-fn xml10_character(value: char) -> bool {
-    matches!(value, '\u{9}' | '\u{A}' | '\u{D}')
-        || matches!(value as u32, 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
 }
 
 /// Streaming event handler replicating [`StyleRegistry::from_xml`]: the raw
@@ -532,9 +298,10 @@ impl StyleHandler {
 
 #[cfg(test)]
 mod tests {
-    use super::{CONTENT_ROOT, FAMILY_NAME, OpenParse};
+    use super::{FAMILY_NAME, OpenParse};
     use crate::elements::style::StyleElements;
     use litchi_core::Result;
+    use litchi_odf_common::core::private::{BindingTracker, ContentDocumentValidator};
     use std::path::{Path, PathBuf};
 
     const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -575,7 +342,7 @@ mod tests {
     /// The historical sequential passes with their exact error precedence:
     /// content validation first, then the automatic-styles scan.
     fn sequential(xml: &str) -> Result<String> {
-        litchi_odf_common::core::validate_content_document_part(xml, CONTENT_ROOT, FAMILY_NAME)?;
+        litchi_odf_common::core::validate_content_document_part(xml, "<office:text", FAMILY_NAME)?;
         let registry = StyleElements::parse_styles(xml)?;
         Ok(project(&registry))
     }
@@ -600,12 +367,7 @@ mod tests {
         use quick_xml::name::{Namespace, ResolveResult};
         use quick_xml::reader::NsReader;
 
-        if content_xml.len() > super::MAX_CONTENT_BYTES {
-            return Err(Error::InvalidFormat(format!(
-                "{FAMILY_NAME} content.xml exceeds the family limit"
-            )));
-        }
-        let mut validate = super::ValidateHandler::new()?;
+        let mut validate = ContentDocumentValidator::new(content_xml, "<office:text", "ODT")?;
         let mut styles = super::StyleHandler::default();
         let mut style_error = None;
 
@@ -1233,7 +995,7 @@ mod tests {
         let mut reader = Reader::from_str(xml);
         reader.config_mut().check_end_names = true;
         reader.config_mut().check_comments = true;
-        let mut tracker = crate::binding_tracker::BindingTracker::new();
+        let mut tracker = BindingTracker::new();
         let mut pending_pop = false;
         let mut resolutions = Vec::new();
         loop {

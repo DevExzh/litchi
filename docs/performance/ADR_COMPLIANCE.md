@@ -1,5 +1,29 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0371 compliance update
+
+Change 0371 places ODF content validation and namespace tracking in the owning
+`litchi-odf-common` layer. Its doc-hidden private surface is consumed by the
+ODT owner and does not expose raw XML types through ordinary CRUD signatures.
+The migration removes duplicate ODT machinery and adds no package identifier,
+archive handle, runtime handle, lock, or unsafe code.
+
+The plain-`Reader` tracker uses checked `u32` depth, limits namespace
+declarations to 256 per element, and preserves reserved binding, unbinding,
+scope restoration, and empty-element deferred-pop behavior. The shared
+validator retains the 256 MiB input ceiling and rejects nesting beyond 4,096
+with a typed invalid-format error, avoiding quick-xml's `u16` namespace-depth
+path. Correctness and bounded hostile-input processing take precedence over
+performance.
+
+Exact formatting, the crate-boundary gate, and the focused locked/offline
+release tests passed, subject to two exact pre-existing writer-test failures
+in unmodified code. Scoped Clippy passed with only the pre-existing
+`large_enum_variant` lint in unmodified `package/model.rs` allowed.
+`performance_claim: none`; `claim_authorized: false`; no latency, allocation,
+RSS, physical-I/O, fixed-memory, or OOM-prevention claim follows. See [Change
+0371](changes/0371-odf-shared-content-validation.md).
+
 ## Change 0370 compliance update
 
 Change 0370 is harness-only and adds no production API, dependency edge,

@@ -19,6 +19,7 @@ chrono = { workspace = true }
 cbc = { workspace = true }
 flate2 = { workspace = true }
 litchi-core = { workspace = true }
+memchr = { workspace = true }
 pbkdf2 = { workspace = true }
 p256 = { workspace = true }
 phf = { workspace = true }

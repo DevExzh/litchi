@@ -1,5 +1,26 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0371: shared ODF content validation
+
+Change 0371 extracts the checked plain-`Reader` namespace tracker and content
+validator into `litchi-odf-common`, then migrates `litchi-odt` off its
+duplicate implementation. The doc-hidden private substrate preserves ODF
+namespace binding, rebinding, unbinding, empty-element deferred-pop, content
+root/body/version, XML-reference, and tokenizer behavior. It accepts at most
+256 namespace declarations per element, retains the 256 MiB input bound, and
+rejects nesting beyond 4,096 with a typed invalid-format error rather than
+using quick-xml's `u16` namespace-depth path.
+
+Locked/offline release tests passed for all focused `litchi-odf-common` and
+`litchi-odt` cases except two exact pre-existing failures in unmodified writer
+tests. Scoped Clippy passed with only the pre-existing
+`large_enum_variant` diagnostic in `package/model.rs` allowed, and the crate
+boundary gate passed. See [Change 0371](changes/0371-odf-shared-content-validation.md).
+
+`performance_claim: none`; `claim_authorized: false`. No timing, allocation,
+RSS, physical-I/O, cold-cache, fixed-memory, throughput, or OOM-prevention
+claim follows.
+
 ## Change 0370: ODP source-backed catalog selectors
 
 Change 0370 adds three opt-in ODP source-backed catalog selectors to the

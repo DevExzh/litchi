@@ -1,5 +1,35 @@
 # Performance program phase report
 
+## Change 0371: shared ODF content validation
+
+### Implementation boundary
+
+The common ODF layer now owns a doc-hidden plain-`Reader` namespace tracker
+and content-document validator. `litchi-odt` consumes that shared substrate
+and deletes its duplicate tracker and handler. The change adds no ordinary
+CRUD surface, raw type, archive handle, runtime handle, lock, or unsafe code.
+The tracker preserves namespace scopes and reserved binding rules with checked
+`u32` depth and at most 256 declarations per element.
+
+The shared validator retains the 256 MiB content bound and rejects a 4,097th
+open element with a typed maximum-depth error. This avoids the `u16` namespace
+depth used by quick-xml's `NsReader`. Existing ODT content-root, body, version,
+XML-reference, and tokenizer validation remains in the same event stream.
+
+### Verification and interpretation
+
+Exact formatting and the crate-boundary gate passed. Locked/offline release
+tests for `litchi-odf-common` and `litchi-odt` passed after skipping two exact
+pre-existing failures in unmodified writer tests. Strict scoped Clippy found
+one pre-existing `large_enum_variant` lint in unmodified `package/model.rs`;
+the scoped run passed with only that lint allowed.
+
+`performance_claim: none`; `claim_authorized: false`. This batch has no clean
+A/B timing evidence and makes no latency, throughput, allocation, RSS,
+physical-I/O, cold-cache, fixed-memory, or OOM-prevention claim. The detailed
+evidence and baseline disclosures are in the [Change 0371
+record](changes/0371-odf-shared-content-validation.md).
+
 ## Change 0370: ODP source-backed catalog selectors
 
 ### Implementation boundary

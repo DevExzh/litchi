@@ -409,7 +409,7 @@ mod tests {
         actual.unwrap_or_else(|error| panic!("{label}: expected success, got {error}"))
     }
 
-    fn assert_error_matches_oracle(label: &str, xml: &str, expected_fragment: &str) {
+    fn assert_error_matches_oracle(label: &str, xml: &str, expected_error: &str) {
         let expected = sequential(xml).map_err(|error| error.to_string());
         let actual = run_catalog(xml).map_err(|error| error.to_string());
         assert_eq!(
@@ -420,21 +420,17 @@ mod tests {
             Ok(_) => panic!("{label}: expected an error"),
             Err(error) => error,
         };
-        assert!(
-            error.contains(expected_fragment),
-            "{label}: error {error:?} does not contain {expected_fragment:?}"
+        assert_eq!(
+            error, expected_error,
+            "{label}: unexpected content-depth error"
         );
     }
 
-    fn deep_document(duplicate_body: bool, trailing: &str) -> String {
+    fn deep_document() -> String {
         let nested_open = "<x>".repeat(4_093);
         let nested_close = "</x>".repeat(4_093);
-        let first_body = format!(
-            "<office:body><office:text><text:p>{nested_open}{nested_close}</text:p></office:text></office:body>"
-        );
-        let second_body = if duplicate_body { "<office:body/>" } else { "" };
         format!(
-            r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE}" xmlns:text="{TEXT_NAMESPACE}">{first_body}{second_body}</office:document-content>{trailing}"#
+            r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE}" xmlns:text="{TEXT_NAMESPACE}"><office:body><office:text><text:p>{nested_open}{nested_close}</text:p></office:text></office:body></office:document-content>"#
         )
     }
 
@@ -470,26 +466,12 @@ mod tests {
     }
 
     #[test]
-    fn catalog_fusion_defers_depth_error_to_later_validation_or_reader_errors() {
-        let depth_error = deep_document(false, "");
+    fn catalog_fusion_enforces_shared_content_depth_limit() {
+        let depth_error = deep_document();
         assert_error_matches_oracle(
-            "scanner depth error",
+            "content depth error",
             &depth_error,
-            "ODF text nesting exceeds 4096 levels",
-        );
-
-        let duplicate_body = deep_document(true, "");
-        assert_error_matches_oracle(
-            "duplicate body after scanner error",
-            &duplicate_body,
-            "ODT content.xml has duplicate office:body",
-        );
-
-        let malformed_tail = deep_document(false, "<");
-        assert_error_matches_oracle(
-            "malformed tail after scanner error",
-            &malformed_tail,
-            "invalid ODT content.xml:",
+            "Invalid format: ODT content.xml nesting exceeds maximum depth of 4096",
         );
     }
 }
