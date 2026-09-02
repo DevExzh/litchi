@@ -199,7 +199,7 @@ impl fmt::Display for LimitKind {
 /// its lineage before publication.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ItemHandle {
-    pub(crate) lineage: u64,
+    pub(crate) lineage: [u8; 20],
     pub(crate) occurrence: usize,
 }
 
@@ -220,7 +220,7 @@ impl ItemHandle {
         Position::new(self.occurrence)
     }
 
-    pub(crate) const fn new(lineage: u64, occurrence: usize) -> Self {
+    pub(crate) const fn new(lineage: [u8; 20], occurrence: usize) -> Self {
         Self {
             lineage,
             occurrence,
@@ -307,13 +307,23 @@ impl From<Item> for ItemSelector {
 /// second copy of the media payload merely to describe the sequence. The
 /// payload can be supplied separately through AudioSource when staging an
 /// insertion or replacement.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct Item {
     pub(crate) handle: ItemHandle,
     pub(crate) position: Position,
     pub(crate) filename: Box<str>,
     pub(crate) byte_length: usize,
 }
+
+impl PartialEq for Item {
+    fn eq(&self, other: &Self) -> bool {
+        self.position == other.position
+            && self.filename == other.filename
+            && self.byte_length == other.byte_length
+    }
+}
+
+impl Eq for Item {}
 
 impl fmt::Debug for Item {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -382,7 +392,7 @@ impl Item {
     }
 
     pub(crate) fn new(
-        lineage: u64,
+        lineage: [u8; 20],
         position: Position,
         filename: impl Into<Box<str>>,
         byte_length: usize,
@@ -448,7 +458,18 @@ impl AudioSource {
     /// borrowed byte slice while AudioSource::new remains zero-copy for an
     /// owned Vec converted into a boxed slice.
     pub fn from_bytes(filename: impl Into<Box<str>>, data: &[u8]) -> Result<Self, Error> {
-        Self::new(filename, data.to_vec().into_boxed_slice())
+        let filename = filename.into();
+        validate_filename(&filename)?;
+        validate_payload(data)?;
+        let mut owned = Vec::new();
+        owned
+            .try_reserve_exact(data.len())
+            .map_err(|_| Error::Allocation { amount: data.len() })?;
+        owned.extend_from_slice(data);
+        Ok(Self {
+            filename,
+            bytes: Arc::from(owned.into_boxed_slice()),
+        })
     }
 
     /// Return the safe leaf filename.
@@ -492,18 +513,11 @@ pub enum OperationKind {
     Insert,
     /// Replace one existing item with fresh audio content.
     Replace,
-    /// Remove one existing item and reclaim its unreferenced media resource.
+    /// Remove one existing item from the soundtrack sequence.
+    ///
+    /// Physical media reclamation is deliberately conservative: storage is
+    /// retained unless the package owner can prove every native dependency.
     Remove,
-}
-
-impl OperationKind {
-    pub(crate) const fn inverse(self) -> Self {
-        match self {
-            Self::Add | Self::Insert => Self::Remove,
-            Self::Replace => Self::Replace,
-            Self::Remove => Self::Insert,
-        }
-    }
 }
 
 /// One operation staged against an immutable source snapshot.
@@ -658,6 +672,7 @@ pub struct Patch {
     pub(crate) before: Box<[Item]>,
     pub(crate) after: Box<[Item]>,
     pub(crate) operation: OperationKind,
+    pub(crate) inverse_operation: OperationKind,
 }
 
 impl fmt::Debug for Patch {
@@ -715,7 +730,8 @@ impl Patch {
             artifacts: self.artifacts.inverse(),
             before: self.after.clone(),
             after: self.before.clone(),
-            operation: self.operation.inverse(),
+            operation: self.inverse_operation,
+            inverse_operation: self.operation,
         }
     }
 }
@@ -885,7 +901,7 @@ mod tests {
 
     #[test]
     fn selector_conversions_remain_position_or_opaque_handle_only() {
-        let handle = ItemHandle::new(42, 3);
+        let handle = ItemHandle::new([42; 20], 3);
         assert_eq!(ItemSelector::from(3usize), ItemSelector::index(3));
         assert_eq!(ItemSelector::from(Position::new(3)), ItemSelector::index(3));
         assert_eq!(ItemSelector::from(handle), ItemSelector::handle(handle));
@@ -895,7 +911,7 @@ mod tests {
 
     #[test]
     fn item_debug_does_not_contain_opaque_handle_identity() {
-        let item = Item::new(7, Position::new(2), "theme.m4a", 32);
+        let item = Item::new([7; 20], Position::new(2), "theme.m4a", 32);
         let debug = format!("{item:?}");
         assert!(debug.contains("position"));
         assert!(debug.contains("theme.m4a"));

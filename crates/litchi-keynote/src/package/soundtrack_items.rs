@@ -21,7 +21,8 @@ use litchi_iwa_common::media::Type as MediaType;
 use litchi_iwa_common::varint::{encode_varint_into, encoded_len};
 use litchi_iwa_common::wire::WireView;
 use litchi_iwa_core::{
-    Archive, DataReferenceTransition, FieldDataReferenceTransition, RawMessage, SnappyStream,
+    Archive, CanonicalFieldDataReferenceOperation, CanonicalFieldDataReferenceTransition,
+    DataReferenceTransition, FieldDataReferenceTransition, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::package_metadata_media_codec as metadata_codec;
 use sha1::{Digest, Sha1};
@@ -285,9 +286,13 @@ fn source_view<'a>(
     require_metadata: bool,
 ) -> Result<Option<SourceView<'a>>, Error> {
     let mut budget = Budget::new(package).map_err(map_physical_error)?;
-    let Some(selection) =
-        soundtrack_physical::select_soundtrack(package, &mut budget, SelectionPolicy::Read)
-            .map_err(map_physical_error)?
+    let policy = if require_metadata {
+        SelectionPolicy::Rewrite
+    } else {
+        SelectionPolicy::Read
+    };
+    let Some(selection) = soundtrack_physical::select_soundtrack(package, &mut budget, policy)
+        .map_err(map_physical_error)?
     else {
         return Ok(None);
     };
@@ -425,9 +430,11 @@ fn extension(name: &str) -> &str {
     name.rsplit_once('.').map_or("", |(_, extension)| extension)
 }
 
-fn package_lineage(package: &Package) -> u64 {
-    let pointer = Arc::as_ptr(&package.state) as usize;
-    u64::try_from(pointer).unwrap_or(0)
+fn package_lineage(package: &Package) -> [u8; SHA1_BYTES] {
+    match &package.state.source {
+        PhysicalSource::Package(catalog) => Sha1::digest(catalog.shared_source().as_ref()).into(),
+        PhysicalSource::Semantic(_) => [0; SHA1_BYTES],
+    }
 }
 
 fn map_physical_error(error: soundtrack_physical::Error) -> Error {
@@ -508,7 +515,7 @@ fn resolve_selector(selector: ItemSelector, before: &[ResolvedItem]) -> Result<P
             lineage,
             occurrence,
         }) => {
-            if lineage == 0
+            if lineage == [0; SHA1_BYTES]
                 || before
                     .first()
                     .map(|item| item.semantic.handle().position())
@@ -679,6 +686,13 @@ fn rewrite_soundtrack_payload(
         .len()
         .checked_add(new_ref_len)
         .ok_or(Error::InvalidSource)?;
+    if output_len > limits.max_output_bytes() {
+        return Err(Error::LimitExceeded {
+            kind: crate::soundtrack::items::LimitKind::OutputBytes,
+            observed: output_len as u64,
+            maximum: limits.max_output_bytes() as u64,
+        });
+    }
     let mut output = Vec::new();
     output
         .try_reserve(output_len)
@@ -866,38 +880,65 @@ fn rewrite_package(
     let object = archive
         .object_mut(view.selection.soundtrack_identifier)
         .ok_or(Error::InvalidSource)?;
-    let field_index = object
+    let matching_fields = object
         .archive_info
         .message_infos
         .get(view.selection.soundtrack_message_index)
         .ok_or(Error::InvalidSource)?
         .field_infos
         .iter()
-        .position(|field| {
-            field.path.as_slice() == [SOUNDTRACK_MEDIA_FIELD] && field.data_references == before_ids
+        .enumerate()
+        .filter_map(|(index, field)| {
+            (field.path.as_slice() == [SOUNDTRACK_MEDIA_FIELD]
+                && field.data_references == before_ids)
+                .then_some(index)
         })
-        .ok_or(Error::InvalidSource)?;
-    let field_transition = FieldDataReferenceTransition {
-        field_info_index: field_index,
-        expected_path: &[SOUNDTRACK_MEDIA_FIELD],
-        before: &before_ids,
-        after: &after_ids,
+        .collect::<Vec<_>>();
+    let replacement = RawMessage {
+        type_: SOUNDTRACK_MESSAGE_TYPE,
+        data: rewritten_payload,
     };
-    let transition = DataReferenceTransition {
-        aggregate_before: &before_ids,
-        aggregate_after: &after_ids,
-        fields: std::slice::from_ref(&field_transition),
-    };
-    object
-        .replace_message_transitioning_data_references_preserving_header_with_limits(
+    match matching_fields.as_slice() {
+        [field_index] => object
+            .replace_message_transitioning_data_references_preserving_header_with_limits(
+                view.selection.soundtrack_message_index,
+                replacement,
+                DataReferenceTransition {
+                    aggregate_before: &before_ids,
+                    aggregate_after: &after_ids,
+                    fields: &[FieldDataReferenceTransition {
+                        field_info_index: *field_index,
+                        expected_path: &[SOUNDTRACK_MEDIA_FIELD],
+                        before: &before_ids,
+                        after: &after_ids,
+                    }],
+                },
+                archive_limits,
+            ),
+        [] if !after_ids.is_empty() => object
+            .replace_message_transitioning_data_references_with_canonical_field_preserving_header_with_limits(
             view.selection.soundtrack_message_index,
-            RawMessage {
-                type_: SOUNDTRACK_MESSAGE_TYPE,
-                data: rewritten_payload,
+            replacement,
+            CanonicalFieldDataReferenceTransition {
+                aggregate_before: &before_ids,
+                aggregate_after: &after_ids,
+                field_path: &[SOUNDTRACK_MEDIA_FIELD],
+                operation: CanonicalFieldDataReferenceOperation::Insert,
             },
-            transition,
             archive_limits,
-        )
+        ),
+        [] => object.replace_message_transitioning_data_references_preserving_header_with_limits(
+            view.selection.soundtrack_message_index,
+            replacement,
+            DataReferenceTransition {
+                aggregate_before: &before_ids,
+                aggregate_after: &after_ids,
+                fields: &[],
+            },
+            archive_limits,
+        ),
+        _ => return Err(Error::InvalidSource),
+    }
         .map_err(|_| Error::InvalidSource)?;
     let serialized_soundtrack = archive
         .to_bytes_with_limits(archive_limits)
@@ -973,21 +1014,14 @@ fn rewrite_package(
     if let (Some(audio), Some(name)) = (source_audio, insertion_name.as_deref()) {
         insertions.push(EntryInsertion::new(name, audio.bytes()));
     }
-    let mut deleted_names = Vec::new();
-    if let Some(old) = old
-        && can_delete_physical_data(catalog, &view.metadata, old.identifier)
-    {
-        deleted_names.push(format!("{DATA_PREFIX}{}", old.current_name));
-    }
     let insertion_refs = insertions;
-    let deleted_refs = deleted_names.iter().map(String::as_str).collect::<Vec<_>>();
     let edits = [
         EntryEdit::new(view.selection.soundtrack_component, &compressed_soundtrack),
         EntryEdit::new(METADATA_COMPONENT, &compressed_metadata),
     ];
     let output = catalog
         .package()
-        .reassemble_with_changes_to_bytes(&insertion_refs, &edits, &deleted_refs, catalog.limits())
+        .reassemble_with_changes_to_bytes(&insertion_refs, &edits, &[], catalog.limits())
         .map_err(|_| Error::InvalidSource)?;
     let target: Arc<[u8]> = output.into();
     let candidate = Package::from_source_with_options(target, source.state.options)
@@ -1008,52 +1042,6 @@ fn rewrite_package(
     // Ensure the changed target can itself be read after reopening, and that
     // every failed path above leaves the source package untouched by design.
     Ok((candidate, candidate_items))
-}
-
-fn can_delete_physical_data(
-    catalog: &SourceCatalog,
-    metadata: &MetadataFacts,
-    identifier: u64,
-) -> bool {
-    let mut owners = metadata
-        .owners
-        .iter()
-        .filter(|owner| owner.data_identifier == identifier);
-    let Some(owner) = owners.next() else {
-        return false;
-    };
-    if owners.next().is_some() || owner.count != 1 {
-        return false;
-    }
-    // ArchiveInfo keeps a logical reference both in the message aggregate
-    // and (for selected fields) in FieldInfo.  Count the aggregate when it is
-    // present, falling back to FieldInfo only for legacy headers that omitted
-    // it; otherwise one logical reference would be counted twice and a safe
-    // reclaim would be incorrectly refused.
-    let mut references = 0usize;
-    for component in catalog.components().iter() {
-        for object in &component.archive().objects {
-            for info in &object.archive_info.message_infos {
-                let aggregate = info
-                    .data_references
-                    .iter()
-                    .filter(|candidate| **candidate == identifier)
-                    .count();
-                let field = info
-                    .field_infos
-                    .iter()
-                    .flat_map(|field| field.data_references.iter())
-                    .filter(|candidate| **candidate == identifier)
-                    .count();
-                references =
-                    references.saturating_add(if aggregate == 0 { field } else { aggregate });
-                if references > 1 {
-                    return false;
-                }
-            }
-        }
-    }
-    references == 1
 }
 
 fn expected_items_after(
@@ -1260,6 +1248,7 @@ impl Edit<'_> {
                     before: before.clone(),
                     after: before,
                     operation: OperationKind::Replace,
+                    inverse_operation: OperationKind::Replace,
                 };
                 return Ok(Commit {
                     package: self.source.snapshot(),
@@ -1277,6 +1266,14 @@ impl Edit<'_> {
             before,
             after,
             operation: operation.kind(),
+            inverse_operation: match operation.kind() {
+                OperationKind::Add | OperationKind::Insert => OperationKind::Remove,
+                OperationKind::Replace => OperationKind::Replace,
+                OperationKind::Remove if position.get() + 1 == view.items.len() => {
+                    OperationKind::Add
+                },
+                OperationKind::Remove => OperationKind::Insert,
+            },
         };
         Ok(Commit {
             package,

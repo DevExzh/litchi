@@ -229,6 +229,49 @@ pub struct DataReferenceTransition<'a> {
     pub fields: &'a [FieldDataReferenceTransition<'a>],
 }
 
+/// Direction of a canonical field-level data-reference metadata change.
+///
+/// This is intentionally separate from [`DataReferenceTransition`].  The
+/// ordinary transition edits existing `FieldInfo` occurrences addressed by
+/// their source ordinal.  A format owner may instead need to materialize the
+/// first field-local attribution for a legacy header that only carries the
+/// aggregate `MessageInfo.data_references` list.  Such a field is created or
+/// removed as one canonical record, never guessed from an arbitrary existing
+/// ordinal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum CanonicalFieldDataReferenceOperation {
+    /// Append one canonical `FieldInfo` carrying the target aggregate list.
+    Insert,
+    /// Remove the previously materialized canonical `FieldInfo`.
+    Remove,
+}
+
+/// Exact aggregate transition that creates or removes one canonical
+/// data-reference `FieldInfo`.
+///
+/// `field_path` is the caller-supplied semantic path.  On insertion the
+/// source must not already contain that path and the canonical record is
+/// appended after every source `FieldInfo`; its type is
+/// [`FieldType::DataReference`] and its data references equal
+/// `aggregate_after`.  On removal the source record must be the final
+/// `FieldInfo`, have exactly the canonical bytes produced by insertion, and
+/// carry `aggregate_before`; `aggregate_after` may contain any references
+/// retained by the aggregate transition.  These strict directional rules
+/// make `inverse()`-style physical replay byte-exact even when the containing
+/// header has unknown or noncanonical bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CanonicalFieldDataReferenceTransition<'a> {
+    /// Complete source `MessageInfo.data_references` list.
+    pub aggregate_before: &'a [u64],
+    /// Complete requested `MessageInfo.data_references` list.
+    pub aggregate_after: &'a [u64],
+    /// Exact path to materialize or remove.
+    pub field_path: &'a [u32],
+    /// Whether to append or remove the canonical field record.
+    pub operation: CanonicalFieldDataReferenceOperation,
+}
+
 impl FieldType {
     /// Project one raw protobuf enum value without losing unknown values.
     #[must_use]
@@ -1810,6 +1853,67 @@ impl ArchiveObject {
         transition: DataReferenceTransition<'_>,
         limits: Limits,
     ) -> Result<RawMessage> {
+        self.replace_message_transitioning_data_references_preserving_header_internal(
+            index, message, transition, None, limits,
+        )
+    }
+
+    /// Replace one payload while inserting or removing one canonical
+    /// data-reference `FieldInfo` for a source whose semantic owner currently
+    /// exists only in the aggregate `MessageInfo.data_references` list.
+    ///
+    /// Insertion appends a minimal canonical field with the supplied path and
+    /// the complete target aggregate list. Removal is the exact inverse: it
+    /// accepts only the final canonical field produced by insertion. The
+    /// target may restore any authorized aggregate-only source state. The
+    /// ordinary transition method remains the right choice for existing field records or for
+    /// aggregate-only removal that does not need to remove metadata. All
+    /// validation, raw-header preservation, and publication remain atomic.
+    pub fn replace_message_transitioning_data_references_with_canonical_field_preserving_header(
+        &mut self,
+        index: usize,
+        message: RawMessage,
+        transition: CanonicalFieldDataReferenceTransition<'_>,
+    ) -> Result<RawMessage> {
+        self.replace_message_transitioning_data_references_with_canonical_field_preserving_header_with_limits(
+            index,
+            message,
+            transition,
+            Limits::default(),
+        )
+    }
+
+    /// Replace one payload while inserting or removing one canonical
+    /// data-reference `FieldInfo` under explicit resource limits.
+    pub fn replace_message_transitioning_data_references_with_canonical_field_preserving_header_with_limits(
+        &mut self,
+        index: usize,
+        message: RawMessage,
+        transition: CanonicalFieldDataReferenceTransition<'_>,
+        limits: Limits,
+    ) -> Result<RawMessage> {
+        let aggregate = DataReferenceTransition {
+            aggregate_before: transition.aggregate_before,
+            aggregate_after: transition.aggregate_after,
+            fields: &[],
+        };
+        self.replace_message_transitioning_data_references_preserving_header_internal(
+            index,
+            message,
+            aggregate,
+            Some(transition),
+            limits,
+        )
+    }
+
+    fn replace_message_transitioning_data_references_preserving_header_internal(
+        &mut self,
+        index: usize,
+        message: RawMessage,
+        transition: DataReferenceTransition<'_>,
+        canonical_field: Option<CanonicalFieldDataReferenceTransition<'_>>,
+        limits: Limits,
+    ) -> Result<RawMessage> {
         let limits = limits.validate()?;
         self.validate_with_limits(limits)?;
         let current_info = self
@@ -1824,6 +1928,17 @@ impl ArchiveObject {
             ));
         }
         validate_data_reference_transition_lists(&transition, limits, index)?;
+        let canonical_plan = canonical_field
+            .map(|field| {
+                prepare_canonical_field_data_reference_transition(
+                    current_info,
+                    transition,
+                    field,
+                    limits,
+                    index,
+                )
+            })
+            .transpose()?;
         let replacement_length = u32::try_from(message.data.len())
             .map_err(|_| Error::invalid_archive(index, "message payload exceeds u32"))?;
         check_message_length(message.data.len(), limits)?;
@@ -1865,7 +1980,17 @@ impl ArchiveObject {
         }
         for (field_index, current_field) in current_info.field_infos.iter().enumerate() {
             let selected = selected_fields.get(field_index).and_then(Option::as_ref);
-            if selected.is_none()
+            let removed = canonical_plan.is_some_and(|plan| {
+                matches!(
+                    plan,
+                    CanonicalFieldDataReferencePlan::Remove {
+                        field_info_index,
+                        ..
+                    } if field_info_index == field_index
+                )
+            });
+            if !removed
+                && selected.is_none()
                 && current_field
                     .data_references
                     .iter()
@@ -1910,6 +2035,7 @@ impl ArchiveObject {
             replacement_length,
             transition,
             &selected_fields,
+            canonical_plan,
             limits,
         )?;
         let rewritten_info = ArchiveInfo::decode_with_limits(&rewritten_header, limits)?;
@@ -1920,6 +2046,7 @@ impl ArchiveObject {
             message.type_,
             replacement_length,
             transition,
+            canonical_plan,
         )?;
         let canonical_after = encode_archive_info(&rewritten_info, limits)?;
         let retain_rewritten_header = retained_source_header && rewritten_header != canonical_after;
@@ -2659,6 +2786,17 @@ struct PreparedFieldTransition<'a> {
 struct PreparedObjectReferenceTransition<'a> {
     aggregate: PreparedReferenceList<'a>,
     fields: Vec<Option<PreparedFieldTransition<'a>>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum CanonicalFieldDataReferencePlan<'a> {
+    Insert {
+        path: &'a [u32],
+    },
+    Remove {
+        field_info_index: usize,
+        path: &'a [u32],
+    },
 }
 
 impl ReferenceRemovals<'_> {
@@ -3482,6 +3620,95 @@ fn validate_data_reference_transition_lists(
     Ok(())
 }
 
+fn prepare_canonical_field_data_reference_transition<'a>(
+    current: &MessageInfo,
+    transition: DataReferenceTransition<'a>,
+    canonical: CanonicalFieldDataReferenceTransition<'a>,
+    limits: Limits,
+    message_index: usize,
+) -> Result<CanonicalFieldDataReferencePlan<'a>> {
+    if !transition.fields.is_empty() {
+        return Err(Error::invalid_archive(
+            message_index,
+            "canonical FieldInfo transition cannot select existing fields",
+        ));
+    }
+    if canonical.field_path.len() > limits.max_metadata_items() {
+        return Err(limit(
+            LimitKind::MetadataItems,
+            canonical.field_path.len(),
+            limits.max_metadata_items(),
+        ));
+    }
+    match canonical.operation {
+        CanonicalFieldDataReferenceOperation::Insert => {
+            if current
+                .field_infos
+                .iter()
+                .any(|field| field.path.as_slice() == canonical.field_path)
+            {
+                return Err(Error::invalid_archive(
+                    message_index,
+                    "canonical FieldInfo path already exists",
+                ));
+            }
+            if canonical.aggregate_after.is_empty() {
+                return Err(Error::invalid_archive(
+                    message_index,
+                    "canonical FieldInfo insertion requires target data references",
+                ));
+            }
+            Ok(CanonicalFieldDataReferencePlan::Insert {
+                path: canonical.field_path,
+            })
+        },
+        CanonicalFieldDataReferenceOperation::Remove => {
+            let mut matching = None;
+            for (field_info_index, field) in current.field_infos.iter().enumerate() {
+                if field.path.as_slice() != canonical.field_path {
+                    continue;
+                }
+                if matching.replace(field_info_index).is_some() {
+                    return Err(Error::invalid_archive(
+                        message_index,
+                        "canonical FieldInfo path is ambiguous",
+                    ));
+                }
+            }
+            let field_info_index = matching.ok_or_else(|| {
+                Error::invalid_archive(message_index, "canonical FieldInfo is missing")
+            })?;
+            if field_info_index != current.field_infos.len().saturating_sub(1) {
+                return Err(Error::invalid_archive(
+                    message_index,
+                    "canonical FieldInfo is not the final field",
+                ));
+            }
+            let field = current
+                .field_infos
+                .get(field_info_index)
+                .ok_or_else(|| Error::invalid_archive(message_index, "FieldInfo is missing"))?;
+            if field.r#type != Some(FieldType::DataReference)
+                || !field.object_references.is_empty()
+                || field.unknown_field_rule.is_some()
+                || field.known_field_rule.is_some()
+                || !field.known_field_version.is_empty()
+                || field.known_field_feature_identifier.is_some()
+                || field.data_references.as_slice() != canonical.aggregate_before
+            {
+                return Err(Error::invalid_archive(
+                    message_index,
+                    "FieldInfo is not the canonical data-reference record",
+                ));
+            }
+            Ok(CanonicalFieldDataReferencePlan::Remove {
+                field_info_index,
+                path: canonical.field_path,
+            })
+        },
+    }
+}
+
 #[allow(
     clippy::too_many_arguments,
     reason = "The raw header rewrite keeps both complete data-reference states and selected FieldInfo occurrences explicit."
@@ -3496,6 +3723,7 @@ fn rewrite_message_metadata_and_transition_data_references_in_header(
     replacement_length: u32,
     transition: DataReferenceTransition<'_>,
     selected_fields: &[Option<&FieldDataReferenceTransition<'_>>],
+    canonical_plan: Option<CanonicalFieldDataReferencePlan<'_>>,
     limits: Limits,
 ) -> Result<Vec<u8>> {
     let wire_limits = header_wire_limits(limits)?;
@@ -3543,6 +3771,7 @@ fn rewrite_message_metadata_and_transition_data_references_in_header(
         replacement_length,
         transition,
         selected_fields,
+        canonical_plan,
         wire_limits,
         limits,
         message_index,
@@ -3577,6 +3806,7 @@ fn rewrite_effective_message_scalars_and_data_reference_transition(
     replacement_length: u32,
     transition: DataReferenceTransition<'_>,
     selected_fields: &[Option<&FieldDataReferenceTransition<'_>>],
+    canonical_plan: Option<CanonicalFieldDataReferencePlan<'_>>,
     wire_limits: WireLimits,
     limits: Limits,
     message_index: usize,
@@ -3633,7 +3863,44 @@ fn rewrite_effective_message_scalars_and_data_reference_transition(
                 let selected = selected_fields
                     .get(field_info_index)
                     .and_then(Option::as_ref);
-                if let Some(selected) = selected {
+                let remove = canonical_plan.is_some_and(|plan| {
+                    matches!(
+                        plan,
+                        CanonicalFieldDataReferencePlan::Remove {
+                            field_info_index: removed_index,
+                            ..
+                        } if removed_index == field_info_index
+                    )
+                });
+                if remove {
+                    let raw = field
+                        .raw(source)
+                        .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
+                    let (path, references) = match canonical_plan {
+                        Some(CanonicalFieldDataReferencePlan::Remove { path, .. }) => {
+                            (path, transition.aggregate_before)
+                        },
+                        _ => unreachable!("canonical FieldInfo removal plan disappeared"),
+                    };
+                    let expected = encode_canonical_data_reference_field_info(
+                        path,
+                        references,
+                        limits,
+                        message_index,
+                    )?;
+                    if raw != expected.as_slice() {
+                        return Err(Error::invalid_archive(
+                            message_index,
+                            "canonical FieldInfo source bytes differ from insertion output",
+                        ));
+                    }
+                    assign_header_field_rewrite(
+                        &mut rewrites,
+                        field_index,
+                        HeaderFieldRewrite::Remove,
+                        message_index,
+                    )?;
+                } else if let Some(selected) = selected {
                     let payload = field
                         .payload(source)
                         .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
@@ -3713,9 +3980,15 @@ fn rewrite_effective_message_scalars_and_data_reference_transition(
             limits,
             message_index,
         )?;
-        return Ok(rewritten);
+        return append_canonical_field_info_if_needed(
+            rewritten,
+            canonical_plan,
+            transition.aggregate_after,
+            limits,
+            message_index,
+        );
     }
-    assemble_header_field_rewrites(
+    let rewritten = assemble_header_field_rewrites(
         source,
         &fields,
         &rewrites,
@@ -3723,7 +3996,120 @@ fn rewrite_effective_message_scalars_and_data_reference_transition(
         limits,
         message_index,
         "IWA transitioned MessageInfo header",
+    )?;
+    append_canonical_field_info_if_needed(
+        rewritten,
+        canonical_plan,
+        transition.aggregate_after,
+        limits,
+        message_index,
     )
+}
+
+fn append_canonical_field_info_if_needed(
+    mut message: Vec<u8>,
+    canonical_plan: Option<CanonicalFieldDataReferencePlan<'_>>,
+    references: &[u64],
+    limits: Limits,
+    message_index: usize,
+) -> Result<Vec<u8>> {
+    let Some(CanonicalFieldDataReferencePlan::Insert { path }) = canonical_plan else {
+        return Ok(message);
+    };
+    let encoded =
+        encode_canonical_data_reference_field_info(path, references, limits, message_index)?;
+    let output_length = message
+        .len()
+        .checked_add(encoded.len())
+        .ok_or_else(|| Error::invalid_archive(message_index, "FieldInfo append overflow"))?;
+    check_header_length(output_length, limits)?;
+    message
+        .try_reserve_exact(encoded.len())
+        .map_err(|_| Error::allocation("IWA canonical FieldInfo", encoded.len()))?;
+    message.extend_from_slice(&encoded);
+    Ok(message)
+}
+
+/// Encode the complete outer `MessageInfo.field_infos` record for the one
+/// canonical field introduced by the aggregate-only compatibility path.
+///
+/// This writer is intentionally small and schema-explicit.  It emits the
+/// required path presence, `FieldType::DataReference`, and one packed data
+/// reference list, with no optional or unknown fields.  The caller can then
+/// append the record to an otherwise source-authoritative MessageInfo without
+/// re-encoding unrelated metadata.
+fn encode_canonical_data_reference_field_info(
+    path: &[u32],
+    references: &[u64],
+    limits: Limits,
+    message_index: usize,
+) -> Result<Vec<u8>> {
+    let path_values_length = packed_u32_length(path)?;
+    let path_message_length = packed_u32_field_length(1, path)?;
+    let path_field_length = length_delimited_field_length(1, path_message_length)?;
+    let type_field_length = varint_field_length(2, 2)?;
+    let references_field_length = packed_u64_field_length(5, references)?;
+    let payload_length = path_field_length
+        .checked_add(type_field_length)
+        .and_then(|length| length.checked_add(references_field_length))
+        .ok_or_else(|| {
+            Error::invalid_archive(message_index, "canonical FieldInfo length overflow")
+        })?;
+    let output_length = length_delimited_field_length(4, payload_length)?;
+    check_header_length(output_length, limits)?;
+
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_length)
+        .map_err(|_| Error::allocation("IWA canonical FieldInfo", output_length))?;
+    append_wire_key_and_length(&mut output, 4, payload_length, message_index)?;
+    append_wire_key_and_length(&mut output, 1, path_message_length, message_index)?;
+    let mut bytes = [0u8; MAX_VARINT_BYTES];
+    if !path.is_empty() {
+        append_wire_key_and_length(&mut output, 1, path_values_length, message_index)?;
+        for value in path {
+            output.extend_from_slice(encode_varint(u64::from(*value), &mut bytes));
+        }
+    }
+    output.extend_from_slice(&[0x10, 0x02]);
+    if !references.is_empty() {
+        append_wire_key_and_length(
+            &mut output,
+            5,
+            packed_u64_length(references)?,
+            message_index,
+        )?;
+        for value in references {
+            output.extend_from_slice(encode_varint(*value, &mut bytes));
+        }
+    }
+    if output.len() != output_length {
+        return Err(Error::invalid_archive(
+            message_index,
+            "canonical FieldInfo length mismatch",
+        ));
+    }
+    Ok(output)
+}
+
+fn append_wire_key_and_length(
+    output: &mut Vec<u8>,
+    field_number: u32,
+    payload_length: usize,
+    message_index: usize,
+) -> Result<()> {
+    let key = u64::from(field_number)
+        .checked_shl(3)
+        .and_then(|value| value.checked_add(2))
+        .ok_or_else(|| Error::invalid_archive(message_index, "wire field key overflow"))?;
+    let mut bytes = [0u8; MAX_VARINT_BYTES];
+    output.extend_from_slice(encode_varint(key, &mut bytes));
+    output.extend_from_slice(encode_varint(
+        u64::try_from(payload_length)
+            .map_err(|_| Error::invalid_archive(message_index, "wire field length exceeds u64"))?,
+        &mut bytes,
+    ));
+    Ok(())
 }
 
 fn rewrite_field_info_data_reference_transition(
@@ -5856,6 +6242,7 @@ fn verify_transitioned_data_archive_info(
     replacement_type: u32,
     replacement_length: u32,
     transition: DataReferenceTransition<'_>,
+    canonical_plan: Option<CanonicalFieldDataReferencePlan<'_>>,
 ) -> Result<()> {
     if before.identifier != after.identifier
         || before.should_merge != after.should_merge
@@ -5886,6 +6273,19 @@ fn verify_transitioned_data_archive_info(
     let after_target = after.message_infos.get(message_index).ok_or_else(|| {
         Error::invalid_archive(message_index, "rewritten message metadata is missing")
     })?;
+    let expected_field_info_count = match canonical_plan {
+        Some(CanonicalFieldDataReferencePlan::Insert { .. }) => before_target
+            .field_infos
+            .len()
+            .checked_add(1)
+            .ok_or_else(|| Error::invalid_archive(message_index, "FieldInfo count overflow"))?,
+        Some(CanonicalFieldDataReferencePlan::Remove { .. }) => before_target
+            .field_infos
+            .len()
+            .checked_sub(1)
+            .ok_or_else(|| Error::invalid_archive(message_index, "FieldInfo count underflow"))?,
+        None => before_target.field_infos.len(),
+    };
     if before_target.data_references.as_slice() != transition.aggregate_before
         || after_target.data_references.as_slice() != transition.aggregate_after
         || after_target.type_ != replacement_type
@@ -5897,52 +6297,102 @@ fn verify_transitioned_data_archive_info(
         || before_target.diff_field_path != after_target.diff_field_path
         || before_target.fields_to_remove != after_target.fields_to_remove
         || before_target.diff_read_version != after_target.diff_read_version
-        || before_target.field_infos.len() != after_target.field_infos.len()
+        || after_target.field_infos.len() != expected_field_info_count
     {
         return Err(Error::invalid_archive(
             message_index,
             "rewritten MessageInfo does not match the authorized data-reference transition",
         ));
     }
-    for (field_index, (before_field, after_field)) in before_target
-        .field_infos
-        .iter()
-        .zip(&after_target.field_infos)
-        .enumerate()
-    {
-        let selected = transition
-            .fields
-            .iter()
-            .find(|authorization| authorization.field_info_index == field_index);
-        if let Some(authorization) = selected {
-            if before_field.path.path.as_slice() != authorization.expected_path
-                || before_field.data_references.as_slice() != authorization.before
-                || after_field.data_references.as_slice() != authorization.after
-            {
-                return Err(Error::invalid_archive(
-                    message_index,
-                    "selected FieldInfo does not match the authorized data-reference transition",
-                ));
-            }
-        } else if before_field.data_references != after_field.data_references {
-            return Err(Error::invalid_archive(
-                message_index,
-                "unselected FieldInfo data references changed during transition",
-            ));
-        }
-        if before_field.path != after_field.path
-            || before_field.r#type != after_field.r#type
-            || before_field.unknown_field_rule != after_field.unknown_field_rule
-            || before_field.known_field_rule != after_field.known_field_rule
-            || before_field.known_field_version != after_field.known_field_version
-            || before_field.known_field_feature_identifier
-                != after_field.known_field_feature_identifier
-            || before_field.object_references != after_field.object_references
+    if let Some(CanonicalFieldDataReferencePlan::Insert { path }) = canonical_plan {
+        let field = after_target.field_infos.last().ok_or_else(|| {
+            Error::invalid_archive(message_index, "canonical FieldInfo insertion is missing")
+        })?;
+        if field.path.as_slice() != path
+            || field.r#type != Some(FieldType::DataReference)
+            || field.unknown_field_rule.is_some()
+            || !field.object_references.is_empty()
+            || field.data_references.as_slice() != transition.aggregate_after
+            || field.known_field_rule.is_some()
+            || !field.known_field_version.is_empty()
+            || field.known_field_feature_identifier.is_some()
         {
             return Err(Error::invalid_archive(
                 message_index,
-                "rewritten FieldInfo metadata changed outside data references",
+                "inserted FieldInfo is not canonical",
             ));
+        }
+    }
+    if let Some(CanonicalFieldDataReferencePlan::Remove {
+        field_info_index, ..
+    }) = canonical_plan
+    {
+        if field_info_index >= before_target.field_infos.len() {
+            return Err(Error::invalid_archive(
+                message_index,
+                "removed canonical FieldInfo index is invalid",
+            ));
+        }
+        for (before_index, before_field) in before_target.field_infos.iter().enumerate() {
+            if before_index == field_info_index {
+                continue;
+            }
+            let after_index = if before_index < field_info_index {
+                before_index
+            } else {
+                before_index - 1
+            };
+            let after_field = after_target.field_infos.get(after_index).ok_or_else(|| {
+                Error::invalid_archive(message_index, "remaining FieldInfo is missing")
+            })?;
+            if before_field != after_field {
+                return Err(Error::invalid_archive(
+                    message_index,
+                    "removing canonical FieldInfo changed another field",
+                ));
+            }
+        }
+    } else {
+        for (field_index, (before_field, after_field)) in before_target
+            .field_infos
+            .iter()
+            .zip(&after_target.field_infos)
+            .enumerate()
+        {
+            let selected = transition
+                .fields
+                .iter()
+                .find(|authorization| authorization.field_info_index == field_index);
+            if let Some(authorization) = selected {
+                if before_field.path.path.as_slice() != authorization.expected_path
+                    || before_field.data_references.as_slice() != authorization.before
+                    || after_field.data_references.as_slice() != authorization.after
+                {
+                    return Err(Error::invalid_archive(
+                        message_index,
+                        "selected FieldInfo does not match the authorized data-reference transition",
+                    ));
+                }
+            } else if before_field.data_references != after_field.data_references {
+                return Err(Error::invalid_archive(
+                    message_index,
+                    "unselected FieldInfo data references changed during transition",
+                ));
+            }
+            if before_field.path != after_field.path
+                || before_field.r#type != after_field.r#type
+                || before_field.unknown_field_rule != after_field.unknown_field_rule
+                || before_field.known_field_rule != after_field.known_field_rule
+                || before_field.known_field_version != after_field.known_field_version
+                || before_field.known_field_feature_identifier
+                    != after_field.known_field_feature_identifier
+                || before_field.object_references != after_field.object_references
+            {
+                return Err(Error::invalid_archive(
+                    message_index,
+                    "rewritten FieldInfo metadata changed outside data references",
+                ));
+            }
         }
     }
     Ok(())
@@ -7294,6 +7744,7 @@ mod tests {
     use super::{
         Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
         ArchiveReferencePolicy, ArchiveReferenceScope, ArchiveReferenceVisitor,
+        CanonicalFieldDataReferenceOperation, CanonicalFieldDataReferenceTransition,
         DataReferencePruning, DataReferenceTransition, Error, FieldDataReferenceTransition,
         FieldInfo, FieldObjectReferenceTransition, FieldPath, FieldType, KnownFieldRule,
         ObjectReferenceTransition, RawMessage, UnknownFieldRule, encode_archive_info,
@@ -9502,6 +9953,226 @@ mod tests {
         );
         assert_eq!(malformed, malformed_before);
         Ok(())
+    }
+
+    #[test]
+    fn canonical_field_transition_inserts_and_removes_exactly_with_unknown_header() -> Result<()> {
+        let source = aggregate_only_data_reference_transition_fixture(true)?;
+        let mut edited = Archive::parse(&source)?;
+        let before = [10, 20];
+        let after = [10, 30, 20];
+        let inserted = CanonicalFieldDataReferenceTransition {
+            aggregate_before: &before,
+            aggregate_after: &after,
+            field_path: &[3],
+            operation: CanonicalFieldDataReferenceOperation::Insert,
+        };
+        let old = edited.objects[0]
+            .replace_message_transitioning_data_references_with_canonical_field_preserving_header(
+                0,
+                RawMessage {
+                    type_: 7,
+                    data: data_reference_payload(&after)?,
+                },
+                inserted,
+            )?;
+        let info = &edited.objects[0].archive_info.message_infos[0];
+        assert_eq!(info.data_references, after);
+        assert_eq!(info.field_infos.len(), 1);
+        assert_eq!(info.field_infos[0].path.as_slice(), [3]);
+        assert_eq!(info.field_infos[0].r#type, Some(FieldType::DataReference));
+        assert_eq!(info.field_infos[0].data_references, after);
+        let encoded = edited.to_bytes()?;
+        let (header, payload) = split_test_archive(&encoded)?;
+        assert!(header.ends_with(&[0xb0, 0x3e, 0x07]));
+        assert_eq!(payload, data_reference_payload(&after)?);
+
+        let inverse = CanonicalFieldDataReferenceTransition {
+            aggregate_before: &after,
+            aggregate_after: &before,
+            field_path: &[3],
+            operation: CanonicalFieldDataReferenceOperation::Remove,
+        };
+        edited.objects[0]
+            .replace_message_transitioning_data_references_with_canonical_field_preserving_header(
+                0, old, inverse,
+            )?;
+        assert_eq!(edited.to_bytes()?, source);
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_field_transition_rejects_stale_and_existing_paths_atomically() -> Result<()> {
+        let source = aggregate_only_data_reference_transition_fixture(true)?;
+        let mut stale = Archive::parse(&source)?;
+        let original = stale.clone();
+        let stale_before = [99, 20];
+        let after = [99, 20, 30];
+        let request = CanonicalFieldDataReferenceTransition {
+            aggregate_before: &stale_before,
+            aggregate_after: &after,
+            field_path: &[3],
+            operation: CanonicalFieldDataReferenceOperation::Insert,
+        };
+        assert!(stale.objects[0]
+            .replace_message_transitioning_data_references_with_canonical_field_preserving_header(
+                0,
+                RawMessage {
+                    type_: 7,
+                    data: data_reference_payload(&after)?,
+                },
+                request,
+            )
+            .is_err());
+        assert_eq!(stale, original);
+
+        let before = [10, 20];
+        let inserted_after = [10, 30, 20];
+        let mut existing = Archive::parse(&source)?;
+        existing.objects[0]
+            .replace_message_transitioning_data_references_with_canonical_field_preserving_header(
+                0,
+                RawMessage {
+                    type_: 7,
+                    data: data_reference_payload(&inserted_after)?,
+                },
+                CanonicalFieldDataReferenceTransition {
+                    aggregate_before: &before,
+                    aggregate_after: &inserted_after,
+                    field_path: &[3],
+                    operation: CanonicalFieldDataReferenceOperation::Insert,
+                },
+            )?;
+        let original = existing.clone();
+        let next = [10, 30, 20, 40];
+        assert!(existing.objects[0]
+            .replace_message_transitioning_data_references_with_canonical_field_preserving_header(
+                0,
+                RawMessage {
+                    type_: 7,
+                    data: data_reference_payload(&next)?,
+                },
+                CanonicalFieldDataReferenceTransition {
+                    aggregate_before: &inserted_after,
+                    aggregate_after: &next,
+                    field_path: &[3],
+                    operation: CanonicalFieldDataReferenceOperation::Insert,
+                },
+            )
+            .is_err());
+        assert_eq!(existing, original);
+        Ok(())
+    }
+
+    #[test]
+    fn canonical_field_transition_rejects_noncanonical_remove_and_limits_atomically() -> Result<()>
+    {
+        let source = aggregate_only_data_reference_transition_fixture(true)?;
+        let mut noncanonical = Archive::parse(&source)?;
+        let before = [10, 20];
+        let after = [10, 30, 20];
+        noncanonical.objects[0]
+            .replace_message_transitioning_data_references_with_canonical_field_preserving_header(
+                0,
+                RawMessage {
+                    type_: 7,
+                    data: data_reference_payload(&after)?,
+                },
+                CanonicalFieldDataReferenceTransition {
+                    aggregate_before: &before,
+                    aggregate_after: &after,
+                    field_path: &[3],
+                    operation: CanonicalFieldDataReferenceOperation::Insert,
+                },
+            )?;
+        let raw = noncanonical.objects[0]
+            .original_header
+            .as_deref()
+            .ok_or_else(|| Error::invalid_archive(0, "canonical FieldInfo source is missing"))?;
+        let expected =
+            super::encode_canonical_data_reference_field_info(&[3], &after, Limits::default(), 0)?;
+        let mut noncanonical_field = vec![0x10, 0x02];
+        let path_message = [0x0a, 0x01, 0x03];
+        push_length_delimited(&mut noncanonical_field, &[0x0a], 1, &path_message)?;
+        push_length_delimited(&mut noncanonical_field, &[0x2a], 1, &[0x0a, 0x1e, 0x14])?;
+        let mut noncanonical_record = Vec::new();
+        push_length_delimited(&mut noncanonical_record, &[0x22], 1, &noncanonical_field)?;
+        assert_eq!(noncanonical_record.len(), expected.len());
+        let key = raw
+            .windows(expected.len())
+            .position(|window| window == expected.as_slice())
+            .ok_or_else(|| Error::invalid_archive(0, "canonical FieldInfo is missing"))?;
+        let mut altered = raw.to_vec();
+        altered[key..key + expected.len()].copy_from_slice(&noncanonical_record);
+        noncanonical.objects[0].original_header = Some(altered.into_boxed_slice());
+        let original = noncanonical.clone();
+        assert!(noncanonical.objects[0]
+            .replace_message_transitioning_data_references_with_canonical_field_preserving_header(
+                0,
+                RawMessage {
+                    type_: 7,
+                    data: data_reference_payload(&before)?,
+                },
+                CanonicalFieldDataReferenceTransition {
+                    aggregate_before: &after,
+                    aggregate_after: &before,
+                    field_path: &[3],
+                    operation: CanonicalFieldDataReferenceOperation::Remove,
+                },
+            )
+            .is_err());
+        assert_eq!(noncanonical, original);
+
+        let mut limited = Archive::parse(&source)?;
+        let original = limited.clone();
+        let limits = Limits::default().with_metadata_items(10)?;
+        assert!(limited.objects[0]
+            .replace_message_transitioning_data_references_with_canonical_field_preserving_header_with_limits(
+                0,
+                RawMessage {
+                    type_: 7,
+                    data: data_reference_payload(&after)?,
+                },
+                CanonicalFieldDataReferenceTransition {
+                    aggregate_before: &before,
+                    aggregate_after: &after,
+                    field_path: &[3],
+                    operation: CanonicalFieldDataReferenceOperation::Insert,
+                },
+                limits,
+            )
+            .is_err());
+        assert_eq!(limited, original);
+        Ok(())
+    }
+
+    fn aggregate_only_data_reference_transition_fixture(
+        with_unknown_header: bool,
+    ) -> Result<Vec<u8>> {
+        let before_payload = data_reference_payload(&[10, 20])?;
+        let mut object = ArchiveObject::new(
+            42,
+            vec![RawMessage {
+                type_: 7,
+                data: before_payload.clone(),
+            }],
+        )?;
+        object.archive_info.message_infos[0].data_references = vec![10, 20];
+        if !with_unknown_header {
+            return Archive {
+                objects: vec![object],
+            }
+            .to_bytes();
+        }
+
+        let mut header = encode_archive_info(&object.archive_info, Limits::default())?;
+        header.extend_from_slice(&[0xb0, 0x3e, 0x07]);
+        let mut source = Vec::new();
+        let mut prefix = [0u8; 10];
+        source.extend_from_slice(encode_varint(header.len() as u64, &mut prefix));
+        source.extend_from_slice(&header);
+        source.extend_from_slice(&before_payload);
+        Ok(source)
     }
 
     fn data_reference_transition_fixture(with_unknown_header: bool) -> Result<Vec<u8>> {
