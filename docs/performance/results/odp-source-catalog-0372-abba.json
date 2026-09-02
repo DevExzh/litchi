@@ -1,0 +1,392 @@
+{
+  "schema_version": 1,
+  "change_id": "0372",
+  "benchmark": "ODP source-backed catalog fused parse",
+  "protocol": {
+    "sequence": "A1-B1-B2-A2",
+    "cpu": 2,
+    "workers": 1,
+    "warmups_per_case_per_leg": 30,
+    "samples_per_case_per_leg": 500,
+    "units": "nanoseconds",
+    "build_parallelism": 1,
+    "measurement_parallelism": 1
+  },
+  "corpus": {
+    "name": "odp-media-textbox-publication",
+    "slides": 12,
+    "media_payloads": 8,
+    "archive_bytes": 16785912,
+    "sha256": "661ae80396d4eda673d35e45d208443cc359052e4b9b27fed0ba6681602a913a"
+  },
+  "runs": {
+    "A1": {
+      "role": "control",
+      "revision": "32290f7cef837d4eb8377a7085b9607d21651d4d",
+      "tree": "cd76a9c5bc40cd1711337089b40d748645d60867",
+      "dirty": false,
+      "binary_sha256": "7291b2b99859f7e1a48a7e8ed143818cf64aa75b797c08978fb78eefa8cbf4c5",
+      "binary_bytes": 53376280,
+      "raw_report_sha256": "17f3fd19ab34e3b7e8645c93ee5c0b08d7b88ae916a94bcf86db5dfb9060973d",
+      "raw_report_bytes": 727547
+    },
+    "B1": {
+      "role": "candidate",
+      "revision": "922eb5e2c56f2a65c8b755514da251f682a902e6",
+      "tree": "52feb9fed1558b98ee8bbf199796ea7234763ba9",
+      "dirty": false,
+      "binary_sha256": "9a26cd1997d36ce18bdcf724e083984edab722b23222be0e3e0e7a579677c847",
+      "binary_bytes": 53369880,
+      "raw_report_sha256": "a359baa7e5fd47604a6cc2b5270cb1dc5fdcfe8c18630e424100dce57daa39ba",
+      "raw_report_bytes": 727662
+    },
+    "B2": {
+      "role": "candidate",
+      "revision": "922eb5e2c56f2a65c8b755514da251f682a902e6",
+      "tree": "52feb9fed1558b98ee8bbf199796ea7234763ba9",
+      "dirty": false,
+      "binary_sha256": "9a26cd1997d36ce18bdcf724e083984edab722b23222be0e3e0e7a579677c847",
+      "binary_bytes": 53369880,
+      "raw_report_sha256": "17320facdac8ae4adf6748037b8ac0d41558c0056962c5ce30fff0e915fd9bc6",
+      "raw_report_bytes": 727572
+    },
+    "A2": {
+      "role": "control",
+      "revision": "32290f7cef837d4eb8377a7085b9607d21651d4d",
+      "tree": "cd76a9c5bc40cd1711337089b40d748645d60867",
+      "dirty": false,
+      "binary_sha256": "7291b2b99859f7e1a48a7e8ed143818cf64aa75b797c08978fb78eefa8cbf4c5",
+      "binary_bytes": 53376280,
+      "raw_report_sha256": "bdf4065c027983fd8f8f49999d89aeaa48b3ba20b598c7dc844cfe7658951922",
+      "raw_report_bytes": 727614
+    }
+  },
+  "untimed_gates": {
+    "semantic_equivalence": true,
+    "topology_equivalence": true,
+    "media_locality": true,
+    "source_replay": true,
+    "source_freshness": true,
+    "content_read_accounting": true,
+    "list_zero_post_preparation_reads": true,
+    "pictures_zero_reads": true,
+    "source_version_observations": {
+      "control": 51,
+      "candidate": 53,
+      "interpretation": "Each binary was internally stable and passed freshness gates. The candidate performs two additional bounded preflight/version observations, so identical observation counts are not claimed."
+    }
+  },
+  "results": [
+    {
+      "case": "odp_source_backed_catalog_open",
+      "operation": "fresh SourceBackedPresentationCatalog::from_read_at",
+      "elapsed_ns": {
+        "A1": {
+          "min": 49308,
+          "p50": 55627,
+          "mean": 58549.73799999999,
+          "p95": 74843,
+          "p99": 90544,
+          "max": 98966,
+          "confidence_interval_95": {
+            "lower": 57823.783262481404,
+            "upper": 59275.69273751858
+          }
+        },
+        "B1": {
+          "min": 41167,
+          "p50": 46934,
+          "mean": 51976.717999999986,
+          "p95": 75874,
+          "p99": 95061,
+          "max": 184234,
+          "confidence_interval_95": {
+            "lower": 50717.11754712502,
+            "upper": 53236.318452874955
+          }
+        },
+        "B2": {
+          "min": 40976,
+          "p50": 47996,
+          "mean": 51579.99399999998,
+          "p95": 71899,
+          "p99": 90624,
+          "max": 152711,
+          "confidence_interval_95": {
+            "lower": 50605.04612055005,
+            "upper": 52554.94187944991
+          }
+        },
+        "A2": {
+          "min": 49249,
+          "p50": 58055,
+          "mean": 62173.236000000004,
+          "p95": 83956,
+          "p99": 109591,
+          "max": 240500,
+          "confidence_interval_95": {
+            "lower": 60843.58215942273,
+            "upper": 63502.88984057728
+          }
+        }
+      },
+      "reduction_percent": {
+        "A1_B1": {
+          "p50": 15.627,
+          "mean": 11.226,
+          "p95": -1.378,
+          "p99": -4.989
+        },
+        "A2_B2": {
+          "p50": 17.327,
+          "mean": 17.038,
+          "p95": 14.361,
+          "p99": 17.307
+        }
+      },
+      "run_drift_percent": {
+        "control_A1_A2": {
+          "p50": 4.365,
+          "mean": 6.189,
+          "p95": 12.176,
+          "p99": 21.036
+        },
+        "candidate_B1_B2": {
+          "p50": 2.263,
+          "mean": -0.763,
+          "p95": -5.239,
+          "p99": -4.668
+        }
+      }
+    },
+    {
+      "case": "odp_source_backed_catalog_list",
+      "operation": "catalog projection after owner preparation",
+      "elapsed_ns": {
+        "A1": {
+          "min": 20,
+          "p50": 30,
+          "mean": 65.89999999999996,
+          "p95": 180,
+          "p99": 270,
+          "max": 391,
+          "confidence_interval_95": {
+            "lower": 60.58086861116271,
+            "upper": 71.21913138883721
+          }
+        },
+        "B1": {
+          "min": 20,
+          "p50": 60,
+          "mean": 91.52199999999999,
+          "p95": 190,
+          "p99": 290,
+          "max": 391,
+          "confidence_interval_95": {
+            "lower": 85.79689819471453,
+            "upper": 97.24710180528545
+          }
+        },
+        "B2": {
+          "min": 20,
+          "p50": 30,
+          "mean": 61.160000000000004,
+          "p95": 151,
+          "p99": 200,
+          "max": 311,
+          "confidence_interval_95": {
+            "lower": 56.47649650886935,
+            "upper": 65.84350349113065
+          }
+        },
+        "A2": {
+          "min": 20,
+          "p50": 40,
+          "mean": 78.22000000000003,
+          "p95": 200,
+          "p99": 291,
+          "max": 400,
+          "confidence_interval_95": {
+            "lower": 72.24124115877873,
+            "upper": 84.19875884122132
+          }
+        }
+      },
+      "reduction_percent": {
+        "A1_B1": {
+          "p50": -100.0,
+          "mean": -38.88,
+          "p95": -5.556,
+          "p99": -7.407
+        },
+        "A2_B2": {
+          "p50": 25.0,
+          "mean": 21.81,
+          "p95": 24.5,
+          "p99": 31.271
+        }
+      },
+      "run_drift_percent": {
+        "control_A1_A2": {
+          "p50": 33.333,
+          "mean": 18.695,
+          "p95": 11.111,
+          "p99": 7.778
+        },
+        "candidate_B1_B2": {
+          "p50": -50.0,
+          "mean": -33.175,
+          "p95": -20.526,
+          "p99": -31.034
+        }
+      }
+    },
+    {
+      "case": "odp_source_backed_catalog_query",
+      "operation": "selected slide projection at index 6 after owner/index preparation",
+      "elapsed_ns": {
+        "A1": {
+          "min": 55908,
+          "p50": 61174,
+          "mean": 65251.92600000003,
+          "p95": 84937,
+          "p99": 91717,
+          "max": 106526,
+          "confidence_interval_95": {
+            "lower": 64484.984968528865,
+            "upper": 66018.86703147119
+          }
+        },
+        "B1": {
+          "min": 57609,
+          "p50": 64518,
+          "mean": 68218.84799999995,
+          "p95": 89863,
+          "p99": 107547,
+          "max": 130940,
+          "confidence_interval_95": {
+            "lower": 67260.81411691022,
+            "upper": 69176.88188308969
+          }
+        },
+        "B2": {
+          "min": 58841,
+          "p50": 65940,
+          "mean": 71840.53400000006,
+          "p95": 91406,
+          "p99": 122578,
+          "max": 692323,
+          "confidence_interval_95": {
+            "lower": 69122.50982685066,
+            "upper": 74558.55817314946
+          }
+        },
+        "A2": {
+          "min": 56248,
+          "p50": 62862,
+          "mean": 68000.46200000003,
+          "p95": 91216,
+          "p99": 114357,
+          "max": 142277,
+          "confidence_interval_95": {
+            "lower": 66895.3598706851,
+            "upper": 69105.56412931495
+          }
+        }
+      },
+      "reduction_percent": {
+        "A1_B1": {
+          "p50": -5.466,
+          "mean": -4.547,
+          "p95": -5.8,
+          "p99": -17.26
+        },
+        "A2_B2": {
+          "p50": -4.896,
+          "mean": -5.647,
+          "p95": -0.208,
+          "p99": -7.189
+        }
+      },
+      "run_drift_percent": {
+        "control_A1_A2": {
+          "p50": 2.759,
+          "mean": 4.212,
+          "p95": 7.393,
+          "p99": 24.685
+        },
+        "candidate_B1_B2": {
+          "p50": 2.204,
+          "mean": 5.309,
+          "p95": 1.717,
+          "p99": 13.976
+        }
+      }
+    }
+  ],
+  "adjudication": {
+    "claim_authorized": true,
+    "accepted_case": "odp_source_backed_catalog_open",
+    "accepted_operation": "fresh SourceBackedPresentationCatalog::from_read_at",
+    "accepted_metrics": [
+      "p50 latency"
+    ],
+    "accepted_result": "p50 fell 15.627% in A1/B1 and 17.327% in A2/B2; control and candidate p50 same-side drift remained below 5%.",
+    "withheld_metrics": [
+      {
+        "metric": "open mean",
+        "reason": "Both comparisons improved and confidence intervals did not overlap, but control mean drift was 6.189%, above the 5% claim gate."
+      },
+      {
+        "metric": "open p95 and p99",
+        "reason": "Control tail drift exceeded the applicable stability thresholds and A1/B1 moved adversely."
+      }
+    ],
+    "rejected_cases": [
+      {
+        "case": "odp_source_backed_catalog_list",
+        "status": "rejected",
+        "reason": "Tens-of-nanoseconds measurements were unstable and the two comparison directions disagreed."
+      },
+      {
+        "case": "odp_source_backed_catalog_query",
+        "status": "rejected",
+        "reason": "Both comparisons regressed, so no query improvement is claimed."
+      }
+    ],
+    "performance_scope_caveats": [
+      "The authorized claim covers only p50 latency for fresh odp_source_backed_catalog_open on the recorded corpus and protocol.",
+      "No broad open-latency, list, query, cold-cache, throughput, scalability, or production-workload claim is authorized.",
+      "No claim is made about RSS, allocation behavior, fixed-memory behavior, physical I/O, or OOM behavior."
+    ],
+    "claims_not_authorized": [
+      "open mean",
+      "open p95",
+      "open p99",
+      "list latency",
+      "query latency",
+      "RSS",
+      "allocation",
+      "fixed-memory",
+      "physical-I/O",
+      "cold-cache",
+      "OOM"
+    ]
+  },
+  "source_provenance": {
+    "control": {
+      "revision": "32290f7cef837d4eb8377a7085b9607d21651d4d",
+      "tree": "cd76a9c5bc40cd1711337089b40d748645d60867",
+      "binary_sha256": "7291b2b99859f7e1a48a7e8ed143818cf64aa75b797c08978fb78eefa8cbf4c5"
+    },
+    "candidate": {
+      "revision": "922eb5e2c56f2a65c8b755514da251f682a902e6",
+      "tree": "52feb9fed1558b98ee8bbf199796ea7234763ba9",
+      "binary_sha256": "9a26cd1997d36ce18bdcf724e083984edab722b23222be0e3e0e7a579677c847"
+    },
+    "corpus_sha256": "661ae80396d4eda673d35e45d208443cc359052e4b9b27fed0ba6681602a913a",
+    "raw_reports_retained_in_repo": false,
+    "compact_artifact_authoritative": true,
+    "provenance_note": "Raw reports are not retained in the repository; their hashes and byte sizes are recorded in this compact artifact."
+  }
+}

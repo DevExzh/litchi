@@ -1,5 +1,38 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0372 compliance update
+
+The fused catalog parser remains within the owning `litchi-odp` package layer
+and consumes the doc-hidden validator owned by `litchi-odf-common`. It exposes
+no raw XML type through CRUD signatures and adds no public API, dependency
+edge, package identifier, archive handle, runtime handle, lock, or unsafe
+code. Validator-first event dispatch and deferred catalog errors retain the
+former sequential error precedence through verified EOF.
+
+Correctness and bounded hostile-input handling take precedence over speed.
+All input-dependent shared tracker growth is fallible; content exceeding the
+256 MiB materialized limit is rejected before allocation, including encrypted
+plaintext metadata. The 4,096-depth, 256-declarations-per-element,
+65,536-page, 1 MiB name, source freshness, ZIP, MIME, publication, and media
+locality fences remain in force.
+
+Focused locked/offline release tests passed for every executed common, ODP,
+and ODT target, subject to two exact pre-existing writer-test exclusions.
+Scoped Clippy passed with one pre-existing `large_enum_variant` allowance;
+the crate-boundary gate and independent static reviews passed.
+
+Clean CPU-2 ABBA on the fixed corpus used control
+`32290f7ce`/`7291b2...`, candidate `922eb5e2c`/`9a26cd...`, one worker,
+30 warmups, and 500 samples per leg. Fresh-open p50 improved 15.627% and
+17.327%, with both p50 same-side drifts below 5%. The [ABBA
+result](results/odp-source-catalog-0372-abba.json) records the evidence.
+
+The authorized claim is limited to fresh
+`SourceBackedPresentationCatalog::from_read_at` p50 latency on that corpus.
+Mean, tails, list, and query are withheld or rejected. No broad open, all-ODP,
+RSS, allocation, fixed-memory, physical-I/O, cold-cache, throughput, or OOM
+claim follows. See [Change 0372](changes/0372-odp-source-catalog-fused-parse.md).
+
 ## Change 0371 compliance update
 
 Change 0371 places ODF content validation and namespace tracking in the owning

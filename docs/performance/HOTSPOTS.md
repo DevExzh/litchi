@@ -1,5 +1,29 @@
 # Performance hotspot inventory
 
+## Change 0372 update
+
+The fresh ODP source-backed catalog open is now a narrowly measured hotspot.
+One borrowing XML pass replaces sequential validation and catalog scans while
+preserving error precedence, source freshness, ZIP/MIME verification,
+publication fences, media locality, and the existing content, depth,
+namespace, page, and name bounds. Input-dependent namespace-tracker growth is
+fallible, and oversized materialized content is rejected before allocation.
+
+Clean CPU-2 ABBA used one worker, 30 warmups, and 500 samples per leg on the
+fixed 12-slide, eight-media corpus with SHA-256
+`661ae80396d4eda673d35e45d208443cc359052e4b9b27fed0ba6681602a913a`.
+Control `32290f7ce`/`7291b2...` and candidate
+`922eb5e2c`/`9a26cd...` improved fresh-open p50 by 15.627% and 17.327%, with
+both p50 same-side drifts below 5%. See the [0372 record](changes/0372-odp-source-catalog-fused-parse.md)
+and [ABBA result](results/odp-source-catalog-0372-abba.json).
+
+Only fresh `SourceBackedPresentationCatalog::from_read_at` p50 on this corpus
+is accepted. Mean and tail metrics are withheld; list is unstable and query
+regressed. No broad open, list, query, RSS, allocation, fixed-memory,
+physical-I/O, cold-cache, throughput, or OOM claim follows. Focused tests,
+scoped Clippy, crate boundaries, and independent static reviews passed with
+the recorded pre-existing exclusions and allowance.
+
 ## Change 0371 update
 
 Change 0371 is a correctness and security-hardening prerequisite, not a
