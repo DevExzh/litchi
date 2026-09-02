@@ -15549,3 +15549,66 @@ or deletion gate. The topology remains 64 workspace packages, 237 internal
 dependency declarations, 226 canonical edges, 11 ordered debts with IDs
 `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. It closes no
 debt or ADR 0028 gate.
+
+## 2026-09-02 amendment: Keynote physical Sort Now evidence status
+
+This status record is intentionally separate from the 2026-09-01 host-owned
+selector verification record above. The focused API is
+`Package::{execute_slide_table_sort_order,execute_slide_table_sort_order_to_rows,
+edit_slide_table_physical_sort,apply_slide_table_physical_sort}` with
+`SlideSelector`, `TableSelector`, and body-relative `RowRange` selection.
+
+Source-level verification inventory includes 26 package integration cases
+covering selectors, full/selected body ranges, stable duplicate keys,
+header/footer isolation, sparse header and UID movement, exact no-op,
+patch/inverse/conflict, unknown/member preservation, locked/malformed/
+unsupported/dependency/topology refusal, and concurrent deterministic commits.
+The focused hidden codecs have 3 unit cases and 11 direct integration cases
+covering sparse source-preserving row/header/UID rewrites,
+malformed/duplicate/noncanonical input, nested length framing, and typed
+resource limits. Dedicated package/codec fuzz targets and corpora exist; any
+sanitizer/fuzz run is bounded and does not imply exhaustive coverage. All
+source-level contracts require strict wire preflight, lazy Buffa parity,
+fallible bounded staging, exact-source patch/inverse, candidate
+reopen/readback/locality, and atomic failure behavior.
+
+An external, disposable Computer Use probe (not a checked-in test) used
+Keynote 14.4 (7043.0.93) with an app-authored five-by-four table whose body was
+Zebra, Apple, Banana, Cherry. A candidate produced before the latest strict
+model-field admission hardening opened without repair, displayed the expected
+ascending order, and survived native save/close/reopen. The artifacts and
+hashes are retained below as exploratory evidence. The current strict owner
+subsequently rejects that app-authored source because model field 39 is an
+conditional-style owner identifier whose CalculationEngine dependency closure
+is not yet rewritten (`UnsupportedDependency`). Consequently the
+probe is not current-owner E3/E4 evidence and does not promote native
+acceptance; a current-admitted native source must be rerun after field 39 is
+modeled or otherwise proven safe.
+
+| exploratory artifact (not a current-owner gate) | bytes | SHA-256 |
+| --- | ---: | --- |
+| app-authored source `/private/tmp/litchi-keynote-physical-sort-20260902.ii56Q4/native-clean-source.key` | 516,029 | `c969edd38c204599921e32dc948acb835ae3740a90a4a2cb8f677d57c5b4da83` |
+| configured source / inverse | 516,029 | `7a9ded3d426198ddf101384eec7a157ff1754d602c4908b11458a4dfcef1e104` |
+| Rust physical-sort candidate before Keynote normalization | 469,132 | `0d6607805234fa3f11e9fdd0a9d4c2f695dc49041e1899c787d3c340cb9d7272` |
+| Keynote-native resave | 516,085 | `1a6fc3487688f0ba23057b191a9c235780a35ea05096566ddedc14f6526e463c` |
+
+The checked-in native fixture under `test-data/iwork` has no table. The
+checked-in native-evidence test records artifact metadata/hashes only; it does
+not launch Keynote. The current matrix therefore keeps physical-sort native
+acceptance pending, even though the disposable pre-hardening candidate passed
+the manual application probe. No arbitrary-producer, native-byte-parity,
+formula/other refused-row-affine, package-wide performance, or
+migration-host/debt/deletion-gate claim follows.
+
+The deprecated host keeps a temporary legacy writer only for source-built
+`KeynoteDocumentBuilder` graphs carrying the explicit
+`Application/Litchi/Blank/Wide` template marker, including their serialized
+reopen form. Unmarked exact packages remain pinned to the focused owner and
+cannot fall back after a structural, semantic, or resource refusal. The paired
+source-built Keynote/Pages regression continues to pass under this guarded
+compatibility boundary.
+
+The current topology is 64 workspace packages, 238 internal dependency
+declarations, 227 canonical edges, 11 development-only edges, 11 ordered
+migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
+migration host. No debt, edge, host, or ADR 0028 deletion gate closes.

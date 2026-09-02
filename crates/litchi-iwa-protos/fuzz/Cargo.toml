@@ -254,6 +254,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "keynote_table_physical_sort_codec"
+path = "fuzz_targets/keynote_table_physical_sort_codec.rs"
+test = false
+doc = false
+bench = false
+
 [profile.release]
 debug = 1
 codegen-units = 1

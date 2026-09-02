@@ -2700,25 +2700,40 @@ values, raw wire views, and generated/Prost/Buffa types stay private. Strict
 fields, admit exact lock and unlock transitions, and fail closed for malformed,
 ambiguous, or unsupported sources.
 
-Raw Keynote title, persisted-sort, and persisted-lock configuration methods and
-calls are retired from the legacy editor host. `litchi-iwa` retains the
-physical `Sort Now` row executor behind
+Raw Keynote title, persisted-sort, persisted-lock, and physical `Sort Now`
+configuration methods and calls are retired from the legacy editor host. The
+focused `litchi-keynote::Package` owns
 `execute_slide_table_sort_order(SlideSelector, TableSelector)` and
 `execute_slide_table_sort_order_to_rows(SlideSelector, TableSelector,
-RowRange)`. It runs only after focused Package persisted `Order` and lock
-admission. The old raw-ID `apply_*` methods remain deprecated declarations for
-source compatibility, and the boundary checker rejects production calls to
-them. There is no lock fallback: every focused lock error propagates. Physical
-rows/cells, storage, formulas, tiles, and broader table compatibility remain
-legacy host responsibilities.
+RowRange)`, while the old raw-ID `apply_*` methods remain deprecated
+declarations for source compatibility and the boundary checker rejects
+production calls to them. There is no lock or physical-sort fallback for an
+exact package: focused errors propagate. A guarded source-built-only writer is
+retained for `KeynoteDocumentBuilder` graphs carrying the explicit
+`Application/Litchi/Blank/Wide` marker; unmarked exact packages cannot fall
+back after focused-owner refusal. Physical row/value reading, formulas, rich
+cells, and broader table compatibility remain outside the focused owner.
 
 Physical row planning is archive-free and shared through the hidden common
-`RowPermutation` primitive. It validates rule arity and scalar domains, uses
-source offsets as the final key for deterministic stable duplicate ordering,
-and builds its inverse with one fallibly reserved buffer. The compatibility
-adapter borrows BNC cell views while planning and rejects hostile row, column,
-and key-product dimensions before allocating. It still owns the generated
-table/tile mutation path; this is not yet a focused physical-storage owner.
+`RowPermutation` primitive. The focused owner admits only the canonical
+type-6001 table-model route and explicitly proven tile, data-list, header, UID,
+and empty pre-BNC sentinel shapes. It validates rule arity and scalar domains,
+uses source offsets as the final key for deterministic stable duplicate
+ordering, and builds its inverse with bounded staging. The private adapter
+borrows BNC cell views while planning and rejects hostile row, column, and
+key-product dimensions before allocation. Formula/error cells, rich text,
+comments, merges, filters, groups, categories, pivots, spills, conditional
+styles, hidden/non-positional state, imported/provenance data, non-empty
+stroke, cross-tile/cross-bucket movement, unknown mutable fields, and other
+unproven row-affine state fail closed atomically.
+
+The current strict owner rejects the app-authored Keynote 14.4 probe because
+model field 39 identifies an unowned conditional-style CalculationEngine
+dependency graph. A pre-hardening Computer Use run is
+recorded in ADR 0008 as external exploratory evidence only; it does not
+certify current-owner native E3/E4 acceptance. The checked-in native fixture
+has no table and the checked-in evidence test records hashes without launching
+Keynote. Native acceptance remains pending.
 
 The scoped gates are 17/17 for the lock codec, 9/9 for focused Keynote lock
 integration, 30/30 for the IWA slide-table suite, four migrated Keynote example

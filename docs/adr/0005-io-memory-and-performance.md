@@ -2154,3 +2154,34 @@ or ADR 0028 gate. The topology
 remains 64 workspace packages, 237 internal dependency declarations, 226
 canonical edges, 11 ordered migration debts with IDs `[1, 2, 4, 8, 10, 12, 13,
 14, 15, 16, 17]`, and one migration host.
+
+## 2026-09-02 amendment: Keynote physical table-sort resource record
+
+The focused physical `Sort Now` operation is bounded by source/candidate
+package, entry/payload/object/message/reference, wire bytes/fields/nesting/work,
+row/column/key-cell, BNC-offset, retained/scratch, allocation, component, and
+reassembly ceilings. Checked arithmetic and fallible staging occur before
+publication. Tile/header/UID codecs borrow source records and expose prepared
+requirements; strict preflight runs before a private lazy Buffa view, while raw
+source bytes remain preservation authority. The operation plans a stable
+permutation without cloning each BNC payload and rewrites only admitted
+row envelopes, sparse header records, and UID arrays plus root preview
+invalidation.
+
+Exact no-ops do not construct candidates. Changed candidates are staged once,
+reopened under retained limits, semantically reread, and locality-verified
+before publication; failures leave the immutable source unchanged. These are
+bounded correctness/refusal contracts, not zero-copy, allocation-count,
+peak-RSS, latency, throughput, or package-wide performance claims. Cross-tile/
+bucket moves and formula/error/rich/comment/merge/filter/group/category/pivot/
+spill/conditional/hidden/imported/provenance/stroke or other unproven row-affine
+dependencies fail closed. There is no public row/value reader. A disposable
+Computer Use probe opened a pre-hardening candidate, but the current strict
+owner rejects the app-authored source because model field 39 identifies an
+unowned conditional-style CalculationEngine dependency graph; that run is
+exploratory evidence only. Native Keynote
+acceptance and hashes for the current owner are pending, and the added
+canonical BNC edge does not close any migration debt or monolith gate. Current
+topology remains 64 packages, 238 declarations, 227 canonical edges, 11
+development-only edges, 11 debts with IDs
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.

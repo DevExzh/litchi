@@ -7276,3 +7276,50 @@ ordered migration debt is retired, `litchi-iwa` remains the one migration host,
 and the documented topology remains 64 packages, 237 internal dependency
 declarations, 226 canonical edges, and 11 ordered debts with IDs `[1, 2, 4, 8,
 10, 12, 13, 14, 15, 16, 17]`. In particular, no ADR 0028 deletion gate closes.
+
+## 2026-09-02 amendment: Keynote physical `Sort Now` focused-owner slice
+
+The bounded physical executor now has focused implementation in
+`litchi-keynote`. Existing slide tables are selected with `SlideSelector` and
+`TableSelector`; persisted sort order is consumed as input, scalar keys are
+limited to text, number, boolean, date, and duration, and body-relative ranges
+keep headers and footers outside the operation. Text uses Rust lexical
+ordering, the other numeric-like domains use total ordering, duplicates retain
+source order, and mixed or unsupported domains fail closed. Admitted tile-row
+envelopes, sparse headers, and UID mappings move together under strict wire
+preflight followed by private lazy Buffa inspection. Exact-source
+patch/inverse, candidate reopen/readback, bounded locality, and root-preview
+invalidation are part of the focused contract; unsupported formulas/errors,
+rich text/comments, merges, filters/groups/categories/pivots/spills,
+conditional/hidden/imported state, stroke dependencies, cross-tile or
+cross-bucket movement, and other unproven row-affine dependencies refuse.
+
+`Sort Now` physical execution in Keynote is exposed by
+`execute_slide_table_sort_order`; selected body-row ranges use the corresponding
+`execute_slide_table_sort_order_to_rows` entry point.
+
+This is a narrow owner slice, not a claim that `litchi-iwa` has been removed.
+The host compatibility route remains during migration only for
+`KeynoteDocumentBuilder` graphs carrying the explicit
+`Application/Litchi/Blank/Wide` marker, including their compatibility
+save/reopen form. Unmarked exact packages cannot fall back after focused-owner
+refusal. The new
+`litchi-keynote -> litchi-numbers-wire` edge is private BNC substrate use, not
+a public raw-ID or low-level-object API. Focused source tests and fuzz surfaces
+are documented separately. A disposable Computer Use probe opened a
+pre-hardening candidate in Keynote 14.4 (7043.0.93), displayed Apple, Banana,
+Cherry, Zebra after an ascending column-zero sort, and survived native
+save/close/reopen. The current strict owner rejects the app-authored source
+because model field 39 identifies an unowned conditional-style CalculationEngine
+dependency graph, so that run is
+exploratory external evidence only—not current-owner E3/E4 certification.
+ADR 0008 records the source, configured, candidate, inverse, and native-resaved
+sizes and SHA-256 hashes as exploratory artifacts. Native acceptance remains
+pending until a current-admitted native source is rerun; no native-byte-parity
+or arbitrary-producer claim follows.
+
+None of the six monolith-exit gates closes. No debt, package, host, or deletion
+gate is retired. The current inventory is 64 workspace packages, 238 internal
+dependency declarations, 227 canonical edges, 11 development-only edges, 11
+ordered migration debts with IDs
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.

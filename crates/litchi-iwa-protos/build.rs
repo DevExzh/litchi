@@ -51,6 +51,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/numbers_table_title_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_sort_order_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_storage_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_table_physical_sort_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_pop_up_menu_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_control_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_number_format_codec.rs");
@@ -198,6 +199,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         buffa_projection_directory,
     )?;
     enforce_table_cell_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_table_physical_sort_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_numbers_table_data_list_provenance(proto_directory, buffa_projection_directory)?;
     enforce_numbers_table_cell_pop_up_menu_projection_provenance(
         proto_directory,
@@ -675,6 +677,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_table_cell_storage_projection_budget(&buffa_table_cell_storage_out_directory)?;
+
+    // Physical table sorting projects only singular scalar envelopes. Rows,
+    // headers, UUIDs, and every repeated field stay on the handwritten
+    // source-preserving path so generated Buffa code cannot materialise an
+    // input-width mutation owner.
+    let buffa_table_physical_sort_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-table-physical-sort");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSTTablePhysicalSortArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_table_physical_sort_out_directory)
+        .include_file("iwa_table_physical_sort_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_table_physical_sort_projection_budget(&buffa_table_physical_sort_out_directory)?;
 
     // Popup-menu model and cell-spec decoding only needs singular wrappers.
     // The repeated model values and control-cell list entries remain on the
@@ -1256,6 +1279,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "17d1cd1afd6f59c46d29f2c481744ead27568ffe937a2b9d9633ce376cb754c9",
         ),
         (
+            "TSTTablePhysicalSortArchive.proto",
+            1532,
+            "962b09a3649c41c80f508a98c1f4a49ba4363eef0a5f2a234f0927d75e3cda07",
+        ),
+        (
             "TSTTableCellPopUpMenuArchive.proto",
             1499,
             "1f12a6fecff8262e107e613489a3a33c800f54a0a12618ed76279b768f6eb4c9",
@@ -1538,6 +1566,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/numbers_table_cell_storage_codec.rs",
             "crate::buffa_numbers_table_cell_storage_generated::",
             "mod buffa_numbers_table_cell_storage_generated {",
+        ),
+        (
+            "src/numbers_table_physical_sort_codec.rs",
+            "crate::buffa_table_physical_sort_generated::",
+            "mod buffa_table_physical_sort_generated {",
         ),
         (
             "src/numbers_table_cell_pop_up_menu_codec.rs",
@@ -7747,6 +7780,130 @@ fn enforce_table_cell_storage_projection_budget(directory: &Path) -> Result<(), 
         469_001,
         "a4ad92afd34f6f276ad8fcd34e249a0738b8adc1b0477aa3e86fc447cf074776",
     )
+}
+
+fn enforce_table_physical_sort_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: &[&str] = &[
+        "LitchiIwaTablePhysicalSortProjection.mod.rs",
+        "TSTTablePhysicalSortArchive.__lazy_view.rs",
+        "TSTTablePhysicalSortArchive.__view.rs",
+        "TSTTablePhysicalSortArchive.rs",
+        "iwa_table_physical_sort_buffa_protos.rs",
+    ];
+    let mut names = fs::read_dir(directory)?
+        .map(|entry| {
+            let entry = entry?;
+            if entry.file_type()?.is_file() {
+                Ok(Some(entry.file_name().into_string().map_err(
+                    |_| "physical-sort generated filename is not UTF-8",
+                )?))
+            } else {
+                Ok(None)
+            }
+        })
+        .collect::<Result<Vec<_>, Box<dyn Error>>>()?
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+    names.sort_unstable();
+    let mut expected = EXPECTED_FILES.to_vec();
+    expected.sort_unstable();
+    if names != expected {
+        return Err(format!(
+            "physical table-sort projection generated files {names:?}; expected {expected:?}"
+        )
+        .into());
+    }
+    let mut bytes = 0u64;
+    for entry in fs::read_dir(directory)? {
+        let entry = entry?;
+        if entry.file_type()?.is_file() {
+            bytes = bytes
+                .checked_add(entry.metadata()?.len())
+                .ok_or("physical-sort generated byte overflow")?;
+        }
+    }
+    let lazy = fs::read_to_string(directory.join("TSTTablePhysicalSortArchive.__lazy_view.rs"))?;
+    if lazy.contains("RepeatedView") {
+        return Err(
+            "physical table-sort Buffa lazy projection exposed repeated storage or Prost".into(),
+        );
+    }
+    if bytes > 256_000 {
+        return Err(format!(
+            "physical table-sort Buffa projection generated {bytes} bytes; maximum is 256000"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_table_physical_sort_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    let canonical = fs::read_to_string(proto_directory.join("TSTArchives.proto"))?;
+    for marker in [
+        "repeated .TST.TileRowInfo rowInfos = 5;",
+        "message HeaderStorageBucket {",
+        "repeated .TST.HeaderStorageBucket.Header headers = 2;",
+        "message ColumnRowUIDMapArchive {",
+        "repeated .TSP.UUID sorted_row_uids = 4;",
+        "repeated uint32 row_index_for_uid = 5;",
+        "repeated uint32 row_uid_for_index = 6;",
+    ] {
+        if canonical.matches(marker).count() != 1 {
+            return Err(format!("physical table-sort canonical marker {marker:?} drifted").into());
+        }
+    }
+    if canonical
+        .lines()
+        .filter(|line| line.trim() == "message Tile {")
+        .count()
+        != 2
+    {
+        return Err("physical table-sort canonical Tile declarations drifted".into());
+    }
+    let projection =
+        fs::read_to_string(projection_directory.join("TSTTablePhysicalSortArchive.proto"))?;
+    let normalized = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let expected = "syntax = \"proto2\";\npackage LitchiIwaTablePhysicalSortProjection;\nmessage TileArchive {\nrequired uint32 max_column = 1;\nrequired uint32 max_row = 2;\nrequired uint32 num_cells = 3;\nrequired uint32 num_rows = 4;\noptional uint32 storage_version = 6;\noptional bool last_saved_in_bnc = 7;\noptional bool should_use_wide_rows = 8;\n}\nmessage TileRowInfoArchive {\nrequired uint32 tile_row_index = 1;\nrequired uint32 cell_count = 2;\nrequired bytes cell_storage_buffer_pre_bnc = 3;\nrequired bytes cell_offsets_pre_bnc = 4;\noptional uint32 storage_version = 5;\noptional bytes cell_storage_buffer = 6;\noptional bytes cell_offsets = 7;\noptional bool has_wide_offsets = 8;\n}\nmessage HeaderStorageBucketArchive {\nrequired uint32 bucket_hash_function = 1;\n}\nmessage HeaderArchive {\nrequired uint32 index = 1;\nrequired fixed32 size_bits = 2;\nrequired uint32 hiding_state = 3;\nrequired uint32 number_of_cells = 4;\noptional bytes cell_style = 5;\noptional bytes text_style = 6;\n}\nmessage ColumnRowUidMapArchive {\n}\nmessage Uuid {\nrequired uint64 lower = 1;\nrequired uint64 upper = 2;\n}";
+    let codec = fs::read_to_string("src/numbers_table_physical_sort_codec.rs")?;
+    let lib = fs::read_to_string("src/lib.rs")?;
+    for marker in [
+        "pub struct DecodeOptions",
+        "pub fn plan_tile_rows_rewrite<",
+        "pub fn plan_header_storage_bucket_rows<",
+        "pub fn plan_column_row_uid_map_rewrite<",
+        "pub fn decode_column_row_uid_map(",
+        "fn parity_tile(",
+        "fn parity_uid_map(",
+        "mod buffa_table_physical_sort_generated {",
+        "/buffa-table-physical-sort/iwa_table_physical_sort_buffa_protos.rs",
+    ] {
+        if !codec.contains(marker) && !lib.contains(marker) {
+            return Err(format!("physical table-sort codec marker {marker:?} drifted").into());
+        }
+    }
+    if normalized != expected
+        || projection.contains("repeated ")
+        || projection.len() > 4 * 1024
+        || codec.contains("prost::")
+        || codec.contains("encode_to_vec")
+        || codec.contains("to_owned_message")
+        || codec.contains("try_encode")
+    {
+        return Err(
+            "physical table-sort projection/codec drifted, widened generated storage, or introduced Prost encoding"
+                .into(),
+        );
+    }
+    Ok(())
 }
 
 fn enforce_table_cell_dependency_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {

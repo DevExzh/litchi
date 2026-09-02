@@ -1404,3 +1404,56 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 `cargo +nightly fuzz run` is the sanitizer invocation.  Corpus additions,
 artifacts, and build output stay in the temporary root; set
 `KEEP_FUZZ_CORPUS=1` to retain it for review.
+
+## Keynote physical table-sort codec
+
+`keynote_table_physical_sort_codec` fuzzes the archive-free wire seam used by
+Keynote's selector-first physical table owner. It drives strict source-
+borrowing plans for `Tile.row_infos` and sparse `HeaderStorageBucket.headers`,
+then checks the prepared and one-shot rewrites against each other. The target
+also validates the row/column UID-map projection and its checked source-indexed
+permutation type.
+
+Every successful rewrite is reparsed and executed as an exact no-op. The
+caller-owned source is compared after every decode, preflight, and execution;
+unknown scalar/length-delimited spans and opaque row/header payloads must
+remain present after permutation. Fixed recipes keep missing required fields,
+duplicate required fields and row indexes, wrong wire types, non-canonical
+varints, truncated messages, malformed UID pairs, and dimension mismatches
+reachable. Output, work, and input ceilings are each retried one byte below
+the exact preflight requirement, so refusal happens before candidate
+publication.
+
+Inputs are capped at 64 KiB, output at 128 KiB, fields at 16,384, records at
+4,096, elements at 16,384, work/scratch at 512 KiB, and nesting at 64. Corpus
+entries are small hand-authored `hex:` wire recipes; they are not copied
+native Keynote package bytes.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check keynote_table_physical_sort_codec
+```
+
+Run a bounded smoke with mutable corpus, artifacts, and build output outside
+the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-keynote-physical-sort-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+cp corpus/keynote_table_physical_sort_codec/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  keynote_table_physical_sort_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```

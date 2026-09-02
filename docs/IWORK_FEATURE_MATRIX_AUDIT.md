@@ -1,8 +1,9 @@
 # iWork Feature-Matrix Audit
 
 > Source audit starting at committed `d33f30f41` (2026-09-01) and including the focused
-> Scientific- and Fraction-format owner work from that baseline. This document records the rationale and
-> cross-suite gaps behind the three authoritative app matrices and does not replace them.
+> Scientific- and Fraction-format owner work plus the current Keynote physical `Sort Now` owner
+> work from that baseline. This document records the rationale and cross-suite gaps behind the three
+> authoritative app matrices and does not replace them.
 
 ## Matrix state
 
@@ -17,7 +18,7 @@ The repository's matrix contract says detailed per-format matrices are the sourc
 | Current implementation certification | ❌ [FORMAT_IMPLEMENTATION_REVIEW.md](FORMAT_IMPLEMENTATION_REVIEW.md#scope-and-rubric) explicitly excludes all iWork |
 | iWork matrix evidence links | ✅ the matrices contain direct focused-source, test, fixture, and audit-evidence links |
 | Root index wording | ✅ stale matrix-count wording was removed when the iWork owners were registered |
-| Current migration topology | ✅ 64 workspace packages, 237 internal dependency declarations, 226 canonical edges, 11 ordered debts `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, one migration host; no Fraction debt/gate closure |
+| Current migration topology | ✅ 64 workspace packages, 238 internal dependency declarations, 227 canonical edges, 11 development-only edges, 11 ordered debts `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, one migration host; no physical-sort debt/gate closure |
 
 Status used below: ✅ fully supports the precisely stated bounded scope; 🟡 partial, metadata-only, preservation-only, host-only, or otherwise constrained; ❌ unsupported; N/A not applicable. A generated schema or detached value type alone receives no semantic-support credit.
 
@@ -45,6 +46,20 @@ this seam. Computer Use additionally established operation-specific native E3/E4
 representative Eighths-to-Hundredths edit; source, candidate, and native-resaved hashes are frozen
 in ADR 0008. This does not promote all nine native UI variants, arbitrary-producer parity, native
 byte parity, or package-wide performance.
+The Keynote physical `Sort Now` owner now has a selector-first exact-source transaction over an
+existing table, but it exposes no public row/value reader. Admission is limited to the canonical
+type-6001 table-model route and explicitly proven tile, data-list, header, UID, and empty pre-BNC
+sentinel shapes. It moves admitted body-row envelopes, sparse row headers, and UID mappings using
+the persisted order as input, with Rust lexical text comparison and `f64::total_cmp`-based
+deterministic ordering for numeric-like values. Formula/error cells, rich text/comments,
+merge/filter/group/category/pivot/spill/conditional/hidden/imported/provenance dependencies,
+non-empty stroke, cross-tile/cross-bucket movement, unknown mutable state, and other unproven
+row-affine state fail closed atomically. A disposable Computer Use run opened a pre-hardening
+candidate in Keynote 14.4 and showed the expected order, but the current strict owner rejects the
+app-authored source because it contains unproven model field 39. The run is external exploratory
+evidence, not current-owner E3/E4 promotion; the checked-in native fixture has no table and the
+checked-in evidence test records hashes without launching Keynote. Native acceptance remains
+pending, and ADR 0008 records the scope and artifact hashes without broadening it.
 Exact current and historical results are recorded in [IWORK_PROGRESS_AUDIT.md](IWORK_PROGRESS_AUDIT.md#current-worktree-verification).
 
 ## Shared IWA capabilities
@@ -101,8 +116,9 @@ Primary references: [package boundary](../crates/litchi-pages/src/package.rs#L45
 | Slide creation/duplication | ❌ | N/A | ❌ | No focused transaction |
 | Show settings/transitions/backgrounds | 🟡 | ✅ | 🟡 | Selected existing graph and bounded fills/settings; no master/theme synthesis |
 | Placeholder visibility | 🟡 | ✅ | 🟡 | Title/body/slide-number visibility only |
-| Slide-table properties | 🟡 | ✅ | 🟡 | Appearance, dimensions, headers, lock, name, title, persisted sort; catalog/discovery remains limited |
-| Table cells/formulas/formats/comments/topology | ❌ | ❌ | ❌ | No public focused package owner |
+| Slide-table properties | 🟡 | ✅ | 🟡 | Appearance, dimensions, headers, lock, name, title, and persisted sort configuration; catalog/discovery remains limited |
+| Physical table row sorting (“Sort Now”) | 🟡 | 🟡 | 🟡 | Selector-first `Package::{execute_slide_table_sort_order,execute_slide_table_sort_order_to_rows}` over existing tables; no public row/value reader. Admission is limited to the canonical type-6001 table-model route and explicitly proven tile, data-list, header, UID, and empty pre-BNC sentinel shapes. Scalar text/number/boolean/date/duration keys use Rust lexical text ordering, `f64::total_cmp`-based deterministic ordering for numeric-like values, ordinary boolean ordering, and stable source-row ordering for duplicates. Body-relative ranges isolate headers/footers; admitted tile-row envelopes, sparse row headers, and UID mappings move together. Strict wire preflight precedes borrowed lazy Buffa views; formula/error, rich-text, comment, merge, filter/group/category/pivot/spill/conditional, hidden/non-positional, imported/provenance, non-empty stroke, cross-tile/cross-bucket, unknown mutable, and other unproven row-affine dependencies fail closed atomically. Exact-source patch/inverse, candidate reopen/readback, locality, and preview invalidation are source-level contracts. A disposable Computer Use run opened a pre-hardening candidate in Keynote 14.4, but the current strict owner rejects that app-authored source because it contains unproven model field 39; the run is external exploratory evidence rather than current-owner E3/E4 promotion. The checked-in native fixture has no table and the checked-in evidence test records hashes without launching Keynote, so native acceptance remains pending ([owner](../crates/litchi-keynote/src/package/slide_table_physical_sort.rs#L1), [semantic surface](../crates/litchi-keynote/src/slide/table/physical_sort.rs#L1), [tests](../crates/litchi-keynote/tests/slide_table_physical_sort.rs#L1), [ADR 0008](adr/0008-migration-and-verification.md#2026-09-02-amendment-keynote-physical-sort-focused-owner-verification-status)) |
+| Table cells/formulas/formats/comments/topology | ❌ | ❌ | ❌ | No public focused cell model or general structural table owner; physical row sorting above is not cell CRUD |
 | Charts | 🟡 | 🟡 | 🟡 | Catalog/title/caption/axis-title/primary value-axis settings only; no data, series, type, legend, styles, or CRUD |
 | Movies and soundtrack settings/order | 🟡 | 🟡 | 🟡 | Existing metadata, geometry, playback, title/caption, settings/order; no asset lifecycle; current soundtrack-order tests are red |
 | Image/audio/movie bytes and asset CRUD | ❌ | ❌ | ❌ | Detached option values do not constitute package media support |
@@ -126,7 +142,7 @@ Primary references: [package boundary](../crates/litchi-keynote/src/package.rs#L
 | Sheet/table names and sheet order | 🟡 | ✅ | 🟡 | Rename/reorder existing objects only; not defined-name or lifecycle support |
 | Sheet/table lifecycle and row/column topology | 🟡 | ✅ | ❌ | Existing sheet reorder is supported above; no focused add/delete/duplicate or row/column insert/delete transaction |
 | Package merge state/editing | ❌ | ❌ | ❌ | Detached geometry vocabulary exists, but there is no native package merge reader or transaction |
-| Table settings | 🟡 | ✅ | 🟡 | Appearance, dimensions, headers/freeze/repeat, lock, title, and persisted sort configuration; no physical sort |
+| Table settings | 🟡 | ✅ | 🟡 | Appearance, dimensions, headers/freeze/repeat, lock, title, and persisted sort configuration; physical row sorting is tracked as a separate Keynote owner |
 | Cell controls/pop-up menus | 🟡 | 🟡 | 🟡 | Checkbox/star/slider/stepper/pop-up only, under strict graph profiles |
 | Existing-cell Number/Percentage display formats | 🟡 | ✅ | 🟡 | Selector-first existing-cell Number and Percentage read/set/reset operations preserve the scalar value and unrelated bytes. Number has operation-specific native evidence; Percentage focused/synthetic coverage is green, and ADR 0008 records a disposable native Numbers open/save/close/reopen plus strict Rust semantic no-op readback. The artifact/ledger is not frozen, so Percentage E3/E4 remain pending. See the [Numbers matrix](../crates/litchi-numbers/docs/FEATURE_MATRIX.md#cells-formulas-controls-and-annotations). |
 | Existing-cell Currency display formats | 🟡 | ✅ | 🟡 | Selector-first existing-cell Currency read/set/clear/reset operations expose checked currency code, decimal, negative, thousands-separator, and Standard/Accounting settings while preserving the scalar value and unrelated bytes. The focused codec filter passes 4/4, the `litchi-numbers-wire` library passes 32/32, and the latest package target passes 22/22 after native BNC flag handling became shape-dependent: plain no-secondary Currency uses `0x0802`, while a Currency record carrying a secondary Number ID uses `0x0803` (`0x0802 | EXPLICIT_DECIMAL_FORMAT`, with `EXPLICIT_DECIMAL_FORMAT = 0x0001`). Standard versus Accounting does not choose this flag. ADR 0008 records operation-specific E3/E4 evidence: a clean native open, native save/close/reopen with the same scalar/settings/text, strict Rust no-op reread, exact inverse restoration, and exact candidate/native-resaved hashes. Bounded fuzz evidence remains separately scoped; no broad-format or deletion-gate claim is made. See the [Numbers matrix](../crates/litchi-numbers/docs/FEATURE_MATRIX.md#cells-formulas-controls-and-annotations). |
@@ -159,7 +175,7 @@ The following capability exists broadly in `litchi-iwa`, but must be labeled **l
 | Table cells/formulas/rich formatting/topology | Broad | Broad | Broad |
 | Focused-owner replacement complete | No | No | No |
 
-“Broad” here is an inventory statement, not a completeness or native-acceptance grade. The host exposes native/raw identities, includes compatibility fallbacks, and is governed by the 11 ordered debts (orders `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`) in the deletion ledger ([host policy](../crates/litchi-iwa/README.md#legacy-and-raw-editing), [ADR 0028](adr/0028-iwa-monolith-exit.md)). The authoritative topology is 64 workspace packages, 237 internal dependency declarations, 226 canonical edges, and one migration host.
+“Broad” here is an inventory statement, not a completeness or native-acceptance grade. The host exposes native/raw identities, includes compatibility fallbacks, and is governed by the 11 ordered debts (orders `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`) in the deletion ledger ([host policy](../crates/litchi-iwa/README.md#legacy-and-raw-editing), [ADR 0028](adr/0028-iwa-monolith-exit.md)). The authoritative topology is 64 workspace packages, 238 internal dependency declarations, 227 canonical edges, 11 development-only edges, and one migration host.
 
 ## Evidence grades used by the authoritative matrices
 
@@ -168,8 +184,8 @@ The following capability exists broadly in `litchi-iwa`, but must be labeled **l
 | E0 | Type/schema/source exists | Extensive; not support by itself |
 | E1 | Synthetic unit/integration test or Litchi self-roundtrip | Extensive for focused transactions and legacy builders |
 | E2 | Checked-in Apple-produced fixture parses; exact no-op/readback | Present for one basic fixture per app |
-| E3 | Litchi-mutated candidate opens in the native app without repair | Operation-specific ADR evidence exists, but no complete checked-in ledger/gate |
-| E4 | Native app saves, closes, reopens; Litchi strict reread verifies semantics/locality | External/manual and incomplete; not a suite-wide CI result |
+| E3 | Litchi-mutated candidate opens in the native app without repair | External exploratory evidence exists for a pre-hardening Keynote candidate; current-owner promotion remains pending because the app-authored source contains unproven model field 39 |
+| E4 | Native app saves, closes, reopens; Litchi strict reread verifies semantics/locality | External/manual exploratory evidence only; the current strict owner does not admit that source, and this is not a suite-wide CI result |
 
 Every supported read/write cell should name its focused API owner, executable test, fixture provenance, evidence grade, native app/version when applicable, and refusal/limit boundary. Exact package preservation, semantic feature support, and native interoperability must remain separate claims.
 
@@ -197,6 +213,14 @@ uncompressed members differed and every other member payload/name/order matched.
 candidate, and native-resaved hashes are recorded in ADR 0008. No ADR 0028 deletion-gate closure is
 implied. This does not promote all nine native UI variants, arbitrary-producer parity, native byte
 parity after Numbers normalization, or package-wide performance.
+
+The focused Keynote physical `Sort Now` row has a separate operation-indexed external evidence
+record, not a current-owner native E3/E4 certification. Computer Use opened a candidate produced
+before strict model-field admission was hardened, but the current strict owner rejects the
+app-authored source because model field 39 is unproven. ADR 0008 records the disposable artifact
+sizes and hashes as exploratory evidence only; the checked-in native fixture has no table and the
+checked-in evidence test does not launch Keynote. Native acceptance remains pending until a
+current-admitted native source is available and the operation is rerun.
 
 ## Matrix maintenance requirements
 

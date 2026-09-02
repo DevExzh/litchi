@@ -30,8 +30,9 @@ use litchi_iwa_core::{
     SnappyStream,
 };
 use litchi_iwa_protos::{
-    package_metadata_codec, table_dimension_codec, table_info_codec, table_model_discovery_codec,
-    table_sort_order_codec,
+    numbers_table_cell_dependency_codec as dependency_codec,
+    numbers_table_cell_storage_codec as storage_codec, package_metadata_codec,
+    table_dimension_codec, table_info_codec, table_model_discovery_codec, table_sort_order_codec,
 };
 
 use super::{Package, PayloadLimitKind, PhysicalSource, ReadError, SemanticLimitKind};
@@ -41,6 +42,23 @@ const SLIDE_MESSAGE_TYPE: u32 = 5;
 const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
 const HEADER_BUCKET_MESSAGE_TYPE: u32 = 6_006;
+const TILE_MESSAGE_TYPE: u32 = 6_002;
+const TABLE_DATA_LIST_MESSAGE_TYPE: u32 = 6_005;
+const TABLE_DATA_LIST_NATIVE_MESSAGE_TYPE: u32 = 6_201;
+const COLUMN_ROW_UID_MAP_LEGACY_MESSAGE_TYPE: u32 = 6_200;
+const COLUMN_ROW_UID_MAP_MESSAGE_TYPE: u32 = 6_267;
+const STROKE_SIDECAR_MESSAGE_TYPE: u32 = 6_305;
+const HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE: u32 = 6_204;
+const FILTER_SET_MESSAGE_TYPE: u32 = 6_220;
+const CATEGORY_OWNER_REFERENCE_MESSAGE_TYPE: u32 = 6_372;
+const GROUP_BY_MESSAGE_TYPE: u32 = 6_373;
+const GROUP_NODE_MESSAGE_TYPE: u32 = 6_383;
+const PHYSICAL_MUTABLE_MESSAGE_TYPES: [u32; 4] = [
+    TILE_MESSAGE_TYPE,
+    HEADER_BUCKET_MESSAGE_TYPE,
+    COLUMN_ROW_UID_MAP_LEGACY_MESSAGE_TYPE,
+    COLUMN_ROW_UID_MAP_MESSAGE_TYPE,
+];
 const TABLE_STYLE_MESSAGE_TYPE: u32 = 6_003;
 const TABLE_STYLE_PRESET_MESSAGE_TYPE: u32 = 6_008;
 const TABLE_STYLE_NETWORK_MESSAGE_TYPE: u32 = 6_247;
@@ -58,11 +76,27 @@ const MODEL_STRING_TABLE_PATH: &[u32] = &[MODEL_STORAGE_FIELD, 4];
 const MODEL_STYLE_TABLE_PATH: &[u32] = &[MODEL_STORAGE_FIELD, 5];
 const MODEL_FORMULA_TABLE_PATH: &[u32] = &[MODEL_STORAGE_FIELD, 6];
 const MODEL_FORMAT_TABLE_PRE_BNC_PATH: &[u32] = &[MODEL_STORAGE_FIELD, 11];
+const MODEL_FORMULA_ERROR_TABLE_PATH: &[u32] = &[MODEL_STORAGE_FIELD, 12];
+const MODEL_MULTIPLE_CHOICE_TABLE_PATH: &[u32] = &[MODEL_STORAGE_FIELD, 16];
+const MODEL_RICH_TEXT_TABLE_PATH: &[u32] = &[MODEL_STORAGE_FIELD, 17];
+const MODEL_CONDITIONAL_STYLE_TABLE_PATH: &[u32] = &[MODEL_STORAGE_FIELD, 18];
+const MODEL_COMMENT_STORAGE_TABLE_PATH: &[u32] = &[MODEL_STORAGE_FIELD, 19];
+const MODEL_IMPORT_WARNING_TABLE_PATH: &[u32] = &[MODEL_STORAGE_FIELD, 20];
+const MODEL_CONTROL_CELL_SPEC_TABLE_PATH: &[u32] = &[MODEL_STORAGE_FIELD, 21];
+const MODEL_BASE_COLUMN_ROW_UIDS_FIELD: u32 = 46;
+const MODEL_STROKE_SIDECAR_FIELD: u32 = 49;
+const MODEL_HEADER_ROWS_FIELD: u32 = 9;
+const MODEL_HEADER_COLUMNS_FIELD: u32 = 10;
+const MODEL_FOOTER_ROWS_FIELD: u32 = 11;
+const HEADER_BUCKET_ROWS: u32 = 65_536;
 
-const ROLE_MESSAGE_TYPES: [u32; 7] = [
+const ROLE_MESSAGE_TYPES: [u32; 10] = [
     TABLE_INFO_MESSAGE_TYPE,
     TABLE_MODEL_MESSAGE_TYPE,
+    TILE_MESSAGE_TYPE,
     HEADER_BUCKET_MESSAGE_TYPE,
+    COLUMN_ROW_UID_MAP_LEGACY_MESSAGE_TYPE,
+    COLUMN_ROW_UID_MAP_MESSAGE_TYPE,
     TABLE_STYLE_MESSAGE_TYPE,
     TABLE_STYLE_PRESET_MESSAGE_TYPE,
     TABLE_STYLE_NETWORK_MESSAGE_TYPE,
@@ -178,20 +212,20 @@ impl Budget {
             .archive()
             .max_entries()
             .checked_mul(passes)
-            .unwrap_or(usize::MAX);
+            .ok_or(Error::InvalidSource)?;
         let max_total = usize::try_from(package.state.options.archive().max_total_bytes())
             .map_err(|_| Error::InvalidSource)?
             .checked_mul(passes)
-            .unwrap_or(usize::MAX);
+            .ok_or(Error::InvalidSource)?;
         let max_components = max_entries;
         let max_objects = archive
             .max_objects()
             .checked_mul(max_components)
-            .unwrap_or(usize::MAX);
+            .ok_or(Error::InvalidSource)?;
         let max_messages = archive
             .max_messages()
             .checked_mul(max_components)
-            .unwrap_or(usize::MAX);
+            .ok_or(Error::InvalidSource)?;
         Ok(Self {
             max_input: aggregate,
             max_output: aggregate,
@@ -373,7 +407,9 @@ impl Budget {
             .filter(|remaining| *remaining > 0)
             .ok_or(Error::Limit {
                 kind,
-                observed: used.saturating_add(1) as u64,
+                observed: used
+                    .checked_add(1)
+                    .map_or(u64::MAX, |observed| observed as u64),
                 maximum: maximum as u64,
             })
     }
@@ -760,7 +796,7 @@ pub(crate) struct ObjectLocation {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum StorageRouteKind {
+pub(crate) enum StorageRouteKind {
     RowBucket,
     ColumnBucket,
     StringTable,
@@ -770,7 +806,7 @@ enum StorageRouteKind {
 }
 
 impl StorageRouteKind {
-    const fn path(self) -> &'static [u32] {
+    pub(crate) const fn path(self) -> &'static [u32] {
         match self {
             Self::RowBucket => MODEL_ROW_BUCKET_PATH,
             Self::ColumnBucket => MODEL_COLUMN_BUCKET_PATH,
@@ -781,15 +817,335 @@ impl StorageRouteKind {
         }
     }
 
-    const fn is_bucket(self) -> bool {
+    pub(crate) const fn is_bucket(self) -> bool {
         matches!(self, Self::RowBucket | Self::ColumnBucket)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct StorageRoute {
-    location: ObjectLocation,
-    kind: StorageRouteKind,
+pub(crate) struct StorageRoute {
+    pub(crate) location: ObjectLocation,
+    pub(crate) kind: StorageRouteKind,
+}
+
+/// One source-ordered tile entry in a physical table's `TileStorage` root.
+///
+/// The key is the native tile coordinate. The object location is an internal
+/// routing detail and never appears in a public Keynote value or error.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code, reason = "Consumed by the physical table-sort owner.")]
+pub(crate) struct PhysicalTileReference {
+    pub(crate) tile_id: u32,
+    pub(crate) location: ObjectLocation,
+}
+
+/// One row-header bucket in source order. Header records are sparse inside a
+/// bucket; the bucket index is still part of the topology proof because a
+/// moved row must stay within an allocated bucket.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code, reason = "Consumed by the physical table-sort owner.")]
+pub(crate) struct PhysicalRowHeaderBucket {
+    pub(crate) bucket_index: u32,
+    pub(crate) location: ObjectLocation,
+    pub(crate) header_count: usize,
+}
+
+/// Feature admissions that would require a row-affine rewrite beyond the
+/// currently owned physical sort transaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[allow(
+    dead_code,
+    reason = "Retained on the private topology for diagnostics."
+)]
+pub(crate) struct PhysicalUnsupportedFeatures {
+    hidden: bool,
+    filter: bool,
+    grouping: bool,
+    pivot: bool,
+    spill: bool,
+    merge: bool,
+    conditional: bool,
+    formula_affine: bool,
+    imported_data: bool,
+}
+
+impl PhysicalUnsupportedFeatures {
+    #[must_use]
+    pub(crate) const fn any(self) -> bool {
+        self.hidden
+            || self.filter
+            || self.grouping
+            || self.pivot
+            || self.spill
+            || self.merge
+            || self.conditional
+            || self.formula_affine
+            || self.imported_data
+    }
+}
+
+/// A validated physical storage spine and row-affine admission for a table.
+///
+/// This value intentionally contains no mutable archive state. It is safe to
+/// pass between preparation stages or threads; the source package remains the
+/// authority and every writer must revalidate its exact source before
+/// publishing a candidate.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code, reason = "Consumed by the physical table-sort owner.")]
+pub(crate) struct PhysicalTableTopology {
+    tile_size: u32,
+    wide_rows: Option<bool>,
+    tile_references: Vec<PhysicalTileReference>,
+    row_header_buckets: Vec<PhysicalRowHeaderBucket>,
+    column_headers: ObjectLocation,
+    string_table: ObjectLocation,
+    row_uid_map: ObjectLocation,
+    stroke_sidecar: Option<ObjectLocation>,
+    mutable_component_count: usize,
+    has_formula_entries: bool,
+    has_formula_error_entries: bool,
+    has_conditional_style_entries: bool,
+    has_comment_entries: bool,
+    has_rich_text_entries: bool,
+    header_rows: u32,
+    header_columns: u32,
+    footer_rows: u32,
+    unsupported: PhysicalUnsupportedFeatures,
+}
+
+impl PhysicalTableTopology {
+    #[must_use]
+    pub(crate) const fn tile_size(&self) -> u32 {
+        self.tile_size
+    }
+
+    #[must_use]
+    pub(crate) const fn wide_rows(&self) -> Option<bool> {
+        self.wide_rows
+    }
+
+    #[must_use]
+    pub(crate) fn tile_references(&self) -> &[PhysicalTileReference] {
+        &self.tile_references
+    }
+
+    #[must_use]
+    pub(crate) fn row_header_buckets(&self) -> &[PhysicalRowHeaderBucket] {
+        &self.row_header_buckets
+    }
+
+    #[must_use]
+    pub(crate) const fn column_headers(&self) -> &ObjectLocation {
+        &self.column_headers
+    }
+
+    #[must_use]
+    pub(crate) const fn string_table(&self) -> &ObjectLocation {
+        &self.string_table
+    }
+
+    #[must_use]
+    pub(crate) const fn row_uid_map(&self) -> &ObjectLocation {
+        &self.row_uid_map
+    }
+
+    #[must_use]
+    #[allow(dead_code, reason = "Consumed by future physical table owners.")]
+    pub(crate) const fn stroke_sidecar(&self) -> Option<&ObjectLocation> {
+        self.stroke_sidecar.as_ref()
+    }
+
+    #[must_use]
+    pub(crate) const fn mutable_component_count(&self) -> usize {
+        self.mutable_component_count
+    }
+
+    #[must_use]
+    pub(crate) const fn has_formula_entries(&self) -> bool {
+        self.has_formula_entries
+    }
+
+    #[must_use]
+    pub(crate) const fn has_formula_error_entries(&self) -> bool {
+        self.has_formula_error_entries
+    }
+
+    #[must_use]
+    pub(crate) const fn has_conditional_style_entries(&self) -> bool {
+        self.has_conditional_style_entries
+    }
+
+    #[must_use]
+    pub(crate) const fn has_comment_entries(&self) -> bool {
+        self.has_comment_entries
+    }
+
+    #[must_use]
+    pub(crate) const fn has_rich_text_entries(&self) -> bool {
+        self.has_rich_text_entries
+    }
+
+    #[must_use]
+    pub(crate) const fn header_rows(&self) -> u32 {
+        self.header_rows
+    }
+
+    #[must_use]
+    #[allow(dead_code, reason = "Consumed by future physical table owners.")]
+    pub(crate) const fn header_columns(&self) -> u32 {
+        self.header_columns
+    }
+
+    #[must_use]
+    pub(crate) const fn footer_rows(&self) -> u32 {
+        self.footer_rows
+    }
+
+    #[must_use]
+    #[allow(dead_code, reason = "Consumed by future physical table owners.")]
+    pub(crate) const fn unsupported_features(&self) -> PhysicalUnsupportedFeatures {
+        self.unsupported
+    }
+}
+
+/// Explicit candidate-locality admission for a physical transaction.
+///
+/// Changed component and preview-entry names are normalized to sorted,
+/// duplicate-free lists at construction. This makes locality decisions
+/// deterministic even when a caller derives the allowlist from a map or a
+/// parallel preparation stage.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code, reason = "Consumed by the physical table-sort owner.")]
+pub(crate) struct LocalityAllowlist {
+    changed_components: Vec<Arc<str>>,
+    root_preview_deletions: Vec<Arc<str>>,
+    changed_object_ids: Vec<u64>,
+}
+
+impl LocalityAllowlist {
+    pub(crate) fn new(
+        changed_components: &[&str],
+        root_preview_deletions: &[&str],
+    ) -> Result<Self> {
+        let mut changed = Vec::new();
+        changed
+            .try_reserve_exact(changed_components.len())
+            .map_err(|_| Error::Allocation(changed_components.len()))?;
+        for component in changed_components {
+            if component.is_empty() {
+                return Err(Error::InvalidSource);
+            }
+            changed.push(Arc::from(*component));
+        }
+        changed.sort_unstable();
+        changed.dedup();
+
+        let mut deletions = Vec::new();
+        deletions
+            .try_reserve_exact(root_preview_deletions.len())
+            .map_err(|_| Error::Allocation(root_preview_deletions.len()))?;
+        for entry in root_preview_deletions {
+            if entry.is_empty() {
+                return Err(Error::InvalidSource);
+            }
+            deletions.push(Arc::from(*entry));
+        }
+        deletions.sort_unstable();
+        deletions.dedup();
+        Ok(Self {
+            changed_components: changed,
+            root_preview_deletions: deletions,
+            changed_object_ids: Vec::new(),
+        })
+    }
+
+    /// Admit exactly the component members that can contain row-affine
+    /// objects for one validated physical table topology.
+    ///
+    /// Native Keynote packages commonly split the tile, row-header bucket,
+    /// and row/column UID map across distinct IWA members.  The object-ID
+    /// fence applied by [`Self::with_changed_object_ids`] remains authoritative
+    /// inside these component envelopes.
+    pub(crate) fn with_physical_topology(
+        topology: &PhysicalTableTopology,
+        root_preview_deletions: &[&str],
+    ) -> Result<Self> {
+        let capacity = 1usize
+            .checked_add(topology.tile_references.len())
+            .and_then(|value| value.checked_add(topology.row_header_buckets.len()))
+            .ok_or(Error::InvalidSource)?;
+        let mut components = Vec::new();
+        components
+            .try_reserve_exact(capacity)
+            .map_err(|_| Error::Allocation(capacity))?;
+        components.push(topology.row_uid_map.component.as_ref());
+        components.extend(
+            topology
+                .tile_references
+                .iter()
+                .map(|tile| tile.location.component.as_ref()),
+        );
+        components.extend(
+            topology
+                .row_header_buckets
+                .iter()
+                .map(|bucket| bucket.location.component.as_ref()),
+        );
+        Self::new(&components, root_preview_deletions)
+    }
+
+    /// Add the exact object identities a physical transaction is allowed to
+    /// mutate.  Component locality remains useful as the ZIP envelope
+    /// boundary, while this optional second fence prevents an unrelated tile
+    /// or header object in the same component from becoming an accidental
+    /// mutation wildcard.
+    pub(crate) fn with_changed_object_ids(mut self, identifiers: &[u64]) -> Result<Self> {
+        let mut objects = Vec::new();
+        objects
+            .try_reserve_exact(identifiers.len())
+            .map_err(|_| Error::Allocation(identifiers.len()))?;
+        for identifier in identifiers {
+            if *identifier == 0 {
+                return Err(Error::InvalidSource);
+            }
+            objects.push(*identifier);
+        }
+        objects.sort_unstable();
+        objects.dedup();
+        self.changed_object_ids = objects;
+        Ok(self)
+    }
+
+    #[must_use]
+    pub(crate) fn changed_components(&self) -> &[Arc<str>] {
+        &self.changed_components
+    }
+
+    #[must_use]
+    pub(crate) fn root_preview_deletions(&self) -> &[Arc<str>] {
+        &self.root_preview_deletions
+    }
+
+    #[must_use]
+    pub(crate) fn changed_object_ids(&self) -> &[u64] {
+        &self.changed_object_ids
+    }
+
+    fn allows_component(&self, name: &str) -> bool {
+        self.changed_components
+            .binary_search_by(|candidate| candidate.as_ref().cmp(name))
+            .is_ok()
+    }
+
+    fn allows_preview_deletion(&self, name: &str) -> bool {
+        self.root_preview_deletions
+            .binary_search_by(|candidate| candidate.as_ref().cmp(name))
+            .is_ok()
+    }
+
+    fn allows_object(&self, identifier: u64) -> bool {
+        self.changed_object_ids.binary_search(&identifier).is_ok()
+    }
 }
 
 /// The proven native route for one selected slide table.
@@ -807,6 +1163,13 @@ pub(crate) struct Target {
     pub(crate) columns: u32,
     storage: Vec<StorageRoute>,
     pub(crate) locked: bool,
+}
+
+impl Target {
+    #[must_use]
+    pub(crate) fn storage_route(&self, kind: StorageRouteKind) -> Option<&StorageRoute> {
+        self.storage.iter().find(|route| route.kind == kind)
+    }
 }
 
 /// Resolve one canonical table and prove its package-wide physical authority.
@@ -978,11 +1341,3455 @@ pub(crate) fn same_target(left: &Target, right: &Target) -> bool {
     left == right
 }
 
+fn validate_physical_root_roles(
+    package: &Package,
+    target: &Target,
+    budget: &mut Budget,
+) -> Result<()> {
+    for (location, message_type) in [
+        (&target.slide, SLIDE_MESSAGE_TYPE),
+        (&target.table_info, TABLE_INFO_MESSAGE_TYPE),
+        (&target.model, TABLE_MODEL_MESSAGE_TYPE),
+    ] {
+        let object = object_at(package, location)?;
+        let _ = exact_message_role(object, message_type, budget)?;
+    }
+
+    let table_info = object_at(package, &target.table_info)?;
+    let table_info_info = table_info
+        .archive_info
+        .message_infos
+        .first()
+        .ok_or(Error::InvalidSource)?;
+    require_message_or_local_reference_field(
+        table_info_info,
+        target.model.identifier,
+        &[TABLE_MODEL_FIELD],
+    )?;
+
+    // Every selected DataStore route is part of the physical graph's exact
+    // authority. A lone aggregate MessageInfo edge is not enough: without a
+    // field-local route there is no proof that the decoded route and the
+    // persisted object graph name the same role.
+    for route in &target.storage {
+        validate_optional_model_route(
+            package,
+            target,
+            route.location.identifier,
+            route.kind.path(),
+            budget,
+        )?;
+    }
+    Ok(())
+}
+
+fn exact_message_role<'a>(
+    object: &'a ArchiveObject,
+    message_type: u32,
+    budget: &mut Budget,
+) -> Result<(usize, &'a [u8])> {
+    if !has_exact_mutable_message_shape(object, &[message_type]) {
+        return Err(Error::UnsupportedDependency);
+    }
+    unique_message(object, message_type, budget)
+}
+
+fn require_local_reference_field(
+    info: &litchi_iwa_core::MessageInfo,
+    identifier: u64,
+    path: &[u32],
+) -> Result<()> {
+    if identifier == 0 {
+        return Err(Error::InvalidSource);
+    }
+    let aggregate = info
+        .object_references
+        .iter()
+        .filter(|candidate| **candidate == identifier)
+        .count();
+    if aggregate != 1 {
+        return Err(Error::UnsupportedDependency);
+    }
+    let mut local = 0usize;
+    for field in &info.field_infos {
+        if field.object_references.contains(&identifier) {
+            if field.object_references.as_slice() != [identifier]
+                || !field.data_references.is_empty()
+                || !is_message_reference_field(field)
+                || field.path.as_slice() != path
+            {
+                return Err(Error::UnsupportedDependency);
+            }
+            local = local.checked_add(1).ok_or(Error::InvalidSource)?;
+        }
+    }
+    if local == 1 {
+        Ok(())
+    } else {
+        Err(Error::UnsupportedDependency)
+    }
+}
+
+fn require_message_or_local_reference_field(
+    info: &litchi_iwa_core::MessageInfo,
+    identifier: u64,
+    path: &[u32],
+) -> Result<()> {
+    if identifier == 0 {
+        return Err(Error::InvalidSource);
+    }
+    if info
+        .object_references
+        .iter()
+        .filter(|candidate| **candidate == identifier)
+        .count()
+        != 1
+    {
+        return Err(Error::UnsupportedDependency);
+    }
+    let matching = info
+        .field_infos
+        .iter()
+        .filter(|field| field.object_references.contains(&identifier))
+        .collect::<Vec<_>>();
+    if matching.is_empty()
+        || (matching.len() == 1
+            && matching[0].object_references.as_slice() == [identifier]
+            && matching[0].data_references.is_empty()
+            && is_message_reference_field(matching[0])
+            && matching[0].path.as_slice() == path)
+    {
+        Ok(())
+    } else {
+        Err(Error::UnsupportedDependency)
+    }
+}
+
+/// Admit the complete native storage spine required by a physical row-sort
+/// transaction.  The persisted sort-order owner intentionally does not call
+/// this function: physical sorting has stricter row-affine requirements and
+/// is kept behind this separate private boundary until its writer is ready.
+pub(crate) fn admit_physical_table(
+    package: &Package,
+    target: &Target,
+    budget: &mut Budget,
+) -> Result<PhysicalTableTopology> {
+    if target.locked {
+        return Err(Error::UnsupportedDependency);
+    }
+    if target.rows == 0 || target.columns == 0 {
+        return Err(Error::InvalidSource);
+    }
+
+    let payload = model_payload(package, target)?;
+    validate_physical_root_roles(package, target, budget)?;
+    let model_options = budget.storage_codec_options(package)?;
+    let mut collector = PhysicalStorageCollector::new();
+    let (model_and_store, report) = storage_codec::decode_table_model_with_data_store_and_visitor(
+        payload,
+        model_options,
+        &mut collector,
+    )
+    .map_err(|_| Error::Codec)?;
+    budget.storage_codec_report(report)?;
+    let model = model_and_store.model();
+    let store = model_and_store.data_store();
+    if model.number_of_rows() != target.rows || model.number_of_columns() != target.columns {
+        return Err(Error::InvalidSource);
+    }
+    let (header_rows, header_columns, footer_rows, uid_identifier, stroke_identifier, features) =
+        parse_physical_model_fields(payload, package, target, budget)?;
+    if header_rows
+        .checked_add(footer_rows)
+        .is_none_or(|body| body > target.rows)
+        || header_columns > target.columns
+    {
+        return Err(Error::InvalidSource);
+    }
+    if features.any() {
+        // Keep the flags on the topology type for future capability
+        // expansion, but do not let a caller accidentally proceed with a
+        // row-affine graph this owner cannot rewrite yet.
+        return Err(Error::UnsupportedDependency);
+    }
+    let (tile_size, wide_rows) = decode_tile_storage(store.tiles(), package, budget)?;
+    if tile_size == 0 {
+        return Err(Error::InvalidSource);
+    }
+    let row_storage_options = budget.storage_codec_options(package)?;
+    let (row_storage, row_storage_report) =
+        storage_codec::decode_header_storage_with_report(store.row_headers(), row_storage_options)
+            .map_err(|_| Error::Codec)?;
+    budget.storage_codec_report(row_storage_report)?;
+    if row_storage.bucket_hash_function() == 0 {
+        return Err(Error::InvalidSource);
+    }
+    let tile_references = validate_tile_storage(
+        package,
+        target,
+        &collector.tile_references,
+        tile_size,
+        budget,
+    )?;
+    let row_header_buckets = validate_row_headers(
+        package,
+        target,
+        &collector.row_header_references,
+        row_storage.bucket_hash_function(),
+        budget,
+    )?;
+
+    let column_headers = target
+        .storage_route(StorageRouteKind::ColumnBucket)
+        .map(|route| route.location.clone())
+        .ok_or(Error::InvalidSource)?;
+    let string_table = target
+        .storage_route(StorageRouteKind::StringTable)
+        .map(|route| route.location.clone())
+        .ok_or(Error::InvalidSource)?;
+    let formula_table = target
+        .storage_route(StorageRouteKind::FormulaTable)
+        .map(|route| route.location.clone())
+        .ok_or(Error::InvalidSource)?;
+    let style_table = target
+        .storage_route(StorageRouteKind::StyleTable)
+        .map(|route| route.location.clone())
+        .ok_or(Error::InvalidSource)?;
+    let format_table = target
+        .storage_route(StorageRouteKind::FormatTablePreBnc)
+        .map(|route| route.location.clone())
+        .ok_or(Error::InvalidSource)?;
+    validate_column_headers(package, &column_headers, target.columns, budget)?;
+    let _ = validate_data_list_state(package, &string_table, 1, budget)?;
+    // Style and pre-BNC format lists are not rewritten by the physical
+    // permutation, but they remain part of the selected storage spine. A
+    // list segment or an unknown root/entry field there could carry
+    // row-affine state that a byte-preserving untouched-object check would
+    // otherwise never interpret.
+    let _ = validate_data_list_state(package, &style_table, 4, budget)?;
+    let has_formula_entries = validate_data_list_state(package, &formula_table, 3, budget)?;
+    let _ = validate_data_list_state(package, &format_table, 2, budget)?;
+
+    for (reference, path, list_type) in [
+        (
+            store.deprecated_custom_format_table(),
+            &[MODEL_STORAGE_FIELD, 15][..],
+            6,
+        ),
+        (store.format_table(), &[MODEL_STORAGE_FIELD, 22][..], 2),
+    ] {
+        if let Some(reference) = reference {
+            validate_optional_model_route(package, target, reference.identifier(), path, budget)?;
+            let location = locate_object(package, reference.identifier())?;
+            ensure_unique_identity(package, reference.identifier(), budget)?;
+            let _ = validate_data_list_state(package, &location, list_type, budget)?;
+        }
+    }
+
+    let row_uid_identifier = uid_identifier.ok_or(Error::UnsupportedDependency)?;
+    validate_optional_model_route(
+        package,
+        target,
+        row_uid_identifier,
+        &[MODEL_BASE_COLUMN_ROW_UIDS_FIELD],
+        budget,
+    )?;
+    validate_exclusive_model_reference(
+        package,
+        target,
+        row_uid_identifier,
+        &[MODEL_BASE_COLUMN_ROW_UIDS_FIELD],
+        budget,
+    )?;
+    let row_uid_map = locate_object(package, row_uid_identifier)?;
+    ensure_unique_identity(package, row_uid_identifier, budget)?;
+    validate_row_uid_map(package, &row_uid_map, target.rows, target.columns, budget)?;
+    validate_mutable_root_aliases(
+        package,
+        target,
+        &tile_references,
+        &row_header_buckets,
+        &column_headers,
+        row_uid_identifier,
+        budget,
+    )?;
+
+    let stroke_sidecar = if let Some(identifier) = stroke_identifier {
+        let location = locate_object(package, identifier)?;
+        ensure_unique_identity(package, identifier, budget)?;
+        validate_empty_stroke_sidecar(package, &location, target, budget)?;
+        Some(location)
+    } else {
+        None
+    };
+
+    let comment_storage = optional_storage_route(
+        package,
+        store.comment_storage_table(),
+        &target.storage,
+        budget,
+    )?;
+    let has_comment_entries = if let Some(location) = &comment_storage {
+        validate_optional_model_route(
+            package,
+            target,
+            location.identifier,
+            MODEL_COMMENT_STORAGE_TABLE_PATH,
+            budget,
+        )?;
+        validate_comment_storage(package, location, budget)?
+    } else {
+        false
+    };
+    let rich_text_table =
+        optional_storage_route(package, store.rich_text_table(), &target.storage, budget)?;
+    let has_rich_text_entries = if let Some(location) = &rich_text_table {
+        validate_optional_model_route(
+            package,
+            target,
+            location.identifier,
+            MODEL_RICH_TEXT_TABLE_PATH,
+            budget,
+        )?;
+        validate_data_list_state(package, location, 8, budget)?
+    } else {
+        false
+    };
+
+    let formula_error_table = optional_storage_route(
+        package,
+        store.formula_error_table(),
+        &target.storage,
+        budget,
+    )?;
+    let has_formula_error_entries = if let Some(location) = &formula_error_table {
+        validate_optional_model_route(
+            package,
+            target,
+            location.identifier,
+            MODEL_FORMULA_ERROR_TABLE_PATH,
+            budget,
+        )?;
+        validate_data_list_state(package, location, 5, budget)?
+    } else {
+        false
+    };
+
+    let conditional_style_table = optional_storage_route(
+        package,
+        store.conditional_style_table(),
+        &target.storage,
+        budget,
+    )?;
+    let has_conditional_style_entries = if let Some(location) = &conditional_style_table {
+        validate_optional_model_route(
+            package,
+            target,
+            location.identifier,
+            MODEL_CONDITIONAL_STYLE_TABLE_PATH,
+            budget,
+        )?;
+        validate_data_list_state(package, location, 9, budget)?
+    } else {
+        false
+    };
+
+    for (reference, path, list_type) in [
+        (
+            store.multiple_choice_list_format_table(),
+            MODEL_MULTIPLE_CHOICE_TABLE_PATH,
+            7,
+        ),
+        (
+            store.import_warning_set_table(),
+            MODEL_IMPORT_WARNING_TABLE_PATH,
+            11,
+        ),
+        (
+            store.control_cell_spec_table(),
+            MODEL_CONTROL_CELL_SPEC_TABLE_PATH,
+            12,
+        ),
+    ] {
+        let location = optional_storage_route(package, reference, &target.storage, budget)?;
+        if let Some(location) = &location {
+            validate_optional_model_route(package, target, location.identifier, path, budget)?;
+            if validate_data_list_state(package, location, list_type, budget)? {
+                return Err(Error::UnsupportedDependency);
+            }
+        }
+    }
+
+    // A merge-region map is coordinate-affine even if a producer emits an
+    // apparently empty root. The focused owner has no merge-map rewrite.
+    if store.merge_region_map().is_some() {
+        return Err(Error::UnsupportedDependency);
+    }
+
+    validate_formula_owner_dependencies(package, target, header_rows, footer_rows, budget)?;
+
+    let mutable_component_count =
+        mutable_component_count(&row_uid_map, &tile_references, &row_header_buckets, budget)?;
+
+    Ok(PhysicalTableTopology {
+        tile_size,
+        wide_rows,
+        tile_references,
+        row_header_buckets,
+        column_headers,
+        string_table,
+        row_uid_map,
+        stroke_sidecar,
+        mutable_component_count,
+        has_formula_entries,
+        has_formula_error_entries,
+        has_conditional_style_entries,
+        has_comment_entries,
+        has_rich_text_entries,
+        header_rows,
+        header_columns,
+        footer_rows,
+        unsupported: features,
+    })
+}
+
+fn mutable_component_count(
+    row_uid_map: &ObjectLocation,
+    tiles: &[PhysicalTileReference],
+    headers: &[PhysicalRowHeaderBucket],
+    budget: &mut Budget,
+) -> Result<usize> {
+    let capacity = 1usize
+        .checked_add(tiles.len())
+        .and_then(|value| value.checked_add(headers.len()))
+        .ok_or(Error::InvalidSource)?;
+    budget.allocations(capacity)?;
+    budget.retained(
+        capacity
+            .checked_mul(size_of::<&str>())
+            .ok_or(Error::InvalidSource)?,
+    )?;
+    let mut components = HashSet::new();
+    components
+        .try_reserve(capacity)
+        .map_err(|_| Error::Allocation(capacity))?;
+    components.insert(row_uid_map.component.as_ref());
+    for tile in tiles {
+        components.insert(tile.location.component.as_ref());
+    }
+    for header in headers {
+        components.insert(header.location.component.as_ref());
+    }
+    Ok(components.len())
+}
+
+struct PhysicalStorageCollector {
+    tile_references: Vec<(u32, u64)>,
+    row_header_references: Vec<u64>,
+}
+
+impl PhysicalStorageCollector {
+    fn new() -> Self {
+        Self {
+            tile_references: Vec::new(),
+            row_header_references: Vec::new(),
+        }
+    }
+}
+
+impl storage_codec::StorageVisitor for PhysicalStorageCollector {
+    fn visit_tile_reference(
+        &mut self,
+        record: storage_codec::TileReferenceRecord<'_>,
+    ) -> std::result::Result<(), storage_codec::DecodeError> {
+        self.tile_references
+            .try_reserve(1)
+            .map_err(|_| storage_codec::DecodeError::allocation(1))?;
+        self.tile_references
+            .push((record.tile_id(), record.reference().identifier()));
+        Ok(())
+    }
+
+    fn visit_header_bucket(
+        &mut self,
+        reference: storage_codec::ReferenceRecord<'_>,
+    ) -> std::result::Result<(), storage_codec::DecodeError> {
+        self.row_header_references
+            .try_reserve(1)
+            .map_err(|_| storage_codec::DecodeError::allocation(1))?;
+        self.row_header_references
+            .push(reference.reference().identifier());
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PhysicalTileRow {
+    index: u32,
+    cell_count: u32,
+}
+
+struct PhysicalTileRowCollector {
+    columns: u32,
+    rows: Vec<PhysicalTileRow>,
+}
+
+impl PhysicalTileRowCollector {
+    fn new(columns: u32) -> Self {
+        Self {
+            columns,
+            rows: Vec::new(),
+        }
+    }
+}
+
+impl storage_codec::StorageVisitor for PhysicalTileRowCollector {
+    fn visit_tile_row(
+        &mut self,
+        row: storage_codec::TileRowInfoSnapshot<'_>,
+    ) -> std::result::Result<(), storage_codec::DecodeError> {
+        let offsets = row
+            .cell_offsets()
+            .unwrap_or_else(|| row.cell_offsets_pre_bnc());
+        if !offsets.len().is_multiple_of(2) {
+            return Err(storage_codec::DecodeError::invalid_visitor_result());
+        }
+        let columns = usize::try_from(self.columns)
+            .map_err(|_| storage_codec::DecodeError::invalid_visitor_result())?;
+        let slots = offsets.len() / 2;
+        if slots < columns {
+            return Err(storage_codec::DecodeError::invalid_visitor_result());
+        }
+        let mut actual = 0u32;
+        for (slot, bytes) in offsets.chunks_exact(2).enumerate() {
+            let value = u16::from_le_bytes([bytes[0], bytes[1]]);
+            if slot >= columns {
+                if value != u16::MAX {
+                    return Err(storage_codec::DecodeError::invalid_visitor_result());
+                }
+            } else if value != u16::MAX {
+                actual = actual
+                    .checked_add(1)
+                    .ok_or_else(storage_codec::DecodeError::invalid_visitor_result)?;
+            }
+        }
+        if actual != row.cell_count() {
+            return Err(storage_codec::DecodeError::invalid_visitor_result());
+        }
+        self.rows
+            .try_reserve(1)
+            .map_err(|_| storage_codec::DecodeError::allocation(1))?;
+        self.rows.push(PhysicalTileRow {
+            index: row.tile_row_index(),
+            cell_count: actual,
+        });
+        Ok(())
+    }
+}
+
+struct PhysicalHeaderCollector {
+    indices: Vec<u32>,
+}
+
+impl PhysicalHeaderCollector {
+    fn new() -> Self {
+        Self {
+            indices: Vec::new(),
+        }
+    }
+}
+
+impl storage_codec::StorageVisitor for PhysicalHeaderCollector {
+    fn visit_header(
+        &mut self,
+        header: storage_codec::HeaderSnapshot,
+    ) -> std::result::Result<(), storage_codec::DecodeError> {
+        self.indices
+            .try_reserve(1)
+            .map_err(|_| storage_codec::DecodeError::allocation(1))?;
+        self.indices.push(header.index());
+        Ok(())
+    }
+}
+
+fn parse_physical_model_fields(
+    payload: &[u8],
+    package: &Package,
+    target: &Target,
+    budget: &mut Budget,
+) -> Result<(
+    u32,
+    u32,
+    u32,
+    Option<u64>,
+    Option<u64>,
+    PhysicalUnsupportedFeatures,
+)> {
+    let limits = budget.residual(package)?;
+    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let mut seen = [false; 94];
+    let mut header_rows = 0;
+    let mut header_columns = 0;
+    let mut footer_rows = 0;
+    let mut row_uid_map = None;
+    let mut stroke_sidecar = None;
+    let mut features = PhysicalUnsupportedFeatures::default();
+
+    for field in fields.fields() {
+        budget.fields(1)?;
+        field
+            .validate_canonical_framing()
+            .map_err(|_| Error::Wire)?;
+        let number = field.number();
+        if number < seen.len() as u32
+            && !matches!(number, 90..=92)
+            && std::mem::replace(&mut seen[number as usize], true)
+        {
+            return Err(Error::InvalidSource);
+        }
+        match number {
+            1 | 8 => {
+                std::str::from_utf8(field_bytes(field)?).map_err(|_| Error::InvalidSource)?;
+            },
+            3 | 18..=21 | 24..=27 | 30 | 36 | 48 => {
+                let _ = strict_reference(field_bytes(field)?, limits, budget)?;
+            },
+            4 => {
+                validate_physical_data_store_wire(field_bytes(field)?, package, budget)?;
+            },
+            5 | 23 | 43 => {
+                // Providers, deprecated origin coordinates, and copied-table
+                // provenance can carry dependencies outside the selected
+                // physical table spine. The focused owner has no rewrite for
+                // those graphs.
+                return Err(Error::UnsupportedDependency);
+            },
+            6 | 7 | 28 => {
+                let _ = canonical_field_u32(field)?;
+            },
+            MODEL_HEADER_ROWS_FIELD => {
+                header_rows = canonical_field_u32(field)?;
+            },
+            MODEL_HEADER_COLUMNS_FIELD => {
+                header_columns = canonical_field_u32(field)?;
+            },
+            MODEL_FOOTER_ROWS_FIELD => {
+                footer_rows = canonical_field_u32(field)?;
+            },
+            12 | 13 | 22 | 29 | 31 | 32 | 37 | 50 | 51 => {
+                let _ = canonical_field_bool(field)?;
+            },
+            14 | 15 | 40 | 41 | 42 => {
+                if canonical_field_u32(field)? != 0 {
+                    features.hidden = true;
+                }
+            },
+            16 | 17 | 33 => {
+                let _ = canonical_field_f64(field)?;
+            },
+            34 | 35 => {
+                let identifier = strict_reference(field_bytes(field)?, limits, budget)?;
+                validate_optional_model_route(package, target, identifier, &[number], budget)?;
+                validate_dormant_hidden_formula_owner(package, identifier, budget)?;
+            },
+            38 => {
+                let _ = strict_reference(field_bytes(field)?, limits, budget)?;
+                features.filter = true;
+            },
+            39 => {
+                // This inline CFUUID identifies the conditional-style
+                // CalculationEngine owner. Its coordinate-affine dependency
+                // graph is reached through UUID maps rather than ordinary
+                // ArchiveInfo object references, so field presence remains
+                // unsupported until that complete closure has a writer.
+                validate_cfuuid(field_bytes(field)?, package, budget)?;
+                return Err(Error::UnsupportedDependency);
+            },
+            44 => {
+                if field_bytes(field)?.is_empty() {
+                    return Err(Error::InvalidSource);
+                }
+            },
+            45 => {
+                // Sort-rule reference trackers can carry row-relative rule
+                // state.  Keep this admission closed until their full graph
+                // is owned by the physical transaction.
+                return Err(Error::UnsupportedDependency);
+            },
+            MODEL_BASE_COLUMN_ROW_UIDS_FIELD => {
+                let reference = strict_reference(field_bytes(field)?, limits, budget)?;
+                if row_uid_map.replace(reference).is_some() {
+                    return Err(Error::InvalidSource);
+                }
+            },
+            47 => {
+                validate_dormant_merge_owner(field_bytes(field)?, package, budget)?;
+            },
+            52 => {
+                if field.wire_type() != 2 {
+                    return Err(Error::InvalidSource);
+                }
+                // `StructuredTextImportRecord` carries an imported region,
+                // source dimensions, and source bytes.  Those values are
+                // row-affine even when the record happens to be empty, so a
+                // physical row permutation must reject its mere presence.
+                let _ = field_bytes(field)?;
+                features.imported_data = true;
+            },
+            MODEL_STROKE_SIDECAR_FIELD => {
+                let reference = strict_reference(field_bytes(field)?, limits, budget)?;
+                // An empty stroke sidecar is retained as an opaque physical
+                // root, but its model edge still has to be an exact
+                // field-local role.  Accepting an aggregate-only edge here
+                // would make a later row-carried BNC identifier impossible
+                // to distinguish from an unrelated sidecar alias.
+                validate_optional_model_route(
+                    package,
+                    target,
+                    reference,
+                    &[MODEL_STROKE_SIDECAR_FIELD],
+                    budget,
+                )?;
+                if stroke_sidecar.replace(reference).is_some() {
+                    return Err(Error::InvalidSource);
+                }
+            },
+            60..=69 | 71..=80 | 87..=89 => {
+                let _ = strict_reference(field_bytes(field)?, limits, budget)?;
+            },
+            70 => {
+                validate_dormant_hidden_states_owner(field_bytes(field)?, package, target, budget)?;
+            },
+            81 => {
+                validate_dormant_deprecated_category_owner(field_bytes(field)?, package, budget)?;
+            },
+            82 => {
+                validate_dormant_pencil_owner(field_bytes(field)?, package, budget)?;
+            },
+            83 => {
+                if !field_bytes(field)?.is_empty() {
+                    features.grouping = true;
+                }
+            },
+            84 => {
+                // Hidden-state owners are coordinate-affine and are not part
+                // of the native physical-sort rewrite closure.
+                return Err(Error::UnsupportedDependency);
+            },
+            85 => {
+                let _ = strict_reference(field_bytes(field)?, limits, budget)?;
+                features.pivot = true;
+            },
+            86 => {
+                let identifier = strict_reference(field_bytes(field)?, limits, budget)?;
+                validate_optional_model_route(package, target, identifier, &[number], budget)?;
+                validate_dormant_category_owner_reference(package, identifier, budget)?;
+            },
+            90..=92 => {
+                let _ = canonical_field_u32(field)?;
+                features.pivot = true;
+            },
+            93 => {
+                // Spill owners encode a row-affine dependency graph.  Do not
+                // infer safety from a UUID-shaped payload alone.
+                return Err(Error::UnsupportedDependency);
+            },
+            _ => return Err(Error::UnsupportedDependency),
+        }
+    }
+    budget.work(payload.len())?;
+    Ok((
+        header_rows,
+        header_columns,
+        footer_rows,
+        row_uid_map,
+        stroke_sidecar,
+        features,
+    ))
+}
+
+fn validated_wire_view<'a>(
+    payload: &'a [u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<WireView<'a>> {
+    let limits = budget.residual(package)?;
+    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    budget.fields(fields.fields().count())?;
+    budget.work(payload.len())?;
+    for field in fields.fields() {
+        field
+            .validate_canonical_framing()
+            .map_err(|_| Error::Wire)?;
+    }
+    Ok(fields)
+}
+
+/// Mark one singular field while validating a physical storage envelope.
+///
+/// The generated storage projections intentionally skip unknown fields so
+/// they can remain forward-compatible.  Physical sorting has a narrower
+/// contract: an unknown field in any mutable storage envelope could carry
+/// row-affine state that the row permutation does not move.  These helpers
+/// therefore reject unknown keys and duplicate singular keys before the
+/// strict Buffa/handwritten codec is entered.
+fn mark_physical_singular<const N: usize>(
+    seen: &mut [bool; N],
+    field: litchi_iwa_common::wire::WireFieldView<'_>,
+) -> Result<()> {
+    let index = usize::try_from(field.number()).map_err(|_| Error::InvalidSource)?;
+    let slot = seen.get_mut(index).ok_or(Error::UnsupportedDependency)?;
+    if std::mem::replace(slot, true) {
+        return Err(Error::InvalidSource);
+    }
+    Ok(())
+}
+
+fn require_physical_field(
+    field: litchi_iwa_common::wire::WireFieldView<'_>,
+    allowed: &[u32],
+) -> Result<()> {
+    if allowed.contains(&field.number()) {
+        Ok(())
+    } else {
+        Err(Error::UnsupportedDependency)
+    }
+}
+
+fn physical_varint_u32(field: litchi_iwa_common::wire::WireFieldView<'_>) -> Result<u32> {
+    canonical_field_u32(field)
+}
+
+fn physical_varint_bool(field: litchi_iwa_common::wire::WireFieldView<'_>) -> Result<bool> {
+    canonical_field_bool(field)
+}
+
+fn physical_bytes<'a>(field: litchi_iwa_common::wire::WireFieldView<'a>) -> Result<&'a [u8]> {
+    field_bytes(field)
+}
+
+fn physical_reference(payload: &[u8], package: &Package, budget: &mut Budget) -> Result<u64> {
+    let limits = budget.residual(package)?;
+    strict_reference(payload, limits, budget)
+}
+
+fn validate_physical_data_store_wire(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut seen = [false; 23];
+    for field in fields.fields() {
+        if !(1..=22).contains(&field.number()) {
+            return Err(Error::UnsupportedDependency);
+        }
+        match field.number() {
+            1 => {
+                mark_physical_singular(&mut seen, field)?;
+                validate_physical_header_storage_wire(physical_bytes(field)?, package, budget)?;
+            },
+            2 | 4..=6 | 11 | 12 | 13 | 15..=22 => {
+                mark_physical_singular(&mut seen, field)?;
+                let _ = physical_reference(physical_bytes(field)?, package, budget)?;
+            },
+            3 => {
+                mark_physical_singular(&mut seen, field)?;
+                validate_physical_tile_storage_wire(physical_bytes(field)?, package, budget)?;
+            },
+            7 | 8 | 14 => {
+                mark_physical_singular(&mut seen, field)?;
+                let _ = physical_varint_u32(field)?;
+            },
+            9 | 10 => {
+                mark_physical_singular(&mut seen, field)?;
+                validate_physical_table_tree_wire(physical_bytes(field)?, package, budget)?;
+            },
+            _ => return Err(Error::UnsupportedDependency),
+        }
+    }
+    Ok(())
+}
+
+fn validate_model_storage_envelope_wire(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut found = false;
+    for field in fields.fields() {
+        if field.number() != MODEL_STORAGE_FIELD {
+            continue;
+        }
+        if std::mem::replace(&mut found, true) {
+            return Err(Error::InvalidSource);
+        }
+        validate_physical_data_store_wire(physical_bytes(field)?, package, budget)?;
+    }
+    if found {
+        Ok(())
+    } else {
+        Err(Error::InvalidSource)
+    }
+}
+
+fn validate_physical_table_tree_wire(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    for field in fields.fields() {
+        require_physical_field(field, &[1])?;
+        if field.wire_type() != 2 {
+            return Err(Error::InvalidSource);
+        }
+        let node = validated_wire_view(field.payload(), package, budget)?;
+        let mut seen = [false; 3];
+        for node_field in node.fields() {
+            require_physical_field(node_field, &[1, 2])?;
+            mark_physical_singular(&mut seen, node_field)?;
+            let _ = physical_varint_u32(node_field)?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_physical_tile_storage_wire(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut seen = [false; 23];
+    for field in fields.fields() {
+        require_physical_field(field, &[1, 2, 3])?;
+        match field.number() {
+            1 => {
+                if field.wire_type() != 2 {
+                    return Err(Error::InvalidSource);
+                }
+                let record = validated_wire_view(field.payload(), package, budget)?;
+                let mut record_seen = [false; 3];
+                for record_field in record.fields() {
+                    require_physical_field(record_field, &[1, 2])?;
+                    mark_physical_singular(&mut record_seen, record_field)?;
+                    match record_field.number() {
+                        1 => {
+                            let _ = physical_varint_u32(record_field)?;
+                        },
+                        2 => {
+                            let _ =
+                                physical_reference(physical_bytes(record_field)?, package, budget)?;
+                        },
+                        _ => return Err(Error::UnsupportedDependency),
+                    }
+                }
+            },
+            2 => {
+                mark_physical_singular(&mut seen, field)?;
+                let _ = physical_varint_u32(field)?;
+            },
+            3 => {
+                mark_physical_singular(&mut seen, field)?;
+                let _ = physical_varint_bool(field)?;
+            },
+            _ => return Err(Error::UnsupportedDependency),
+        }
+    }
+    Ok(())
+}
+
+fn validate_physical_tile_wire(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut seen = [false; 23];
+    for field in fields.fields() {
+        require_physical_field(field, &[1, 2, 3, 4, 5, 6, 7, 8])?;
+        match field.number() {
+            1..=4 | 6 => {
+                mark_physical_singular(&mut seen, field)?;
+                let _ = physical_varint_u32(field)?;
+            },
+            5 => {
+                if field.wire_type() != 2 {
+                    return Err(Error::InvalidSource);
+                }
+                validate_physical_tile_row_wire(field.payload(), package, budget)?;
+            },
+            7 | 8 => {
+                mark_physical_singular(&mut seen, field)?;
+                let _ = physical_varint_bool(field)?;
+            },
+            _ => return Err(Error::UnsupportedDependency),
+        }
+    }
+    Ok(())
+}
+
+fn validate_physical_tile_row_wire(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut seen = [false; 23];
+    for field in fields.fields() {
+        require_physical_field(field, &[1, 2, 3, 4, 5, 6, 7, 8])?;
+        match field.number() {
+            1 | 2 | 5 => {
+                mark_physical_singular(&mut seen, field)?;
+                let _ = physical_varint_u32(field)?;
+            },
+            3 | 4 | 6 | 7 => {
+                mark_physical_singular(&mut seen, field)?;
+                let _ = physical_bytes(field)?;
+            },
+            8 => {
+                mark_physical_singular(&mut seen, field)?;
+                let _ = physical_varint_bool(field)?;
+            },
+            _ => return Err(Error::UnsupportedDependency),
+        }
+    }
+    Ok(())
+}
+
+fn validate_physical_header_storage_wire(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut seen = [false; 23];
+    for field in fields.fields() {
+        require_physical_field(field, &[1, 2])?;
+        match field.number() {
+            1 => {
+                mark_physical_singular(&mut seen, field)?;
+                let _ = physical_varint_u32(field)?;
+            },
+            2 => {
+                let reference = physical_bytes(field)?;
+                let _ = physical_reference(reference, package, budget)?;
+            },
+            _ => return Err(Error::UnsupportedDependency),
+        }
+    }
+    Ok(())
+}
+
+fn validate_physical_header_bucket_wire(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut seen = [false; 23];
+    for field in fields.fields() {
+        require_physical_field(field, &[1, 2])?;
+        match field.number() {
+            1 => {
+                mark_physical_singular(&mut seen, field)?;
+                let _ = physical_varint_u32(field)?;
+            },
+            2 => {
+                if field.wire_type() != 2 {
+                    return Err(Error::InvalidSource);
+                }
+                validate_physical_header_wire(field.payload(), package, budget)?;
+            },
+            _ => return Err(Error::UnsupportedDependency),
+        }
+    }
+    Ok(())
+}
+
+fn validate_physical_header_wire(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut seen = [false; 7];
+    for field in fields.fields() {
+        require_physical_field(field, &[1, 2, 3, 4, 5, 6])?;
+        let index = usize::try_from(field.number()).map_err(|_| Error::InvalidSource)?;
+        let slot = seen.get_mut(index).ok_or(Error::UnsupportedDependency)?;
+        if std::mem::replace(slot, true) {
+            return Err(Error::InvalidSource);
+        }
+        match field.number() {
+            1 | 3 | 4 => {
+                let _ = physical_varint_u32(field)?;
+            },
+            2 => {
+                if field.wire_type() != 5 || field.payload().len() != 4 {
+                    return Err(Error::InvalidSource);
+                }
+            },
+            5 | 6 => {
+                let _ = physical_reference(physical_bytes(field)?, package, budget)?;
+            },
+            _ => return Err(Error::UnsupportedDependency),
+        }
+    }
+    Ok(())
+}
+
+fn validate_physical_uuid_wire(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut seen = [false; 3];
+    for field in fields.fields() {
+        require_physical_field(field, &[1, 2])?;
+        let index = usize::try_from(field.number()).map_err(|_| Error::InvalidSource)?;
+        let slot = seen.get_mut(index).ok_or(Error::UnsupportedDependency)?;
+        if std::mem::replace(slot, true) {
+            return Err(Error::InvalidSource);
+        }
+        let _ = canonical_field_u64(field)?;
+    }
+    Ok(())
+}
+
+fn validate_physical_repeated_u32(field: litchi_iwa_common::wire::WireFieldView<'_>) -> Result<()> {
+    match field.wire_type() {
+        0 => {
+            let _ = canonical_field_u32(field)?;
+        },
+        2 => {
+            let mut payload = field.payload();
+            while !payload.is_empty() {
+                let (value, width) =
+                    decode_varint_from_bytes(payload).map_err(|_| Error::InvalidSource)?;
+                if width != encoded_len(value) || u32::try_from(value).is_err() {
+                    return Err(Error::InvalidSource);
+                }
+                payload = &payload[width..];
+            }
+        },
+        _ => return Err(Error::InvalidSource),
+    }
+    Ok(())
+}
+
+fn validate_physical_uid_map_wire(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    for field in fields.fields() {
+        require_physical_field(field, &[1, 2, 3, 4, 5, 6])?;
+        match field.number() {
+            1 | 4 => validate_physical_uuid_wire(physical_bytes(field)?, package, budget)?,
+            2 | 3 | 5 | 6 => validate_physical_repeated_u32(field)?,
+            _ => return Err(Error::UnsupportedDependency),
+        }
+    }
+    Ok(())
+}
+
+fn validate_physical_data_list_entry_wire(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut seen = [false; 13];
+    for field in fields.fields() {
+        require_physical_field(field, &[1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12])?;
+        match field.number() {
+            1 | 2 => {
+                mark_physical_singular(&mut seen, field)?;
+                let _ = physical_varint_u32(field)?;
+            },
+            3 => {
+                mark_physical_singular(&mut seen, field)?;
+                let value = std::str::from_utf8(physical_bytes(field)?)
+                    .map_err(|_| Error::InvalidSource)?;
+                let _ = value;
+            },
+            4 | 9 | 10 => {
+                mark_physical_singular(&mut seen, field)?;
+                let _ = physical_reference(physical_bytes(field)?, package, budget)?;
+            },
+            5 | 6 | 8 | 11 | 12 => {
+                mark_physical_singular(&mut seen, field)?;
+                let _ = physical_bytes(field)?;
+            },
+            _ => return Err(Error::UnsupportedDependency),
+        }
+    }
+    Ok(())
+}
+
+fn validate_physical_data_list_wire(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut seen = [false; 6];
+    for field in fields.fields() {
+        require_physical_field(field, &[1, 2, 3, 4, 5])?;
+        match field.number() {
+            1 | 2 => {
+                mark_physical_singular(&mut seen, field)?;
+                let _ = physical_varint_u32(field)?;
+            },
+            3 => {
+                if field.wire_type() != 2 {
+                    return Err(Error::InvalidSource);
+                }
+                validate_physical_data_list_entry_wire(field.payload(), package, budget)?;
+            },
+            4 => {
+                let _ = physical_reference(physical_bytes(field)?, package, budget)?;
+            },
+            5 => {
+                mark_physical_singular(&mut seen, field)?;
+                let _ = physical_varint_bool(field)?;
+            },
+            _ => return Err(Error::UnsupportedDependency),
+        }
+    }
+    Ok(())
+}
+
+fn canonical_field_u64(field: litchi_iwa_common::wire::WireFieldView<'_>) -> Result<u64> {
+    if field.wire_type() != 0 {
+        return Err(Error::InvalidSource);
+    }
+    let (value, width) =
+        decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
+    if width != encoded_len(value) {
+        return Err(Error::InvalidSource);
+    }
+    Ok(value)
+}
+
+fn canonical_field_bool(field: litchi_iwa_common::wire::WireFieldView<'_>) -> Result<bool> {
+    match canonical_field_u64(field)? {
+        0 => Ok(false),
+        1 => Ok(true),
+        _ => Err(Error::InvalidSource),
+    }
+}
+
+fn canonical_field_f64(field: litchi_iwa_common::wire::WireFieldView<'_>) -> Result<f64> {
+    if field.wire_type() != 1 || field.payload().len() != size_of::<f64>() {
+        return Err(Error::InvalidSource);
+    }
+    let bytes: [u8; size_of::<f64>()] = field
+        .payload()
+        .try_into()
+        .map_err(|_| Error::InvalidSource)?;
+    let value = f64::from_le_bytes(bytes);
+    value
+        .is_finite()
+        .then_some(value)
+        .ok_or(Error::InvalidSource)
+}
+
+#[allow(
+    dead_code,
+    reason = "Field 45 is fail-closed until its dependency closure is owned."
+)]
+/// Accept either one canonical 16-byte CFUUID or all four canonical word
+/// fields, but never a mixed, partial, duplicate, or all-zero identity.
+fn validate_cfuuid(payload: &[u8], package: &Package, budget: &mut Budget) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut bytes = None;
+    let mut words = [None; 4];
+    for field in fields.fields() {
+        match field.number() {
+            1 => {
+                if field.wire_type() != 2 || bytes.replace(field.payload()).is_some() {
+                    return Err(Error::InvalidSource);
+                }
+            },
+            2..=5 => {
+                let index =
+                    usize::try_from(field.number() - 2).map_err(|_| Error::InvalidSource)?;
+                if words[index].replace(canonical_field_u32(field)?).is_some() {
+                    return Err(Error::InvalidSource);
+                }
+            },
+            _ => return Err(Error::InvalidSource),
+        }
+    }
+    match bytes {
+        Some(value) => {
+            if words.iter().any(Option::is_some)
+                || value.len() != 16
+                || value.iter().all(|byte| *byte == 0)
+            {
+                return Err(Error::InvalidSource);
+            }
+        },
+        None => {
+            if words.iter().any(Option::is_none) || words.iter().all(|value| value == &Some(0)) {
+                return Err(Error::InvalidSource);
+            }
+        },
+    }
+    Ok(())
+}
+
+#[allow(
+    dead_code,
+    reason = "Fields 84 and 93 are fail-closed until their dependency closures are owned."
+)]
+fn validate_dormant_formula_store(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut next_index = None;
+    for field in fields.fields() {
+        match field.number() {
+            2 if next_index.is_none() => next_index = Some(canonical_field_u32(field)?),
+            3 if field.wire_type() == 2 => return Err(Error::UnsupportedDependency),
+            _ => return Err(Error::InvalidSource),
+        }
+    }
+    if next_index == Some(0) {
+        Ok(())
+    } else {
+        Err(Error::UnsupportedDependency)
+    }
+}
+
+fn validate_dormant_merge_owner(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    validate_dormant_uuid_formula_owner(payload, package, budget, false)
+}
+
+fn validate_dormant_pencil_owner(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    validate_dormant_uuid_formula_owner(payload, package, budget, true)
+}
+
+fn validate_dormant_uuid_formula_owner(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+    reject_annotations: bool,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut owner_seen = false;
+    let mut store_seen = false;
+    for field in fields.fields() {
+        match field.number() {
+            1 if !owner_seen && field.wire_type() == 2 => {
+                owner_seen = true;
+                validate_cfuuid(field.payload(), package, budget)?;
+            },
+            2 if !store_seen && field.wire_type() == 2 => {
+                store_seen = true;
+                validate_dormant_formula_store(field.payload(), package, budget)?;
+            },
+            3 if reject_annotations && field.wire_type() == 2 => {
+                return Err(Error::UnsupportedDependency);
+            },
+            _ => return Err(Error::InvalidSource),
+        }
+    }
+    owner_seen.then_some(()).ok_or(Error::InvalidSource)
+}
+
+fn strict_single_message<'a>(
+    package: &'a Package,
+    identifier: u64,
+    message_type: u32,
+    budget: &mut Budget,
+) -> Result<(&'a ArchiveObject, usize, &'a [u8])> {
+    let location = locate_object(package, identifier)?;
+    ensure_unique_identity(package, identifier, budget)?;
+    let object = object_at(package, &location)?;
+    if object.messages.len() != 1 || object.archive_info.message_infos.len() != 1 {
+        return Err(Error::UnsupportedDependency);
+    }
+    let (index, payload) = unique_message(object, message_type, budget)?;
+    Ok((object, index, payload))
+}
+
+fn validate_declared_references(
+    object: &ArchiveObject,
+    message_index: usize,
+    expected: &[u64],
+    accepted_paths: &[&[u32]],
+    budget: &mut Budget,
+) -> Result<()> {
+    let info = object
+        .archive_info
+        .message_infos
+        .get(message_index)
+        .ok_or(Error::InvalidSource)?;
+    budget.references(
+        info.object_references
+            .len()
+            .checked_add(info.data_references.len())
+            .and_then(|count| {
+                info.field_infos.iter().try_fold(count, |total, field| {
+                    total
+                        .checked_add(field.object_references.len())
+                        .and_then(|value| value.checked_add(field.data_references.len()))
+                })
+            })
+            .ok_or(Error::InvalidSource)?,
+    )?;
+    if !info.data_references.is_empty()
+        || info.object_references.len() != expected.len()
+        || expected.iter().any(|identifier| {
+            info.object_references
+                .iter()
+                .filter(|candidate| *candidate == identifier)
+                .count()
+                != 1
+        })
+    {
+        return Err(Error::UnsupportedDependency);
+    }
+    for field in &info.field_infos {
+        if !field.data_references.is_empty() {
+            return Err(Error::UnsupportedDependency);
+        }
+        if field.object_references.is_empty() {
+            continue;
+        }
+        if !field
+            .r#type
+            .is_none_or(|kind| matches!(kind, FieldType::ObjectReference | FieldType::Message))
+            || !accepted_paths
+                .iter()
+                .any(|path| field.path.as_slice() == *path)
+            || field.object_references.iter().any(|identifier| {
+                expected
+                    .iter()
+                    .filter(|candidate| *candidate == identifier)
+                    .count()
+                    != 1
+            })
+        {
+            return Err(Error::UnsupportedDependency);
+        }
+    }
+    Ok(())
+}
+
+fn validate_selected_model_references(
+    package: &Package,
+    target: &Target,
+    identifiers: &[u64],
+    accepted_path: &[u32],
+    budget: &mut Budget,
+) -> Result<()> {
+    let model = object_at(package, &target.model)?;
+    let info = model
+        .archive_info
+        .message_infos
+        .get(target.model_message_index)
+        .ok_or(Error::InvalidSource)?;
+    budget.work(
+        identifiers
+            .len()
+            .checked_add(info.field_infos.len())
+            .ok_or(Error::InvalidSource)?,
+    )?;
+    budget.references(
+        info.object_references
+            .len()
+            .checked_add(info.data_references.len())
+            .and_then(|count| {
+                info.field_infos.iter().try_fold(count, |total, field| {
+                    total
+                        .checked_add(field.object_references.len())
+                        .and_then(|value| value.checked_add(field.data_references.len()))
+                })
+            })
+            .ok_or(Error::InvalidSource)?,
+    )?;
+    for identifier in identifiers {
+        if info
+            .object_references
+            .iter()
+            .filter(|candidate| *candidate == identifier)
+            .count()
+            != 1
+        {
+            return Err(Error::UnsupportedDependency);
+        }
+    }
+    for field in &info.field_infos {
+        let contains_selected = field
+            .object_references
+            .iter()
+            .any(|identifier| identifiers.contains(identifier));
+        if contains_selected
+            && (!field.data_references.is_empty()
+                || !field.r#type.is_none_or(|kind| {
+                    matches!(kind, FieldType::ObjectReference | FieldType::Message)
+                })
+                || field.path.as_slice() != accepted_path
+                || field
+                    .object_references
+                    .iter()
+                    .any(|identifier| !identifiers.contains(identifier)))
+        {
+            return Err(Error::UnsupportedDependency);
+        }
+    }
+    Ok(())
+}
+
+fn validate_dormant_hidden_formula_owner(
+    package: &Package,
+    identifier: u64,
+    budget: &mut Budget,
+) -> Result<()> {
+    let (object, index, payload) = strict_single_message(
+        package,
+        identifier,
+        HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE,
+        budget,
+    )?;
+    validate_declared_references(object, index, &[], &[], budget)?;
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut owner_seen = false;
+    let mut import_seen = false;
+    for field in fields.fields() {
+        match field.number() {
+            1 if !owner_seen && field.wire_type() == 2 => {
+                owner_seen = true;
+                validate_cfuuid(field.payload(), package, budget)?;
+            },
+            2 if field.wire_type() == 2 => return Err(Error::UnsupportedDependency),
+            3 if !import_seen => {
+                import_seen = true;
+                if canonical_field_bool(field)? {
+                    return Err(Error::UnsupportedDependency);
+                }
+            },
+            _ => return Err(Error::InvalidSource),
+        }
+    }
+    owner_seen.then_some(()).ok_or(Error::InvalidSource)
+}
+
+fn validate_dormant_hidden_states_owner(
+    payload: &[u8],
+    package: &Package,
+    target: &Target,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let limits = budget.residual(package)?;
+    let mut owner = None;
+    let mut state = None;
+    for field in fields.fields() {
+        match field.number() {
+            1 if owner.is_none() && field.wire_type() == 2 => owner = Some(field.payload()),
+            2 if state.is_none() && field.wire_type() == 2 => state = Some(field.payload()),
+            _ => return Err(Error::UnsupportedDependency),
+        }
+    }
+    let owner_uid = parse_uuid(owner.ok_or(Error::InvalidSource)?, limits, budget)?;
+    let filter_ids = validate_dormant_hidden_state(
+        state.ok_or(Error::InvalidSource)?,
+        owner_uid,
+        package,
+        budget,
+    )?;
+    if filter_ids[0] == filter_ids[1] {
+        return Err(Error::UnsupportedDependency);
+    }
+    validate_selected_model_references(package, target, &filter_ids, &[70], budget)?;
+    for identifier in filter_ids {
+        validate_dormant_filter_set(package, identifier, budget)?;
+    }
+    Ok(())
+}
+
+fn validate_dormant_hidden_state(
+    payload: &[u8],
+    owner_uid: (u64, u64),
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<[u64; 2]> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let limits = budget.residual(package)?;
+    let mut uid = None;
+    let mut column = None;
+    let mut row = None;
+    for field in fields.fields() {
+        match field.number() {
+            1 if uid.is_none() && field.wire_type() == 2 => uid = Some(field.payload()),
+            2 if column.is_none() && field.wire_type() == 2 => column = Some(field.payload()),
+            3 if row.is_none() && field.wire_type() == 2 => row = Some(field.payload()),
+            _ => return Err(Error::UnsupportedDependency),
+        }
+    }
+    if parse_uuid(uid.ok_or(Error::InvalidSource)?, limits, budget)? != owner_uid {
+        return Err(Error::UnsupportedDependency);
+    }
+    Ok([
+        validate_dormant_hidden_extent(column.ok_or(Error::InvalidSource)?, 0, package, budget)?,
+        validate_dormant_hidden_extent(row.ok_or(Error::InvalidSource)?, 1, package, budget)?,
+    ])
+}
+
+fn validate_dormant_hidden_extent(
+    payload: &[u8],
+    expected_direction: u32,
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<u64> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let limits = budget.residual(package)?;
+    let mut uid = None;
+    let mut direction = None;
+    let mut import_seen = false;
+    let mut filter = None;
+    for field in fields.fields() {
+        match field.number() {
+            1 if uid.is_none() && field.wire_type() == 2 => uid = Some(field.payload()),
+            3 if direction.is_none() => direction = Some(canonical_field_u32(field)?),
+            6 if !import_seen => {
+                import_seen = true;
+                if canonical_field_bool(field)? {
+                    return Err(Error::UnsupportedDependency);
+                }
+            },
+            8 if filter.is_none() && field.wire_type() == 2 => {
+                filter = Some(strict_reference(field.payload(), limits, budget)?);
+            },
+            2 | 5 | 7 | 9..=12 => return Err(Error::UnsupportedDependency),
+            _ => return Err(Error::InvalidSource),
+        }
+    }
+    let _ = parse_uuid(uid.ok_or(Error::InvalidSource)?, limits, budget)?;
+    if direction != Some(expected_direction) {
+        return Err(Error::UnsupportedDependency);
+    }
+    filter.ok_or(Error::InvalidSource)
+}
+
+fn validate_dormant_filter_set(
+    package: &Package,
+    identifier: u64,
+    budget: &mut Budget,
+) -> Result<()> {
+    let (object, index, payload) =
+        strict_single_message(package, identifier, FILTER_SET_MESSAGE_TYPE, budget)?;
+    validate_declared_references(object, index, &[], &[], budget)?;
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut kind = None;
+    let mut enabled = None;
+    let mut import = None;
+    let mut offset_count = 0usize;
+    for field in fields.fields() {
+        match field.number() {
+            1 if kind.is_none() => kind = Some(canonical_field_u32(field)?),
+            2 if enabled.is_none() => enabled = Some(canonical_field_bool(field)?),
+            4 if import.is_none() => import = Some(canonical_field_bool(field)?),
+            5 => {
+                if field.wire_type() != 0 || canonical_field_u32(field)? != 0 {
+                    return Err(Error::UnsupportedDependency);
+                }
+                offset_count = offset_count.checked_add(1).ok_or(Error::InvalidSource)?;
+            },
+            3 | 6 | 7 => return Err(Error::UnsupportedDependency),
+            _ => return Err(Error::InvalidSource),
+        }
+    }
+    if kind == Some(0) && enabled == Some(false) && import == Some(false) && offset_count == 1 {
+        Ok(())
+    } else {
+        Err(Error::UnsupportedDependency)
+    }
+}
+
+fn validate_dormant_deprecated_category_owner(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut owner = None;
+    let mut group_count = 0usize;
+    for field in fields.fields() {
+        match field.number() {
+            1 if owner.is_none() && field.wire_type() == 2 => owner = Some(field.payload()),
+            2 if field.wire_type() == 2 => {
+                group_count = group_count.checked_add(1).ok_or(Error::InvalidSource)?;
+                if validate_dormant_group_by(field.payload(), false, package, budget)?.is_some() {
+                    return Err(Error::UnsupportedDependency);
+                }
+            },
+            _ => return Err(Error::InvalidSource),
+        }
+    }
+    let owner = parse_uuid_allow_zero(owner.ok_or(Error::InvalidSource)?, package, budget)?;
+    if owner == (0, 0) && group_count == 1 {
+        Ok(())
+    } else {
+        Err(Error::UnsupportedDependency)
+    }
+}
+
+fn parse_uuid_allow_zero(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<(u64, u64)> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut lower = None;
+    let mut upper = None;
+    for field in fields.fields() {
+        match field.number() {
+            1 if lower.is_none() => lower = Some(canonical_field_u64(field)?),
+            2 if upper.is_none() => upper = Some(canonical_field_u64(field)?),
+            _ => return Err(Error::InvalidSource),
+        }
+    }
+    Ok((
+        lower.ok_or(Error::InvalidSource)?,
+        upper.ok_or(Error::InvalidSource)?,
+    ))
+}
+
+fn validate_dormant_category_owner_reference(
+    package: &Package,
+    identifier: u64,
+    budget: &mut Budget,
+) -> Result<()> {
+    let limits = budget.residual(package)?;
+    let (owner_object, owner_index, owner_payload) = strict_single_message(
+        package,
+        identifier,
+        CATEGORY_OWNER_REFERENCE_MESSAGE_TYPE,
+        budget,
+    )?;
+    let owner_fields = validated_wire_view(owner_payload, package, budget)?;
+    let mut group_identifier = None;
+    for field in owner_fields.fields() {
+        if field.number() != 1 || field.wire_type() != 2 || group_identifier.is_some() {
+            return Err(Error::UnsupportedDependency);
+        }
+        group_identifier = Some(strict_reference(field.payload(), limits, budget)?);
+    }
+    let group_identifier = group_identifier.ok_or(Error::InvalidSource)?;
+    validate_declared_references(
+        owner_object,
+        owner_index,
+        &[group_identifier],
+        &[&[1]],
+        budget,
+    )?;
+
+    let (group_object, group_index, group_payload) =
+        strict_single_message(package, group_identifier, GROUP_BY_MESSAGE_TYPE, budget)?;
+    let root_identifier = validate_dormant_group_by(group_payload, true, package, budget)?
+        .ok_or(Error::InvalidSource)?;
+    validate_declared_references(
+        group_object,
+        group_index,
+        &[root_identifier],
+        &[&[17], &[18]],
+        budget,
+    )?;
+    let (root_object, root_index, root_payload) =
+        strict_single_message(package, root_identifier, GROUP_NODE_MESSAGE_TYPE, budget)?;
+    validate_declared_references(root_object, root_index, &[], &[], budget)?;
+    validate_inert_group_node(root_payload, package, budget)
+}
+
+fn validate_dormant_group_by(
+    payload: &[u8],
+    require_root_reference: bool,
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<Option<u64>> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let limits = budget.residual(package)?;
+    let mut uid = None;
+    let mut root = None;
+    let mut enabled = None;
+    let mut owner_index = None;
+    let mut coordinates = [false; 8];
+    let mut embedded_root = false;
+    for field in fields.fields() {
+        match field.number() {
+            1 if uid.is_none() && field.wire_type() == 2 => uid = Some(field.payload()),
+            3 if !embedded_root && field.wire_type() == 2 => {
+                embedded_root = true;
+                validate_inert_group_node(field.payload(), package, budget)?;
+            },
+            6 if enabled.is_none() => enabled = Some(canonical_field_bool(field)?),
+            7..=13 | 16 if field.wire_type() == 2 => {
+                let (slot, expected_column) = match field.number() {
+                    7 => (0, 0),
+                    8 => (1, 1),
+                    9 => (2, 3),
+                    10 => (3, 2),
+                    11 => (4, 4),
+                    12 => (5, 5),
+                    13 => (6, 6),
+                    16 => (7, 7),
+                    _ => unreachable!(),
+                };
+                if std::mem::replace(&mut coordinates[slot], true) {
+                    return Err(Error::InvalidSource);
+                }
+                validate_inert_coordinate(field.payload(), expected_column, package, budget)?;
+            },
+            14 if owner_index.is_none() => owner_index = Some(canonical_field_u32(field)?),
+            18 if root.is_none() && field.wire_type() == 2 => {
+                root = Some(strict_reference(field.payload(), limits, budget)?);
+            },
+            2 | 4 | 5 | 15 | 17 => return Err(Error::UnsupportedDependency),
+            _ => return Err(Error::InvalidSource),
+        }
+    }
+    let _ = parse_uuid(uid.ok_or(Error::InvalidSource)?, limits, budget)?;
+    if enabled != Some(false)
+        || owner_index != Some(8)
+        || !embedded_root
+        || coordinates.iter().any(|seen| !seen)
+        || require_root_reference != root.is_some()
+    {
+        return Err(Error::UnsupportedDependency);
+    }
+    Ok(root)
+}
+
+fn validate_inert_group_node(payload: &[u8], package: &Package, budget: &mut Budget) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let limits = budget.residual(package)?;
+    let mut uid = None;
+    let mut format_manager_seen = false;
+    for field in fields.fields() {
+        match field.number() {
+            1 if uid.is_none() && field.wire_type() == 2 => uid = Some(field.payload()),
+            6 if !format_manager_seen && field.wire_type() == 2 => {
+                format_manager_seen = true;
+                if !field.payload().is_empty() {
+                    return Err(Error::UnsupportedDependency);
+                }
+            },
+            3..=5 | 7..=10 => return Err(Error::UnsupportedDependency),
+            _ => return Err(Error::InvalidSource),
+        }
+    }
+    if parse_uuid(uid.ok_or(Error::InvalidSource)?, limits, budget)? == (1, 0) {
+        Ok(())
+    } else {
+        Err(Error::UnsupportedDependency)
+    }
+}
+
+fn validate_inert_coordinate(
+    payload: &[u8],
+    expected_column: u32,
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut column = None;
+    let mut row = None;
+    for field in fields.fields() {
+        match field.number() {
+            2 if column.is_none() => column = Some(canonical_field_u32(field)?),
+            3 if row.is_none() => row = Some(canonical_field_u32(field)?),
+            _ => return Err(Error::InvalidSource),
+        }
+    }
+    if column == Some(expected_column) && row == Some(0) {
+        Ok(())
+    } else {
+        Err(Error::UnsupportedDependency)
+    }
+}
+
+fn field_bytes<'a>(field: litchi_iwa_common::wire::WireFieldView<'a>) -> Result<&'a [u8]> {
+    if field.wire_type() != 2 {
+        return Err(Error::InvalidSource);
+    }
+    Ok(field.payload())
+}
+
+fn canonical_field_u32(field: litchi_iwa_common::wire::WireFieldView<'_>) -> Result<u32> {
+    if field.wire_type() != 0 {
+        return Err(Error::InvalidSource);
+    }
+    let raw = field.payload();
+    let (value, width) = decode_varint_from_bytes(raw).map_err(|_| Error::InvalidSource)?;
+    if width != encoded_len(value) {
+        return Err(Error::InvalidSource);
+    }
+    u32::try_from(value).map_err(|_| Error::InvalidSource)
+}
+
+fn decode_tile_storage(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<(u32, Option<bool>)> {
+    let options = budget.storage_codec_options(package)?;
+    let (snapshot, report) = storage_codec::decode_tile_storage_with_report(payload, options)
+        .map_err(|_| Error::Codec)?;
+    budget.storage_codec_report(report)?;
+    Ok((
+        snapshot.tile_size().ok_or(Error::InvalidSource)?,
+        snapshot.should_use_wide_rows(),
+    ))
+}
+
+fn validate_tile_storage(
+    package: &Package,
+    target: &Target,
+    references: &[(u32, u64)],
+    tile_size: u32,
+    budget: &mut Budget,
+) -> Result<Vec<PhysicalTileReference>> {
+    if references.is_empty() {
+        return Err(Error::UnsupportedDependency);
+    }
+    budget.allocations(
+        references
+            .len()
+            .checked_mul(2)
+            .ok_or(Error::InvalidSource)?,
+    )?;
+    let mut seen_keys = HashSet::new();
+    let mut seen_identifiers = HashSet::new();
+    seen_keys
+        .try_reserve(references.len())
+        .map_err(|_| Error::Allocation(references.len()))?;
+    seen_identifiers
+        .try_reserve(references.len())
+        .map_err(|_| Error::Allocation(references.len()))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(references.len())
+        .map_err(|_| Error::Allocation(references.len()))?;
+    for (tile_id, identifier) in references.iter().copied() {
+        if !seen_keys.insert(tile_id) || identifier == 0 || !seen_identifiers.insert(identifier) {
+            return Err(Error::InvalidSource);
+        }
+        let location = locate_object(package, identifier)?;
+        ensure_unique_identity(package, identifier, budget)?;
+        let object = object_at(package, &location)?;
+        let (message_index, tile_payload) =
+            unique_mutable_message(object, &[TILE_MESSAGE_TYPE], budget)?;
+        let _ = message_index;
+        validate_physical_tile_wire(tile_payload, package, budget)?;
+        let mut rows = PhysicalTileRowCollector::new(target.columns);
+        let options = budget.storage_codec_options(package)?;
+        let (tile, report) =
+            storage_codec::decode_tile_with_visitor(tile_payload, options, &mut rows)
+                .map_err(|_| Error::Codec)?;
+        budget.storage_codec_report(report)?;
+        if tile.max_column() >= target.columns
+            || tile.max_row() >= target.rows
+            || tile.num_rows() > tile_size
+        {
+            return Err(Error::InvalidSource);
+        }
+        let mut row_indices = HashSet::new();
+        row_indices
+            .try_reserve(rows.rows.len())
+            .map_err(|_| Error::Allocation(rows.rows.len()))?;
+        let mut maximum = 0u32;
+        let mut cell_total = 0u32;
+        for row in rows.rows {
+            if row.index >= tile_size || !row_indices.insert(row.index) {
+                return Err(Error::InvalidSource);
+            }
+            let row_end = row.index.checked_add(1).ok_or(Error::InvalidSource)?;
+            maximum = maximum.max(row_end);
+            let global = tile_id
+                .checked_mul(tile_size)
+                .and_then(|base| base.checked_add(row.index))
+                .ok_or(Error::InvalidSource)?;
+            if global >= target.rows {
+                return Err(Error::InvalidSource);
+            }
+            cell_total = cell_total
+                .checked_add(row.cell_count)
+                .ok_or(Error::InvalidSource)?;
+        }
+        if maximum != tile.num_rows() || cell_total != tile.num_cells() {
+            return Err(Error::InvalidSource);
+        }
+        output.push(PhysicalTileReference { tile_id, location });
+    }
+    Ok(output)
+}
+
+fn validate_row_headers(
+    package: &Package,
+    target: &Target,
+    references: &[u64],
+    expected_hash: u32,
+    budget: &mut Budget,
+) -> Result<Vec<PhysicalRowHeaderBucket>> {
+    let expected = target.rows.div_ceil(HEADER_BUCKET_ROWS);
+    if references.len() != usize::try_from(expected).map_err(|_| Error::InvalidSource)? {
+        return Err(Error::InvalidSource);
+    }
+    let mut seen = HashSet::new();
+    seen.try_reserve(references.len())
+        .map_err(|_| Error::Allocation(references.len()))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(references.len())
+        .map_err(|_| Error::Allocation(references.len()))?;
+    for (bucket_index, identifier) in references.iter().copied().enumerate() {
+        if identifier == 0 || !seen.insert(identifier) {
+            return Err(Error::InvalidSource);
+        }
+        let location = locate_object(package, identifier)?;
+        ensure_unique_identity(package, identifier, budget)?;
+        let object = object_at(package, &location)?;
+        let (_, payload) = unique_mutable_message(object, &[HEADER_BUCKET_MESSAGE_TYPE], budget)?;
+        validate_physical_header_bucket_wire(payload, package, budget)?;
+        let mut headers = PhysicalHeaderCollector::new();
+        let options = budget.storage_codec_options(package)?;
+        let (bucket, report) = storage_codec::decode_header_storage_bucket_with_visitor(
+            payload,
+            options,
+            &mut headers,
+        )
+        .map_err(|_| Error::Codec)?;
+        budget.storage_codec_report(report)?;
+        if bucket.bucket_hash_function() != expected_hash {
+            return Err(Error::InvalidSource);
+        }
+        let bucket_start = u32::try_from(bucket_index)
+            .ok()
+            .and_then(|index| index.checked_mul(HEADER_BUCKET_ROWS))
+            .ok_or(Error::InvalidSource)?;
+        let bucket_end = bucket_start
+            .checked_add(HEADER_BUCKET_ROWS)
+            .map_or(target.rows, |end| end.min(target.rows));
+        let mut indices = HashSet::new();
+        indices
+            .try_reserve(headers.indices.len())
+            .map_err(|_| Error::Allocation(headers.indices.len()))?;
+        for index in headers.indices.iter().copied() {
+            if index < bucket_start || index >= bucket_end || !indices.insert(index) {
+                return Err(Error::InvalidSource);
+            }
+        }
+        output.push(PhysicalRowHeaderBucket {
+            bucket_index: u32::try_from(bucket_index).map_err(|_| Error::InvalidSource)?,
+            location,
+            header_count: headers.indices.len(),
+        });
+    }
+    Ok(output)
+}
+
+fn validate_column_headers(
+    package: &Package,
+    location: &ObjectLocation,
+    columns: u32,
+    budget: &mut Budget,
+) -> Result<()> {
+    let object = object_at(package, location)?;
+    let (_, payload) = unique_mutable_message(object, &[HEADER_BUCKET_MESSAGE_TYPE], budget)?;
+    validate_physical_header_bucket_wire(payload, package, budget)?;
+    let mut headers = PhysicalHeaderCollector::new();
+    let options = budget.storage_codec_options(package)?;
+    let (bucket, report) =
+        storage_codec::decode_header_storage_bucket_with_visitor(payload, options, &mut headers)
+            .map_err(|_| Error::Codec)?;
+    budget.storage_codec_report(report)?;
+    if bucket.bucket_hash_function() == 0 {
+        return Err(Error::InvalidSource);
+    }
+    let mut seen = HashSet::new();
+    seen.try_reserve(headers.indices.len())
+        .map_err(|_| Error::Allocation(headers.indices.len()))?;
+    for index in headers.indices {
+        if index >= columns || !seen.insert(index) {
+            return Err(Error::InvalidSource);
+        }
+    }
+    Ok(())
+}
+
+fn validate_row_uid_map(
+    package: &Package,
+    location: &ObjectLocation,
+    rows: u32,
+    columns: u32,
+    budget: &mut Budget,
+) -> Result<()> {
+    let object = object_at(package, location)?;
+    let (_, payload) = unique_mutable_message(
+        object,
+        &[
+            COLUMN_ROW_UID_MAP_LEGACY_MESSAGE_TYPE,
+            COLUMN_ROW_UID_MAP_MESSAGE_TYPE,
+        ],
+        budget,
+    )?;
+    validate_physical_uid_map_wire(payload, package, budget)?;
+    let limits = budget.residual(package)?;
+    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let mut sorted_columns = Vec::new();
+    let mut column_index_for_uid = Vec::new();
+    let mut column_uid_for_index = Vec::new();
+    let mut sorted_rows = Vec::new();
+    let mut row_index_for_uid = Vec::new();
+    let mut row_uid_for_index = Vec::new();
+    let mut saw = [false; 7];
+    for field in fields.fields() {
+        budget.fields(1)?;
+        field
+            .validate_canonical_framing()
+            .map_err(|_| Error::Wire)?;
+        match field.number() {
+            1 | 4 => {
+                let slot = field.number() as usize;
+                if field.wire_type() != 2 {
+                    return Err(Error::InvalidSource);
+                }
+                let uuid = parse_uuid(field_bytes(field)?, limits, budget)?;
+                if (slot == 1 && !saw[1]) || (slot == 4 && !saw[4]) {
+                    saw[slot] = true;
+                }
+                if slot == 1 {
+                    sorted_columns
+                        .try_reserve(1)
+                        .map_err(|_| Error::Allocation(1))?;
+                    sorted_columns.push(uuid);
+                } else {
+                    sorted_rows
+                        .try_reserve(1)
+                        .map_err(|_| Error::Allocation(1))?;
+                    sorted_rows.push(uuid);
+                }
+            },
+            2 | 3 | 5 | 6 => {
+                let slot = field.number() as usize;
+                saw[slot] = true;
+                let values = decode_repeated_u32(field)?;
+                let destination = match slot {
+                    2 => &mut column_index_for_uid,
+                    3 => &mut column_uid_for_index,
+                    5 => &mut row_index_for_uid,
+                    6 => &mut row_uid_for_index,
+                    _ => unreachable!(),
+                };
+                destination
+                    .try_reserve(values.len())
+                    .map_err(|_| Error::Allocation(values.len()))?;
+                destination.extend(values);
+            },
+            _ => return Err(Error::UnsupportedDependency),
+        }
+    }
+    budget.work(payload.len())?;
+    let expected_rows = usize::try_from(rows).map_err(|_| Error::InvalidSource)?;
+    let expected_columns = usize::try_from(columns).map_err(|_| Error::InvalidSource)?;
+    if !saw[1]
+        || !saw[2]
+        || !saw[3]
+        || !saw[4]
+        || !saw[5]
+        || !saw[6]
+        || sorted_columns.len() != expected_columns
+        || column_index_for_uid.len() != expected_columns
+        || column_uid_for_index.len() != expected_columns
+        || sorted_rows.len() != expected_rows
+        || row_index_for_uid.len() != expected_rows
+        || row_uid_for_index.len() != expected_rows
+    {
+        return Err(Error::InvalidSource);
+    }
+    validate_uid_axis(
+        &sorted_columns,
+        &column_index_for_uid,
+        &column_uid_for_index,
+    )?;
+    validate_uid_axis(&sorted_rows, &row_index_for_uid, &row_uid_for_index)
+}
+
+/// Prove that every mutable physical root belongs exclusively to the
+/// selected model.  The archive header is the authoritative package-wide
+/// edge census; the strict model/DataStore projection closes the native
+/// payload routes that may be omitted from `ArchiveInfo` in older packages.
+/// A second model that names one of these roots would otherwise let a row
+/// permutation mutate data outside the selected table's ownership boundary.
+fn validate_mutable_root_aliases(
+    package: &Package,
+    target: &Target,
+    tiles: &[PhysicalTileReference],
+    headers: &[PhysicalRowHeaderBucket],
+    column_headers: &ObjectLocation,
+    row_uid_identifier: u64,
+    budget: &mut Budget,
+) -> Result<()> {
+    let capacity = tiles
+        .len()
+        .checked_add(headers.len())
+        .and_then(|value| value.checked_add(2))
+        .ok_or(Error::InvalidSource)?;
+    budget.allocations(capacity.checked_mul(2).ok_or(Error::InvalidSource)?)?;
+    budget.retained(
+        capacity
+            .checked_mul(size_of::<u64>())
+            .and_then(|value| value.checked_mul(2))
+            .ok_or(Error::InvalidSource)?,
+    )?;
+    let mut mutable_identifiers = HashSet::new();
+    mutable_identifiers
+        .try_reserve(capacity)
+        .map_err(|_| Error::Allocation(capacity))?;
+    for identifier in tiles
+        .iter()
+        .map(|tile| tile.location.identifier)
+        .chain(headers.iter().map(|header| header.location.identifier))
+        .chain([column_headers.identifier, row_uid_identifier])
+    {
+        if identifier == 0 || !mutable_identifiers.insert(identifier) {
+            // A physical object cannot safely serve two mutable roles: the
+            // writer would have no single message-role transformation for it.
+            return Err(Error::UnsupportedDependency);
+        }
+    }
+
+    let model_object = object_at(package, &target.model)?;
+    let model_info = model_object
+        .archive_info
+        .message_infos
+        .get(target.model_message_index)
+        .ok_or(Error::InvalidSource)?;
+    let mut expected = HashMap::new();
+    expected
+        .try_reserve(mutable_identifiers.len())
+        .map_err(|_| Error::Allocation(mutable_identifiers.len()))?;
+    let mut allowed_fields = HashMap::new();
+    allowed_fields
+        .try_reserve(mutable_identifiers.len())
+        .map_err(|_| Error::Allocation(mutable_identifiers.len()))?;
+    for identifier in mutable_identifiers.iter().copied() {
+        let aggregate_count = model_info
+            .object_references
+            .iter()
+            .filter(|candidate| **candidate == identifier)
+            .count();
+        if aggregate_count != 1 {
+            return Err(Error::UnsupportedDependency);
+        }
+        let mut local_field = None;
+        for (field_index, field) in model_info.field_infos.iter().enumerate() {
+            if !field.object_references.contains(&identifier) {
+                continue;
+            }
+            if field.object_references.as_slice() != [identifier]
+                || !field.data_references.is_empty()
+                || !is_message_reference_field(field)
+                || local_field.replace(field_index).is_some()
+            {
+                return Err(Error::UnsupportedDependency);
+            }
+        }
+        let expected_count = if let Some(field_index) = local_field {
+            if allowed_fields.insert(identifier, field_index).is_some() {
+                return Err(Error::UnsupportedDependency);
+            }
+            // ArchiveInfo exposes the same authoritative route once in the
+            // aggregate list and once in the field-local list. The census
+            // counts only the field-local occurrence for this exact role.
+            1
+        } else {
+            aggregate_count
+        };
+        if expected.insert(identifier, expected_count).is_some() {
+            return Err(Error::UnsupportedDependency);
+        }
+    }
+
+    let archive_limits = package
+        .state
+        .options
+        .archive()
+        .effective_archive_limits()
+        .map_err(|_| Error::Archive)?;
+    let mut census = MutableRootInboundReferenceCensus {
+        expected: &expected,
+        allowed_fields: &allowed_fields,
+        owner_identifier: target.model.identifier,
+        owner_message_index: target.model_message_index,
+        observed: HashMap::new(),
+        invalid: false,
+    };
+
+    for component in package.state.source.components().iter() {
+        budget.components(1)?;
+        for object in &component.archive().objects {
+            budget.payload_objects(1)?;
+            if object.archive_info.identifier.is_none()
+                || object.messages.len() != object.archive_info.message_infos.len()
+            {
+                return Err(Error::InvalidSource);
+            }
+            let field_count = object
+                .archive_info
+                .message_infos
+                .iter()
+                .map(|info| info.field_infos.len())
+                .try_fold(0usize, |sum, count| sum.checked_add(count))
+                .ok_or(Error::InvalidSource)?;
+            let reference_count =
+                object
+                    .archive_info
+                    .message_infos
+                    .iter()
+                    .try_fold(0usize, |sum, info| {
+                        let nested = info.field_infos.iter().try_fold(0usize, |sum, field| {
+                            sum.checked_add(field.object_references.len())
+                                .and_then(|value| value.checked_add(field.data_references.len()))
+                                .ok_or(Error::InvalidSource)
+                        })?;
+                        sum.checked_add(info.object_references.len())
+                            .and_then(|value| value.checked_add(info.data_references.len()))
+                            .and_then(|value| value.checked_add(nested))
+                            .ok_or(Error::InvalidSource)
+                    })?;
+            let message_bytes = object
+                .messages
+                .iter()
+                .map(|message| message.data.len())
+                .try_fold(0usize, |sum, bytes| sum.checked_add(bytes))
+                .ok_or(Error::InvalidSource)?;
+            budget.payload_messages(object.messages.len())?;
+            budget.fields(field_count)?;
+            budget.references(reference_count)?;
+            budget.allocations(
+                object
+                    .messages
+                    .len()
+                    .checked_add(field_count)
+                    .and_then(|value| value.checked_add(reference_count))
+                    .and_then(|value| value.checked_add(1))
+                    .ok_or(Error::InvalidSource)?,
+            )?;
+            budget.work(
+                object
+                    .messages
+                    .len()
+                    .checked_add(message_bytes)
+                    .and_then(|value| value.checked_add(field_count))
+                    .and_then(|value| value.checked_add(reference_count))
+                    .ok_or(Error::InvalidSource)?,
+            )?;
+            object
+                .inspect_references_with_policy_and_limits(
+                    &mut census,
+                    ArchiveReferencePolicy::RejectUnknownMetadata,
+                    archive_limits,
+                )
+                .map_err(|_| Error::Archive)?;
+
+            for (message_index, message) in object.messages.iter().enumerate() {
+                validate_message_header(object, message_index)?;
+                if message.type_ != TABLE_MODEL_MESSAGE_TYPE
+                    || (object.archive_info.identifier == Some(target.model.identifier)
+                        && message_index == target.model_message_index)
+                {
+                    continue;
+                }
+
+                let options = budget.storage_codec_options(package)?;
+                let mut collector = PhysicalStorageCollector::new();
+                validate_model_storage_envelope_wire(&message.data, package, budget)?;
+                let (projection, report) =
+                    storage_codec::decode_table_model_with_data_store_and_visitor(
+                        &message.data,
+                        options,
+                        &mut collector,
+                    )
+                    .map_err(|_| Error::Codec)?;
+                budget.storage_codec_report(report)?;
+                let store = projection.data_store();
+                let optional_alias = [
+                    store.formula_error_table(),
+                    store.merge_region_map(),
+                    store.deprecated_custom_format_table(),
+                    store.multiple_choice_list_format_table(),
+                    store.rich_text_table(),
+                    store.conditional_style_table(),
+                    store.comment_storage_table(),
+                    store.import_warning_set_table(),
+                    store.control_cell_spec_table(),
+                    store.format_table(),
+                ]
+                .into_iter()
+                .flatten()
+                .any(|reference| mutable_identifiers.contains(&reference.identifier()));
+                if collector
+                    .tile_references
+                    .iter()
+                    .any(|(_, identifier)| mutable_identifiers.contains(identifier))
+                    || collector
+                        .row_header_references
+                        .iter()
+                        .any(|identifier| mutable_identifiers.contains(identifier))
+                    || mutable_identifiers.contains(&store.column_headers().identifier())
+                    || mutable_identifiers.contains(&store.string_table().identifier())
+                    || mutable_identifiers.contains(&store.style_table().identifier())
+                    || mutable_identifiers.contains(&store.formula_table().identifier())
+                    || mutable_identifiers.contains(&store.format_table_pre_bnc().identifier())
+                    || optional_alias
+                    || parse_model_uid_reference(&message.data, package, budget)?
+                        .is_some_and(|identifier| mutable_identifiers.contains(&identifier))
+                {
+                    return Err(Error::UnsupportedDependency);
+                }
+            }
+        }
+    }
+
+    let complete = expected
+        .iter()
+        .all(|(identifier, count)| census.observed.get(identifier).copied() == Some(*count));
+    if census.invalid || !complete {
+        Err(Error::UnsupportedDependency)
+    } else {
+        Ok(())
+    }
+}
+
+fn parse_model_uid_reference(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<Option<u64>> {
+    let limits = budget.residual(package)?;
+    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let mut identifier = None;
+    for field in fields.fields() {
+        budget.fields(1)?;
+        field
+            .validate_canonical_framing()
+            .map_err(|_| Error::Wire)?;
+        if field.number() == MODEL_BASE_COLUMN_ROW_UIDS_FIELD {
+            let value = strict_reference(field_bytes(field)?, limits, budget)?;
+            if identifier.replace(value).is_some() {
+                return Err(Error::InvalidSource);
+            }
+        }
+    }
+    budget.work(payload.len())?;
+    Ok(identifier)
+}
+
+fn parse_uuid(payload: &[u8], limits: WireLimits, budget: &mut Budget) -> Result<(u64, u64)> {
+    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let mut lower = None;
+    let mut upper = None;
+    for field in fields.fields() {
+        budget.fields(1)?;
+        field
+            .validate_canonical_framing()
+            .map_err(|_| Error::Wire)?;
+        let value = match field.number() {
+            1 | 2 => {
+                if field.wire_type() != 0 {
+                    return Err(Error::InvalidSource);
+                }
+                let (value, width) =
+                    decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
+                if width != encoded_len(value) {
+                    return Err(Error::InvalidSource);
+                }
+                value
+            },
+            _ => return Err(Error::InvalidSource),
+        };
+        if field.number() == 1 {
+            if lower.replace(value).is_some() {
+                return Err(Error::InvalidSource);
+            }
+        } else if upper.replace(value).is_some() {
+            return Err(Error::InvalidSource);
+        }
+    }
+    let lower = lower.ok_or(Error::InvalidSource)?;
+    let upper = upper.ok_or(Error::InvalidSource)?;
+    if lower == 0 && upper == 0 {
+        return Err(Error::InvalidSource);
+    }
+    Ok((lower, upper))
+}
+
+fn decode_repeated_u32(field: litchi_iwa_common::wire::WireFieldView<'_>) -> Result<Vec<u32>> {
+    let payload = field.payload();
+    let mut values = Vec::new();
+    match field.wire_type() {
+        0 => values.push(canonical_varint_u32(payload)?),
+        2 => {
+            let mut remaining = payload;
+            while !remaining.is_empty() {
+                let (value, width) =
+                    decode_varint_from_bytes(remaining).map_err(|_| Error::InvalidSource)?;
+                if width != encoded_len(value) {
+                    return Err(Error::InvalidSource);
+                }
+                values.push(u32::try_from(value).map_err(|_| Error::InvalidSource)?);
+                remaining = &remaining[width..];
+            }
+        },
+        _ => return Err(Error::InvalidSource),
+    }
+    Ok(values)
+}
+
+fn canonical_varint_u32(payload: &[u8]) -> Result<u32> {
+    let (value, width) = decode_varint_from_bytes(payload).map_err(|_| Error::InvalidSource)?;
+    if width != encoded_len(value) {
+        return Err(Error::InvalidSource);
+    }
+    u32::try_from(value).map_err(|_| Error::InvalidSource)
+}
+
+fn validate_uid_axis(
+    sorted_uids: &[(u64, u64)],
+    index_for_uid: &[u32],
+    uid_for_index: &[u32],
+) -> Result<()> {
+    if sorted_uids
+        .windows(2)
+        .any(|pair| (pair[0].1, pair[0].0) >= (pair[1].1, pair[1].0))
+    {
+        return Err(Error::InvalidSource);
+    }
+    let length = sorted_uids.len();
+    let mut seen_index = HashSet::new();
+    let mut seen_uid = HashSet::new();
+    seen_index
+        .try_reserve(length)
+        .map_err(|_| Error::Allocation(length))?;
+    seen_uid
+        .try_reserve(length)
+        .map_err(|_| Error::Allocation(length))?;
+    for index in index_for_uid.iter().copied() {
+        if usize::try_from(index)
+            .ok()
+            .filter(|index| *index < length)
+            .is_none()
+            || !seen_index.insert(index)
+        {
+            return Err(Error::InvalidSource);
+        }
+    }
+    for uid in uid_for_index.iter().copied() {
+        if usize::try_from(uid)
+            .ok()
+            .filter(|uid| *uid < length)
+            .is_none()
+            || !seen_uid.insert(uid)
+        {
+            return Err(Error::InvalidSource);
+        }
+    }
+    for (physical, uid) in uid_for_index.iter().copied().enumerate() {
+        let sorted = usize::try_from(uid).map_err(|_| Error::InvalidSource)?;
+        let mapped = usize::try_from(index_for_uid[sorted]).map_err(|_| Error::InvalidSource)?;
+        if mapped != physical {
+            return Err(Error::InvalidSource);
+        }
+    }
+    Ok(())
+}
+
+fn validate_empty_stroke_sidecar(
+    package: &Package,
+    location: &ObjectLocation,
+    target: &Target,
+    budget: &mut Budget,
+) -> Result<()> {
+    let object = object_at(package, location)?;
+    let (_, payload) = unique_mutable_message(object, &[STROKE_SIDECAR_MESSAGE_TYPE], budget)?;
+    let limits = budget.residual(package)?;
+    let fields = WireView::parse_with_limits(payload, limits).map_err(|_| Error::Wire)?;
+    let mut dimensions = [None; 3];
+    let mut nonempty_layers = false;
+    for field in fields.fields() {
+        budget.fields(1)?;
+        field
+            .validate_canonical_framing()
+            .map_err(|_| Error::Wire)?;
+        match field.number() {
+            1..=3 => {
+                let slot = usize::try_from(field.number() - 1).map_err(|_| Error::InvalidSource)?;
+                if dimensions[slot]
+                    .replace(canonical_field_u32(field)?)
+                    .is_some()
+                {
+                    return Err(Error::InvalidSource);
+                }
+            },
+            4..=7 => {
+                if field.wire_type() != 2 {
+                    return Err(Error::InvalidSource);
+                }
+                let reference = strict_reference(field_bytes(field)?, limits, budget)?;
+                if reference == 0 {
+                    return Err(Error::InvalidSource);
+                }
+                nonempty_layers = true;
+            },
+            _ => return Err(Error::UnsupportedDependency),
+        }
+    }
+    if dimensions[1].is_some_and(|columns| columns != target.columns)
+        || dimensions[2].is_some_and(|rows| rows != target.rows)
+        || nonempty_layers
+    {
+        return Err(Error::UnsupportedDependency);
+    }
+    Ok(())
+}
+
+fn optional_storage_route(
+    package: &Package,
+    reference: Option<storage_codec::ReferenceSnapshot>,
+    required: &[StorageRoute],
+    budget: &mut Budget,
+) -> Result<Option<ObjectLocation>> {
+    let Some(reference) = reference else {
+        return Ok(None);
+    };
+    let identifier = reference.identifier();
+    if identifier == 0
+        || required
+            .iter()
+            .any(|route| route.location.identifier == identifier)
+    {
+        return Err(Error::InvalidSource);
+    }
+    let location = locate_object(package, identifier)?;
+    ensure_unique_identity(package, identifier, budget)?;
+    Ok(Some(location))
+}
+
+/// Prove an optional DataStore route against the model message's exact graph
+/// metadata.  The decoded DataStore reference is not sufficient on its own:
+/// archive metadata is the authority used by the IWA object graph, and an
+/// opaque row-carried identifier is safe to retain only when that authority
+/// names the same object at the canonical nested field path.
+fn validate_optional_model_route(
+    package: &Package,
+    target: &Target,
+    identifier: u64,
+    path: &[u32],
+    budget: &mut Budget,
+) -> Result<()> {
+    if identifier == 0 {
+        return Err(Error::InvalidSource);
+    }
+    let model = object_at(package, &target.model)?;
+    let info = model
+        .archive_info
+        .message_infos
+        .get(target.model_message_index)
+        .ok_or(Error::InvalidSource)?;
+
+    let aggregate_count = info
+        .object_references
+        .iter()
+        .filter(|candidate| **candidate == identifier)
+        .count();
+    budget.references(aggregate_count)?;
+    if aggregate_count != 1 {
+        return Err(Error::UnsupportedDependency);
+    }
+
+    let mut field_count = 0usize;
+    for field in &info.field_infos {
+        let references = field
+            .object_references
+            .iter()
+            .filter(|candidate| **candidate == identifier)
+            .count();
+        budget.references(
+            references
+                .checked_add(field.data_references.len())
+                .ok_or(Error::InvalidSource)?,
+        )?;
+        if references == 0 {
+            continue;
+        }
+        if references != 1
+            || field.object_references.as_slice() != [identifier]
+            || !field.data_references.is_empty()
+            || !is_message_reference_field(field)
+            || field.path.as_slice() != path
+        {
+            return Err(Error::UnsupportedDependency);
+        }
+        field_count = field_count.checked_add(1).ok_or(Error::InvalidSource)?;
+    }
+    // Physical row movement cannot safely infer a route from the aggregate
+    // MessageInfo list. Require the one exact field-local role even for
+    // producers that also retain the aggregate edge for graph traversal.
+    if field_count > 1 {
+        return Err(Error::UnsupportedDependency);
+    }
+    Ok(())
+}
+
+fn validate_exclusive_model_reference(
+    package: &Package,
+    target: &Target,
+    identifier: u64,
+    path: &[u32],
+    budget: &mut Budget,
+) -> Result<()> {
+    let model = object_at(package, &target.model)?;
+    let info = model
+        .archive_info
+        .message_infos
+        .get(target.model_message_index)
+        .ok_or(Error::InvalidSource)?;
+    require_local_reference_field(info, identifier, path)?;
+    let allowed_field_index = info
+        .field_infos
+        .iter()
+        .enumerate()
+        .filter(|(_, field)| {
+            field.path.as_slice() == path
+                && field.object_references.as_slice() == [identifier]
+                && field.data_references.is_empty()
+                && is_message_reference_field(field)
+        })
+        .map(|(index, _)| index)
+        .next()
+        .ok_or(Error::UnsupportedDependency)?;
+    let archive_limits = package
+        .state
+        .options
+        .archive()
+        .effective_archive_limits()
+        .map_err(|_| Error::Archive)?;
+    let wire_limits = budget.residual(package)?;
+    let mut census = ExclusiveInboundReferenceCensus {
+        identifier,
+        owner_identifier: target.model.identifier,
+        owner_message_index: target.model_message_index,
+        allowed_field_index: Some(allowed_field_index),
+        observed: 0,
+        invalid: false,
+    };
+    let mut payload_owners = 0usize;
+    for component in package.state.source.components().iter() {
+        budget.components(1)?;
+        for object in &component.archive().objects {
+            budget.payload_objects(1)?;
+            if object.archive_info.identifier.is_none()
+                || object.messages.len() != object.archive_info.message_infos.len()
+            {
+                return Err(Error::InvalidSource);
+            }
+            budget.payload_messages(object.messages.len())?;
+            for (message_index, message) in object.messages.iter().enumerate() {
+                validate_message_header(object, message_index)?;
+                budget.work(
+                    message
+                        .data
+                        .len()
+                        .checked_add(1)
+                        .ok_or(Error::InvalidSource)?,
+                )?;
+                if message.type_ != TABLE_MODEL_MESSAGE_TYPE {
+                    continue;
+                }
+                let view = WireView::parse_with_limits(&message.data, wire_limits)
+                    .map_err(|_| Error::Wire)?;
+                for field in view.fields() {
+                    if field.number() != MODEL_BASE_COLUMN_ROW_UIDS_FIELD {
+                        continue;
+                    }
+                    field
+                        .validate_canonical_framing()
+                        .map_err(|_| Error::Wire)?;
+                    let referenced = strict_reference(field_bytes(field)?, wire_limits, budget)?;
+                    if referenced == identifier {
+                        payload_owners =
+                            payload_owners.checked_add(1).ok_or(Error::InvalidSource)?;
+                        if object.archive_info.identifier != Some(target.model.identifier)
+                            || message_index != target.model_message_index
+                        {
+                            return Err(Error::UnsupportedDependency);
+                        }
+                    }
+                }
+            }
+            let field_count = object
+                .archive_info
+                .message_infos
+                .iter()
+                .map(|message| message.field_infos.len())
+                .try_fold(0usize, |sum, count| sum.checked_add(count))
+                .ok_or(Error::InvalidSource)?;
+            let reference_count =
+                object
+                    .archive_info
+                    .message_infos
+                    .iter()
+                    .try_fold(0usize, |sum, message| {
+                        let nested =
+                            message.field_infos.iter().try_fold(0usize, |sum, field| {
+                                sum.checked_add(field.object_references.len())
+                                    .and_then(|value| {
+                                        value.checked_add(field.data_references.len())
+                                    })
+                                    .ok_or(Error::InvalidSource)
+                            })?;
+                        sum.checked_add(message.object_references.len())
+                            .and_then(|value| value.checked_add(message.data_references.len()))
+                            .and_then(|value| value.checked_add(nested))
+                            .ok_or(Error::InvalidSource)
+                    })?;
+            budget.fields(field_count)?;
+            budget.references(reference_count)?;
+            budget.work(
+                field_count
+                    .checked_add(reference_count)
+                    .ok_or(Error::InvalidSource)?,
+            )?;
+            object
+                .inspect_references_with_policy_and_limits(
+                    &mut census,
+                    ArchiveReferencePolicy::RejectUnknownMetadata,
+                    archive_limits,
+                )
+                .map_err(|_| Error::Archive)?;
+        }
+    }
+    if payload_owners == 1 && !census.invalid && census.observed == 1 {
+        Ok(())
+    } else {
+        Err(Error::UnsupportedDependency)
+    }
+}
+
+struct MutableRootInboundReferenceCensus<'a> {
+    expected: &'a HashMap<u64, usize>,
+    allowed_fields: &'a HashMap<u64, usize>,
+    owner_identifier: u64,
+    owner_message_index: usize,
+    observed: HashMap<u64, usize>,
+    invalid: bool,
+}
+
+impl ArchiveReferenceVisitor for MutableRootInboundReferenceCensus<'_> {
+    fn visit_reference(
+        &mut self,
+        occurrence: ArchiveReferenceOccurrence,
+    ) -> litchi_iwa_core::Result<()> {
+        let Some(expected) = self.expected.get(&occurrence.referenced_identifier) else {
+            return Ok(());
+        };
+        if occurrence.kind != ArchiveReferenceKind::Object
+            || occurrence.object_identifier != self.owner_identifier
+            || occurrence.message_index != self.owner_message_index
+        {
+            self.invalid = true;
+            return Ok(());
+        }
+        let allowed_field = self.allowed_fields.get(&occurrence.referenced_identifier);
+        match occurrence.scope {
+            ArchiveReferenceScope::Message if allowed_field.is_some() => {
+                // The aggregate edge is retained for the archive graph, but
+                // it is not a row-affine role proof. Count only its exact
+                // field-local counterpart below.
+                return Ok(());
+            },
+            ArchiveReferenceScope::Field { field_index }
+                if allowed_field.is_some_and(|expected| *expected == field_index) => {},
+            ArchiveReferenceScope::Message => {},
+            ArchiveReferenceScope::Field { .. } => {
+                self.invalid = true;
+                return Ok(());
+            },
+        }
+        let count = self
+            .observed
+            .entry(occurrence.referenced_identifier)
+            .or_insert(0);
+        if let Some(next) = count.checked_add(1) {
+            *count = next;
+            if next > *expected {
+                self.invalid = true;
+            }
+        } else {
+            self.invalid = true;
+        }
+        Ok(())
+    }
+}
+
+struct ExclusiveInboundReferenceCensus {
+    identifier: u64,
+    owner_identifier: u64,
+    owner_message_index: usize,
+    allowed_field_index: Option<usize>,
+    observed: usize,
+    invalid: bool,
+}
+
+impl ArchiveReferenceVisitor for ExclusiveInboundReferenceCensus {
+    fn visit_reference(
+        &mut self,
+        occurrence: ArchiveReferenceOccurrence,
+    ) -> litchi_iwa_core::Result<()> {
+        if occurrence.referenced_identifier != self.identifier {
+            return Ok(());
+        }
+        let allowed_scope = match occurrence.scope {
+            ArchiveReferenceScope::Message => {
+                // Keep the aggregate edge as graph metadata, but require
+                // the selected field-local role to prove exclusivity.
+                self.allowed_field_index.is_some()
+            },
+            ArchiveReferenceScope::Field { field_index } => {
+                self.allowed_field_index == Some(field_index)
+            },
+        };
+        if occurrence.kind != ArchiveReferenceKind::Object
+            || occurrence.object_identifier != self.owner_identifier
+            || occurrence.message_index != self.owner_message_index
+            || !allowed_scope
+        {
+            self.invalid = true;
+        } else if matches!(occurrence.scope, ArchiveReferenceScope::Message) {
+            // The aggregate occurrence is expected, but only the exact
+            // field-local occurrence contributes to the exclusivity count.
+        } else if let Some(next) = self.observed.checked_add(1) {
+            self.observed = next;
+        } else {
+            self.invalid = true;
+        }
+        Ok(())
+    }
+}
+
+fn validate_data_list_state(
+    package: &Package,
+    location: &ObjectLocation,
+    expected_list_type: i32,
+    budget: &mut Budget,
+) -> Result<bool> {
+    let object = object_at(package, location)?;
+    if !has_exact_mutable_message_shape(
+        object,
+        &[
+            TABLE_DATA_LIST_MESSAGE_TYPE,
+            TABLE_DATA_LIST_NATIVE_MESSAGE_TYPE,
+        ],
+    ) {
+        return Err(Error::UnsupportedDependency);
+    }
+    let (_, payload) = unique_message_any(
+        object,
+        &[
+            TABLE_DATA_LIST_MESSAGE_TYPE,
+            TABLE_DATA_LIST_NATIVE_MESSAGE_TYPE,
+        ],
+        budget,
+    )?;
+    validate_physical_data_list_wire(payload, package, budget)?;
+    let options = budget.storage_codec_options(package)?;
+    let mut collector = PhysicalListPresenceCollector::default();
+    let (snapshot, report) =
+        storage_codec::decode_table_data_list_with_visitor(payload, options, &mut collector)
+            .map_err(|_| Error::Codec)?;
+    budget.storage_codec_report(report)?;
+    if snapshot.list_type() != expected_list_type || collector.has_segments {
+        return Err(Error::UnsupportedDependency);
+    }
+    Ok(collector.has_entries)
+}
+
+#[derive(Default)]
+struct PhysicalDependencyPresence {
+    any: bool,
+}
+
+impl dependency_codec::DependencyVisitor for PhysicalDependencyPresence {
+    fn visit_formula_owner_dependency(
+        &mut self,
+        _reference: dependency_codec::ReferenceRecord<'_>,
+    ) -> std::result::Result<(), dependency_codec::DecodeError> {
+        self.any = true;
+        Ok(())
+    }
+
+    fn visit_tiled_cell_dependency(
+        &mut self,
+        _reference: dependency_codec::ReferenceRecord<'_>,
+    ) -> std::result::Result<(), dependency_codec::DecodeError> {
+        self.any = true;
+        Ok(())
+    }
+
+    fn visit_tiled_range_dependency(
+        &mut self,
+        _reference: dependency_codec::ReferenceRecord<'_>,
+    ) -> std::result::Result<(), dependency_codec::DecodeError> {
+        self.any = true;
+        Ok(())
+    }
+
+    fn visit_cell_record(
+        &mut self,
+        _record: dependency_codec::CellRecordSnapshot<'_>,
+    ) -> std::result::Result<(), dependency_codec::DecodeError> {
+        self.any = true;
+        Ok(())
+    }
+
+    fn visit_range_back_dependency(
+        &mut self,
+        _record: dependency_codec::RangeBackDependencySnapshot<'_>,
+    ) -> std::result::Result<(), dependency_codec::DecodeError> {
+        self.any = true;
+        Ok(())
+    }
+
+    fn visit_from_to_range(
+        &mut self,
+        _record: dependency_codec::FromToRangeSnapshot<'_>,
+    ) -> std::result::Result<(), dependency_codec::DecodeError> {
+        self.any = true;
+        Ok(())
+    }
+
+    fn visit_expanded_edge_component(
+        &mut self,
+        _component: dependency_codec::ExpandedEdgeComponent,
+    ) -> std::result::Result<(), dependency_codec::DecodeError> {
+        self.any = true;
+        Ok(())
+    }
+}
+
+fn validate_formula_owner_dependencies(
+    package: &Package,
+    target: &Target,
+    header_rows: u32,
+    footer_rows: u32,
+    budget: &mut Budget,
+) -> Result<()> {
+    const FORMULA_OWNER_DEPENDENCIES_MESSAGE_TYPE: u32 = 4_008;
+
+    let mut selected_owners = 0usize;
+    for component in package.state.source.components().iter() {
+        for object in &component.archive().objects {
+            let count = object
+                .messages
+                .iter()
+                .filter(|message| message.type_ == FORMULA_OWNER_DEPENDENCIES_MESSAGE_TYPE)
+                .count();
+            if count == 0 {
+                continue;
+            }
+            if count != 1 || object.messages.len() != 1 {
+                return Err(Error::UnsupportedDependency);
+            }
+            let (_, payload) =
+                unique_message(object, FORMULA_OWNER_DEPENDENCIES_MESSAGE_TYPE, budget)?;
+            let outer = validated_wire_view(payload, package, budget)?;
+            if outer
+                .fields()
+                .any(|field| !(1..=16).contains(&field.number()))
+            {
+                return Err(Error::UnsupportedDependency);
+            }
+            let options = budget.storage_codec_options(package)?;
+            let mut presence = PhysicalDependencyPresence::default();
+            let (snapshot, report) =
+                dependency_codec::decode_formula_owner_dependencies_with_visitor(
+                    payload,
+                    options,
+                    &mut presence,
+                )
+                .map_err(|_| Error::Codec)?;
+            budget.storage_codec_report(report)?;
+            let selected = snapshot
+                .formula_owner()
+                .is_some_and(|reference| reference.identifier() == target.table_info.identifier);
+            if !selected {
+                continue;
+            }
+            selected_owners = selected_owners.checked_add(1).ok_or(Error::InvalidSource)?;
+            if presence.any
+                || snapshot.internal_formula_owner_id() == 0
+                || snapshot.formula_owner_uid().lower() == 0
+                    && snapshot.formula_owner_uid().upper() == 0
+                || snapshot
+                    .base_owner_uid()
+                    .is_some_and(|uid| uid.lower() == 0 && uid.upper() == 0)
+            {
+                return Err(Error::UnsupportedDependency);
+            }
+            for payload in [
+                snapshot.cell_dependencies(),
+                snapshot.range_dependencies(),
+                snapshot.cell_errors(),
+                snapshot.tiled_cell_dependencies(),
+                snapshot.uuid_references(),
+                snapshot.tiled_range_dependencies(),
+                snapshot.spill_range_sizes(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                if validated_wire_view(payload, package, budget)?
+                    .fields()
+                    .next()
+                    .is_some()
+                {
+                    return Err(Error::UnsupportedDependency);
+                }
+            }
+            if let Some(payload) = snapshot.volatile_dependencies() {
+                validate_empty_volatile_dependencies(payload, package, budget)?;
+            }
+            if let Some(payload) = snapshot.whole_owner_dependencies() {
+                validate_empty_whole_owner_dependencies(payload, package, budget)?;
+            }
+
+            if snapshot.owner_kind() != Some(1) || snapshot.base_owner_uid().is_some() {
+                return Err(Error::UnsupportedDependency);
+            }
+            for payload in [
+                snapshot.spanning_column_dependencies(),
+                snapshot.spanning_row_dependencies(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                validate_inert_spanning_dependencies(
+                    payload,
+                    Some((target, header_rows, footer_rows)),
+                    package,
+                    budget,
+                )?;
+            }
+        }
+    }
+    if selected_owners == 1 {
+        Ok(())
+    } else {
+        Err(Error::UnsupportedDependency)
+    }
+}
+
+fn validate_empty_volatile_dependencies(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut seen = [false; 8];
+    for field in fields.fields() {
+        let index = usize::try_from(field.number()).map_err(|_| Error::InvalidSource)?;
+        if !matches!(index, 1..=5 | 7)
+            || std::mem::replace(&mut seen[index], true)
+            || field.wire_type() != 2
+            || validated_wire_view(field.payload(), package, budget)?
+                .fields()
+                .next()
+                .is_some()
+        {
+            return Err(Error::UnsupportedDependency);
+        }
+    }
+    Ok(())
+}
+
+fn validate_empty_whole_owner_dependencies(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut seen = false;
+    for field in fields.fields() {
+        if field.number() != 1
+            || std::mem::replace(&mut seen, true)
+            || field.wire_type() != 2
+            || validated_wire_view(field.payload(), package, budget)?
+                .fields()
+                .next()
+                .is_some()
+        {
+            return Err(Error::UnsupportedDependency);
+        }
+    }
+    Ok(())
+}
+
+fn validate_inert_spanning_dependencies(
+    payload: &[u8],
+    selected: Option<(&Target, u32, u32)>,
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<()> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut total = None;
+    let mut body = None;
+    for field in fields.fields() {
+        match field.number() {
+            1 => return Err(Error::UnsupportedDependency),
+            2 if total.is_none() && field.wire_type() == 2 => {
+                total = Some(validate_range_coordinate(field.payload(), package, budget)?);
+            },
+            3 if body.is_none() && field.wire_type() == 2 => {
+                body = Some(validate_range_coordinate(field.payload(), package, budget)?);
+            },
+            _ => return Err(Error::UnsupportedDependency),
+        }
+    }
+    if let Some((target, header_rows, footer_rows)) = selected {
+        let last_column = target.columns.checked_sub(1).ok_or(Error::InvalidSource)?;
+        let last_row = target.rows.checked_sub(1).ok_or(Error::InvalidSource)?;
+        let body_last_row = target
+            .rows
+            .checked_sub(footer_rows)
+            .and_then(|rows| rows.checked_sub(1))
+            .ok_or(Error::InvalidSource)?;
+        if total != Some((0, 0, last_column, last_row))
+            || body != Some((0, header_rows, last_column, body_last_row))
+        {
+            return Err(Error::UnsupportedDependency);
+        }
+    }
+    Ok(())
+}
+
+fn validate_range_coordinate(
+    payload: &[u8],
+    package: &Package,
+    budget: &mut Budget,
+) -> Result<(u32, u32, u32, u32)> {
+    let fields = validated_wire_view(payload, package, budget)?;
+    let mut values = [None; 4];
+    for field in fields.fields() {
+        let index = usize::try_from(field.number())
+            .ok()
+            .and_then(|number| number.checked_sub(1))
+            .filter(|index| *index < values.len())
+            .ok_or(Error::InvalidSource)?;
+        if values[index].replace(canonical_field_u32(field)?).is_some() {
+            return Err(Error::InvalidSource);
+        }
+    }
+    Ok((
+        values[0].ok_or(Error::InvalidSource)?,
+        values[1].ok_or(Error::InvalidSource)?,
+        values[2].ok_or(Error::InvalidSource)?,
+        values[3].ok_or(Error::InvalidSource)?,
+    ))
+}
+
+#[derive(Default)]
+struct PhysicalListPresenceCollector {
+    has_entries: bool,
+    has_segments: bool,
+}
+
+impl storage_codec::StorageVisitor for PhysicalListPresenceCollector {
+    fn visit_list_entry(
+        &mut self,
+        _entry: storage_codec::TableDataListEntrySnapshot<'_>,
+    ) -> std::result::Result<(), storage_codec::DecodeError> {
+        self.has_entries = true;
+        Ok(())
+    }
+
+    fn visit_list_segment(
+        &mut self,
+        _reference: storage_codec::ReferenceRecord<'_>,
+    ) -> std::result::Result<(), storage_codec::DecodeError> {
+        self.has_segments = true;
+        Ok(())
+    }
+}
+
+fn validate_comment_storage(
+    package: &Package,
+    location: &ObjectLocation,
+    budget: &mut Budget,
+) -> Result<bool> {
+    let object = object_at(package, location)?;
+    if !has_exact_mutable_message_shape(
+        object,
+        &[
+            TABLE_DATA_LIST_MESSAGE_TYPE,
+            TABLE_DATA_LIST_NATIVE_MESSAGE_TYPE,
+        ],
+    ) {
+        return Err(Error::UnsupportedDependency);
+    }
+    let (_, payload) = unique_message_any(
+        object,
+        &[
+            TABLE_DATA_LIST_MESSAGE_TYPE,
+            TABLE_DATA_LIST_NATIVE_MESSAGE_TYPE,
+        ],
+        budget,
+    )?;
+    validate_physical_data_list_wire(payload, package, budget)?;
+    let options = budget.storage_codec_options(package)?;
+    let mut collector = PhysicalCommentStorageCollector::new();
+    let (snapshot, report) =
+        storage_codec::decode_table_data_list_with_visitor(payload, options, &mut collector)
+            .map_err(|_| Error::Codec)?;
+    budget.storage_codec_report(report)?;
+    // TST's comment-storage root is list type 10. It is intentionally kept
+    // opaque during row movement; BNC cell references travel with their raw
+    // row envelopes and no coordinate rewrite is attempted here.
+    if snapshot.list_type() != 10 || collector.has_segments || collector.invalid_entry {
+        return Err(Error::UnsupportedDependency);
+    }
+    let entry_count = collector.keys.len();
+    if entry_count != collector.identifiers.len() {
+        return Err(Error::InvalidSource);
+    }
+    budget.allocations(entry_count.checked_mul(2).ok_or(Error::InvalidSource)?)?;
+    budget.retained(
+        entry_count
+            .checked_mul(size_of::<u32>())
+            .and_then(|bytes| bytes.checked_add(entry_count.checked_mul(size_of::<u64>())?))
+            .ok_or(Error::InvalidSource)?,
+    )?;
+    let mut keys = collector.keys;
+    let mut identifiers = collector.identifiers;
+    keys.sort_unstable();
+    identifiers.sort_unstable();
+    if keys.windows(2).any(|pair| pair[0] == pair[1])
+        || identifiers.windows(2).any(|pair| pair[0] == pair[1])
+    {
+        return Err(Error::UnsupportedDependency);
+    }
+    for identifier in identifiers {
+        // The list entry's BNC reference is a row-carried opaque edge, but it
+        // must still resolve to exactly one physical object before the owner
+        // can move its enclosing row without consulting comment semantics.
+        locate_object(package, identifier)?;
+        ensure_unique_identity(package, identifier, budget)?;
+    }
+    Ok(entry_count != 0)
+}
+
+/// Fallible, rollback-free staging for the comment-list shape proof.  The
+/// storage codec deliberately invokes visitors before its enclosing decode
+/// returns, so this collector publishes nothing; `validate_comment_storage`
+/// checks every staged value only after strict wire and Buffa parity succeed.
+struct PhysicalCommentStorageCollector {
+    keys: Vec<u32>,
+    identifiers: Vec<u64>,
+    has_segments: bool,
+    invalid_entry: bool,
+}
+
+impl PhysicalCommentStorageCollector {
+    fn new() -> Self {
+        Self {
+            keys: Vec::new(),
+            identifiers: Vec::new(),
+            has_segments: false,
+            invalid_entry: false,
+        }
+    }
+}
+
+impl storage_codec::StorageVisitor for PhysicalCommentStorageCollector {
+    fn visit_list_entry(
+        &mut self,
+        entry: storage_codec::TableDataListEntrySnapshot<'_>,
+    ) -> std::result::Result<(), storage_codec::DecodeError> {
+        let Some(reference) = entry.comment_storage() else {
+            self.invalid_entry = true;
+            return Ok(());
+        };
+        if entry.string_value().is_some()
+            || entry.reference().is_some()
+            || entry.formula().is_some()
+            || entry.format().is_some()
+            || entry.custom_format().is_some()
+            || entry.rich_text_payload().is_some()
+            || entry.import_warning_set().is_some()
+            || entry.cell_spec().is_some()
+        {
+            self.invalid_entry = true;
+            return Ok(());
+        }
+        self.keys
+            .try_reserve(1)
+            .map_err(|_| storage_codec::DecodeError::allocation(1))?;
+        self.identifiers
+            .try_reserve(1)
+            .map_err(|_| storage_codec::DecodeError::allocation(1))?;
+        self.keys.push(entry.key());
+        self.identifiers.push(reference.identifier());
+        Ok(())
+    }
+
+    fn visit_list_segment(
+        &mut self,
+        _reference: storage_codec::ReferenceRecord<'_>,
+    ) -> std::result::Result<(), storage_codec::DecodeError> {
+        self.has_segments = true;
+        Ok(())
+    }
+}
+
 pub(crate) fn physical_catalog(package: &Package) -> Result<&SourceCatalog> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
         PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
     }
+}
+
+/// Resolve one parsed physical component by its canonical package-member
+/// name.  Keeping this lookup beside [`locate_object`] gives physical owners
+/// one authority for component/object routing and prevents a caller from
+/// falling back to a second name scan with subtly different semantics.
+pub(crate) fn component<'a>(
+    package: &'a Package,
+    name: &str,
+) -> Result<&'a litchi_iwa_archive::Component> {
+    physical_catalog(package)?
+        .components()
+        .get(name)
+        .ok_or(Error::InvalidSource)
 }
 
 /// Charge the package-entry scan performed by root preview invalidation.
@@ -1004,25 +4811,58 @@ pub(crate) fn object_at<'a>(
     package: &'a Package,
     location: &ObjectLocation,
 ) -> Result<&'a ArchiveObject> {
-    let object = package
+    let index = package
+        .state
+        .object_index
+        .binary_search_by_key(&location.identifier, |locator| locator.identifier)
+        .map_err(|_| Error::InvalidSource)?;
+    let locator = package.state.object_index[index];
+    let component = package
         .state
         .source
         .components()
-        .get_index(
-            package
-                .state
-                .object_index
-                .iter()
-                .find(|locator| locator.identifier == location.identifier)
-                .map(|locator| locator.component)
-                .ok_or(Error::InvalidSource)?,
-        )
-        .and_then(|component| component.archive().objects.get(location.object_index))
+        .get_index(locator.component)
+        .ok_or(Error::InvalidSource)?;
+    if component.name() != location.component.as_ref() || locator.object != location.object_index {
+        return Err(Error::InvalidSource);
+    }
+    let object = component
+        .archive()
+        .objects
+        .get(location.object_index)
         .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(location.identifier) {
         return Err(Error::InvalidSource);
     }
     Ok(object)
+}
+
+/// Locate one physical object with its component name without exposing native
+/// object identifiers to semantic callers. The package object index is sorted
+/// once at ingress, so this hot path is logarithmic rather than a full scan.
+pub(crate) fn object_with_component(
+    package: &Package,
+    identifier: u64,
+) -> Result<(&str, &ArchiveObject)> {
+    let index = package
+        .state
+        .object_index
+        .binary_search_by_key(&identifier, |locator| locator.identifier)
+        .map_err(|_| Error::InvalidSource)?;
+    let locator = package.state.object_index[index];
+    let component = package
+        .state
+        .source
+        .components()
+        .get_index(locator.component)
+        .ok_or(Error::InvalidSource)?;
+    let object = component
+        .archive()
+        .objects
+        .get(locator.object)
+        .filter(|object| object.archive_info.identifier == Some(identifier))
+        .ok_or(Error::InvalidSource)?;
+    Ok((component.name(), object))
 }
 
 pub(crate) fn model_payload<'a>(package: &'a Package, target: &Target) -> Result<&'a [u8]> {
@@ -1041,8 +4881,7 @@ pub(crate) fn component_archive(
     name: &str,
     budget: &mut Budget,
 ) -> Result<Archive> {
-    let catalog = physical_catalog(package)?;
-    let entry = catalog
+    let entry = physical_catalog(package)?
         .package()
         .iter()
         .find(|entry| entry.name() == name)
@@ -1215,6 +5054,336 @@ pub(crate) fn verify_locality(
     Ok(())
 }
 
+/// Verify that a physical candidate differs only in the explicitly admitted
+/// component members and, optionally, root preview deletions.
+///
+/// Physical sorting rewrites several objects in one component (the model,
+/// tile rows, row headers, and UID map), so the persisted field-44 locality
+/// helper above is intentionally too narrow. This helper performs the same
+/// source/candidate ZIP checks but accepts a deterministic allowlist owned by
+/// the physical transaction.
+pub(crate) fn verify_physical_locality(
+    source: &Package,
+    candidate: &Package,
+    allowlist: &LocalityAllowlist,
+    budget: &mut Budget,
+) -> Result<()> {
+    let archive_limits = source
+        .state
+        .options
+        .archive()
+        .effective_archive_limits()
+        .map_err(|_| Error::Archive)?;
+    let source_catalog = physical_catalog(source)?;
+    let candidate_catalog = physical_catalog(candidate)?;
+    let source_entries = source_catalog.package();
+    let candidate_entries = candidate_catalog.package();
+    budget.entries(
+        source_entries
+            .len()
+            .checked_add(candidate_entries.len())
+            .ok_or(Error::InvalidSource)?,
+    )?;
+    budget.allocations(
+        source_entries
+            .len()
+            .checked_add(candidate_entries.len())
+            .ok_or(Error::InvalidSource)?,
+    )?;
+    let mut source_names = HashSet::new();
+    source_names
+        .try_reserve(source_entries.len())
+        .map_err(|_| Error::Allocation(source_entries.len()))?;
+    let mut candidate_by_name = HashMap::new();
+    candidate_by_name
+        .try_reserve(candidate_entries.len())
+        .map_err(|_| Error::Allocation(candidate_entries.len()))?;
+    for entry in source_entries.iter() {
+        budget.work(entry_comparison_work(entry)?)?;
+        if !source_names.insert(entry.name()) {
+            return Err(Error::Verification);
+        }
+    }
+    for entry in candidate_entries.iter() {
+        budget.work(entry_comparison_work(entry)?)?;
+        if candidate_by_name.insert(entry.name(), entry).is_some() {
+            return Err(Error::Verification);
+        }
+    }
+
+    // A deletion is admissible only when the source renderer identifies it as
+    // a root preview. Never let a caller turn this into an arbitrary package
+    // member deletion by supplying a hand-written name.
+    budget.preflight_preview_scan(source_entries.len())?;
+    let source_previews = super::rendering_invalidation::root_preview_deletions(source_entries)
+        .map_err(|_| Error::Verification)?;
+    if allowlist.root_preview_deletions().iter().any(|name| {
+        !source_previews
+            .names()
+            .iter()
+            .any(|preview| *preview == name.as_ref())
+    }) {
+        return Err(Error::Verification);
+    }
+
+    for entry in source_entries.iter() {
+        let name = entry.name();
+        if allowlist.allows_preview_deletion(name) {
+            if candidate_by_name.contains_key(name) {
+                return Err(Error::Verification);
+            }
+            continue;
+        }
+        let other = candidate_by_name
+            .get(name)
+            .copied()
+            .ok_or(Error::Verification)?;
+        if !allowlist.allows_component(name)
+            && (entry.data() != other.data()
+                || entry.metadata() != other.metadata()
+                || entry.raw_record().local_record() != other.raw_record().local_record()
+                || !same_central_directory_record(
+                    entry.raw_record().central_directory_record(),
+                    other.raw_record().central_directory_record(),
+                ))
+        {
+            return Err(Error::Verification);
+        }
+    }
+    for name in candidate_by_name.keys() {
+        if !source_names.contains(name) {
+            return Err(Error::Verification);
+        }
+    }
+
+    // Every allowlisted component must exist on both sides. This catches a
+    // typo or a non-deterministic component derivation before object-level
+    // checks are attempted.
+    for component_name in allowlist.changed_components() {
+        let name = component_name.as_ref();
+        if !source_names.contains(name) || !candidate_by_name.contains_key(name) {
+            return Err(Error::Verification);
+        }
+    }
+
+    // Object identities are a second, optional fence inside an allowlisted
+    // component.  Reject an identity routed through another component (or a
+    // candidate that relocates it) before comparing any payload bytes.
+    for identifier in allowlist.changed_object_ids() {
+        let (source_component_name, _) =
+            object_with_component(source, *identifier).map_err(|_| Error::Verification)?;
+        let (candidate_component_name, _) =
+            object_with_component(candidate, *identifier).map_err(|_| Error::Verification)?;
+        if source_component_name != candidate_component_name
+            || !allowlist.allows_component(source_component_name)
+        {
+            return Err(Error::Verification);
+        }
+    }
+
+    for component_name in allowlist.changed_components() {
+        let source_component =
+            component(source, component_name.as_ref()).map_err(|_| Error::Verification)?;
+        let candidate_component =
+            component(candidate, component_name.as_ref()).map_err(|_| Error::Verification)?;
+        let source_archive = source_component.archive();
+        let candidate_archive = candidate_component.archive();
+        if source_archive.objects.len() != candidate_archive.objects.len() {
+            return Err(Error::Verification);
+        }
+        for source_object in &source_archive.objects {
+            let identifier = source_object
+                .archive_info
+                .identifier
+                .ok_or(Error::Verification)?;
+            let candidate_object = candidate_archive
+                .object(identifier)
+                .ok_or(Error::Verification)?;
+            verify_physical_object_delta(
+                source_object,
+                candidate_object,
+                allowlist,
+                archive_limits,
+                budget,
+            )?;
+            budget.work(archive_object_cost(source_object)?)?;
+            budget.work(archive_object_cost(candidate_object)?)?;
+        }
+    }
+    Ok(())
+}
+
+/// Check one object in an allowlisted component without making the component
+/// itself an unchecked mutation wildcard.  Physical sorting may alter only
+/// the payload bytes of the native tile, header-bucket, and row/column UID-map
+/// messages.  Every other message and all object/reference metadata stay
+/// source-authoritative, including objects unrelated to the selected table
+/// that happen to share the component.
+fn verify_physical_object_delta(
+    source: &ArchiveObject,
+    candidate: &ArchiveObject,
+    allowlist: &LocalityAllowlist,
+    limits: litchi_iwa_core::Limits,
+    budget: &mut Budget,
+) -> Result<()> {
+    let identifier = source.archive_info.identifier.ok_or(Error::Verification)?;
+    if candidate.archive_info.identifier != Some(identifier)
+        || source.messages.len() != source.archive_info.message_infos.len()
+        || candidate.messages.len() != candidate.archive_info.message_infos.len()
+        || source.messages.len() != candidate.messages.len()
+        || source.archive_info.should_merge != candidate.archive_info.should_merge
+        || source.archive_info.message_infos.len() != candidate.archive_info.message_infos.len()
+    {
+        return Err(Error::Verification);
+    }
+
+    let mut changed_message = false;
+    for (index, (source_message, candidate_message)) in
+        source.messages.iter().zip(&candidate.messages).enumerate()
+    {
+        let source_info = source
+            .archive_info
+            .message_infos
+            .get(index)
+            .ok_or(Error::Verification)?;
+        let candidate_info = candidate
+            .archive_info
+            .message_infos
+            .get(index)
+            .ok_or(Error::Verification)?;
+        if source_info.type_ != source_message.type_
+            || candidate_info.type_ != candidate_message.type_
+            || source_info.type_ != candidate_info.type_
+            || source_info.versions != candidate_info.versions
+            || source_info.field_infos != candidate_info.field_infos
+            || source_info.object_references != candidate_info.object_references
+            || source_info.data_references != candidate_info.data_references
+            || source_info.base_message_index != candidate_info.base_message_index
+            || source_info.diff_merge_version != candidate_info.diff_merge_version
+            || source_info.diff_field_path != candidate_info.diff_field_path
+            || source_info.fields_to_remove != candidate_info.fields_to_remove
+            || source_info.diff_read_version != candidate_info.diff_read_version
+            || u32::try_from(source_message.data.len()).ok() != Some(source_info.length)
+            || u32::try_from(candidate_message.data.len()).ok() != Some(candidate_info.length)
+        {
+            return Err(Error::Verification);
+        }
+        if source_message.data == candidate_message.data {
+            if source_info.length != candidate_info.length {
+                return Err(Error::Verification);
+            }
+            continue;
+        }
+        if !PHYSICAL_MUTABLE_MESSAGE_TYPES.contains(&source_message.type_)
+            || (!allowlist.changed_object_ids().is_empty() && !allowlist.allows_object(identifier))
+        {
+            return Err(Error::Verification);
+        }
+        changed_message = true;
+    }
+
+    if changed_message {
+        // A changed payload is admissible only for one exact physical role.
+        // In particular, a multi-message object cannot smuggle a second
+        // message header or an unrelated payload through the component
+        // allowlist alongside a rewritten tile/header/UID root.
+        if source.messages.len() != 1
+            || candidate.messages.len() != 1
+            || !PHYSICAL_MUTABLE_MESSAGE_TYPES.contains(&source.messages[0].type_)
+        {
+            return Err(Error::Verification);
+        }
+
+        // Reconstruct the candidate from the source object using the core's
+        // header-preserving primitive.  This is a source-bound proof that the
+        // candidate changed only the exact payload bytes: retained unknown
+        // ArchiveInfo fields, message framing, reference metadata, and raw
+        // header bytes must all match the primitive's deterministic rewrite.
+        // The two recorded lengths are updated only because a payload length
+        // change legitimately changes the enclosing physical framing.
+        let mut expected = source.clone();
+        for (index, (source_message, candidate_message)) in
+            source.messages.iter().zip(&candidate.messages).enumerate()
+        {
+            if source_message.data != candidate_message.data {
+                expected
+                    .replace_message_preserving_header_with_limits(
+                        index,
+                        candidate_message.clone(),
+                        limits,
+                    )
+                    .map_err(|_| Error::Verification)?;
+            }
+        }
+
+        // `header_length` and `data_length` are parsed source framing facts,
+        // not free-form provenance fields.  Derive both values from the
+        // source-preserving replacement and compare them with the candidate
+        // before copying anything into the expected object.  In particular,
+        // this rejects a candidate that changes the object-length varint
+        // width, retains a stale payload length, or otherwise moves the
+        // physical object boundary outside the exact rewritten message.
+        let ((expected_header_length, expected_data_length), mut expected) =
+            physical_object_framing(expected, limits, budget)?;
+        if candidate.header_length != expected_header_length
+            || candidate.data_length != expected_data_length
+        {
+            return Err(Error::Verification);
+        }
+        expected.header_length = expected_header_length;
+        expected.data_length = expected_data_length;
+        if !expected.same_content_ignoring_offsets(candidate) {
+            return Err(Error::Verification);
+        }
+    } else if !source.same_content_ignoring_offsets(candidate) {
+        // A candidate object that retained identical payloads must still be
+        // byte/content-identical apart from offsets.
+        return Err(Error::Verification);
+    }
+    Ok(())
+}
+
+/// Return the exact serialized object framing implied by its source-preserved
+/// ArchiveInfo header and current message payloads.
+///
+/// `Archive::encoded_len_with_limits` follows the same retained-header rule
+/// used by publication, including the canonical object-length varint.
+/// Subtracting the checked payload total therefore exposes the exact framed
+/// header length without accessing ArchiveObject's private raw-header fields.
+fn physical_object_framing(
+    object: ArchiveObject,
+    limits: litchi_iwa_core::Limits,
+    budget: &mut Budget,
+) -> Result<((u64, u64), ArchiveObject)> {
+    let payload_length = object.messages.iter().try_fold(0usize, |total, message| {
+        total
+            .checked_add(message.data.len())
+            .ok_or(Error::Verification)
+    })?;
+    budget.allocations(1)?;
+    budget.retained(size_of::<ArchiveObject>())?;
+    let mut archive = Archive::new();
+    archive
+        .objects
+        .try_reserve_exact(1)
+        .map_err(|_| Error::Allocation(1))?;
+    archive.objects.push(object);
+    let encoded_length = archive
+        .encoded_len_with_limits(limits)
+        .map_err(|_| Error::Verification)?;
+    let header_length = encoded_length
+        .checked_sub(payload_length)
+        .ok_or(Error::Verification)?;
+    let object = archive.objects.pop().ok_or(Error::Verification)?;
+    Ok((
+        (
+            u64::try_from(header_length).map_err(|_| Error::Verification)?,
+            u64::try_from(payload_length).map_err(|_| Error::Verification)?,
+        ),
+        object,
+    ))
+}
+
 fn entry_comparison_work(entry: &litchi_iwa_archive::package::Entry) -> Result<usize> {
     entry
         .name()
@@ -1352,12 +5521,13 @@ fn read_error(error: ReadError) -> Error {
     }
 }
 
-fn locate_object(package: &Package, identifier: u64) -> Result<ObjectLocation> {
+pub(crate) fn locate_object(package: &Package, identifier: u64) -> Result<ObjectLocation> {
     let locator = package
         .state
         .object_index
-        .iter()
-        .find(|locator| locator.identifier == identifier)
+        .binary_search_by_key(&identifier, |locator| locator.identifier)
+        .ok()
+        .map(|index| package.state.object_index[index])
         .ok_or(Error::InvalidSource)?;
     let component = package
         .state
@@ -1380,7 +5550,7 @@ fn locate_object(package: &Package, identifier: u64) -> Result<ObjectLocation> {
     })
 }
 
-fn unique_message<'a>(
+pub(crate) fn unique_message<'a>(
     object: &'a ArchiveObject,
     message_type: u32,
     budget: &mut Budget,
@@ -1408,6 +5578,68 @@ fn unique_message<'a>(
         }
     }
     selected.ok_or(Error::InvalidSource)
+}
+
+/// Strictly locate one message whose type is in a small compatibility set.
+/// This is used for type-renumbered native UID maps and data-list roots while
+/// retaining the same canonical message-header and role-alias proof as the
+/// focused persisted owners.
+pub(crate) fn unique_message_any<'a>(
+    object: &'a ArchiveObject,
+    message_types: &[u32],
+    budget: &mut Budget,
+) -> Result<(usize, &'a [u8])> {
+    if object.messages.len() != object.archive_info.message_infos.len() {
+        return Err(Error::InvalidSource);
+    }
+    let mut selected = None;
+    for (index, message) in object.messages.iter().enumerate() {
+        budget.work(
+            message
+                .data
+                .len()
+                .checked_add(1)
+                .ok_or(Error::InvalidSource)?,
+        )?;
+        validate_message_header(object, index)?;
+        if ROLE_MESSAGE_TYPES.contains(&message.type_) && !message_types.contains(&message.type_) {
+            return Err(Error::UnsupportedDependency);
+        }
+        if message_types.contains(&message.type_)
+            && selected.replace((index, message.data.as_slice())).is_some()
+        {
+            return Err(Error::UnsupportedDependency);
+        }
+    }
+    selected.ok_or(Error::InvalidSource)
+}
+
+/// Locate one mutable physical-root message and reject any co-located
+/// payload, including an otherwise-unknown future role.  Physical sorting
+/// rewrites these objects in place, so preserving an additional message
+/// beside the selected role would make the mutation boundary ambiguous.
+fn unique_mutable_message<'a>(
+    object: &'a ArchiveObject,
+    message_types: &[u32],
+    budget: &mut Budget,
+) -> Result<(usize, &'a [u8])> {
+    if !has_exact_mutable_message_shape(object, message_types) {
+        return Err(Error::UnsupportedDependency);
+    }
+    let (index, payload) = unique_message_any(object, message_types, budget)?;
+    if index != 0 {
+        return Err(Error::UnsupportedDependency);
+    }
+    Ok((index, payload))
+}
+
+fn has_exact_mutable_message_shape(object: &ArchiveObject, message_types: &[u32]) -> bool {
+    object.messages.len() == 1
+        && object.archive_info.message_infos.len() == 1
+        && object
+            .messages
+            .first()
+            .is_some_and(|message| message_types.contains(&message.type_))
 }
 
 fn validate_message_header(object: &ArchiveObject, index: usize) -> Result<()> {
@@ -2355,13 +6587,15 @@ fn validate_package_metadata(
 }
 
 fn metadata_component_matches_physical(metadata: &str, physical: &str) -> bool {
-    fn basename(name: &str) -> &str {
-        name.rsplit('/').next().unwrap_or(name)
+    fn canonical(name: &str) -> &str {
+        let name = name.strip_suffix(".iwa").unwrap_or(name);
+        // PackageMetadata addresses components relative to the `Index/`
+        // archive directory, while SourceCatalog retains that directory in
+        // its physical entry name.  Normalize only that fixed prefix and the
+        // native suffix; never collapse arbitrary path components.
+        name.strip_prefix("Index/").unwrap_or(name)
     }
-    fn without_iwa(name: &str) -> &str {
-        name.strip_suffix(".iwa").unwrap_or(name)
-    }
-    without_iwa(basename(metadata)) == without_iwa(basename(physical))
+    canonical(metadata) == canonical(physical)
 }
 
 #[derive(Clone, Copy)]
@@ -3063,4 +7297,112 @@ fn charge_archive_inventory(archive: &Archive, budget: &mut Budget) -> Result<()
     // retained payload before callers use the archive for further scans.
     budget.retained(message_bytes)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use litchi_iwa_core::RawMessage;
+
+    use super::*;
+
+    #[test]
+    fn mutable_roots_require_one_known_message_shape() {
+        let tile = ArchiveObject::new(
+            1,
+            vec![RawMessage {
+                type_: TILE_MESSAGE_TYPE,
+                data: Vec::new(),
+            }],
+        )
+        .expect("canonical test object");
+        assert!(has_exact_mutable_message_shape(&tile, &[TILE_MESSAGE_TYPE]));
+
+        let wrong_role = ArchiveObject::new(
+            2,
+            vec![RawMessage {
+                type_: HEADER_BUCKET_MESSAGE_TYPE,
+                data: Vec::new(),
+            }],
+        )
+        .expect("canonical test object");
+        assert!(!has_exact_mutable_message_shape(
+            &wrong_role,
+            &[TILE_MESSAGE_TYPE]
+        ));
+
+        let co_located = ArchiveObject::new(
+            3,
+            vec![
+                RawMessage {
+                    type_: TILE_MESSAGE_TYPE,
+                    data: Vec::new(),
+                },
+                RawMessage {
+                    type_: TILE_MESSAGE_TYPE,
+                    data: Vec::new(),
+                },
+            ],
+        )
+        .expect("canonical test object");
+        assert!(!has_exact_mutable_message_shape(
+            &co_located,
+            &[TILE_MESSAGE_TYPE]
+        ));
+    }
+
+    #[test]
+    fn metadata_component_matching_preserves_full_component_path() {
+        assert!(metadata_component_matches_physical(
+            "Tables/Tile",
+            "Index/Tables/Tile.iwa"
+        ));
+        assert!(metadata_component_matches_physical(
+            "Index/Tables/Tile.iwa",
+            "Tables/Tile"
+        ));
+        assert!(!metadata_component_matches_physical(
+            "A/Tables/Tile",
+            "B/Tables/Tile.iwa"
+        ));
+        assert!(!metadata_component_matches_physical(
+            "Tile",
+            "Index/Tables/Tile.iwa"
+        ));
+    }
+
+    #[test]
+    fn mutable_root_census_rejects_non_owner_edges() {
+        let expected = HashMap::from([(42, 1)]);
+        let allowed_fields = HashMap::new();
+        let mut census = MutableRootInboundReferenceCensus {
+            expected: &expected,
+            allowed_fields: &allowed_fields,
+            owner_identifier: 7,
+            owner_message_index: 0,
+            observed: HashMap::new(),
+            invalid: false,
+        };
+        census
+            .visit_reference(ArchiveReferenceOccurrence {
+                object_identifier: 7,
+                message_index: 0,
+                scope: ArchiveReferenceScope::Message,
+                kind: ArchiveReferenceKind::Object,
+                referenced_identifier: 42,
+            })
+            .expect("reference visitor accepts a valid owner edge");
+        assert!(!census.invalid);
+        assert_eq!(census.observed.get(&42), Some(&1));
+
+        census
+            .visit_reference(ArchiveReferenceOccurrence {
+                object_identifier: 9,
+                message_index: 0,
+                scope: ArchiveReferenceScope::Message,
+                kind: ArchiveReferenceKind::Object,
+                referenced_identifier: 42,
+            })
+            .expect("reference visitor reports aliases without leaking errors");
+        assert!(census.invalid);
+    }
 }

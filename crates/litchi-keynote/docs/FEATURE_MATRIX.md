@@ -87,8 +87,9 @@ it is not a general Keynote package editor.
 | Table dimensions | 🟡 | ✅ | 🟡 | Existing row/column point-size dimensions have checked edits; no row/column insertion or deletion ([dimension API](../src/package/slide_table_dimension.rs#L871), [tests](../tests/slide_table_dimension.rs#L879)). |
 | Header/footer/freeze/repeat settings | 🟡 | ✅ | 🟡 | Existing table header settings expose bounded presentation and repeat/freeze metadata; this is not print layout or cell topology ([headers API](../src/package/slide_table_headers.rs#L763), [tests](../tests/slide_table_headers.rs#L1042)). |
 | Table lock state | 🟡 | ✅ | 🟡 | Existing table lock state is readable and source-bound editable; a locked table can reject unrelated property edits ([lock API](../src/package/slide_table_lock_state.rs#L787), [tests](../tests/slide_table_lock_state.rs#L709)). |
-| Persisted table sort configuration | 🟡 | ✅ | 🟡 | Reads/writes persisted sort rules and ranges only; it does not invoke Keynote's physical “Sort Now” executor or move row data ([sort values](../src/slide/table/sort.rs#L1), [sort transaction](../src/package/slide_table_sort_order.rs#L564), [sort tests](../tests/slide_table_sort_order.rs#L1)). |
-| Table cells, formulas, formatting, merges, and row/column topology | ❌ | ❌ | ❌ | Formula and dimension vocabularies are detached semantic values, not a focused package cell model; no cell CRUD, formula recalculation, merge, or structural table transaction exists ([detached formula values](../src/slide/table/formula.rs#L1), [private table graph](../src/package/slide_table_core.rs#L1)). |
+| Persisted table sort configuration | 🟡 | ✅ | 🟡 | Reads/writes persisted sort rules and ranges only; it does not invoke Keynote's physical “Sort Now” executor or move row data. Physical row movement is the separate focused owner below ([sort values](../src/slide/table/sort.rs#L1), [sort transaction](../src/package/slide_table_sort_order.rs#L564), [sort tests](../tests/slide_table_sort_order.rs#L1)). |
+| Physical table row sorting (“Sort Now”) | 🟡 | 🟡 | 🟡 | The existing-table owner executes persisted order through selector-first `Package::{execute_slide_table_sort_order,execute_slide_table_sort_order_to_rows}` and the exact-source `edit/apply` transaction; no public row/value reader is exposed. Admission is limited to the canonical type-6001 table-model route and explicitly proven tile, data-list, header, UID, and empty pre-BNC sentinel shapes. Sort keys are finite scalar text, number, boolean, date, and duration values: text uses Rust lexical ordering, numeric/date/duration values use `f64::total_cmp`-based deterministic ordering except that signed zeroes compare equal and retain source order, booleans use their ordinary ordering, and mixed scalar domains fail closed. Duplicate keys retain deterministic source-row order. Strict wire preflight precedes private borrowed Buffa lazy views; unknown/unselected bytes remain source-authoritative. Formula/error, rich-text, comment, merge, filter/group/category/pivot/spill/conditional, hidden/non-positional, imported/provenance, cross-tile/cross-bucket, non-empty stroke, unknown mutable, and other unproven row-affine dependencies refuse atomically. Exact-source patches/inverses, candidate reopen/readback, bounded locality, and preview invalidation are source-level contracts. A disposable Computer Use run opened a pre-hardening candidate in Keynote 14.4 and showed the expected order, but the current strict owner rejects that app-authored source because model field 39 identifies an unowned conditional-style CalculationEngine dependency graph. The run therefore remains external exploratory evidence, not current-owner E3/E4 promotion; the checked-in native fixture has no table and the checked-in evidence test records hashes without launching Keynote. Native acceptance remains pending ([semantic values](../src/slide/table/physical_sort.rs#L1), [physical owner](../src/package/slide_table_physical_sort.rs#L1), [integration tests](../tests/slide_table_physical_sort.rs#L1), [ADR 0008](../../../docs/adr/0008-migration-and-verification.md#2026-09-02-amendment-keynote-physical-sort-focused-owner-verification-status)). |
+| Table cells, formulas, formatting, merges, and row/column topology | ❌ | ❌ | ❌ | Physical row movement above is not a public cell model. Formula and dimension vocabularies are detached semantic values, not focused package cell CRUD; there is no cell authoring, formula recalculation, merge, or general structural table transaction ([detached formula values](../src/slide/table/formula.rs#L1), [private table graph](../src/package/slide_table_core.rs#L1)). |
 
 ## Charts
 
@@ -150,8 +151,8 @@ Evidence levels used by the repository audit are:
 | E0 | Typed source/schema exists | Extensive |
 | E1 | Synthetic unit/integration test or Litchi self-roundtrip | Extensive for focused transactions |
 | E2 | Checked-in Apple-produced fixture parses and exact no-op/readback works | Present for one basic fixture |
-| E3 | Litchi-mutated candidate opens in native Keynote without repair | Operation-specific/manual evidence only; no complete checked-in gate |
-| E4 | Native save/close/reopen followed by strict Litchi reread | Not suite-wide or automated |
+| E3 | Litchi-mutated candidate opens in native Keynote without repair | External exploratory evidence exists for a pre-hardening candidate; current-owner promotion is pending because the app-authored source contains unproven model field 39 |
+| E4 | Native save/close/reopen followed by strict Litchi reread | External/manual exploratory evidence only; the current strict owner does not admit that source, and this is not suite-wide or automated |
 
 The checked-in [native fixture](../../../test-data/iwork/README.md#native-iwork-fixtures) contains
 one basic slide and no real movie, rich table, chart, build, comment, or soundtrack collection.
@@ -170,5 +171,8 @@ The audited dirty snapshot was not green:
 
 These failures are recorded as audit evidence, not silently downgraded to unsupported features.
 They must be fixed and rerun on a frozen revision before the affected write cells are promoted to
-native interoperability claims. The focused owner also needs richer native fixtures and an
-operation-indexed E3/E4 ledger before the Keynote matrix can support a general authoring claim.
+native interoperability claims. The focused physical-sort owner has source-level test/fuzz
+evidence and an external exploratory probe, but no current-owner E3/E4 certification: the current
+strict admission rejects the app-authored probe's unproven model field 39. A current-admitted
+native source and richer checked-in fixtures are still required before the Keynote matrix can make
+a native physical-sort or general authoring claim.

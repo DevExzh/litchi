@@ -787,6 +787,29 @@ mod buffa_numbers_table_cell_storage_generated {
     ));
 }
 
+/// Private lazy-view roots for the Keynote/format-neutral physical table-sort
+/// storage seam. Repeated rows, headers, and UID arrays remain on the strict
+/// source-preserving path and never cross this generated boundary.
+#[doc(hidden)]
+mod buffa_table_physical_sort_generated {
+    #![allow(
+        clippy::all,
+        clippy::pedantic,
+        clippy::arbitrary_source_item_ordering,
+        clippy::allow_attributes_without_reason,
+        clippy::module_name_repetitions,
+        clippy::shadow_same,
+        elided_lifetimes_in_paths,
+        unreachable_pub,
+        non_snake_case,
+        reason = "Private Buffa generated projection."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-table-physical-sort/iwa_table_physical_sort_buffa_protos.rs"
+    ));
+}
+
 /// Private lazy-view roots for singular Numbers popup-menu cell envelopes.
 /// Repeated menu values and control-cell list entries stay on handwritten
 /// source-preserving paths and never cross the generated boundary.
@@ -1745,6 +1768,23 @@ pub mod table_appearance_codec;
 /// Strict generated-free Numbers table-cell dependency/cache projection.
 #[doc(hidden)]
 pub mod numbers_table_cell_dependency_codec;
+
+/// Strict generated-free physical table-sort storage projection and
+/// source-preserving repeated-field rewrites.
+#[doc(hidden)]
+pub mod numbers_table_physical_sort_codec;
+
+/// Format-neutral spelling for the physical table-sort storage seam.
+#[doc(hidden)]
+pub mod table_physical_sort_codec {
+    pub use super::numbers_table_physical_sort_codec::*;
+}
+
+/// Keynote spelling retained for the concrete format owner.
+#[doc(hidden)]
+pub mod keynote_table_physical_sort_codec {
+    pub use super::numbers_table_physical_sort_codec::*;
+}
 
 /// Strict raw-preserving PackageMetadata sparse-publication codec.
 #[doc(hidden)]

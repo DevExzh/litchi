@@ -62,10 +62,11 @@ claims. Shared `litchi-iwa-*` crates are substrate, not a fourth format. Capabil
 only in the legacy `litchi-iwa` migration host do not count as focused-owner support unless the
 relevant detailed matrix labels them explicitly as host-only.
 
-The current iWork migration inventory remains 64 workspace packages, 237 internal dependency
-declarations, 226 canonical edges, 11 ordered migration debts `[1, 2, 4, 8, 10, 12, 13, 14, 15,
-16, 17]`, and one migration host. These are topology facts, not evidence that the concrete format
-owners or the monolith deletion gate are complete; the Fraction slice closes no debt or gate.
+The current iWork migration inventory is 64 workspace packages, 238 internal dependency
+declarations, 227 canonical edges, 11 development-only edges, 11 ordered migration debts
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. These are topology facts,
+not evidence that the concrete format owners or the monolith deletion gate are complete; the
+focused Keynote physical-sort slice closes no debt or gate.
 
 The Numbers matrix now records bounded existing-cell Number, Percentage, Currency, Scientific, and
 Fraction display-format owners. Currency, Scientific, and Fraction support are operation-specific
@@ -77,6 +78,24 @@ Numbers E3/E4 evidence for the representative Eighths-to-Hundredths edit. The so
 and native-resaved hashes are recorded in ADR 0008; this does not claim native UI acceptance for all
 nine variants, arbitrary-producer parity, native byte parity, or package-wide performance. Neither
 operation-specific record broadens its scope.
+
+The Keynote matrix now records a bounded focused owner for physical table row sorting (“Sort Now”).
+The owner is selector-first and source-bound, uses a private strict Buffa lazy codec for admitted
+tile/header/UID storage, and exposes no public row/value reader. Admission is limited to the
+canonical type-6001 table-model route and explicitly proven tile, data-list, header, UID, and
+empty pre-BNC sentinel shapes. Sort keys are finite scalar text, number, boolean, date, and
+duration values (Rust lexical text ordering; `f64::total_cmp`-based deterministic ordering for
+numeric-like values). Formula/error cells, rich text, comments, merges, filters, groups, categories,
+pivots, spills, conditional styles, hidden/non-positional state, imported/provenance data,
+non-empty stroke, cross-tile/cross-bucket movement, unknown mutable state, and other unproven
+row-affine dependencies reject atomically. A disposable Computer Use run opened a pre-hardening
+candidate in Keynote 14.4 and showed the expected Apple/Banana/Cherry/Zebra order, but the current
+strict owner rejects that app-authored source because model field 39 identifies an unowned
+conditional-style CalculationEngine dependency graph. That run is external exploratory evidence,
+not current-owner E3/E4 promotion; the checked-in native fixture
+has no table and the checked-in evidence test records hashes without launching Keynote. Native
+acceptance remains pending; see the [Keynote matrix](../crates/litchi-keynote/docs/FEATURE_MATRIX.md)
+and [ADR 0008](adr/0008-migration-and-verification.md#2026-09-02-amendment-keynote-physical-sort-focused-owner-verification-status).
 
 For XLSB sparklines, the detailed XLSB matrix records the strict, bounded Worksheet-ABNF support
 for [MS-XLSB] §2.1.7.62 and records §2.4.228-230, §2.4.581-583, and §2.4.806. The common
