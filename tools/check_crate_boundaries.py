@@ -4427,11 +4427,8 @@ KEYNOTE_SOUNDTRACK_SETTINGS_MEDIA_TOPOLOGY_NAMES = frozenset(
 )
 
 # Soundtrack item media lifecycle is moving into a focused Keynote owner.  The
-# ratchet below deliberately checks the new semantic seam without retiring the
-# compatibility host: native acceptance, exact package preservation, and
-# candidate reopen evidence are still required before the legacy item surface
-# can be removed.  Keep the paths and names explicit so a similarly named
-# helper cannot satisfy the migration merely by importing the old host.
+# Keep the paths and names explicit so a similarly named helper cannot satisfy
+# the migration merely by importing the old host.
 KEYNOTE_SOUNDTRACK_ITEMS_SEMANTIC_SOURCE = (
     KEYNOTE_SOURCE_ROOT / "soundtrack" / "items.rs"
 )
@@ -4463,6 +4460,25 @@ KEYNOTE_SOUNDTRACK_ITEMS_PACKAGE_METHODS = (
     "soundtrack_items",
     "edit_soundtrack_items",
     "apply_soundtrack_items",
+)
+RETIRED_IWA_KEYNOTE_SOUNDTRACK_ITEMS_METHODS = frozenset(
+    {"soundtrack_items", "add_soundtrack_item", "insert_soundtrack_item", "replace_soundtrack_item", "remove_soundtrack_item"}
+)
+RETIRED_IWA_KEYNOTE_SOUNDTRACK_ITEMS_SOURCES = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "soundtrack_items.rs",
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "soundtrack_wire.rs",
+)
+RETIRED_IWA_KEYNOTE_SOUNDTRACK_ITEMS_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/edit_keynote_soundtrack_items.rs"
+)
+RETIRED_IWA_KEYNOTE_SOUNDTRACK_ITEMS_TESTS = frozenset(
+    {"soundtrack_item_crud_is_ordered_transactional_and_wire_exact", "soundtrack_item_replacement_isolated_from_duplicate_references"}
+)
+RETIRED_IWA_KEYNOTE_SOUNDTRACK_ITEMS_CALL = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+    r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?(?:soundtrack_items|add_soundtrack_item|"
+    r"insert_soundtrack_item|replace_soundtrack_item|remove_soundtrack_item)\b"
+    r"[ \t\r\n]*\("
 )
 KEYNOTE_SOUNDTRACK_ITEMS_MODULE = re.compile(
     r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?items\b"
@@ -17120,13 +17136,7 @@ def _keynote_soundtrack_items_public_leak(identifier: str) -> str | None:
 def audit_keynote_soundtrack_items_facade_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Require the focused semantic soundtrack-item owner without cutover.
-
-    This ratchet is intentionally an ownership check, not a retirement check.
-    The old ``litchi-iwa`` item CRUD surface remains a declared migration debt
-    until candidate reopen, exact preservation, and native Keynote evidence
-    have all been recorded by the owning implementation.
-    """
+    """Require the focused semantic soundtrack-item owner."""
 
     source_root = root / KEYNOTE_SOURCE_ROOT
     if not source_root.is_dir():
@@ -17278,6 +17288,48 @@ def audit_keynote_soundtrack_items_facade_source_topology(
             f"Package::{method}: {KEYNOTE_SOURCE_ROOT / 'package.rs'}"
         )
 
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_soundtrack_items_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep retired Keynote soundtrack-item CRUD out of the migration host."""
+    violations: list[str] = []
+    for path in RETIRED_IWA_KEYNOTE_SOUNDTRACK_ITEMS_SOURCES:
+        if (root / path).exists():
+            violations.append(f"retired litchi-iwa Keynote soundtrack-item source returned: {path}")
+    if (root / RETIRED_IWA_KEYNOTE_SOUNDTRACK_ITEMS_EXAMPLE).exists():
+        violations.append(f"retired litchi-iwa Keynote soundtrack-item example returned: {RETIRED_IWA_KEYNOTE_SOUNDTRACK_ITEMS_EXAMPLE}")
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = path.read_text(encoding="utf-8")
+            for name, line_number in _rust_function_declarations(source):
+                if name in RETIRED_IWA_KEYNOTE_SOUNDTRACK_ITEMS_METHODS:
+                    violations.append(f"retired litchi-iwa Keynote soundtrack-item method {name}: {path.relative_to(root)}:{line_number}")
+                if name in RETIRED_IWA_KEYNOTE_SOUNDTRACK_ITEMS_TESTS:
+                    violations.append(f"retired litchi-iwa Keynote soundtrack-item test {name}: {path.relative_to(root)}:{line_number}")
+    host_root = root / Path("crates/litchi-iwa")
+    if host_root.is_dir():
+        for path in sorted(host_root.rglob("*.rs")):
+            source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+            for match in RETIRED_IWA_KEYNOTE_SOUNDTRACK_ITEMS_CALL.finditer(source):
+                receiver = source[match.start():match.end()].split(".", 1)[0].strip()
+                if receiver == "KeynotePackage":
+                    continue
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(f"retired litchi-iwa Keynote soundtrack-item call: {path.relative_to(root)}:{line_number}")
+    for path in (IWA_KEYNOTE_EDITOR_SOURCE, IWA_KEYNOTE_SOURCE_ROOT / "mod.rs"):
+        full = root / path
+        if not full.is_file():
+            continue
+        source = _mask_rust_non_code(full.read_text(encoding="utf-8"))
+        for module in ("soundtrack_items", "soundtrack_wire"):
+            for match in re.finditer(rf"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?mod[ \t\r\n]+(?:r#)?{module}\b", source, re.MULTILINE):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(f"retired litchi-iwa Keynote soundtrack-item module {module}: {path}:{line_number}")
+        for match in re.finditer(r"\bKeynoteSoundtrackItemInfo\b", source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(f"retired litchi-iwa Keynote soundtrack-item type re-export KeynoteSoundtrackItemInfo: {path}:{line_number}")
     return sorted(set(violations))
 
 
@@ -48863,6 +48915,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_soundtrack_order_source_topology()
         + audit_keynote_soundtrack_settings_facade_source_topology()
         + audit_keynote_soundtrack_items_facade_source_topology()
+        + audit_iwa_keynote_soundtrack_items_source_topology()
         + audit_iwa_keynote_slide_transition_source_topology()
         + audit_keynote_slide_transition_facade_source_topology()
         + audit_iwa_keynote_slide_background_source_topology()
