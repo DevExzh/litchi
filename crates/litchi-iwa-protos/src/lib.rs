@@ -921,6 +921,31 @@ mod buffa_package_metadata_generated {
     ));
 }
 
+/// Private Buffa scalar views for PackageMetadata media lifecycle records.
+///
+/// The generated projection intentionally contains no repeated fields.  The
+/// handwritten media codec streams DataInfo and ComponentDataReference owner
+/// records directly from the caller-owned source bytes and uses these views
+/// only as schema/parity oracles.
+#[doc(hidden)]
+mod buffa_package_metadata_media_generated {
+    #![allow(
+        clippy::all,
+        clippy::pedantic,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::shadow_same,
+        elided_lifetimes_in_paths,
+        unreachable_pub,
+        non_snake_case,
+        reason = "Private Buffa generated projection."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-package-metadata-media/iwa_package_metadata_media_buffa_protos.rs"
+    ));
+}
+
 /// Private scalar lazy-view parity roots for the strict formula reader.
 #[doc(hidden)]
 mod buffa_formula_generated {
@@ -1789,6 +1814,11 @@ pub mod keynote_table_physical_sort_codec {
 /// Strict raw-preserving PackageMetadata sparse-publication codec.
 #[doc(hidden)]
 pub mod package_metadata_codec;
+
+/// Strict, lazy, raw-preserving PackageMetadata DataInfo and media-owner
+/// lifecycle codec. Generated Buffa values remain private to this crate.
+#[doc(hidden)]
+pub mod package_metadata_media_codec;
 
 /// Strict generated-free streaming reader for table-local scalar formulas.
 #[doc(hidden)]

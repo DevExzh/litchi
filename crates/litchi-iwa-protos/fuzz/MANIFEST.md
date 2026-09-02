@@ -41,6 +41,7 @@ generated libFuzzer output part of the repository.
 | `numbers_table_cell_fraction_format_codec` | `fuzz_targets/numbers_table_cell_fraction_format_codec.rs` | `corpus/numbers_table_cell_fraction_format_codec/` |
 | `movie_playback_codec` | `fuzz_targets/movie_playback_codec.rs` | `corpus/movie_playback_codec/` |
 | `keynote_table_physical_sort_codec` | `fuzz_targets/keynote_table_physical_sort_codec.rs` | `corpus/keynote_table_physical_sort_codec/` |
+| `package_metadata_media_codec` | `fuzz_targets/package_metadata_media_codec.rs` | `corpus/package_metadata_media_codec/` |
 
 `fuzz_targets/numbers_table_model.rs` is retained as a source-only harness and
 is intentionally not registered until it is revalidated. A source file alone

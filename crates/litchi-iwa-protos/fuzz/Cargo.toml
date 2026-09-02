@@ -261,6 +261,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "package_metadata_media_codec"
+path = "fuzz_targets/package_metadata_media_codec.rs"
+test = false
+doc = false
+bench = false
+
 [profile.release]
 debug = 1
 codegen-units = 1

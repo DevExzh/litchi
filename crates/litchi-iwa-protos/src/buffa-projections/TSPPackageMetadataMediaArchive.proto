@@ -1,0 +1,20 @@
+// Tiny scalar sidecar for the PackageMetadata media lifecycle codec.
+//
+// Repeated DataInfo, ComponentInfo, and ObjectReference fields deliberately
+// stay out of this schema.  The handwritten codec streams those records from
+// the caller-owned bytes and uses this projection only as a Buffa parity
+// oracle for the selected scalar envelopes.
+syntax = "proto2";
+package LitchiIwaPackageMetadataMediaProjection;
+
+message DataInfoArchive {
+  required uint64 identifier = 1;
+  required bytes digest = 2;
+  required string preferred_file_name = 3;
+  optional string file_name = 4;
+  optional uint64 materialized_length = 18;
+}
+
+message ComponentDataReferenceArchive {
+  required uint64 data_identifier = 1;
+}
