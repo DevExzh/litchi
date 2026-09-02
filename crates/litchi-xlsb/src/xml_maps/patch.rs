@@ -64,20 +64,29 @@ impl Patch {
         let before = self.before.source();
         let after = self.after.source();
 
-        for part in &before.dependencies {
-            if !after
+        for dependency in &after.dependencies {
+            if !before
                 .dependencies
                 .iter()
-                .any(|candidate| candidate.part_name == part.part_name)
+                .any(|candidate| candidate.part_name.is_equivalent_to(&dependency.part_name))
             {
-                refuse_other_inbound(package, &part.part_name, &before.workbook.part_name)?;
-                package.remove_part(&part.part_name);
+                refuse_inbound(package, &dependency.part_name)?;
             }
         }
 
         restore_part(package, &after.workbook)?;
         for worksheet in &after.worksheets {
             restore_part(package, worksheet)?;
+        }
+        for part in &before.dependencies {
+            if !after
+                .dependencies
+                .iter()
+                .any(|candidate| candidate.part_name == part.part_name)
+            {
+                refuse_inbound(package, &part.part_name)?;
+                package.remove_part(&part.part_name);
+            }
         }
         for dependency in &after.dependencies {
             restore_part(package, dependency)?;
@@ -164,30 +173,39 @@ fn restore_relationships(part: &mut dyn Part, source: &[SourceRelationship]) -> 
     Ok(())
 }
 
-fn refuse_other_inbound(
-    package: &OpcPackage,
-    removed: &litchi_opc::PackURI,
-    workbook: &litchi_opc::PackURI,
-) -> Result<()> {
+fn refuse_inbound(package: &OpcPackage, target_part: &litchi_opc::PackURI) -> Result<()> {
+    for relationship in package.rels().iter() {
+        if relationship_targets(relationship, target_part)? {
+            return Err(invalid(format!(
+                "cannot remove XML Maps part '{}' while another part references it",
+                target_part.as_str()
+            )));
+        }
+    }
     for part in package.iter_parts() {
         for relationship in part.rels().iter() {
-            if relationship.target_mode() == TargetMode::Internal
-                && relationship.target_partname().ok().as_ref() == Some(removed)
-                && !(part.partname() == workbook
-                    && matches!(
-                        relationship.reltype(),
-                        litchi_ooxml_common::spreadsheet_xml_maps::REL
-                            | litchi_ooxml_common::spreadsheet_xml_maps::STRICT_REL
-                    ))
-            {
+            if relationship_targets(relationship, target_part)? {
                 return Err(invalid(format!(
                     "cannot remove XML Maps part '{}' while another part references it",
-                    removed.as_str()
+                    target_part.as_str()
                 )));
             }
         }
     }
     Ok(())
+}
+
+fn relationship_targets(
+    relationship: &litchi_opc::Relationship,
+    target_part: &litchi_opc::PackURI,
+) -> Result<bool> {
+    if relationship.target_mode() != TargetMode::Internal {
+        return Ok(false);
+    }
+    let target = relationship
+        .target_partname()
+        .map_err(|error| invalid(error.to_string()))?;
+    Ok(target.is_equivalent_to(target_part))
 }
 
 fn invalid(message: impl Into<String>) -> Error {

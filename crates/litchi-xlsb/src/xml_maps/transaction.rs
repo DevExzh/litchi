@@ -14,7 +14,8 @@ use super::snapshot::{SourcePart, SourceRelationship, SourceState};
 use super::{
     CellReference, ColumnBinding, Commit, MappedTable, Patch, SingleCellBinding, Snapshot, XmlMap,
     XmlMapConformance, XmlMapInfo, parse_single_cells, parse_xml_map_info_with_limits,
-    patch_single_cells, patch_table_bindings, validate_binding_map_ids, validate_catalog,
+    patch_single_cells, patch_table_bindings, serialize_single_cells, validate_binding_map_ids,
+    validate_catalog,
 };
 use crate::package::error::{Error, Result};
 
@@ -177,7 +178,7 @@ impl Transaction {
         Ok(true)
     }
 
-    /// Put one binding into an already existing worksheet single-cell part.
+    /// Put one binding into a worksheet single-cell part.
     pub fn put_single_cell_binding(
         &mut self,
         sheet_index: usize,
@@ -186,14 +187,8 @@ impl Transaction {
         let values = self
             .single_cell_bindings
             .get(sheet_index)
-            .ok_or_else(|| Error::WorksheetNotFound(sheet_index.to_string()))?
-            .as_ref()
-            .ok_or_else(|| {
-                Error::UnsupportedFeature(
-                    "creating a new tableSingleCells part is intentionally refused".to_string(),
-                )
-            })?;
-        let mut values = values.clone();
+            .ok_or_else(|| Error::WorksheetNotFound(sheet_index.to_string()))?;
+        let mut values = values.as_ref().cloned().unwrap_or_default();
         if let Some(index) = values
             .iter()
             .position(|value| value.table_id() == binding.table_id())
@@ -203,6 +198,10 @@ impl Transaction {
             }
             values[index] = binding;
         } else {
+            values.try_reserve(1).map_err(|source| Error::Allocation {
+                resource: "single-cell transaction draft",
+                source,
+            })?;
             values.push(binding);
         }
         let previous = self.single_cell_bindings[sheet_index].replace(values);
@@ -240,7 +239,12 @@ impl Transaction {
             return Ok(None);
         };
         let removed = values.remove(index);
-        let previous = self.single_cell_bindings[sheet_index].replace(values);
+        let next = if values.is_empty() {
+            None
+        } else {
+            Some(values)
+        };
+        let previous = std::mem::replace(&mut self.single_cell_bindings[sheet_index], next);
         match validate_draft(
             self.catalog.as_ref(),
             &self.mapped_tables,
@@ -596,38 +600,186 @@ impl Transaction {
     }
 
     fn materialize_single_cells(&self, source: &mut SourceState) -> Result<()> {
-        for part in source
-            .dependencies
-            .iter_mut()
-            .filter(|part| part.content_type == SINGLE_CELLS_CONTENT_TYPE)
-        {
-            let target_sheet = source
-                .worksheets
-                .iter()
-                .position(|worksheet| {
-                    let target = part.part_name.relative_ref(worksheet.part_name.base_uri());
-                    worksheet.relationships.iter().any(|relationship| {
-                        relationship.relationship_type == SINGLE_CELLS_REL
-                            && relationship.mode == TargetMode::Internal
-                            && relationship.target == target
-                    })
-                })
-                .ok_or_else(|| invalid("tableSingleCells owner worksheet is absent"))?;
-            let values = self
-                .single_cell_bindings
-                .get(target_sheet)
-                .and_then(Option::as_deref)
-                .ok_or_else(|| {
-                    Error::UnsupportedFeature(
-                        "removing a tableSingleCells part is intentionally refused".to_string(),
+        let mut owners: Vec<Option<(usize, String)>> = Vec::new();
+        owners
+            .try_reserve(source.worksheets.len())
+            .map_err(|source| Error::Allocation {
+                resource: "tableSingleCells owner index",
+                source,
+            })?;
+        owners.resize(source.worksheets.len(), None);
+        for worksheet in &source.worksheets {
+            for relationship in &worksheet.relationships {
+                if relationship.relationship_type == SINGLE_CELLS_REL
+                    && relationship.mode == TargetMode::Internal
+                {
+                    PackURI::from_rel_ref(worksheet.part_name.base_uri(), &relationship.target)
+                        .map_err(|error| invalid(error))?;
+                }
+            }
+        }
+        for (dependency_index, part) in source.dependencies.iter().enumerate() {
+            if part.content_type != SINGLE_CELLS_CONTENT_TYPE {
+                continue;
+            }
+            let mut owner = None;
+            for (sheet_index, worksheet) in source.worksheets.iter().enumerate() {
+                if let Some(relationship) = worksheet.relationships.iter().find(|relationship| {
+                    source_relationship_targets(
+                        worksheet.part_name.base_uri(),
+                        relationship,
+                        &part.part_name,
                     )
-                })?;
+                }) {
+                    if owner
+                        .replace((sheet_index, relationship.id.clone()))
+                        .is_some()
+                    {
+                        return Err(invalid(
+                            "tableSingleCells part is referenced by multiple worksheets",
+                        ));
+                    }
+                }
+            }
+            let Some((target_sheet, relationship_id)) = owner else {
+                return Err(invalid("tableSingleCells owner worksheet is absent"));
+            };
+            if owners[target_sheet]
+                .replace((dependency_index, relationship_id))
+                .is_some()
+            {
+                return Err(invalid(
+                    "tableSingleCells part is referenced by multiple worksheets",
+                ));
+            }
+        }
+
+        for (sheet_index, owner) in owners.iter().enumerate() {
+            let Some((dependency_index, _)) = owner else {
+                continue;
+            };
+            let Some(values) = self
+                .single_cell_bindings
+                .get(sheet_index)
+                .and_then(Option::as_deref)
+            else {
+                continue;
+            };
+            let part = &mut source.dependencies[*dependency_index];
             let parsed = parse_single_cells(part.bytes(), self.before.limits().bindings)?;
             part.bytes = Arc::new(patch_single_cells(
                 &parsed,
                 values,
                 self.before.limits().bindings,
             )?);
+        }
+
+        let mut removals = Vec::new();
+        removals
+            .try_reserve(source.worksheets.len())
+            .map_err(|source| Error::Allocation {
+                resource: "tableSingleCells removal plan",
+                source,
+            })?;
+        for (sheet_index, owner) in owners.iter().enumerate() {
+            let Some((dependency_index, _)) = owner else {
+                continue;
+            };
+            if self
+                .single_cell_bindings
+                .get(sheet_index)
+                .and_then(Option::as_ref)
+                .is_some()
+            {
+                continue;
+            }
+            let part = &source.dependencies[*dependency_index];
+            let parsed = parse_single_cells(part.bytes(), self.before.limits().bindings)?;
+            parsed.ensure_removal_lossless()?;
+            patch_single_cells(&parsed, &[], self.before.limits().bindings)?;
+            let relationship_id = owners[sheet_index]
+                .as_ref()
+                .map(|(_, id)| id.clone())
+                .ok_or_else(|| invalid("tableSingleCells owner relationship is absent"))?;
+            removals.push((sheet_index, relationship_id, part.part_name.clone()));
+        }
+
+        for (sheet_index, relationship_id, _) in &removals {
+            source.worksheets[*sheet_index]
+                .relationships
+                .retain(|relationship| relationship.id != *relationship_id);
+        }
+
+        for (sheet_index, values) in self.single_cell_bindings.iter().enumerate() {
+            if owners.get(sheet_index).and_then(Option::as_ref).is_some() {
+                continue;
+            }
+            let Some(values) = values.as_deref() else {
+                continue;
+            };
+            if values.is_empty() {
+                continue;
+            }
+            let part_name = next_single_cells_part_name(source)?;
+            let bytes = serialize_single_cells(values, self.before.limits().bindings)?;
+            let relationship_id =
+                next_relationship_id(&source.worksheets[sheet_index].relationships);
+            let target =
+                part_name.relative_ref(source.worksheets[sheet_index].part_name.base_uri());
+            source
+                .dependencies
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "tableSingleCells dependency",
+                    source,
+                })?;
+            source
+                .part_names
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "tableSingleCells part-name index",
+                    source,
+                })?;
+            source.worksheets[sheet_index]
+                .relationships
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "tableSingleCells worksheet relationship",
+                    source,
+                })?;
+            source.dependencies.push(SourcePart {
+                part_name: part_name.clone(),
+                content_type: SINGLE_CELLS_CONTENT_TYPE.to_string(),
+                bytes: Arc::new(bytes),
+                relationships: Vec::new(),
+            });
+            source.part_names.push(part_name);
+            source.worksheets[sheet_index]
+                .relationships
+                .push(SourceRelationship {
+                    id: relationship_id,
+                    relationship_type: SINGLE_CELLS_REL.to_string(),
+                    target,
+                    mode: TargetMode::Internal,
+                });
+        }
+
+        for (_, _, part_name) in removals {
+            source
+                .dependencies
+                .retain(|part| part.part_name != part_name);
+            source.part_names.retain(|name| name != &part_name);
+        }
+        source
+            .dependencies
+            .sort_by(|left, right| left.part_name.as_str().cmp(right.part_name.as_str()));
+        source
+            .part_names
+            .sort_by(|left, right| left.as_str().cmp(right.as_str()));
+        for worksheet in &mut source.worksheets {
+            worksheet
+                .relationships
+                .sort_by(|left, right| left.id.cmp(&right.id));
         }
         Ok(())
     }
@@ -751,11 +903,43 @@ fn next_map_part_name(source: &SourceState) -> Result<PackURI> {
             format!("/xl/xmlMaps{index}.xml")
         };
         let uri = PackURI::new(candidate)?;
-        if !source.part_names.iter().any(|name| name == &uri) {
+        if !source
+            .part_names
+            .iter()
+            .any(|name| name.is_equivalent_to(&uri))
+        {
             return Ok(uri);
         }
     }
     Err(invalid("could not allocate a bounded MapInfo part name"))
+}
+
+fn next_single_cells_part_name(source: &SourceState) -> Result<PackURI> {
+    for index in 1usize..=source.part_names.len().saturating_add(1) {
+        let uri = PackURI::new(format!("/xl/tables/tableSingleCells{index}.bin"))?;
+        if !source
+            .part_names
+            .iter()
+            .any(|name| name.is_equivalent_to(&uri))
+        {
+            return Ok(uri);
+        }
+    }
+    Err(invalid(
+        "could not allocate a bounded tableSingleCells part name",
+    ))
+}
+
+fn source_relationship_targets(
+    base_uri: &str,
+    relationship: &SourceRelationship,
+    part_name: &PackURI,
+) -> bool {
+    relationship.relationship_type == SINGLE_CELLS_REL
+        && relationship.mode == TargetMode::Internal
+        && PackURI::from_rel_ref(base_uri, &relationship.target)
+            .ok()
+            .is_some_and(|target| target.is_equivalent_to(part_name))
 }
 
 fn serialize_catalog(
