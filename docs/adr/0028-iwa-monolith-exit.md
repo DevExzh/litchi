@@ -7323,3 +7323,22 @@ gate is retired. The current inventory is 64 workspace packages, 238 internal
 dependency declarations, 227 canonical edges, 11 development-only edges, 11
 ordered migration debts with IDs
 `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
+
+## 2026-09-03 amendment: Keynote soundtrack-item ownership ratchet (open)
+
+The focused Keynote crate now reserves the semantic namespace
+`soundtrack::items` and a private package owner for soundtrack item
+add/insert/replace/remove. This ratchet requires item positions and opaque
+package-local handles at the public boundary; native IDs, media topology,
+archive paths, generated messages, and package bytes remain private. The
+existing settings and reference-order owners retain their narrower scopes.
+
+No monolith-exit gate closes. In particular, the legacy `litchi-iwa`
+soundtrack-item CRUD source, wire helpers, tests, and compatibility callers
+must remain until the focused owner has independently demonstrated bounded
+lazy-Buffa ingress, exact metadata/data-reference and ZIP preservation,
+shared-media closure, candidate reopen/readback, atomic failures, exact
+patch/inverse/conflict behavior, adversarial fuzz coverage, and native Keynote
+save/close/reopen acceptance for each operation. Soundtrack creation and
+general media-asset CRUD remain open debts, and no dependency edge or ordered
+migration debt is retired by this source-level ownership step.

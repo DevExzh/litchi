@@ -3655,3 +3655,24 @@ remains 64 workspace packages, 238 internal dependency
 declarations, 227 canonical edges, 11 development-only edges, 11 ordered
 migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
 migration host.
+
+## 2026-09-03 amendment: semantic soundtrack-item lifecycle vocabulary
+
+Keynote soundtrack media lifecycle is represented by the nested
+`soundtrack::items` namespace. `Item` exposes only position, safe filename,
+and materialized byte length; `AudioSource` owns bounded immutable audio bytes
+after filename and signature validation; and `ItemHandle` is an opaque,
+package-local capability. `Edit` accepts exactly one checked add, insert,
+replace, or remove operation, while `Patch` and `Commit` retain exact-source
+authorization and reversible semantic summaries. Positions are zero-based
+semantic values; native identifiers, archive paths, IWA objects, generated
+messages, and package bytes do not cross the public boundary.
+
+The namespace is staged alongside the existing settings and order owners, not
+as a replacement for either. It distinguishes an absent rooted soundtrack from
+an existing empty collection and initially refuses unsupported topology rather
+than synthesizing native structure. Physical metadata ownership, fresh data
+allocation, shared-media closure, lazy Buffa validation, ZIP preservation,
+candidate reopen, fuzzing, and native application acceptance remain private
+implementation gates. Until those gates are complete, the legacy item surface
+and its migration debt stay in place.

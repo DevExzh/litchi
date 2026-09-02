@@ -541,6 +541,39 @@ def add_keynote_soundtrack_settings_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_keynote_soundtrack_items_canonical_scaffold(root: Path) -> None:
+    """Install a minimal focused soundtrack-item owner for checker tests."""
+
+    semantic = root / boundaries.KEYNOTE_SOUNDTRACK_ITEMS_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.KEYNOTE_SOUNDTRACK_ITEMS_CANONICAL_TYPES
+        ),
+        encoding="utf-8",
+    )
+
+    owner = root / boundaries.KEYNOTE_SOUNDTRACK_ITEMS_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "impl Package {\n"
+        "    pub fn soundtrack_items(&self) {}\n"
+        "    pub fn edit_soundtrack_items(&self) {}\n"
+        "    pub fn apply_soundtrack_items(&self) {}\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    lib = root / boundaries.KEYNOTE_SOUNDTRACK_ITEMS_EXPORT_SOURCES[0]
+    lib.parent.mkdir(parents=True, exist_ok=True)
+    lib.write_text("pub mod soundtrack;\n", encoding="utf-8")
+    package = root / boundaries.KEYNOTE_SOUNDTRACK_ITEMS_EXPORT_SOURCES[1]
+    package.write_text("mod soundtrack_items;\n", encoding="utf-8")
+    soundtrack = root / boundaries.KEYNOTE_SOUNDTRACK_ITEMS_EXPORT_SOURCES[2]
+    soundtrack.write_text("pub mod items;\n", encoding="utf-8")
+
+
 def add_numbers_sheet_order_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_SHEET_ORDER_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -7119,6 +7152,139 @@ class BoundaryPolicyTests(unittest.TestCase):
                     "crates/litchi-iwa/src/keynote/editor/other.rs:5"
                 ],
             )
+
+    def test_focused_keynote_soundtrack_items_owner_scaffold_is_valid(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_soundtrack_items_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_soundtrack_items_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_keynote_soundtrack_items_requires_each_canonical_type(
+        self,
+    ) -> None:
+        for missing in boundaries.KEYNOTE_SOUNDTRACK_ITEMS_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_soundtrack_items_canonical_scaffold(root)
+                    semantic = root / boundaries.KEYNOTE_SOUNDTRACK_ITEMS_SEMANTIC_SOURCE
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.KEYNOTE_SOUNDTRACK_ITEMS_CANONICAL_TYPES
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+                    self.assertEqual(
+                        boundaries.audit_keynote_soundtrack_items_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-keynote soundtrack items public API "
+                            f"is missing canonical soundtrack item type {missing}: "
+                            "crates/litchi-keynote/src/soundtrack/items.rs"
+                        ],
+                    )
+
+    def test_focused_keynote_soundtrack_items_requires_private_owner_and_modules(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_soundtrack_items_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SOUNDTRACK_ITEMS_OWNER_SOURCE
+            owner.unlink()
+            soundtrack = root / boundaries.KEYNOTE_SOUNDTRACK_ITEMS_EXPORT_SOURCES[2]
+            soundtrack.write_text("mod items;\n", encoding="utf-8")
+            package = root / boundaries.KEYNOTE_SOUNDTRACK_ITEMS_EXPORT_SOURCES[1]
+            package.write_text("pub mod soundtrack_items;\n", encoding="utf-8")
+
+            violations = boundaries.audit_keynote_soundtrack_items_facade_source_topology(
+                root
+            )
+            self.assertIn(
+                "focused litchi-keynote soundtrack items public API is missing "
+                "private package owner source: "
+                "crates/litchi-keynote/src/package/soundtrack_items.rs",
+                violations,
+            )
+            self.assertIn(
+                "focused litchi-keynote soundtrack items public API is missing "
+                "public soundtrack::items module: "
+                "crates/litchi-keynote/src/soundtrack.rs",
+                violations,
+            )
+            self.assertIn(
+                "focused litchi-keynote soundtrack items public API exposes "
+                "package::soundtrack_items module: "
+                "crates/litchi-keynote/src/package.rs:1",
+                violations,
+            )
+            self.assertIn(
+                "focused litchi-keynote soundtrack items public API is missing "
+                "Package::soundtrack_items: crates/litchi-keynote/src/package.rs",
+                violations,
+            )
+
+    def test_focused_keynote_soundtrack_items_rejects_public_physical_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_soundtrack_items_canonical_scaffold(root)
+            semantic = root / boundaries.KEYNOTE_SOUNDTRACK_ITEMS_SEMANTIC_SOURCE
+            with semantic.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "pub struct MediaAssetId;\n"
+                    "pub fn package_bytes(&self) -> &[u8] { unimplemented!() }\n"
+                )
+
+            violations = boundaries.audit_keynote_soundtrack_items_facade_source_topology(
+                root
+            )
+            self.assertIn(
+                "focused litchi-keynote soundtrack items public API exposes "
+                "soundtrack media topology MediaAssetId: "
+                "crates/litchi-keynote/src/soundtrack/items.rs:12",
+                violations,
+            )
+            self.assertIn(
+                "focused litchi-keynote soundtrack items public API exposes raw byte slice "
+                "&[u8]: crates/litchi-keynote/src/soundtrack/items.rs:13",
+                violations,
+            )
+
+    def test_soundtrack_item_boundary_does_not_retire_legacy_host_early(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_soundtrack_items_canonical_scaffold(root)
+            legacy = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "editor/soundtrack_items.rs"
+            legacy.parent.mkdir(parents=True)
+            legacy.write_text(
+                "pub fn soundtrack_items() {}\n"
+                "pub fn add_soundtrack_item() {}\n"
+                "pub fn insert_soundtrack_item() {}\n"
+                "pub fn replace_soundtrack_item() {}\n"
+                "pub fn remove_soundtrack_item() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_soundtrack_items_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_keynote_soundtrack_items_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_keynote_soundtrack_items_facade_source_topology()",
+            main_source,
+        )
 
     def test_focused_keynote_soundtrack_settings_requires_each_canonical_type(
         self,

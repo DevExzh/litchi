@@ -96,6 +96,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "keynote_soundtrack_items"
+path = "fuzz_targets/keynote_soundtrack_items.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "keynote_slide_movie_geometry"
 path = "fuzz_targets/keynote_slide_movie_geometry.rs"
 test = false

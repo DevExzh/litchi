@@ -4425,6 +4425,115 @@ KEYNOTE_SOUNDTRACK_SETTINGS_MEDIA_TOPOLOGY_NAMES = frozenset(
         "payloads",
     }
 )
+
+# Soundtrack item media lifecycle is moving into a focused Keynote owner.  The
+# ratchet below deliberately checks the new semantic seam without retiring the
+# compatibility host: native acceptance, exact package preservation, and
+# candidate reopen evidence are still required before the legacy item surface
+# can be removed.  Keep the paths and names explicit so a similarly named
+# helper cannot satisfy the migration merely by importing the old host.
+KEYNOTE_SOUNDTRACK_ITEMS_SEMANTIC_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "soundtrack" / "items.rs"
+)
+KEYNOTE_SOUNDTRACK_ITEMS_OWNER_SOURCE = (
+    KEYNOTE_SOURCE_ROOT / "package" / "soundtrack_items.rs"
+)
+KEYNOTE_SOUNDTRACK_ITEMS_EXPORT_SOURCES = (
+    KEYNOTE_SOURCE_ROOT / "lib.rs",
+    KEYNOTE_SOURCE_ROOT / "package.rs",
+    KEYNOTE_SOURCE_ROOT / "soundtrack.rs",
+)
+KEYNOTE_SOUNDTRACK_ITEMS_CANONICAL_TYPES = (
+    "Item",
+    "ItemHandle",
+    "ItemSelector",
+    "AudioSource",
+    "OperationKind",
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+)
+KEYNOTE_SOUNDTRACK_ITEMS_SHORT_NAMES = frozenset(
+    KEYNOTE_SOUNDTRACK_ITEMS_CANONICAL_TYPES
+)
+KEYNOTE_SOUNDTRACK_ITEMS_PACKAGE_METHODS = (
+    "soundtrack_items",
+    "edit_soundtrack_items",
+    "apply_soundtrack_items",
+)
+KEYNOTE_SOUNDTRACK_ITEMS_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?items\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+KEYNOTE_PACKAGE_SOUNDTRACK_ITEMS_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?soundtrack_items\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+KEYNOTE_SOUNDTRACK_ITEMS_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "SnappyStream",
+        "SourceCatalog",
+    }
+)
+KEYNOTE_SOUNDTRACK_ITEMS_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeLimit",
+        "DecodeOptions",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+KEYNOTE_SOUNDTRACK_ITEMS_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "kn", "tsa", "tsk", "tsp"}
+)
+KEYNOTE_SOUNDTRACK_ITEMS_TOPOLOGY_NAMES = frozenset(
+    {
+        "ComponentDataReference",
+        "ComponentInfo",
+        "DataInfo",
+        "DataReference",
+        "EmbeddedMediaAsset",
+        "FieldInfo",
+        "KeynoteSoundtrackItemInfo",
+        "MediaAssetId",
+        "PackageMetadata",
+        "data_reference",
+        "data_references",
+        "metadata",
+        "media",
+        "media_items",
+        "movie_media",
+        "payload",
+        "payloads",
+    }
+)
+# AudioSource is a semantic content value, so its immutable payload accessor
+# is intentionally allowed.  Package bytes, wire buffers, and media topology
+# remain forbidden from the public focused API.
+KEYNOTE_SOUNDTRACK_ITEMS_ALLOWED_RAW_SLICE_METHODS = frozenset(
+    {"bytes", "as_ref", "from_bytes"}
+)
 RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_METHODS = (
     "slide_transition",
     "set_slide_transition",
@@ -16990,6 +17099,184 @@ def audit_keynote_soundtrack_settings_facade_source_topology(
                     f"raw byte slice {byte_slice}: "
                     f"{path.relative_to(root)}:{byte_slice_line}"
                 )
+
+    return sorted(set(violations))
+
+
+def _keynote_soundtrack_items_public_leak(identifier: str) -> str | None:
+    """Classify physical vocabulary forbidden in soundtrack item values."""
+
+    if identifier in KEYNOTE_SOUNDTRACK_ITEMS_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in KEYNOTE_SOUNDTRACK_ITEMS_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in KEYNOTE_SOUNDTRACK_ITEMS_WIRE_TYPES:
+        return "wire type"
+    if identifier in KEYNOTE_SOUNDTRACK_ITEMS_TOPOLOGY_NAMES:
+        return "soundtrack media topology"
+    return _iwork_public_leak(identifier)
+
+
+def audit_keynote_soundtrack_items_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Require the focused semantic soundtrack-item owner without cutover.
+
+    This ratchet is intentionally an ownership check, not a retirement check.
+    The old ``litchi-iwa`` item CRUD surface remains a declared migration debt
+    until candidate reopen, exact preservation, and native Keynote evidence
+    have all been recorded by the owning implementation.
+    """
+
+    source_root = root / KEYNOTE_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+
+    violations: list[str] = []
+    semantic_path = root / KEYNOTE_SOUNDTRACK_ITEMS_SEMANTIC_SOURCE
+    owner_path = root / KEYNOTE_SOUNDTRACK_ITEMS_OWNER_SOURCE
+    package_path = root / (KEYNOTE_SOURCE_ROOT / "package.rs")
+    soundtrack_path = root / (KEYNOTE_SOURCE_ROOT / "soundtrack.rs")
+    lib_path = root / (KEYNOTE_SOURCE_ROOT / "lib.rs")
+
+    if not semantic_path.is_file():
+        violations.append(
+            "focused litchi-keynote soundtrack items public API is missing "
+            f"semantic source: {KEYNOTE_SOUNDTRACK_ITEMS_SEMANTIC_SOURCE}"
+        )
+        return violations
+    if not owner_path.is_file():
+        violations.append(
+            "focused litchi-keynote soundtrack items public API is missing "
+            f"private package owner source: {KEYNOTE_SOUNDTRACK_ITEMS_OWNER_SOURCE}"
+        )
+    if not package_path.is_file():
+        violations.append(
+            "focused litchi-keynote soundtrack items public API is missing "
+            f"package owner module source: {KEYNOTE_SOURCE_ROOT / 'package.rs'}"
+        )
+
+    semantic_source = semantic_path.read_text(encoding="utf-8")
+    semantic_exports = _rust_canonical_exports(
+        semantic_source, KEYNOTE_SOUNDTRACK_ITEMS_SHORT_NAMES
+    )
+    for name in KEYNOTE_SOUNDTRACK_ITEMS_CANONICAL_TYPES:
+        if name in semantic_exports:
+            continue
+        violations.append(
+            "focused litchi-keynote soundtrack items public API is missing "
+            f"canonical soundtrack item type {name}: "
+            f"{KEYNOTE_SOUNDTRACK_ITEMS_SEMANTIC_SOURCE}"
+        )
+
+    if soundtrack_path.is_file():
+        soundtrack_source = _mask_rust_non_code(
+            soundtrack_path.read_text(encoding="utf-8")
+        )
+        if KEYNOTE_SOUNDTRACK_ITEMS_MODULE.search(soundtrack_source) is None:
+            violations.append(
+                "focused litchi-keynote soundtrack items public API is missing "
+                "public soundtrack::items module: "
+                f"{KEYNOTE_SOURCE_ROOT / 'soundtrack.rs'}"
+            )
+    else:
+        violations.append(
+            "focused litchi-keynote soundtrack items public API is missing "
+            f"semantic soundtrack module source: {KEYNOTE_SOURCE_ROOT / 'soundtrack.rs'}"
+        )
+
+    if package_path.is_file():
+        package_source = _mask_rust_non_code(
+            package_path.read_text(encoding="utf-8")
+        )
+        if KEYNOTE_PACKAGE_SOUNDTRACK_ITEMS_MODULE.search(package_source) is None:
+            violations.append(
+                "focused litchi-keynote soundtrack items public API is missing "
+                "private package soundtrack_items module: "
+                f"{KEYNOTE_SOURCE_ROOT / 'package.rs'}"
+            )
+        public_module = re.compile(
+            r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?soundtrack_items\b",
+            re.MULTILINE,
+        )
+        for match in public_module.finditer(package_source):
+            line_number = package_source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-keynote soundtrack items public API exposes "
+                "package::soundtrack_items module: "
+                f"{KEYNOTE_SOURCE_ROOT / 'package.rs'}:{line_number}"
+            )
+
+    if lib_path.is_file():
+        lib_source = _mask_rust_non_code(lib_path.read_text(encoding="utf-8"))
+        if re.search(
+            r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?soundtrack\b",
+            lib_source,
+            re.MULTILINE,
+        ) is None:
+            violations.append(
+                "focused litchi-keynote soundtrack items public API is missing "
+                f"root soundtrack module: {KEYNOTE_SOURCE_ROOT / 'lib.rs'}"
+            )
+
+    implementation_sources = [semantic_path]
+    if owner_path.is_file():
+        implementation_sources.append(owner_path)
+    declarations: list[tuple[Path, str, int]] = []
+    for path in implementation_sources:
+        source = path.read_text(encoding="utf-8")
+        declarations.extend(
+            (path, declaration, line_number)
+            for declaration, line_number in _rust_public_declarations(source)
+        )
+    for path, declaration, line_number in declarations:
+        for match in RUST_IDENTIFIER.finditer(declaration):
+            identifier = match.group(1)
+            reason = _keynote_soundtrack_items_public_leak(identifier)
+            if reason is None:
+                continue
+            identifier_line = line_number + declaration.count(
+                "\n", 0, match.start(1)
+            )
+            violations.append(
+                "focused litchi-keynote soundtrack items public API exposes "
+                f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+            )
+        for match in RUST_BYTE_SLICE.finditer(declaration):
+            method = re.search(
+                r"\bfn[ \t\r\n]+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b",
+                declaration,
+            )
+            if method is not None and method.group(1) in (
+                KEYNOTE_SOUNDTRACK_ITEMS_ALLOWED_RAW_SLICE_METHODS
+            ):
+                continue
+            byte_slice = re.sub(r"\s+", "", match.group(0))
+            byte_slice_line = line_number + declaration.count(
+                "\n", 0, match.start()
+            )
+            violations.append(
+                "focused litchi-keynote soundtrack items public API exposes "
+                f"raw byte slice {byte_slice}: {path.relative_to(root)}:{byte_slice_line}"
+            )
+
+    method_sources = [package_path]
+    if owner_path.is_file():
+        method_sources.append(owner_path)
+    methods: set[str] = set()
+    for path in method_sources:
+        methods.update(
+            name for name, _line_number in _rust_function_declarations(
+                path.read_text(encoding="utf-8")
+            )
+        )
+    for method in KEYNOTE_SOUNDTRACK_ITEMS_PACKAGE_METHODS:
+        if method in methods:
+            continue
+        violations.append(
+            "focused litchi-keynote soundtrack items public API is missing "
+            f"Package::{method}: {KEYNOTE_SOURCE_ROOT / 'package.rs'}"
+        )
 
     return sorted(set(violations))
 
@@ -48575,6 +48862,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_keynote_soundtrack_settings_source_topology()
         + audit_iwa_keynote_soundtrack_order_source_topology()
         + audit_keynote_soundtrack_settings_facade_source_topology()
+        + audit_keynote_soundtrack_items_facade_source_topology()
         + audit_iwa_keynote_slide_transition_source_topology()
         + audit_keynote_slide_transition_facade_source_topology()
         + audit_iwa_keynote_slide_background_source_topology()
