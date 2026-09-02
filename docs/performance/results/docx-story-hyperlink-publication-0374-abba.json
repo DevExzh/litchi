@@ -1,0 +1,280 @@
+{
+  "schema_version": 1,
+  "protocol": {
+    "order": [
+      "A1_control",
+      "B1_candidate",
+      "B2_candidate",
+      "A2_control"
+    ],
+    "cpu_affinity": [2],
+    "logical_cpu_count": 1,
+    "execution_workers": [1],
+    "profile": "release",
+    "rust_version": "1.95.0",
+    "warmups": 20,
+    "samples_per_case": 500,
+    "benchmark_vm_cap_bytes": 4294967296,
+    "all_runs_clean": true,
+    "worktrees_clean": true
+  },
+  "validation_protocol": {
+    "cargo_processes": "one at a time",
+    "cargo_build_jobs": 1,
+    "cargo_incremental": false,
+    "debug_compilation": false,
+    "test_threads": 1,
+    "build_vm_cap_bytes": 8589934592,
+    "minimum_mem_available_gib": 10,
+    "parallel_build_or_worktree_lane": false
+  },
+  "corpus": {
+    "name": "docx-story-hyperlink-publication",
+    "generator": "litchi-docx-story-hyperlink-publication-v1",
+    "story_kinds": 7,
+    "opc_parts": 15,
+    "zip_members": 24,
+    "archive_bytes": 9900,
+    "uncompressed_bytes": 39564,
+    "sha256": "457421e8f86ec8eb52fbe181cebe7d0821ce1e794a08142ff01a4c4e03df0cac"
+  },
+  "implementations": {
+    "control": {
+      "revision": "73fabbcf707279e09d7a4de62a8190cb4075dd41",
+      "tree": "bec7e7a2d2919d2f0bdfce4f50fd3a1cbfb82adc",
+      "binary_sha256": "1bf48f11ad9b600d0145dde0d30baee4bd05d25900cb77ff6721e7bcbba6f97e",
+      "binary_bytes": 53378400,
+      "dirty": false
+    },
+    "candidate": {
+      "revision": "7cb61e3938c040c01e4c48960d2ce881404cf63a",
+      "tree": "7d22585dfe8c6c66ae16d36452106acfde2988c0",
+      "binary_sha256": "7b9d807392cb6171ef53b78f9acd0a6325ac3d352e0a588e47155cdc3db62600",
+      "binary_bytes": 53368832,
+      "dirty": false
+    }
+  },
+  "raw_reports": {
+    "A1_control": {
+      "sha256": "cf2f9d0ed50e76a072f0899ea38f1e9a5be6356c9eeb2ab5d3d1b1d876e74966",
+      "bytes": 271152
+    },
+    "B1_candidate": {
+      "sha256": "6a81db1e9852d6f793449ea56497daf434c9a8c3afc4d1eed455efc6e9ad5c96",
+      "bytes": 271157
+    },
+    "B2_candidate": {
+      "sha256": "3f8ae206f868f07905f76a760afda7fe6e5b48b7a780b60f054a70c1e08ccfc6",
+      "bytes": 271156
+    },
+    "A2_control": {
+      "sha256": "2b57b48a2878b6f98002d6e985b849d98ee94008a9bca7d525119e151556aa64",
+      "bytes": 271147
+    }
+  },
+  "outputs": {
+    "docx_story_hyperlink_noop_save": {
+      "bytes": 9900,
+      "sha256": "457421e8f86ec8eb52fbe181cebe7d0821ce1e794a08142ff01a4c4e03df0cac",
+      "equals_corpus": true
+    },
+    "docx_story_hyperlink_redaction_save": {
+      "bytes": 9757,
+      "writes": 125,
+      "sha256": "7f776cb8087680f390c271bee7ff35da31e8ecf1f4469a6d63a89f3e9ded327c"
+    }
+  },
+  "results": [
+    {
+      "case": "docx_story_hyperlink_noop_save",
+      "operation": "fresh source-backed story-hyperlink no-op publication",
+      "legs": {
+        "A1": {
+          "p50_ns": 270332,
+          "mean_ns": 274415.632,
+          "p95_ns": 308196,
+          "p99_ns": 331937
+        },
+        "B1": {
+          "p50_ns": 187670,
+          "mean_ns": 193445.992,
+          "p95_ns": 230708,
+          "p99_ns": 263333
+        },
+        "B2": {
+          "p50_ns": 188305,
+          "mean_ns": 191201.176,
+          "p95_ns": 217500,
+          "p99_ns": 236607
+        },
+        "A2": {
+          "p50_ns": 270518,
+          "mean_ns": 285962.416,
+          "p95_ns": 347640,
+          "p99_ns": 568945
+        }
+      },
+      "reduction_percent": {
+        "A1_B1": {
+          "p50": 30.577956,
+          "mean": 29.506205,
+          "p95": 25.142442,
+          "p99": 20.667777
+        },
+        "A2_B2": {
+          "p50": 30.390954,
+          "mean": 33.137655,
+          "p95": 37.435278,
+          "p99": 58.413028
+        }
+      },
+      "run_drift_percent": {
+        "control_A1_A2": {
+          "p50": 0.068804,
+          "mean": 4.207772,
+          "p95": 12.798349,
+          "p99": 71.401501
+        },
+        "candidate_B1_B2": {
+          "p50": 0.338360,
+          "mean": -1.160436,
+          "p95": -5.724986,
+          "p99": -10.149127
+        }
+      }
+    },
+    {
+      "case": "docx_story_hyperlink_redaction_save",
+      "operation": "fresh source-backed story-hyperlink redaction publication",
+      "legs": {
+        "A1": {
+          "p50_ns": 511930,
+          "mean_ns": 519136.074,
+          "p95_ns": 590104,
+          "p99_ns": 618463
+        },
+        "B1": {
+          "p50_ns": 426988,
+          "mean_ns": 437355.972,
+          "p95_ns": 498979,
+          "p99_ns": 556577
+        },
+        "B2": {
+          "p50_ns": 418562,
+          "mean_ns": 425725.002,
+          "p95_ns": 474063,
+          "p99_ns": 513508
+        },
+        "A2": {
+          "p50_ns": 514149,
+          "mean_ns": 524503.900,
+          "p95_ns": 612804,
+          "p99_ns": 675993
+        }
+      },
+      "reduction_percent": {
+        "A1_B1": {
+          "p50": 16.592503,
+          "mean": 15.753115,
+          "p95": 15.442193,
+          "p99": 10.006419
+        },
+        "A2_B2": {
+          "p50": 18.591303,
+          "mean": 18.832824,
+          "p95": 22.640355,
+          "p99": 24.036492
+        }
+      },
+      "run_drift_percent": {
+        "control_A1_A2": {
+          "p50": 0.433458,
+          "mean": 1.033992,
+          "p95": 3.846780,
+          "p99": 9.302092
+        },
+        "candidate_B1_B2": {
+          "p50": -1.973358,
+          "mean": -2.659383,
+          "p95": -4.993397,
+          "p99": -7.738193
+        }
+      }
+    }
+  ],
+  "gates": {
+    "rows": 8,
+    "correctness_refusal_gate_count": 14,
+    "all_gates_true_in_all_rows": true,
+    "source_immutability": true,
+    "deterministic_output": true,
+    "story_xml_and_relationship_locality": true
+  },
+  "capture_counter_evidence": {
+    "test": "publication_reuses_the_planned_story_snapshot",
+    "before_publication": {
+      "capture_source": 1,
+      "load_story": 1
+    },
+    "after_publication": {
+      "capture_source": 1,
+      "load_story": 1
+    },
+    "timing_inference": false
+  },
+  "validation": {
+    "focused_capture_test": "1/1",
+    "litchi_docx_library": "935/935",
+    "source_backed_story_hyperlinks": "23/23",
+    "other_integration_targets": "passed",
+    "excluded_pre_existing_test": "replacing_the_path_reports_source_changed_without_retargeting",
+    "production_clippy": {
+      "warnings_denied": true,
+      "pre_existing_allowances": [
+        "unnecessary_lazy_evaluations",
+        "double_must_use",
+        "needless_borrow",
+        "redundant_closure_call",
+        "unfulfilled_lint_expectations"
+      ]
+    },
+    "boundary_gate": "passed",
+    "release_build_duration": "15m09s",
+    "reclaimed_target_observations": [
+      "validation target: approximately 1.1 GiB (du -sh)",
+      "release target: approximately 938 MiB (du -sh)"
+    ],
+    "post_cleanup_cargo_targets": "4 KiB (du -sh)"
+  },
+  "adjudication": {
+    "performance_claim": "scoped",
+    "claim_authorized": true,
+    "accepted": [
+      {
+        "case": "docx_story_hyperlink_noop_save",
+        "metrics": ["p50_ns", "mean_ns"]
+      },
+      {
+        "case": "docx_story_hyperlink_redaction_save",
+        "metrics": ["p50_ns", "mean_ns", "p95_ns", "p99_ns"]
+      }
+    ],
+    "withheld": [
+      "noop p95 and p99 because control tail drift exceeded the gate",
+      "reads",
+      "decompression",
+      "materialization",
+      "allocation volume",
+      "RSS",
+      "physical I/O",
+      "cold cache",
+      "throughput",
+      "fixed memory",
+      "general OOM prevention",
+      "all-DOCX behavior",
+      "parallel execution",
+      "capture/load reuse inferred from timing"
+    ],
+    "scope": "the named benchmark cases, corpus, protocol, and implementations only"
+  }
+}
