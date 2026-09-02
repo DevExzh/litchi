@@ -15,7 +15,7 @@ use crate::layout::Defaults;
 use crate::merge;
 use crate::row;
 
-const MAX_CELL_CHARACTERS: usize = 32_767;
+pub(crate) const MAX_CELL_CHARACTERS: usize = 32_767;
 
 /// Workbook-local lineage for opaque shared-string identities.
 #[derive(Debug)]
@@ -220,7 +220,8 @@ impl Value {
             },
             Self::Text(text) => Some(text),
             Self::Date(date) => Some(&date.0),
-            Self::Bool(_) | Self::Number(_) | Self::Error(_) => None,
+            Self::Bool(_) | Self::Error(_) => None,
+            Self::Number(number) => return number.validate_for_write(),
         };
         if text.is_some_and(|text| text.chars().count() > MAX_CELL_CHARACTERS) {
             return Err(invalid(format!(
@@ -418,6 +419,15 @@ impl Number {
             .parse()
             .ok()
             .filter(|value: &f64| value.is_finite())
+    }
+
+    pub(crate) fn validate_for_write(&self) -> Result<()> {
+        if self.0.chars().count() > MAX_CELL_CHARACTERS {
+            return Err(invalid(format!(
+                "cell number exceeds {MAX_CELL_CHARACTERS} characters"
+            )));
+        }
+        Ok(())
     }
 }
 

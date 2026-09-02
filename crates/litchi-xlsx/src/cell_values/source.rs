@@ -15,18 +15,20 @@ use litchi_sheet::Cell as Address;
 use super::snapshot::SourceProvenance;
 use super::{Commit, MAX_SHEET_OWNERS, MultiCommit, MultiPatch, MultiSnapshot, Patch, Snapshot};
 use crate::Selector;
-use crate::cell::{Cell, Content, Value};
+use crate::cell::{Cell, Content, Number, Value};
 use crate::error::{Error, Result, invalid};
 use crate::formula::Formula;
 use crate::raw::worksheet::edit::{Action, rewrite};
 
-/// Maximum unique existing cells in one atomic value transaction.
+/// Maximum unique cells in one atomic value transaction.
 pub const MAX_BATCH_EDITS: usize = 256;
 
-/// One typed value-only edit for an existing scalar cell.
+/// One typed value-only edit for a scalar cell.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum CellValueEdit {
+    /// Insert one numeric cell at an absent coordinate.
+    Insert { address: Address, value: Number },
     /// Replace the stored scalar value without changing local style.
     Set { address: Address, value: Value },
     /// Replace the payload with a checked cacheless scalar formula.
@@ -48,11 +50,19 @@ pub enum CellValueEdit {
 pub struct SheetCellValueEdit<'a> {
     /// Worksheet selected by its semantic name or zero-based position.
     pub selector: Selector<'a>,
-    /// Scalar operation applied to an existing cell owner.
+    /// Scalar operation applied to one selected worksheet.
     pub edit: CellValueEdit,
 }
 
 impl<'a> SheetCellValueEdit<'a> {
+    /// Construct a selector-first numeric insertion for an absent coordinate.
+    pub fn insert(selector: impl Into<Selector<'a>>, address: Address, value: Number) -> Self {
+        Self {
+            selector: selector.into(),
+            edit: CellValueEdit::insert(address, value),
+        }
+    }
+
     /// Construct a selector-first value replacement.
     pub fn set(
         selector: impl Into<Selector<'a>>,
@@ -109,6 +119,11 @@ impl<'a> SheetCellValueEdit<'a> {
 }
 
 impl CellValueEdit {
+    /// Construct a numeric insertion for an absent coordinate.
+    pub fn insert(address: Address, value: Number) -> Self {
+        Self::Insert { address, value }
+    }
+
     /// Construct a checked value replacement.
     pub fn set(address: Address, value: impl Into<Value>) -> Self {
         Self::Set {
@@ -145,7 +160,8 @@ impl CellValueEdit {
     #[must_use]
     pub const fn address(&self) -> Address {
         match self {
-            Self::Set { address, .. }
+            Self::Insert { address, .. }
+            | Self::Set { address, .. }
             | Self::SetFormula { address, .. }
             | Self::SetSharedFormula { address, .. }
             | Self::Clear { address }
@@ -156,6 +172,7 @@ impl CellValueEdit {
 
 #[derive(Clone, Debug)]
 enum StagedValueEdit {
+    Insert(Content),
     Set(Content),
     SetSharedFormula(Formula),
     Clear,
@@ -660,6 +677,11 @@ impl SourceEdit {
         self.staged.is_empty()
     }
 
+    /// Stage one numeric insertion for an absent coordinate.
+    pub fn insert(&mut self, address: Address, value: Number) -> Result<()> {
+        self.apply_batch([CellValueEdit::insert(address, value)])
+    }
+
     /// Stage one value replacement. Repeated selectors are rejected.
     pub fn set(&mut self, address: Address, value: impl Into<Value>) -> Result<()> {
         self.apply_batch([CellValueEdit::set(address, value)])
@@ -716,13 +738,20 @@ impl SourceEdit {
                     "duplicate value-only selector '{address}'"
                 )));
             }
-            let source = self.before.editable_cell(address).ok_or_else(|| {
-                invalid(format!(
-                    "cell selector '{address}' has no existing cell owner"
-                ))
-            })?;
+            let source = self.before.editable_cell(address);
             let value = match edit {
+                CellValueEdit::Insert { value, .. } => {
+                    self.before.require_insertable_absence(address)?;
+                    let value = Value::Number(value);
+                    value.validate_for_write()?;
+                    StagedValueEdit::Insert(Content::Value(value))
+                },
                 CellValueEdit::Set { value, .. } => {
+                    let source = source.ok_or_else(|| {
+                        invalid(format!(
+                            "cell selector '{address}' has no existing cell owner"
+                        ))
+                    })?;
                     value.validate_for_write()?;
                     if !matches!(source, Cell::Value(_)) {
                         return Err(self.before.edit_blocked(address));
@@ -730,22 +759,42 @@ impl SourceEdit {
                     StagedValueEdit::Set(Content::Value(value))
                 },
                 CellValueEdit::SetFormula { formula, .. } => {
+                    let _source = source.ok_or_else(|| {
+                        invalid(format!(
+                            "cell selector '{address}' has no existing cell owner"
+                        ))
+                    })?;
                     Content::Formula(formula.clone()).validate_for_write()?;
                     self.before.require_formula_target(address)?;
                     StagedValueEdit::Set(Content::Formula(formula))
                 },
                 CellValueEdit::SetSharedFormula { formula, .. } => {
+                    let _source = source.ok_or_else(|| {
+                        invalid(format!(
+                            "cell selector '{address}' has no existing cell owner"
+                        ))
+                    })?;
                     Content::Formula(formula.clone()).validate_for_write()?;
                     self.before.shared_formula_group(address, MAX_BATCH_EDITS)?;
                     StagedValueEdit::SetSharedFormula(formula)
                 },
                 CellValueEdit::Clear { .. } => {
+                    let source = source.ok_or_else(|| {
+                        invalid(format!(
+                            "cell selector '{address}' has no existing cell owner"
+                        ))
+                    })?;
                     if !matches!(source, Cell::Value(_)) {
                         return Err(self.before.edit_blocked(address));
                     }
                     StagedValueEdit::Clear
                 },
                 CellValueEdit::Remove { .. } => {
+                    let source = source.ok_or_else(|| {
+                        invalid(format!(
+                            "cell selector '{address}' has no existing cell owner"
+                        ))
+                    })?;
                     if !matches!(source, Cell::Value(_)) {
                         return Err(self.before.edit_blocked(address));
                     }
@@ -790,6 +839,9 @@ impl SourceEdit {
         for (address, expected) in &self.staged {
             let matches = match expected {
                 StagedValueEdit::Set(content) => {
+                    snapshot.cell(*address) == Some(&content.as_cell())
+                },
+                StagedValueEdit::Insert(content) => {
                     snapshot.cell(*address) == Some(&content.as_cell())
                 },
                 StagedValueEdit::SetSharedFormula(formula) => shared_formula_readback(
@@ -847,6 +899,16 @@ impl MultiSourceEdit {
     #[must_use]
     pub fn worksheet_count(&self) -> usize {
         self.before.len()
+    }
+
+    /// Stage one selector-first numeric insertion for an absent coordinate.
+    pub fn insert<'a>(
+        &mut self,
+        selector: impl Into<Selector<'a>>,
+        address: Address,
+        value: Number,
+    ) -> Result<()> {
+        self.apply_batch([SheetCellValueEdit::insert(selector, address, value)])
     }
 
     /// Stage one selector-first scalar replacement.
@@ -937,15 +999,22 @@ impl MultiSourceEdit {
                     address
                 )));
             }
-            let source = snapshot.editable_cell(address).ok_or_else(|| {
-                invalid(format!(
-                    "cell selector '{}!{}' has no existing cell owner",
-                    snapshot.sheet_name(),
-                    address
-                ))
-            })?;
+            let source = snapshot.editable_cell(address);
             let value = match request.edit {
+                CellValueEdit::Insert { value, .. } => {
+                    snapshot.require_insertable_absence(address)?;
+                    let value = Value::Number(value);
+                    value.validate_for_write()?;
+                    StagedValueEdit::Insert(Content::Value(value))
+                },
                 CellValueEdit::Set { value, .. } => {
+                    let source = source.ok_or_else(|| {
+                        invalid(format!(
+                            "cell selector '{}!{}' has no existing cell owner",
+                            snapshot.sheet_name(),
+                            address
+                        ))
+                    })?;
                     value.validate_for_write()?;
                     if !matches!(source, Cell::Value(_)) {
                         return Err(snapshot.edit_blocked(address));
@@ -953,22 +1022,50 @@ impl MultiSourceEdit {
                     StagedValueEdit::Set(Content::Value(value))
                 },
                 CellValueEdit::SetFormula { formula, .. } => {
+                    let _source = source.ok_or_else(|| {
+                        invalid(format!(
+                            "cell selector '{}!{}' has no existing cell owner",
+                            snapshot.sheet_name(),
+                            address
+                        ))
+                    })?;
                     Content::Formula(formula.clone()).validate_for_write()?;
                     snapshot.require_formula_target(address)?;
                     StagedValueEdit::Set(Content::Formula(formula))
                 },
                 CellValueEdit::SetSharedFormula { formula, .. } => {
+                    let _source = source.ok_or_else(|| {
+                        invalid(format!(
+                            "cell selector '{}!{}' has no existing cell owner",
+                            snapshot.sheet_name(),
+                            address
+                        ))
+                    })?;
                     Content::Formula(formula.clone()).validate_for_write()?;
                     snapshot.shared_formula_group(address, MAX_BATCH_EDITS)?;
                     StagedValueEdit::SetSharedFormula(formula)
                 },
                 CellValueEdit::Clear { .. } => {
+                    let source = source.ok_or_else(|| {
+                        invalid(format!(
+                            "cell selector '{}!{}' has no existing cell owner",
+                            snapshot.sheet_name(),
+                            address
+                        ))
+                    })?;
                     if !matches!(source, Cell::Value(_)) {
                         return Err(snapshot.edit_blocked(address));
                     }
                     StagedValueEdit::Clear
                 },
                 CellValueEdit::Remove { .. } => {
+                    let source = source.ok_or_else(|| {
+                        invalid(format!(
+                            "cell selector '{}!{}' has no existing cell owner",
+                            snapshot.sheet_name(),
+                            address
+                        ))
+                    })?;
                     if !matches!(source, Cell::Value(_)) {
                         return Err(snapshot.edit_blocked(address));
                     }
@@ -1085,6 +1182,9 @@ impl MultiSourceEdit {
                     StagedValueEdit::Set(content) => {
                         candidate.cell(*address) == Some(&content.as_cell())
                     },
+                    StagedValueEdit::Insert(content) => {
+                        candidate.cell(*address) == Some(&content.as_cell())
+                    },
                     StagedValueEdit::SetSharedFormula(formula) => shared_formula_readback(
                         snapshot,
                         &candidate,
@@ -1135,6 +1235,7 @@ fn effective_action_count(
             StagedValueEdit::Set(content) => {
                 usize::from(snapshot.cell(*address) != Some(&content.as_cell()))
             },
+            StagedValueEdit::Insert(_) => 1,
             StagedValueEdit::SetSharedFormula(formula) => {
                 let group = snapshot.shared_formula_group(*address, MAX_BATCH_EDITS)?;
                 let current = snapshot.cell(group.master).ok_or_else(|| {
@@ -1174,6 +1275,14 @@ fn append_actions(
             if snapshot.cell(address) != Some(&content.as_cell()) {
                 actions.insert(address, Action::set(content.clone()));
             }
+        },
+        StagedValueEdit::Insert(content) => {
+            if snapshot.cell(address).is_some() {
+                return Err(invalid(format!(
+                    "cell selector '{address}' already has an existing cell owner"
+                )));
+            }
+            actions.insert(address, Action::set(content.clone()));
         },
         StagedValueEdit::SetSharedFormula(formula) => {
             let group = snapshot.shared_formula_group(address, MAX_BATCH_EDITS)?;

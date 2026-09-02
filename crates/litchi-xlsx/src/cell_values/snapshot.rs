@@ -9,6 +9,7 @@ use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, Part, Relationship, Relationships,
     SourceBackedPackage, SourceLineage, SourceRelationshipTarget, SourceTopologyPlan, TargetMode,
 };
+use litchi_sheet::Cell as Address;
 
 use crate::cell::{Cell, SharedFormulaStorage, Store, Value};
 use crate::error::{EditBlock, Error, Result, allocation, invalid};
@@ -773,6 +774,43 @@ impl Snapshot {
 
     pub(super) fn editable_cell(&self, address: litchi_sheet::Cell) -> Option<&Cell> {
         self.cell(address)
+    }
+
+    pub(super) fn require_insertable_absence(&self, address: Address) -> Result<()> {
+        if self
+            .cells
+            .merge_ranges()
+            .iter()
+            .any(|range| range.contains(address))
+        {
+            return Err(Error::EditBlocked {
+                sheet: self.sheet_name().to_owned(),
+                address,
+                reason: EditBlock::CoveredMerge,
+            });
+        }
+        let formula_covered = self.cells.entries().iter().any(|entry| {
+            entry
+                .formula_range
+                .is_some_and(|range| range.contains(address))
+                || entry
+                    .shared_formula
+                    .as_ref()
+                    .is_some_and(|storage| storage.range.contains(address))
+        });
+        if formula_covered {
+            return Err(Error::EditBlocked {
+                sheet: self.sheet_name().to_owned(),
+                address,
+                reason: EditBlock::GroupFormula,
+            });
+        }
+        if self.cells.entry(address).is_some() {
+            return Err(invalid(format!(
+                "cell selector '{address}' already has an existing cell owner"
+            )));
+        }
+        Ok(())
     }
 
     pub(crate) fn shared_formula_group(
