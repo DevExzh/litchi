@@ -1,5 +1,34 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0369 compliance update
+
+The fused ODT catalog pass remains inside the owning `litchi-odt` source-backed
+boundary. A private handler combines the existing `content.xml` validation and
+text-block-kind observation without exposing a raw parser, package identifier,
+archive handle, runtime handle, lock, unsafe storage, dependency edge, or new
+public API. The one borrowing XML pass preserves the former validation-before-
+scan error precedence. Source freshness, ZIP verification, cancellation, and
+the 256 MiB content limit remain outer publication fences; the 1,000,000-block
+and 4,096-depth execution ceilings are unchanged. Styles, media, and semantic
+payloads remain cold in the measured open path.
+
+The clean CPU-2 ABBA used 30 warmups and 500 samples per leg, control
+`bf1cb55c6`/`a7991b...`, candidate `b712aafbf20e`/`1a75eb...`, and corpus SHA-256
+`d63726138d0a50c8ff7e150af4a86385df1a34d886bb5f61f985c78ac79b0220`.
+Confidence intervals did not overlap and same-side drifts stayed below 15%.
+Open reductions were A1/B1 p50/mean/p95/p99 `53.560%`/`53.116%`/`51.008%`/
+`49.508%`, and A2/B2 `56.320%`/`56.078%`/`54.542%`/`54.304%`. The [ABBA
+result](results/odt-source-catalog-0369-abba.json) is the retained evidence.
+
+Exact rustfmt, `cargo test -p litchi-odt --lib --tests` (557 library tests and
+all integration targets; 926 total), scoped Clippy with `-D warnings`, and
+independent code/resource review all passed or accepted. The only accepted
+claim is deterministic large media-rich ODT corpus latency for a fresh
+`SourceBackedDocumentCatalog::from_read_at` open. List is excluded as a
+tens-of-nanoseconds unstable result; query is excluded as a 2.9%-3.4%
+below-materiality result. No all-ODT, RSS, allocation, fixed-memory,
+physical-I/O, cold-cache, throughput, or OOM claim follows.
+
 ## Change 0368 compliance update
 
 Change 0368 is harness-only and adds no production API, dependency edge,

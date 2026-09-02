@@ -27,7 +27,7 @@ pub type TextElements = Elements;
 /// Internal name retained for the decoder's block slots.
 pub(crate) type TextBlock = Block;
 
-const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+pub(crate) const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 const XLINK_NAMESPACE: &[u8] = b"http://www.w3.org/1999/xlink";
 const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const MAX_TEXT_BLOCKS: usize = 1_000_000;
@@ -1134,14 +1134,11 @@ pub(crate) fn parse_block_at(xml_content: &str, index: usize) -> Result<Option<T
 /// Scan visible paragraph and heading starts without retaining XML elements
 /// or text. The caller is responsible for ODT package-root validation; this
 /// routine mirrors the text parser's namespace and suppression rules.
+#[cfg(test)]
 pub(crate) fn scan_text_block_kinds(xml_content: &str) -> Result<Vec<Kind>> {
     let mut reader = NsReader::from_str(xml_content);
     let mut buffer = Vec::new();
-    let mut kinds = Vec::new();
-    let mut active_depths: Vec<usize> = Vec::new();
-    let mut document_depth = 0usize;
-    let mut tracked_changes_depth = 0usize;
-    let mut skipped_depth = 0usize;
+    let mut handler = TextBlockKindHandler::new();
 
     loop {
         let (namespace, event) = reader
@@ -1149,32 +1146,67 @@ pub(crate) fn scan_text_block_kinds(xml_content: &str) -> Result<Vec<Kind>> {
             .map_err(|error| Error::InvalidFormat(format!("invalid ODF text XML: {error}")))?;
         let text_namespace =
             matches!(namespace, ResolveResult::Bound(Namespace(uri)) if uri == TEXT_NAMESPACE);
+        handler.on_event(text_namespace, &event)?;
+        if matches!(&event, Event::Eof) {
+            break;
+        }
+        buffer.clear();
+    }
+
+    handler.finish()
+}
+
+/// Borrowing event handler for the visible paragraph and heading catalog.
+///
+/// The state machine is shared by the standalone scanner and the catalog's
+/// fused validation pass so their block ordering, suppression rules, limits,
+/// and allocation resources remain identical.
+pub(crate) struct TextBlockKindHandler {
+    kinds: Vec<Kind>,
+    active_depths: Vec<usize>,
+    document_depth: usize,
+    tracked_changes_depth: usize,
+    skipped_depth: usize,
+}
+
+impl TextBlockKindHandler {
+    pub(crate) fn new() -> Self {
+        Self {
+            kinds: Vec::new(),
+            active_depths: Vec::new(),
+            document_depth: 0,
+            tracked_changes_depth: 0,
+            skipped_depth: 0,
+        }
+    }
+
+    pub(crate) fn on_event(&mut self, text_namespace: bool, event: &Event<'_>) -> Result<()> {
         match event {
-            Event::Start(ref element) => {
-                document_depth = document_depth.checked_add(1).ok_or_else(|| {
+            Event::Start(element) => {
+                self.document_depth = self.document_depth.checked_add(1).ok_or_else(|| {
                     Error::InvalidFormat("ODF text nesting depth overflow".to_string())
                 })?;
-                if document_depth > MAX_TEXT_DEPTH {
+                if self.document_depth > MAX_TEXT_DEPTH {
                     return Err(Error::InvalidFormat(format!(
                         "ODF text nesting exceeds {MAX_TEXT_DEPTH} levels"
                     )));
                 }
 
-                if tracked_changes_depth > 0 {
-                    tracked_changes_depth =
-                        tracked_changes_depth.checked_add(1).ok_or_else(|| {
+                if self.tracked_changes_depth > 0 {
+                    self.tracked_changes_depth =
+                        self.tracked_changes_depth.checked_add(1).ok_or_else(|| {
                             Error::InvalidFormat(
                                 "ODF tracked-change nesting depth overflow".to_string(),
                             )
                         })?;
                 } else if is_text_element(text_namespace, element, b"tracked-changes") {
-                    tracked_changes_depth = 1;
+                    self.tracked_changes_depth = 1;
                 } else {
-                    let block_kind = (skipped_depth == 0)
+                    let block_kind = (self.skipped_depth == 0)
                         .then(|| text_block_kind(text_namespace, element))
                         .flatten();
                     if block_kind.is_none()
-                        && let Some(current) = active_depths.last_mut()
+                        && let Some(current) = self.active_depths.last_mut()
                     {
                         *current = current.checked_add(1).ok_or_else(|| {
                             Error::InvalidFormat(
@@ -1184,67 +1216,73 @@ pub(crate) fn scan_text_block_kinds(xml_content: &str) -> Result<Vec<Kind>> {
                     }
 
                     if let Some(kind) = block_kind {
-                        push_text_block_kind(&mut kinds, kind)?;
-                        active_depths
+                        push_text_block_kind(&mut self.kinds, kind)?;
+                        self.active_depths
                             .try_reserve(1)
                             .map_err(|source| Error::Allocation {
                                 resource: "ODT source text-block scan stack",
                                 source,
                             })?;
-                        active_depths.push(1);
-                    } else if skipped_depth > 0 {
-                        skipped_depth = skipped_depth.checked_add(1).ok_or_else(|| {
-                            Error::InvalidFormat("ODF suppressed text depth overflow".to_string())
-                        })?;
-                    } else if active_depths.last().is_some()
+                        self.active_depths.push(1);
+                    } else if self.skipped_depth > 0 {
+                        self.skipped_depth =
+                            self.skipped_depth.checked_add(1).ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "ODF suppressed text depth overflow".to_string(),
+                                )
+                            })?;
+                    } else if self.active_depths.last().is_some()
                         && (is_text_element(text_namespace, element, b"note-body")
                             || is_text_element(text_namespace, element, b"ruby-text"))
                     {
-                        skipped_depth = 1;
+                        self.skipped_depth = 1;
                     }
                 }
             },
-            Event::Empty(ref element) if tracked_changes_depth == 0 && skipped_depth == 0 => {
+            Event::Empty(element) if self.tracked_changes_depth == 0 && self.skipped_depth == 0 => {
                 if let Some(kind) = text_block_kind(text_namespace, element) {
-                    push_text_block_kind(&mut kinds, kind)?;
+                    push_text_block_kind(&mut self.kinds, kind)?;
                 }
             },
             Event::End(_) => {
-                document_depth = document_depth.checked_sub(1).ok_or_else(|| {
+                self.document_depth = self.document_depth.checked_sub(1).ok_or_else(|| {
                     Error::InvalidFormat("ODF text element stack underflow".to_string())
                 })?;
-                if tracked_changes_depth > 0 {
-                    tracked_changes_depth -= 1;
+                if self.tracked_changes_depth > 0 {
+                    self.tracked_changes_depth -= 1;
                 } else {
-                    skipped_depth = skipped_depth.saturating_sub(1);
-                    if let Some(current) = active_depths.last_mut() {
+                    self.skipped_depth = self.skipped_depth.saturating_sub(1);
+                    if let Some(current) = self.active_depths.last_mut() {
                         *current = current.checked_sub(1).ok_or_else(|| {
                             Error::InvalidFormat("ODT text block stack underflow".to_string())
                         })?;
                         if *current == 0 {
-                            active_depths.pop().ok_or_else(|| {
+                            self.active_depths.pop().ok_or_else(|| {
                                 Error::InvalidFormat(BLOCK_STACK_ERROR.to_string())
                             })?;
                         }
                     }
                 }
             },
-            Event::Eof => break,
+            Event::Eof => {},
             _ => {},
         }
-        buffer.clear();
+
+        Ok(())
     }
 
-    if !active_depths.is_empty()
-        || document_depth != 0
-        || tracked_changes_depth != 0
-        || skipped_depth != 0
-    {
-        return Err(Error::InvalidFormat(
-            "incomplete ODF text XML structure".to_string(),
-        ));
+    pub(crate) fn finish(self) -> Result<Vec<Kind>> {
+        if !self.active_depths.is_empty()
+            || self.document_depth != 0
+            || self.tracked_changes_depth != 0
+            || self.skipped_depth != 0
+        {
+            return Err(Error::InvalidFormat(
+                "incomplete ODF text XML structure".to_string(),
+            ));
+        }
+        Ok(self.kinds)
     }
-    Ok(kinds)
 }
 
 fn push_text_block_kind(kinds: &mut Vec<Kind>, kind: Kind) -> Result<()> {

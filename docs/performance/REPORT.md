@@ -1,5 +1,49 @@
 # Performance program phase report
 
+## Change 0369: ODT source-backed catalog fused parse
+
+### Implementation boundary
+
+Source-backed ODT catalog opening now validates and classifies `content.xml`
+through one borrowing XML pass instead of sequential validation and kind
+scanning. The handler is private to the ODT owner. It preserves the previous
+error order: XML/tokenizer and validation/tokenizer finish errors win over a
+deferred kind-scan error, while source freshness, ZIP verification,
+cancellation, and limits fences still precede catalog publication. The 256
+MiB content limit, 1,000,000-block ceiling, and 4,096-depth ceiling are
+unchanged. Styles, media, and semantic payloads remain cold, and no public API
+or package ownership surface changes.
+
+### Correctness and measurement
+
+Exact rustfmt passed. `cargo test -p litchi-odt --lib --tests` passed with 557
+library tests and all integration targets, 926 tests total. Scoped Clippy
+with `-D warnings` passed, and an independent code/resource review accepted
+the implementation and bounds.
+
+The clean ABBA ran on CPU 2 with 30 warmups and 500 samples per leg. Control
+was `bf1cb55c6` (binary `a7991b...`) and candidate was `b712aafbf20e` (binary
+`1a75eb...`). Both used the deterministic large media-rich corpus with SHA-256
+`d63726138d0a50c8ff7e150af4a86385df1a34d886bb5f61f985c78ac79b0220`.
+Confidence intervals did not overlap and same-side drifts were below 15%.
+
+| ABBA legs | p50 | mean | p95 | p99 |
+| --- | ---: | ---: | ---: | ---: |
+| A1/B1 reduction | 53.560% | 53.116% | 51.008% | 49.508% |
+| A2/B2 reduction | 56.320% | 56.078% | 54.542% | 54.304% |
+
+The [machine-readable result](results/odt-source-catalog-0369-abba.json)
+contains the clean ABBA evidence.
+
+### Interpretation
+
+The accepted performance claim is limited to latency for a fresh
+`SourceBackedDocumentCatalog::from_read_at` on this deterministic large
+media-rich ODT corpus. The list projection is excluded because its tens of
+nanoseconds result was unstable. The query projection is excluded because its
+2.9%-3.4% result is below materiality. All-ODT, RSS, allocation, fixed-memory,
+physical-I/O, cold-cache, throughput, and OOM claims are explicitly withheld.
+
 ## Change 0368: ODT source-backed document catalog selectors
 
 Change 0368 is a harness-only evidence tranche. It adds the opt-in

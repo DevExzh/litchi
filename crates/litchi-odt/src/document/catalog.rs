@@ -15,12 +15,13 @@ use std::path::Path;
 use litchi_core::FileSource;
 use litchi_core::{Error, ReadAt, Result, SourceVersion};
 use litchi_odf_common::{
-    core::{SourceBackedPackage, validate_content_document_part},
+    core::SourceBackedPackage,
     package::{is_media_path, resolve_package_path},
 };
 use zeroize::Zeroizing;
 
 use super::ReadLimits;
+use super::open_parse::run_catalog;
 use crate::elements::text::{Block, Kind, TextElements};
 
 const ODF_TEXT: &str = "application/vnd.oasis.opendocument.text";
@@ -203,8 +204,7 @@ impl SourceBackedDocumentCatalog {
                 )));
             }
             let content = read_content(&package)?;
-            validate_content_document_part(&content, "<office:text", FAMILY_NAME)?;
-            let kinds = TextElements::scan_block_kinds(&content)?;
+            let kinds = run_catalog(&content)?;
             let mut entries = Vec::new();
             entries
                 .try_reserve_exact(kinds.len())
@@ -377,4 +377,119 @@ fn prefer_current<T>(source: &dyn ReadAt, expected: SourceVersion, result: Resul
     let observed = source.version()?;
     ensure_current(expected, observed)?;
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::run_catalog;
+    use crate::elements::text::{Kind, scan_text_block_kinds};
+    use litchi_odf_common::core::validate_content_document_part;
+
+    const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+    const TEXT_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+
+    fn document(body: &str) -> String {
+        format!(
+            r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE}" xmlns:text="{TEXT_NAMESPACE}"><office:body>{body}</office:body></office:document-content>"#
+        )
+    }
+
+    fn sequential(xml: &str) -> litchi_core::Result<Vec<Kind>> {
+        validate_content_document_part(xml, "<office:text", "ODT")?;
+        scan_text_block_kinds(xml)
+    }
+
+    fn assert_matches_oracle(label: &str, xml: &str) -> Vec<Kind> {
+        let expected = sequential(xml).map_err(|error| error.to_string());
+        let actual = run_catalog(xml).map_err(|error| error.to_string());
+        assert_eq!(
+            actual, expected,
+            "{label}: fused catalog differs from sequential oracle"
+        );
+        actual.unwrap_or_else(|error| panic!("{label}: expected success, got {error}"))
+    }
+
+    fn assert_error_matches_oracle(label: &str, xml: &str, expected_fragment: &str) {
+        let expected = sequential(xml).map_err(|error| error.to_string());
+        let actual = run_catalog(xml).map_err(|error| error.to_string());
+        assert_eq!(
+            actual, expected,
+            "{label}: fused catalog differs from sequential oracle"
+        );
+        let error = match actual {
+            Ok(_) => panic!("{label}: expected an error"),
+            Err(error) => error,
+        };
+        assert!(
+            error.contains(expected_fragment),
+            "{label}: error {error:?} does not contain {expected_fragment:?}"
+        );
+    }
+
+    fn deep_document(duplicate_body: bool, trailing: &str) -> String {
+        let nested_open = "<x>".repeat(4_093);
+        let nested_close = "</x>".repeat(4_093);
+        let first_body = format!(
+            "<office:body><office:text><text:p>{nested_open}{nested_close}</text:p></office:text></office:body>"
+        );
+        let second_body = if duplicate_body { "<office:body/>" } else { "" };
+        format!(
+            r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE}" xmlns:text="{TEXT_NAMESPACE}">{first_body}{second_body}</office:document-content>{trailing}"#
+        )
+    }
+
+    #[test]
+    fn catalog_fusion_preserves_canonical_block_order() {
+        let xml = document(
+            r#"<office:text xmlns:draw="urn:example:draw"><text:h/><text:p/><text:p><draw:frame><draw:text-box><text:h/></draw:text-box></draw:frame></text:p><text:p/></office:text>"#,
+        );
+        let kinds = assert_matches_oracle("canonical order", &xml);
+        assert_eq!(kinds.len(), 5);
+        assert_eq!(kinds[0], kinds[3]);
+        assert_eq!(kinds[1], kinds[2]);
+        assert_eq!(kinds[1], kinds[4]);
+        assert_ne!(kinds[0], kinds[1]);
+    }
+
+    #[test]
+    fn catalog_fusion_preserves_alias_rebinding_and_suppression() {
+        let alias_and_rebinding = format!(
+            r#"<o:document-content xmlns:o="{OFFICE_NAMESPACE}" xmlns:t="{TEXT_NAMESPACE}"><o:body><o:text><t:p><t:span xmlns:t="urn:example:rebound"><t:h/></t:span><t:h/></t:p><t:h/></o:text></o:body></o:document-content>"#
+        );
+        let kinds = assert_matches_oracle("alias and rebinding", &alias_and_rebinding);
+        assert_eq!(kinds.len(), 3);
+        assert_eq!(kinds[1], kinds[2]);
+        assert_ne!(kinds[0], kinds[1]);
+
+        let suppressed = format!(
+            r#"<o:document-content xmlns:o="{OFFICE_NAMESPACE}" xmlns:t="{TEXT_NAMESPACE}"><o:body><o:text><t:p><t:note><t:note-body><t:p/></t:note-body></t:note><t:ruby><t:ruby-text><t:h/></t:ruby-text></t:ruby></t:p><t:tracked-changes><t:changed-region><t:h/></t:changed-region></t:tracked-changes><t:h/></o:text></o:body></o:document-content>"#
+        );
+        let kinds = assert_matches_oracle("tracked/note/ruby suppression", &suppressed);
+        assert_eq!(kinds.len(), 2);
+        assert_ne!(kinds[0], kinds[1]);
+    }
+
+    #[test]
+    fn catalog_fusion_defers_depth_error_to_later_validation_or_reader_errors() {
+        let depth_error = deep_document(false, "");
+        assert_error_matches_oracle(
+            "scanner depth error",
+            &depth_error,
+            "ODF text nesting exceeds 4096 levels",
+        );
+
+        let duplicate_body = deep_document(true, "");
+        assert_error_matches_oracle(
+            "duplicate body after scanner error",
+            &duplicate_body,
+            "ODT content.xml has duplicate office:body",
+        );
+
+        let malformed_tail = deep_document(false, "<");
+        assert_error_matches_oracle(
+            "malformed tail after scanner error",
+            &malformed_tail,
+            "invalid ODT content.xml:",
+        );
+    }
 }
