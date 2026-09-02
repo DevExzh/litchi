@@ -1,5 +1,46 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0375 compliance update
+
+litchi-pptx remains the sole owner of the selected-slide source-backed
+semantic snapshot and publication boundary; the existing bounded litchi-opc
+publisher remains a substrate. The retained snapshot is immutable planning
+state. Publication validates execution, version, lineage, URI, limits,
+complete selected-slide closure, and exact selected bytes before applying
+against it. Identity mismatch retains the exact semantic recapture/refusal
+path, and later raw errors cannot retry or publish. No dependency edge, public
+raw type, archive/runtime handle, lock, unsafe code, or parallel path is
+introduced.
+
+Focused evidence proves SlidePart/Scene capture reuse at 1/1 before and after
+one-slide publication and 2/2 before and after the multi-slide batch. The
+foreign-identical-source case performs one semantic recapture, returns
+StaleSource, and writes zero bytes. This evidence is independent of timing
+and does not imply an allocation or RSS result.
+
+The three existing selectors were run under one-Cargo/one-process-at-a-time
+discipline with CARGO_BUILD_JOBS=1, CARGO_INCREMENTAL=0, 8 GiB build and
+4 GiB run caps, and no parallel build/worktree lane. Validation passed
+533/533 library tests and 21/21 source-backed edit tests, while recording
+exactly these unrelated pre-existing stale expectation exclusions:
+opened::tests::stale_and_unsupported_raw_xml_fail_before_publication,
+pptx_malformed_presentation::malformed_presentation_children_are_reported_by_their_owner,
+and pptx_table_styles::noncanonical_style_target_survives_transactional_raw_save.
+They concern stricter direct sldIdLst owner validation and never enter the
+0375 publication path. Production-library Clippy, the 64-package/240-
+declaration boundary gate, and independent equivalence/safety/test reviews
+passed.
+
+The clean release ABBA package and exact provenance are in [the compact
+result](results/pptx-selected-slide-retained-snapshot-0375-abba.json).
+Because the raw reports contain no correctness/refusal booleans and the
+paired direction/stability gates fail, performance_claim is none. Output
+hash equality is limited to generated-output byte identity. No
+allocation/RSS/heap, reads, decompression/materialization, physical-I/O,
+cold-cache, throughput/scaling, fixed-memory, general-OOM, all-PPTX,
+real-producer, topology/media/notes/theme/chart, parallel, semantic reopen,
+preservation, refusal, or reversibility claim is accepted.
+
 ## Change 0374 compliance update
 
 Change 0374 keeps story-hyperlink capture and publication in the owning

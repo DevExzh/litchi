@@ -1,5 +1,40 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0375: PPTX selected-slide retained snapshot
+
+Change 0375 retains validated source-backed PPTX selected-slide semantic
+snapshots from planning through publication. Publication verifies the current
+raw selected bytes against execution, version, lineage, URI, limits, and the
+complete retained selected-slide closure before applying the edit without
+semantic recapture. Focused tests report SlidePart/Scene counters of 1/1
+before and after one-slide publication and 2/2 before and after the
+multi-slide batch; the foreign-identical-source test performs one required
+recapture, returns StaleSource, and emits zero bytes.
+
+The three existing selectors were run under serial OOM-mitigating/resource-capped
+protocol constraints: one Cargo process and one run process at a time,
+CARGO_BUILD_JOBS=1, CARGO_INCREMENTAL=0, 8 GiB build and 4 GiB run virtual
+caps, with no parallel build or worktree lane. The litchi-pptx library suite
+passed 533/533, source_backed_edit passed 21/21, and the remaining integration
+targets passed with exactly three unrelated pre-existing stale expectation
+exclusions:
+opened::tests::stale_and_unsupported_raw_xml_fail_before_publication,
+pptx_malformed_presentation::malformed_presentation_children_are_reported_by_their_owner,
+and pptx_table_styles::noncanonical_style_target_survives_transactional_raw_save.
+They concern stricter direct sldIdLst owner validation and do not enter this
+publication path. Production-library Clippy, the 64-package/240-declaration
+boundary gate, and independent equivalence/safety/test reviews passed.
+
+The clean release ABBA package contains exact output, counter, timing, and
+provenance data in [the compact result](results/pptx-selected-slide-retained-snapshot-0375-abba.json).
+The source counters and output hashes are stable across all legs, but the raw
+reports contain no correctness booleans. Direction and drift gates fail, so
+performance_claim is none; the exact reuse proof is counter/equivalence
+evidence, not a timing or memory inference. No allocation/RSS/heap, reads,
+decompression/materialization, physical-I/O, cold-cache, throughput/scaling,
+fixed-memory, general-OOM, all-PPTX, real-producer, topology/media, or
+parallel claim follows. See [Change 0375](changes/0375-pptx-selected-slide-retained-snapshot.md).
+
 ## Change 0374: DOCX story-hyperlink retained snapshot
 
 Change 0374 retains the validated story-hyperlink `Snapshot` inside

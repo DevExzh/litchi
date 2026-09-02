@@ -1,5 +1,32 @@
 # Performance hotspot inventory
 
+## Change 0375 update
+
+The source-backed PPTX selected-slide publication path now carries validated
+semantic snapshots from planning into publication. It validates current raw
+selected bytes, source execution/version/lineage, URI and limits, and the
+complete selected-slide closure before applying against the retained snapshot.
+Focused SlidePart/Scene counters stay 1/1 through one-slide publication and
+2/2 through the multi-slide batch; the foreign-identical-source case
+recaptures once, rejects as StaleSource, and writes zero bytes.
+
+The three existing selected-slide selectors were measured in clean serial
+ABBA, but paired directions and/or stability gates fail for every package-level
+timing interpretation. Numerically passing tail cells remain descriptive only.
+The raw reports contain no semantic/refusal booleans,
+so output-hash equality is not a correctness or reopen proof and
+performance_claim is none. Validation passed 533/533 library tests and
+21/21 source-backed edit tests, with exactly these three unrelated
+pre-existing stale expectation exclusions:
+opened::tests::stale_and_unsupported_raw_xml_fail_before_publication,
+pptx_malformed_presentation::malformed_presentation_children_are_reported_by_their_owner,
+and pptx_table_styles::noncanonical_style_target_survives_transactional_raw_save.
+The exclusions concern stricter direct sldIdLst owner validation and never
+enter Change 0375 publication. No resource, I/O, cold-cache, throughput,
+fixed-memory, general-OOM, broad-PPTX, real-producer, topology/media, or
+parallel claim is made. See [Change 0375](changes/0375-pptx-selected-slide-retained-snapshot.md)
+and [the compact ABBA result](results/pptx-selected-slide-retained-snapshot-0375-abba.json).
+
 ## Change 0374 update
 
 Change 0374 is a narrowly measured DOCX source-backed story-hyperlink
