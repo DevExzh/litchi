@@ -53,11 +53,96 @@ use super::source::{CONTENT_ROOT, FAMILY_NAME};
 use crate::binding_tracker::BindingTracker;
 use crate::elements::element::Element;
 use crate::elements::style::{Style, StyleRegistry};
+use crate::elements::text::{Kind, TEXT_NAMESPACE, TextBlockKindHandler};
 
 // Parity with the `validate_content_document_part` pre-scan limit in
 // litchi-odf-common (`MAX_CONTENT_BYTES` there is crate-private).
 const MAX_CONTENT_BYTES: usize = 256 * 1024 * 1024;
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+
+/// Validate the ODT content root and build its visible text-block catalog in
+/// one borrowing `Reader` pass.
+///
+/// Validation is driven before the catalog handler for every event. A catalog
+/// error is deferred while tokenization and validation continue to EOF so a
+/// later reader or validation/finish error preserves the historical
+/// validate-then-scan precedence.
+pub(crate) fn run_catalog(content_xml: &str) -> Result<Vec<Kind>> {
+    if content_xml.len() > MAX_CONTENT_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "{FAMILY_NAME} content.xml exceeds the family limit"
+        )));
+    }
+    let mut validate = ValidateHandler::new()?;
+    let mut catalog = TextBlockKindHandler::new();
+    let mut catalog_error = None;
+
+    let mut reader = Reader::from_str(content_xml);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().check_comments = true;
+    let mut tracker = BindingTracker::new();
+    let mut pending_pop = false;
+    loop {
+        if pending_pop {
+            tracker.pop();
+            pending_pop = false;
+        }
+        let event = match reader.read_event() {
+            Ok(event) => event,
+            Err(error) => {
+                return Err(Error::InvalidFormat(format!(
+                    "invalid {FAMILY_NAME} content.xml: {error}"
+                )));
+            },
+        };
+        match &event {
+            Event::Start(element) => {
+                tracker.push(element).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid {FAMILY_NAME} content.xml: {error}"))
+                })?;
+            },
+            Event::Empty(element) => {
+                tracker.push(element).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid {FAMILY_NAME} content.xml: {error}"))
+                })?;
+                pending_pop = true;
+            },
+            Event::End(_) => pending_pop = true,
+            _ => {},
+        }
+
+        let (office, text_namespace) = match &event {
+            Event::Start(element) | Event::Empty(element) => {
+                let (namespace, _) = tracker.resolve_element(element.name());
+                match namespace {
+                    ResolveResult::Bound(Namespace(uri)) => (
+                        validate.depth <= 2 && uri == OFFICE_NAMESPACE,
+                        uri == TEXT_NAMESPACE,
+                    ),
+                    _ => (false, false),
+                }
+            },
+            _ => (false, false),
+        };
+
+        let is_eof = matches!(&event, Event::Eof);
+        validate.on_event(office, &event)?;
+        if catalog_error.is_none()
+            && let Err(error) = catalog.on_event(text_namespace, &event)
+        {
+            catalog_error = Some(error);
+        }
+        if is_eof {
+            break;
+        }
+    }
+
+    validate.finish()?;
+    if let Some(error) = catalog_error {
+        return Err(error);
+    }
+    catalog.finish()
+}
 
 /// The two-handler fused open parse over `content.xml`.
 pub(crate) struct OpenParse {

@@ -1,5 +1,34 @@
 # Performance hotspot inventory
 
+## Change 0369 update
+
+The source-backed ODT catalog open path is now a measured, narrowly bounded
+hotspot result. One borrowing XML pass replaces sequential `content.xml`
+validation and text-block-kind scanning, using a private handler and retaining
+the former validation-before-scan error precedence. Source freshness, ZIP,
+cancellation, and 256 MiB limits fences remain before catalog publication;
+the 1,000,000-block and 4,096-depth ceilings remain. Styles, media, and
+semantic payloads stay cold, with no public API or ownership-boundary change.
+
+Clean CPU-2 ABBA evidence used 30 warmups and 500 samples per leg on the
+corpus SHA-256
+`d63726138d0a50c8ff7e150af4a86385df1a34d886bb5f61f985c78ac79b0220`.
+Control `bf1cb55c6`/`a7991b...` and candidate `b712aafbf20e`/`1a75eb...`
+had non-overlapping confidence intervals and same-side drifts below 15%.
+Open reductions were 53.560%/53.116%/51.008%/49.508% for p50/mean/p95/p99
+in A1/B1 and 56.320%/56.078%/54.542%/54.304% in A2/B2. See the [0369
+record](changes/0369-odt-source-catalog-fused-parse.md) and [ABBA
+result](results/odt-source-catalog-0369-abba.json).
+
+The accepted claim is fresh `SourceBackedDocumentCatalog::from_read_at`
+latency on this deterministic large media-rich ODT corpus only. The list
+projection is rejected as a tens-of-nanoseconds unstable result; the query
+projection is rejected as a 2.9%-3.4% below-materiality result. No all-ODT,
+RSS, allocation, fixed-memory, physical-I/O, cold-cache, throughput, or OOM
+claim follows. Exact rustfmt, the 557-library/all-integration-target ODT test
+run (926 total), scoped `-D warnings` Clippy, and independent code/resource
+review all passed or accepted.
+
 ## Change 0368 update
 
 Change 0368 establishes an ODT catalog measurement boundary rather than an

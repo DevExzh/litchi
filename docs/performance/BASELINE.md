@@ -1,5 +1,36 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0369: ODT source-backed catalog fused parse
+
+Change 0369 replaces sequential `content.xml` validation and text-block-kind
+classification in source-backed ODT catalog opening with one borrowing XML
+pass. The private handler preserves the former error precedence: XML/tokenizer
+and validation/tokenizer finish errors take precedence over a deferred kind
+scan error. Source freshness, ZIP verification, cancellation, and limits
+fences still complete before publication. The 256 MiB content limit,
+1,000,000-block ceiling, and 4,096 nesting-depth ceiling are unchanged.
+Styles, media, and semantic payloads remain cold; no public API, dependency
+edge, archive handle, or storage contract changes.
+
+Clean CPU-2 ABBA used control `bf1cb55c6`/`a7991b...` and candidate
+`b712aafbf20e`/`1a75eb...`, with 30 warmups and 500 samples per leg over the
+corpus SHA-256
+`d63726138d0a50c8ff7e150af4a86385df1a34d886bb5f61f985c78ac79b0220`.
+Confidence intervals did not overlap and same-side drifts stayed below 15%.
+Open reductions were 53.560% p50, 53.116% mean, 51.008% p95, and 49.508%
+p99 for A1/B1; and 56.320% p50, 56.078% mean, 54.542% p95, and 54.304% p99
+for A2/B2. See [Change 0369](changes/0369-odt-source-catalog-fused-parse.md)
+and the [clean ABBA result](results/odt-source-catalog-0369-abba.json).
+
+The accepted claim is deterministic large media-rich ODT corpus latency only
+for fresh `SourceBackedDocumentCatalog::from_read_at` open. List is excluded
+because its tens-of-nanoseconds result was unstable, and query is excluded
+because its 2.9%-3.4% result is below materiality. All-ODT, RSS, allocation,
+fixed-memory, physical-I/O, cold-cache, throughput, and OOM claims are
+withheld. Correctness evidence is exact rustfmt, `cargo test -p litchi-odt
+--lib --tests` (557 library tests and all integration targets; 926 total),
+scoped Clippy `-D warnings`, and independent code/resource review acceptance.
+
 ## Change 0368: ODT source-backed document catalog evidence
 
 Change 0368 adds three opt-in source-backed ODT catalog selectors:

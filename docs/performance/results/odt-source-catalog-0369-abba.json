@@ -1,0 +1,423 @@
+{
+  "schema_version": 1,
+  "protocol": "ABBA",
+  "warmups_per_run": 30,
+  "samples_per_run": 500,
+  "cpu_affinity": "2",
+  "runs": {
+    "control_a1": {
+      "revision": "bf1cb55c6978eba184f7aaa6a88d25bf8d7f2801",
+      "dirty": false,
+      "binary_sha256": "a7991b10934f8ec964814b3e7d43831cfd12ace43aa39b23d055863c1e5fd6ca"
+    },
+    "candidate_b1": {
+      "revision": "b712aafbf20ed9d8fa4e6528f4d27322d14d57c6",
+      "dirty": false,
+      "binary_sha256": "1a75eb06ca3210e987303fafe0056985c11848ad29d780cd8f9a9e3bbceacce3"
+    },
+    "candidate_b2": {
+      "revision": "b712aafbf20ed9d8fa4e6528f4d27322d14d57c6",
+      "dirty": false,
+      "binary_sha256": "1a75eb06ca3210e987303fafe0056985c11848ad29d780cd8f9a9e3bbceacce3"
+    },
+    "control_a2": {
+      "revision": "bf1cb55c6978eba184f7aaa6a88d25bf8d7f2801",
+      "dirty": false,
+      "binary_sha256": "a7991b10934f8ec964814b3e7d43831cfd12ace43aa39b23d055863c1e5fd6ca"
+    }
+  },
+  "corpus_sha256s": [
+    "d63726138d0a50c8ff7e150af4a86385df1a34d886bb5f61f985c78ac79b0220"
+  ],
+  "results": [
+    {
+      "case": "odt_source_backed_catalog_open",
+      "statistics": {
+        "control_a1": {
+          "unit": "ns",
+          "min": 1900993,
+          "p50": 1974560,
+          "p95": 2060965,
+          "p99": 2128738,
+          "max": 2211783,
+          "mean": 1982248.3920000002,
+          "standard_deviation": 44346.65162809441,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 1978351.857068093,
+            "upper": 1986144.9269319074
+          }
+        },
+        "candidate_b1": {
+          "unit": "ns",
+          "min": 872104,
+          "p50": 916985,
+          "p95": 1009713,
+          "p99": 1074835,
+          "max": 1202240,
+          "mean": 929352.1400000002,
+          "standard_deviation": 43765.78224773226,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 925506.6433708365,
+            "upper": 933197.636629164
+          }
+        },
+        "candidate_b2": {
+          "unit": "ns",
+          "min": 870561,
+          "p50": 923910,
+          "p95": 1039785,
+          "p99": 1112735,
+          "max": 1210080,
+          "mean": 937018.6939999996,
+          "standard_deviation": 50130.182033399666,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 932613.9870319483,
+            "upper": 941423.4009680508
+          }
+        },
+        "control_a2": {
+          "unit": "ns",
+          "min": 2012838,
+          "p50": 2115189,
+          "p95": 2287376,
+          "p99": 2435100,
+          "max": 2608570,
+          "mean": 2133366.4760000007,
+          "standard_deviation": 83041.58033357753,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 2126069.996859159,
+            "upper": 2140662.9551408426
+          }
+        }
+      },
+      "reduction_percent": {
+        "a1_vs_b1": {
+          "p50": 53.56003362774492,
+          "mean": 53.11626213189531,
+          "p95": 51.00775607543069,
+          "p99": 49.50834719913865
+        },
+        "a2_vs_b2": {
+          "p50": 56.32021535664189,
+          "mean": 56.07793107554207,
+          "p95": 54.54245388602486,
+          "p99": 54.30434068416081
+        }
+      },
+      "run_drift_percent": {
+        "control": {
+          "p50": 7.122042379061664,
+          "mean": 7.623569508739976,
+          "p95": 10.985679038702743,
+          "p99": 14.391719413098278
+        },
+        "candidate": {
+          "p50": 0.7551922877691565,
+          "mean": 0.8249353146159757,
+          "p95": 2.978272043640123,
+          "p99": 3.5261226141686866
+        }
+      }
+    },
+    {
+      "case": "odt_source_backed_catalog_list",
+      "statistics": {
+        "control_a1": {
+          "unit": "ns",
+          "min": 20,
+          "p50": 40,
+          "p95": 210,
+          "p99": 301,
+          "max": 440,
+          "mean": 77.87000000000002,
+          "standard_deviation": 67.36159342338239,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 71.95124870296051,
+            "upper": 83.78875129703952
+          }
+        },
+        "candidate_b1": {
+          "unit": "ns",
+          "min": 20,
+          "p50": 30,
+          "p95": 140,
+          "p99": 180,
+          "max": 290,
+          "mean": 48.27999999999999,
+          "standard_deviation": 41.7374847741277,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 44.612720477834095,
+            "upper": 51.94727952216588
+          }
+        },
+        "candidate_b2": {
+          "unit": "ns",
+          "min": 20,
+          "p50": 40,
+          "p95": 161,
+          "p99": 240,
+          "max": 400,
+          "mean": 67.49599999999998,
+          "standard_deviation": 55.1179277178653,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 62.65304291435294,
+            "upper": 72.33895708564702
+          }
+        },
+        "control_a2": {
+          "unit": "ns",
+          "min": 20,
+          "p50": 80,
+          "p95": 210,
+          "p99": 281,
+          "max": 350,
+          "mean": 90.30199999999999,
+          "standard_deviation": 62.66959192066762,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 84.79551314874577,
+            "upper": 95.80848685125422
+          }
+        }
+      },
+      "reduction_percent": {
+        "a1_vs_b1": {
+          "p50": 25,
+          "mean": 37.9992294850392,
+          "p95": 33.33333333333333,
+          "p99": 40.19933554817276
+        },
+        "a2_vs_b2": {
+          "p50": 50,
+          "mean": 25.255254590153058,
+          "p95": 23.333333333333332,
+          "p99": 14.590747330960854
+        }
+      },
+      "run_drift_percent": {
+        "control": {
+          "p50": 100,
+          "mean": 15.965069988442238,
+          "p95": 0,
+          "p99": -6.64451827242525
+        },
+        "candidate": {
+          "p50": 33.33333333333333,
+          "mean": 39.80115990057995,
+          "p95": 15,
+          "p99": 33.33333333333333
+        }
+      }
+    },
+    {
+      "case": "odt_source_backed_catalog_query",
+      "statistics": {
+        "control_a1": {
+          "unit": "ns",
+          "min": 1648075,
+          "p50": 1720860,
+          "p95": 1862270,
+          "p99": 1968346,
+          "max": 2183564,
+          "mean": 1738124.8379999984,
+          "standard_deviation": 67784.42832023647,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 1732168.9341585042,
+            "upper": 1744080.7418414925
+          }
+        },
+        "candidate_b1": {
+          "unit": "ns",
+          "min": 1602410,
+          "p50": 1670285,
+          "p95": 1771434,
+          "p99": 1828464,
+          "max": 1899292,
+          "mean": 1681618.2240000004,
+          "standard_deviation": 47725.31533798428,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 1677424.821532768,
+            "upper": 1685811.6264672328
+          }
+        },
+        "candidate_b2": {
+          "unit": "ns",
+          "min": 1579950,
+          "p50": 1658804,
+          "p95": 1771985,
+          "p99": 1873225,
+          "max": 2009023,
+          "mean": 1669563.6720000003,
+          "standard_deviation": 54477.38507786734,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 1664776.9964301046,
+            "upper": 1674350.347569896
+          }
+        },
+        "control_a2": {
+          "unit": "ns",
+          "min": 1609892,
+          "p50": 1714902,
+          "p95": 1840150,
+          "p99": 1991749,
+          "max": 3091857,
+          "mean": 1728631.6280000014,
+          "standard_deviation": 93291.27477641389,
+          "confidence_interval_95": {
+            "method": "two-sided Student's t interval for the mean",
+            "lower": 1720434.5556695582,
+            "upper": 1736828.7003304446
+          }
+        }
+      },
+      "reduction_percent": {
+        "a1_vs_b1": {
+          "p50": 2.938937507990191,
+          "mean": 3.2510100980444085,
+          "p95": 4.877703018359314,
+          "p99": 7.106575774787563
+        },
+        "a2_vs_b2": {
+          "p50": 3.271207334296654,
+          "mean": 3.417035477266017,
+          "p95": 3.7043175828057495,
+          "p99": 5.9507498183757095
+        }
+      },
+      "run_drift_percent": {
+        "control": {
+          "p50": -0.34622223771835015,
+          "mean": -0.5461753835196587,
+          "p95": -1.187797687768154,
+          "p99": 1.1889677932639893
+        },
+        "candidate": {
+          "p50": -0.687367724669742,
+          "mean": -0.7168423740869342,
+          "p95": 0.031104743388689616,
+          "p99": 2.448011008146729
+        }
+      }
+    }
+  ],
+  "adjudication": {
+    "claim_authorized": true,
+    "authorized_case": "odt_source_backed_catalog_open",
+    "authorized_operation": "fresh from_read_at latency",
+    "accepted_metrics": {
+      "p50": {
+        "direction": "candidate lower than control",
+        "reduction_percent": {
+          "a1_vs_b1": 53.56003362774492,
+          "a2_vs_b2": 56.32021535664189
+        },
+        "exact_directional_range_percent": {
+          "minimum": 53.56003362774492,
+          "maximum": 56.32021535664189
+        }
+      },
+      "mean": {
+        "direction": "candidate lower than control",
+        "reduction_percent": {
+          "a1_vs_b1": 53.11626213189531,
+          "a2_vs_b2": 56.07793107554207
+        },
+        "exact_directional_range_percent": {
+          "minimum": 53.11626213189531,
+          "maximum": 56.07793107554207
+        }
+      },
+      "p95": {
+        "direction": "candidate lower than control",
+        "reduction_percent": {
+          "a1_vs_b1": 51.00775607543069,
+          "a2_vs_b2": 54.54245388602486
+        },
+        "exact_directional_range_percent": {
+          "minimum": 51.00775607543069,
+          "maximum": 54.54245388602486
+        }
+      },
+      "p99": {
+        "direction": "candidate lower than control",
+        "reduction_percent": {
+          "a1_vs_b1": 49.50834719913865,
+          "a2_vs_b2": 54.30434068416081
+        },
+        "exact_directional_range_percent": {
+          "minimum": 49.50834719913865,
+          "maximum": 54.30434068416081
+        }
+      }
+    },
+    "rejected_cases": [
+      {
+        "case": "odt_source_backed_catalog_list",
+        "status": "rejected",
+        "reason": "rejected for sub-microsecond instability",
+        "scope": "The operation is tens to hundreds of nanoseconds, so timer and scheduler noise dominate the observed direction."
+      },
+      {
+        "case": "odt_source_backed_catalog_query",
+        "status": "rejected",
+        "reason": "below materiality",
+        "scope": "The observed reduction is below the materiality threshold for a claim-bearing performance result."
+      }
+    ],
+    "performance_scope_caveats": [
+      "The authorized claim covers only fresh odt_source_backed_catalog_open from_read_at latency on the recorded corpus and benchmark protocol.",
+      "The result is a controlled latency comparison, not an end-to-end CRUD, throughput, scalability, or production workload claim.",
+      "No claim is made about RSS, allocation behavior, fixed-memory behavior, physical I/O, or OOM behavior."
+    ],
+    "claims_not_authorized": [
+      "RSS",
+      "allocation",
+      "fixed-memory",
+      "physical-I/O",
+      "OOM"
+    ]
+  },
+  "source_provenance": {
+    "control": {
+      "revision": "bf1cb55c6978eba184f7aaa6a88d25bf8d7f2801",
+      "binary_sha256": "a7991b10934f8ec964814b3e7d43831cfd12ace43aa39b23d055863c1e5fd6ca"
+    },
+    "candidate": {
+      "revision": "b712aafbf20ed9d8fa4e6528f4d27322d14d57c6",
+      "binary_sha256": "1a75eb06ca3210e987303fafe0056985c11848ad29d780cd8f9a9e3bbceacce3"
+    },
+    "candidate_patch_sha256": "68cc729043e7a88706d260a1b6e27e5d5e009831a24759169029e9dd5863fef7",
+    "corpus_sha256": "d63726138d0a50c8ff7e150af4a86385df1a34d886bb5f61f985c78ac79b0220",
+    "raw_reports": {
+      "A1": {
+        "sha256": "dc4b66bef6cbbd3cd680f442cf35f7ecb5c2d2e87a4dcb01a28d5868669ed00e",
+        "bytes": 733579
+      },
+      "B1": {
+        "sha256": "c69a0b9b34b41a26de246451a52d8b89a3e38035ff245c3e3da11b47201bb0a0",
+        "bytes": 733038
+      },
+      "B2": {
+        "sha256": "ec3483a2aca6852856962328607ec8371490a8c8e1d15045efb727af0acf9f57",
+        "bytes": 733123
+      },
+      "A2": {
+        "sha256": "d523e5f8ef1721e1f6bbbfbfe8fde457b7bdc9179b2112ccfc26ff0dd1d1729c",
+        "bytes": 733651
+      }
+    },
+    "raw_reports_retained_in_repo": false,
+    "compact_artifact_authoritative": true,
+    "provenance_note": "Raw reports are not retained in the repository; this compact artifact is authoritative."
+  }
+}
