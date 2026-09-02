@@ -194,6 +194,41 @@ pub struct ObjectReferenceTransition<'a> {
     pub fields: &'a [FieldObjectReferenceTransition<'a>],
 }
 
+/// Exact before-to-after data-reference state for one nested `FieldInfo`.
+///
+/// The ordinal and path jointly authorize the target occurrence. Unlike the
+/// historical permutation helper, both lists may have different cardinality;
+/// this is needed by media owners when an item is inserted, replaced, or
+/// removed. The caller still owns the format-level proof that the selected
+/// field is the semantic owner of the aggregate list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FieldDataReferenceTransition<'a> {
+    /// Zero-based `FieldInfo` occurrence in the target `MessageInfo`.
+    pub field_info_index: usize,
+    /// Exact decoded path required at `field_info_index`.
+    pub expected_path: &'a [u32],
+    /// Complete source data-reference list.
+    pub before: &'a [u64],
+    /// Complete requested data-reference list.
+    pub after: &'a [u64],
+}
+
+/// Exact aggregate and selected-field data-reference state transition.
+///
+/// Lists are positional and may change cardinality. Every value is required
+/// to be nonzero. Unknown and unrelated archive metadata remains raw-byte
+/// authoritative; only the aggregate field and explicitly selected
+/// `FieldInfo` occurrences are rewritten.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DataReferenceTransition<'a> {
+    /// Complete source `MessageInfo.data_references` list.
+    pub aggregate_before: &'a [u64],
+    /// Complete requested `MessageInfo.data_references` list.
+    pub aggregate_after: &'a [u64],
+    /// Exact selected nested `FieldInfo` transitions.
+    pub fields: &'a [FieldDataReferenceTransition<'a>],
+}
+
 impl FieldType {
     /// Project one raw protobuf enum value without losing unknown values.
     #[must_use]
@@ -1734,6 +1769,191 @@ impl ArchiveObject {
         Ok(old)
     }
 
+    /// Replace one payload and apply an exact aggregate and nested-field
+    /// data-reference transition while preserving unrelated `ArchiveInfo`
+    /// bytes.
+    ///
+    /// This is the changed-cardinality counterpart to
+    /// [`Self::replace_message_reordering_data_references_preserving_header`].
+    /// It is intentionally a low-level physical primitive: the caller must
+    /// prove that the selected data-reference field is the semantic owner of
+    /// the payload's references and that no unselected metadata edge needs a
+    /// corresponding update. Source and target lists are nevertheless fully
+    /// checked here before any mutation occurs.
+    pub fn replace_message_transitioning_data_references_preserving_header(
+        &mut self,
+        index: usize,
+        message: RawMessage,
+        transition: DataReferenceTransition<'_>,
+    ) -> Result<RawMessage> {
+        self.replace_message_transitioning_data_references_preserving_header_with_limits(
+            index,
+            message,
+            transition,
+            Limits::default(),
+        )
+    }
+
+    /// Replace one payload and apply a changed-cardinality data-reference
+    /// transition under explicit resource limits.
+    ///
+    /// The operation is atomic. It validates the retained source header,
+    /// rewrites only aggregate field 6 and explicitly selected nested
+    /// `FieldInfo` field 5 records, decodes and compares the resulting neutral
+    /// metadata, and publishes the new raw-header provenance only after every
+    /// check succeeds. Values may be inserted, removed, or replaced at any
+    /// position; zero identifiers and stale source authorizations are refused.
+    pub fn replace_message_transitioning_data_references_preserving_header_with_limits(
+        &mut self,
+        index: usize,
+        message: RawMessage,
+        transition: DataReferenceTransition<'_>,
+        limits: Limits,
+    ) -> Result<RawMessage> {
+        let limits = limits.validate()?;
+        self.validate_with_limits(limits)?;
+        let current_info = self
+            .archive_info
+            .message_infos
+            .get(index)
+            .ok_or_else(|| Error::invalid_archive(index, "message index is out of bounds"))?;
+        if current_info.data_references.as_slice() != transition.aggregate_before {
+            return Err(Error::invalid_archive(
+                index,
+                "aggregate source data references differ from transition authorization",
+            ));
+        }
+        validate_data_reference_transition_lists(&transition, limits, index)?;
+        let replacement_length = u32::try_from(message.data.len())
+            .map_err(|_| Error::invalid_archive(index, "message payload exceeds u32"))?;
+        check_message_length(message.data.len(), limits)?;
+
+        let mut selected_fields = Vec::new();
+        selected_fields
+            .try_reserve_exact(current_info.field_infos.len())
+            .map_err(|_| {
+                Error::allocation(
+                    "IWA FieldInfo data-reference transitions",
+                    current_info.field_infos.len(),
+                )
+            })?;
+        selected_fields.resize(current_info.field_infos.len(), None);
+        for authorization in transition.fields {
+            let current_field = current_info
+                .field_infos
+                .get(authorization.field_info_index)
+                .ok_or_else(|| {
+                    Error::invalid_archive(index, "FieldInfo transition index is out of bounds")
+                })?;
+            if current_field.path.path.as_slice() != authorization.expected_path
+                || current_field.data_references.as_slice() != authorization.before
+            {
+                return Err(Error::invalid_archive(
+                    index,
+                    "FieldInfo source state differs from transition authorization",
+                ));
+            }
+            if selected_fields[authorization.field_info_index]
+                .replace(authorization)
+                .is_some()
+            {
+                return Err(Error::invalid_archive(
+                    index,
+                    "FieldInfo data-reference transition occurrence is selected more than once",
+                ));
+            }
+        }
+        for (field_index, current_field) in current_info.field_infos.iter().enumerate() {
+            let selected = selected_fields.get(field_index).and_then(Option::as_ref);
+            if selected.is_none()
+                && current_field
+                    .data_references
+                    .iter()
+                    .any(|identifier| !transition.aggregate_after.contains(identifier))
+            {
+                return Err(Error::invalid_archive(
+                    index,
+                    "unselected FieldInfo retains a removed data reference",
+                ));
+            }
+            if let Some(selected) = selected
+                && selected
+                    .after
+                    .iter()
+                    .any(|identifier| !transition.aggregate_after.contains(identifier))
+            {
+                return Err(Error::invalid_archive(
+                    index,
+                    "selected FieldInfo target is outside aggregate data references",
+                ));
+            }
+        }
+
+        let canonical_before = encode_archive_info(&self.archive_info, limits)?;
+        let (source_header, retained_source_header) = match (
+            self.original_header.as_deref(),
+            self.original_canonical_header.as_deref(),
+        ) {
+            (Some(original), Some(canonical)) if canonical == canonical_before.as_slice() => {
+                (original, true)
+            },
+            _ => (canonical_before.as_slice(), false),
+        };
+        preflight_header(source_header, HeaderKind::ArchiveInfo, limits)?;
+        let rewritten_header = rewrite_message_metadata_and_transition_data_references_in_header(
+            source_header,
+            self.archive_info.message_infos.len(),
+            index,
+            current_info.type_,
+            current_info.length,
+            message.type_,
+            replacement_length,
+            transition,
+            &selected_fields,
+            limits,
+        )?;
+        let rewritten_info = ArchiveInfo::decode_with_limits(&rewritten_header, limits)?;
+        verify_transitioned_data_archive_info(
+            &self.archive_info,
+            &rewritten_info,
+            index,
+            message.type_,
+            replacement_length,
+            transition,
+        )?;
+        let canonical_after = encode_archive_info(&rewritten_info, limits)?;
+        let retain_rewritten_header = retained_source_header && rewritten_header != canonical_after;
+        let published_header_length = if retain_rewritten_header {
+            rewritten_header.len()
+        } else {
+            canonical_after.len()
+        };
+        validate_raw_object_size_with_replacement(
+            self,
+            index,
+            message.data.len(),
+            published_header_length,
+            limits,
+        )?;
+        let (original_header, original_canonical_header) = if retain_rewritten_header {
+            (
+                Some(rewritten_header.into_boxed_slice()),
+                Some(canonical_after.into_boxed_slice()),
+            )
+        } else {
+            (None, None)
+        };
+        let message_slot = self
+            .messages
+            .get_mut(index)
+            .ok_or_else(|| Error::invalid_archive(index, "message index is out of bounds"))?;
+        let old = std::mem::replace(message_slot, message);
+        self.archive_info = rewritten_info;
+        self.original_header = original_header;
+        self.original_canonical_header = original_canonical_header;
+        Ok(old)
+    }
+
     /// Append one payload and synchronize its physical metadata atomically.
     pub fn push_message(&mut self, message: RawMessage) -> Result<()> {
         self.push_message_with_limits(message, Limits::default())
@@ -2413,6 +2633,8 @@ enum HeaderFieldRewrite {
     Remove,
     Varint(u64),
     LengthDelimited(Vec<u8>),
+    /// Complete encoded field bytes, including key and value.
+    Raw(Vec<u8>),
 }
 
 #[derive(Clone, Copy)]
@@ -3183,6 +3405,631 @@ fn rewrite_message_metadata_and_transition_references_in_header(
         message_index,
         "IWA transitioned ArchiveInfo header",
     )
+}
+
+fn validate_data_reference_transition_lists(
+    transition: &DataReferenceTransition<'_>,
+    limits: Limits,
+    message_index: usize,
+) -> Result<()> {
+    let aggregate_items = transition
+        .aggregate_before
+        .len()
+        .checked_add(transition.aggregate_after.len())
+        .ok_or_else(|| {
+            Error::invalid_archive(message_index, "data-reference transition overflow")
+        })?;
+    if aggregate_items > limits.max_metadata_items() {
+        return Err(limit(
+            LimitKind::MetadataItems,
+            aggregate_items,
+            limits.max_metadata_items(),
+        ));
+    }
+    if transition
+        .aggregate_before
+        .iter()
+        .chain(transition.aggregate_after)
+        .any(|identifier| *identifier == 0)
+    {
+        return Err(Error::invalid_archive(
+            message_index,
+            "data-reference transition contains a zero identifier",
+        ));
+    }
+    let mut authorization_items = transition.fields.len();
+    for field in transition.fields {
+        authorization_items = authorization_items
+            .checked_add(field.expected_path.len())
+            .and_then(|count| count.checked_add(field.before.len()))
+            .and_then(|count| count.checked_add(field.after.len()))
+            .ok_or_else(|| {
+                Error::invalid_archive(message_index, "FieldInfo transition authorization overflow")
+            })?;
+        if field
+            .before
+            .iter()
+            .chain(field.after)
+            .any(|identifier| *identifier == 0)
+        {
+            return Err(Error::invalid_archive(
+                message_index,
+                "FieldInfo data-reference transition contains a zero identifier",
+            ));
+        }
+        if field
+            .before
+            .iter()
+            .any(|identifier| !transition.aggregate_before.contains(identifier))
+            || field
+                .after
+                .iter()
+                .any(|identifier| !transition.aggregate_after.contains(identifier))
+        {
+            return Err(Error::invalid_archive(
+                message_index,
+                "FieldInfo transition references are outside the aggregate state",
+            ));
+        }
+    }
+    if authorization_items > limits.max_metadata_items() {
+        return Err(limit(
+            LimitKind::MetadataItems,
+            authorization_items,
+            limits.max_metadata_items(),
+        ));
+    }
+    Ok(())
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "The raw header rewrite keeps both complete data-reference states and selected FieldInfo occurrences explicit."
+)]
+fn rewrite_message_metadata_and_transition_data_references_in_header(
+    source: &[u8],
+    expected_message_count: usize,
+    message_index: usize,
+    current_type: u32,
+    current_length: u32,
+    replacement_type: u32,
+    replacement_length: u32,
+    transition: DataReferenceTransition<'_>,
+    selected_fields: &[Option<&FieldDataReferenceTransition<'_>>],
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    let wire_limits = header_wire_limits(limits)?;
+    let fields = parse_wire_fields_with_limits(source, wire_limits)
+        .map_err(|error| map_wire_error(error, HeaderKind::ArchiveInfo))?;
+    let mut message_count = 0usize;
+    let mut target = None;
+    for (field_index, field) in fields.iter().copied().enumerate() {
+        if field.number() != 2 {
+            continue;
+        }
+        if field.wire_type() != 2 {
+            return Err(Error::invalid_archive(
+                message_index,
+                "ArchiveInfo contains an ambiguous MessageInfo field",
+            ));
+        }
+        if message_count == message_index {
+            target = Some((field_index, field));
+        }
+        message_count = message_count.checked_add(1).ok_or_else(|| {
+            Error::invalid_archive(message_index, "message metadata count overflow")
+        })?;
+    }
+    if message_count != expected_message_count {
+        return Err(Error::invalid_archive(
+            message_index,
+            "raw and neutral MessageInfo counts differ",
+        ));
+    }
+    let (target_index, target_field) = target.ok_or_else(|| {
+        Error::invalid_archive(
+            message_index,
+            "message metadata is missing from ArchiveInfo",
+        )
+    })?;
+    let message_source = target_field
+        .payload(source)
+        .map_err(|error| map_wire_error(error, HeaderKind::ArchiveInfo))?;
+    let rewritten_message = rewrite_effective_message_scalars_and_data_reference_transition(
+        message_source,
+        current_type,
+        current_length,
+        replacement_type,
+        replacement_length,
+        transition,
+        selected_fields,
+        wire_limits,
+        limits,
+        message_index,
+    )?;
+    let mut rewrites = retained_field_rewrites(fields.len())?;
+    assign_header_field_rewrite(
+        &mut rewrites,
+        target_index,
+        HeaderFieldRewrite::LengthDelimited(rewritten_message),
+        message_index,
+    )?;
+    assemble_header_field_rewrites(
+        source,
+        &fields,
+        &rewrites,
+        HeaderKind::ArchiveInfo,
+        limits,
+        message_index,
+        "IWA transitioned data-reference ArchiveInfo header",
+    )
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "The raw MessageInfo rewrite keeps scalar and complete data-reference authorization explicit."
+)]
+fn rewrite_effective_message_scalars_and_data_reference_transition(
+    source: &[u8],
+    current_type: u32,
+    current_length: u32,
+    replacement_type: u32,
+    replacement_length: u32,
+    transition: DataReferenceTransition<'_>,
+    selected_fields: &[Option<&FieldDataReferenceTransition<'_>>],
+    wire_limits: WireLimits,
+    limits: Limits,
+    message_index: usize,
+) -> Result<Vec<u8>> {
+    let fields = parse_wire_fields_with_limits(source, wire_limits)
+        .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
+    let type_field = effective_required_varint_field(
+        source,
+        &fields,
+        1,
+        u64::from(current_type),
+        message_index,
+        "MessageInfo type field is missing",
+        "raw and neutral MessageInfo types differ",
+    )?;
+    let length_field = effective_required_varint_field(
+        source,
+        &fields,
+        3,
+        u64::from(current_length),
+        message_index,
+        "MessageInfo length field is missing",
+        "raw and neutral MessageInfo lengths differ",
+    )?;
+    let mut rewrites = retained_field_rewrites(fields.len())?;
+    if current_type != replacement_type {
+        assign_header_field_rewrite(
+            &mut rewrites,
+            type_field,
+            HeaderFieldRewrite::Varint(u64::from(replacement_type)),
+            message_index,
+        )?;
+    }
+    if current_length != replacement_length {
+        assign_header_field_rewrite(
+            &mut rewrites,
+            length_field,
+            HeaderFieldRewrite::Varint(u64::from(replacement_length)),
+            message_index,
+        )?;
+    }
+
+    let mut field_info_index = 0usize;
+    let mut aggregate_seen = false;
+    for (field_index, field) in fields.iter().copied().enumerate() {
+        match field.number() {
+            4 => {
+                if field.wire_type() != 2 {
+                    return Err(Error::invalid_archive(
+                        message_index,
+                        "MessageInfo contains an ambiguous FieldInfo field",
+                    ));
+                }
+                let selected = selected_fields
+                    .get(field_info_index)
+                    .and_then(Option::as_ref);
+                if let Some(selected) = selected {
+                    let payload = field
+                        .payload(source)
+                        .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
+                    let rewritten = rewrite_field_info_data_reference_transition(
+                        payload,
+                        selected.before,
+                        selected.after,
+                        wire_limits,
+                        limits,
+                        message_index,
+                    )?;
+                    assign_header_field_rewrite(
+                        &mut rewrites,
+                        field_index,
+                        HeaderFieldRewrite::LengthDelimited(rewritten),
+                        message_index,
+                    )?;
+                }
+                field_info_index = field_info_index.checked_add(1).ok_or_else(|| {
+                    Error::invalid_archive(message_index, "FieldInfo count overflow")
+                })?;
+            },
+            6 => {
+                if !aggregate_seen {
+                    let payload = field
+                        .payload(source)
+                        .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
+                    let rewritten = rewrite_repeated_data_reference_fields(
+                        source,
+                        field,
+                        payload,
+                        transition.aggregate_before,
+                        transition.aggregate_after,
+                        wire_limits,
+                        limits,
+                        message_index,
+                        "IWA transitioned MessageInfo data references",
+                    )?;
+                    assign_header_field_rewrite(
+                        &mut rewrites,
+                        field_index,
+                        rewritten,
+                        message_index,
+                    )?;
+                    aggregate_seen = true;
+                } else {
+                    assign_header_field_rewrite(
+                        &mut rewrites,
+                        field_index,
+                        HeaderFieldRewrite::Remove,
+                        message_index,
+                    )?;
+                }
+            },
+            _ => {},
+        }
+    }
+    if field_info_index != selected_fields.len() {
+        return Err(Error::invalid_archive(
+            message_index,
+            "raw and authorized FieldInfo counts differ",
+        ));
+    }
+    if !aggregate_seen && !transition.aggregate_after.is_empty() {
+        let mut rewritten = assemble_header_field_rewrites(
+            source,
+            &fields,
+            &rewrites,
+            HeaderKind::MessageInfo,
+            limits,
+            message_index,
+            "IWA transitioned MessageInfo header",
+        )?;
+        append_packed_data_references_to_message_info(
+            &mut rewritten,
+            transition.aggregate_after,
+            limits,
+            message_index,
+        )?;
+        return Ok(rewritten);
+    }
+    assemble_header_field_rewrites(
+        source,
+        &fields,
+        &rewrites,
+        HeaderKind::MessageInfo,
+        limits,
+        message_index,
+        "IWA transitioned MessageInfo header",
+    )
+}
+
+fn rewrite_field_info_data_reference_transition(
+    source: &[u8],
+    before: &[u64],
+    after: &[u64],
+    wire_limits: WireLimits,
+    limits: Limits,
+    message_index: usize,
+) -> Result<Vec<u8>> {
+    let fields = parse_wire_fields_with_limits(source, wire_limits)
+        .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
+    let mut rewrites = retained_field_rewrites(fields.len())?;
+    let mut first = None;
+    let mut observed = Vec::new();
+    observed
+        .try_reserve_exact(before.len())
+        .map_err(|_| Error::allocation("IWA FieldInfo data-reference validation", before.len()))?;
+    for (index, field) in fields.iter().copied().enumerate() {
+        if field.number() == 5 {
+            if first.is_none() {
+                first = Some((index, field));
+            }
+            let payload = field
+                .payload(source)
+                .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
+            append_decoded_reference_values(
+                payload,
+                field.wire_type(),
+                &mut observed,
+                message_index,
+                "FieldInfo data-reference field has an ambiguous wire type",
+            )?;
+            assign_header_field_rewrite(
+                &mut rewrites,
+                index,
+                HeaderFieldRewrite::Remove,
+                message_index,
+            )?;
+        }
+    }
+    if observed != before {
+        return Err(Error::invalid_archive(
+            message_index,
+            "raw FieldInfo data references differ from transition authorization",
+        ));
+    }
+    if let Some((index, _field)) = first {
+        if !after.is_empty() {
+            let encoded = encode_packed_reference_field(
+                5,
+                after,
+                limits,
+                message_index,
+                "IWA transitioned FieldInfo data references",
+            )?;
+            assign_header_field_rewrite(
+                &mut rewrites,
+                index,
+                HeaderFieldRewrite::Raw(encoded),
+                message_index,
+            )?;
+        }
+        assemble_header_field_rewrites(
+            source,
+            &fields,
+            &rewrites,
+            HeaderKind::MessageInfo,
+            limits,
+            message_index,
+            "IWA transitioned FieldInfo header",
+        )
+    } else if after.is_empty() {
+        assemble_header_field_rewrites(
+            source,
+            &fields,
+            &rewrites,
+            HeaderKind::MessageInfo,
+            limits,
+            message_index,
+            "IWA transitioned FieldInfo header",
+        )
+    } else {
+        let mut rewritten = assemble_header_field_rewrites(
+            source,
+            &fields,
+            &rewrites,
+            HeaderKind::MessageInfo,
+            limits,
+            message_index,
+            "IWA transitioned FieldInfo header",
+        )?;
+        let encoded = encode_packed_reference_field(
+            5,
+            after,
+            limits,
+            message_index,
+            "IWA transitioned FieldInfo data references",
+        )?;
+        rewritten.try_reserve_exact(encoded.len()).map_err(|_| {
+            Error::allocation("IWA transitioned FieldInfo data references", encoded.len())
+        })?;
+        rewritten.extend_from_slice(&encoded);
+        check_header_length(rewritten.len(), limits)?;
+        Ok(rewritten)
+    }
+}
+
+fn rewrite_repeated_data_reference_fields(
+    source: &[u8],
+    first_field: WireField,
+    first_payload: &[u8],
+    before: &[u64],
+    after: &[u64],
+    wire_limits: WireLimits,
+    limits: Limits,
+    message_index: usize,
+    allocation_context: &'static str,
+) -> Result<HeaderFieldRewrite> {
+    let _ = first_payload;
+    let fields = parse_wire_fields_with_limits(source, wire_limits)
+        .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
+    let mut observed = Vec::new();
+    observed
+        .try_reserve_exact(before.len())
+        .map_err(|_| Error::allocation(allocation_context, before.len()))?;
+    let mut first_start = None;
+    for field in fields.iter().copied().filter(|field| field.number() == 6) {
+        if first_start.is_none() {
+            first_start = Some(field.start());
+        }
+        let payload = field
+            .payload(source)
+            .map_err(|error| map_wire_error(error, HeaderKind::MessageInfo))?;
+        append_decoded_reference_values(
+            payload,
+            field.wire_type(),
+            &mut observed,
+            message_index,
+            "MessageInfo data-reference field has an ambiguous wire type",
+        )?;
+    }
+    if first_start != Some(first_field.start()) || observed != before {
+        return Err(Error::invalid_archive(
+            message_index,
+            "raw MessageInfo data references differ from transition authorization",
+        ));
+    }
+    if after.is_empty() {
+        Ok(HeaderFieldRewrite::Remove)
+    } else {
+        Ok(HeaderFieldRewrite::Raw(encode_packed_reference_field(
+            6,
+            after,
+            limits,
+            message_index,
+            allocation_context,
+        )?))
+    }
+}
+
+fn append_decoded_reference_values(
+    payload: &[u8],
+    wire_type: u8,
+    output: &mut Vec<u64>,
+    message_index: usize,
+    ambiguous_reason: &'static str,
+) -> Result<()> {
+    match wire_type {
+        0 => {
+            let (value, encoded_length) = litchi_iwa_common::decode_varint_from_bytes(payload)
+                .map_err(|_| {
+                    Error::invalid_archive(message_index, "malformed unpacked data reference")
+                })?;
+            if encoded_length != payload.len() {
+                return Err(Error::invalid_archive(
+                    message_index,
+                    "unpacked data reference has trailing bytes",
+                ));
+            }
+            output.push(value);
+        },
+        2 => {
+            let mut cursor = 0usize;
+            while cursor < payload.len() {
+                let remaining = payload.get(cursor..).ok_or_else(|| {
+                    Error::invalid_archive(message_index, "packed data-reference range is invalid")
+                })?;
+                let (value, encoded_length) =
+                    litchi_iwa_common::decode_varint_from_bytes(remaining).map_err(|_| {
+                        Error::invalid_archive(message_index, "malformed packed data reference")
+                    })?;
+                output.push(value);
+                cursor = cursor.checked_add(encoded_length).ok_or_else(|| {
+                    Error::invalid_archive(message_index, "packed data-reference range overflow")
+                })?;
+            }
+        },
+        _ => return Err(Error::invalid_archive(message_index, ambiguous_reason)),
+    }
+    Ok(())
+}
+
+fn encode_reference_payload(
+    references: &[u64],
+    limits: Limits,
+    message_index: usize,
+) -> Result<Vec<u8>> {
+    let mut length = 0usize;
+    for identifier in references {
+        length = length
+            .checked_add(u64_varint_length(*identifier))
+            .ok_or_else(|| Error::invalid_archive(message_index, "reference payload overflow"))?;
+    }
+    if length > limits.max_header_bytes() {
+        return Err(limit(
+            LimitKind::HeaderBytes,
+            length,
+            limits.max_header_bytes(),
+        ));
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(length)
+        .map_err(|_| Error::allocation("IWA transitioned data-reference payload", length))?;
+    let mut bytes = [0u8; MAX_VARINT_BYTES];
+    for identifier in references {
+        output.extend_from_slice(encode_varint(*identifier, &mut bytes));
+    }
+    Ok(output)
+}
+
+fn append_packed_data_references_to_message_info(
+    message: &mut Vec<u8>,
+    references: &[u64],
+    limits: Limits,
+    message_index: usize,
+) -> Result<()> {
+    append_packed_data_reference_field(message, 6, references, limits, message_index)
+}
+
+fn append_packed_data_reference_field(
+    message: &mut Vec<u8>,
+    field_number: u32,
+    references: &[u64],
+    limits: Limits,
+    message_index: usize,
+) -> Result<()> {
+    if references.is_empty() {
+        return Ok(());
+    }
+    let encoded = encode_packed_reference_field(
+        field_number,
+        references,
+        limits,
+        message_index,
+        "IWA appended data references",
+    )?;
+    let extra = encoded.len();
+    let output_len = message
+        .len()
+        .checked_add(extra)
+        .ok_or_else(|| Error::invalid_archive(message_index, "reference append overflow"))?;
+    check_header_length(output_len, limits)?;
+    message
+        .try_reserve_exact(extra)
+        .map_err(|_| Error::allocation("IWA appended data references", extra))?;
+    message.extend_from_slice(&encoded);
+    Ok(())
+}
+
+fn encode_packed_reference_field(
+    field_number: u32,
+    references: &[u64],
+    limits: Limits,
+    message_index: usize,
+    allocation_context: &'static str,
+) -> Result<Vec<u8>> {
+    let payload = encode_reference_payload(references, limits, message_index)?;
+    let key_value = u64::from(field_number)
+        .checked_shl(3)
+        .and_then(|value| value.checked_add(2))
+        .ok_or_else(|| Error::invalid_archive(message_index, "reference field key overflow"))?;
+    let mut key_bytes = [0u8; MAX_VARINT_BYTES];
+    let mut length_bytes = [0u8; MAX_VARINT_BYTES];
+    let key = encode_varint(key_value, &mut key_bytes);
+    let length = encode_varint(
+        u64::try_from(payload.len()).map_err(|_| {
+            Error::invalid_archive(message_index, "reference payload length exceeds u64")
+        })?,
+        &mut length_bytes,
+    );
+    let output_length = key
+        .len()
+        .checked_add(length.len())
+        .and_then(|value| value.checked_add(payload.len()))
+        .ok_or_else(|| Error::invalid_archive(message_index, "reference field overflow"))?;
+    check_header_length(output_length, limits)?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_length)
+        .map_err(|_| Error::allocation(allocation_context, output_length))?;
+    output.extend_from_slice(key);
+    output.extend_from_slice(length);
+    output.extend_from_slice(&payload);
+    Ok(output)
 }
 
 #[allow(
@@ -4504,6 +5351,7 @@ fn assemble_header_field_rewrites(
                         Error::invalid_archive(message_index, "header rewrite overflow")
                     })?
             },
+            HeaderFieldRewrite::Raw(raw) => raw.len(),
         };
         output_length = output_length
             .checked_add(field_length)
@@ -4563,6 +5411,7 @@ fn assemble_header_field_rewrites(
                 ));
                 output.extend_from_slice(payload);
             },
+            HeaderFieldRewrite::Raw(raw) => output.extend_from_slice(raw),
         }
     }
     if output.len() != output_length {
@@ -4990,6 +5839,109 @@ fn verify_transitioned_archive_info(
             return Err(Error::invalid_archive(
                 message_index,
                 "rewritten FieldInfo does not match the authorized reference transition",
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Verify a changed-cardinality data-reference transition against the decoded
+/// archive metadata. This check is deliberately stricter than a protobuf
+/// round-trip: only the requested aggregate list, selected nested fields, and
+/// replacement message scalars may differ.
+fn verify_transitioned_data_archive_info(
+    before: &ArchiveInfo,
+    after: &ArchiveInfo,
+    message_index: usize,
+    replacement_type: u32,
+    replacement_length: u32,
+    transition: DataReferenceTransition<'_>,
+) -> Result<()> {
+    if before.identifier != after.identifier
+        || before.should_merge != after.should_merge
+        || before.message_infos.len() != after.message_infos.len()
+    {
+        return Err(Error::invalid_archive(
+            message_index,
+            "raw ArchiveInfo data-reference transition changed unrelated metadata",
+        ));
+    }
+    for (index, (before_info, after_info)) in before
+        .message_infos
+        .iter()
+        .zip(&after.message_infos)
+        .enumerate()
+    {
+        if index != message_index && before_info != after_info {
+            return Err(Error::invalid_archive(
+                message_index,
+                "raw data-reference transition changed another MessageInfo",
+            ));
+        }
+    }
+    let before_target = before
+        .message_infos
+        .get(message_index)
+        .ok_or_else(|| Error::invalid_archive(message_index, "message index is out of bounds"))?;
+    let after_target = after.message_infos.get(message_index).ok_or_else(|| {
+        Error::invalid_archive(message_index, "rewritten message metadata is missing")
+    })?;
+    if before_target.data_references.as_slice() != transition.aggregate_before
+        || after_target.data_references.as_slice() != transition.aggregate_after
+        || after_target.type_ != replacement_type
+        || after_target.length != replacement_length
+        || before_target.versions != after_target.versions
+        || before_target.object_references != after_target.object_references
+        || before_target.base_message_index != after_target.base_message_index
+        || before_target.diff_merge_version != after_target.diff_merge_version
+        || before_target.diff_field_path != after_target.diff_field_path
+        || before_target.fields_to_remove != after_target.fields_to_remove
+        || before_target.diff_read_version != after_target.diff_read_version
+        || before_target.field_infos.len() != after_target.field_infos.len()
+    {
+        return Err(Error::invalid_archive(
+            message_index,
+            "rewritten MessageInfo does not match the authorized data-reference transition",
+        ));
+    }
+    for (field_index, (before_field, after_field)) in before_target
+        .field_infos
+        .iter()
+        .zip(&after_target.field_infos)
+        .enumerate()
+    {
+        let selected = transition
+            .fields
+            .iter()
+            .find(|authorization| authorization.field_info_index == field_index);
+        if let Some(authorization) = selected {
+            if before_field.path.path.as_slice() != authorization.expected_path
+                || before_field.data_references.as_slice() != authorization.before
+                || after_field.data_references.as_slice() != authorization.after
+            {
+                return Err(Error::invalid_archive(
+                    message_index,
+                    "selected FieldInfo does not match the authorized data-reference transition",
+                ));
+            }
+        } else if before_field.data_references != after_field.data_references {
+            return Err(Error::invalid_archive(
+                message_index,
+                "unselected FieldInfo data references changed during transition",
+            ));
+        }
+        if before_field.path != after_field.path
+            || before_field.r#type != after_field.r#type
+            || before_field.unknown_field_rule != after_field.unknown_field_rule
+            || before_field.known_field_rule != after_field.known_field_rule
+            || before_field.known_field_version != after_field.known_field_version
+            || before_field.known_field_feature_identifier
+                != after_field.known_field_feature_identifier
+            || before_field.object_references != after_field.object_references
+        {
+            return Err(Error::invalid_archive(
+                message_index,
+                "rewritten FieldInfo metadata changed outside data references",
             ));
         }
     }
@@ -6342,9 +7294,10 @@ mod tests {
     use super::{
         Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
         ArchiveReferencePolicy, ArchiveReferenceScope, ArchiveReferenceVisitor,
-        DataReferencePruning, Error, FieldInfo, FieldObjectReferenceTransition, FieldPath,
-        FieldType, KnownFieldRule, ObjectReferenceTransition, RawMessage, UnknownFieldRule,
-        encode_archive_info, encode_varint, encode_varint_with_width, varint_len,
+        DataReferencePruning, DataReferenceTransition, Error, FieldDataReferenceTransition,
+        FieldInfo, FieldObjectReferenceTransition, FieldPath, FieldType, KnownFieldRule,
+        ObjectReferenceTransition, RawMessage, UnknownFieldRule, encode_archive_info,
+        encode_varint, encode_varint_with_width, varint_len,
     };
     use crate::{LimitKind, Limits, Result};
 
@@ -8372,6 +9325,227 @@ mod tests {
     fn push_test_varint(output: &mut Vec<u8>, value: u64, width: usize) {
         let mut encoded = [0u8; 10];
         output.extend_from_slice(encode_varint_with_width(value, width, &mut encoded));
+    }
+
+    #[test]
+    fn changed_cardinality_data_transition_supports_insert_remove_and_replace() -> Result<()> {
+        let source = data_reference_transition_fixture(true)?;
+        let original = Archive::parse(&source)?;
+
+        for (after, payload) in [
+            (vec![10, 30, 20], data_reference_payload(&[10, 30, 20])?),
+            (vec![20], data_reference_payload(&[20])?),
+            (vec![40, 20], data_reference_payload(&[40, 20])?),
+        ] {
+            let mut edited = original.clone();
+            let before = [10, 20];
+            let field_before = [10, 20];
+            let field_after = after.clone();
+            let transition = DataReferenceTransition {
+                aggregate_before: &before,
+                aggregate_after: &after,
+                fields: &[FieldDataReferenceTransition {
+                    field_info_index: 0,
+                    expected_path: &[3],
+                    before: &field_before,
+                    after: &field_after,
+                }],
+            };
+            edited.objects[0].replace_message_transitioning_data_references_preserving_header(
+                0,
+                RawMessage {
+                    type_: 7,
+                    data: payload,
+                },
+                transition,
+            )?;
+            assert_eq!(
+                edited.objects[0].archive_info.message_infos[0].data_references,
+                after
+            );
+            assert_eq!(
+                edited.objects[0].archive_info.message_infos[0].field_infos[0].data_references,
+                after
+            );
+            let encoded = edited.to_bytes()?;
+            let (header, _) = split_test_archive(&encoded)?;
+            assert!(header.ends_with(&[0xb0, 0x3e, 0x07]));
+
+            // The source header's unknown suffix is retained, while the
+            // archive identifier prefix remains source-exact.
+            assert_eq!(&header[..2], &[0x08, 0x2a]);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn changed_cardinality_data_transition_inverse_restores_exact_source() -> Result<()> {
+        let source = data_reference_transition_fixture(true)?;
+        let mut edited = Archive::parse(&source)?;
+        let before = [10, 20];
+        let after = [10, 30, 20];
+        let transition = DataReferenceTransition {
+            aggregate_before: &before,
+            aggregate_after: &after,
+            fields: &[FieldDataReferenceTransition {
+                field_info_index: 0,
+                expected_path: &[3],
+                before: &before,
+                after: &after,
+            }],
+        };
+        let old = edited.objects[0]
+            .replace_message_transitioning_data_references_preserving_header(
+                0,
+                RawMessage {
+                    type_: 7,
+                    data: data_reference_payload(&after)?,
+                },
+                transition,
+            )?;
+        let inverse = DataReferenceTransition {
+            aggregate_before: &after,
+            aggregate_after: &before,
+            fields: &[FieldDataReferenceTransition {
+                field_info_index: 0,
+                expected_path: &[3],
+                before: &after,
+                after: &before,
+            }],
+        };
+        edited.objects[0]
+            .replace_message_transitioning_data_references_preserving_header(0, old, inverse)?;
+        assert_eq!(edited.to_bytes()?, source);
+        Ok(())
+    }
+
+    #[test]
+    fn changed_cardinality_data_transition_rejects_stale_or_limited_requests_atomically()
+    -> Result<()> {
+        let source = data_reference_transition_fixture(false)?;
+        let mut edited = Archive::parse(&source)?;
+        let original = edited.clone();
+        let wrong_before = [99, 20];
+        let after = [10, 30, 20];
+        let stale = DataReferenceTransition {
+            aggregate_before: &wrong_before,
+            aggregate_after: &after,
+            fields: &[FieldDataReferenceTransition {
+                field_info_index: 0,
+                expected_path: &[3],
+                before: &wrong_before,
+                after: &after,
+            }],
+        };
+        assert!(
+            edited.objects[0]
+                .replace_message_transitioning_data_references_preserving_header(
+                    0,
+                    RawMessage {
+                        type_: 7,
+                        data: data_reference_payload(&after)?,
+                    },
+                    stale,
+                )
+                .is_err()
+        );
+        assert_eq!(edited, original);
+
+        let before = [10, 20];
+        let limited = DataReferenceTransition {
+            aggregate_before: &before,
+            aggregate_after: &after,
+            fields: &[FieldDataReferenceTransition {
+                field_info_index: 0,
+                expected_path: &[3],
+                before: &before,
+                after: &after,
+            }],
+        };
+        let limits = Limits::default().with_metadata_items(1)?;
+        assert!(
+            edited.objects[0]
+                .replace_message_transitioning_data_references_preserving_header_with_limits(
+                    0,
+                    RawMessage {
+                        type_: 7,
+                        data: data_reference_payload(&after)?,
+                    },
+                    limited,
+                    limits,
+                )
+                .is_err()
+        );
+        assert_eq!(edited, original);
+
+        // A malformed retained raw header is rejected before the object is
+        // touched. This exercises raw-wire admission independently from the
+        // stale authorization check above.
+        let mut malformed = original.clone();
+        malformed.objects[0].original_header = Some(Box::from([0x30, 0x80]));
+        malformed.objects[0].original_canonical_header = Some(
+            encode_archive_info(&malformed.objects[0].archive_info, Limits::default())?
+                .into_boxed_slice(),
+        );
+        let malformed_before = malformed.clone();
+        assert!(
+            malformed.objects[0]
+                .replace_message_transitioning_data_references_preserving_header(
+                    0,
+                    RawMessage {
+                        type_: 7,
+                        data: data_reference_payload(&after)?,
+                    },
+                    limited,
+                )
+                .is_err()
+        );
+        assert_eq!(malformed, malformed_before);
+        Ok(())
+    }
+
+    fn data_reference_transition_fixture(with_unknown_header: bool) -> Result<Vec<u8>> {
+        let before_payload = data_reference_payload(&[10, 20])?;
+        let mut object = ArchiveObject::new(
+            42,
+            vec![RawMessage {
+                type_: 7,
+                data: before_payload.clone(),
+            }],
+        )?;
+        let info = &mut object.archive_info.message_infos[0];
+        info.data_references = vec![10, 20];
+        let mut field = FieldInfo::new(vec![3]);
+        field.r#type = Some(FieldType::DataReference);
+        field.data_references = vec![10, 20];
+        info.field_infos.push(field);
+        if !with_unknown_header {
+            return Archive {
+                objects: vec![object],
+            }
+            .to_bytes();
+        }
+
+        let mut header = encode_archive_info(&object.archive_info, Limits::default())?;
+        header.extend_from_slice(&[0xb0, 0x3e, 0x07]);
+        let mut source = Vec::new();
+        let mut prefix = [0u8; 10];
+        source.extend_from_slice(encode_varint(header.len() as u64, &mut prefix));
+        source.extend_from_slice(&header);
+        source.extend_from_slice(&before_payload);
+        Ok(source)
+    }
+
+    fn data_reference_payload(references: &[u64]) -> Result<Vec<u8>> {
+        let mut payload = Vec::new();
+        for identifier in references {
+            let mut reference = Vec::new();
+            reference.extend_from_slice(&[0x08]);
+            let mut bytes = [0u8; 10];
+            reference.extend_from_slice(encode_varint(*identifier, &mut bytes));
+            push_length_delimited(&mut payload, &[0x1a], 1, &reference)?;
+        }
+        Ok(payload)
     }
 
     fn reference_pruning_fixture() -> Result<ReferencePruningFixture> {
