@@ -15,6 +15,7 @@ mod snappy;
 pub use archive::{
     Archive, ArchiveInfo, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
     ArchiveReferencePolicy, ArchiveReferenceScope, ArchiveReferenceVisitor,
+    CanonicalFieldDataReferenceOperation, CanonicalFieldDataReferenceTransition,
     DataReferenceTransition, FieldDataReferenceTransition, FieldInfo, FieldPath, FieldType,
     KnownFieldRule, MessageInfo, RawMessage, UnknownFieldRule,
 };

@@ -784,7 +784,10 @@ fn changed_item_transaction_preserves_unknown_fields_and_unselected_zip_records(
         }
         assert_eq!(after_entries.get(name), Some(data));
     }
-    assert_eq!(after_entries.get("Data/soundtrack-first.wav"), None);
+    assert_eq!(
+        after_entries.get("Data/soundtrack-first.wav"),
+        before_entries.get("Data/soundtrack-first.wav")
+    );
     assert_eq!(
         after_entries.get("Data/soundtrack-second.wav"),
         before_entries.get("Data/soundtrack-second.wav")

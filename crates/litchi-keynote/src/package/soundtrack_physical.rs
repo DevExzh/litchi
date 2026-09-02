@@ -863,9 +863,6 @@ pub(crate) fn validate_media_closure(
         .message_infos
         .get(selection.soundtrack_message_index)
         .ok_or(Error::InvalidSource)?;
-    if info.data_references.is_empty() {
-        return Ok(());
-    }
     let mut states = HashMap::new();
     budget.charge_work(info.data_references.len())?;
     states
@@ -1350,7 +1347,7 @@ pub(crate) fn validate_soundtrack_metadata(
             return Err(Error::InvalidSource);
         }
     }
-    if !media_path {
+    if !media_path && !info.data_references.is_empty() {
         return Err(Error::InvalidSource);
     }
     Ok(())
