@@ -1,5 +1,24 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0366: XLSX selected general-reference decoding
+
+The selected worksheet single/range scanner now decodes bounded XML general
+references through the canonical decode helper. Predefined `amp`, `lt`, `gt`,
+`quot`, and `apos` references are eligible in formula, value, and inline
+payloads. Decimal and hexadecimal numeric references are eligible in formula
+and value payloads only when ASCII and the full token is at most 12 bytes.
+Numeric inline references, overlong or non-ASCII numeric spellings, and numeric
+scalars outside the XML 1.0 `Char` production return `NotEligible` and use the
+verified eager fallback; malformed, custom, and out-of-range references remain
+MCE/typed errors. XML/MCE/x14ac and the OPC reader still drain to verified EOF
+before publication or callbacks. Eligible cold `cell`, `cells`, and
+`visit_cells` paths retain no `Store`, `PartData`, or semantic caches. There is
+no API or public accepted-input change; the pre-existing eager/shared-string
+XML-legality residual is out of scope. Validation passed focused `9/9`, full
+`litchi-xlsx` library `892/892`, and scoped Clippy with `-D warnings` with only
+the unrelated `clippy::useless-asref` issue allowed. `performance_claim: none`:
+no latency, RSS, fixed-memory, or OOM claim.
+
 ## Latest XLSX source-worksheet range streaming (change 0365)
 
 Change 0365 extends cold `SourceWorksheet::cells(area)` and staged
