@@ -17,7 +17,7 @@ use litchi_opc::{
 use litchi_xlsx::cell_values::{
     CellValueEdit, MAX_BATCH_EDITS, SheetCellValueEdit, SourceBackedEditor,
 };
-use litchi_xlsx::{Address, Cell, Error, ErrorValue, Formula, Number, Value};
+use litchi_xlsx::{Address, Cell, EditBlock, Error, ErrorValue, Formula, Number, Selector, Value};
 use soapberry_zip::office::ArchiveReader;
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -702,6 +702,441 @@ fn first_middle_last_batch_reopens_preserves_unselected_parts_and_inverts() {
 }
 
 #[test]
+fn source_insert_holes_order_rows_expand_dimension_and_read_back() {
+    let bytes = fixture(
+        format!(
+            r#"<worksheet xmlns="{SML}"><dimension ref="B1:B1"/><sheetData><row r="1"><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#
+        ),
+        false,
+    );
+    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.apply_batch([CellValueEdit::insert(
+        address("A1"),
+        Number::new("1").unwrap(),
+    )])
+    .unwrap();
+    edit.insert(address("C1"), Number::new("3").unwrap())
+        .unwrap();
+    edit.insert(address("C3"), Number::new("9").unwrap())
+        .unwrap();
+    let commit = edit.commit().unwrap();
+
+    assert_eq!(
+        commit.snapshot().value(address("A1")),
+        Some(&Value::Number(Number::new("1").unwrap()))
+    );
+    assert_eq!(
+        commit.snapshot().value(address("B1")),
+        Some(&Value::Number(Number::new("2").unwrap()))
+    );
+    assert_eq!(
+        commit.snapshot().value(address("C1")),
+        Some(&Value::Number(Number::new("3").unwrap()))
+    );
+    assert_eq!(
+        commit.snapshot().value(address("C3")),
+        Some(&Value::Number(Number::new("9").unwrap()))
+    );
+    assert!(commit.snapshot().contains_cell(address("C3")));
+
+    let xml = String::from_utf8_lossy(commit.snapshot().source_xml());
+    let first = xml.find(r#"<c r="A1""#).unwrap();
+    let existing = xml.find(r#"<c r="B1""#).unwrap();
+    let last = xml.find(r#"<c r="C1""#).unwrap();
+    assert!(first < existing && existing < last);
+    assert!(xml.contains(r#"<dimension ref="A1:C3"/>"#));
+    assert!(xml.contains(r#"<row r="3"><c r="C3"><v>9</v></c></row>"#));
+}
+
+#[test]
+fn multi_source_insert_uses_selector_first_operations_across_sheets() {
+    let bytes = two_sheets();
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let mut edit = editor
+        .edit_sheets([
+            Selector::Name("Sheet1".into()),
+            Selector::Name("Sheet2".into()),
+        ])
+        .unwrap();
+    edit.insert("Sheet1", address("D1"), Number::new("40").unwrap())
+        .unwrap();
+    edit.apply_batch([SheetCellValueEdit::insert(
+        "Sheet2",
+        address("A4"),
+        Number::new("50").unwrap(),
+    )])
+    .unwrap();
+    let commit = edit.commit().unwrap();
+
+    let mut output = Vec::new();
+    editor
+        .publish_multi_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    let mut published = OpcPackage::from_bytes(&output).unwrap();
+    assert_eq!(
+        litchi_xlsx::cell_values::Snapshot::load_multi(&published, "Sheet1")
+            .unwrap()
+            .value(address("D1")),
+        Some(&Value::Number(Number::new("40").unwrap()))
+    );
+    assert_eq!(
+        litchi_xlsx::cell_values::Snapshot::load_multi(&published, "Sheet2")
+            .unwrap()
+            .value(address("A4")),
+        Some(&Value::Number(Number::new("50").unwrap()))
+    );
+    let original = OpcPackage::from_bytes(&bytes).unwrap();
+    commit.patch().inverse().apply(&mut published).unwrap();
+    for part in [SHEET, "/xl/worksheets/sheet2.xml"] {
+        let uri = PackURI::new(part).unwrap();
+        assert_eq!(
+            published.get_part(&uri).unwrap().blob(),
+            original.get_part(&uri).unwrap().blob()
+        );
+    }
+
+    assert_eq!(
+        commit.snapshot().value(0, address("D1")),
+        Some(&Value::Number(Number::new("40").unwrap()))
+    );
+    assert_eq!(
+        commit.snapshot().value(1, address("A4")),
+        Some(&Value::Number(Number::new("50").unwrap()))
+    );
+    assert!(commit.snapshot().contains_cell(0, address("D1")));
+    assert!(commit.snapshot().contains_cell(1, address("A4")));
+}
+
+#[test]
+fn insert_existing_empty_and_style_only_owners_refuse_with_empty_transaction() {
+    let base = fixture(
+        format!(
+            r#"<worksheet xmlns="{SML}"><dimension ref="A1:B1"/><sheetData><row r="1"><c r="A1"></c><c r="B1" s="1"></c></row></sheetData></worksheet>"#
+        ),
+        false,
+    );
+    let (bytes, _style_uri, _style_xml) = with_two_cell_styles(&base);
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    assert!(matches!(
+        edit.insert(address("A1"), Number::new("1").unwrap()),
+        Err(Error::Invalid(message))
+            if message == "cell selector 'A1' already has an existing cell owner"
+    ));
+    assert!(matches!(
+        edit.insert(address("B1"), Number::new("2").unwrap()),
+        Err(Error::Invalid(message))
+            if message == "cell selector 'B1' already has an existing cell owner"
+    ));
+    assert!(edit.is_empty());
+    let commit = edit.commit().unwrap();
+    assert!(!commit.changed());
+
+    let mut output = Vec::new();
+    editor
+        .publish_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, bytes);
+}
+
+#[test]
+fn insert_holes_inside_merge_array_data_table_and_shared_ranges_refuse_atomically() {
+    let cases = [
+        r#"<f t="array" ref="A1:B2">A1</f>"#,
+        r#"<f t="dataTable" ref="A1:B2" dt2D="1" r1="A1" r2="B1"/>"#,
+        r#"<f t="shared" ref="A1:B2" si="7">A1+1</f>"#,
+    ];
+    for formula in cases {
+        let bytes = fixture(
+            format!(
+                r#"<worksheet xmlns="{SML}"><dimension ref="A1:B2"/><sheetData><row r="1"><c r="A1">{formula}<v>1</v></c><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#
+            ),
+            false,
+        );
+        let editor =
+            SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+        let mut edit = editor.edit("Sheet1").unwrap();
+        let target = address("B2");
+        assert!(matches!(
+            edit.insert(target, Number::new("3").unwrap()),
+            Err(Error::EditBlocked {
+                sheet,
+                address,
+                reason: EditBlock::GroupFormula,
+            }) if sheet == "Sheet1" && address == target
+        ));
+        assert!(edit.is_empty());
+    }
+}
+
+#[test]
+fn merge_markup_is_refused_at_source_open() {
+    let bytes = fixture(
+        format!(
+            r#"<worksheet xmlns="{SML}"><dimension ref="A1:B2"/><sheetData/><mergeCells count="1"><mergeCell ref="A1:B2"/><future/></mergeCells></worksheet>"#
+        ),
+        false,
+    );
+    let result = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes)))
+        .and_then(|editor| editor.edit("Sheet1"));
+    assert!(matches!(
+        result,
+        Err(Error::Invalid(message))
+            if message == "value-only edits refuse dependency-bearing or unknown element 'mergeCells'"
+    ));
+}
+
+#[test]
+fn insert_duplicate_and_late_existing_target_batches_are_atomic() {
+    let bytes = three_cells();
+    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    assert!(matches!(
+        edit.apply_batch([
+            CellValueEdit::insert(address("B1"), Number::new("2").unwrap()),
+            CellValueEdit::insert(address("B1"), Number::new("3").unwrap()),
+        ]),
+        Err(Error::Invalid(message)) if message == "duplicate value-only selector 'B1'"
+    ));
+    assert!(edit.is_empty());
+    assert!(matches!(
+        edit.apply_batch([
+            CellValueEdit::insert(address("B1"), Number::new("2").unwrap()),
+            CellValueEdit::insert(address("A1"), Number::new("3").unwrap()),
+        ]),
+        Err(Error::Invalid(message))
+            if message == "cell selector 'A1' already has an existing cell owner"
+    ));
+    assert!(edit.is_empty());
+    edit.insert(address("B1"), Number::new("2").unwrap())
+        .unwrap();
+    assert_eq!(edit.len(), 1);
+}
+
+#[test]
+fn insert_accepts_exact_cell_character_limit_and_rejects_one_over() {
+    const MAX_CELL_CHARACTERS: usize = 32_767;
+    let bytes = fixture(
+        format!(
+            r#"<worksheet xmlns="{SML}"><dimension ref="A1:A1"/><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData></worksheet>"#
+        ),
+        false,
+    );
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let exact_text = format!("0.{}1", "0".repeat(MAX_CELL_CHARACTERS - 3));
+    let mut exact = editor.edit("Sheet1").unwrap();
+    exact
+        .insert(address("B1"), Number::new(exact_text).unwrap())
+        .unwrap();
+    exact.commit().unwrap();
+
+    let one_over_text = format!("0.{}1", "0".repeat(MAX_CELL_CHARACTERS - 2));
+    let mut over = editor.edit("Sheet1").unwrap();
+    assert!(
+        over.insert(address("B1"), Number::new(one_over_text).unwrap())
+            .is_err()
+    );
+    assert!(over.is_empty());
+}
+
+#[test]
+fn insert_invalidates_calculation_properties_and_chain() {
+    let bytes = scalar_formula_source();
+    let original = OpcPackage::from_bytes(&bytes).unwrap();
+    let original_chain_target = calculation_chain_target(&original);
+    let original_chain = original
+        .get_part(&PackURI::new(CALC_CHAIN).unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    let original_workbook = original
+        .get_part(&PackURI::new(MAIN).unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    let original_content_types = zip_member(&bytes, "[Content_Types].xml");
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.insert(address("C1"), Number::new("3").unwrap())
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    commit.patch().apply(&mut replay).unwrap();
+    assert!(!has_calculation_chain(&replay));
+    let workbook = String::from_utf8_lossy(
+        replay
+            .get_part(&PackURI::new(MAIN).unwrap())
+            .unwrap()
+            .blob(),
+    );
+    assert!(workbook.contains("calcId=\"0\""));
+
+    commit.patch().inverse().apply(&mut replay).unwrap();
+    assert!(has_calculation_chain(&replay));
+    assert_eq!(calculation_chain_target(&replay), original_chain_target);
+    assert_eq!(
+        replay
+            .get_part(&PackURI::new(CALC_CHAIN).unwrap())
+            .unwrap()
+            .blob(),
+        original_chain.as_slice(),
+    );
+    assert_eq!(
+        replay
+            .get_part(&PackURI::new(MAIN).unwrap())
+            .unwrap()
+            .blob(),
+        original_workbook.as_slice(),
+    );
+    let restored = PackageWriter::to_bytes(&replay).unwrap();
+    assert_eq!(
+        zip_member(&restored, "[Content_Types].xml"),
+        original_content_types,
+    );
+}
+
+#[test]
+fn insert_patch_is_deterministic_and_inverse_restores_exact_source_and_absence() {
+    let bytes = three_cells();
+    let original = OpcPackage::from_bytes(&bytes).unwrap();
+    let original_sheet = original
+        .get_part(&PackURI::new(SHEET).unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.insert(address("D4"), Number::new("7").unwrap())
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.snapshot().contains_cell(address("D4")));
+
+    let mut first = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut second = OpcPackage::from_bytes(&bytes).unwrap();
+    commit.patch().apply(&mut first).unwrap();
+    commit.patch().apply(&mut second).unwrap();
+    assert_eq!(
+        PackageWriter::to_bytes(&first).unwrap(),
+        PackageWriter::to_bytes(&second).unwrap()
+    );
+    commit.patch().inverse().apply(&mut first).unwrap();
+    assert_eq!(
+        first
+            .get_part(&PackURI::new(SHEET).unwrap())
+            .unwrap()
+            .blob(),
+        original_sheet.as_slice()
+    );
+    let restored = litchi_xlsx::cell_values::Snapshot::load(&first, "Sheet1").unwrap();
+    assert!(!restored.contains_cell(address("D4")));
+}
+
+#[test]
+fn insert_preserves_untouched_members_relationships_and_content_types() {
+    let (bytes, style_uri, style_xml) = with_two_cell_styles(&three_cells());
+    let original = OpcPackage::from_bytes(&bytes).unwrap();
+    let original_unused = original
+        .get_part(&PackURI::new(UNUSED).unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    let original_content_types = zip_member(&bytes, "[Content_Types].xml");
+    let mut original_relationships = original
+        .get_part(&PackURI::new(MAIN).unwrap())
+        .unwrap()
+        .rels()
+        .iter()
+        .map(|relationship| {
+            format!(
+                "{}\\0{}\\0{}\\0{}",
+                relationship.r_id(),
+                relationship.reltype(),
+                relationship.target_ref(),
+                relationship.is_external()
+            )
+        })
+        .collect::<Vec<_>>();
+    original_relationships.sort();
+
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.insert(address("D1"), Number::new("4").unwrap())
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    commit.patch().apply(&mut replay).unwrap();
+
+    assert_eq!(
+        replay
+            .get_part(&PackURI::new(UNUSED).unwrap())
+            .unwrap()
+            .blob(),
+        original_unused.as_slice()
+    );
+    assert_eq!(
+        replay.get_part(&style_uri).unwrap().blob(),
+        style_xml.as_slice()
+    );
+    let mut replay_relationships = replay
+        .get_part(&PackURI::new(MAIN).unwrap())
+        .unwrap()
+        .rels()
+        .iter()
+        .map(|relationship| {
+            format!(
+                "{}\\0{}\\0{}\\0{}",
+                relationship.r_id(),
+                relationship.reltype(),
+                relationship.target_ref(),
+                relationship.is_external()
+            )
+        })
+        .collect::<Vec<_>>();
+    replay_relationships.sort();
+    assert_eq!(replay_relationships, original_relationships);
+    let published = PackageWriter::to_bytes(&replay).unwrap();
+    assert_eq!(
+        zip_member(&published, "[Content_Types].xml"),
+        original_content_types
+    );
+}
+
+#[test]
+fn signed_insert_changed_refuses_but_empty_noop_is_exact() {
+    let bytes = fixture(
+        format!(
+            r#"<worksheet xmlns="{SML}"><dimension ref="A1:A1"/><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData></worksheet>"#
+        ),
+        true,
+    );
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let noop = editor.edit("Sheet1").unwrap().commit().unwrap();
+    let mut output = Vec::new();
+    editor.publish_commit_to_stream(&mut output, &noop).unwrap();
+    assert_eq!(output, bytes);
+
+    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.insert(address("D1"), Number::new("42").unwrap())
+        .unwrap();
+    let changed = edit.commit().unwrap();
+    let mut output = Vec::new();
+    assert!(matches!(
+        editor.publish_commit_to_stream(&mut output, &changed),
+        Err(Error::Package(OpcError::SignedSourceRequiresExplicitPolicy))
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
 fn scalar_staging_and_batch_staging_are_equivalent_and_clear_retains_record() {
     let bytes = three_cells();
     let scalar =
@@ -823,18 +1258,25 @@ fn remove_missing_and_duplicate_selectors_fail_atomically() {
     let bytes = three_cells();
     let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
-    assert!(edit.remove(address("Z99")).is_err());
+    assert!(matches!(
+        edit.remove(address("Z99")),
+        Err(Error::Invalid(message))
+            if message == "cell selector 'Z99' has no existing cell owner"
+    ));
     assert!(edit.is_empty());
-    assert!(
+    assert!(matches!(
         edit.apply_batch([
             CellValueEdit::remove(address("B2")),
             CellValueEdit::set(address("B2"), false),
-        ])
-        .is_err()
-    );
+        ]),
+        Err(Error::Invalid(message)) if message == "duplicate value-only selector 'B2'"
+    ));
     assert!(edit.is_empty());
     edit.remove(address("B2")).unwrap();
-    assert!(edit.clear(address("B2")).is_err());
+    assert!(matches!(
+        edit.clear(address("B2")),
+        Err(Error::Invalid(message)) if message == "duplicate value-only selector 'B2'"
+    ));
     assert_eq!(edit.len(), 1);
 }
 
@@ -846,15 +1288,19 @@ fn exact_noop_duplicate_and_late_failure_are_atomic() {
     let mut edit = editor.edit("Sheet1").unwrap();
     edit.set(address("A1"), Number::new("1").unwrap()).unwrap();
     let before = edit.len();
-    assert!(
+    assert!(matches!(
         edit.apply_batch([
             CellValueEdit::set(address("B2"), false),
             CellValueEdit::set(address("Z99"), 9u32),
-        ])
-        .is_err()
-    );
+        ]),
+        Err(Error::Invalid(message))
+            if message == "cell selector 'Z99' has no existing cell owner"
+    ));
     assert_eq!(edit.len(), before);
-    assert!(edit.set(address("A1"), 2u32).is_err());
+    assert!(matches!(
+        edit.set(address("A1"), 2u32),
+        Err(Error::Invalid(message)) if message == "duplicate value-only selector 'A1'"
+    ));
     let commit = edit.commit().unwrap();
     assert!(!commit.changed());
     let mut output = Vec::new();
@@ -920,6 +1366,28 @@ fn exact_batch_limit_accepts_n_and_rejects_n_plus_one_atomically() {
     .unwrap();
     assert_eq!(edit.len(), MAX_BATCH_EDITS);
     assert!(edit.remove(address("A257")).is_err());
+    assert_eq!(edit.len(), MAX_BATCH_EDITS);
+
+    let insert_bytes = fixture(
+        format!(r#"<worksheet xmlns="{SML}"><dimension ref="A1:A257"/><sheetData/></worksheet>"#),
+        false,
+    );
+    let editor =
+        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(insert_bytes))).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.apply_batch(
+        (1..=MAX_BATCH_EDITS).map(|row| {
+            CellValueEdit::insert(address(&format!("A{row}")), Number::new("0").unwrap())
+        }),
+    )
+    .unwrap();
+    assert_eq!(edit.len(), MAX_BATCH_EDITS);
+    let over = format!("A{}", MAX_BATCH_EDITS + 1);
+    assert!(matches!(
+        edit.insert(address(&over), Number::new("0").unwrap()),
+        Err(Error::Invalid(message))
+            if message == format!("value-only batch exceeds {MAX_BATCH_EDITS} unique cells")
+    ));
     assert_eq!(edit.len(), MAX_BATCH_EDITS);
 }
 
@@ -1998,8 +2466,13 @@ fn grouped_formula_edits_are_refused_without_staging() {
                 .unwrap();
         let mut edit = editor.edit("Sheet1").unwrap();
         assert!(
-            edit.set_formula(target, Formula::new("A1+9").unwrap())
-                .is_err(),
+            matches!(
+                edit.set_formula(target, Formula::new("A1+9").unwrap()),
+                Err(Error::EditBlocked {
+                    reason: EditBlock::GroupFormula,
+                    ..
+                })
+            ),
             "{kind} formula must remain group-scoped"
         );
         assert!(edit.is_empty(), "{kind} refusal must be atomic");
@@ -2196,10 +2669,13 @@ fn shared_formula_follower_is_rejected_without_staging() {
         SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(shared_formula_source())))
             .unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
-    assert!(
-        edit.set_shared_formula(address("B1"), Formula::new("B2+$C3").unwrap())
-            .is_err()
-    );
+    assert!(matches!(
+        edit.set_shared_formula(address("B1"), Formula::new("B2+$C3").unwrap()),
+        Err(Error::EditBlocked {
+            reason: EditBlock::GroupFormula,
+            ..
+        })
+    ));
     assert!(edit.is_empty());
 }
 
@@ -2209,13 +2685,34 @@ fn ordinary_cell_edits_refuse_shared_group_without_staging() {
         SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(shared_formula_source())))
             .unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
-    assert!(
-        edit.set_formula(address("B1"), Formula::new("B2+$C3").unwrap())
-            .is_err()
-    );
-    assert!(edit.set(address("B1"), Number::new("42").unwrap()).is_err());
-    assert!(edit.clear(address("B1")).is_err());
-    assert!(edit.remove(address("B1")).is_err());
+    assert!(matches!(
+        edit.set_formula(address("B1"), Formula::new("B2+$C3").unwrap()),
+        Err(Error::EditBlocked {
+            reason: EditBlock::GroupFormula,
+            ..
+        })
+    ));
+    assert!(matches!(
+        edit.set(address("B1"), Number::new("42").unwrap()),
+        Err(Error::EditBlocked {
+            reason: EditBlock::GroupFormula,
+            ..
+        })
+    ));
+    assert!(matches!(
+        edit.clear(address("B1")),
+        Err(Error::EditBlocked {
+            reason: EditBlock::GroupFormula,
+            ..
+        })
+    ));
+    assert!(matches!(
+        edit.remove(address("B1")),
+        Err(Error::EditBlocked {
+            reason: EditBlock::GroupFormula,
+            ..
+        })
+    ));
     assert!(edit.is_empty());
 }
 
