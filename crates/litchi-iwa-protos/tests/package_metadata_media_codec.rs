@@ -1,8 +1,8 @@
 use litchi_iwa_protos::package_metadata_media_codec::{
     ComponentDataReferenceSnapshot, ComponentSelector, ComponentSnapshot, DataInfoAddition,
-    DataInfoRemoval, DataInfoSnapshot, DataReferenceOwnerAddition, DataReferenceOwnerRemoval,
-    DecodeError, DecodeLimit, DecodeOptions, InvalidReason, MediaRewriteBatch, OwnerSnapshot,
-    PackageMetadataMediaVisitor, inspect_package_metadata_media,
+    DataInfoRemoval, DataInfoSnapshot, DataReferenceOwnerAddition, DataReferenceOwnerCountUpdate,
+    DataReferenceOwnerRemoval, DecodeError, DecodeLimit, DecodeOptions, InvalidReason,
+    MediaRewriteBatch, OwnerSnapshot, PackageMetadataMediaVisitor, inspect_package_metadata_media,
     prepare_package_metadata_media_rewrite, rewrite_package_metadata_media,
     visit_package_metadata_media,
 };
@@ -770,6 +770,130 @@ fn owner_addition_creates_a_missing_parent_and_last_owner_removal_drops_parent()
     let facts = inspect_facts(removed.bytes());
     assert!(!facts.references.contains(&(8, 42, 0, false)));
     assert!(!facts.owners.contains(&(8, 42, 1, false)));
+}
+
+#[test]
+fn owner_count_update_is_exact_and_byte_preserving_with_an_exact_inverse() {
+    let source = canonical_source();
+    let selector = ComponentSelector::new(7, "Index/Document.iwa");
+    let updates = [DataReferenceOwnerCountUpdate::new(selector, 41, 92, 2, 4)];
+    let batch = MediaRewriteBatch::new(&[], &[], &[], &[]).with_owner_updates(&updates);
+
+    let output = rewrite_package_metadata_media(&source, batch, rewrite_options(&source)).unwrap();
+    assert_eq!(output.report().owner_additions(), 0);
+    assert_eq!(output.report().owner_removals(), 0);
+    assert_eq!(output.report().owner_updates(), 1);
+    let updated = output.into_bytes();
+    let facts = inspect_facts(&updated);
+    assert_eq!(
+        facts.owners,
+        [(7, 41, 1, false), (7, 41, 4, false), (7, 42, 1, false)]
+    );
+
+    let inverse_updates = [DataReferenceOwnerCountUpdate::new(selector, 41, 92, 4, 2)];
+    let inverse =
+        MediaRewriteBatch::new(&[], &[], &[], &[]).with_owner_count_updates(&inverse_updates);
+    let restored =
+        rewrite_package_metadata_media(&updated, inverse, rewrite_options(&updated)).unwrap();
+    assert_eq!(restored.bytes(), source);
+}
+
+#[test]
+fn owner_count_update_rejects_stale_zero_duplicate_conflicting_and_opaque_requests() {
+    let source = canonical_source();
+    let selector = ComponentSelector::new(7, "Index/Document.iwa");
+
+    let zero_expected = [DataReferenceOwnerCountUpdate::new(selector, 41, 91, 0, 2)];
+    let error = rewrite_package_metadata_media(
+        &source,
+        MediaRewriteBatch::new(&[], &[], &[], &[]).with_owner_updates(&zero_expected),
+        rewrite_options(&source),
+    )
+    .unwrap_err();
+    assert_eq!(
+        error.invalid_reason(),
+        Some(InvalidReason::InvalidIdentifier)
+    );
+
+    let zero_new = [DataReferenceOwnerCountUpdate::new(selector, 41, 91, 1, 0)];
+    let error = rewrite_package_metadata_media(
+        &source,
+        MediaRewriteBatch::new(&[], &[], &[], &[]).with_owner_updates(&zero_new),
+        rewrite_options(&source),
+    )
+    .unwrap_err();
+    assert_eq!(
+        error.invalid_reason(),
+        Some(InvalidReason::InvalidIdentifier)
+    );
+
+    let stale = [DataReferenceOwnerCountUpdate::new(selector, 41, 91, 9, 2)];
+    let error = rewrite_package_metadata_media(
+        &source,
+        MediaRewriteBatch::new(&[], &[], &[], &[]).with_owner_updates(&stale),
+        rewrite_options(&source),
+    )
+    .unwrap_err();
+    assert_eq!(
+        error.invalid_reason(),
+        Some(InvalidReason::ExistingOwnerCollision)
+    );
+
+    let duplicate = [
+        DataReferenceOwnerCountUpdate::new(selector, 41, 91, 1, 2),
+        DataReferenceOwnerCountUpdate::new(selector, 41, 91, 1, 3),
+    ];
+    let error = rewrite_package_metadata_media(
+        &source,
+        MediaRewriteBatch::new(&[], &[], &[], &[]).with_owner_updates(&duplicate),
+        rewrite_options(&source),
+    )
+    .unwrap_err();
+    assert_eq!(
+        error.invalid_reason(),
+        Some(InvalidReason::ConflictingOperation)
+    );
+
+    let additions = [DataReferenceOwnerAddition::new(selector, 41, 91, 1)];
+    let conflicts_with_addition = [DataReferenceOwnerCountUpdate::new(selector, 41, 91, 1, 2)];
+    let error = rewrite_package_metadata_media(
+        &source,
+        MediaRewriteBatch::new(&[], &[], &additions, &[])
+            .with_owner_updates(&conflicts_with_addition),
+        rewrite_options(&source),
+    )
+    .unwrap_err();
+    assert_eq!(
+        error.invalid_reason(),
+        Some(InvalidReason::DuplicateOperation)
+    );
+
+    let removals = [DataReferenceOwnerRemoval::new(selector, 41, 91, 1)];
+    let conflicts_with_removal = [DataReferenceOwnerCountUpdate::new(selector, 41, 91, 1, 2)];
+    let error = rewrite_package_metadata_media(
+        &source,
+        MediaRewriteBatch::new(&[], &[], &[], &removals)
+            .with_owner_updates(&conflicts_with_removal),
+        rewrite_options(&source),
+    )
+    .unwrap_err();
+    assert_eq!(
+        error.invalid_reason(),
+        Some(InvalidReason::DuplicateOperation)
+    );
+
+    let opaque = source_with_unknowns();
+    let opaque_updates = [DataReferenceOwnerCountUpdate::new(selector, 41, 91, 1, 2)];
+    let error = rewrite_package_metadata_media(
+        &opaque,
+        MediaRewriteBatch::new(&[], &[], &[], &[]).with_owner_updates(&opaque_updates),
+        rewrite_options(&opaque),
+    )
+    .unwrap_err();
+    assert_eq!(
+        error.invalid_reason(),
+        Some(InvalidReason::UnknownSelectedRecord)
+    );
 }
 
 #[test]
