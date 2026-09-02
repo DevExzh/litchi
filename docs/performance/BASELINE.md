@@ -1,5 +1,30 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0367: XLSX selected merge streaming
+
+Change 0367 extends the selected worksheet scanner with valid direct active
+`mergeCells` support globally through verified worksheet EOF. It validates the
+exact merge count, nonempty `ref`, reference grid, singleton rejection,
+placement/direct-child rules, and overlap rules, then builds the canonical
+transient `merge::Index`. After all worksheet, dependency, ZIP, source, and
+execution fences complete, a selected single-cell non-anchor returns
+`Covered`; anchors retain `Stored`/`Missing`.
+
+Range `cells` and `visit` remain sparse physical records, including merge
+followers, with no synthetic covered cells; `stored_extent` is unchanged. The
+range path retains at most 16,384 merges with `try_reserve`; 16,385+ drains to
+verified EOF and then takes the mandatory eager fallback. Unknown merge
+attributes, children, or payload fall back after the drain, while malformed
+structure is a hard typed error. Eligible cold paths publish no `Store`,
+`PartData`, or semantic caches.
+
+The transient index's internal `BTreeMap` and heap allocations are bounded by
+the cap but are not individually fallible, so no fixed-memory, RSS, or OOM
+claim follows. Focused validation passed `14/14`, full `litchi-xlsx` library
+validation passed `906/906`, and scoped Clippy passed with only the unrelated
+`clippy::useless-asref` issue allowed. `performance_claim: none`; no latency
+claim follows. See [Change 0367](changes/0367-xlsx-selected-merge-streaming.md).
+
 ## Change 0366: XLSX selected general-reference decoding
 
 The selected worksheet single/range scanner now decodes bounded XML general

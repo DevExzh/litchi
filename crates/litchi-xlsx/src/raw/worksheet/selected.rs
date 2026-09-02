@@ -26,6 +26,7 @@ use super::super::namespace::{SPREADSHEETML_NAMESPACE, STRICT_SPREADSHEETML_NAME
 use super::super::strings::decode_spreadsheet_text;
 use super::model::{
     MAX_CELL_CHARACTERS, MAX_CELL_STYLE, MAX_ENCODED_CELL_BYTES, MAX_FORMULA_CHARACTERS,
+    merge_successor,
 };
 use super::{parse_a1, parse_one_based_row, x14ac};
 use crate::cell::{Cell, ErrorValue, Number, Text, Value};
@@ -34,6 +35,7 @@ use crate::formula::{Cache, Formula, Kind};
 
 const MAX_XML_DEPTH: usize = 256;
 const MAX_GENERAL_REFERENCE_TOKEN_BYTES: usize = 12;
+const MAX_MERGED_RANGES: usize = 16_384;
 // The 12-byte cap keeps 8192 * 12 formula bytes and 32767 * 12 value bytes
 // below MAX_ENCODED_CELL_BYTES (458738); inline numeric refs stay ineligible
 // because `_xHHHH_` decoding could otherwise compose around the encoded bound.
@@ -56,6 +58,9 @@ pub struct SelectedCell {
     /// deferred; the dependency metadata identifies the latter. An explicit
     /// empty record is represented by `Cell::Empty`.
     pub cell: Option<Cell>,
+    /// Merged range covering the requested coordinate when it is not the
+    /// merge anchor. The range is absent for anchors and unmerged cells.
+    pub covering_merge: Option<Rect>,
     /// Bounded dependency metadata observed while scanning the complete
     /// worksheet stream.
     pub dependencies: SelectedDependencies,
@@ -184,6 +189,19 @@ pub fn scan_range(
     limits: &StreamLimits,
     requested: Rect,
 ) -> StreamResult<RangeScanOutcome> {
+    scan_stream(input, capabilities, limits, requested).map(|(outcome, _)| outcome)
+}
+
+#[expect(
+    clippy::result_large_err,
+    reason = "The stream error intentionally retains typed primary plus raw/active callback diagnostics; boxing it would change the established API."
+)]
+fn scan_stream(
+    input: &mut dyn BufRead,
+    capabilities: &Capabilities,
+    limits: &StreamLimits,
+    requested: Rect,
+) -> StreamResult<(RangeScanOutcome, Option<Rect>)> {
     let mut scanner = Scanner::new(requested);
     let result = x14ac::capture_stream_with_active(
         input,
@@ -222,7 +240,8 @@ pub fn scan(
     limits: &StreamLimits,
     requested: Address,
 ) -> StreamResult<ScanOutcome> {
-    let outcome = scan_range(input, capabilities, limits, Rect::single(requested))?;
+    let (outcome, covering_merge) =
+        scan_stream(input, capabilities, limits, Rect::single(requested))?;
     match outcome {
         RangeScanOutcome::NotEligible(reason) => Ok(ScanOutcome::NotEligible(reason)),
         RangeScanOutcome::Eligible(selected) => {
@@ -246,6 +265,7 @@ pub fn scan(
             Ok(ScanOutcome::Eligible(SelectedCell {
                 address: requested,
                 cell: record.and_then(|record| record.cell),
+                covering_merge,
                 dependencies,
             }))
         },
@@ -256,6 +276,8 @@ pub fn scan(
 enum Frame {
     Worksheet,
     SheetData,
+    MergeCells,
+    MergeCell,
     Row,
     Cell,
     Formula,
@@ -407,6 +429,10 @@ struct Scanner {
     root_seen: bool,
     root_closed: bool,
     seen_sheet_data: bool,
+    seen_merge_cells: bool,
+    merge_window_closed: bool,
+    merge_count: Option<u32>,
+    merges: Vec<Rect>,
     pending_cell: Option<PendingCell>,
     selected: Vec<SelectedRecord>,
     selected_count: usize,
@@ -424,6 +450,10 @@ impl Scanner {
             root_seen: false,
             root_closed: false,
             seen_sheet_data: false,
+            seen_merge_cells: false,
+            merge_window_closed: false,
+            merge_count: None,
+            merges: Vec::new(),
             pending_cell: None,
             selected: Vec::new(),
             selected_count: 0,
@@ -432,9 +462,9 @@ impl Scanner {
         }
     }
 
-    fn finish(self) -> Result<RangeScanOutcome> {
+    fn finish(self) -> Result<(RangeScanOutcome, Option<Rect>)> {
         if let Some(reason) = self.not_eligible {
-            return Ok(RangeScanOutcome::NotEligible(reason));
+            return Ok((RangeScanOutcome::NotEligible(reason), None));
         }
         if !self.root_seen || !self.root_closed || !self.stack.is_empty() {
             return Err(invalid(
@@ -449,19 +479,52 @@ impl Scanner {
                 "selected worksheet record count lost synchronization",
             ));
         }
+        if self.seen_merge_cells && self.merges.is_empty() {
+            return Err(invalid(
+                "worksheet mergeCells contains no mergeCell records",
+            ));
+        }
+        if let Some(count) = self.merge_count
+            && count
+                != u32::try_from(self.merges.len())
+                    .map_err(|_source| invalid("worksheet merged-range count does not fit u32"))?
+        {
+            return Err(invalid(format!(
+                "worksheet merged-range count differs from {} records",
+                self.merges.len()
+            )));
+        }
+        let index = crate::merge::Index::new(self.merges)?;
+        let covering_merge = if self.requested.rows() == 1 && self.requested.columns() == 1 {
+            let address = self.requested.start();
+            index
+                .containing(address)
+                .filter(|range| range.start() != address)
+        } else {
+            None
+        };
         let target_shared_string_index = (self.selected.len() == 1)
             .then(|| self.selected[0].shared_string_index)
             .flatten();
         let mut dependencies = self.dependencies;
         dependencies.target_shared_string_index = target_shared_string_index;
-        Ok(RangeScanOutcome::Eligible(SelectedCells {
-            cells: self.selected,
-            dependencies,
-        }))
+        Ok((
+            RangeScanOutcome::Eligible(SelectedCells {
+                cells: self.selected,
+                dependencies,
+            }),
+            covering_merge,
+        ))
     }
 
     fn event(&mut self, event: &SemanticEvent<'_>) -> Result<()> {
         if self.not_eligible.is_some() {
+            if let SemanticEvent::Start(element) | SemanticEvent::Empty(element) = event
+                && self.stack.last() == Some(&Frame::Worksheet)
+                && is_spreadsheetml_element(element, "mergeCells")
+            {
+                self.validate_merge_cells_placement()?;
+            }
             return Ok(());
         }
         match event {
@@ -471,6 +534,10 @@ impl Scanner {
             SemanticEvent::Text(text) | SemanticEvent::CData(text) => self.text(text.text()),
             SemanticEvent::GeneralRef(reference) if self.in_payload() => {
                 self.general_reference(reference)
+            },
+            SemanticEvent::GeneralRef(_) if self.in_merge() => {
+                self.mark(NotEligibleReason::MergeSemantics);
+                Ok(())
             },
             SemanticEvent::GeneralRef(_) => Ok(()),
             SemanticEvent::Comment(_) | SemanticEvent::Decl(_) => Ok(()),
@@ -505,9 +572,16 @@ impl Scanner {
         let frame = match parent {
             Frame::Worksheet => self.start_worksheet_child(element)?,
             Frame::SheetData => self.start_sheet_data_child(element)?,
+            Frame::MergeCells => self.start_merge_cells_child(element)?,
+            Frame::MergeCell => self.start_merge_cell_child(element)?,
             Frame::Row => self.start_row_child(element)?,
             Frame::Cell => self.start_cell_child(element)?,
             Frame::Formula | Frame::Value | Frame::InlineText => {
+                if is_merge_markup(element) {
+                    return Err(invalid(
+                        "worksheet merge markup appears outside its schema context",
+                    ));
+                }
                 self.mark(NotEligibleReason::UnsupportedStructure);
                 None
             },
@@ -535,13 +609,24 @@ impl Scanner {
             self.seen_sheet_data = true;
             return Ok(Some(Frame::SheetData));
         }
-        if is_spreadsheetml_element(element, "mergeCells")
-            || is_spreadsheetml_element(element, "mergeCell")
+        if is_spreadsheetml_element(element, "mergeCells") {
+            self.validate_merge_cells_placement()?;
+            self.seen_merge_cells = true;
+            return self.start_merge_cells(element);
+        }
+        if is_spreadsheetml_element(element, "mergeCell") {
+            return Err(invalid(
+                "worksheet merge markup appears outside its schema context",
+            ));
+        }
+        let local = element.expanded_name.local_name.as_str();
+        if self.seen_sheet_data
+            && is_spreadsheetml_element(element, local)
+            && merge_successor(local.as_bytes())
         {
-            self.mark(NotEligibleReason::MergeSemantics);
-        } else if is_spreadsheetml_element(element, "cols")
-            || is_spreadsheetml_element(element, "col")
-        {
+            self.merge_window_closed = true;
+        }
+        if is_spreadsheetml_element(element, "cols") || is_spreadsheetml_element(element, "col") {
             self.mark(NotEligibleReason::Styles);
         } else {
             self.mark(NotEligibleReason::UnsupportedStructure);
@@ -553,13 +638,12 @@ impl Scanner {
         if is_spreadsheetml_element(element, "row") {
             self.start_row(element)
         } else {
-            if is_spreadsheetml_element(element, "mergeCells")
-                || is_spreadsheetml_element(element, "mergeCell")
-            {
-                self.mark(NotEligibleReason::MergeSemantics);
-            } else {
-                self.mark(NotEligibleReason::UnsupportedStructure);
+            if is_merge_markup(element) {
+                return Err(invalid(
+                    "worksheet merge markup appears outside its schema context",
+                ));
             }
+            self.mark(NotEligibleReason::UnsupportedStructure);
             Ok(None)
         }
     }
@@ -567,6 +651,11 @@ impl Scanner {
     fn start_row_child(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
         if is_spreadsheetml_element(element, "c") {
             return self.start_cell(element);
+        }
+        if is_merge_markup(element) {
+            return Err(invalid(
+                "worksheet merge markup appears outside its schema context",
+            ));
         }
         self.mark(NotEligibleReason::UnsupportedStructure);
         Ok(None)
@@ -601,7 +690,84 @@ impl Scanner {
             cell.saw_inline = true;
             return Ok(Some(Frame::Inline));
         }
+        if is_merge_markup(element) {
+            return Err(invalid(
+                "worksheet merge markup appears outside its schema context",
+            ));
+        }
         self.mark(NotEligibleReason::UnsupportedStructure);
+        Ok(None)
+    }
+
+    fn start_merge_cells(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
+        self.validate_attributes(element, &["count"], false)?;
+        self.merge_count = unqualified_attribute(element, "count")
+            .map(|value| {
+                value.parse::<u32>().map_err(|_source| {
+                    invalid(format!("invalid worksheet merged-range count '{value}'"))
+                })
+            })
+            .transpose()?;
+        if self.not_eligible.is_some() {
+            return Ok(None);
+        }
+        Ok(Some(Frame::MergeCells))
+    }
+
+    fn validate_merge_cells_placement(&self) -> Result<()> {
+        if !self.seen_sheet_data {
+            return Err(invalid("worksheet mergeCells appears before sheetData"));
+        }
+        if self.seen_merge_cells {
+            return Err(invalid("worksheet has duplicate mergeCells elements"));
+        }
+        if self.merge_window_closed {
+            return Err(invalid(
+                "worksheet mergeCells appears after a schema successor",
+            ));
+        }
+        Ok(())
+    }
+
+    fn start_merge_cells_child(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
+        if is_spreadsheetml_element(element, "mergeCell") {
+            return self.start_merge_cell(element);
+        }
+        if is_merge_markup(element) {
+            return Err(invalid("worksheet mergeCells has an unmodeled child"));
+        }
+        self.mark(NotEligibleReason::MergeSemantics);
+        Ok(None)
+    }
+
+    fn start_merge_cell(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
+        self.validate_attributes(element, &["ref"], false)?;
+        if self.merges.len() >= MAX_MERGED_RANGES {
+            self.merges.clear();
+            self.mark(NotEligibleReason::MergeSemantics);
+            return Ok(None);
+        }
+        let reference = unqualified_attribute(element, "ref")
+            .ok_or_else(|| invalid("worksheet mergeCell is missing ref"))?;
+        let range = Rect::from_a1(reference)
+            .map_err(|error| invalid(format!("invalid merged range '{reference}': {error}")))?;
+        if range.rows() == 1 && range.columns() == 1 {
+            return Err(invalid(format!(
+                "worksheet merged range '{reference}' contains only one cell"
+            )));
+        }
+        if self.not_eligible.is_some() {
+            return Ok(None);
+        }
+        self.merges
+            .try_reserve(1)
+            .map_err(|source| allocation("selected worksheet merged ranges", source))?;
+        self.merges.push(range);
+        Ok(Some(Frame::MergeCell))
+    }
+
+    fn start_merge_cell_child(&mut self, _element: &SemanticElement<'_>) -> Result<Option<Frame>> {
+        self.mark(NotEligibleReason::MergeSemantics);
         Ok(None)
     }
 
@@ -621,6 +787,11 @@ impl Scanner {
         if is_spreadsheetml_element(element, "r") {
             self.mark(NotEligibleReason::RichInlineText);
         } else {
+            if is_merge_markup(element) {
+                return Err(invalid(
+                    "worksheet merge markup appears outside its schema context",
+                ));
+            }
             self.mark(NotEligibleReason::UnsupportedStructure);
         }
         Ok(None)
@@ -783,6 +954,8 @@ impl Scanner {
         match frame {
             Frame::Worksheet => self.root_closed = true,
             Frame::SheetData => {},
+            Frame::MergeCells => self.finish_merge_cells()?,
+            Frame::MergeCell => {},
             Frame::Row => self.finish_row()?,
             Frame::Cell => self.finish_cell()?,
             Frame::Formula | Frame::Value | Frame::InlineText | Frame::Inline => {},
@@ -794,6 +967,8 @@ impl Scanner {
         match frame {
             Frame::Worksheet => self.root_closed = true,
             Frame::SheetData => {},
+            Frame::MergeCells => self.finish_merge_cells()?,
+            Frame::MergeCell => {},
             Frame::Row => self.finish_row()?,
             Frame::Cell => self.finish_cell()?,
             Frame::Formula | Frame::Value | Frame::InlineText | Frame::Inline => {},
@@ -806,6 +981,24 @@ impl Scanner {
             return Err(invalid("unterminated worksheet cell"));
         }
         self.row = None;
+        Ok(())
+    }
+
+    fn finish_merge_cells(&self) -> Result<()> {
+        if self.merges.is_empty() {
+            return Err(invalid(
+                "worksheet mergeCells contains no mergeCell records",
+            ));
+        }
+        if self
+            .merge_count
+            .is_some_and(|count| usize::try_from(count).ok() != Some(self.merges.len()))
+        {
+            return Err(invalid(format!(
+                "worksheet merged-range count differs from {} records",
+                self.merges.len()
+            )));
+        }
         Ok(())
     }
 
@@ -936,6 +1129,14 @@ impl Scanner {
                 .as_mut()
                 .ok_or_else(|| invalid("worksheet inline text outside a cell"))?
                 .append_inline(text),
+            Frame::MergeCells | Frame::MergeCell => {
+                if text.trim().is_empty() {
+                    Ok(())
+                } else {
+                    self.mark(NotEligibleReason::MergeSemantics);
+                    Ok(())
+                }
+            },
             Frame::Worksheet | Frame::SheetData | Frame::Row | Frame::Cell | Frame::Inline => {
                 if text.trim().is_empty() {
                     Ok(())
@@ -981,6 +1182,13 @@ impl Scanner {
         matches!(
             self.stack.last(),
             Some(Frame::Formula | Frame::Value | Frame::InlineText)
+        )
+    }
+
+    fn in_merge(&self) -> bool {
+        matches!(
+            self.stack.last(),
+            Some(Frame::MergeCells | Frame::MergeCell)
         )
     }
 
@@ -1089,12 +1297,19 @@ fn is_spreadsheetml_element(element: &SemanticElement<'_>, local: &str) -> bool 
         && element.expanded_name.local_name == local
 }
 
+fn is_merge_markup(element: &SemanticElement<'_>) -> bool {
+    is_spreadsheetml_element(element, "mergeCells")
+        || is_spreadsheetml_element(element, "mergeCell")
+}
+
 fn matches_frame(frame: Frame, element: &litchi_ooxml_common::mce::SemanticEnd<'_>) -> bool {
     let local = element.expanded_name.local_name.as_str();
     let namespace = element.expanded_name.namespace.as_bytes();
     let expected = match frame {
         Frame::Worksheet => "worksheet",
         Frame::SheetData => "sheetData",
+        Frame::MergeCells => "mergeCells",
+        Frame::MergeCell => "mergeCell",
         Frame::Row => "row",
         Frame::Cell => "c",
         Frame::Formula => "f",

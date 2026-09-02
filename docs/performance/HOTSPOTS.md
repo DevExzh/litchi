@@ -1,5 +1,28 @@
 # Performance hotspot inventory
 
+## Change 0367 update
+
+Change 0367 is a correctness and fallback-boundary update, not a measured
+hotspot (`performance_claim: none`). The selected worksheet scanner supports
+valid direct active `mergeCells` globally through verified EOF, with exact
+count, nonempty `ref`, reference-grid, singleton, placement/direct-child, and
+overlap validation. The canonical transient `merge::Index` lets a fenced
+single-cell non-anchor return `Covered`; anchors remain `Stored`/`Missing`.
+
+Range `cells` and `visit` retain sparse physical records, including merge
+followers, and never synthesize covered cells; `stored_extent` is unchanged.
+The range cap is 16,384 retained merges with `try_reserve`; 16,385+ drains to
+verified EOF before mandatory eager fallback. Unknown merge attributes,
+children, or payload use that fallback, while malformed structure is a hard
+typed error. Eligible cold paths retain no `Store`, `PartData`, or semantic
+caches.
+
+The transient index's internal `BTreeMap` and heap allocations are bounded by
+the cap but not individually fallible, so there is no fixed-memory, RSS, or
+OOM claim. Focused validation passed `14/14`, full `litchi-xlsx` library
+validation passed `906/906`, and scoped Clippy passed with only the unrelated
+`clippy::useless-asref` issue allowed. No latency claim follows.
+
 ## Change 0366 update
 
 Change 0366 extends the selected worksheet single/range scanner's eligible

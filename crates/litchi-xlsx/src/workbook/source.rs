@@ -725,6 +725,12 @@ impl SourceWorksheet {
                     return self.eager_cell(address);
                 }
 
+                if let Some(range) = selected.covering_merge
+                    && range.start() != address
+                {
+                    return Ok(SourceCellView::Covered(range));
+                }
+
                 match (selected.cell, dependencies.target_shared_string_index) {
                     (Some(cell), _) => Ok(SourceCellView::Stored(cell)),
                     (None, Some(_)) => match shared_text {
@@ -2106,7 +2112,7 @@ mod tests {
         #[test]
         fn merge_not_eligible_0363_falls_back_and_initializes_store() {
             let bytes = one_sheet_xlsx(&format!(
-                r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells></worksheet>"#,
+                r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1" futureAttr="preserve"/></mergeCells></worksheet>"#,
             ));
             let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
@@ -2919,7 +2925,7 @@ mod tests {
         #[test]
         fn merge_and_shared_formula_0365_fall_back_to_store() {
             let merge = worksheet_xml(
-                r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>"#,
+                r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1" futureAttr="preserve"/></mergeCells>"#,
             );
             let (_source, workbook) = source_workbook(&merge, None, None);
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
@@ -3411,6 +3417,309 @@ mod tests {
                 .unwrap();
             crc[offset + 3] = b'8';
             assert_zero_callbacks_without_publication(crc);
+        }
+    }
+
+    mod streaming_0367_tests {
+        use std::sync::Arc;
+
+        use litchi_opc::{OpcError, SourceCacheDiagnostics};
+
+        use super::super::SourceCell;
+        use super::streaming_0364_tests::dependency_xlsx;
+        use super::{
+            CountingSource, ReadLimits, SourceBackedWorkbook, SourceCellView, managed_context,
+        };
+        use crate::{Cell, Error, Value};
+
+        const SPREADSHEETML_NAMESPACE: &str =
+            "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+        fn worksheet_xml(sheet_data: &str) -> String {
+            let first = std::str::from_utf8(super::FIRST_MARKER).unwrap();
+            let second = std::str::from_utf8(super::SECOND_MARKER).unwrap();
+            format!(
+                r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><!--{first} {second}-->{sheet_data}</worksheet>"#,
+            )
+        }
+
+        fn worksheet_xml_after(sheet_data: &str, after_root: &str) -> String {
+            let first = std::str::from_utf8(super::FIRST_MARKER).unwrap();
+            let second = std::str::from_utf8(super::SECOND_MARKER).unwrap();
+            format!(
+                r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><!--{first} {second}-->{sheet_data}</worksheet>{after_root}"#,
+            )
+        }
+
+        fn source_workbook(
+            worksheet: &str,
+            styles: Option<&str>,
+        ) -> (Arc<CountingSource>, SourceBackedWorkbook) {
+            let source = Arc::new(CountingSource::new(dependency_xlsx(
+                worksheet, None, styles,
+            )));
+            let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+            (source, workbook)
+        }
+
+        fn addresses(cells: &[SourceCell]) -> Vec<String> {
+            cells.iter().map(|cell| cell.address.a1()).collect()
+        }
+
+        fn assert_no_part_cache_admission(
+            before: SourceCacheDiagnostics,
+            after: SourceCacheDiagnostics,
+        ) {
+            assert_eq!(after.cold_loads, before.cold_loads);
+            assert_eq!(after.successful_loads, before.successful_loads);
+            assert_eq!(after.retained_entries, before.retained_entries);
+            assert_eq!(after.retained_bytes, before.retained_bytes);
+        }
+
+        fn assert_zero_callbacks(bytes: Vec<u8>) {
+            let source = Arc::new(CountingSource::new(bytes));
+            let workbook = SourceBackedWorkbook::from_read_at(source).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let before = workbook.cache_diagnostics();
+            let mut callbacks = Vec::new();
+
+            let result = sheet.visit_cells("A1:E3", |address, _cell| {
+                callbacks.push(address.a1());
+                Ok(())
+            });
+
+            assert!(result.is_err());
+            assert!(callbacks.is_empty());
+            assert!(sheet.data.cells.get().is_none());
+            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(workbook.inner.styles.get().is_none());
+            assert_no_part_cache_admission(before, workbook.cache_diagnostics());
+        }
+
+        #[test]
+        fn cold_merge_cell_views_0367_match_forced_eager_without_admission() {
+            let worksheet = worksheet_xml(
+                r#"<sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1"><v>8</v></c><c r="E1"/></row></sheetData><mergeCells count="1"><mergeCell ref="A1:C1"/></mergeCells>"#,
+            );
+            let (_source, workbook) = source_workbook(&worksheet, None);
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let before = workbook.cache_diagnostics();
+            let references = ["A1", "B1", "C1", "D1", "E1"];
+
+            let cold = references
+                .into_iter()
+                .map(|reference| sheet.cell(reference).unwrap())
+                .collect::<Vec<_>>();
+
+            assert!(matches!(
+                &cold[0],
+                SourceCellView::Stored(Cell::Value(Value::Number(value)))
+                    if value.as_str() == "7"
+            ));
+            assert!(matches!(
+                &cold[1],
+                SourceCellView::Covered(range) if range.a1() == "A1:C1"
+            ));
+            assert!(matches!(
+                &cold[2],
+                SourceCellView::Covered(range) if range.a1() == "A1:C1"
+            ));
+            assert!(matches!(&cold[3], SourceCellView::Missing));
+            assert!(matches!(&cold[4], SourceCellView::Stored(Cell::Empty)));
+            assert!(sheet.data.cells.get().is_none());
+            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(workbook.inner.styles.get().is_none());
+            assert_no_part_cache_admission(before, workbook.cache_diagnostics());
+
+            sheet.stored_extent().unwrap();
+            let eager = references
+                .into_iter()
+                .map(|reference| sheet.cell(reference).unwrap())
+                .collect::<Vec<_>>();
+            assert_eq!(cold, eager);
+        }
+
+        #[test]
+        fn cold_cells_and_visit_0367_are_sparse_physical_and_merge_coverage_is_not_synthetic() {
+            let worksheet = worksheet_xml(
+                r#"<sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1"><v>8</v></c><c r="E1"/></row><row r="3"><c r="C3"><v>9</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:C1"/></mergeCells>"#,
+            );
+            let (_source, workbook) = source_workbook(&worksheet, None);
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let before = workbook.cache_diagnostics();
+
+            let cold = sheet.cells("A1:E3").unwrap();
+            assert_eq!(
+                addresses(&cold),
+                vec![
+                    "A1".to_owned(),
+                    "B1".to_owned(),
+                    "E1".to_owned(),
+                    "C3".to_owned(),
+                ]
+            );
+            assert!(matches!(
+                &cold[1].cell,
+                Cell::Value(Value::Number(value)) if value.as_str() == "8"
+            ));
+            assert!(matches!(&cold[2].cell, Cell::Empty));
+            assert!(sheet.data.cells.get().is_none());
+
+            let mut visited = Vec::new();
+            let count = sheet
+                .visit_cells("A1:E3", |address, cell| {
+                    visited.push((address, cell.clone()));
+                    Ok(())
+                })
+                .unwrap();
+            let expected = cold
+                .iter()
+                .map(|cell| (cell.address, cell.cell.clone()))
+                .collect::<Vec<_>>();
+            assert_eq!(count, expected.len());
+            assert_eq!(visited, expected);
+            assert!(sheet.data.cells.get().is_none());
+            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(workbook.inner.styles.get().is_none());
+            assert_no_part_cache_admission(before, workbook.cache_diagnostics());
+
+            sheet.stored_extent().unwrap();
+            assert_eq!(cold, sheet.cells("A1:E3").unwrap());
+        }
+
+        #[test]
+        fn malformed_merge_metadata_0367_has_zero_callbacks_and_publication() {
+            let malformed = worksheet_xml(
+                r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1">"#,
+            );
+            let overlap = worksheet_xml(
+                r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="2"><mergeCell ref="A1:B2"/><mergeCell ref="B2:C3"/></mergeCells>"#,
+            );
+            let count = worksheet_xml(
+                r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="2"><mergeCell ref="A1:B1"/></mergeCells>"#,
+            );
+            let out_of_grid = worksheet_xml(
+                r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="XFE1:XFF1"/></mergeCells>"#,
+            );
+            let tail = worksheet_xml_after(
+                r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>"#,
+                "<tail>",
+            );
+
+            for worksheet in [malformed, overlap, count, out_of_grid, tail] {
+                assert_zero_callbacks(dependency_xlsx(&worksheet, None, None));
+            }
+        }
+
+        #[test]
+        fn crc_source_change_and_cancellation_0367_have_zero_callbacks() {
+            let valid = worksheet_xml(
+                r#"<sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1"><v>8</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>"#,
+            );
+            let mut crc = dependency_xlsx(&valid, None, None);
+            let marker = b"<v>7</v>";
+            let offset = crc
+                .windows(marker.len())
+                .position(|window| window == marker)
+                .unwrap();
+            crc[offset + 3] = b'9';
+            assert_zero_callbacks(crc);
+
+            let (source, workbook) = source_workbook(&valid, None);
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let before = workbook.cache_diagnostics();
+            source.changed();
+            let mut callbacks = 0usize;
+            let error = sheet
+                .visit_cells("A1:E3", |_address, _cell| {
+                    callbacks += 1;
+                    Ok(())
+                })
+                .unwrap_err();
+            assert!(matches!(
+                error,
+                Error::Package(OpcError::SourceChanged { .. })
+            ));
+            assert_eq!(callbacks, 0);
+            assert!(sheet.data.cells.get().is_none());
+            assert_no_part_cache_admission(before, workbook.cache_diagnostics());
+
+            let source = Arc::new(CountingSource::new(dependency_xlsx(&valid, None, None)));
+            let (_budget, cancellation_source, context) = managed_context(u64::MAX);
+            let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+                source,
+                ReadLimits::default(),
+                context,
+            )
+            .unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let before = workbook.cache_diagnostics();
+            cancellation_source.cancel();
+            let mut callbacks = 0usize;
+            let error = sheet
+                .visit_cells("A1:E3", |_address, _cell| {
+                    callbacks += 1;
+                    Ok(())
+                })
+                .unwrap_err();
+            assert!(matches!(error, Error::Package(OpcError::Cancelled)));
+            assert_eq!(callbacks, 0);
+            assert!(sheet.data.cells.get().is_none());
+            assert_no_part_cache_admission(before, workbook.cache_diagnostics());
+        }
+
+        fn assert_fallback_parity(
+            fallback: &str,
+            styles: Option<&str>,
+            eager: &str,
+            references: &[&str],
+        ) {
+            let (_source, fallback_workbook) = source_workbook(fallback, styles);
+            let fallback_sheet = fallback_workbook.sheet("Sheet1").unwrap().unwrap();
+            let before = fallback_workbook.cache_diagnostics();
+            let actual = references
+                .iter()
+                .map(|reference| fallback_sheet.cell(*reference).unwrap())
+                .collect::<Vec<_>>();
+            assert!(fallback_sheet.data.cells.get().is_some());
+            let after = fallback_workbook.cache_diagnostics();
+            assert!(after.successful_loads > before.successful_loads);
+
+            let (_source, eager_workbook) = source_workbook(eager, styles);
+            let eager_sheet = eager_workbook.sheet("Sheet1").unwrap().unwrap();
+            eager_sheet.stored_extent().unwrap();
+            let expected = references
+                .iter()
+                .map(|reference| eager_sheet.cell(*reference).unwrap())
+                .collect::<Vec<_>>();
+            assert_eq!(actual, expected);
+        }
+
+        #[test]
+        fn merge_and_unsupported_semantics_0367_match_eager_with_store_admission() {
+            let shared_formula = worksheet_xml(
+                r#"<sheetData><row r="1"><c r="A1"><f t="shared" ref="A1:A2" si="7">B1</f><v>1</v></c><c r="B1"><v>2</v></c></row><row r="2"><c r="A2"><f t="shared" si="7"/><v>3</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>"#,
+            );
+            let normal_formula = worksheet_xml(
+                r#"<sheetData><row r="1"><c r="A1"><f>B1</f><v>1</v></c><c r="B1"><v>2</v></c></row><row r="2"><c r="A2"><f>B2</f><v>3</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>"#,
+            );
+            assert_fallback_parity(&shared_formula, None, &normal_formula, &["A1", "B1"]);
+
+            let row_style = worksheet_xml(
+                r#"<sheetData><row r="1" s="0"><c r="A1"><v>7</v></c></row></sheetData>"#,
+            );
+            let unstyled =
+                worksheet_xml(r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>"#);
+            let style_catalog = super::streaming_0364_tests::styles(1);
+            assert_fallback_parity(&row_style, Some(&style_catalog), &unstyled, &["A1"]);
+
+            let general_reference = worksheet_xml(
+                r#"<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>&#x41;</t></is></c></row></sheetData>"#,
+            );
+            let decoded = worksheet_xml(
+                r#"<sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>A</t></is></c></row></sheetData>"#,
+            );
+            assert_fallback_parity(&general_reference, None, &decoded, &["A1"]);
         }
     }
 }

@@ -1283,9 +1283,9 @@ mod streaming_0362_selected_tests {
         let cases = [
             (
                 worksheet(
-                    r#"<mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells><sheetData/>"#,
+                    r#"<sheetData/><mergeCells futureAttr="preserve" count="1"><mergeCell ref="A1:B1"/></mergeCells>"#,
                 ),
-                NotEligibleReason::MergeSemantics,
+                NotEligibleReason::UnsupportedStructure,
             ),
             (
                 worksheet(
@@ -1927,14 +1927,15 @@ mod streaming_0365_range_tests {
     }
 
     #[test]
-    fn streaming_0365_range_marks_merge_formula_and_inherited_styles_not_eligible() {
+    fn streaming_0365_range_marks_formula_and_inherited_styles_not_eligible() {
+        let merged = worksheet(
+            r#"<sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>"#,
+        );
+        let selected = eligible_range(&merged, "A1:B1");
+        assert_eq!(selected.cells.len(), 1);
+        assert_number(selected.cells[0].cell.as_ref(), "1");
+
         let cases = [
-            (
-                worksheet(
-                    r#"<mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells><sheetData/>"#,
-                ),
-                NotEligibleReason::MergeSemantics,
-            ),
             (
                 worksheet(
                     r#"<sheetData><row r="1"><c r="A1"><f t="shared" si="0" ref="A1:A2">A1+1</f><v>2</v></c></row></sheetData>"#,
@@ -2014,6 +2015,290 @@ mod streaming_0365_range_tests {
             scan_range_xml(&formula_without_inline_payload, "A1").is_err(),
             "formula-bearing inlineStr without is must be rejected"
         );
+    }
+}
+
+#[cfg(test)]
+mod streaming_0367_merge_tests {
+    use std::fmt::{Debug, Write as _};
+    use std::io::Cursor;
+
+    use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
+    use litchi_sheet::{Cell as Address, Rect};
+
+    use super::super::selected::{
+        NotEligibleReason, RangeScanOutcome, ScanOutcome, SelectedCell, scan, scan_range,
+    };
+    use crate::cell::{Cell, Value};
+
+    const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    const STREAMING_MERGE_CAP: usize = 16_384;
+
+    type StreamResult<T> = super::super::selected::StreamResult<T>;
+
+    fn address(reference: &str) -> Address {
+        Address::from_a1(reference).expect("valid worksheet address")
+    }
+
+    fn range(reference: &str) -> Rect {
+        Rect::from_a1(reference).expect("valid worksheet range")
+    }
+
+    fn worksheet(body: &str) -> String {
+        format!(r#"<worksheet xmlns="{SPREADSHEETML}">{body}</worksheet>"#)
+    }
+
+    fn scan_xml(xml: &str, target: &str) -> StreamResult<ScanOutcome> {
+        let mut input = Cursor::new(xml.as_bytes());
+        scan(
+            &mut input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            address(target),
+        )
+    }
+
+    fn scan_range_xml(xml: &str, reference: &str) -> StreamResult<RangeScanOutcome> {
+        let mut input = Cursor::new(xml.as_bytes());
+        scan_range(
+            &mut input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            range(reference),
+        )
+    }
+
+    fn eligible(xml: &str, target: &str) -> SelectedCell {
+        match scan_xml(xml, target) {
+            Ok(ScanOutcome::Eligible(selected)) => selected,
+            other => panic!("expected eligible selection, got {other:?}"),
+        }
+    }
+
+    fn eligible_range(xml: &str, reference: &str) -> super::super::selected::SelectedCells {
+        match scan_range_xml(xml, reference) {
+            Ok(RangeScanOutcome::Eligible(selected)) => selected,
+            other => panic!("expected eligible range, got {other:?}"),
+        }
+    }
+
+    fn assert_merge_fallback(xml: &str, target: &str) {
+        match scan_xml(xml, target) {
+            Ok(ScanOutcome::NotEligible(_)) => {},
+            other => panic!("expected merge fallback, got {other:?}"),
+        }
+    }
+
+    fn assert_number(selected: SelectedCell, expected: &str) {
+        match selected.cell {
+            Some(Cell::Value(Value::Number(value))) => assert_eq!(value.as_str(), expected),
+            other => panic!("expected number {expected}, got {other:?}"),
+        }
+    }
+
+    fn assert_stream_xml_error<T: Debug>(result: StreamResult<T>) {
+        match result {
+            Err(StreamError::Mce {
+                error: MceError::Xml(_) | MceError::NonConformant(_),
+                ..
+            }) => {},
+            other => panic!("expected typed XML stream error, got {other:?}"),
+        }
+    }
+
+    fn cap_matrix(count: usize) -> Result<String, std::collections::TryReserveError> {
+        let mut xml = String::new();
+        xml.try_reserve(count.saturating_mul(40).saturating_add(256))?;
+        write!(
+            &mut xml,
+            r#"<worksheet xmlns="{SPREADSHEETML}"><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData><mergeCells count="{count}">"#
+        )
+        .expect("String formatting cannot fail");
+        for index in 0..count {
+            let start = index * 2 + 1;
+            let end = start + 1;
+            write!(&mut xml, r#"<mergeCell ref="A{start}:A{end}"/>"#)
+                .expect("String formatting cannot fail");
+        }
+        xml.push_str("</mergeCells></worksheet>");
+        Ok(xml)
+    }
+
+    #[test]
+    fn streaming_0367_accepts_unsorted_adjacent_merges() {
+        let xml = worksheet(
+            r#"<sheetData><row r="1"><c r="A1"><v>1</v></c><c r="C1"><v>3</v></c></row></sheetData><mergeCells count="2"><mergeCell ref="C1:D1"/><mergeCell ref="A1:B1"/></mergeCells>"#,
+        );
+
+        let left = eligible(&xml, "A1");
+        assert_eq!(left.covering_merge, None);
+        assert_number(left, "1");
+
+        let right = eligible(&xml, "C1");
+        assert_eq!(right.covering_merge, None);
+        assert_number(right, "3");
+    }
+
+    #[test]
+    fn streaming_0367_single_cell_wrapper_classifies_anchor_covered_missing_and_follower() {
+        let xml = worksheet(
+            r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row><row r="2"><c r="B2"><v>9</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B2"/></mergeCells>"#,
+        );
+
+        let anchor = eligible(&xml, "A1");
+        assert_eq!(anchor.covering_merge, None);
+        assert_number(anchor, "7");
+
+        let covered = eligible(&xml, "B1");
+        assert_eq!(covered.covering_merge, Some(range("A1:B2")));
+        assert!(covered.cell.is_none());
+
+        let missing = eligible(&xml, "C3");
+        assert_eq!(missing.covering_merge, None);
+        assert!(missing.cell.is_none());
+
+        let follower = eligible(&xml, "B2");
+        assert_eq!(follower.covering_merge, Some(range("A1:B2")));
+        assert_number(follower, "9");
+    }
+
+    #[test]
+    fn streaming_0367_range_selection_remains_sparse_and_physical() {
+        let xml = worksheet(
+            r#"<sheetData><row r="1"><c r="A1"><v>1</v></c><c r="E1"><v>5</v></c></row><row r="2"><c r="C2"><v>3</v></c></row></sheetData><mergeCells count="2"><mergeCell ref="A1:C2"/><mergeCell ref="E1:F1"/></mergeCells>"#,
+        );
+        let selected = eligible_range(&xml, "A1:F2");
+
+        assert_eq!(
+            selected
+                .cells
+                .iter()
+                .map(|record| record.address)
+                .collect::<Vec<_>>(),
+            vec![address("A1"), address("E1"), address("C2")]
+        );
+        assert!(matches!(
+            selected.cells[0].cell.as_ref(),
+            Some(Cell::Value(Value::Number(value))) if value.as_str() == "1"
+        ));
+        assert!(matches!(
+            selected.cells[1].cell.as_ref(),
+            Some(Cell::Value(Value::Number(value))) if value.as_str() == "5"
+        ));
+        assert!(matches!(
+            selected.cells[2].cell.as_ref(),
+            Some(Cell::Value(Value::Number(value))) if value.as_str() == "3"
+        ));
+    }
+
+    #[test]
+    fn streaming_0367_merge_count_is_optional_exact_and_nonempty_but_not_mismatched() {
+        let optional =
+            worksheet(r#"<sheetData/><mergeCells><mergeCell ref="A1:B1"/></mergeCells>"#);
+        assert!(matches!(
+            scan_xml(&optional, "A1"),
+            Ok(ScanOutcome::Eligible(_))
+        ));
+
+        let exact = worksheet(
+            r#"<sheetData/><mergeCells count="2"><mergeCell ref="A1:B1"/><mergeCell ref="C1:D1"/></mergeCells>"#,
+        );
+        assert!(matches!(
+            scan_xml(&exact, "A1"),
+            Ok(ScanOutcome::Eligible(_))
+        ));
+
+        let empty = worksheet(r#"<sheetData/><mergeCells count="0"/>"#);
+        assert!(scan_xml(&empty, "A1").is_err());
+
+        let mismatch =
+            worksheet(r#"<sheetData/><mergeCells count="2"><mergeCell ref="A1:B1"/></mergeCells>"#);
+        assert!(scan_xml(&mismatch, "A1").is_err());
+    }
+
+    #[test]
+    fn streaming_0367_rejects_invalid_merge_references_and_placement() {
+        let cases = [
+            worksheet(
+                r#"<sheetData/><mergeCells><mergeCell ref="A1:B1"/></mergeCells><mergeCells><mergeCell ref="C1:D1"/></mergeCells>"#,
+            ),
+            worksheet(
+                r#"<sheetData/><mergeCells><mergeCell ref="A1:B1"/><mergeCell ref="A1:B1"/></mergeCells>"#,
+            ),
+            worksheet(
+                r#"<sheetData/><mergeCells><mergeCell ref="A1:B2"/><mergeCell ref="B2:C3"/></mergeCells>"#,
+            ),
+            worksheet(r#"<sheetData/><mergeCells><mergeCell ref="A1"/></mergeCells>"#),
+            worksheet(r#"<mergeCells><mergeCell ref="A1:B1"/></mergeCells><sheetData/>"#),
+            worksheet(
+                r#"<sheetData/><hyperlinks/><mergeCells><mergeCell ref="A1:B1"/></mergeCells>"#,
+            ),
+            worksheet(r#"<sheetData/><mergeCells><mergeCell ref="XFE1:XFF1"/></mergeCells>"#),
+            worksheet(r#"<sheetData/><mergeCells><mergeCell/></mergeCells>"#),
+        ];
+
+        for (index, xml) in cases.iter().enumerate() {
+            assert!(
+                scan_xml(xml, "A1").is_err(),
+                "accepted invalid merge case {index}"
+            );
+        }
+    }
+
+    #[test]
+    fn streaming_0367_merge_nested_and_payload_markup_falls_back() {
+        let nested = worksheet(
+            r#"<sheetData/><mergeCells><mergeCell ref="A1:B1"><mergeCell ref="C1:D1"/></mergeCell></mergeCells>"#,
+        );
+        assert_merge_fallback(&nested, "A1");
+
+        let payload = worksheet(
+            r#"<sheetData/><mergeCells><mergeCell ref="A1:B1">payload</mergeCell></mergeCells>"#,
+        );
+        assert_merge_fallback(&payload, "A1");
+    }
+
+    #[test]
+    fn streaming_0367_unknown_merge_attributes_and_children_fall_back() {
+        let attribute = format!(
+            r#"<worksheet xmlns="{SPREADSHEETML}" xmlns:z="urn:future"><sheetData/><mergeCells z:opaque="yes"><mergeCell ref="A1:B1"/></mergeCells></worksheet>"#
+        );
+        assert_merge_fallback(&attribute, "A1");
+
+        let child = format!(
+            r#"<worksheet xmlns="{SPREADSHEETML}" xmlns:z="urn:future"><sheetData/><mergeCells><mergeCell ref="A1:B1"/><z:future/></mergeCells></worksheet>"#
+        );
+        assert_merge_fallback(&child, "A1");
+    }
+
+    #[test]
+    fn streaming_0367_late_malformed_tail_is_not_published_as_eligible() {
+        let xml = format!(
+            r#"{}<tail>"#,
+            worksheet(
+                r#"<sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells><mergeCell ref="A1:B1"/></mergeCells>"#,
+            )
+        );
+        assert_stream_xml_error(scan_xml(&xml, "A1"));
+    }
+
+    #[test]
+    fn streaming_0367_merge_cap_is_bounded_without_area_expansion() {
+        for (count, expected_eligible) in [
+            (STREAMING_MERGE_CAP, true),
+            (STREAMING_MERGE_CAP + 1, false),
+        ] {
+            let xml = cap_matrix(count).expect("bounded merge matrix");
+            match scan_xml(&xml, "A1").expect("merge cap stream") {
+                ScanOutcome::Eligible(selected) if expected_eligible => {
+                    assert_eq!(selected.covering_merge, None);
+                    assert_number(selected, "1");
+                },
+                ScanOutcome::NotEligible(NotEligibleReason::MergeSemantics)
+                    if !expected_eligible => {},
+                other => panic!("unexpected result at merge count {count}: {other:?}"),
+            }
+        }
     }
 }
 
