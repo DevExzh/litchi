@@ -264,6 +264,56 @@ fn malformed_table_model_payload_is_reported() {
 }
 
 #[test]
+fn table_model_discovery_projects_borrowed_name_and_dimensions() {
+    let editor = PagesDocumentBuilder::new()
+        .body_table("Discovery", 3, 4)
+        .build()
+        .expect("source-built Pages table");
+    let graph = body_table_graphs(&editor).expect("body-table discovery");
+
+    assert_eq!(graph.len(), 1);
+    assert_eq!(graph[0].info.name, "Discovery");
+    assert_eq!((graph[0].info.rows, graph[0].info.columns), (3, 4));
+}
+
+#[test]
+fn table_model_discovery_preserves_payload_multiplicity_for_caller_validation() {
+    let no_messages: [RawMessage; 0] = [];
+    assert!(
+        decode_table_models(no_messages.iter(), 42)
+            .unwrap()
+            .is_empty()
+    );
+
+    let editor = PagesDocumentBuilder::new()
+        .body_table("Duplicate", 2, 2)
+        .build()
+        .expect("source-built Pages table");
+    let graph = body_table_graphs(&editor).expect("body-table discovery");
+    let model_id = graph[0].info.model_object_id;
+    let archive_name = find_object_archive(editor.package(), model_id).expect("model archive");
+    let archive = editor
+        .package()
+        .archive(&archive_name)
+        .expect("model archive");
+    let model = archive.object(model_id).expect("model object");
+    let message = model
+        .messages
+        .iter()
+        .find(|message| TABLE_MODEL_MESSAGE_TYPES.contains(&message.type_))
+        .expect("table-model message")
+        .clone();
+    let messages = [message.clone(), message];
+
+    assert_eq!(
+        decode_table_models(messages.iter(), model_id)
+            .expect("both payloads are independently valid")
+            .len(),
+        2
+    );
+}
+
+#[test]
 fn source_built_table_has_no_conditional_highlighting_and_clear_is_idempotent() {
     let mut editor = PagesDocumentBuilder::new()
         .body_table("Conditional", 2, 2)

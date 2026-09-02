@@ -7394,3 +7394,22 @@ No package, dependency edge, ordered migration debt, host, or whole-monolith
 deletion gate closes. The current topology remains 64 workspace packages, 238
 internal dependency declarations, 227 canonical edges, 11 development-only
 edges, 11 ordered migration debts, and one migration host.
+
+## 2026-09-03 amendment: Pages table-model discovery uses a borrowed Buffa view
+
+Pages body-table discovery in the migration host now projects only the table
+name and dimensions through the strict borrowed
+`table_model_discovery_codec::TableModelSnapshot`. The source message remains
+caller-owned; the discovery path performs the codec's complete canonical wire
+preflight and Buffa parity checks, then allocates only the owned name required
+by the existing compatibility result. It no longer materializes an eager
+generated `TableModelArchive` merely to discover those three facts.
+
+This ratchet is intentionally limited to read-only body-table discovery.
+Existing eager decodes used by table topology, geometry, creation, and mutation
+remain outside its scope until equivalent preservation-aware owners exist. A
+source-boundary audit prevents the discovery helper from returning to generated
+eager decode. No public API, package, dependency edge, ordered migration debt,
+host, or monolith-exit gate closes through this internal allocation and
+ownership improvement, and no new native Pages artifact is required because
+the emitted package bytes and mutation behavior are unchanged.

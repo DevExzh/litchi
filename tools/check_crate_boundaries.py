@@ -10293,6 +10293,18 @@ NUMBERS_TABLE_LOCK_ALLOWED_COMMON_REEXPORT = (
 )
 IWA_PAGES_SOURCE_ROOT = Path("crates/litchi-iwa/src/pages")
 IWA_PAGES_EDITOR_SOURCE = IWA_PAGES_SOURCE_ROOT / "editor.rs"
+IWA_PAGES_TABLE_MODEL_DISCOVERY_SOURCE = (
+    IWA_PAGES_SOURCE_ROOT / "editor" / "tables" / "validation.rs"
+)
+IWA_PAGES_TABLE_MODEL_DISCOVERY_REQUIRED_MARKERS = (
+    "table_model_discovery_codec",
+    "decode_table_model",
+    "DecodeOptions",
+    "TableModelSnapshot",
+)
+IWA_PAGES_TABLE_MODEL_EAGER_DECODE = re.compile(
+    r"\bTableModelArchive\s*::\s*decode\s*\("
+)
 IWA_PAGES_CHART_CAPTION_SOURCE = (
     IWA_PAGES_SOURCE_ROOT / "editor" / "charts" / "caption.rs"
 )
@@ -47757,6 +47769,34 @@ def audit_pages_section_text_facade_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_pages_table_model_discovery_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep Pages body-table discovery on the strict borrowed Buffa projection."""
+
+    path = root / IWA_PAGES_TABLE_MODEL_DISCOVERY_SOURCE
+    if not path.is_file():
+        return []
+
+    source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    code = _mask_rust_non_code(source)
+    violations: list[str] = []
+    for marker in IWA_PAGES_TABLE_MODEL_DISCOVERY_REQUIRED_MARKERS:
+        if re.search(rf"\b{re.escape(marker)}\b", code) is None:
+            violations.append(
+                "litchi-iwa Pages table-model discovery is missing strict borrowed "
+                f"codec marker {marker}: {IWA_PAGES_TABLE_MODEL_DISCOVERY_SOURCE}"
+            )
+    for match in IWA_PAGES_TABLE_MODEL_EAGER_DECODE.finditer(code):
+        line_number = code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "litchi-iwa Pages table-model discovery performs eager generated "
+            "TableModelArchive::decode: "
+            f"{IWA_PAGES_TABLE_MODEL_DISCOVERY_SOURCE}:{line_number}"
+        )
+    return sorted(set(violations))
+
+
 def audit_iwa_pages_document_settings_source_topology(root: Path = ROOT) -> list[str]:
     """Keep retired Pages document-settings APIs and modules out of the host."""
 
@@ -48861,6 +48901,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_pages_package_output_api_source_topology()
         + audit_iwork_atomic_publication()
         + audit_pages_package_no_eager_prost_source_topology()
+        + audit_iwa_pages_table_model_discovery_source_topology()
         + audit_iwa_pages_footnote_text_source_topology()
         + audit_pages_footnote_text_facade_source_topology()
         + audit_iwa_pages_footnote_lifecycle_source_topology()
