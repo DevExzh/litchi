@@ -678,7 +678,7 @@ evidence only and make no latency claim;
 
 ## ODT source-backed document catalog selectors (change 0368)
 
-The harness exposes 404 selectable cases; the default matrix remains 36 cases and 198 rows.
+Change 0368 exposed 404 selectable cases; the default matrix remains 36 cases and 198 rows.
 
 The three catalog-first ODT selectors are opt-in and use the same fixed
 large-media-rich corpus as the repeated-text controls:
@@ -722,6 +722,49 @@ These records are evidence for the named catalog lifecycle only: they make no
 generic latency, physical-I/O, allocation, decompression, cold-cache,
 throughput, or broad ODF claim. The selectors add three selectable names but
 do not change the default 36 cases / 198 records.
+
+## ODP source-backed presentation catalog selectors (change 0370)
+
+The current harness exposes 407 selectable cases; the default matrix remains 36
+cases and 198 rows. The three selectors are opt-in and reuse the existing
+deterministic 12-slide/eight-media ODP corpus:
+
+```text
+odp_source_backed_catalog_open
+odp_source_backed_catalog_list
+odp_source_backed_catalog_query
+```
+
+Run the catalog family with:
+
+```sh
+cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
+  --warmup 3 --samples 15 \
+  --case odp_source_backed_catalog_open,odp_source_backed_catalog_list,odp_source_backed_catalog_query \
+  --json target/perf/odp-source-catalog.json
+```
+
+The corpus contains 12 deterministic semantic slides and eight incompressible
+2 MiB `Pictures/*` members. The open selector times a fresh
+`SourceBackedPresentationCatalog::from_read_at`; the list selector prepares the
+owner outside timing and times only `catalog()`; the query selector prepares the
+owner outside timing and times only `slide_at(6)`. Ordered catalog entries,
+selected-slide text, full presentation text, archive topology, and all media
+payload identities are checked against exact untimed oracles.
+
+Every retained sample also has an untimed `InstrumentedSource` replay recording
+total reads/bytes, compressed-range overlap, `content.xml` and untouched-member
+overlap, ordinary payload reads, Pictures reads, and source-version
+observations. Open and query replays require positive content and untouched
+non-media reads and zero `Pictures/*` reads. List replays occur after source
+preparation is reset and require zero operation reads across all source,
+content, untouched, ordinary-payload, and Pictures counters. Replay shapes and
+source-version observations must remain deterministic across samples.
+
+`performance_claim: none`; these selectors provide catalog lifecycle,
+semantic, and source-range evidence only. They make no generic latency,
+physical-I/O, allocation, decompression, cold-cache, throughput, or broad ODF
+claim, and they leave the default 36 cases / 198 records unchanged.
 
 six additional matched simulated CFB selective-read cases
 (`cfb_selective_simulated_{mini,mini_4095,fat}_{legacy,shared}_read`) reuse the

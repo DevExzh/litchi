@@ -1,5 +1,47 @@
 # Performance program phase report
 
+## Change 0370: ODP source-backed catalog selectors
+
+### Implementation boundary
+
+Change 0370 is a harness-only evidence tranche. It adds the opt-in
+`odp_source_backed_catalog_open`, `odp_source_backed_catalog_list`, and
+`odp_source_backed_catalog_query` selectors without changing production code,
+the CRUD surface, or the default matrix. The selectable registry is **407**;
+the default remains **36 cases / 198 rows**. The fixed ODP corpus contains 12
+slides, 13 archive members, and eight deterministic 2 MiB `Pictures/*`
+members. The archive is 16,785,912 bytes with SHA-256
+`661ae80396d4eda673d35e45d208443cc359052e4b9b27fed0ba6681602a913a`.
+
+### Timing scopes and control
+
+The open timer covers fresh source-backed catalog construction. The list timer
+covers only `catalog()` after owner preparation. The query timer covers only
+the selected slide projection at index 6 after owner/index preparation.
+Semantic digests, topology, source replay, and media-locality checks are
+untimed gates.
+
+The retained [machine-readable control report](results/odp-source-catalog-0370-control.json)
+uses CPU 2, 30 warmups, and 500 samples. Its source revision is dirty:
+`f35486fb7085bb128eb89a4d2e9edd3ad1065f02`; the binary SHA-256 is
+`08594839ede39d7f2ed0c143d818e41de0b7cdb77bc92fbcdd2a96083ca9966a`.
+
+| Selector | p50 (ns) | mean (ns) | p95 (ns) | p99 (ns) |
+| --- | ---: | ---: | ---: | ---: |
+| open | 57,538 | 61,057.616 | 76,884 | 88,020 |
+| list | 31 | 63.854 | 161 | 200 |
+| query, index 6 | 60,062 | 64,323.154 | 83,354 | 101,659 |
+
+### Interpretation
+
+`performance_claim: none`; `claim_authorized: false`. The dirty control is
+descriptive only and is not a clean A/B comparison. No latency, RSS,
+allocation, physical-I/O, decompression, cold-cache, fixed-memory,
+throughput, or OOM-prevention claim follows. Strict Clippy exposed only 23
+preexisting unrelated diagnostics; the scoped allow-list Clippy run passed.
+The focused selector test passed `1/1`, the enumeration test passed `1/1`, and
+no full suite was run.
+
 ## Change 0369: ODT source-backed catalog fused parse
 
 ### Implementation boundary

@@ -1,5 +1,10 @@
 # Performance CRUD coverage
 
+## 2026-09-02: change 0370 adds ODP source-backed catalog evidence
+
+- Three opt-in selectors add source-backed ODP catalog open, list, and selected-slide query evidence over a fixed 12-slide, 13-member media-rich corpus with eight 2 MiB `Pictures/*` members. This measures named catalog lifecycle scopes only; it adds no production CRUD API and is not CRUD-completion evidence.
+- The selectable registry is **407** and the default remains **36 cases / 198 rows**. Focused selector and selectable-count tests passed `1/1` each; `performance_claim: none`; `claim_authorized: false`. The dirty control is descriptive and makes no latency, throughput, allocation, RSS, physical-I/O, or OOM-prevention claim.
+
 ## 2026-09-02: change 0368 adds ODT source-backed catalog evidence
 
 - Three opt-in selectors add source-backed ODT catalog open, list, and selected-block query evidence over the existing 10,008-entry media-rich corpus. This measures named catalog lifecycle scopes only; it adds no production CRUD API and is not CRUD-completion evidence.
