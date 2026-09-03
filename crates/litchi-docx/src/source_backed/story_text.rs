@@ -1,7 +1,7 @@
 //! Source-backed text snapshots for one selected Word story.
 //!
 //! This module deliberately keeps the selection closure to one main, header,
-//! footer, footnote, endnote, or comment story. Relationship metadata is
+//! footer, footnote, endnote, comment, or glossary-entry story. Relationship metadata is
 //! resolved without reading payloads; only the owning XML member is
 //! materialized. Edits reuse the main document transaction engine through a
 //! private `w:document`/`w:body` adapter. For collection parts, only the exact
@@ -38,18 +38,96 @@ use super::Package;
 const TRANSITIONAL_WORD_NAMESPACE: &[u8] =
     b"http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const STRICT_WORD_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/wordprocessingml/main";
+const TRANSITIONAL_RELATIONSHIP_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const STRICT_RELATIONSHIP_NAMESPACE: &[u8] =
+    b"http://purl.oclc.org/ooxml/officeDocument/relationships";
+const VML_NAMESPACE: &[u8] = b"urn:schemas-microsoft-com:vml";
 const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
 const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const DEFAULT_MAX_NAMESPACE_BINDINGS: usize = 256;
 const DEFAULT_MAX_NAMESPACE_BYTES: usize = 4 * 1024 * 1024;
 const MAX_STORY_REFERENCE_BYTES: usize = 64 * 1024;
+const MAX_GLOSSARY_SELECTOR_NAME_BYTES: usize = 1024 * 1024;
+const MAX_GLOSSARY_SELECTOR_ID_BYTES: usize = 256;
+
+/// An owned semantic selector for one existing glossary document part.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum GlossarySelector {
+    /// Select by the Unicode-case-folded `w:name` value.
+    ByName(String),
+    /// Select by the semantic `w:guid` value.
+    ById(crate::glossary::Id),
+    /// Select the entry whose `w:name` and `w:guid` both match.
+    ByNameAndId {
+        /// Requested building-block name.
+        name: String,
+        /// Requested building-block GUID.
+        id: crate::glossary::Id,
+    },
+    /// Select by source-order index as a snapshot-local fallback.
+    ByIndex(usize),
+}
+
+/// The compact diagnostic kind of a glossary selector.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GlossarySelectorKind {
+    /// A Unicode-case-folded name selector.
+    ByName,
+    /// A semantic GUID selector.
+    ById,
+    /// A selector requiring both name and GUID equality.
+    ByNameAndId,
+    /// A source-order index selector.
+    ByIndex,
+}
+
+impl GlossarySelector {
+    /// Return the compact selector kind used by typed lookup diagnostics.
+    #[must_use]
+    pub const fn kind(&self) -> GlossarySelectorKind {
+        match self {
+            Self::ByName(_) => GlossarySelectorKind::ByName,
+            Self::ById(_) => GlossarySelectorKind::ById,
+            Self::ByNameAndId { .. } => GlossarySelectorKind::ByNameAndId,
+            Self::ByIndex(_) => GlossarySelectorKind::ByIndex,
+        }
+    }
+
+    /// Construct a name-based glossary selector.
+    #[must_use]
+    pub fn by_name(name: impl Into<String>) -> Self {
+        Self::ByName(name.into())
+    }
+
+    /// Construct a GUID-based glossary selector.
+    #[must_use]
+    pub const fn by_id(id: crate::glossary::Id) -> Self {
+        Self::ById(id)
+    }
+
+    /// Construct a selector requiring both name and GUID equality.
+    #[must_use]
+    pub fn by_name_and_id(name: impl Into<String>, id: crate::glossary::Id) -> Self {
+        Self::ByNameAndId {
+            name: name.into(),
+            id,
+        }
+    }
+
+    /// Construct a checked source-order selector.
+    #[must_use]
+    pub const fn by_index(index: usize) -> Self {
+        Self::ByIndex(index)
+    }
+}
 
 /// A semantic selector for one source-backed Word story.
 ///
 /// Header and footer indices are assigned after sorting the relationship
 /// targets by canonical absolute part name. The selector never exposes an OPC
 /// URI or relationship identifier.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Selector {
     /// The package's unique main document part.
     Main,
@@ -63,6 +141,8 @@ pub enum Selector {
     Endnote(u32),
     /// One comment selected by its WordprocessingML ID.
     Comment(u32),
+    /// One existing glossary document part selected by semantic identity.
+    Glossary(GlossarySelector),
 }
 
 impl Selector {
@@ -100,6 +180,36 @@ impl Selector {
     #[must_use]
     pub const fn comment(id: u32) -> Self {
         Self::Comment(id)
+    }
+
+    /// Construct a glossary-entry selector.
+    #[must_use]
+    pub fn glossary(selector: GlossarySelector) -> Self {
+        Self::Glossary(selector)
+    }
+
+    /// Construct a source-order glossary-entry selector.
+    #[must_use]
+    pub const fn glossary_index(index: usize) -> Self {
+        Self::Glossary(GlossarySelector::ByIndex(index))
+    }
+
+    /// Construct a name-based glossary-entry selector.
+    #[must_use]
+    pub fn glossary_by_name(name: impl Into<String>) -> Self {
+        Self::Glossary(GlossarySelector::by_name(name))
+    }
+
+    /// Construct a GUID-based glossary-entry selector.
+    #[must_use]
+    pub const fn glossary_by_id(id: crate::glossary::Id) -> Self {
+        Self::Glossary(GlossarySelector::ById(id))
+    }
+
+    /// Construct a glossary-entry selector requiring a name and GUID.
+    #[must_use]
+    pub fn glossary_by_name_and_id(name: impl Into<String>, id: crate::glossary::Id) -> Self {
+        Self::Glossary(GlossarySelector::by_name_and_id(name, id))
     }
 }
 
@@ -155,6 +265,18 @@ pub enum Error {
         story: &'static str,
         /// Requested semantic entry ID.
         id: u32,
+    },
+    /// The requested glossary entry is absent.
+    #[error("source-backed glossary selector {selector:?} is absent")]
+    MissingGlossaryEntry {
+        /// Compact selector kind that matched no source entry.
+        selector: GlossarySelectorKind,
+    },
+    /// More than one glossary entry matches the semantic selector.
+    #[error("source-backed glossary selector {selector:?} is ambiguous")]
+    AmbiguousGlossaryEntry {
+        /// Compact selector kind that matched multiple source entries.
+        selector: GlossarySelectorKind,
     },
     /// A publication inverse was applied to a foreign complete artifact.
     #[error("source-backed story text publication conflicts with the complete source artifact")]
@@ -374,6 +496,7 @@ enum RootKind {
     Footnotes,
     Endnotes,
     Comments,
+    Glossary,
 }
 
 impl RootKind {
@@ -382,7 +505,7 @@ impl RootKind {
             Self::Footnotes => Some(b"footnote"),
             Self::Endnotes => Some(b"endnote"),
             Self::Comments => Some(b"comment"),
-            Self::Main | Self::Header | Self::Footer => None,
+            Self::Main | Self::Header | Self::Footer | Self::Glossary => None,
         }
     }
 }
@@ -444,7 +567,7 @@ pub struct Snapshot {
 impl Clone for Snapshot {
     fn clone(&self) -> Self {
         Self {
-            selector: self.selector,
+            selector: self.selector.clone(),
             partname: self.partname.clone(),
             payload: self.payload.clone(),
             layout: self.layout.clone(),
@@ -467,8 +590,8 @@ impl Snapshot {
 
     /// Return the semantic selector captured by this snapshot.
     #[must_use]
-    pub const fn selector(&self) -> Selector {
-        self.selector
+    pub fn selector(&self) -> Selector {
+        self.selector.clone()
     }
 
     /// Return the exact source revision captured by this snapshot.
@@ -659,7 +782,7 @@ impl Snapshot {
         let mut base = self.clone();
         let transaction = if let Some(transaction) = self.transaction.clone() {
             transaction
-        } else if !matches!(self.selector, Selector::Main) {
+        } else if !matches!(&self.selector, Selector::Main) {
             let effective_output_limit = self.limits.max_output_bytes.min(MAX_DOCUMENT_XML_BYTES);
             let (document_xml, envelope) =
                 make_wrapped_document(self.raw_bytes(), &self.layout, effective_output_limit)?;
@@ -750,9 +873,9 @@ impl Snapshot {
             )
         };
         let payload = Payload::Owned(Arc::new(raw));
-        let layout = scan_story(
+        let layout = scan_selected_story(
             payload.as_bytes(),
-            self.selector,
+            &self.selector,
             Some(self.layout.word_namespace.as_ref()),
             self.limits,
             self.execution.as_ref(),
@@ -764,7 +887,7 @@ impl Snapshot {
         });
         let part_fingerprint = digest(payload.as_bytes());
         Ok(Self {
-            selector: self.selector,
+            selector: self.selector.clone(),
             partname: self.partname.clone(),
             payload,
             layout,
@@ -1042,7 +1165,7 @@ impl Package {
     ) -> Result<Publication> {
         self.package.check_execution()?;
         let execution = self.package.execution_context();
-        let current = capture(&self, patch.before.selector, patch.before.limits)?;
+        let current = capture(&self, patch.before.selector.clone(), patch.before.limits)?;
         let target = patch.apply(&current)?;
         let original_artifact = self.package.source_artifact();
         let mut output = FingerprintingWriter::new(writer);
@@ -1114,10 +1237,13 @@ impl Package {
 
 fn capture(package: &Package, selector: Selector, limits: Limits) -> Result<Snapshot> {
     package.package.check_execution()?;
+    if let Selector::Glossary(glossary) = &selector {
+        validate_glossary_selector(glossary)?;
+    }
     let source_version = package.package.source_version()?;
     let source_lineage = package.package.source_lineage();
     let execution = package.package.execution_context();
-    let (partname, part, relationship_word_namespace) = resolve_part(&package.package, selector)?;
+    let (partname, part, relationship_word_namespace) = resolve_part(&package.package, &selector)?;
     let declared = part.declared_uncompressed_size()?;
     if declared > limits.max_xml_bytes as u64 {
         return Err(Error::Limit {
@@ -1140,9 +1266,9 @@ fn capture(package: &Package, selector: Selector, limits: Limits) -> Result<Snap
     } else {
         Payload::Owned(data.into_arc()?)
     };
-    let layout = scan_story(
+    let layout = scan_selected_story(
         payload.as_bytes(),
-        selector,
+        &selector,
         relationship_word_namespace,
         limits,
         execution.as_ref(),
@@ -1296,7 +1422,7 @@ fn is_supported_story_xml_reference(reference: &[u8]) -> bool {
 
 fn resolve_part<'package>(
     package: &'package SourceBackedPackage,
-    selector: Selector,
+    selector: &Selector,
 ) -> Result<(PackURI, PartView<'package>, Option<&'static [u8]>)> {
     let execution = package.execution_context();
     check_execution_context(execution.as_ref())?;
@@ -1325,17 +1451,18 @@ fn resolve_part<'package>(
         },
         Selector::Header(index) => {
             let (partname, part, relationship_namespace) =
-                resolve_header_footer(package, index, true)?;
+                resolve_header_footer(package, *index, true)?;
             Ok((partname, part, Some(relationship_namespace)))
         },
         Selector::Footer(index) => {
             let (partname, part, relationship_namespace) =
-                resolve_header_footer(package, index, false)?;
+                resolve_header_footer(package, *index, false)?;
             Ok((partname, part, Some(relationship_namespace)))
         },
-        Selector::Footnote(id) => resolve_secondary_part(package, id, SecondaryProfile::Footnote),
-        Selector::Endnote(id) => resolve_secondary_part(package, id, SecondaryProfile::Endnote),
-        Selector::Comment(id) => resolve_secondary_part(package, id, SecondaryProfile::Comment),
+        Selector::Footnote(id) => resolve_secondary_part(package, *id, SecondaryProfile::Footnote),
+        Selector::Endnote(id) => resolve_secondary_part(package, *id, SecondaryProfile::Endnote),
+        Selector::Comment(id) => resolve_secondary_part(package, *id, SecondaryProfile::Comment),
+        Selector::Glossary(_) => resolve_glossary_part(package, package_dialect),
     }
 }
 
@@ -1449,6 +1576,114 @@ fn resolve_secondary_part<'package>(
     Ok((target, part, Some(relationship_namespace)))
 }
 
+fn resolve_glossary_part<'package>(
+    package: &'package SourceBackedPackage,
+    package_dialect: WordDialect,
+) -> Result<(PackURI, PartView<'package>, Option<&'static [u8]>)> {
+    let execution = package.execution_context();
+    let main = package.main_document_part()?;
+    if !matches!(
+        main.content_type(),
+        ct::WML_DOCUMENT_MAIN
+            | ct::WML_TEMPLATE_MAIN
+            | ct::WML_DOCUMENT_MACRO_MAIN
+            | ct::WML_TEMPLATE_MACRO_MAIN
+    ) {
+        return Err(Error::Document(crate::Error::InvalidContentType {
+            expected: format!(
+                "{}, {}, {}, or {}",
+                ct::WML_DOCUMENT_MAIN,
+                ct::WML_TEMPLATE_MAIN,
+                ct::WML_DOCUMENT_MACRO_MAIN,
+                ct::WML_TEMPLATE_MACRO_MAIN,
+            ),
+            got: main.content_type().to_owned(),
+        }));
+    }
+    if package.rels().iter().any(|relationship| {
+        matches!(
+            relationship.reltype(),
+            TRANSITIONAL_GLOSSARY | STRICT_GLOSSARY
+        )
+    }) {
+        return Err(Error::Document(crate::Error::InvalidRelationship(
+            "package root cannot source a glossary-document relationship".into(),
+        )));
+    }
+    let expected_relationship = match package_dialect {
+        WordDialect::Transitional => TRANSITIONAL_GLOSSARY,
+        WordDialect::Strict => STRICT_GLOSSARY,
+    };
+    let mut selected = None;
+    for part in package.iter_parts() {
+        check_execution_context(execution.as_ref())?;
+        let is_main = part.partname() == main.partname();
+        for relationship in part.rels().iter() {
+            check_execution_context(execution.as_ref())?;
+            if !matches!(
+                relationship.reltype(),
+                TRANSITIONAL_GLOSSARY | STRICT_GLOSSARY
+            ) {
+                continue;
+            }
+            if !is_main {
+                return Err(Error::Document(crate::Error::InvalidRelationship(
+                    "glossary-document relationship has an invalid source".into(),
+                )));
+            }
+            if relationship.reltype() != expected_relationship {
+                return Err(Error::Document(crate::Error::InvalidRelationship(
+                    "glossary relationship does not match package conformance".into(),
+                )));
+            }
+            if relationship.is_external() {
+                return Err(Error::Document(crate::Error::InvalidRelationship(
+                    "glossary relationship cannot be external".into(),
+                )));
+            }
+            if selected.is_some() {
+                return Err(Error::Document(crate::Error::InvalidRelationship(
+                    "main document has multiple glossary relationships".into(),
+                )));
+            }
+            selected = Some(relationship.target_partname()?);
+        }
+    }
+    let target = selected.ok_or_else(|| {
+        Error::Document(crate::Error::InvalidRelationship(
+            "main document glossary relationship is missing".into(),
+        ))
+    })?;
+    let part = package.part(&target)?;
+    if part.content_type() != ct::WML_DOCUMENT_GLOSSARY {
+        return Err(Error::Document(crate::Error::InvalidContentType {
+            expected: ct::WML_DOCUMENT_GLOSSARY.to_owned(),
+            got: part.content_type().to_owned(),
+        }));
+    }
+    if inbound_count(package, &target)? != 1 {
+        return Err(Error::Document(crate::Error::InvalidRelationship(
+            "glossary target has an ambiguous inbound relationship closure".into(),
+        )));
+    }
+    for candidate in package.iter_parts() {
+        check_execution_context(execution.as_ref())?;
+        if candidate.content_type() == ct::WML_DOCUMENT_GLOSSARY
+            && candidate.partname() != part.partname()
+        {
+            return Err(Error::Document(crate::Error::InvalidRelationship(
+                "orphan glossary content-type part exists beside the owned root".into(),
+            )));
+        }
+    }
+    validate_glossary_root_relationships(package, &part, package_dialect, execution.as_ref())?;
+    Ok((
+        part.partname().clone(),
+        part,
+        Some(package_dialect.word_namespace()),
+    ))
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum WordDialect {
     Transitional,
@@ -1462,6 +1697,113 @@ impl WordDialect {
             Self::Strict => STRICT_WORD_NAMESPACE,
         }
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum OwnedStoryKind {
+    Header,
+    Footer,
+    Footnotes,
+    Endnotes,
+    Comments,
+    Glossary,
+}
+
+impl OwnedStoryKind {
+    const fn index(self) -> Option<usize> {
+        match self {
+            Self::Header => Some(0),
+            Self::Footer => Some(1),
+            Self::Footnotes => Some(2),
+            Self::Endnotes => Some(3),
+            Self::Comments => Some(4),
+            Self::Glossary => None,
+        }
+    }
+
+    const fn content_type(self) -> Option<&'static str> {
+        match self {
+            Self::Header => Some(ct::WML_HEADER),
+            Self::Footer => Some(ct::WML_FOOTER),
+            Self::Footnotes => Some(ct::WML_FOOTNOTES),
+            Self::Endnotes => Some(ct::WML_ENDNOTES),
+            Self::Comments => Some(ct::WML_COMMENTS),
+            Self::Glossary => None,
+        }
+    }
+}
+
+fn validate_glossary_root_relationships(
+    package: &SourceBackedPackage,
+    root: &PartView<'_>,
+    package_dialect: WordDialect,
+    execution: Option<&ExecutionContext>,
+) -> Result<()> {
+    let mut seen = [false; 5];
+    for relationship in root.rels().iter() {
+        check_execution_context(execution)?;
+        if word_relationship_uri_dialect(relationship.reltype())
+            .is_some_and(|dialect| dialect != package_dialect)
+        {
+            return Err(Error::Document(crate::Error::InvalidRelationship(
+                "glossary auxiliary relationship uses a dialect different from the package root"
+                    .into(),
+            )));
+        }
+        let Some((dialect, kind)) = word_story_relationship_kind(relationship.reltype()) else {
+            if !relationship.is_external() {
+                let target = relationship.target_partname()?;
+                let target_part = package.part(&target)?;
+                if inbound_count(package, target_part.partname())? != 1 {
+                    return Err(Error::Document(crate::Error::InvalidRelationship(
+                        "glossary auxiliary target has an ambiguous inbound relationship closure"
+                            .into(),
+                    )));
+                }
+            }
+            continue;
+        };
+        if dialect != package_dialect {
+            return Err(Error::Document(crate::Error::InvalidRelationship(
+                "Word story relationship uses a dialect different from the package root".into(),
+            )));
+        }
+        if kind == OwnedStoryKind::Glossary {
+            return Err(Error::Document(crate::Error::InvalidRelationship(
+                "a glossary story cannot own another glossary story".into(),
+            )));
+        }
+        if relationship.is_external() {
+            return Err(Error::Document(crate::Error::InvalidRelationship(
+                "glossary-owned Word story relationship cannot be external".into(),
+            )));
+        }
+        if let Some(index) = kind.index()
+            && std::mem::replace(&mut seen[index], true)
+        {
+            return Err(Error::Document(crate::Error::InvalidRelationship(
+                "glossary story has multiple relationships of one story kind".into(),
+            )));
+        }
+        let target = relationship.target_partname()?;
+        let target_part = package.part(&target)?;
+        let expected = kind.content_type().ok_or(unsupported_xml(
+            "glossary story relationship has no content type",
+        ))?;
+        if target_part.content_type() != expected {
+            return Err(Error::Document(crate::Error::InvalidContentType {
+                expected: expected.to_owned(),
+                got: target_part.content_type().to_owned(),
+            }));
+        }
+        if inbound_count(package, target_part.partname())? != 1 {
+            return Err(Error::Document(crate::Error::InvalidRelationship(
+                "glossary auxiliary story has an ambiguous inbound relationship closure".into(),
+            )));
+        }
+        reject_outbound_story_relationships(&target_part, execution)?;
+    }
+    Ok(())
 }
 
 fn package_word_dialect(package: &SourceBackedPackage) -> Result<WordDialect> {
@@ -1498,21 +1840,35 @@ fn office_document_relationship_dialect(reltype: &str) -> Option<WordDialect> {
     }
 }
 
-fn word_story_relationship_dialect(reltype: &str) -> Option<WordDialect> {
+fn word_story_relationship_kind(reltype: &str) -> Option<(WordDialect, OwnedStoryKind)> {
     match reltype {
-        rt::HEADER
-        | rt::FOOTER
-        | rt::FOOTNOTES
-        | rt::ENDNOTES
-        | rt::COMMENTS
-        | TRANSITIONAL_GLOSSARY => Some(WordDialect::Transitional),
-        STRICT_HEADER
-        | STRICT_FOOTER
-        | STRICT_FOOTNOTES
-        | STRICT_ENDNOTES
-        | rt::STRICT_COMMENTS
-        | STRICT_GLOSSARY => Some(WordDialect::Strict),
+        rt::HEADER => Some((WordDialect::Transitional, OwnedStoryKind::Header)),
+        rt::FOOTER => Some((WordDialect::Transitional, OwnedStoryKind::Footer)),
+        rt::FOOTNOTES => Some((WordDialect::Transitional, OwnedStoryKind::Footnotes)),
+        rt::ENDNOTES => Some((WordDialect::Transitional, OwnedStoryKind::Endnotes)),
+        rt::COMMENTS => Some((WordDialect::Transitional, OwnedStoryKind::Comments)),
+        TRANSITIONAL_GLOSSARY => Some((WordDialect::Transitional, OwnedStoryKind::Glossary)),
+        STRICT_HEADER => Some((WordDialect::Strict, OwnedStoryKind::Header)),
+        STRICT_FOOTER => Some((WordDialect::Strict, OwnedStoryKind::Footer)),
+        STRICT_FOOTNOTES => Some((WordDialect::Strict, OwnedStoryKind::Footnotes)),
+        STRICT_ENDNOTES => Some((WordDialect::Strict, OwnedStoryKind::Endnotes)),
+        rt::STRICT_COMMENTS => Some((WordDialect::Strict, OwnedStoryKind::Comments)),
+        STRICT_GLOSSARY => Some((WordDialect::Strict, OwnedStoryKind::Glossary)),
         _ => None,
+    }
+}
+
+fn word_story_relationship_dialect(reltype: &str) -> Option<WordDialect> {
+    word_story_relationship_kind(reltype).map(|(dialect, _)| dialect)
+}
+
+fn word_relationship_uri_dialect(reltype: &str) -> Option<WordDialect> {
+    if reltype.starts_with("http://schemas.openxmlformats.org/officeDocument/2006/relationships/") {
+        Some(WordDialect::Transitional)
+    } else if reltype.starts_with("http://purl.oclc.org/ooxml/officeDocument/relationships/") {
+        Some(WordDialect::Strict)
+    } else {
+        None
     }
 }
 
@@ -1699,7 +2055,122 @@ struct NamespaceContext {
     raw_namespace_bytes: usize,
 }
 
+fn preflight_attribute_value(value: &[u8], maximum: usize, resource: &'static str) -> Result<()> {
+    let raw_maximum = maximum.checked_mul(4).unwrap_or(usize::MAX);
+    if value.len() > raw_maximum {
+        return Err(Error::Limit {
+            resource,
+            actual: value.len(),
+            maximum: raw_maximum,
+        });
+    }
+    let _ = checked_decoded_attribute_value_length(value, maximum, resource)?;
+    Ok(())
+}
+
+fn checked_decoded_attribute_value_length(
+    value: &[u8],
+    maximum: usize,
+    resource: &'static str,
+) -> Result<usize> {
+    let raw_maximum = maximum.checked_mul(4).unwrap_or(usize::MAX);
+    if value.len() > raw_maximum {
+        return Err(Error::Limit {
+            resource,
+            actual: value.len(),
+            maximum: raw_maximum,
+        });
+    }
+    let mut decoded_length = 0usize;
+    let mut offset = 0usize;
+    while offset < value.len() {
+        if value[offset] != b'&' {
+            decoded_length = decoded_length.checked_add(1).ok_or(Error::Limit {
+                resource,
+                actual: usize::MAX,
+                maximum,
+            })?;
+            offset += 1;
+            continue;
+        }
+        let entity_start = offset + 1;
+        let entity_end = value[entity_start..]
+            .iter()
+            .position(|byte| *byte == b';')
+            .map(|relative| entity_start + relative)
+            .ok_or_else(|| {
+                Error::Document(crate::Error::InvalidFormat(
+                    "unterminated XML attribute escape".into(),
+                ))
+            })?;
+        let entity = &value[entity_start..entity_end];
+        let replacement_length = if matches!(entity, b"lt" | b"gt" | b"amp" | b"apos" | b"quot") {
+            1
+        } else if entity.first() == Some(&b'#') {
+            let (radix, digits) = if entity.get(1) == Some(&b'x') || entity.get(1) == Some(&b'X') {
+                (16_u32, &entity[2..])
+            } else {
+                (10_u32, &entity[1..])
+            };
+            if digits.is_empty() {
+                return Err(Error::Document(crate::Error::InvalidFormat(
+                    "empty XML character reference".into(),
+                )));
+            }
+            let mut codepoint = 0u32;
+            for digit in digits {
+                let digit_value = if digit.is_ascii_digit() {
+                    u32::from(*digit - b'0')
+                } else if radix == 16 && digit.is_ascii_hexdigit() {
+                    u32::from(digit.to_ascii_lowercase() - b'a' + 10)
+                } else {
+                    return Err(Error::Document(crate::Error::InvalidFormat(
+                        "invalid XML character reference".into(),
+                    )));
+                };
+                codepoint = codepoint
+                    .checked_mul(radix)
+                    .and_then(|value| value.checked_add(digit_value))
+                    .ok_or_else(|| {
+                        Error::Document(crate::Error::InvalidFormat(
+                            "XML character reference is out of range".into(),
+                        ))
+                    })?;
+            }
+            char::from_u32(codepoint)
+                .ok_or_else(|| {
+                    Error::Document(crate::Error::InvalidFormat(
+                        "XML character reference is not a Unicode scalar".into(),
+                    ))
+                })?
+                .len_utf8()
+        } else {
+            return Err(Error::Document(crate::Error::InvalidFormat(
+                "unsupported XML attribute escape".into(),
+            )));
+        };
+        decoded_length = decoded_length
+            .checked_add(replacement_length)
+            .ok_or(Error::Limit {
+                resource,
+                actual: usize::MAX,
+                maximum,
+            })?;
+        if decoded_length > maximum {
+            return Err(Error::Limit {
+                resource,
+                actual: decoded_length,
+                maximum,
+            });
+        }
+        offset = entity_end + 1;
+    }
+    Ok(decoded_length)
+}
+
 fn decode_attribute_value(value: &[u8]) -> Result<Vec<u8>> {
+    let decoded_length =
+        checked_decoded_attribute_value_length(value, usize::MAX, "story attribute value")?;
     let value = std::str::from_utf8(value).map_err(|error| {
         Error::Document(crate::Error::InvalidFormat(format!(
             "invalid XML attribute UTF-8: {error}"
@@ -1707,7 +2178,7 @@ fn decode_attribute_value(value: &[u8]) -> Result<Vec<u8>> {
     })?;
     let mut decoded = Vec::new();
     decoded
-        .try_reserve_exact(value.len())
+        .try_reserve_exact(decoded_length)
         .map_err(|source| Error::Allocation {
             resource: "story namespace value",
             source,
@@ -1818,6 +2289,7 @@ impl NamespaceContext {
         start: &BytesStart<'_>,
         max_bindings: usize,
         max_namespace_bytes: usize,
+        expected_word_namespace: Option<&[u8]>,
     ) -> Result<(Self, Vec<u8>)> {
         if parent.bindings.len() > max_bindings {
             return Err(Error::Limit {
@@ -1882,6 +2354,7 @@ impl NamespaceContext {
                         maximum: max_namespace_bytes,
                     });
                 }
+                preflight_attribute_value(value, max_namespace_bytes, "namespace attribute value")?;
                 let decoded_value = decode_attribute_value(value)?;
                 if decoded_value.as_slice() == MCE_NAMESPACE {
                     return Err(unsupported_xml(
@@ -1944,22 +2417,24 @@ impl NamespaceContext {
             {
                 return Err(unsupported_xml("undeclared attribute namespace prefix"));
             }
-            let decoded_value = if !is_namespace_declaration(key) {
-                Some(decode_attribute_value(value)?)
-            } else {
-                None
-            };
-            if !is_namespace_declaration(key)
-                && (is_mce_attribute(key, decoded_value.as_deref().unwrap_or_default())
+            if !is_namespace_declaration(key) {
+                let mce_attribute = is_mce_attribute_name(key)
                     || context
                         .resolve_attribute(key)
-                        .is_some_and(|namespace| namespace == MCE_NAMESPACE))
-            {
-                return Err(unsupported_xml(
-                    "markup-compatibility attributes are not accepted in a source-bound story",
-                ));
+                        .is_some_and(|namespace| namespace == MCE_NAMESPACE)
+                    || value == MCE_NAMESPACE;
+                if mce_attribute {
+                    preflight_attribute_value(value, max_namespace_bytes, "story attribute value")?;
+                    return Err(unsupported_xml(
+                        "markup-compatibility attributes are not accepted in a source-bound story",
+                    ));
+                }
             }
         }
+        let word_namespace = expected_word_namespace
+            .or_else(|| context.resolve_element(start.name()))
+            .unwrap_or_default();
+        reject_word_dialect_attributes(start, &context, word_namespace)?;
         Ok((context, namespace_attributes))
     }
 
@@ -2033,21 +2508,47 @@ fn append_namespace_attribute(
     namespace: &[u8],
     maximum: usize,
 ) -> Result<()> {
-    let worst_case = namespace
+    let escaped_namespace_bytes = namespace.iter().try_fold(0usize, |total, byte| {
+        let byte_len = match byte {
+            b'&' => 5,
+            b'<' => 4,
+            b'"' => 6,
+            _ => 1,
+        };
+        total.checked_add(byte_len).ok_or(Error::Limit {
+            resource: "story namespace attributes",
+            actual: usize::MAX,
+            maximum,
+        })
+    })?;
+    let prefix_bytes = if prefix.is_empty() {
+        0
+    } else {
+        prefix.len().checked_add(1).ok_or(Error::Limit {
+            resource: "story namespace attributes",
+            actual: usize::MAX,
+            maximum,
+        })?
+    };
+    let declaration_bytes = b" xmlns"
         .len()
-        .checked_mul(5)
-        .and_then(|value| value.checked_add(prefix.len()))
-        .and_then(|value| value.checked_add(11))
+        .checked_add(prefix_bytes)
+        .and_then(|value| value.checked_add(b"=\"".len()))
+        .and_then(|value| value.checked_add(escaped_namespace_bytes))
+        .and_then(|value| value.checked_add(1))
         .ok_or(Error::Limit {
             resource: "story namespace attributes",
             actual: usize::MAX,
             maximum,
         })?;
-    let projected = output.len().checked_add(worst_case).ok_or(Error::Limit {
-        resource: "story namespace attributes",
-        actual: usize::MAX,
-        maximum,
-    })?;
+    let projected = output
+        .len()
+        .checked_add(declaration_bytes)
+        .ok_or(Error::Limit {
+            resource: "story namespace attributes",
+            actual: usize::MAX,
+            maximum,
+        })?;
     if projected > maximum {
         return Err(Error::Limit {
             resource: "story namespace attributes",
@@ -2056,7 +2557,7 @@ fn append_namespace_attribute(
         });
     }
     output
-        .try_reserve(worst_case)
+        .try_reserve_exact(declaration_bytes)
         .map_err(|source| Error::Allocation {
             resource: "story namespace attributes",
             source,
@@ -2088,12 +2589,12 @@ fn reader_position(reader: &Reader<&[u8]>) -> Result<usize> {
     })
 }
 
-fn secondary_identity(selector: Selector) -> Option<(&'static str, u32)> {
+fn secondary_identity(selector: &Selector) -> Option<(&'static str, u32)> {
     match selector {
-        Selector::Footnote(id) => Some(("footnote", id)),
-        Selector::Endnote(id) => Some(("endnote", id)),
-        Selector::Comment(id) => Some(("comment", id)),
-        Selector::Main | Selector::Header(_) | Selector::Footer(_) => None,
+        Selector::Footnote(id) => Some(("footnote", *id)),
+        Selector::Endnote(id) => Some(("endnote", *id)),
+        Selector::Comment(id) => Some(("comment", *id)),
+        Selector::Main | Selector::Header(_) | Selector::Footer(_) | Selector::Glossary(_) => None,
     }
 }
 
@@ -2101,7 +2602,7 @@ fn selector_matches_entry(
     start: &BytesStart<'_>,
     context: &NamespaceContext,
     word_namespace: &[u8],
-    selector: Selector,
+    selector: &Selector,
 ) -> Result<bool> {
     let Some((story, selected_id)) = secondary_identity(selector) else {
         return Ok(false);
@@ -2116,7 +2617,7 @@ fn selector_matches_entry(
     let matches = match selector {
         Selector::Footnote(_) | Selector::Endnote(_) => id == i64::from(selected_id),
         Selector::Comment(_) => u32::try_from(id).ok() == Some(selected_id),
-        Selector::Main | Selector::Header(_) | Selector::Footer(_) => false,
+        Selector::Main | Selector::Header(_) | Selector::Footer(_) | Selector::Glossary(_) => false,
     };
     if !matches {
         return Ok(false);
@@ -2168,14 +2669,787 @@ fn word_attribute(
                 "secondary story entry repeats a WordprocessingML attribute",
             )));
         }
+        if let Err(error) = preflight_attribute_value(
+            attribute.value.as_ref(),
+            MAX_GLOSSARY_SELECTOR_NAME_BYTES,
+            "story attribute value",
+        ) {
+            return Some(Err(error));
+        }
         selected = Some(decode_attribute_value(attribute.value.as_ref()));
     }
     selected
 }
 
+fn validate_glossary_selector(selector: &GlossarySelector) -> Result<()> {
+    match selector {
+        GlossarySelector::ByName(name) => {
+            let _ = glossary_name_key(name)?;
+        },
+        GlossarySelector::ById(id) => validate_glossary_selector_id(id)?,
+        GlossarySelector::ByNameAndId { name, id } => {
+            let _ = glossary_name_key(name)?;
+            validate_glossary_selector_id(id)?;
+        },
+        GlossarySelector::ByIndex(_) => {},
+    }
+    Ok(())
+}
+
+fn validate_glossary_selector_id(id: &crate::glossary::Id) -> Result<()> {
+    if id.as_str().len() > MAX_GLOSSARY_SELECTOR_ID_BYTES {
+        return Err(Error::Limit {
+            resource: "glossary selector ID bytes",
+            actual: id.as_str().len(),
+            maximum: MAX_GLOSSARY_SELECTOR_ID_BYTES,
+        });
+    }
+    Ok(())
+}
+
+fn glossary_name_key(value: &str) -> Result<String> {
+    if value.len() > MAX_GLOSSARY_SELECTOR_NAME_BYTES {
+        return Err(Error::Limit {
+            resource: "glossary selector name bytes",
+            actual: value.len(),
+            maximum: MAX_GLOSSARY_SELECTOR_NAME_BYTES,
+        });
+    }
+    use caseless::Caseless;
+    use unicode_normalization::UnicodeNormalization;
+
+    let mut key = String::new();
+    key.try_reserve(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "glossary selector name key",
+            source,
+        })?;
+    for character in value.chars().nfd().default_case_fold().nfd() {
+        let next = key
+            .len()
+            .checked_add(character.len_utf8())
+            .ok_or(Error::Limit {
+                resource: "glossary selector name key",
+                actual: usize::MAX,
+                maximum: MAX_GLOSSARY_SELECTOR_NAME_BYTES,
+            })?;
+        if next > MAX_GLOSSARY_SELECTOR_NAME_BYTES {
+            return Err(Error::Limit {
+                resource: "glossary selector name key",
+                actual: next,
+                maximum: MAX_GLOSSARY_SELECTOR_NAME_BYTES,
+            });
+        }
+        if key.capacity() < next {
+            key.try_reserve(character.len_utf8())
+                .map_err(|source| Error::Allocation {
+                    resource: "glossary selector name key",
+                    source,
+                })?;
+        }
+        key.push(character);
+    }
+    Ok(key)
+}
+
+fn glossary_metadata_text(
+    start: &BytesStart<'_>,
+    context: &NamespaceContext,
+    word_namespace: &[u8],
+    field: &'static str,
+) -> Result<Option<String>> {
+    let Some(value) = word_attribute(start, context, word_namespace, b"val").transpose()? else {
+        return Ok(None);
+    };
+    if value.len() > MAX_GLOSSARY_SELECTOR_NAME_BYTES {
+        return Err(Error::Limit {
+            resource: "glossary selector metadata bytes",
+            actual: value.len(),
+            maximum: MAX_GLOSSARY_SELECTOR_NAME_BYTES,
+        });
+    }
+    let value = String::from_utf8(value).map_err(|_| {
+        unsupported_xml(match field {
+            "name" => "glossary entry name is not valid UTF-8",
+            _ => "glossary entry GUID is not valid UTF-8",
+        })
+    })?;
+    validate_xml_1_0_value(
+        &value,
+        match field {
+            "name" => "glossary entry name contains a character forbidden by XML 1.0",
+            _ => "glossary entry GUID contains a character forbidden by XML 1.0",
+        },
+    )?;
+    Ok(Some(value))
+}
+
+fn validate_xml_1_0_value(value: &str, reason: &'static str) -> Result<()> {
+    if value.chars().all(|character| {
+        matches!(
+            character,
+            '\u{9}' | '\u{a}' | '\u{d}' | '\u{20}'..='\u{d7ff}'
+                | '\u{e000}'..='\u{fffd}'
+                | '\u{10000}'..='\u{10ffff}'
+        )
+    }) {
+        Ok(())
+    } else {
+        Err(unsupported_xml(reason))
+    }
+}
+
+fn glossary_metadata_id(
+    start: &BytesStart<'_>,
+    context: &NamespaceContext,
+    word_namespace: &[u8],
+) -> Result<Option<crate::glossary::Id>> {
+    let Some(value) = glossary_metadata_text(start, context, word_namespace, "guid")? else {
+        return Ok(None);
+    };
+    let id = crate::glossary::Id::new(value)
+        .map_err(|_| unsupported_xml("glossary entry GUID is not a semantic building-block ID"))?;
+    Ok(Some(id))
+}
+
+fn glossary_selector_matches(
+    selector: &GlossarySelector,
+    requested_name_key: Option<&str>,
+    index: usize,
+    name_key: Option<&str>,
+    id: Option<&str>,
+) -> bool {
+    match selector {
+        GlossarySelector::ByName(_) => requested_name_key == name_key,
+        GlossarySelector::ById(requested) => id == Some(requested.as_str()),
+        GlossarySelector::ByNameAndId {
+            id: requested_id, ..
+        } => requested_name_key == name_key && id == Some(requested_id.as_str()),
+        GlossarySelector::ByIndex(requested) => *requested == index,
+    }
+}
+
+fn scan_selected_story(
+    xml: &[u8],
+    selector: &Selector,
+    expected_word_namespace: Option<&[u8]>,
+    limits: Limits,
+    execution: Option<&ExecutionContext>,
+) -> Result<Layout> {
+    match selector {
+        Selector::Glossary(glossary) => {
+            scan_glossary(xml, glossary, expected_word_namespace, limits, execution)
+        },
+        _ => scan_story(xml, selector, expected_word_namespace, limits, execution),
+    }
+}
+
+fn scan_glossary(
+    xml: &[u8],
+    selector: &GlossarySelector,
+    expected_word_namespace: Option<&[u8]>,
+    limits: Limits,
+    execution: Option<&ExecutionContext>,
+) -> Result<Layout> {
+    if xml.len() > limits.max_xml_bytes {
+        return Err(Error::Limit {
+            resource: "XML bytes",
+            actual: xml.len(),
+            maximum: limits.max_xml_bytes,
+        });
+    }
+    validate_glossary_selector(selector)?;
+    let requested_name_key = match selector {
+        GlossarySelector::ByName(name) | GlossarySelector::ByNameAndId { name, .. } => {
+            Some(glossary_name_key(name)?)
+        },
+        GlossarySelector::ById(_) | GlossarySelector::ByIndex(_) => None,
+    };
+    let mut reader = Reader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    let mut event_count = 0usize;
+    let mut depth = 0usize;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut word_namespace = Vec::new();
+    let mut namespace_stack = Vec::new();
+    let empty_namespace_context = NamespaceContext::default();
+    let mut root_has_background = false;
+    let mut root_has_doc_parts = false;
+    let mut doc_parts_depth = None;
+    let mut doc_part_depth = None;
+    let mut doc_part_pr_depth = None;
+    let mut body_depth = None;
+    let mut entry_count = 0usize;
+    let mut current_entry_index = 0usize;
+    let mut current_entry_start = None;
+    let mut current_entry_selected = false;
+    let mut current_entry_pr_seen = false;
+    let mut current_entry_name_key = None;
+    let mut current_entry_id = None;
+    let mut current_body_count = 0usize;
+    let mut current_body_inner_start = None;
+    let mut current_body_inner_end = None;
+    let mut current_body_namespace_attributes = None;
+    let mut current_body_has_w_namespace = false;
+    let mut paragraph_stack = Vec::new();
+    let mut current_paragraphs = Vec::new();
+    let mut paragraphs = Vec::new();
+    let mut selected_count = 0usize;
+    let mut selected_inner_start = None;
+    let mut selected_inner_end = None;
+    let mut selected_namespace_attributes = None;
+    let mut selected_has_w_namespace = false;
+
+    loop {
+        let before = reader_position(&reader)?;
+        let event = reader.read_event().map_err(|error| {
+            Error::Document(crate::Error::InvalidFormat(format!(
+                "invalid glossary XML: {error}",
+            )))
+        })?;
+        event_count = event_count.checked_add(1).ok_or(Error::Limit {
+            resource: "XML events",
+            actual: usize::MAX,
+            maximum: limits.max_events,
+        })?;
+        if event_count > limits.max_events {
+            return Err(Error::Limit {
+                resource: "XML events",
+                actual: event_count,
+                maximum: limits.max_events,
+            });
+        }
+        if event_count & 63 == 0 {
+            check_execution_context(execution)?;
+        }
+        let after = reader_position(&reader)?;
+        match event {
+            Event::Start(start) => {
+                let event_start = before;
+                let parent_depth = depth;
+                let logical_depth = parent_depth.checked_add(1).ok_or(Error::Limit {
+                    resource: "XML depth",
+                    actual: usize::MAX,
+                    maximum: limits.max_depth,
+                })?;
+                if logical_depth > limits.max_depth {
+                    return Err(Error::Limit {
+                        resource: "XML depth",
+                        actual: logical_depth,
+                        maximum: limits.max_depth,
+                    });
+                }
+                let parent_context = namespace_stack.last().unwrap_or(&empty_namespace_context);
+                let (context, element_namespace_attributes) = NamespaceContext::for_element(
+                    parent_context,
+                    &start,
+                    limits.max_namespace_bindings,
+                    limits.max_namespace_bytes,
+                    expected_word_namespace,
+                )?;
+                if parent_depth == 0 {
+                    if root_seen || root_closed {
+                        return Err(unsupported_xml("multiple glossary roots"));
+                    }
+                    let info = inspect_root(
+                        &start,
+                        RootKind::Glossary,
+                        &context,
+                        element_namespace_attributes,
+                    )?;
+                    if expected_word_namespace
+                        .is_some_and(|expected| info.word_namespace.as_slice() != expected)
+                    {
+                        return Err(unsupported_xml(
+                            "glossary relationship and XML dialects differ",
+                        ));
+                    }
+                    word_namespace = info.word_namespace;
+                    root_seen = true;
+                } else if !root_seen || root_closed {
+                    return Err(unsupported_xml("glossary content occurs outside its root"));
+                }
+                reject_wrong_word_namespace(start.name(), &context, &word_namespace)?;
+                if parent_depth == 1 {
+                    if is_word_element(start.name(), &context, &word_namespace, b"background") {
+                        if root_has_background || root_has_doc_parts {
+                            return Err(unsupported_xml(
+                                "glossary root has an invalid background order",
+                            ));
+                        }
+                        root_has_background = true;
+                    } else if is_word_element(start.name(), &context, &word_namespace, b"docParts")
+                    {
+                        if root_has_doc_parts {
+                            return Err(unsupported_xml(
+                                "glossary root contains multiple docParts",
+                            ));
+                        }
+                        root_has_doc_parts = true;
+                        doc_parts_depth = Some(logical_depth);
+                    } else if is_glossary_root_extension(start.name(), &context, &word_namespace) {
+                        // Preserve qualified extension metadata outside the Word schema.
+                    } else {
+                        return Err(unsupported_xml(
+                            "glossary root has an unexpected direct child",
+                        ));
+                    }
+                } else if doc_parts_depth == Some(parent_depth) {
+                    if !is_word_element(start.name(), &context, &word_namespace, b"docPart") {
+                        return Err(unsupported_xml(
+                            "glossary docParts contains a non-docPart child",
+                        ));
+                    }
+                    if doc_part_depth.is_some() {
+                        return Err(unsupported_xml("glossary docPart nesting is invalid"));
+                    }
+                    entry_count = entry_count.checked_add(1).ok_or(Error::Limit {
+                        resource: "story entries",
+                        actual: usize::MAX,
+                        maximum: limits.max_entries,
+                    })?;
+                    if entry_count > limits.max_entries {
+                        return Err(Error::Limit {
+                            resource: "story entries",
+                            actual: entry_count,
+                            maximum: limits.max_entries,
+                        });
+                    }
+                    current_entry_index = entry_count - 1;
+                    current_entry_start = Some(event_start);
+                    current_entry_selected = matches!(
+                        selector,
+                        GlossarySelector::ByIndex(requested) if *requested == current_entry_index
+                    );
+                    if current_entry_selected {
+                        selected_count = 1;
+                    }
+                    current_entry_pr_seen = false;
+                    current_entry_name_key = None;
+                    current_entry_id = None;
+                    current_body_count = 0;
+                    current_body_inner_start = None;
+                    current_body_inner_end = None;
+                    current_body_namespace_attributes = None;
+                    current_body_has_w_namespace = false;
+                    current_paragraphs.clear();
+                    doc_part_depth = Some(logical_depth);
+                } else if doc_part_depth == Some(parent_depth) {
+                    if is_word_element(start.name(), &context, &word_namespace, b"docPartPr") {
+                        if current_entry_pr_seen || current_body_count != 0 {
+                            return Err(unsupported_xml(
+                                "glossary docPartPr must precede its docPartBody and occur once",
+                            ));
+                        }
+                        current_entry_pr_seen = true;
+                        doc_part_pr_depth = Some(logical_depth);
+                    } else if is_word_element(
+                        start.name(),
+                        &context,
+                        &word_namespace,
+                        b"docPartBody",
+                    ) {
+                        if current_body_count != 0 {
+                            return Err(unsupported_xml(
+                                "glossary docPart has multiple docPartBody elements",
+                            ));
+                        }
+                        current_body_count =
+                            current_body_count.checked_add(1).ok_or(Error::Limit {
+                                resource: "glossary entry bodies",
+                                actual: usize::MAX,
+                                maximum: 1,
+                            })?;
+                        if body_depth.is_some() {
+                            return Err(unsupported_xml("glossary docPartBody nesting is invalid"));
+                        }
+                        body_depth = Some(logical_depth);
+                        if current_entry_selected {
+                            current_body_inner_start = Some(after);
+                            let (attributes, has_w_namespace) = context
+                                .wrapper_namespace_attributes(
+                                    &word_namespace,
+                                    limits.max_xml_bytes,
+                                )?;
+                            current_body_namespace_attributes = Some(attributes);
+                            current_body_has_w_namespace = has_w_namespace;
+                        }
+                    } else if context.resolve_element(start.name())
+                        == Some(word_namespace.as_slice())
+                    {
+                        return Err(unsupported_xml(
+                            "glossary docPart has an unexpected direct Word child",
+                        ));
+                    }
+                } else if doc_part_pr_depth == Some(parent_depth)
+                    && is_word_element(start.name(), &context, &word_namespace, b"name")
+                {
+                    let value = glossary_metadata_text(&start, &context, &word_namespace, "name")?;
+                    if let Some(value) = value {
+                        current_entry_name_key = Some(glossary_name_key(&value)?);
+                    }
+                } else if doc_part_pr_depth == Some(parent_depth)
+                    && is_word_element(start.name(), &context, &word_namespace, b"guid")
+                {
+                    current_entry_id = glossary_metadata_id(&start, &context, &word_namespace)?;
+                } else if body_depth == Some(parent_depth)
+                    && current_entry_selected
+                    && is_word_element(start.name(), &context, &word_namespace, b"p")
+                {
+                    ensure_paragraph_capacity(
+                        current_paragraphs.len(),
+                        paragraph_stack.len(),
+                        limits.max_paragraphs,
+                    )?;
+                    reserve_one(&mut paragraph_stack, "glossary paragraph stack")?;
+                    paragraph_stack.push((logical_depth, event_start));
+                    reserve_one(&mut current_paragraphs, "glossary paragraph ranges")?;
+                }
+                depth = logical_depth;
+                reserve_one(&mut namespace_stack, "glossary namespace stack")?;
+                namespace_stack.push(context);
+            },
+            Event::Empty(start) => {
+                let event_start = before;
+                let parent_depth = depth;
+                let logical_depth = parent_depth.checked_add(1).ok_or(Error::Limit {
+                    resource: "XML depth",
+                    actual: usize::MAX,
+                    maximum: limits.max_depth,
+                })?;
+                if logical_depth > limits.max_depth {
+                    return Err(Error::Limit {
+                        resource: "XML depth",
+                        actual: logical_depth,
+                        maximum: limits.max_depth,
+                    });
+                }
+                let parent_context = namespace_stack.last().unwrap_or(&empty_namespace_context);
+                let (context, element_namespace_attributes) = NamespaceContext::for_element(
+                    parent_context,
+                    &start,
+                    limits.max_namespace_bindings,
+                    limits.max_namespace_bytes,
+                    expected_word_namespace,
+                )?;
+                if parent_depth == 0 {
+                    if root_seen || root_closed {
+                        return Err(unsupported_xml("multiple glossary roots"));
+                    }
+                    let info = inspect_root(
+                        &start,
+                        RootKind::Glossary,
+                        &context,
+                        element_namespace_attributes,
+                    )?;
+                    if expected_word_namespace
+                        .is_some_and(|expected| info.word_namespace.as_slice() != expected)
+                    {
+                        return Err(unsupported_xml(
+                            "glossary relationship and XML dialects differ",
+                        ));
+                    }
+                    word_namespace = info.word_namespace;
+                    root_seen = true;
+                    root_closed = true;
+                } else if !root_seen || root_closed {
+                    return Err(unsupported_xml("glossary content occurs outside its root"));
+                } else {
+                    reject_wrong_word_namespace(start.name(), &context, &word_namespace)?;
+                    if parent_depth == 1 {
+                        if is_word_element(start.name(), &context, &word_namespace, b"background") {
+                            if root_has_background || root_has_doc_parts {
+                                return Err(unsupported_xml(
+                                    "glossary root has an invalid background order",
+                                ));
+                            }
+                            root_has_background = true;
+                        } else if is_word_element(
+                            start.name(),
+                            &context,
+                            &word_namespace,
+                            b"docParts",
+                        ) {
+                            if root_has_doc_parts {
+                                return Err(unsupported_xml(
+                                    "glossary root contains multiple docParts",
+                                ));
+                            }
+                            root_has_doc_parts = true;
+                        } else if is_glossary_root_extension(
+                            start.name(),
+                            &context,
+                            &word_namespace,
+                        ) {
+                            // Preserve qualified extension metadata outside the Word schema.
+                        } else {
+                            return Err(unsupported_xml(
+                                "glossary root has an unexpected direct child",
+                            ));
+                        }
+                    } else if doc_parts_depth == Some(parent_depth) {
+                        if !is_word_element(start.name(), &context, &word_namespace, b"docPart") {
+                            return Err(unsupported_xml(
+                                "glossary docParts contains a non-docPart child",
+                            ));
+                        }
+                        entry_count = entry_count.checked_add(1).ok_or(Error::Limit {
+                            resource: "story entries",
+                            actual: usize::MAX,
+                            maximum: limits.max_entries,
+                        })?;
+                        if entry_count > limits.max_entries {
+                            return Err(Error::Limit {
+                                resource: "story entries",
+                                actual: entry_count,
+                                maximum: limits.max_entries,
+                            });
+                        }
+                        return Err(unsupported_xml(
+                            "glossary docPart must contain exactly one docPartBody",
+                        ));
+                    } else if doc_part_depth == Some(parent_depth) {
+                        if is_word_element(start.name(), &context, &word_namespace, b"docPartPr") {
+                            if current_entry_pr_seen || current_body_count != 0 {
+                                return Err(unsupported_xml(
+                                    "glossary docPartPr must precede its docPartBody and occur once",
+                                ));
+                            }
+                            current_entry_pr_seen = true;
+                        } else if is_word_element(
+                            start.name(),
+                            &context,
+                            &word_namespace,
+                            b"docPartBody",
+                        ) {
+                            if current_body_count != 0 {
+                                return Err(unsupported_xml(
+                                    "glossary docPart has multiple docPartBody elements",
+                                ));
+                            }
+                            current_body_count =
+                                current_body_count.checked_add(1).ok_or(Error::Limit {
+                                    resource: "glossary entry bodies",
+                                    actual: usize::MAX,
+                                    maximum: 1,
+                                })?;
+                            if current_entry_selected {
+                                current_body_inner_start = Some(after);
+                                current_body_inner_end = Some(after);
+                                let (attributes, has_w_namespace) = context
+                                    .wrapper_namespace_attributes(
+                                        &word_namespace,
+                                        limits.max_xml_bytes,
+                                    )?;
+                                current_body_namespace_attributes = Some(attributes);
+                                current_body_has_w_namespace = has_w_namespace;
+                            }
+                        } else if context.resolve_element(start.name())
+                            == Some(word_namespace.as_slice())
+                        {
+                            return Err(unsupported_xml(
+                                "glossary docPart has an unexpected direct Word child",
+                            ));
+                        }
+                    } else if doc_part_pr_depth == Some(parent_depth)
+                        && is_word_element(start.name(), &context, &word_namespace, b"name")
+                    {
+                        let value =
+                            glossary_metadata_text(&start, &context, &word_namespace, "name")?;
+                        if let Some(value) = value {
+                            current_entry_name_key = Some(glossary_name_key(&value)?);
+                        }
+                    } else if doc_part_pr_depth == Some(parent_depth)
+                        && is_word_element(start.name(), &context, &word_namespace, b"guid")
+                    {
+                        current_entry_id = glossary_metadata_id(&start, &context, &word_namespace)?;
+                    } else if body_depth == Some(parent_depth)
+                        && current_entry_selected
+                        && is_word_element(start.name(), &context, &word_namespace, b"p")
+                    {
+                        ensure_paragraph_capacity(
+                            current_paragraphs.len(),
+                            paragraph_stack.len(),
+                            limits.max_paragraphs,
+                        )?;
+                        reserve_one(&mut current_paragraphs, "glossary paragraph ranges")?;
+                        current_paragraphs.push(Range {
+                            start: event_start,
+                            end: after,
+                        });
+                    }
+                }
+            },
+            Event::End(end) => {
+                let event_start = before;
+                if depth == 0 {
+                    return Err(unsupported_xml("glossary XML has an unmatched end element"));
+                }
+                let context = namespace_stack
+                    .last()
+                    .ok_or(unsupported_xml("glossary namespace stack is incomplete"))?;
+                reject_wrong_word_namespace(end.name(), context, &word_namespace)?;
+                if is_word_element(end.name(), context, &word_namespace, b"p")
+                    && let Some((paragraph_depth, start)) = paragraph_stack.pop()
+                {
+                    if paragraph_depth != depth {
+                        return Err(unsupported_xml("nested or crossing glossary paragraphs"));
+                    }
+                    current_paragraphs.push(Range { start, end: after });
+                }
+                if body_depth == Some(depth) {
+                    if !paragraph_stack.is_empty() {
+                        return Err(unsupported_xml(
+                            "glossary body closes with an open paragraph",
+                        ));
+                    }
+                    if current_entry_selected {
+                        current_body_inner_end = Some(event_start);
+                    }
+                    body_depth = None;
+                }
+                if doc_part_pr_depth == Some(depth) {
+                    doc_part_pr_depth = None;
+                    if !current_entry_selected
+                        && glossary_selector_matches(
+                            selector,
+                            requested_name_key.as_deref(),
+                            current_entry_index,
+                            current_entry_name_key.as_deref(),
+                            current_entry_id.as_ref().map(crate::glossary::Id::as_str),
+                        )
+                    {
+                        if selected_count != 0 {
+                            return Err(Error::AmbiguousGlossaryEntry {
+                                selector: selector.kind(),
+                            });
+                        }
+                        if current_body_count != 0 {
+                            return Err(unsupported_xml(
+                                "selected glossary entry body precedes its properties",
+                            ));
+                        }
+                        selected_count = 1;
+                        current_entry_selected = true;
+                    }
+                }
+                if doc_part_depth == Some(depth) {
+                    if current_body_count != 1 {
+                        return Err(unsupported_xml(
+                            "every glossary docPart must contain exactly one docPartBody",
+                        ));
+                    }
+                    if current_entry_selected {
+                        let entry_start = current_entry_start
+                            .ok_or(unsupported_xml("glossary docPart start is missing"))?;
+                        let entry_bytes = after
+                            .checked_sub(entry_start)
+                            .ok_or(unsupported_xml("selected glossary entry range is inverted"))?;
+                        if entry_bytes > limits.max_entry_bytes {
+                            return Err(Error::Limit {
+                                resource: "selected entry bytes",
+                                actual: entry_bytes,
+                                maximum: limits.max_entry_bytes,
+                            });
+                        }
+                        selected_inner_start = current_body_inner_start;
+                        selected_inner_end = current_body_inner_end;
+                        selected_namespace_attributes = current_body_namespace_attributes.take();
+                        selected_has_w_namespace = current_body_has_w_namespace;
+                        paragraphs = std::mem::take(&mut current_paragraphs);
+                    } else {
+                        current_paragraphs.clear();
+                    }
+                    doc_part_depth = None;
+                    current_entry_start = None;
+                    current_entry_selected = false;
+                    current_entry_pr_seen = false;
+                    current_entry_name_key = None;
+                    current_entry_id = None;
+                    current_body_count = 0;
+                    current_body_inner_start = None;
+                    current_body_inner_end = None;
+                    current_body_has_w_namespace = false;
+                }
+                if doc_parts_depth == Some(depth) {
+                    doc_parts_depth = None;
+                }
+                if depth == 1 {
+                    if root_closed {
+                        return Err(unsupported_xml("glossary root closes more than once"));
+                    }
+                    root_closed = true;
+                }
+                namespace_stack.pop();
+                depth -= 1;
+            },
+            Event::DocType(_) => {
+                return Err(unsupported_xml("DOCTYPE declarations are not accepted"));
+            },
+            Event::PI(_) => {
+                return Err(unsupported_xml("processing instructions are not accepted"));
+            },
+            Event::CData(_) => {
+                return Err(unsupported_xml("CDATA sections are not accepted"));
+            },
+            Event::GeneralRef(reference) => {
+                validate_story_general_reference(&reference)?;
+            },
+            Event::Decl(_) if root_seen => {
+                return Err(unsupported_xml(
+                    "XML declarations are only accepted before the glossary root",
+                ));
+            },
+            Event::Text(text)
+                if depth == 0 && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
+            {
+                return Err(unsupported_xml(
+                    "non-whitespace text occurs outside glossary root",
+                ));
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+
+    if !root_seen || !root_closed || depth != 0 || !namespace_stack.is_empty() {
+        return Err(unsupported_xml("glossary XML root is incomplete"));
+    }
+    if !root_has_doc_parts {
+        return Err(unsupported_xml("glossary root must contain docParts"));
+    }
+    if selected_count == 0 {
+        return Err(Error::MissingGlossaryEntry {
+            selector: selector.kind(),
+        });
+    }
+    let root_start_end = selected_inner_start.ok_or(unsupported_xml(
+        "selected glossary entry body start is missing",
+    ))?;
+    let root_end_start = selected_inner_end.ok_or(unsupported_xml(
+        "selected glossary entry body end is missing",
+    ))?;
+    let namespace_attributes = selected_namespace_attributes.ok_or(unsupported_xml(
+        "selected glossary namespace context is missing",
+    ))?;
+    check_execution_context(execution)?;
+    paragraphs.sort_by_key(|range| range.start);
+    Ok(Layout {
+        paragraphs: paragraphs.into(),
+        root_start_end,
+        root_end_start,
+        root_kind: RootKind::Glossary,
+        namespace_attributes: namespace_attributes.into(),
+        word_namespace: word_namespace.into(),
+        has_w_namespace: selected_has_w_namespace,
+    })
+}
+
 fn scan_story(
     xml: &[u8],
-    selector: Selector,
+    selector: &Selector,
     expected_word_namespace: Option<&[u8]>,
     limits: Limits,
     execution: Option<&ExecutionContext>,
@@ -2194,6 +3468,11 @@ fn scan_story(
         Selector::Footnote(_) => RootKind::Footnotes,
         Selector::Endnote(_) => RootKind::Endnotes,
         Selector::Comment(_) => RootKind::Comments,
+        Selector::Glossary(_) => {
+            return Err(unsupported_xml(
+                "glossary selectors require a glossary scan",
+            ));
+        },
     };
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(false);
@@ -2256,6 +3535,7 @@ fn scan_story(
                     &start,
                     limits.max_namespace_bindings,
                     limits.max_namespace_bytes,
+                    expected_word_namespace,
                 )?;
                 if parent_depth == 0 {
                     if root_seen || root_closed {
@@ -2349,6 +3629,7 @@ fn scan_story(
                             RootKind::Footnotes | RootKind::Endnotes | RootKind::Comments => {
                                 selected_entry_depth == Some(parent_depth)
                             },
+                            RootKind::Glossary => false,
                         };
                 if direct_paragraph {
                     ensure_paragraph_capacity(
@@ -2401,6 +3682,7 @@ fn scan_story(
                     &start,
                     limits.max_namespace_bindings,
                     limits.max_namespace_bytes,
+                    expected_word_namespace,
                 )?;
                 if parent_depth == 0 {
                     if root_seen || root_closed {
@@ -2501,6 +3783,7 @@ fn scan_story(
                                 RootKind::Footnotes | RootKind::Endnotes | RootKind::Comments => {
                                     selected_entry_depth == Some(parent_depth)
                                 },
+                                RootKind::Glossary => false,
                             };
                     if direct_paragraph {
                         ensure_paragraph_capacity(
@@ -2650,6 +3933,7 @@ fn inspect_root(
         RootKind::Footnotes => b"footnotes".as_slice(),
         RootKind::Endnotes => b"endnotes".as_slice(),
         RootKind::Comments => b"comments".as_slice(),
+        RootKind::Glossary => b"glossaryDocument".as_slice(),
     };
     if local.as_ref() != expected_local {
         return Err(unsupported_xml("selected story root has the wrong element"));
@@ -2775,12 +4059,10 @@ fn namespace_declared_prefix<'a>(key: QName<'a>) -> Option<&'a [u8]> {
     key.into_inner().strip_prefix(b"xmlns:")
 }
 
-fn is_mce_attribute(key: QName<'_>, value: &[u8]) -> bool {
-    value == MCE_NAMESPACE
-        || key
-            .prefix()
-            .as_ref()
-            .is_some_and(|prefix| prefix.as_ref() == b"mc")
+fn is_mce_attribute_name(key: QName<'_>) -> bool {
+    key.prefix()
+        .as_ref()
+        .is_some_and(|prefix| prefix.as_ref() == b"mc")
         || key.as_ref() == b"mc:Ignorable"
 }
 
@@ -2791,6 +4073,16 @@ fn is_word_element(
     local: &[u8],
 ) -> bool {
     name.local_name().as_ref() == local && context.resolve_element(name) == Some(word_namespace)
+}
+
+fn is_glossary_root_extension(
+    name: QName<'_>,
+    context: &NamespaceContext,
+    word_namespace: &[u8],
+) -> bool {
+    context
+        .resolve_element(name)
+        .is_some_and(|namespace| !namespace.is_empty() && namespace != word_namespace)
 }
 
 fn reject_wrong_word_namespace(
@@ -2808,6 +4100,20 @@ fn reject_wrong_word_namespace(
             "markup-compatibility elements are not accepted in a source-bound story",
         ));
     }
+    if (word_namespace == STRICT_WORD_NAMESPACE
+        && namespace == Some(TRANSITIONAL_RELATIONSHIP_NAMESPACE))
+        || (word_namespace == TRANSITIONAL_WORD_NAMESPACE
+            && namespace == Some(STRICT_RELATIONSHIP_NAMESPACE))
+    {
+        return Err(unsupported_xml(
+            "glossary content mixes Strict and Transitional relationship namespaces",
+        ));
+    }
+    if word_namespace == STRICT_WORD_NAMESPACE && namespace == Some(VML_NAMESPACE) {
+        return Err(unsupported_xml(
+            "Strict glossary content cannot contain VML",
+        ));
+    }
     if matches!(
         local.as_ref(),
         b"document"
@@ -2820,12 +4126,58 @@ fn reject_wrong_word_namespace(
             | b"endnote"
             | b"comments"
             | b"comment"
+            | b"glossaryDocument"
+            | b"background"
+            | b"docParts"
+            | b"docPart"
+            | b"docPartPr"
+            | b"docPartBody"
+            | b"name"
+            | b"guid"
             | b"p"
     ) && namespace != Some(word_namespace)
     {
         return Err(unsupported_xml(
             "WordprocessingML element has an incorrect namespace binding",
         ));
+    }
+    Ok(())
+}
+
+fn reject_word_dialect_attributes(
+    start: &BytesStart<'_>,
+    context: &NamespaceContext,
+    word_namespace: &[u8],
+) -> Result<()> {
+    for attribute in start.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| {
+            Error::Document(crate::Error::Xml(format!(
+                "invalid story attribute: {error}"
+            )))
+        })?;
+        if is_namespace_declaration(attribute.key) {
+            continue;
+        }
+        let Some(prefix) = attribute.key.prefix() else {
+            continue;
+        };
+        let Some(namespace) = context.resolve_prefix(prefix.as_ref()) else {
+            continue;
+        };
+        if (word_namespace == STRICT_WORD_NAMESPACE
+            && namespace == TRANSITIONAL_RELATIONSHIP_NAMESPACE)
+            || (word_namespace == TRANSITIONAL_WORD_NAMESPACE
+                && namespace == STRICT_RELATIONSHIP_NAMESPACE)
+        {
+            return Err(unsupported_xml(
+                "glossary content mixes Strict and Transitional relationship attributes",
+            ));
+        }
+        if word_namespace == STRICT_WORD_NAMESPACE && namespace == VML_NAMESPACE {
+            return Err(unsupported_xml(
+                "Strict glossary content cannot contain VML attributes",
+            ));
+        }
     }
     Ok(())
 }

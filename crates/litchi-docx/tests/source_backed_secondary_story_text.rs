@@ -557,7 +557,7 @@ fn exercise_change(
 ) {
     let source = fixture(dialect, Mutation::Valid);
     let package = open(&source);
-    let snapshot = package.story_text_snapshot(selector).unwrap();
+    let snapshot = package.story_text_snapshot(selector.clone()).unwrap();
     assert_eq!(snapshot.paragraph_text(0).unwrap().as_deref(), Some(before));
     let mut edit = snapshot.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), after)
@@ -572,7 +572,7 @@ fn exercise_change(
     let reopened = open(&published);
     assert_eq!(
         reopened
-            .story_text_snapshot(selector)
+            .story_text_snapshot(selector.clone())
             .unwrap()
             .paragraph_text(0)
             .unwrap()
