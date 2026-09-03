@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "change": "0387-opc-source-materialization-shared-payload",
+  "decision": "retain_measured_copy_elision",
+  "performance_claim": {
+    "authorized": false,
+    "scope": "none",
+    "reason": "the operation-local allocation vectors and structural pointer identity are accepted as descriptive mechanism evidence, but the run was not balanced ABBA and does not authorize a latency, RSS, or broad OPC claim"
+  },
+  "mechanism": {
+    "control": "PartData bytes were copied with to_vec and the new Vec was placed in a newly allocated Arc<Vec<u8>> for every materialized Part",
+    "candidate": "the unmanaged PartData Arc<Vec<u8>> is cloned and adopted by PartFactory::load_shared without copying the payload or allocating another Arc owner",
+    "observed_allocator_delta_per_part_on_this_build": {
+      "allocation_calls": -2,
+      "allocated_bytes": "negative uncompressed payload bytes minus 40 bytes of Arc<Vec<u8>> allocation overhead"
+    }
+  },
+  "provenance": {
+    "control_revision": "7edfad113e62f45025848273ef04d6a94c433b27",
+    "control_source_backed_rs_git_blob_sha1": "a39b8272e329e6f4cee5eeeddc24d2a97f7ca533",
+    "candidate_source_backed_rs_git_blob_sha1": "2b1058c42eee28c5c9eaeb7afe9ca81702425676",
+    "candidate_patch_sha256": "189717f6eb5ac86d21d13f5ccd3b0c23a1d260db5602af327b449f52e89292aa",
+    "intervening_non_rust_revision": "78e961bc4d838d38bcdbf730abbc3d697c4af6ae",
+    "intervening_non_rust_paths": [
+      ".github/workflows/perf-baseline.yml",
+      "docs/performance/changes/0386-full-resource-profile-artifact.md",
+      "tools/test_perf_workflow_policy.py"
+    ],
+    "source_binding_note": "both binaries were built from revision 7edfad113; the candidate additionally carried exactly candidate_patch_sha256. The later revision changed only the listed CI/documentation/Python files, and the final Rust source blob remains candidate_source_backed_rs_git_blob_sha1.",
+    "compiler": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "toolchain_note": "the repository-pinned 1.95 toolchain had rustc but no Cargo component in this environment, so stable 1.98.1 was selected explicitly",
+    "allocator_binary": {
+      "control_sha256": "1aa6ef28d6bba3df8b7a045370cba661aa262711dcf01013d9ab1d58742bd5ef",
+      "candidate_sha256": "04e47a043f959fec19e403418b2007f979680caa27be00399693f82af7e6fe36",
+      "instrumentation": "system_allocator_operation_scoped"
+    },
+    "normal_binary": {
+      "control_sha256": "241d1f2c69dd48c3b6785df540d4ca7e73a1471b5fae6eef782d26b322cb7be9",
+      "candidate_sha256": "8e036a37ece61007431d77616397d0a96de201c086e96065f3582dbd280258f4",
+      "instrumentation": "none"
+    }
+  },
+  "environment": {
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1011-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "logical_cpus_available": 32,
+    "cpu_affinity": "0-31",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "perf_event_paranoid": "1"
+  },
+  "protocol": {
+    "selector": "opc_source_materialize",
+    "profile": "release",
+    "warmups_per_report": 3,
+    "retained_samples_per_report": 15,
+    "processes": "one process per report; retained samples run in-process",
+    "variants": [
+      "control",
+      "candidate"
+    ],
+    "instrumentation_modes": [
+      "normal",
+      "system_allocator_operation_scoped"
+    ],
+    "latency_adjudication": "withheld: evidence_only_opc_source_materialization is deliberately excluded from comparable latency, runs were not balanced ABBA, and CPUs were not pinned to one core",
+    "rss_adjudication": "withheld: procfs RSS delta includes probe overhead and peak_rss_bytes is a process-lifetime high-water mark rather than operation-local peak",
+    "copied_byte_adjudication": "unavailable: copied bytes are not directly instrumented; the removed to_vec is proven by source and allocation identity, not relabeled as a copied-byte counter",
+    "decompression_and_physical_io": "unavailable and not inferred"
+  },
+  "cases": [
+    {
+      "corpus": {
+        "name": "tiny-compressible",
+        "archive_sha256": "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a",
+        "content_set_sha256": "5edf13e632475771f0f6a26012da7653cf46ced3882e61334b71753f004f7497",
+        "archive_bytes": 1310,
+        "entry_count": 3,
+        "archive_member_count": 5,
+        "uncompressed_payload_bytes": 1536,
+        "target_payload_sha256": "630b1da45fe604eda3b5468b7c9ca7facfbd404941779786276a69ff870e4bdd"
+      },
+      "invariant_vectors": {
+        "opc_parts": 3,
+        "logical_read_calls": 15,
+        "logical_read_returned_bytes": 318,
+        "ordinary_payload_read_calls": 3,
+        "ordinary_payload_read_bytes": 180
+      },
+      "allocation_vectors": {
+        "control_allocation_calls": 53,
+        "candidate_allocation_calls": 47,
+        "removed_allocation_calls": 6,
+        "allocation_call_reduction_percent": 11.320754716981131,
+        "control_allocated_bytes": 246756,
+        "candidate_allocated_bytes": 245100,
+        "removed_allocated_bytes": 1656,
+        "allocated_byte_reduction_percent": 0.6711083013179011
+      },
+      "raw_artifacts": {
+        "control_report": {
+          "path": "change-0387/control-tiny-compressible.json.zst",
+          "decompressed_sha256": "eb7f8a8333c2787ac2cd2571713c986d1ae9cfda620cff89a5f80d57d935f8ca"
+        },
+        "candidate_report": {
+          "path": "change-0387/candidate-tiny-compressible.json.zst",
+          "decompressed_sha256": "8bb65abb8dbf9923e060180bd6339b7f8e74f6f1e48a1bb314b575597861b185"
+        },
+        "control_catalog": {
+          "path": "change-0387/control-tiny-compressible.corpus.json.zst",
+          "decompressed_sha256": "6eb8915c457edc48ea27d7d28edcbd2a376a082b5e3ccc90b153892bf717552c"
+        },
+        "candidate_catalog": {
+          "path": "change-0387/candidate-tiny-compressible.corpus.json.zst",
+          "decompressed_sha256": "2b731a061f6fada4bfe50e81a803a4e1d73398ff6ea2434070a088dd9f143178"
+        }
+      }
+    },
+    {
+      "corpus": {
+        "name": "many-small-incompressible",
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "content_set_sha256": "182144c9fcad416467809d94abdfc3655e6aba9118f6121a4bc214545fb746e2",
+        "archive_bytes": 303003,
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "uncompressed_payload_bytes": 262144,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d"
+      },
+      "invariant_vectors": {
+        "opc_parts": 256,
+        "logical_read_calls": 1280,
+        "logical_read_returned_bytes": 276992,
+        "ordinary_payload_read_calls": 256,
+        "ordinary_payload_read_bytes": 265216
+      },
+      "allocation_vectors": {
+        "control_allocation_calls": 3609,
+        "candidate_allocation_calls": 3097,
+        "removed_allocation_calls": 512,
+        "allocation_call_reduction_percent": 14.186755333887504,
+        "control_allocated_bytes": 21290113,
+        "candidate_allocated_bytes": 21017729,
+        "removed_allocated_bytes": 272384,
+        "allocated_byte_reduction_percent": 1.279391988196587
+      },
+      "raw_artifacts": {
+        "control_report": {
+          "path": "change-0387/control-many-small-incompressible.json.zst",
+          "decompressed_sha256": "2fb9f7cdae78ff73f0c8612a130c0ebad88dbcfb9390733e1e0e3941c3454d83"
+        },
+        "candidate_report": {
+          "path": "change-0387/candidate-many-small-incompressible.json.zst",
+          "decompressed_sha256": "8746f5fd412891dfbf4337eaabe40e7d01b4b9cbc20e5daa1eeedba6154c357b"
+        },
+        "control_catalog": {
+          "path": "change-0387/control-many-small-incompressible.corpus.json.zst",
+          "decompressed_sha256": "b7edd3133543fe35446811b9ce4ca5e7301ca0b2c7f10db02201e85484fc0fd6"
+        },
+        "candidate_catalog": {
+          "path": "change-0387/candidate-many-small-incompressible.corpus.json.zst",
+          "decompressed_sha256": "d4f0b7516410e1121a231d427438953fddf40a3e674338d31d9db133a65c695a"
+        }
+      }
+    },
+    {
+      "corpus": {
+        "name": "few-large-incompressible",
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "content_set_sha256": "5aa35f0445aa68edefa8a19596cd61e4720afe72a4e78f96c4932309efa35730",
+        "archive_bytes": 16783632,
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "uncompressed_payload_bytes": 16777216,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098"
+      },
+      "invariant_vectors": {
+        "opc_parts": 4,
+        "logical_read_calls": 532,
+        "logical_read_returned_bytes": 16782540,
+        "ordinary_payload_read_calls": 516,
+        "ordinary_payload_read_bytes": 16782356
+      },
+      "allocation_vectors": {
+        "control_allocation_calls": 69,
+        "candidate_allocation_calls": 61,
+        "removed_allocation_calls": 8,
+        "allocation_call_reduction_percent": 11.594202898550725,
+        "control_allocated_bytes": 33879589,
+        "candidate_allocated_bytes": 17102213,
+        "removed_allocated_bytes": 16777376,
+        "allocated_byte_reduction_percent": 49.52060073692157
+      },
+      "raw_artifacts": {
+        "control_report": {
+          "path": "change-0387/control-few-large-incompressible.json.zst",
+          "decompressed_sha256": "9c9a7ce77934a515fccf5ce7e8cb1417ae0aa8dec81b06fa0012e631c6968ac8"
+        },
+        "candidate_report": {
+          "path": "change-0387/candidate-few-large-incompressible.json.zst",
+          "decompressed_sha256": "d5a046f16d8e6bf3b150827a5042af25ecdd616b25fec1429caedee5120ed55d"
+        },
+        "control_catalog": {
+          "path": "change-0387/control-few-large-incompressible.corpus.json.zst",
+          "decompressed_sha256": "1623162b048a8fd8085d78bf0d860189dd4811952c97a75ea71766d9b0923b03"
+        },
+        "candidate_catalog": {
+          "path": "change-0387/candidate-few-large-incompressible.corpus.json.zst",
+          "decompressed_sha256": "dc1bdd238aeb94e1f93373581e116e19886bf3ab025aeb699ebf45a81974a46a"
+        }
+      }
+    }
+  ],
+  "vector_validation": {
+    "allocation_call_and_allocated_byte_vectors_constant_across_retained_samples": true,
+    "all_invariant_vectors_equal_between_control_and_candidate": true,
+    "removed_allocation_calls_equal_two_per_part": true,
+    "removed_allocated_bytes_equal_uncompressed_payload_bytes_plus_40_bytes_per_part": true,
+    "operation_metric_envelopes_validated": 12,
+    "corpus_catalog_bindings_validated": 12,
+    "normal_reports_allocator_status": "unavailable"
+  },
+  "limitations": [
+    "no balanced or randomized A/B timing order",
+    "no single-core CPU pinning",
+    "no operation-local peak RSS measurement",
+    "no copied-byte, decompression, recompression, or physical-I/O counter",
+    "synthetic OPC corpora only",
+    "managed source-backed packages intentionally remain non-materializable",
+    "the owning conversion still materializes every admitted Part"
+  ]
+}

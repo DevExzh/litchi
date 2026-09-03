@@ -3842,11 +3842,12 @@ impl SourceBackedPackage {
     /// Fully materialize this immutable view into the existing mutable package type.
     ///
     /// This conversion refuses managed packages before any ordinary payload
-    /// read. An owning package would detach copied payloads from the cache
-    /// handles that retain the execution context's hierarchical reservations;
-    /// use the source-backed view while that context is active. A materialized
-    /// signed graph retains borrowed-ingress policy and must be explicitly
-    /// stripped or resigned before ordinary publication.
+    /// read. Unmanaged payloads are adopted as shared allocations by the
+    /// owning parts. Managed payload handles retain hierarchical reservations,
+    /// however, and cannot escape as bare owning-package allocations; use the
+    /// source-backed view while that context is active. A materialized signed
+    /// graph retains borrowed-ingress policy and must be explicitly stripped
+    /// or resigned before ordinary publication.
     pub fn into_opc_package(self) -> Result<OpcPackage> {
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
@@ -3863,10 +3864,11 @@ impl SourceBackedPackage {
     /// consuming the source-backed package.
     ///
     /// The borrowed conversion is intentionally unavailable for packages
-    /// opened with an execution context. An owning package would detach the
-    /// copied payloads from the cache handles that retain the context's
-    /// hierarchical memory and object reservations. The refusal occurs after
-    /// source and execution checks, but before any ordinary payload read.
+    /// opened with an execution context. Unmanaged payloads are adopted as
+    /// shared allocations by the owning parts, while managed payload handles
+    /// retain hierarchical memory and object reservations that cannot be
+    /// detached into a bare owning-package allocation. The refusal occurs
+    /// after source and execution checks, but before any ordinary payload read.
     ///
     /// # Errors
     ///
@@ -3911,10 +3913,10 @@ impl SourceBackedPackage {
         for index in 0..self.parts.len() {
             let bytes = self.finish_stage(self.read_part(index))?;
             let catalog_part = &self.parts[index];
-            let part_result = PartFactory::load(
+            let part_result = PartFactory::load_shared(
                 catalog_part.partname.clone(),
                 catalog_part.content_type.clone(),
-                bytes.as_bytes().to_vec(),
+                self.finish_stage(bytes.into_arc())?,
             );
             let mut part = self.finish_stage(part_result)?;
             let result = copy_relationships(&catalog_part.relationships, part.rels_mut());
@@ -11760,6 +11762,91 @@ mod tests {
         assert_eq!(owned.part_count(), 2);
         assert_eq!(owned.non_part_members().len(), 1);
         assert_eq!(owned.main_document_part().unwrap().blob(), b"document");
+    }
+
+    #[test]
+    fn consuming_materialization_retains_cached_payload_allocation() {
+        const DOCUMENT: &[u8] = b"consuming materialization payload";
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            DOCUMENT,
+            true,
+        )));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let cached_payload = package
+            .main_document_part()
+            .unwrap()
+            .data()
+            .unwrap()
+            .into_arc()
+            .unwrap();
+
+        let owned = package.into_opc_package().unwrap();
+        let materialized_payload = owned.main_document_part().unwrap().blob_arc();
+        assert!(Arc::ptr_eq(&cached_payload, &materialized_payload));
+        assert_eq!(materialized_payload.as_slice(), DOCUMENT);
+
+        // The owning package must retain the adopted allocation after every
+        // source-backed handle is gone.
+        drop(materialized_payload);
+        drop(cached_payload);
+        drop(source);
+        assert_eq!(owned.main_document_part().unwrap().blob(), DOCUMENT);
+    }
+
+    #[test]
+    fn borrowed_materialization_retains_cached_payload_allocation_after_source_drop() {
+        const DOCUMENT: &[u8] = b"borrowed materialization payload";
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            DOCUMENT,
+            true,
+        )));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let cached_payload = package
+            .main_document_part()
+            .unwrap()
+            .data()
+            .unwrap()
+            .into_arc()
+            .unwrap();
+
+        let mut owned = package.to_opc_package().unwrap();
+        let materialized_payload = owned.main_document_part().unwrap().blob_arc();
+        assert!(Arc::ptr_eq(&cached_payload, &materialized_payload));
+        assert_eq!(materialized_payload.as_slice(), DOCUMENT);
+
+        // Mutating the owning package must detach its part without changing
+        // the source-backed cache's shared payload.
+        let target = PackURI::new("/word/document.xml").unwrap();
+        owned
+            .get_part_mut(&target)
+            .unwrap()
+            .set_blob(b"edited owning payload".to_vec());
+        assert_eq!(
+            owned.get_part(&target).unwrap().blob(),
+            b"edited owning payload"
+        );
+        assert_eq!(
+            package
+                .main_document_part()
+                .unwrap()
+                .data()
+                .unwrap()
+                .as_bytes(),
+            DOCUMENT
+        );
+
+        // Drop the borrowed source-backed package and all other handles. The
+        // materialized package owns the shared payload independently.
+        drop(materialized_payload);
+        drop(cached_payload);
+        drop(package);
+        drop(source);
+        assert_eq!(
+            owned.main_document_part().unwrap().blob(),
+            b"edited owning payload"
+        );
     }
 
     #[test]
