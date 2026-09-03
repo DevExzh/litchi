@@ -6,4 +6,5 @@ package LitchiIwaProjection;
 
 message MovieAudioFlagArchive {
   optional bool audio_only = 9;
+  optional bool is_live_video = 30;
 }
