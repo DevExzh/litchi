@@ -1,5 +1,19 @@
 # Performance hotspot inventory
 
+## Change 0390 update
+
+The source-backed OPC full-materialization decoder-construction hotspot now
+uses one reusable operation-scoped session per unmanaged materialization;
+stored members bypass it and managed reservation-bearing handles still refuse
+escape. Operation allocator vectors show 4/160,640, 510/20,481,600, and
+6/240,960 fewer calls/bytes for tiny, many-small, and few-large synthetic
+corpora, while logical reads, returned bytes, and Part counts stay invariant.
+Default owning OPC open remains eager and broad/default OPC behavior is not
+changed. Latency, operation-local peak/RSS, copied/decompressed/physical I/O,
+and broad performance claims remain withheld; see [Change
+0390](changes/0390-opc-materialization-decoder-session.md).
+`performance_claim: none`; `claim_authorized: false`.
+
 ## Change 0387 update
 
 The source-backed OPC owning-conversion hotspot was confirmed at one

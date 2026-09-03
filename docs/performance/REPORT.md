@@ -1,5 +1,24 @@
 # Performance program phase report
 
+## Change 0390: OPC materialization decoder session
+
+One opaque indexed-read session now owns a lazily initialized Deflate decoder
+for each unmanaged source-backed full materialization. It resets the decoder
+for successive bounded entries, bypasses it for Store entries, and is absent
+from cache-hit/waiter paths; managed refusal and existing ZIP/OPC/error,
+accounting, cancellation, cache, freshness, and ownership checks remain.
+
+The matched stable 1.98.1 allocator evidence measures exactly two avoided
+decoder allocation calls and 80,320 bytes per avoided decoder. Corpus deltas
+are 4/160,640, 510/20,481,600, and 6/240,960 calls/bytes, with invariant
+logical source reads, returned bytes, and materialized Part counts. The
+[summary](results/opc-source-materialization-decoder-session-0390-summary.json),
+[compressed raw evidence](results/change-0390/), and [checked comparison](results/opc-source-materialization-decoder-session-0390-comparison.json)
+bind baseline `2c0fd89c7…`, patch `d8254264…`, Rust 1.98.1, both binaries,
+corpora, catalogs, and vectors. Latency, operation-local peak/RSS,
+copied/decompressed/physical I/O, and broad/default OPC behavior are withheld.
+`performance_claim: none`; `claim_authorized: false`.
+
 ## Change 0387: OPC source materialization shared payload
 
 Unmanaged `SourceBackedPackage` conversion now passes its cached immutable

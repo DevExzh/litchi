@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "change": "0390-opc-source-materialization-decoder-session",
+  "performance_claim": "none",
+  "claim_authorized": false,
+  "mechanism": {
+    "scope": "one decoder session per unmanaged full materialization",
+    "implementation": "reuse DeflateDecoder state with reset for successive bounded entries; Store entries bypass the decoder",
+    "avoided_decoder_delta": {
+      "allocation_calls": -2,
+      "allocated_bytes": -80320
+    },
+    "invariant_vectors": [
+      "logical source read calls",
+      "logical source returned bytes",
+      "materialized OPC Part count"
+    ]
+  },
+  "source": {
+    "baseline_revision": "2c0fd89c7c0e873ada1e62d58ac454c59c83b8bf",
+    "candidate_base_revision": "2c0fd89c7c0e873ada1e62d58ac454c59c83b8bf",
+    "candidate_patch_sha256": "d825426486c50788c71dd8bb7ef76045642448216f8a8136a059556639a4e4b4",
+    "control_files": {
+      "crates/litchi-opc/src/source_backed.rs": "2b1058c42eee28c5c9eaeb7afe9ca81702425676",
+      "crates/soapberry-zip/src/office.rs": "f0a2f6b6f7351356c694b5dd184729e40b50d917"
+    },
+    "candidate_files": {
+      "crates/litchi-opc/src/source_backed.rs": "d9b2971b2b7f8de7c1ad53196f7bbb3ff2b13aeb",
+      "crates/soapberry-zip/src/office.rs": "33115a179546257e2292a78300a4382a86a83bcc"
+    }
+  },
+  "binary": {
+    "compiler": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "toolchain": "stable 1.98.1",
+    "profile": "release",
+    "instrumentation": "system_allocator_operation_scoped",
+    "control": {
+      "sha256": "1f4c917cc16e33b10e145e70223d6325b02a8f395a8699bfdb395155c67a2544",
+      "bytes": 54430512
+    },
+    "candidate": {
+      "sha256": "50543d9c5aa3585f26c8d6f3feb2725b6e0a0dcde9957a1b8e04f464b618c9a7",
+      "bytes": 54431792
+    }
+  },
+  "protocol": {
+    "selector": "opc_source_materialize",
+    "warmups": 3,
+    "retained_samples": 15,
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "policy": "docs/performance/perf-regression-policy-opc-source-materialize-allocator-v1.json"
+  },
+  "corpora": [
+    {
+      "name": "tiny-compressible",
+      "shape": "tiny",
+      "payload_kind": "compressible",
+      "archive_bytes": 1310,
+      "entry_count": 3,
+      "uncompressed_payload_bytes": 1536,
+      "archive_sha256": "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a",
+      "content_set_sha256": "5edf13e632475771f0f6a26012da7653cf46ced3882e61334b71753f004f7497",
+      "target_payload_sha256": "630b1da45fe604eda3b5468b7c9ca7facfbd404941779786276a69ff870e4bdd",
+      "vector_bound": {
+        "control": {
+          "allocation_calls": 47,
+          "allocated_bytes": 245100,
+          "logical_read_calls": 15,
+          "logical_read_returned_bytes": 318,
+          "opc_parts": 3
+        },
+        "candidate": {
+          "allocation_calls": 43,
+          "allocated_bytes": 84460,
+          "logical_read_calls": 15,
+          "logical_read_returned_bytes": 318,
+          "opc_parts": 3
+        },
+        "delta": {
+          "allocation_calls": -4,
+          "allocated_bytes": -160640
+        }
+      },
+      "artifacts": {
+        "control": {
+          "report": "change-0390/control-tiny-compressible.json.zst",
+          "report_decompressed_sha256": "2e395214a66875d248ef2c8e804733eb1a1b16ebcdd41b6481ed7b9b32c3ef1c",
+          "report_compressed_sha256": "6b50f2eb55fab55a7de713f84d3b6046abfc5f843ada0915711ff6706a5cbb15",
+          "catalog": "change-0390/control-tiny-compressible.corpus.json.zst",
+          "catalog_decompressed_sha256": "3c707451c1f24044e750b3c2c7d27be1a10463ca9ec8ec03de73c886daf1e39e",
+          "catalog_compressed_sha256": "43c93f59b4eabee144a68133a16a37b39cbf08ea499f571832e92bd21b1993a9",
+          "catalog_manifest_sha256": "9bbc2278156ec17efb34d14dd7049f6ab949b1ece668fb5334df15083a8b5bcf"
+        },
+        "candidate": {
+          "report": "change-0390/candidate-tiny-compressible.json.zst",
+          "report_decompressed_sha256": "b0dfe6e5e66cd6adcff623cdea6006bc5cb0bfa1cf142f9929c01960370f520e",
+          "report_compressed_sha256": "27f38ca6a5b03caad69083a42c9dd27a9eecba720e42f3989721ee7f3ffaadae",
+          "catalog": "change-0390/candidate-tiny-compressible.corpus.json.zst",
+          "catalog_decompressed_sha256": "5fe908b86f48254b0ece87ac9693a243a90186c81e697413831bf0bd31dc8bef",
+          "catalog_compressed_sha256": "ae2410adb75ef947dee63bae6215b2e22108a4a99152b18529dd99897681702f",
+          "catalog_manifest_sha256": "18b476342211f229ae131e05a87d9de9a59b8e2a786622e6bf11d59a4b7609e0"
+        }
+      }
+    },
+    {
+      "name": "many-small-incompressible",
+      "shape": "many-small",
+      "payload_kind": "incompressible",
+      "archive_bytes": 303003,
+      "entry_count": 256,
+      "uncompressed_payload_bytes": 262144,
+      "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+      "content_set_sha256": "182144c9fcad416467809d94abdfc3655e6aba9118f6121a4bc214545fb746e2",
+      "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+      "vector_bound": {
+        "control": {
+          "allocation_calls": 3097,
+          "allocated_bytes": 21017729,
+          "logical_read_calls": 1280,
+          "logical_read_returned_bytes": 276992,
+          "opc_parts": 256
+        },
+        "candidate": {
+          "allocation_calls": 2587,
+          "allocated_bytes": 536129,
+          "logical_read_calls": 1280,
+          "logical_read_returned_bytes": 276992,
+          "opc_parts": 256
+        },
+        "delta": {
+          "allocation_calls": -510,
+          "allocated_bytes": -20481600
+        }
+      },
+      "artifacts": {
+        "control": {
+          "report": "change-0390/control-many-small-incompressible.json.zst",
+          "report_decompressed_sha256": "29d6fe080d9f9474e63f7c82e6b1b04052313efdbebf80f8a8d0476abac2651d",
+          "report_compressed_sha256": "6e3cf0bc223bcba5f59e7907a31a3c3e86ae7a7b63c2a8d733abf5cf3495d827",
+          "catalog": "change-0390/control-many-small-incompressible.corpus.json.zst",
+          "catalog_decompressed_sha256": "23d9e1cd28c8bdf58866dd9a4f277d86eaf7ec0e8880bb10218f0246082ff284",
+          "catalog_compressed_sha256": "55212f666d55d64410401cce3b5c8dfb54069329b3da65d15c8cd8db038b6844",
+          "catalog_manifest_sha256": "6e742c84c150e90ba8571ab0f7c109778f6512c3fc6084e7c84f4acd772b8ab7"
+        },
+        "candidate": {
+          "report": "change-0390/candidate-many-small-incompressible.json.zst",
+          "report_decompressed_sha256": "b21e537bf0b71605bf256469d3f284f65dcbbae3013d3ad96bcf424cff82e0b4",
+          "report_compressed_sha256": "774d1af20aa8be9ca8fa20ccd0dcb19669fa4a2ceb321154118ff42f70023539",
+          "catalog": "change-0390/candidate-many-small-incompressible.corpus.json.zst",
+          "catalog_decompressed_sha256": "f336ce7b5febe940122a5215564c2475dbfc8815c78ef68a1e0d1b3be90ae4ae",
+          "catalog_compressed_sha256": "0d486270a5dcdb4408ebe0555fe911692d3c52339b9085da12a18e2c3df401f6",
+          "catalog_manifest_sha256": "e260dd1a0699520d7bb8e220f959cf1194a7602fe55c81feabee607925af6fb9"
+        }
+      }
+    },
+    {
+      "name": "few-large-incompressible",
+      "shape": "few-large",
+      "payload_kind": "incompressible",
+      "archive_bytes": 16783632,
+      "entry_count": 4,
+      "uncompressed_payload_bytes": 16777216,
+      "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+      "content_set_sha256": "5aa35f0445aa68edefa8a19596cd61e4720afe72a4e78f96c4932309efa35730",
+      "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098",
+      "vector_bound": {
+        "control": {
+          "allocation_calls": 61,
+          "allocated_bytes": 17102213,
+          "logical_read_calls": 532,
+          "logical_read_returned_bytes": 16782540,
+          "opc_parts": 4
+        },
+        "candidate": {
+          "allocation_calls": 55,
+          "allocated_bytes": 16861253,
+          "logical_read_calls": 532,
+          "logical_read_returned_bytes": 16782540,
+          "opc_parts": 4
+        },
+        "delta": {
+          "allocation_calls": -6,
+          "allocated_bytes": -240960
+        }
+      },
+      "artifacts": {
+        "control": {
+          "report": "change-0390/control-few-large-incompressible.json.zst",
+          "report_decompressed_sha256": "7f8f00e68e25446416db5f824451f4d34fdf46f4935b68e31a863991da033e18",
+          "report_compressed_sha256": "e0f78e6411ae524a48e8ce0aef2e4c8f64f0904a8da109fa379d8eca4f22d31c",
+          "catalog": "change-0390/control-few-large-incompressible.corpus.json.zst",
+          "catalog_decompressed_sha256": "8c008c4805b5d68b1ea02bfeeafab19bf7e725a7c4a70ff23e8bca6161babd58",
+          "catalog_compressed_sha256": "cbabfa3d1117a225032da69ccc6b0f26cd6d4d11f1de650c42c597765d46434e",
+          "catalog_manifest_sha256": "8322f00596bcc3ebab98822254dc112afc5ba19b5f900a2ffb984c4bd76b8780"
+        },
+        "candidate": {
+          "report": "change-0390/candidate-few-large-incompressible.json.zst",
+          "report_decompressed_sha256": "1949b4d060081796808c01ca024c3f39e9571415abefe16b82d9e98e0f8b0a82",
+          "report_compressed_sha256": "7a4ed96110e1b8774c6a8ae76516fbd0ba08487c439fd5985ea17385be102337",
+          "catalog": "change-0390/candidate-few-large-incompressible.corpus.json.zst",
+          "catalog_decompressed_sha256": "4b33eb071b5ffbd9ef692925c590b5c1bb9efb6a09dcdba020b1f573061a4096",
+          "catalog_compressed_sha256": "90552c06fa23c3148eb8e25f2d4e3cf00ad4758e610b43a11b2c93856abda708",
+          "catalog_manifest_sha256": "e53413fd85c9c9348fa86e77ffcbd85f84e2b0d62d9c2ec13431696656d01577"
+        }
+      }
+    }
+  ],
+  "comparison": {
+    "path": "opc-source-materialization-decoder-session-0390-comparison.json",
+    "policy_id": "litchi-allocator-opc-source-materialize-v1",
+    "status": "pass",
+    "matched_results": 3,
+    "compared_metrics": 15,
+    "regressions": 0,
+    "latency_compared_results": 0,
+    "latency_excluded_results": 3
+  },
+  "withheld": [
+    "latency and throughput",
+    "operation-local peak/RSS",
+    "copied bytes",
+    "decompressed bytes",
+    "physical I/O",
+    "broad or default OPC behavior"
+  ]
+}

@@ -3910,8 +3910,9 @@ impl SourceBackedPackage {
         let mut package = OpcPackage::new();
         let result = copy_relationships(&self.package_relationships, package.rels_mut());
         self.finish_stage(result)?;
+        let mut read_session = self.archive.read_session();
         for index in 0..self.parts.len() {
-            let bytes = self.finish_stage(self.read_part(index))?;
+            let bytes = self.finish_stage(self.read_part_with_session(index, &mut read_session))?;
             let catalog_part = &self.parts[index];
             let part_result = PartFactory::load_shared(
                 catalog_part.partname.clone(),
@@ -6687,13 +6688,30 @@ impl SourceBackedPackage {
     }
 
     fn read_part(&self, index: usize) -> Result<PartData> {
-        self.read_part_with_accounting(index, None)
+        self.read_part_with_accounting_and_session(index, None, None)
+    }
+
+    fn read_part_with_session(
+        &self,
+        index: usize,
+        session: &mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>,
+    ) -> Result<PartData> {
+        self.read_part_with_accounting_and_session(index, None, Some(session))
     }
 
     fn read_part_with_accounting(
         &self,
         index: usize,
         accounting: Option<&mut OpcOperationAccounting>,
+    ) -> Result<PartData> {
+        self.read_part_with_accounting_and_session(index, accounting, None)
+    }
+
+    fn read_part_with_accounting_and_session(
+        &self,
+        index: usize,
+        accounting: Option<&mut OpcOperationAccounting>,
+        mut session: Option<&mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>>,
     ) -> Result<PartData> {
         self.cache.check_context().map_err(map_execution_error)?;
         let entry_id = self
@@ -6751,6 +6769,7 @@ impl SourceBackedPackage {
                         Some(flight),
                         None,
                         accounting,
+                        session.as_deref_mut(),
                     );
                 },
                 CacheAccess::Bypass(reservation) => {
@@ -6761,6 +6780,7 @@ impl SourceBackedPackage {
                         None,
                         Some(reservation),
                         accounting,
+                        session.as_deref_mut(),
                     );
                 },
             }
@@ -6775,6 +6795,7 @@ impl SourceBackedPackage {
         flight: Option<Arc<LoadFlight>>,
         bypass_resources: Option<LoadResources>,
         mut accounting: Option<&mut OpcOperationAccounting>,
+        mut session: Option<&mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>>,
     ) -> Result<PartData> {
         let mut zip_accounting = LowLevelZipOperationAccounting::default();
         let result = (|| {
@@ -6782,12 +6803,17 @@ impl SourceBackedPackage {
                 .parts
                 .get(index)
                 .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
-            let bytes = match match accounting.as_deref_mut() {
-                Some(_) => self
+            let bytes = match (accounting.as_deref_mut(), session.as_deref_mut()) {
+                (Some(_), Some(session)) => {
+                    session.read_entry_with_accounting(part.entry_id, &mut zip_accounting)
+                },
+                (Some(_), None) => self
                     .archive
                     .read_entry_with_accounting(part.entry_id, &mut zip_accounting),
-                None => self.archive.read_entry(part.entry_id),
-            } {
+                (None, Some(session)) => session.read_entry(part.entry_id),
+                (None, None) => self.archive.read_entry(part.entry_id),
+            };
+            let bytes = match bytes {
                 Ok(bytes) => bytes,
                 Err(error) => {
                     // A failed archive read can race with source mutation or
@@ -10284,7 +10310,15 @@ mod tests {
         // cancellation must survive ZIP's std::io::Error conversion.
         cancellation_source.cancel();
         let error = package
-            .load_part_with_accounting(index, entry_id, Some(declared), Some(flight), None, None)
+            .load_part_with_accounting(
+                index,
+                entry_id,
+                Some(declared),
+                Some(flight),
+                None,
+                None,
+                None,
+            )
             .unwrap_err();
         assert!(matches!(error, OpcError::Cancelled));
         assert_eq!(source.reads.load(Ordering::SeqCst), reads_before);

@@ -1103,6 +1103,95 @@ class PerfCompareTests(unittest.TestCase):
             checked_comparison,
         )
 
+    def test_checked_0390_decoder_session_allocator_evidence_rederives_in_memory(self):
+        repository = Path(__file__).resolve().parents[1]
+        raw_artifacts = repository / "docs/performance/results/change-0390"
+        checked_policy = json.loads(
+            (
+                repository
+                / "docs/performance/perf-regression-policy-opc-source-materialize-allocator-v1.json"
+            ).read_text(encoding="utf-8")
+        )
+        checked_comparison = json.loads(
+            (
+                repository
+                / "docs/performance/results/opc-source-materialization-decoder-session-0390-comparison.json"
+            ).read_text(encoding="utf-8")
+        )
+        perf_compare.validate_policy(checked_policy)
+        self.assertEqual(checked_policy["allocator_evidence_scope"], "operation")
+        self.assertEqual(checked_policy["result_key_fields"], ["case", "corpus"])
+        self.assertEqual(checked_comparison["status"], "pass")
+        self.assertEqual(
+            checked_comparison["policy"]["policy_id"], checked_policy["policy_id"]
+        )
+        self.assertEqual(checked_comparison["summary"]["matched_results"], 3)
+        self.assertEqual(checked_comparison["summary"]["compared_metrics"], 15)
+        self.assertEqual(
+            checked_comparison["summary"]["latency_claims"],
+            "withheld_instrumentation",
+        )
+        self.assertEqual(checked_comparison["summary"]["latency_compared_results"], 0)
+        self.assertEqual(checked_comparison["summary"]["latency_excluded_results"], 3)
+        self.assertTrue(
+            all("cache_state" not in item for item in checked_comparison["comparisons"])
+        )
+        self.assertEqual(
+            {item["metric"] for item in checked_comparison["comparisons"]},
+            {
+                "operation_metrics.allocation.allocation_calls.values",
+                "operation_metrics.allocation.allocated_bytes.values",
+                "operation_metrics.materialization.opc_parts.values",
+                "operation_metrics.source.logical_read_calls.values",
+                "operation_metrics.source.logical_read_returned_bytes.values",
+            },
+        )
+
+        def read_zstd_json(path):
+            try:
+                payload = subprocess.check_output(
+                    ["zstd", "-q", "-d", "-c", str(path)]
+                )
+            except FileNotFoundError:
+                self.skipTest("zstd is unavailable; cannot rederive checked artifacts")
+            return json.loads(payload)
+
+        artifact_pairs = (
+            ("tiny", "tiny-compressible", "compressible"),
+            ("many-small", "many-small-incompressible", "incompressible"),
+            ("few-large", "few-large-incompressible", "incompressible"),
+        )
+
+        def aggregate(role):
+            report_names = [
+                f"{role}-{filename}.json.zst"
+                for _, filename, _ in artifact_pairs
+            ]
+            reports = [read_zstd_json(raw_artifacts / name) for name in report_names]
+            aggregate_report = copy.deepcopy(reports[0])
+            aggregate_report["results"] = [
+                report_value["results"][0] for report_value in reports
+            ]
+            aggregate_report.pop("parallel_metrics", None)
+            aggregate_report.pop("corpus_catalog", None)
+            aggregate_report["configuration"]["corpus_shapes"] = [
+                shape for shape, _, _ in artifact_pairs
+            ]
+            aggregate_report["configuration"]["payload_kinds"] = [
+                payload_kind
+                for payload_kind in dict.fromkeys(
+                    payload_kind for _, _, payload_kind in artifact_pairs
+                )
+            ]
+            return aggregate_report
+
+        self.assertEqual(
+            perf_compare.compare_reports(
+                aggregate("control"), aggregate("candidate"), checked_policy
+            ),
+            checked_comparison,
+        )
+
     def test_operation_allocator_policy_rejects_malformed_envelope(self):
         comparison_policy = operation_allocator_policy_fixture()
         baseline = operation_allocator_report()

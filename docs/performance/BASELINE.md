@@ -1,5 +1,23 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0390: OPC materialization decoder session
+
+Unmanaged full materialization now reuses one operation-scoped Deflate decoder
+session across bounded entries; Store entries bypass it. Managed refusal,
+cache-hit/waiter behavior, source accounting, and all existing read/error,
+freshness, and ownership boundaries remain in force.
+
+Stable Rust 1.98.1 operation-allocator reports (three warmups, 15 samples)
+measure exact avoided-decoder reductions of 4/160,640 calls/bytes for tiny,
+510/20,481,600 for many-small, and 6/240,960 for few-large. Logical read
+calls/returned bytes and materialized Part counts are invariant. The
+[0390 summary](results/opc-source-materialization-decoder-session-0390-summary.json),
+[raw reports/catalogs](results/change-0390/), and [checked comparison](results/opc-source-materialization-decoder-session-0390-comparison.json)
+bind baseline `2c0fd89c7…`, candidate patch `d8254264…`, compiler, binaries,
+corpora, and vectors. Latency, operation-local peak/RSS, copied/decompressed/
+physical-I/O, and broad/default OPC behavior remain withheld.
+`performance_claim: none`; `claim_authorized: false`.
+
 ## Change 0387: source-backed OPC materialization shares payload allocations
 
 Unmanaged source-backed-to-owning conversion now adopts each cached
