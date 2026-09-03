@@ -1,12 +1,13 @@
 //! Bounded cross-presentation copying over deferred PresentationML sources.
 //!
-//! This first source-backed tranche has a deliberately bounded closure. It
-//! copies one slide whose exact internal relationships are one slide-layout
-//! edge plus zero or more direct embedded pictures, and reuses a destination
-//! layout only after its registered layout/master/theme boundary has been
-//! proven equivalent.
+//! This source-backed tranche has a deliberately bounded closure. It copies
+//! one slide whose exact internal relationships are one slide-layout edge
+//! plus zero or more direct embedded pictures and chart hosts, and reuses a
+//! destination layout only after its registered layout/master/theme boundary
+//! has been proven equivalent.
 
 use std::collections::HashSet;
+use std::fmt::Write as _;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 
@@ -16,6 +17,7 @@ use litchi_opc::{
     PackURI, PartView, Relationships, SourceBackedPackage, SourceLineage, SourceTopologyPlan,
     TargetMode,
 };
+use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -39,11 +41,20 @@ const STRICT_REL_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/
 const STRICT_PML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
 const TRANSITIONAL_DML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 const STRICT_DML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
+const TRANSITIONAL_CHART_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/drawingml/2006/chart";
+const STRICT_CHART_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/chart";
 const P14_NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2010/main";
 const STRICT_SLIDE_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/slide";
 const STRICT_LAYOUT_REL: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/slideLayout";
 const STRICT_IMAGE_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/image";
+const TRANSITIONAL_CHART_REL: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart";
+const STRICT_CHART_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/chart";
+const TRANSITIONAL_CHART_CONTENT_TYPE: &str =
+    "application/vnd.openxmlformats-officedocument.drawingml.chart+xml";
+const STRICT_CHART_CONTENT_TYPE: &str = "application/vnd.ms-office.chart+xml";
 const STRICT_MASTER_REL: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/slideMaster";
 const STRICT_THEME_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/theme";
@@ -52,13 +63,15 @@ const STRICT_THEME_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relati
 enum RootNamespace {
     PresentationMl,
     DrawingMl,
+    Chart,
 }
 
 impl RootNamespace {
-    const fn matches(self, pml: bool, dml: bool) -> bool {
+    const fn matches(self, pml: bool, dml: bool, chart: bool) -> bool {
         match self {
             Self::PresentationMl => pml,
             Self::DrawingMl => dml,
+            Self::Chart => chart,
         }
     }
 }
@@ -67,9 +80,9 @@ impl RootNamespace {
 ///
 /// Only a dependency-free slide closure is supported in this tranche: the
 /// source slide has exactly one internal slide-layout relationship plus zero
-/// or more direct embedded images, and no chart, diagram, table, notes,
-/// comments, external, or shared-owner relationship. No inverse or durable
-/// patch is represented.
+/// or more direct embedded images and chart hosts, and no diagram, table,
+/// notes, comments, external, or shared-owner relationship. No inverse or
+/// durable patch is represented.
 pub struct SourceBackedCrossSlideCopyPlan {
     source: SourceBackedPresentation,
     source_position: usize,
@@ -95,6 +108,8 @@ pub struct SourceBackedCrossSlideCopyPlan {
     target_presentation_xml: Vec<u8>,
     images: Vec<PreparedImage>,
     image_relationships: Vec<PreparedImageRelationship>,
+    charts: Vec<PreparedChart>,
+    chart_relationships: Vec<PreparedChartRelationship>,
     slide_relationship_order: Vec<PreparedSlideRelationship>,
     touched_digest: [u8; 32],
     planned_bytes: usize,
@@ -119,9 +134,27 @@ struct PreparedImageRelationship {
 }
 
 #[derive(PartialEq, Eq)]
+struct PreparedChart {
+    source_uri: PackURI,
+    target_uri: PackURI,
+    content_type: String,
+    declared_size: u64,
+    bytes: Vec<u8>,
+}
+
+#[derive(PartialEq, Eq)]
+struct PreparedChartRelationship {
+    source_relationship_id: String,
+    target_relationship_id: String,
+    relationship_type: String,
+    target_uri: PackURI,
+}
+
+#[derive(PartialEq, Eq)]
 enum PreparedSlideRelationship {
     Layout,
     Image(usize),
+    Chart(usize),
 }
 
 /// Semantic result of one published source-backed cross-presentation copy.
@@ -237,6 +270,8 @@ impl SourceBackedPresentationEditor {
             target_presentation_xml: prepared.target_presentation_xml,
             images: prepared.images,
             image_relationships: prepared.image_relationships,
+            charts: prepared.charts,
+            chart_relationships: prepared.chart_relationships,
             slide_relationship_order: prepared.slide_relationship_order,
             touched_digest: prepared.touched_digest,
             planned_bytes: prepared.planned_bytes,
@@ -300,7 +335,7 @@ impl SourceBackedPresentationEditor {
             destination_slide_position: plan.destination_slide_position,
             insertion_position: plan.insertion_position,
             destination_slide_count: plan.destination_slide_count,
-            source_name: plan.source_name.clone(),
+            source_name: clone_string(&plan.source_name, "source-backed published slide name")?,
         })
     }
 }
@@ -328,6 +363,8 @@ struct Prepared {
     target_presentation_xml: Vec<u8>,
     images: Vec<PreparedImage>,
     image_relationships: Vec<PreparedImageRelationship>,
+    charts: Vec<PreparedChart>,
+    chart_relationships: Vec<PreparedChartRelationship>,
     slide_relationship_order: Vec<PreparedSlideRelationship>,
     touched_digest: [u8; 32],
     planned_bytes: usize,
@@ -358,6 +395,8 @@ impl Prepared {
             && self.target_presentation_xml == plan.target_presentation_xml
             && self.images == plan.images
             && self.image_relationships == plan.image_relationships
+            && self.charts == plan.charts
+            && self.chart_relationships == plan.chart_relationships
             && self.slide_relationship_order == plan.slide_relationship_order
             && self.touched_digest == plan.touched_digest
             && self.planned_bytes == plan.planned_bytes
@@ -368,9 +407,15 @@ impl Prepared {
         execution_context: Option<&ExecutionContext>,
     ) -> Result<SourceTopologyPlan> {
         let mut topology = SourceTopologyPlan::new();
-        topology.try_replace_part(self.presentation_uri.clone(), self.target_presentation_xml)?;
+        topology.try_replace_part(
+            clone_pack_uri(
+                &self.presentation_uri,
+                "source-backed topology presentation URI",
+            )?,
+            self.target_presentation_xml,
+        )?;
         topology.try_add_part(
-            self.target_slide_uri.clone(),
+            clone_pack_uri(&self.target_slide_uri, "source-backed topology slide URI")?,
             ct::PML_SLIDE,
             self.source_slide_xml,
         )?;
@@ -378,21 +423,40 @@ impl Prepared {
             self.presentation_uri,
             self.presentation_relationship_id,
             self.slide_relationship_type,
-            self.target_slide_uri.clone(),
+            clone_pack_uri(
+                &self.target_slide_uri,
+                "source-backed topology slide relationship target",
+            )?,
         )?;
         for image in self.images {
             check_execution(execution_context)?;
             topology.try_add_part(image.target_uri, image.content_type, image.bytes)?;
+        }
+        for chart in self.charts {
+            check_execution(execution_context)?;
+            topology.try_add_part(chart.target_uri, chart.content_type, chart.bytes)?;
         }
         for relationship in self.slide_relationship_order {
             check_execution(execution_context)?;
             match relationship {
                 PreparedSlideRelationship::Layout => {
                     topology.try_add_internal_relationship(
-                        self.target_slide_uri.clone(),
-                        self.layout_relationship_id.clone(),
-                        self.layout_relationship_type.clone(),
-                        self.destination_layout_uri.clone(),
+                        clone_pack_uri(
+                            &self.target_slide_uri,
+                            "source-backed topology layout relationship source",
+                        )?,
+                        clone_string(
+                            &self.layout_relationship_id,
+                            "source-backed topology layout relationship ID",
+                        )?,
+                        clone_string(
+                            &self.layout_relationship_type,
+                            "source-backed topology layout relationship type",
+                        )?,
+                        clone_pack_uri(
+                            &self.destination_layout_uri,
+                            "source-backed topology layout relationship target",
+                        )?,
                     )?;
                 },
                 PreparedSlideRelationship::Image(index) => {
@@ -401,10 +465,46 @@ impl Prepared {
                         .get(index)
                         .ok_or_else(|| invalid("prepared image relationship index is invalid"))?;
                     topology.try_add_internal_relationship(
-                        self.target_slide_uri.clone(),
-                        relationship.target_relationship_id.clone(),
-                        relationship.relationship_type.clone(),
-                        relationship.target_uri.clone(),
+                        clone_pack_uri(
+                            &self.target_slide_uri,
+                            "source-backed topology image relationship source",
+                        )?,
+                        clone_string(
+                            &relationship.target_relationship_id,
+                            "source-backed topology image relationship ID",
+                        )?,
+                        clone_string(
+                            &relationship.relationship_type,
+                            "source-backed topology image relationship type",
+                        )?,
+                        clone_pack_uri(
+                            &relationship.target_uri,
+                            "source-backed topology image relationship target",
+                        )?,
+                    )?;
+                },
+                PreparedSlideRelationship::Chart(index) => {
+                    let relationship = self
+                        .chart_relationships
+                        .get(index)
+                        .ok_or_else(|| invalid("prepared chart relationship index is invalid"))?;
+                    topology.try_add_internal_relationship(
+                        clone_pack_uri(
+                            &self.target_slide_uri,
+                            "source-backed topology chart relationship source",
+                        )?,
+                        clone_string(
+                            &relationship.target_relationship_id,
+                            "source-backed topology chart relationship ID",
+                        )?,
+                        clone_string(
+                            &relationship.relationship_type,
+                            "source-backed topology chart relationship type",
+                        )?,
+                        clone_pack_uri(
+                            &relationship.target_uri,
+                            "source-backed topology chart relationship target",
+                        )?,
                     )?;
                 },
             }
@@ -582,15 +682,8 @@ fn prepare(
     let source_slide = source.inner.slides[source_position].clone();
     let source_slide_view = source.inner.package.part(&source_slide.part_uri)?;
     let source_slide_data = source_slide_view.data()?;
-    let slide_dialect = validate_xml(
+    let slide_dialect = validate_source_slide_xml(
         source_slide_data.as_bytes(),
-        b"sld",
-        RootNamespace::PresentationMl,
-        true,
-        true,
-        false,
-        true,
-        false,
         "source slide",
         execution_context,
     )?;
@@ -600,35 +693,65 @@ fn prepare(
             "source slide and presentation use different OOXML dialects",
         );
     }
-    let embedded_images = direct_embedded_images(
+    let direct_graphics = direct_embedded_images(
         source_slide_data.as_bytes(),
         slide_dialect,
         execution_context,
     )?;
     let mut image_relationship_ids = Vec::new();
     image_relationship_ids
-        .try_reserve(embedded_images.len())
+        .try_reserve(direct_graphics.images.len())
         .map_err(|source| Error::Allocation {
             resource: "source-backed embedded image relationship IDs",
             source,
         })?;
     let mut image_relationship_membership = HashSet::<&str>::new();
     image_relationship_membership
-        .try_reserve(embedded_images.len())
+        .try_reserve(direct_graphics.images.len())
         .map_err(|source| Error::Allocation {
             resource: "source-backed embedded image relationship membership",
             source,
         })?;
-    for image in &embedded_images {
+    for image in &direct_graphics.images {
         check_execution(execution_context)?;
         if image_relationship_membership.insert(image.relationship_id.as_str()) {
             image_relationship_ids.push(image.relationship_id.clone());
+        }
+    }
+    let mut chart_relationship_ids = Vec::new();
+    chart_relationship_ids
+        .try_reserve(direct_graphics.charts.len())
+        .map_err(|source| Error::Allocation {
+            resource: "source-backed embedded chart relationship IDs",
+            source,
+        })?;
+    let mut chart_relationship_membership = HashSet::<&str>::new();
+    chart_relationship_membership
+        .try_reserve(direct_graphics.charts.len())
+        .map_err(|source| Error::Allocation {
+            resource: "source-backed embedded chart relationship membership",
+            source,
+        })?;
+    for chart in &direct_graphics.charts {
+        check_execution(execution_context)?;
+        if chart_relationship_membership.insert(chart.relationship_id.as_str()) {
+            chart_relationship_ids.push(chart.relationship_id.clone());
+        }
+    }
+    for relationship_id in &image_relationship_ids {
+        check_execution(execution_context)?;
+        if chart_relationship_membership.contains(relationship_id.as_str()) {
+            return refusal(
+                SlideCopyRefusal::AmbiguousTopology,
+                "one slide relationship is used by both an image and a chart host",
+            );
         }
     }
     let layout_relationship = exact_layout_relationship(
         &source_slide_view,
         slide_dialect,
         &image_relationship_ids,
+        &chart_relationship_ids,
         execution_context,
     )?;
     let source_layout_uri = layout_relationship.target_partname()?;
@@ -644,6 +767,32 @@ fn prepare(
         .try_reserve(image_relationship_ids.len())
         .map_err(|source| Error::Allocation {
             resource: "source-backed embedded image relationships",
+            source,
+        })?;
+    let mut source_chart_parts = Vec::<SourceChartPart<'_>>::new();
+    source_chart_parts
+        .try_reserve(chart_relationship_ids.len())
+        .map_err(|source| Error::Allocation {
+            resource: "source-backed embedded chart parts",
+            source,
+        })?;
+    let mut source_chart_relationships = Vec::new();
+    source_chart_relationships
+        .try_reserve(chart_relationship_ids.len())
+        .map_err(|source| Error::Allocation {
+            resource: "source-backed embedded chart relationships",
+            source,
+        })?;
+    let mut selected_relationship_ids = Vec::new();
+    selected_relationship_ids
+        .try_reserve(
+            image_relationship_ids
+                .len()
+                .checked_add(chart_relationship_ids.len())
+                .ok_or_else(|| invalid("source-backed selected relationship count overflow"))?,
+        )
+        .map_err(|source| Error::Allocation {
+            resource: "source-backed selected relationship IDs",
             source,
         })?;
     let mut slide_relationship_order = Vec::new();
@@ -668,10 +817,93 @@ fn prepare(
             }
         }
         if !is_image_relationship {
-            return refusal(
-                SlideCopyRefusal::UnsupportedRelationship,
-                "source slide has an unreferenced relationship",
-            );
+            let mut is_chart_relationship = false;
+            for relationship_id in &chart_relationship_ids {
+                check_execution(execution_context)?;
+                if relationship_id == relationship.r_id() {
+                    is_chart_relationship = true;
+                    break;
+                }
+            }
+            if !is_chart_relationship {
+                return refusal(
+                    SlideCopyRefusal::UnsupportedRelationship,
+                    "source slide has an unreferenced relationship",
+                );
+            }
+            let source_chart_uri = relationship.target_partname()?;
+            if !source_chart_uri.as_str().starts_with("/ppt/charts/") {
+                return refusal(
+                    SlideCopyRefusal::UnsupportedRelationship,
+                    "embedded chart target is outside /ppt/charts/",
+                );
+            }
+            let mut existing_chart_index = None;
+            for (index, part) in source_chart_parts.iter().enumerate() {
+                check_execution(execution_context)?;
+                if part.source_uri.is_equivalent_to(&source_chart_uri) {
+                    existing_chart_index = Some(index);
+                    break;
+                }
+            }
+            let chart_index =
+                if let Some(index) = existing_chart_index {
+                    index
+                } else {
+                    let source_chart_part = source.inner.package.part(&source_chart_uri).map_err(
+                        |error| match error {
+                            litchi_opc::OpcError::PartNotFound(_) => Error::SlideCopyPlan {
+                                kind: SlideCopyRefusal::AmbiguousTopology,
+                                detail: "embedded chart target part is missing".into(),
+                            },
+                            other => Error::Opc(other),
+                        },
+                    )?;
+                    if source_chart_part.content_type() != chart_content_type(slide_dialect) {
+                        return Err(Error::ContentType {
+                            expected: chart_content_type(slide_dialect).into(),
+                            actual: source_chart_part.content_type().into(),
+                        });
+                    }
+                    if !source_chart_part.rels().is_empty() {
+                        return refusal(
+                            SlideCopyRefusal::UnsupportedRelationship,
+                            "embedded chart target must be a relationship-free leaf part",
+                        );
+                    }
+                    let declared_size = source_chart_part.declared_uncompressed_size()?;
+                    source_chart_parts.push(SourceChartPart {
+                        source_uri: source_chart_uri,
+                        content_type: clone_string(
+                            source_chart_part.content_type(),
+                            "source-backed embedded chart content type",
+                        )?,
+                        part: source_chart_part,
+                        declared_size,
+                    });
+                    source_chart_parts
+                        .len()
+                        .checked_sub(1)
+                        .ok_or_else(|| invalid("embedded chart part index underflow"))?
+                };
+            let relationship_index = source_chart_relationships.len();
+            source_chart_relationships.push(SourceChartRelationship {
+                source_relationship_id: clone_string(
+                    relationship.r_id(),
+                    "source-backed embedded chart relationship ID",
+                )?,
+                relationship_type: clone_string(
+                    relationship.reltype(),
+                    "source-backed embedded chart relationship type",
+                )?,
+                chart_index,
+            });
+            selected_relationship_ids.push(clone_string(
+                relationship.r_id(),
+                "source-backed selected chart relationship ID",
+            )?);
+            slide_relationship_order.push(PreparedSlideRelationship::Chart(relationship_index));
+            continue;
         }
         let source_image_uri = relationship.target_partname()?;
         if !source_image_uri.as_str().starts_with("/ppt/media/") {
@@ -719,8 +951,11 @@ fn prepare(
             }
             let declared_size = source_image_part.declared_uncompressed_size()?;
             source_image_parts.push(SourceImagePart {
-                source_uri: source_image_uri.clone(),
-                content_type: source_image_part.content_type().to_owned(),
+                source_uri: source_image_uri,
+                content_type: clone_string(
+                    source_image_part.content_type(),
+                    "source-backed embedded image content type",
+                )?,
                 part: source_image_part,
                 declared_size,
             });
@@ -731,10 +966,20 @@ fn prepare(
         };
         let relationship_index = source_image_relationships.len();
         source_image_relationships.push(SourceImageRelationship {
-            source_relationship_id: relationship.r_id().to_owned(),
-            relationship_type: relationship.reltype().to_owned(),
+            source_relationship_id: clone_string(
+                relationship.r_id(),
+                "source-backed embedded image relationship ID",
+            )?,
+            relationship_type: clone_string(
+                relationship.reltype(),
+                "source-backed embedded image relationship type",
+            )?,
             media_index,
         });
+        selected_relationship_ids.push(clone_string(
+            relationship.r_id(),
+            "source-backed selected image relationship ID",
+        )?);
         slide_relationship_order.push(PreparedSlideRelationship::Image(relationship_index));
     }
     let source_layouts = registered_layouts(
@@ -854,9 +1099,18 @@ fn prepare(
     let presentation_relationship_id =
         allocate_relationship_id(destination_presentation_view.rels(), execution_context)?;
     let target_slide_uri = allocate_slide_uri(&editor.package, execution_context)?;
-    let presentation_relationship_type = destination_anchor_relationship.reltype().to_owned();
-    let layout_relationship_type = destination_layout_relationship.reltype().to_owned();
-    let layout_relationship_id = destination_layout_relationship.r_id().to_owned();
+    let presentation_relationship_type = clone_string(
+        destination_anchor_relationship.reltype(),
+        "source-backed presentation relationship type",
+    )?;
+    let layout_relationship_type = clone_string(
+        destination_layout_relationship.reltype(),
+        "source-backed layout relationship type",
+    )?;
+    let layout_relationship_id = clone_string(
+        destination_layout_relationship.r_id(),
+        "source-backed layout relationship ID",
+    )?;
     let target_presentation_xml = crate::opened::insert_slide_binding(
         destination_presentation_data.as_bytes(),
         destination_refs
@@ -922,8 +1176,35 @@ fn prepare(
             )?);
         }
     }
-    let target_relationship_ids = allocate_image_relationship_ids(
-        &source_image_relationships,
+    let mut target_chart_uris = Vec::new();
+    target_chart_uris
+        .try_reserve(source_chart_parts.len())
+        .map_err(|source| Error::Allocation {
+            resource: "source-backed target chart URI list",
+            source,
+        })?;
+    if !source_chart_parts.is_empty() {
+        let mut occupied_chart_names = collect_physical_names(&editor.package, execution_context)?;
+        let additional_names = source_chart_parts
+            .len()
+            .checked_mul(2)
+            .ok_or_else(|| invalid("source-backed chart-name capacity overflow"))?;
+        occupied_chart_names
+            .try_reserve(additional_names)
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed destination chart member names",
+                source,
+            })?;
+        for _ in 0..source_chart_parts.len() {
+            check_execution(execution_context)?;
+            target_chart_uris.push(allocate_chart_uri(
+                &mut occupied_chart_names,
+                execution_context,
+            )?);
+        }
+    }
+    let target_relationship_ids = allocate_relationship_ids(
+        &selected_relationship_ids,
         destination_layout_relationship.r_id(),
         execution_context,
     )?;
@@ -934,26 +1215,71 @@ fn prepare(
             resource: "source-backed target image relationship mappings",
             source,
         })?;
-    for (index, relationship) in source_image_relationships.iter().enumerate() {
+    for relationship in &source_image_relationships {
         check_execution(execution_context)?;
         let target_uri = target_image_uris
             .get(relationship.media_index)
-            .ok_or_else(|| invalid("prepared target image URI index is invalid"))?
-            .clone();
+            .ok_or_else(|| invalid("prepared target image URI index is invalid"))?;
         image_relationships.push(PreparedImageRelationship {
-            source_relationship_id: relationship.source_relationship_id.clone(),
-            target_relationship_id: target_relationship_ids
-                .get(index)
-                .ok_or_else(|| invalid("prepared target image relationship ID is invalid"))?
-                .clone(),
-            relationship_type: relationship.relationship_type.clone(),
-            target_uri,
+            source_relationship_id: clone_string(
+                &relationship.source_relationship_id,
+                "source-backed target image source relationship ID",
+            )?,
+            target_relationship_id: clone_string(
+                assigned_relationship_id(
+                    &relationship.source_relationship_id,
+                    &selected_relationship_ids,
+                    &target_relationship_ids,
+                    execution_context,
+                )?,
+                "source-backed target image relationship ID",
+            )?,
+            relationship_type: clone_string(
+                &relationship.relationship_type,
+                "source-backed target image relationship type",
+            )?,
+            target_uri: clone_pack_uri(target_uri, "source-backed target image URI")?,
+        });
+    }
+    let mut chart_relationships = Vec::new();
+    chart_relationships
+        .try_reserve(source_chart_relationships.len())
+        .map_err(|source| Error::Allocation {
+            resource: "source-backed target chart relationship mappings",
+            source,
+        })?;
+    for relationship in &source_chart_relationships {
+        check_execution(execution_context)?;
+        let target_uri = target_chart_uris
+            .get(relationship.chart_index)
+            .ok_or_else(|| invalid("prepared target chart URI index is invalid"))?;
+        chart_relationships.push(PreparedChartRelationship {
+            source_relationship_id: clone_string(
+                &relationship.source_relationship_id,
+                "source-backed target chart source relationship ID",
+            )?,
+            target_relationship_id: clone_string(
+                assigned_relationship_id(
+                    &relationship.source_relationship_id,
+                    &selected_relationship_ids,
+                    &target_relationship_ids,
+                    execution_context,
+                )?,
+                "source-backed target chart relationship ID",
+            )?,
+            relationship_type: clone_string(
+                &relationship.relationship_type,
+                "source-backed target chart relationship type",
+            )?,
+            target_uri: clone_pack_uri(target_uri, "source-backed target chart URI")?,
         });
     }
     let rewritten_slide_len = rewritten_embedded_xml_len(
         source_slide_data.as_bytes(),
-        &embedded_images,
+        &direct_graphics.images,
         &image_relationships,
+        &direct_graphics.charts,
+        &chart_relationships,
         execution_context,
     )?;
     let mut image_size = 0usize;
@@ -974,15 +1300,202 @@ fn prepare(
             .checked_add(declared_size)
             .ok_or_else(|| invalid("source-backed cross-copy image size overflow"))?;
     }
-    let original_slide_size = if source_image_parts.is_empty() {
+    let mut chart_size = 0usize;
+    for chart_part in &source_chart_parts {
+        check_execution(execution_context)?;
+        let declared_size =
+            usize::try_from(chart_part.declared_size).map_err(|_| Error::Limit {
+                resource: "source-backed embedded chart bytes",
+                limit: usize::MAX,
+            })?;
+        if chart_part.declared_size > editor.limits.max_total_part_bytes() {
+            return Err(Error::Limit {
+                resource: "source-backed embedded chart bytes",
+                limit: usize::try_from(editor.limits.max_total_part_bytes()).unwrap_or(usize::MAX),
+            });
+        }
+        chart_size = chart_size
+            .checked_add(declared_size)
+            .ok_or_else(|| invalid("source-backed cross-copy chart size overflow"))?;
+    }
+    let original_slide_size = if source_image_parts.is_empty() && source_chart_parts.is_empty() {
         0
     } else {
         source_slide_data.as_bytes().len()
     };
+    let mut retained_metadata_size = 0usize;
+    for value in [
+        source_slide.part_uri.as_str(),
+        source_layout_uri.as_str(),
+        destination_layout_uri.as_str(),
+        target_slide_uri.as_str(),
+        presentation_relationship_id.as_str(),
+        layout_relationship_id.as_str(),
+        presentation_relationship_type.as_str(),
+        layout_relationship_type.as_str(),
+        source_name.as_str(),
+    ] {
+        add_metadata_size(&mut retained_metadata_size, value)?;
+    }
+    for image_part in &source_image_parts {
+        add_metadata_size(&mut retained_metadata_size, image_part.source_uri.as_str())?;
+        add_metadata_size(&mut retained_metadata_size, &image_part.content_type)?;
+    }
+    for chart_part in &source_chart_parts {
+        add_metadata_size(&mut retained_metadata_size, chart_part.source_uri.as_str())?;
+        add_metadata_size(&mut retained_metadata_size, &chart_part.content_type)?;
+    }
+    for uri in &target_image_uris {
+        add_metadata_size(&mut retained_metadata_size, uri.as_str())?;
+    }
+    for uri in &target_chart_uris {
+        add_metadata_size(&mut retained_metadata_size, uri.as_str())?;
+    }
+    for relationship in &source_image_relationships {
+        add_metadata_size(
+            &mut retained_metadata_size,
+            &relationship.source_relationship_id,
+        )?;
+        add_metadata_size(&mut retained_metadata_size, &relationship.relationship_type)?;
+        add_metadata_size(
+            &mut retained_metadata_size,
+            target_image_uris
+                .get(relationship.media_index)
+                .ok_or_else(|| invalid("prepared target image URI index is invalid"))?
+                .as_str(),
+        )?;
+    }
+    for relationship in &source_chart_relationships {
+        add_metadata_size(
+            &mut retained_metadata_size,
+            &relationship.source_relationship_id,
+        )?;
+        add_metadata_size(&mut retained_metadata_size, &relationship.relationship_type)?;
+        add_metadata_size(
+            &mut retained_metadata_size,
+            target_chart_uris
+                .get(relationship.chart_index)
+                .ok_or_else(|| invalid("prepared target chart URI index is invalid"))?
+                .as_str(),
+        )?;
+    }
+    for reference in &direct_graphics.images {
+        add_metadata_size(&mut retained_metadata_size, &reference.relationship_id)?;
+    }
+    for reference in &direct_graphics.charts {
+        add_metadata_size(&mut retained_metadata_size, &reference.relationship_id)?;
+    }
+    for image_part in &source_image_parts {
+        add_metadata_size(&mut retained_metadata_size, image_part.source_uri.as_str())?;
+        add_metadata_size(&mut retained_metadata_size, &image_part.content_type)?;
+    }
+    for chart_part in &source_chart_parts {
+        add_metadata_size(&mut retained_metadata_size, chart_part.source_uri.as_str())?;
+        add_metadata_size(&mut retained_metadata_size, &chart_part.content_type)?;
+    }
+    for uri in &target_image_uris {
+        add_metadata_size(&mut retained_metadata_size, uri.as_str())?;
+    }
+    for uri in &target_chart_uris {
+        add_metadata_size(&mut retained_metadata_size, uri.as_str())?;
+    }
+    for relationship in &image_relationships {
+        add_metadata_size(
+            &mut retained_metadata_size,
+            &relationship.source_relationship_id,
+        )?;
+        add_metadata_size(
+            &mut retained_metadata_size,
+            &relationship.target_relationship_id,
+        )?;
+        add_metadata_size(&mut retained_metadata_size, &relationship.relationship_type)?;
+        add_metadata_size(
+            &mut retained_metadata_size,
+            relationship.target_uri.as_str(),
+        )?;
+    }
+    for relationship in &chart_relationships {
+        add_metadata_size(
+            &mut retained_metadata_size,
+            &relationship.source_relationship_id,
+        )?;
+        add_metadata_size(
+            &mut retained_metadata_size,
+            &relationship.target_relationship_id,
+        )?;
+        add_metadata_size(&mut retained_metadata_size, &relationship.relationship_type)?;
+        add_metadata_size(
+            &mut retained_metadata_size,
+            relationship.target_uri.as_str(),
+        )?;
+    }
+    add_metadata_size(
+        &mut retained_metadata_size,
+        destination_presentation_view.partname().as_str(),
+    )?;
+    add_metadata_size(
+        &mut retained_metadata_size,
+        destination_presentation_view.partname().as_str(),
+    )?;
+    add_metadata_size(&mut retained_metadata_size, source_slide.part_uri.as_str())?;
+    add_metadata_size(&mut retained_metadata_size, source_name.as_str())?;
+    add_metadata_size(&mut retained_metadata_size, layout_relationship_id.as_str())?;
+    let topology_slide_uri_copies = slide_relationship_order
+        .len()
+        .checked_add(2)
+        .ok_or_else(|| invalid("source-backed topology slide URI copy count overflow"))?;
+    for _ in 0..topology_slide_uri_copies {
+        add_metadata_size(&mut retained_metadata_size, target_slide_uri.as_str())?;
+    }
+    for relationship in &slide_relationship_order {
+        match relationship {
+            PreparedSlideRelationship::Layout => {
+                add_metadata_size(&mut retained_metadata_size, layout_relationship_id.as_str())?;
+                add_metadata_size(
+                    &mut retained_metadata_size,
+                    layout_relationship_type.as_str(),
+                )?;
+                add_metadata_size(&mut retained_metadata_size, destination_layout_uri.as_str())?;
+            },
+            PreparedSlideRelationship::Image(index) => {
+                let relationship = image_relationships
+                    .get(*index)
+                    .ok_or_else(|| invalid("prepared image relationship index is invalid"))?;
+                add_metadata_size(
+                    &mut retained_metadata_size,
+                    &relationship.target_relationship_id,
+                )?;
+                add_metadata_size(&mut retained_metadata_size, &relationship.relationship_type)?;
+                add_metadata_size(
+                    &mut retained_metadata_size,
+                    relationship.target_uri.as_str(),
+                )?;
+            },
+            PreparedSlideRelationship::Chart(index) => {
+                let relationship = chart_relationships
+                    .get(*index)
+                    .ok_or_else(|| invalid("prepared chart relationship index is invalid"))?;
+                add_metadata_size(
+                    &mut retained_metadata_size,
+                    &relationship.target_relationship_id,
+                )?;
+                add_metadata_size(&mut retained_metadata_size, &relationship.relationship_type)?;
+                add_metadata_size(
+                    &mut retained_metadata_size,
+                    relationship.target_uri.as_str(),
+                )?;
+            },
+        }
+    }
+    for relationship_id in &target_relationship_ids {
+        add_metadata_size(&mut retained_metadata_size, relationship_id)?;
+    }
     let staging_request = original_slide_size
         .checked_add(rewritten_slide_len)
         .and_then(|bytes| bytes.checked_add(target_presentation_xml.len()))
         .and_then(|bytes| bytes.checked_add(image_size))
+        .and_then(|bytes| bytes.checked_add(chart_size))
+        .and_then(|bytes| bytes.checked_add(retained_metadata_size))
         .ok_or_else(|| invalid("source-backed cross-copy staging size overflow"))?;
     let memory_reservation = reserve_memory(execution_context, staging_request, editor.limits)?;
     let mut images = Vec::new();
@@ -1008,28 +1521,89 @@ fn prepare(
         }
         let target_uri = target_image_uris
             .get(index)
-            .ok_or_else(|| invalid("prepared target image URI index is invalid"))?
-            .clone();
+            .ok_or_else(|| invalid("prepared target image URI index is invalid"))?;
         images.push(PreparedImage {
-            source_uri: image_part.source_uri.clone(),
-            target_uri,
-            content_type: image_part.content_type.clone(),
+            source_uri: clone_pack_uri(
+                &image_part.source_uri,
+                "source-backed copied image source URI",
+            )?,
+            target_uri: clone_pack_uri(target_uri, "source-backed copied image target URI")?,
+            content_type: clone_string(
+                &image_part.content_type,
+                "source-backed copied image content type",
+            )?,
             declared_size: image_part.declared_size,
-            bytes: clone_bytes(data.as_bytes(), "source-backed copied image")?,
+            bytes: clone_bytes_checked(
+                data.as_bytes(),
+                "source-backed copied image",
+                execution_context,
+            )?,
         });
     }
-    let source_slide_original_xml = if source_image_parts.is_empty() {
-        None
-    } else {
-        Some(clone_bytes(
-            source_slide_data.as_bytes(),
-            "source-backed original slide",
-        )?)
-    };
+    let mut charts = Vec::new();
+    charts
+        .try_reserve(source_chart_parts.len())
+        .map_err(|source| Error::Allocation {
+            resource: "source-backed copied chart parts",
+            source,
+        })?;
+    for (index, chart_part) in source_chart_parts.iter().enumerate() {
+        check_execution(execution_context)?;
+        let data = chart_part.part.data()?;
+        let actual_size = data.as_bytes().len();
+        let declared_size =
+            usize::try_from(chart_part.declared_size).map_err(|_| Error::Limit {
+                resource: "source-backed embedded chart bytes",
+                limit: usize::MAX,
+            })?;
+        if actual_size != declared_size {
+            return Err(Error::Invalid(
+                "embedded chart decoded size differs from ZIP metadata".into(),
+            ));
+        }
+        validate_chart_xml(
+            data.as_bytes(),
+            slide_dialect,
+            "source chart",
+            execution_context,
+        )?;
+        let target_uri = target_chart_uris
+            .get(index)
+            .ok_or_else(|| invalid("prepared target chart URI index is invalid"))?;
+        charts.push(PreparedChart {
+            source_uri: clone_pack_uri(
+                &chart_part.source_uri,
+                "source-backed copied chart source URI",
+            )?,
+            target_uri: clone_pack_uri(target_uri, "source-backed copied chart target URI")?,
+            content_type: clone_string(
+                &chart_part.content_type,
+                "source-backed copied chart content type",
+            )?,
+            declared_size: chart_part.declared_size,
+            bytes: clone_bytes_checked(
+                data.as_bytes(),
+                "source-backed copied chart",
+                execution_context,
+            )?,
+        });
+    }
+    let source_slide_original_xml =
+        if source_image_parts.is_empty() && source_chart_parts.is_empty() {
+            None
+        } else {
+            Some(clone_bytes_checked(
+                source_slide_data.as_bytes(),
+                "source-backed original slide",
+                execution_context,
+            )?)
+        };
     let source_slide_xml = rewrite_embedded_relationships(
         source_slide_data.as_bytes(),
-        &embedded_images,
+        &direct_graphics.images,
         &image_relationships,
+        &direct_graphics.charts,
+        &chart_relationships,
         execution_context,
     )?;
     let planned_bytes = source_slide_xml
@@ -1039,6 +1613,11 @@ fn prepare(
             images
                 .iter()
                 .try_fold(bytes, |total, image| total.checked_add(image.bytes.len()))
+        })
+        .and_then(|bytes| {
+            charts
+                .iter()
+                .try_fold(bytes, |total, chart| total.checked_add(chart.bytes.len()))
         })
         .ok_or_else(|| invalid("source-backed cross-copy staged byte count overflow"))?;
     let touched_digest = digest_touched(
@@ -1061,6 +1640,8 @@ fn prepare(
         &names,
         &images,
         &image_relationships,
+        &charts,
+        &chart_relationships,
         &slide_relationship_order,
         execution_context,
     )?;
@@ -1073,20 +1654,25 @@ fn prepare(
         destination_version,
         source_lineage,
         destination_lineage,
-        source_slide_uri: source_slide.part_uri.clone(),
+        source_slide_uri: clone_pack_uri(&source_slide.part_uri, "source-backed source slide URI")?,
         destination_layout_uri,
-        presentation_uri: destination_presentation_view.partname().clone(),
+        presentation_uri: clone_pack_uri(
+            destination_presentation_view.partname(),
+            "source-backed presentation URI",
+        )?,
         target_slide_uri,
         slide_id,
         presentation_relationship_id,
         layout_relationship_id,
         slide_relationship_type: presentation_relationship_type,
-        layout_relationship_type: layout_relationship_type.to_owned(),
+        layout_relationship_type,
         source_slide_original_xml,
         source_slide_xml,
         target_presentation_xml,
         images,
         image_relationships,
+        charts,
+        chart_relationships,
         slide_relationship_order,
         touched_digest,
         planned_bytes,
@@ -1167,6 +1753,40 @@ fn verify_candidate(
             .checked_add(declared_size)
             .ok_or_else(|| invalid("source-backed candidate image reread size overflow"))?;
     }
+    for chart in &prepared.charts {
+        check_execution(execution_context)?;
+        let declared_size = usize::try_from(chart.declared_size).map_err(|_| Error::Limit {
+            resource: "source-backed candidate chart bytes",
+            limit: usize::MAX,
+        })?;
+        if chart.declared_size > editor.limits.max_total_part_bytes() {
+            return Err(Error::Limit {
+                resource: "source-backed candidate chart bytes",
+                limit: usize::try_from(editor.limits.max_total_part_bytes()).unwrap_or(usize::MAX),
+            });
+        }
+        if declared_size != chart.bytes.len() {
+            return Err(Error::StaleSource);
+        }
+        let chart_view =
+            source
+                .inner
+                .package
+                .part(&chart.source_uri)
+                .map_err(|error| match error {
+                    litchi_opc::OpcError::PartNotFound(_) => Error::StaleSource,
+                    other => Error::Opc(other),
+                })?;
+        if chart_view.declared_uncompressed_size()? != chart.declared_size
+            || chart_view.content_type() != chart.content_type.as_str()
+            || !chart_view.rels().is_empty()
+        {
+            return Err(Error::StaleSource);
+        }
+        second_read_bytes = second_read_bytes
+            .checked_add(declared_size)
+            .ok_or_else(|| invalid("source-backed candidate chart reread size overflow"))?;
+    }
     let retained_staged_bytes = prepared
         .planned_bytes
         .checked_add(
@@ -1180,11 +1800,12 @@ fn verify_candidate(
     let reread_peak = retained_staged_bytes
         .checked_add(second_read_bytes)
         .ok_or_else(|| invalid("source-backed candidate reread peak overflow"))?;
-    let _reread_memory_reservation = if prepared.images.is_empty() {
-        None
-    } else {
-        reserve_memory(execution_context, reread_peak, editor.limits)?
-    };
+    let _reread_memory_reservation =
+        if second_read_bytes > 0 || !prepared.images.is_empty() || !prepared.charts.is_empty() {
+            reserve_memory(execution_context, reread_peak, editor.limits)?
+        } else {
+            None
+        };
     for image in &prepared.images {
         check_execution(execution_context)?;
         let image_view =
@@ -1213,18 +1834,41 @@ fn verify_candidate(
             return Err(Error::StaleSource);
         }
     }
-    let staged_source_dialect = validate_xml(
+    let staged_source_dialect = validate_source_slide_xml(
         prepared.source_slide_xml.as_slice(),
-        b"sld",
-        RootNamespace::PresentationMl,
-        true,
-        true,
-        false,
-        true,
-        false,
         "staged source slide",
         execution_context,
     )?;
+    for chart in &prepared.charts {
+        check_execution(execution_context)?;
+        let chart_view =
+            source
+                .inner
+                .package
+                .part(&chart.source_uri)
+                .map_err(|error| match error {
+                    litchi_opc::OpcError::PartNotFound(_) => Error::StaleSource,
+                    other => Error::Opc(other),
+                })?;
+        if chart_view.declared_uncompressed_size()? != chart.declared_size
+            || chart_view.content_type() != chart.content_type.as_str()
+            || !chart_view.rels().is_empty()
+        {
+            return Err(Error::StaleSource);
+        }
+        let chart_data = chart_view.data()?;
+        let actual_size = u64::try_from(chart_data.as_bytes().len())
+            .map_err(|_| invalid("embedded chart byte count exceeds u64"))?;
+        if actual_size != chart.declared_size || chart_data.as_bytes() != chart.bytes.as_slice() {
+            return Err(Error::StaleSource);
+        }
+        validate_chart_xml(
+            chart_data.as_bytes(),
+            staged_source_dialect,
+            "staged source chart",
+            execution_context,
+        )?;
+    }
     let staged_destination_dialect = validate_xml(
         &prepared.target_presentation_xml,
         b"presentation",
@@ -1304,6 +1948,53 @@ fn verify_candidate(
             );
         }
     }
+    for chart in &prepared.charts {
+        check_execution(execution_context)?;
+        let relationship_uri = chart
+            .target_uri
+            .rels_uri()
+            .map_err(|error| Error::Uri(error.to_string()))?;
+        let chart_part_collision = part_exists(&editor.package, &chart.target_uri)?;
+        let relationship_part_collision = if chart_part_collision {
+            true
+        } else {
+            part_exists(&editor.package, &relationship_uri)?
+        };
+        let chart_non_part_collision = if chart_part_collision || relationship_part_collision {
+            true
+        } else {
+            let mut collision = false;
+            for member in editor.package.non_part_members() {
+                check_execution(execution_context)?;
+                if member
+                    .name()
+                    .eq_ignore_ascii_case(chart.target_uri.membername())
+                    || member
+                        .name()
+                        .eq_ignore_ascii_case(relationship_uri.membername())
+                {
+                    collision = true;
+                    break;
+                }
+            }
+            collision
+        };
+        if chart_part_collision || relationship_part_collision || chart_non_part_collision {
+            return refusal(
+                SlideCopyRefusal::UnknownPhysicalMember,
+                "allocated destination chart member already exists",
+            );
+        }
+    }
+    for chart in &prepared.charts {
+        check_execution(execution_context)?;
+        validate_chart_xml(
+            &chart.bytes,
+            staged_source_dialect,
+            "staged source chart",
+            execution_context,
+        )?;
+    }
     Ok(())
 }
 
@@ -1319,10 +2010,12 @@ fn exact_layout_relationship<'a>(
     slide: &'a PartView<'a>,
     dialect: Dialect,
     image_relationship_ids: &[String],
+    chart_relationship_ids: &[String],
     execution_context: Option<&ExecutionContext>,
 ) -> Result<&'a litchi_opc::Relationship> {
     let expected_relationships = 1usize
         .checked_add(image_relationship_ids.len())
+        .and_then(|count| count.checked_add(chart_relationship_ids.len()))
         .ok_or_else(|| invalid("source slide relationship count overflow"))?;
     if slide.rels().len() != expected_relationships {
         return refusal(
@@ -1363,25 +2056,49 @@ fn exact_layout_relationship<'a>(
                     break;
                 }
             }
+            let mut is_chart_relationship = false;
             if !is_image_relationship {
+                for id in chart_relationship_ids {
+                    check_execution(execution_context)?;
+                    if id == relationship.r_id() {
+                        is_chart_relationship = true;
+                        break;
+                    }
+                }
+            }
+            if !is_image_relationship && !is_chart_relationship {
                 return refusal(
                     SlideCopyRefusal::UnsupportedRelationship,
                     "source slide has an unsupported relationship",
                 );
             }
-            validate_internal(
-                relationship,
-                dialect,
-                rt::IMAGE,
-                STRICT_IMAGE_REL,
-                "embedded image",
-            )?;
+            if is_image_relationship {
+                validate_internal(
+                    relationship,
+                    dialect,
+                    rt::IMAGE,
+                    STRICT_IMAGE_REL,
+                    "embedded image",
+                )?;
+            } else {
+                validate_internal(
+                    relationship,
+                    dialect,
+                    TRANSITIONAL_CHART_REL,
+                    STRICT_CHART_REL,
+                    "embedded chart",
+                )?;
+            }
             image_found = image_found
                 .checked_add(1)
                 .ok_or_else(|| invalid("source slide image relationship count overflow"))?;
         }
     }
-    if image_found != image_relationship_ids.len() {
+    let selected_relationship_count = image_relationship_ids
+        .len()
+        .checked_add(chart_relationship_ids.len())
+        .ok_or_else(|| invalid("source slide selected relationship count overflow"))?;
+    if image_found != selected_relationship_count {
         return refusal(
             SlideCopyRefusal::AmbiguousTopology,
             "embedded image relationship is missing",
@@ -1453,11 +2170,35 @@ struct SourceImageRelationship {
     media_index: usize,
 }
 
+struct EmbeddedChartReference {
+    relationship_id: String,
+    chart_start: usize,
+    chart_end: usize,
+}
+
+struct SourceChartPart<'a> {
+    source_uri: PackURI,
+    content_type: String,
+    part: PartView<'a>,
+    declared_size: u64,
+}
+
+struct SourceChartRelationship {
+    source_relationship_id: String,
+    relationship_type: String,
+    chart_index: usize,
+}
+
+struct DirectSlideGraphics {
+    images: Vec<EmbeddedImageReference>,
+    charts: Vec<EmbeddedChartReference>,
+}
+
 fn direct_embedded_images(
     xml: &[u8],
     dialect: Dialect,
     execution_context: Option<&ExecutionContext>,
-) -> Result<Vec<EmbeddedImageReference>> {
+) -> Result<DirectSlideGraphics> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
@@ -1469,6 +2210,13 @@ fn direct_embedded_images(
     let mut pictures = 0usize;
     let mut picture_blips = 0usize;
     let mut image_references = Vec::new();
+    let mut chart_references = Vec::new();
+    let mut frame_depth = None;
+    let mut graphic_depth = None;
+    let mut graphic_data_depth = None;
+    let mut frame_graphic_seen = false;
+    let mut frame_graphic_data_seen = false;
+    let mut frame_chart_seen = false;
     image_references
         .try_reserve(1)
         .map_err(|source| Error::Allocation {
@@ -1484,6 +2232,7 @@ fn direct_embedded_images(
             .map_err(|error| Error::Xml(error.to_string()))?;
         let pml = is_pml(&namespace);
         let dml = is_dml(&namespace);
+        let chart = is_chart(&namespace);
         let is_start = matches!(&event, Event::Start(_));
         let is_empty = matches!(&event, Event::Empty(_));
         let event_end = usize::try_from(reader.buffer_position())
@@ -1491,6 +2240,16 @@ fn direct_embedded_images(
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 let local = element.local_name();
+                if chart
+                    && !(frame_depth.is_some()
+                        && graphic_data_depth == Some(depth)
+                        && local.as_ref() == b"chart")
+                {
+                    return refusal(
+                        SlideCopyRefusal::UnknownSemanticSurface,
+                        "source slide chart content is outside a direct chart host",
+                    );
+                }
                 if pml && local.as_ref() == b"spTree" {
                     scene_trees = scene_trees
                         .checked_add(1)
@@ -1512,6 +2271,218 @@ fn direct_embedded_images(
                             .checked_add(1)
                             .ok_or_else(|| invalid("source slide XML depth overflow"))?,
                     );
+                } else if pml && local.as_ref() == b"graphicFrame" {
+                    if scene_depth != Some(depth) || frame_depth.is_some() {
+                        return refusal(
+                            SlideCopyRefusal::UnknownSemanticSurface,
+                            "source slide graphicFrame is not a direct scene element",
+                        );
+                    }
+                    if is_empty {
+                        return refusal(
+                            SlideCopyRefusal::UnknownSemanticSurface,
+                            "source slide graphicFrame has no graphic content",
+                        );
+                    }
+                    frame_depth = Some(
+                        depth
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("source slide XML depth overflow"))?,
+                    );
+                    frame_graphic_seen = false;
+                    frame_graphic_data_seen = false;
+                    frame_chart_seen = false;
+                } else if dml && local.as_ref() == b"graphic" {
+                    if frame_depth != Some(depth) || frame_graphic_seen {
+                        return refusal(
+                            SlideCopyRefusal::UnknownSemanticSurface,
+                            "source slide graphicFrame has an unsupported graphic structure",
+                        );
+                    }
+                    if is_empty {
+                        return refusal(
+                            SlideCopyRefusal::UnknownSemanticSurface,
+                            "source slide graphicFrame graphic cannot be empty",
+                        );
+                    }
+                    frame_graphic_seen = true;
+                    graphic_depth = Some(
+                        depth
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("source slide XML depth overflow"))?,
+                    );
+                } else if dml && local.as_ref() == b"graphicData" {
+                    if graphic_depth != Some(depth) || frame_graphic_data_seen {
+                        return refusal(
+                            SlideCopyRefusal::UnknownSemanticSurface,
+                            "source slide graphic has an unsupported graphicData structure",
+                        );
+                    }
+                    if is_empty {
+                        return refusal(
+                            SlideCopyRefusal::UnknownSemanticSurface,
+                            "source slide graphicData cannot be empty",
+                        );
+                    }
+                    let expected_chart_namespace = match dialect {
+                        Dialect::Transitional => TRANSITIONAL_CHART_NAMESPACE,
+                        Dialect::Strict => STRICT_CHART_NAMESPACE,
+                    };
+                    let mut uri_seen = false;
+                    let mut chart_uri_matches = false;
+                    for attribute in element.attributes() {
+                        check_execution(execution_context)?;
+                        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                        let key = attribute.key.as_ref();
+                        if key == b"xmlns" || key.starts_with(b"xmlns:") {
+                            continue;
+                        }
+                        let attribute_namespace =
+                            reader.resolver().resolve_attribute(attribute.key).0;
+                        if attribute.key.prefix().is_some()
+                            && attribute.key.as_namespace_binding().is_none()
+                            && matches!(&attribute_namespace, ResolveResult::Unknown(_))
+                        {
+                            return refusal(
+                                SlideCopyRefusal::UnknownSemanticSurface,
+                                "source slide graphicData has an unresolved attribute namespace",
+                            );
+                        }
+                        if attribute.key.prefix().is_none() && key == b"uri" && !uri_seen {
+                            uri_seen = true;
+                            chart_uri_matches =
+                                attribute.value.as_ref() == expected_chart_namespace;
+                        } else {
+                            return refusal(
+                                SlideCopyRefusal::UnknownSemanticSurface,
+                                "source slide graphicData has a non-canonical URI attribute",
+                            );
+                        }
+                    }
+                    if !uri_seen || !chart_uri_matches {
+                        return refusal(
+                            SlideCopyRefusal::UnknownSemanticSurface,
+                            "source slide graphicData does not name the chart namespace",
+                        );
+                    }
+                    frame_graphic_data_seen = true;
+                    graphic_data_depth = Some(
+                        depth
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("source slide XML depth overflow"))?,
+                    );
+                } else if chart && local.as_ref() == b"chart" {
+                    if graphic_data_depth != Some(depth) || frame_chart_seen {
+                        return refusal(
+                            SlideCopyRefusal::UnknownSemanticSurface,
+                            "source slide graphicData has an unsupported chart structure",
+                        );
+                    }
+                    if !is_empty {
+                        return refusal(
+                            SlideCopyRefusal::UnknownSemanticSurface,
+                            "source slide chart host must use an empty c:chart element",
+                        );
+                    }
+                    let expected_namespace = match dialect {
+                        Dialect::Transitional => TRANSITIONAL_REL_NAMESPACE,
+                        Dialect::Strict => STRICT_REL_NAMESPACE,
+                    };
+                    let mut chart_relationship_id = None;
+                    let mut chart_relationship_key = None;
+                    for attribute in element.attributes() {
+                        check_execution(execution_context)?;
+                        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                        let key = attribute.key.as_ref();
+                        if key == b"xmlns" || key.starts_with(b"xmlns:") {
+                            continue;
+                        }
+                        let attribute_namespace =
+                            reader.resolver().resolve_attribute(attribute.key).0;
+                        let relationship_namespace = match attribute_namespace {
+                            ResolveResult::Bound(Namespace(value))
+                                if value == TRANSITIONAL_REL_NAMESPACE
+                                    || value == STRICT_REL_NAMESPACE =>
+                            {
+                                Some(value)
+                            },
+                            _ => None,
+                        };
+                        if key.starts_with(b"r:") || relationship_namespace.is_some() {
+                            if relationship_namespace != Some(expected_namespace)
+                                || attribute.key.local_name().as_ref() != b"id"
+                                || chart_relationship_id.is_some()
+                                || attribute.value.is_empty()
+                            {
+                                return refusal(
+                                    SlideCopyRefusal::UnsupportedRelationship,
+                                    "source slide chart host has an invalid relationship attribute",
+                                );
+                            }
+                            let relationship_id = std::str::from_utf8(attribute.value.as_ref())
+                                .map_err(|_| {
+                                    Error::Invalid(
+                                        "source slide chart relationship ID is not UTF-8".into(),
+                                    )
+                                })?;
+                            chart_relationship_id = Some(clone_string(
+                                relationship_id,
+                                "source-backed validated chart relationship ID",
+                            )?);
+                            let mut key_copy = Vec::new();
+                            key_copy.try_reserve_exact(key.len()).map_err(|source| {
+                                Error::Allocation {
+                                    resource: "source-backed validated chart attribute key",
+                                    source,
+                                }
+                            })?;
+                            key_copy.extend_from_slice(key);
+                            chart_relationship_key = Some(key_copy);
+                        } else if attribute.key.prefix().is_some()
+                            && attribute.key.as_namespace_binding().is_none()
+                            && matches!(&attribute_namespace, ResolveResult::Unknown(_))
+                        {
+                            return refusal(
+                                SlideCopyRefusal::UnknownSemanticSurface,
+                                "source slide chart host has an unresolved attribute namespace",
+                            );
+                        } else {
+                            return refusal(
+                                SlideCopyRefusal::UnknownSemanticSurface,
+                                "source slide chart host has an unsupported attribute",
+                            );
+                        }
+                    }
+                    let relationship_id =
+                        chart_relationship_id.ok_or_else(|| Error::SlideCopyPlan {
+                            kind: SlideCopyRefusal::UnknownSemanticSurface,
+                            detail: "source slide chart host has no chart relationship".into(),
+                        })?;
+                    let relationship_key = chart_relationship_key
+                        .as_deref()
+                        .ok_or_else(|| invalid("source slide chart relationship key is missing"))?;
+                    let (relative_start, relative_end) = embed_attribute_range(
+                        xml.get(event_start..event_end)
+                            .ok_or_else(|| invalid("source slide chart event range is invalid"))?,
+                        relationship_key,
+                        execution_context,
+                    )?;
+                    chart_references
+                        .try_reserve(1)
+                        .map_err(|source| Error::Allocation {
+                            resource: "source-backed embedded chart references",
+                            source,
+                        })?;
+                    chart_references.push(EmbeddedChartReference {
+                        relationship_id,
+                        chart_start: event_start
+                            .checked_add(relative_start)
+                            .ok_or_else(|| invalid("source slide chart offset overflow"))?,
+                        chart_end: event_start
+                            .checked_add(relative_end)
+                            .ok_or_else(|| invalid("source slide chart offset overflow"))?,
+                    });
+                    frame_chart_seen = true;
                 } else if pml && local.as_ref() == b"pic" {
                     if scene_depth != Some(depth) {
                         return refusal(
@@ -1611,16 +2582,19 @@ fn direct_embedded_images(
                                             "source slide picture has multiple or empty image IDs",
                                         );
                                     }
-                                    blip_relationship_id = Some(
-                                        std::str::from_utf8(attribute.value.as_ref())
-                                            .map_err(|_| {
-                                                Error::Invalid(
-                                                    "source slide image relationship ID is not UTF-8"
-                                                        .into(),
-                                                )
-                                            })?
-                                            .to_owned(),
-                                    );
+                                    let relationship_id = std::str::from_utf8(
+                                        attribute.value.as_ref(),
+                                    )
+                                    .map_err(|_| {
+                                        Error::Invalid(
+                                            "source slide image relationship ID is not UTF-8"
+                                                .into(),
+                                        )
+                                    })?;
+                                    blip_relationship_id = Some(clone_string(
+                                        relationship_id,
+                                        "source-backed validated image relationship ID",
+                                    )?);
                                     let mut key_copy = Vec::new();
                                     key_copy.try_reserve_exact(key.len()).map_err(|source| {
                                         Error::Allocation {
@@ -1676,6 +2650,17 @@ fn direct_embedded_images(
                             .checked_add(relative_end)
                             .ok_or_else(|| invalid("source slide image offset overflow"))?,
                     });
+                } else if frame_depth.is_some()
+                    && ((graphic_data_depth == Some(depth)
+                        && !(chart && local.as_ref() == b"chart"))
+                        || (graphic_depth == Some(depth)
+                            && !(dml && local.as_ref() == b"graphicData"))
+                        || (chart && local.as_ref() != b"chart"))
+                {
+                    return refusal(
+                        SlideCopyRefusal::UnknownSemanticSurface,
+                        "source slide graphicFrame contains an unsupported chart element",
+                    );
                 }
                 if is_start {
                     depth = depth
@@ -1703,6 +2688,33 @@ fn direct_embedded_images(
                 if scene_depth == Some(closing_depth) {
                     scene_depth = None;
                 }
+                if graphic_data_depth == Some(closing_depth) {
+                    if !frame_chart_seen {
+                        return refusal(
+                            SlideCopyRefusal::UnknownSemanticSurface,
+                            "source slide chart graphicData has no c:chart",
+                        );
+                    }
+                    graphic_data_depth = None;
+                }
+                if graphic_depth == Some(closing_depth) {
+                    if !frame_graphic_data_seen {
+                        return refusal(
+                            SlideCopyRefusal::UnknownSemanticSurface,
+                            "source slide chart graphic has no chart graphicData",
+                        );
+                    }
+                    graphic_depth = None;
+                }
+                if frame_depth == Some(closing_depth) {
+                    if !frame_graphic_seen || !frame_graphic_data_seen || !frame_chart_seen {
+                        return refusal(
+                            SlideCopyRefusal::UnknownSemanticSurface,
+                            "source slide graphicFrame has an incomplete chart host",
+                        );
+                    }
+                    frame_depth = None;
+                }
             },
             Event::DocType(_) | Event::PI(_) => {
                 return refusal(
@@ -1718,6 +2730,9 @@ fn direct_embedded_images(
         || scene_depth.is_some()
         || picture_depth.is_some()
         || picture_fill_depth.is_some()
+        || frame_depth.is_some()
+        || graphic_depth.is_some()
+        || graphic_data_depth.is_some()
     {
         return Err(invalid("source slide XML is unterminated"));
     }
@@ -1732,7 +2747,10 @@ fn direct_embedded_images(
             "source slide image reference count is inconsistent",
         ));
     }
-    Ok(image_references)
+    Ok(DirectSlideGraphics {
+        images: image_references,
+        charts: chart_references,
+    })
 }
 
 fn embed_attribute_range(
@@ -1857,23 +2875,6 @@ fn check_execution_at_cadence(
     Ok(())
 }
 
-fn mapped_image_relationship<'a>(
-    source_relationship_id: &str,
-    relationships: &'a [PreparedImageRelationship],
-    execution_context: Option<&ExecutionContext>,
-) -> Result<&'a PreparedImageRelationship> {
-    for relationship in relationships {
-        check_execution(execution_context)?;
-        if relationship.source_relationship_id == source_relationship_id {
-            return Ok(relationship);
-        }
-    }
-    Err(Error::SlideCopyPlan {
-        kind: SlideCopyRefusal::AmbiguousTopology,
-        detail: "source slide image relationship mapping is missing".into(),
-    })
-}
-
 fn escaped_relationship_id(value: &str) -> Result<Vec<u8>> {
     let bytes = value.as_bytes();
     if bytes.is_empty()
@@ -1911,45 +2912,145 @@ fn escaped_relationship_id(value: &str) -> Result<Vec<u8>> {
     Ok(escaped)
 }
 
+struct RewriteReference<'a> {
+    relationship_id: &'a str,
+    start: usize,
+    end: usize,
+}
+
+fn rewrite_references<'a>(
+    image_references: &'a [EmbeddedImageReference],
+    chart_references: &'a [EmbeddedChartReference],
+    execution_context: Option<&ExecutionContext>,
+) -> Result<Vec<RewriteReference<'a>>> {
+    let capacity = image_references
+        .len()
+        .checked_add(chart_references.len())
+        .ok_or_else(|| invalid("source slide rewrite reference count overflow"))?;
+    let mut references = Vec::new();
+    references
+        .try_reserve_exact(capacity)
+        .map_err(|source| Error::Allocation {
+            resource: "source-backed slide rewrite references",
+            source,
+        })?;
+    for reference in image_references {
+        check_execution(execution_context)?;
+        references.push(RewriteReference {
+            relationship_id: &reference.relationship_id,
+            start: reference.embed_start,
+            end: reference.embed_end,
+        });
+    }
+    for reference in chart_references {
+        check_execution(execution_context)?;
+        references.push(RewriteReference {
+            relationship_id: &reference.relationship_id,
+            start: reference.chart_start,
+            end: reference.chart_end,
+        });
+    }
+    check_execution(execution_context)?;
+    references.sort_unstable_by(|left, right| {
+        left.start
+            .cmp(&right.start)
+            .then_with(|| left.end.cmp(&right.end))
+            .then_with(|| left.relationship_id.cmp(right.relationship_id))
+    });
+    Ok(references)
+}
+
+fn mapped_relationship_id<'a>(
+    source_relationship_id: &str,
+    image_relationships: &'a [PreparedImageRelationship],
+    chart_relationships: &'a [PreparedChartRelationship],
+    execution_context: Option<&ExecutionContext>,
+) -> Result<&'a str> {
+    let mut found = None;
+    for relationship in image_relationships {
+        check_execution(execution_context)?;
+        if relationship.source_relationship_id == source_relationship_id {
+            if found.is_some() {
+                return refusal(
+                    SlideCopyRefusal::AmbiguousTopology,
+                    "source slide relationship mapping is duplicated",
+                );
+            }
+            found = Some(relationship.target_relationship_id.as_str());
+        }
+    }
+    for relationship in chart_relationships {
+        check_execution(execution_context)?;
+        if relationship.source_relationship_id == source_relationship_id {
+            if found.is_some() {
+                return refusal(
+                    SlideCopyRefusal::AmbiguousTopology,
+                    "source slide relationship mapping is duplicated",
+                );
+            }
+            found = Some(relationship.target_relationship_id.as_str());
+        }
+    }
+    found.ok_or_else(|| Error::SlideCopyPlan {
+        kind: SlideCopyRefusal::AmbiguousTopology,
+        detail: "source slide relationship mapping is missing".into(),
+    })
+}
+
 fn rewritten_embedded_xml_len(
     xml: &[u8],
-    references: &[EmbeddedImageReference],
-    relationships: &[PreparedImageRelationship],
+    image_references: &[EmbeddedImageReference],
+    image_relationships: &[PreparedImageRelationship],
+    chart_references: &[EmbeddedChartReference],
+    chart_relationships: &[PreparedChartRelationship],
     execution_context: Option<&ExecutionContext>,
 ) -> Result<usize> {
     let mut length = xml.len();
     let mut previous_end = 0usize;
+    let references = rewrite_references(image_references, chart_references, execution_context)?;
     for reference in references {
         check_execution(execution_context)?;
-        if reference.embed_start < previous_end
-            || reference.embed_end < reference.embed_start
-            || reference.embed_end > xml.len()
+        if reference.start < previous_end
+            || reference.end < reference.start
+            || reference.end > xml.len()
         {
-            return Err(invalid("source slide image ranges overlap or exceed XML"));
+            return Err(invalid(
+                "source slide relationship ranges overlap or exceed XML",
+            ));
         }
-        let relationship = mapped_image_relationship(
-            &reference.relationship_id,
-            relationships,
+        let target_relationship_id = mapped_relationship_id(
+            reference.relationship_id,
+            image_relationships,
+            chart_relationships,
             execution_context,
         )?;
-        let escaped = escaped_relationship_id(&relationship.target_relationship_id)?;
+        let escaped = escaped_relationship_id(target_relationship_id)?;
         length = length
-            .checked_sub(reference.embed_end - reference.embed_start)
+            .checked_sub(reference.end - reference.start)
             .and_then(|length| length.checked_add(escaped.len()))
             .ok_or_else(|| invalid("rewritten source slide XML length overflow"))?;
-        previous_end = reference.embed_end;
+        previous_end = reference.end;
     }
     Ok(length)
 }
 
 fn rewrite_embedded_relationships(
     xml: &[u8],
-    references: &[EmbeddedImageReference],
-    relationships: &[PreparedImageRelationship],
+    image_references: &[EmbeddedImageReference],
+    image_relationships: &[PreparedImageRelationship],
+    chart_references: &[EmbeddedChartReference],
+    chart_relationships: &[PreparedChartRelationship],
     execution_context: Option<&ExecutionContext>,
 ) -> Result<Vec<u8>> {
-    let expected_len =
-        rewritten_embedded_xml_len(xml, references, relationships, execution_context)?;
+    let expected_len = rewritten_embedded_xml_len(
+        xml,
+        image_references,
+        image_relationships,
+        chart_references,
+        chart_relationships,
+        execution_context,
+    )?;
+    let references = rewrite_references(image_references, chart_references, execution_context)?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(expected_len)
@@ -1960,23 +3061,35 @@ fn rewrite_embedded_relationships(
     let mut cursor = 0usize;
     for reference in references {
         check_execution(execution_context)?;
-        let relationship = mapped_image_relationship(
-            &reference.relationship_id,
-            relationships,
+        let target_relationship_id = mapped_relationship_id(
+            reference.relationship_id,
+            image_relationships,
+            chart_relationships,
             execution_context,
         )?;
-        let escaped = escaped_relationship_id(&relationship.target_relationship_id)?;
-        output.extend_from_slice(
-            xml.get(cursor..reference.embed_start)
-                .ok_or_else(|| invalid("source slide image prefix range is invalid"))?,
-        );
-        output.extend_from_slice(&escaped);
-        cursor = reference.embed_end;
+        let escaped = escaped_relationship_id(target_relationship_id)?;
+        extend_bytes_checked(
+            &mut output,
+            xml.get(cursor..reference.start)
+                .ok_or_else(|| invalid("source slide relationship prefix range is invalid"))?,
+            "source-backed rewritten slide XML prefix",
+            execution_context,
+        )?;
+        extend_bytes_checked(
+            &mut output,
+            &escaped,
+            "source-backed rewritten relationship ID",
+            execution_context,
+        )?;
+        cursor = reference.end;
     }
-    output.extend_from_slice(
+    extend_bytes_checked(
+        &mut output,
         xml.get(cursor..)
-            .ok_or_else(|| invalid("source slide image suffix range is invalid"))?,
-    );
+            .ok_or_else(|| invalid("source slide relationship suffix range is invalid"))?,
+        "source-backed rewritten slide XML suffix",
+        execution_context,
+    )?;
     if output.len() != expected_len {
         return Err(invalid(
             "rewritten source slide XML length changed unexpectedly",
@@ -2305,9 +3418,13 @@ fn graph_digest(
     ] {
         check_execution(execution_context)?;
         digest.update(name.as_bytes());
-        digest.update(view.content_type().as_bytes());
+        digest_bytes(
+            &mut digest,
+            view.content_type().as_bytes(),
+            execution_context,
+        )?;
         digest.update((data.as_bytes().len() as u64).to_le_bytes());
-        digest.update(data.as_bytes());
+        digest_bytes(&mut digest, data.as_bytes(), execution_context)?;
         let mut rels = Vec::new();
         rels.try_reserve_exact(view.rels().len())
             .map_err(|source| Error::Allocation {
@@ -2329,9 +3446,21 @@ fn graph_digest(
                     format!("{context} graph has a non-exact edge"),
                 );
             }
-            digest.update(relationship.r_id().as_bytes());
-            digest.update(relationship.reltype().as_bytes());
-            digest.update(relationship.target_ref().as_bytes());
+            digest_bytes(
+                &mut digest,
+                relationship.r_id().as_bytes(),
+                execution_context,
+            )?;
+            digest_bytes(
+                &mut digest,
+                relationship.reltype().as_bytes(),
+                execution_context,
+            )?;
+            digest_bytes(
+                &mut digest,
+                relationship.target_ref().as_bytes(),
+                execution_context,
+            )?;
         }
     }
     Ok(digest.finalize().into())
@@ -2642,7 +3771,12 @@ fn allocate_relationship_id(
         .ok_or_else(|| invalid("relationship candidate count overflow"))?;
     for candidate in 1..=maximum {
         check_execution(execution_context)?;
-        let id = format!("rId{candidate}");
+        let id = generated_string(
+            "rId",
+            candidate,
+            "",
+            "source-backed candidate presentation relationship ID",
+        )?;
         if relationships.get(&id).is_none() {
             return Ok(id);
         }
@@ -2680,8 +3814,12 @@ fn allocate_slide_uri(
         .ok_or_else(|| invalid("slide part-name candidate count overflow"))?;
     for index in 1..=maximum {
         check_execution(execution_context)?;
-        let uri = PackURI::new(format!("/ppt/slides/slide{index}.xml"))
-            .map_err(|error| Error::Uri(error.to_string()))?;
+        let uri = generated_pack_uri(
+            "/ppt/slides/slide",
+            index,
+            ".xml",
+            "source-backed candidate slide URI",
+        )?;
         let relationship_uri = uri
             .rels_uri()
             .map_err(|error| Error::Uri(error.to_string()))?;
@@ -2750,13 +3888,40 @@ fn allocate_media_uri(
         .ok_or_else(|| invalid("media part-name candidate count overflow"))?;
     for index in 1..=maximum {
         check_execution(execution_context)?;
-        let name = if extension.is_empty() {
-            format!("{stem}-copy{index}")
+        let mut uri_value = String::new();
+        let digits = (usize::BITS as usize / 3)
+            .checked_add(2)
+            .ok_or_else(|| invalid("media part-name digit capacity overflow"))?;
+        let extension_size = if extension.is_empty() {
+            0
         } else {
-            format!("{stem}-copy{index}.{extension}")
+            1usize
+                .checked_add(extension.len())
+                .ok_or_else(|| invalid("media part-name extension size overflow"))?
         };
-        let uri = PackURI::new(format!("/ppt/media/{name}"))
-            .map_err(|error| Error::Uri(error.to_string()))?;
+        let capacity = "/ppt/media/"
+            .len()
+            .checked_add(stem.len())
+            .and_then(|size| size.checked_add("-copy".len()))
+            .and_then(|size| size.checked_add(digits))
+            .and_then(|size| size.checked_add(extension_size))
+            .ok_or_else(|| invalid("media part-name size overflow"))?;
+        uri_value
+            .try_reserve_exact(capacity)
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed candidate image URI",
+                source,
+            })?;
+        uri_value.push_str("/ppt/media/");
+        uri_value.push_str(stem);
+        uri_value.push_str("-copy");
+        write!(&mut uri_value, "{index}")
+            .map_err(|_| invalid("media part-name formatting failed"))?;
+        if !extension.is_empty() {
+            uri_value.push('.');
+            uri_value.push_str(extension);
+        }
+        let uri = PackURI::new(uri_value).map_err(|error| Error::Uri(error.to_string()))?;
         let relationship_uri = uri
             .rels_uri()
             .map_err(|error| Error::Uri(error.to_string()))?;
@@ -2781,12 +3946,52 @@ fn allocate_media_uri(
     )
 }
 
-fn allocate_image_relationship_ids(
-    relationships: &[SourceImageRelationship],
+fn allocate_chart_uri(
+    physical_names: &mut HashSet<String>,
+    execution_context: Option<&ExecutionContext>,
+) -> Result<PackURI> {
+    let maximum = physical_names
+        .len()
+        .checked_add(1)
+        .ok_or_else(|| invalid("chart part-name candidate count overflow"))?;
+    for index in 1..=maximum {
+        check_execution(execution_context)?;
+        let uri = generated_pack_uri(
+            "/ppt/charts/chart",
+            index,
+            ".xml",
+            "source-backed candidate chart URI",
+        )?;
+        let relationship_uri = uri
+            .rels_uri()
+            .map_err(|error| Error::Uri(error.to_string()))?;
+        let member_key = folded_ascii_name(
+            uri.membername(),
+            "source-backed candidate chart member name",
+        )?;
+        let relationship_key = folded_ascii_name(
+            relationship_uri.membername(),
+            "source-backed candidate chart relationship member name",
+        )?;
+        if physical_names.contains(&member_key) || physical_names.contains(&relationship_key) {
+            continue;
+        }
+        physical_names.insert(member_key);
+        physical_names.insert(relationship_key);
+        return Ok(uri);
+    }
+    refusal(
+        SlideCopyRefusal::AmbiguousTopology,
+        "chart part-name space is exhausted",
+    )
+}
+
+fn allocate_relationship_ids(
+    source_relationship_ids: &[String],
     layout_relationship_id: &str,
     execution_context: Option<&ExecutionContext>,
 ) -> Result<Vec<String>> {
-    let capacity = relationships
+    let capacity = source_relationship_ids
         .len()
         .checked_add(1)
         .ok_or_else(|| invalid("image relationship ID count overflow"))?;
@@ -2796,33 +4001,35 @@ fn allocate_image_relationship_ids(
             resource: "source-backed target relationship IDs",
             source,
         })?;
-    used.insert(layout_relationship_id.to_owned());
+    used.insert(clone_string(
+        layout_relationship_id,
+        "source-backed used layout relationship ID",
+    )?);
     let mut source_order = Vec::new();
     source_order
-        .try_reserve_exact(relationships.len())
+        .try_reserve_exact(source_relationship_ids.len())
         .map_err(|source| Error::Allocation {
             resource: "source-backed image relationship allocation order",
             source,
         })?;
-    for index in 0..relationships.len() {
+    for index in 0..source_relationship_ids.len() {
         check_execution(execution_context)?;
         source_order.push(index);
     }
     source_order.sort_unstable_by(|left, right| {
-        relationships[*left]
-            .source_relationship_id
-            .cmp(&relationships[*right].source_relationship_id)
+        source_relationship_ids[*left]
+            .cmp(&source_relationship_ids[*right])
             .then_with(|| left.cmp(right))
     });
     check_execution(execution_context)?;
     let mut assignments = Vec::new();
     assignments
-        .try_reserve_exact(relationships.len())
+        .try_reserve_exact(source_relationship_ids.len())
         .map_err(|source| Error::Allocation {
             resource: "source-backed target relationship ID assignments",
             source,
         })?;
-    let maximum = relationships
+    let maximum = source_relationship_ids
         .len()
         .checked_add(used.len())
         .and_then(|count| count.checked_add(1))
@@ -2838,11 +4045,19 @@ fn allocate_image_relationship_ids(
                     "target slide relationship ID space is exhausted",
                 );
             }
-            let id = format!("rId{candidate}");
+            let id = generated_string(
+                "rId",
+                candidate,
+                "",
+                "source-backed generated relationship ID",
+            )?;
             candidate = candidate
                 .checked_add(1)
                 .ok_or_else(|| invalid("target relationship ID candidate overflow"))?;
-            if used.insert(id.clone()) {
+            if used.insert(clone_string(
+                &id,
+                "source-backed used generated relationship ID",
+            )?) {
                 assignments.push((index, id));
                 break;
             }
@@ -2864,6 +4079,27 @@ fn allocate_image_relationship_ids(
     Ok(result)
 }
 
+fn assigned_relationship_id<'a>(
+    source_relationship_id: &str,
+    source_relationship_ids: &[String],
+    target_relationship_ids: &'a [String],
+    execution_context: Option<&ExecutionContext>,
+) -> Result<&'a str> {
+    for (index, candidate) in source_relationship_ids.iter().enumerate() {
+        check_execution(execution_context)?;
+        if candidate == source_relationship_id {
+            return target_relationship_ids
+                .get(index)
+                .map(String::as_str)
+                .ok_or_else(|| invalid("prepared target relationship ID is missing"));
+        }
+    }
+    Err(Error::SlideCopyPlan {
+        kind: SlideCopyRefusal::AmbiguousTopology,
+        detail: "prepared source relationship ID is missing".into(),
+    })
+}
+
 fn folded_ascii_name(value: &str, resource: &'static str) -> Result<String> {
     let mut folded = String::new();
     folded
@@ -2872,6 +4108,13 @@ fn folded_ascii_name(value: &str, resource: &'static str) -> Result<String> {
     folded.push_str(value);
     folded.make_ascii_lowercase();
     Ok(folded)
+}
+
+fn starts_with_ascii_case_insensitive(value: &str, prefix: &str) -> bool {
+    value
+        .as_bytes()
+        .get(..prefix.len())
+        .is_some_and(|candidate| candidate.eq_ignore_ascii_case(prefix.as_bytes()))
 }
 
 fn destination_names(
@@ -2967,11 +4210,7 @@ fn reject_package_features(
     if !has_signature {
         for part in package.iter_parts() {
             check_execution(execution_context)?;
-            if part
-                .partname()
-                .as_str()
-                .to_ascii_lowercase()
-                .starts_with("/_xmlsignatures/")
+            if starts_with_ascii_case_insensitive(part.partname().as_str(), "/_xmlsignatures/")
                 || part.content_type().contains("digital-signature")
             {
                 has_signature = true;
@@ -3152,6 +4391,8 @@ fn relationship_list(
 enum XmlValidationPolicy {
     SourceClosure,
     ExistingDestinationAnchor,
+    SourceSlideCharts,
+    ChartPart,
 }
 
 fn validate_xml(
@@ -3201,6 +4442,26 @@ fn validate_anchor_xml(
     )
 }
 
+fn validate_source_slide_xml(
+    xml: &[u8],
+    context: &'static str,
+    execution_context: Option<&ExecutionContext>,
+) -> Result<Dialect> {
+    validate_xml_with_policy(
+        xml,
+        b"sld",
+        RootNamespace::PresentationMl,
+        true,
+        true,
+        false,
+        true,
+        false,
+        XmlValidationPolicy::SourceSlideCharts,
+        context,
+        execution_context,
+    )
+}
+
 fn validate_xml_with_policy(
     xml: &[u8],
     root: &[u8],
@@ -3222,6 +4483,7 @@ fn validate_xml_with_policy(
     let mut root_closed = false;
     let mut declaration_seen = false;
     let mut prolog_content_seen = false;
+    let mut xml_version = XmlVersion::Implicit1_0;
     let mut transitional = false;
     let mut strict = false;
     loop {
@@ -3270,12 +4532,21 @@ fn validate_xml_with_policy(
                 let pml = value == crate::namespace::PRESENTATIONML_NAMESPACE
                     || value == STRICT_PML_NAMESPACE;
                 let dml = value == TRANSITIONAL_DML_NAMESPACE || value == STRICT_DML_NAMESPACE;
+                let chart =
+                    value == TRANSITIONAL_CHART_NAMESPACE || value == STRICT_CHART_NAMESPACE;
                 let pml_is_transitional = value == crate::namespace::PRESENTATIONML_NAMESPACE;
                 let pml_is_strict = value == STRICT_PML_NAMESPACE;
+                let chart_is_transitional = value == TRANSITIONAL_CHART_NAMESPACE;
+                let chart_is_strict = value == STRICT_CHART_NAMESPACE;
                 let creation_id =
                     value == P14_NAMESPACE && element.local_name().as_ref() == b"creationId";
                 if (!pml || !allow_pml)
                     && (!dml || !allow_dml)
+                    && (!chart
+                        || !matches!(
+                            validation_policy,
+                            XmlValidationPolicy::SourceSlideCharts | XmlValidationPolicy::ChartPart
+                        ))
                     && !creation_id
                     && !allow_unknown_namespaces
                     && !matches!(
@@ -3303,6 +4574,13 @@ fn validate_xml_with_policy(
                     if value == TRANSITIONAL_DML_NAMESPACE {
                         transitional = true;
                     } else {
+                        strict = true;
+                    }
+                }
+                if chart {
+                    if chart_is_transitional {
+                        transitional = true;
+                    } else if chart_is_strict {
                         strict = true;
                     }
                 }
@@ -3346,7 +4624,9 @@ fn validate_xml_with_policy(
                 }
                 if !root_seen {
                     root_seen = true;
-                    if element.local_name().as_ref() != root || !root_namespace.matches(pml, dml) {
+                    if element.local_name().as_ref() != root
+                        || !root_namespace.matches(pml, dml, chart)
+                    {
                         return refusal(
                             SlideCopyRefusal::UnknownSemanticSurface,
                             format!("{context} has an unexpected root"),
@@ -3357,6 +4637,8 @@ fn validate_xml_with_policy(
                     }
                 } else if reject_dependency_surfaces
                     && unsupported_surface(element.local_name().as_ref())
+                    && !(matches!(validation_policy, XmlValidationPolicy::SourceSlideCharts)
+                        && element.local_name().as_ref() == b"graphicFrame")
                 {
                     return refusal(
                         SlideCopyRefusal::UnknownSemanticSurface,
@@ -3368,6 +4650,10 @@ fn validate_xml_with_policy(
                         && matches!(root_namespace, RootNamespace::PresentationMl)
                         && dml
                         && element.local_name().as_ref() == b"blip";
+                let allow_source_slide_chart_relationship_attributes =
+                    matches!(validation_policy, XmlValidationPolicy::SourceSlideCharts)
+                        && chart
+                        && element.local_name().as_ref() == b"chart";
                 let expected_relationship_namespace = if pml_is_strict {
                     Some(STRICT_REL_NAMESPACE)
                 } else if pml_is_transitional {
@@ -3382,12 +4668,21 @@ fn validate_xml_with_policy(
                     && !strict
                 {
                     Some(TRANSITIONAL_REL_NAMESPACE)
+                } else if allow_source_slide_chart_relationship_attributes {
+                    if chart_is_strict {
+                        Some(STRICT_REL_NAMESPACE)
+                    } else {
+                        Some(TRANSITIONAL_REL_NAMESPACE)
+                    }
                 } else {
                     None
                 };
                 for attribute in element.attributes() {
                     check_execution(execution_context)?;
                     let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                    attribute
+                        .decoded_and_normalized_value(xml_version, reader.decoder())
+                        .map_err(|error| Error::Xml(error.to_string()))?;
                     let key = attribute.key.as_ref();
                     let attribute_namespace = reader.resolver().resolve_attribute(attribute.key).0;
                     let relationship_namespace = match attribute_namespace {
@@ -3399,6 +4694,9 @@ fn validate_xml_with_policy(
                         },
                         _ => None,
                     };
+                    attribute
+                        .decoded_and_normalized_value(xml_version, reader.decoder())
+                        .map_err(|error| Error::Xml(error.to_string()))?;
                     let allow_anchor_relationship_attribute = matches!(
                         validation_policy,
                         XmlValidationPolicy::ExistingDestinationAnchor
@@ -3423,7 +4721,13 @@ fn validate_xml_with_policy(
                             allow_source_slide_image_relationship_attributes
                                 && attribute.key.local_name().as_ref() == b"embed"
                                 && relationship_namespace == expected_relationship_namespace;
-                        let allowed = allowed_presentation_attribute || allowed_image_attribute;
+                        let allowed_chart_attribute =
+                            allow_source_slide_chart_relationship_attributes
+                                && attribute.key.local_name().as_ref() == b"id"
+                                && relationship_namespace == expected_relationship_namespace;
+                        let allowed = allowed_presentation_attribute
+                            || allowed_image_attribute
+                            || allowed_chart_attribute;
                         if !allowed {
                             return refusal(
                                 SlideCopyRefusal::UnsupportedRelationship,
@@ -3471,7 +4775,17 @@ fn validate_xml_with_policy(
                     "{context} contains a misplaced or repeated XML declaration"
                 )));
             },
-            Event::Decl(_) => declaration_seen = true,
+            Event::Decl(declaration) => {
+                let version = declaration
+                    .version()
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                xml_version = match version.as_ref() {
+                    b"1.0" => XmlVersion::Explicit1_0,
+                    b"1.1" => XmlVersion::Explicit1_1,
+                    _ => return Err(Error::Xml(format!("{context} has an invalid XML version"))),
+                };
+                declaration_seen = true;
+            },
             Event::Text(text) if depth == 0 => {
                 if !text.as_ref().iter().all(u8::is_ascii_whitespace) {
                     return Err(Error::Xml(format!(
@@ -3530,6 +4844,41 @@ fn valid_xml_reference(reference: &BytesRef<'_>) -> bool {
                 }))
 }
 
+fn chart_content_type(dialect: Dialect) -> &'static str {
+    match dialect {
+        Dialect::Transitional => TRANSITIONAL_CHART_CONTENT_TYPE,
+        Dialect::Strict => STRICT_CHART_CONTENT_TYPE,
+    }
+}
+
+fn validate_chart_xml(
+    xml: &[u8],
+    dialect: Dialect,
+    context: &'static str,
+    execution_context: Option<&ExecutionContext>,
+) -> Result<()> {
+    let actual = validate_xml_with_policy(
+        xml,
+        b"chartSpace",
+        RootNamespace::Chart,
+        false,
+        true,
+        false,
+        true,
+        false,
+        XmlValidationPolicy::ChartPart,
+        context,
+        execution_context,
+    )?;
+    if actual != dialect {
+        return refusal(
+            SlideCopyRefusal::UnknownSemanticSurface,
+            format!("{context} uses a different OOXML dialect"),
+        );
+    }
+    Ok(())
+}
+
 fn unsupported_surface(local: &[u8]) -> bool {
     matches!(
         local,
@@ -3547,6 +4896,10 @@ fn unsupported_surface(local: &[u8]) -> bool {
             | b"embeddedFontLst"
             | b"notes"
             | b"comment"
+            | b"chartEx"
+            | b"externalData"
+            | b"pivotSource"
+            | b"userShapes"
             | b"AlternateContent"
             | b"Choice"
             | b"Fallback"
@@ -3568,6 +4921,16 @@ fn is_dml(namespace: &ResolveResult<'_>) -> bool {
         ResolveResult::Bound(Namespace(value)) => {
             let value: &[u8] = value;
             value == TRANSITIONAL_DML_NAMESPACE || value == STRICT_DML_NAMESPACE
+        },
+        _ => false,
+    }
+}
+
+fn is_chart(namespace: &ResolveResult<'_>) -> bool {
+    match namespace {
+        ResolveResult::Bound(Namespace(value)) => {
+            let value: &[u8] = value;
+            value == TRANSITIONAL_CHART_NAMESPACE || value == STRICT_CHART_NAMESPACE
         },
         _ => false,
     }
@@ -3744,6 +5107,8 @@ fn digest_touched(
     destination_names: &HashSet<String>,
     images: &[PreparedImage],
     image_relationships: &[PreparedImageRelationship],
+    charts: &[PreparedChart],
+    chart_relationships: &[PreparedChartRelationship],
     slide_relationship_order: &[PreparedSlideRelationship],
     execution_context: Option<&ExecutionContext>,
 ) -> Result<[u8; 32]> {
@@ -3756,13 +5121,13 @@ fn digest_touched(
     ] {
         check_execution(execution_context)?;
         digest.update((bytes.len() as u64).to_le_bytes());
-        digest.update(bytes);
+        digest_bytes(&mut digest, bytes, execution_context)?;
     }
     if let Some(source_slide_original) = source_slide_original {
         check_execution(execution_context)?;
         digest.update([1]);
         digest.update((source_slide_original.len() as u64).to_le_bytes());
-        digest.update(source_slide_original);
+        digest_bytes(&mut digest, source_slide_original, execution_context)?;
     } else {
         check_execution(execution_context)?;
         digest.update([0]);
@@ -3775,19 +5140,31 @@ fn digest_touched(
         target_slide_uri,
     ] {
         check_execution(execution_context)?;
-        digest.update(uri.as_str().as_bytes());
+        digest_bytes(&mut digest, uri.as_str().as_bytes(), execution_context)?;
         digest.update([0]);
     }
     digest.update(slide_id.to_le_bytes());
-    digest.update(relationship_id.as_bytes());
+    digest_bytes(&mut digest, relationship_id.as_bytes(), execution_context)?;
     digest.update([0]);
-    digest.update(layout_relationship_id.as_bytes());
+    digest_bytes(
+        &mut digest,
+        layout_relationship_id.as_bytes(),
+        execution_context,
+    )?;
     digest.update([0]);
-    digest.update(slide_relationship_type.as_bytes());
+    digest_bytes(
+        &mut digest,
+        slide_relationship_type.as_bytes(),
+        execution_context,
+    )?;
     digest.update([0]);
-    digest.update(layout_relationship_type.as_bytes());
+    digest_bytes(
+        &mut digest,
+        layout_relationship_type.as_bytes(),
+        execution_context,
+    )?;
     digest.update([0]);
-    digest.update(source_name.as_bytes());
+    digest_bytes(&mut digest, source_name.as_bytes(), execution_context)?;
     digest.update((images.len() as u64).to_le_bytes());
     for image in images {
         check_execution(execution_context)?;
@@ -3796,12 +5173,12 @@ fn digest_touched(
             image.target_uri.as_str(),
             image.content_type.as_str(),
         ] {
-            digest.update(value.as_bytes());
+            digest_bytes(&mut digest, value.as_bytes(), execution_context)?;
             digest.update([0]);
         }
         digest.update(image.declared_size.to_le_bytes());
         digest.update((image.bytes.len() as u64).to_le_bytes());
-        digest.update(&image.bytes);
+        digest_bytes(&mut digest, &image.bytes, execution_context)?;
     }
     digest.update((image_relationships.len() as u64).to_le_bytes());
     for relationship in image_relationships {
@@ -3812,7 +5189,35 @@ fn digest_touched(
             relationship.relationship_type.as_str(),
             relationship.target_uri.as_str(),
         ] {
-            digest.update(value.as_bytes());
+            digest_bytes(&mut digest, value.as_bytes(), execution_context)?;
+            digest.update([0]);
+        }
+    }
+    digest.update((charts.len() as u64).to_le_bytes());
+    for chart in charts {
+        check_execution(execution_context)?;
+        for value in [
+            chart.source_uri.as_str(),
+            chart.target_uri.as_str(),
+            chart.content_type.as_str(),
+        ] {
+            digest_bytes(&mut digest, value.as_bytes(), execution_context)?;
+            digest.update([0]);
+        }
+        digest.update(chart.declared_size.to_le_bytes());
+        digest.update((chart.bytes.len() as u64).to_le_bytes());
+        digest_bytes(&mut digest, &chart.bytes, execution_context)?;
+    }
+    digest.update((chart_relationships.len() as u64).to_le_bytes());
+    for relationship in chart_relationships {
+        check_execution(execution_context)?;
+        for value in [
+            relationship.source_relationship_id.as_str(),
+            relationship.target_relationship_id.as_str(),
+            relationship.relationship_type.as_str(),
+            relationship.target_uri.as_str(),
+        ] {
+            digest_bytes(&mut digest, value.as_bytes(), execution_context)?;
             digest.update([0]);
         }
     }
@@ -3823,6 +5228,10 @@ fn digest_touched(
             PreparedSlideRelationship::Layout => digest.update([0]),
             PreparedSlideRelationship::Image(index) => {
                 digest.update([1]);
+                digest.update((*index as u64).to_le_bytes());
+            },
+            PreparedSlideRelationship::Chart(index) => {
+                digest.update([2]);
                 digest.update((*index as u64).to_le_bytes());
             },
         }
@@ -3843,7 +5252,7 @@ fn digest_touched(
     check_execution(execution_context)?;
     for name in names {
         check_execution(execution_context)?;
-        digest.update(name.as_bytes());
+        digest_bytes(&mut digest, name.as_bytes(), execution_context)?;
         digest.update([0]);
     }
     Ok(digest.finalize().into())
@@ -3874,13 +5283,103 @@ fn reserve_memory(
         .map_err(map_execution_error)
 }
 
-fn clone_bytes(bytes: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+fn add_metadata_size(total: &mut usize, value: &str) -> Result<()> {
+    *total = total
+        .checked_add(value.len())
+        .ok_or_else(|| invalid("source-backed retained metadata size overflow"))?;
+    Ok(())
+}
+
+fn generated_string(
+    prefix: &str,
+    index: usize,
+    suffix: &str,
+    resource: &'static str,
+) -> Result<String> {
+    let digits = (usize::BITS as usize / 3)
+        .checked_add(2)
+        .ok_or_else(|| invalid("generated metadata digit capacity overflow"))?;
+    let capacity = prefix
+        .len()
+        .checked_add(digits)
+        .and_then(|size| size.checked_add(suffix.len()))
+        .ok_or_else(|| invalid("generated metadata size overflow"))?;
+    let mut output = String::new();
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|source| Error::Allocation { resource, source })?;
+    output.push_str(prefix);
+    write!(&mut output, "{index}").map_err(|_| invalid("generated metadata formatting failed"))?;
+    output.push_str(suffix);
+    Ok(output)
+}
+
+fn generated_pack_uri(
+    prefix: &str,
+    index: usize,
+    suffix: &str,
+    resource: &'static str,
+) -> Result<PackURI> {
+    PackURI::new(generated_string(prefix, index, suffix, resource)?)
+        .map_err(|error| Error::Uri(error.to_string()))
+}
+
+fn clone_string(value: &str, resource: &'static str) -> Result<String> {
+    let mut output = String::new();
+    output
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    output.push_str(value);
+    Ok(output)
+}
+
+fn clone_pack_uri(uri: &PackURI, resource: &'static str) -> Result<PackURI> {
+    let value = clone_string(uri.as_str(), resource)?;
+    PackURI::new(value).map_err(|error| Error::Uri(error.to_string()))
+}
+
+fn clone_bytes_checked(
+    bytes: &[u8],
+    resource: &'static str,
+    execution_context: Option<&ExecutionContext>,
+) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     output
         .try_reserve_exact(bytes.len())
         .map_err(|source| Error::Allocation { resource, source })?;
-    output.extend_from_slice(bytes);
+    for chunk in bytes.chunks(64 * 1024) {
+        check_execution(execution_context)?;
+        output.extend_from_slice(chunk);
+    }
     Ok(output)
+}
+
+fn extend_bytes_checked(
+    output: &mut Vec<u8>,
+    bytes: &[u8],
+    resource: &'static str,
+    execution_context: Option<&ExecutionContext>,
+) -> Result<()> {
+    for chunk in bytes.chunks(64 * 1024) {
+        check_execution(execution_context)?;
+        output
+            .try_reserve(chunk.len())
+            .map_err(|source| Error::Allocation { resource, source })?;
+        output.extend_from_slice(chunk);
+    }
+    Ok(())
+}
+
+fn digest_bytes(
+    digest: &mut Sha256,
+    bytes: &[u8],
+    execution_context: Option<&ExecutionContext>,
+) -> Result<()> {
+    for chunk in bytes.chunks(64 * 1024) {
+        check_execution(execution_context)?;
+        digest.update(chunk);
+    }
+    Ok(())
 }
 
 fn check_execution(context: Option<&ExecutionContext>) -> Result<()> {
@@ -3922,13 +5421,18 @@ impl<W: Write> Write for SourceCheckedWriter<W> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         self.check_source()?;
         let written = self.inner.write(bytes)?;
-        if written <= bytes.len() {
-            let mut state = lock_source_state(&self.state);
-            state.accepted = state
-                .accepted
-                .checked_add(u64::try_from(written).unwrap_or(u64::MAX))
-                .unwrap_or(u64::MAX);
+        if written > bytes.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "wrapped writer reported more bytes than provided",
+            ));
         }
+        let mut state = lock_source_state(&self.state);
+        state.accepted = state
+            .accepted
+            .checked_add(u64::try_from(written).unwrap_or(u64::MAX))
+            .unwrap_or(u64::MAX);
+        drop(state);
         self.check_source()?;
         Ok(written)
     }
