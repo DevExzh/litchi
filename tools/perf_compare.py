@@ -29,11 +29,22 @@ SUPPORTED_POLICY_SCHEMA = 2
 SUPPORTED_REPORT_SCHEMA = 1
 EVIDENCE_ONLY_LATENCY_CLAIM = "evidence_only_filesystem_selector"
 OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM = "evidence_only_opc_source_overlay_accounting"
+OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM = (
+    "evidence_only_opc_source_materialization"
+)
+OPC_SOURCE_MATERIALIZATION_SOURCE_SCOPE = "in_process_instrumented_source_read_at"
+OPC_SOURCE_MATERIALIZATION_REQUEST_SCOPE = (
+    "unavailable_in_process_source_does_not_record_requested_lengths"
+)
+OPC_SOURCE_MATERIALIZATION_LARGEST_SCOPE = (
+    "unavailable_in_process_source_does_not_record_largest_ranges"
+)
 COMPARABLE_LATENCY_CLAIM = "comparable_timed_operation"
 OPERATION_ALIGNMENT = "elapsed_ns.samples_by_elapsed_then_sample_index"
 _EVIDENCE_ONLY_LATENCY_CLAIMS = {
     EVIDENCE_ONLY_LATENCY_CLAIM,
     OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM,
+    OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM,
 }
 
 _DEFAULT_RESULT_KEY_FIELDS = ("case", "corpus")
@@ -1583,6 +1594,13 @@ _SOURCE_NUMERIC_VECTOR_KEYS = (
     "logical_read_largest_returned_bytes",
     "max_concurrent_reads",
 )
+_OPC_SOURCE_MATERIALIZATION_UNAVAILABLE_NUMERIC_VECTOR_KEYS = frozenset(
+    {
+        "logical_read_requested_bytes",
+        "logical_read_largest_requested_bytes",
+        "logical_read_largest_returned_bytes",
+    }
+)
 _SOURCE_BOUNDARY_VECTOR_KEYS = (
     "compressed_bytes",
     "decompressed_bytes",
@@ -1597,6 +1615,7 @@ _SOURCE_COUNTER_SCOPES = {
     "not_applicable_filesystem_xlsx",
     "not_applicable_immutable_owned_slice",
     "not_applicable_in_process_sink",
+    OPC_SOURCE_MATERIALIZATION_SOURCE_SCOPE,
 }
 _SOURCE_COUNTER_SCOPE_STATUSES = {
     "timed_read_at": "measured",
@@ -1607,6 +1626,7 @@ _SOURCE_COUNTER_SCOPE_STATUSES = {
     "not_applicable_filesystem_xlsx": "not_applicable",
     "not_applicable_immutable_owned_slice": "not_applicable",
     "not_applicable_in_process_sink": "not_applicable",
+    OPC_SOURCE_MATERIALIZATION_SOURCE_SCOPE: "measured",
 }
 _PATTERN_VALUES = {"sequential", "random", "unknown"}
 _PROCESS_METRICS_KEYS = {
@@ -1875,11 +1895,12 @@ def _validate_operation_metrics(
     if not isinstance(latency_claim, str) or latency_claim not in {
         EVIDENCE_ONLY_LATENCY_CLAIM,
         OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM,
+        OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM,
         COMPARABLE_LATENCY_CLAIM,
     }:
         raise ComparisonInputError(
             f"{path}.latency_claim must be one of "
-            f"{[COMPARABLE_LATENCY_CLAIM, EVIDENCE_ONLY_LATENCY_CLAIM, OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM]}"
+            f"{[COMPARABLE_LATENCY_CLAIM, EVIDENCE_ONLY_LATENCY_CLAIM, OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM, OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM]}"
         )
     has_opc_zip = "opc_zip" in obj
     if has_opc_zip != (latency_claim == OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM):
@@ -2010,28 +2031,56 @@ def _validate_operation_metrics(
                 "elapsed_ns.sample_order"
             )
 
+    if (
+        counter_scope == OPC_SOURCE_MATERIALIZATION_SOURCE_SCOPE
+        and latency_claim != OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM
+    ):
+        raise ComparisonInputError(
+            f"{path}.source.counter_scope={counter_scope!r} requires "
+            f"latency_claim={OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM!r}"
+        )
+    if (
+        latency_claim == OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM
+        and counter_scope != OPC_SOURCE_MATERIALIZATION_SOURCE_SCOPE
+    ):
+        raise ComparisonInputError(
+            f"{path}.latency_claim={latency_claim!r} requires "
+            f"source.counter_scope={OPC_SOURCE_MATERIALIZATION_SOURCE_SCOPE!r}"
+        )
     if source_status == "measured" and latency_claim not in _EVIDENCE_ONLY_LATENCY_CLAIMS:
         raise ComparisonInputError(
-            f"{path}.measured source metrics require "
-            f"latency_claim={EVIDENCE_ONLY_LATENCY_CLAIM!r}"
+            f"{path}.measured source metrics require an evidence-only "
+            f"latency_claim, got {latency_claim!r}"
         )
     for key in _SOURCE_NUMERIC_VECTOR_KEYS:
         vector_status = _validate_metric_vector(
             source[key], f"{path}.source.{key}", sample_count
         )
-        if vector_status != source_status:
+        expected_vector_status = (
+            "unavailable"
+            if counter_scope == OPC_SOURCE_MATERIALIZATION_SOURCE_SCOPE
+            and key in _OPC_SOURCE_MATERIALIZATION_UNAVAILABLE_NUMERIC_VECTOR_KEYS
+            else source_status
+        )
+        if vector_status != expected_vector_status:
             raise ComparisonInputError(
-                f"{path}.source.status does not match {path}.source.{key}.status"
+                f"{path}.source.{key}.status must be {expected_vector_status!r} "
+                f"for source scope {counter_scope!r}"
             )
     pattern_status = _validate_pattern_vector(
         source["logical_read_pattern"],
         f"{path}.source.logical_read_pattern",
         sample_count,
     )
-    if pattern_status != source_status:
+    expected_pattern_status = (
+        "unavailable"
+        if counter_scope == OPC_SOURCE_MATERIALIZATION_SOURCE_SCOPE
+        else source_status
+    )
+    if pattern_status != expected_pattern_status:
         raise ComparisonInputError(
-            f"{path}.source.status does not match "
-            f"{path}.source.logical_read_pattern.status"
+            f"{path}.source.logical_read_pattern.status must be "
+            f"{expected_pattern_status!r} for source scope {counter_scope!r}"
         )
     boundary_status = "unavailable" if source_status == "measured" else source_status
     for key in _SOURCE_BOUNDARY_VECTOR_KEYS:

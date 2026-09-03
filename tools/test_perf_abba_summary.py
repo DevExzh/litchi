@@ -948,6 +948,37 @@ def with_xlsx_operation_metrics(reports):
     return reports
 
 
+def with_opc_source_materialization_operation_metrics(reports):
+    """Attach valid source-materialization operation metrics to every result."""
+
+    from tools.test_perf_compare import (
+        opc_source_materialize_operation_metrics_report_fields,
+    )
+
+    reports = copy.deepcopy(reports)
+    for leg in reports:
+        for result in leg["results"]:
+            metrics = opc_source_materialize_operation_metrics_report_fields()
+            sample_count = len(result["elapsed_ns"]["samples"])
+            metrics["sample_count"] = sample_count
+            metrics["sample_indices"] = list(range(sample_count))
+            for value in metrics.values():
+                if isinstance(value, dict):
+                    _resize_operation_metric_vectors(value, sample_count)
+            result["operation_metrics"] = metrics
+    return reports
+
+
+def _resize_operation_metric_vectors(value, sample_count):
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key == "values" and isinstance(item, list):
+                repeats = (sample_count + len(item) - 1) // len(item)
+                value[key] = (item * repeats)[:sample_count]
+            else:
+                _resize_operation_metric_vectors(item, sample_count)
+
+
 def with_legacy_operation_metrics(reports):
     """Attach the pre-additive schema-1 operation-metrics envelope."""
 
@@ -1481,6 +1512,19 @@ class PerfAbbaSummaryTests(unittest.TestCase):
             summary["results"][0]["identity"]["operation_metrics_status"],
             "verified_equal",
         )
+
+    def test_opc_source_materialization_scope_and_claim_validate_across_legs(self):
+        reports = with_opc_source_materialization_operation_metrics(four_legs())
+        summary = perf_abba_summary.summarize_reports(reports)
+        self.assertEqual(
+            summary["results"][0]["identity"]["operation_metrics_status"],
+            "verified_equal",
+        )
+        for result in summary["results"]:
+            self.assertEqual(
+                result["identity"]["operation_metrics_status"],
+                "verified_equal",
+            )
 
     def test_operation_metrics_identity_preserves_non_xlsx_sample_indices(self):
         reports = with_operation_metrics(four_legs())

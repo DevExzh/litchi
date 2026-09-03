@@ -725,7 +725,7 @@ do not change the default 36 cases / 198 records.
 
 ## ODP source-backed presentation catalog selectors (change 0370)
 
-The current harness exposes 407 selectable cases; the default matrix remains 36
+The current harness exposes 408 selectable cases; the default matrix remains 36
 cases and 198 rows. The three selectors are opt-in and reuse the existing
 deterministic 12-slide/eight-media ODP corpus:
 
@@ -1002,7 +1002,7 @@ The validation/section and scalar-cell selectors are opt-in and do not alter the
 ```sh
 cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
   --warmup 3 --samples 15 --json target/perf/container-baseline.json \
-  --corpus-manifest target/perf/container-baseline.corpus-v2.json
+  --corpus-manifest target/perf/container-baseline.corpus-manifest-v2.json
 ```
 
 `--corpus-manifest` writes the additive schema-2 deterministic corpus catalog
@@ -2760,6 +2760,21 @@ and the [release manifest](../../docs/performance/results/doc-lazy-fingerprint-0
   perform source I/O, proving that open did not materialize it.
 - `opc_source_open_main_read`: open the same source and materialize its unique
   Office Document main Part in one timed operation.
+- `opc_source_materialize`: build and validate the unmanaged source-backed
+  catalog before timing, then time only conversion into the complete owning
+  `OpcPackage`. Every Part payload and relationship is verified after timing;
+  retained samples report logical source reads, materialized Part counts, and
+  operation-scoped process/allocation vectors. The normal binary labels
+  allocator vectors unavailable, while the allocator target measures them.
+  Its operation envelope uses the evidence-only claim
+  `evidence_only_opc_source_materialization` and source scope
+  `in_process_instrumented_source_read_at`; no copied-byte, decompressed-byte,
+  physical-I/O, or comparative latency claim is inferred.
+  Verification intentionally covers the logical `OpcPackage` Part graph,
+  including package and Part relationships. ZIP container members such as
+  `[Content_Types].xml` and `.rels` are serialization artifacts outside
+  `OpcPackage::part_count` and are not claimed as separately materialized
+  logical Parts.
 - `opc_source_cached_main_read`: cold-load before timing, then require the timed
   access to add zero source reads and return the same pinned `Arc` allocation.
 - `opc_source_concurrent_same_part`: start two cold main-Part reads together;

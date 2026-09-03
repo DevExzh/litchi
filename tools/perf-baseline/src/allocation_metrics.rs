@@ -157,6 +157,14 @@ pub(crate) struct Sample {
     pub peak_live_bytes_after: Option<u64>,
 }
 
+/// Return an explicit unavailable sample for binaries that do not install the
+/// benchmark allocator wrapper.  Keeping this state in the sample envelope
+/// lets operation-scoped reports distinguish an uninstrumented run from a
+/// measured zero without changing the normal binary's allocator behavior.
+pub(crate) fn unavailable_sample() -> Sample {
+    Sample::unavailable()
+}
+
 impl Sample {
     fn unavailable() -> Self {
         Self {
