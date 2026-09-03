@@ -109,6 +109,11 @@ const PPTX_SOURCE_EDIT_CORPUS_GENERATOR: &str = "litchi-pptx-source-edit-media-v
 const PPTX_CROSS_COPY_CORPUS_GENERATOR: &str = "litchi-pptx-cross-slide-copy-evidence-v1";
 const PPTX_SOURCE_BACKED_CROSS_COPY_CORPUS_GENERATOR: &str =
     "litchi-pptx-source-backed-cross-slide-copy-evidence-v1";
+/// The image-query selectors intentionally reuse the media-rich cross-copy
+/// source archive.  Keeping the generator identity shared makes the input
+/// provenance explicit: this is an alternate read-only projection of the
+/// existing deterministic picture-heavy source, not a second corpus.
+const PPTX_SOURCE_IMAGE_QUERY_CORPUS_GENERATOR: &str = PPTX_CROSS_COPY_CORPUS_GENERATOR;
 const XLSX_CALC_SOURCE_EDIT_CORPUS_GENERATOR: &str =
     "litchi-xlsx-calculation-metadata-source-edit-media-v1";
 const XLSX_DEFINED_NAMES_SOURCE_EDIT_CORPUS_GENERATOR: &str =
@@ -214,6 +219,11 @@ const PPTX_CROSS_COPY_SOURCE_SLIDE: usize = 2;
 const PPTX_CROSS_COPY_DESTINATION_SLIDE: usize = 1;
 const PPTX_CROSS_COPY_INSERTION_POSITION: usize = 1;
 const PPTX_CROSS_COPY_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
+const PPTX_SOURCE_IMAGE_QUERY_SELECTED_POSITION: usize = 3;
+const PPTX_SOURCE_IMAGE_QUERY_FIRST_SHAPE_POSITION: usize = 2;
+const PPTX_SOURCE_IMAGE_QUERY_FIRST_SHAPE_ID: u32 = 4;
+const PPTX_SOURCE_IMAGE_QUERY_FIRST_RELATIONSHIP_ID: usize = 2;
+const PPTX_SOURCE_IMAGE_QUERY_BOUNDS: [i64; 4] = [800, 800, 72, 72];
 const PPTX_MULTI_SLIDE_BATCH_COUNT: usize = 8;
 const PPT_PICTURE_COUNT: usize = 32;
 const PPT_PICTURE_BYTES: usize = 256 * 1024;
@@ -1006,6 +1016,9 @@ enum Case {
     PptxCrossCopyPlain,
     PptxCrossCopyMediaRich,
     PptxSourceBackedCrossCopyPlain,
+    PptxSourceBackedImagesQuery,
+    PptxSourceBackedImageQuery,
+    PptxSourceBackedReadImageQuery,
     PptxSlideRemoveBoundarySave,
     PptxSlideMoveBoundarySave,
     XlsxEagerCalculationMetadataEditSave,
@@ -1478,6 +1491,9 @@ impl Case {
             Self::PptxCrossCopyPlain => "pptx_cross_copy_plain",
             Self::PptxCrossCopyMediaRich => "pptx_cross_copy_media_rich",
             Self::PptxSourceBackedCrossCopyPlain => "pptx_source_backed_cross_copy_plain",
+            Self::PptxSourceBackedImagesQuery => "pptx_source_backed_images_query",
+            Self::PptxSourceBackedImageQuery => "pptx_source_backed_image_query",
+            Self::PptxSourceBackedReadImageQuery => "pptx_source_backed_read_image_query",
             Self::PptxSlideRemoveBoundarySave => "pptx_slide_remove_boundary_save",
             Self::PptxSlideMoveBoundarySave => "pptx_slide_move_boundary_save",
             Self::XlsxEagerCalculationMetadataEditSave => {
@@ -2850,6 +2866,15 @@ impl Case {
         matches!(self, Self::PptxSourceBackedCrossCopyPlain)
     }
 
+    const fn is_pptx_source_image_query(self) -> bool {
+        matches!(
+            self,
+            Self::PptxSourceBackedImagesQuery
+                | Self::PptxSourceBackedImageQuery
+                | Self::PptxSourceBackedReadImageQuery
+        )
+    }
+
     const fn is_pptx_slide_boundary(self) -> bool {
         matches!(
             self,
@@ -3159,6 +3184,23 @@ struct PptxSourceBackedCrossCopyCorpus {
     destination_slide_count: usize,
     added_slide_payload_bytes: usize,
     gates: PptxSourceBackedCrossCopyGateSummary,
+}
+
+#[derive(Debug)]
+struct PptxSourceImageQueryCorpus {
+    manifest: CorpusManifest,
+    archive: Vec<u8>,
+    source_slide: usize,
+    expected_images: Vec<PptxSourceImageMetadata>,
+    expected_images_sha256: String,
+    selected_position: usize,
+    selected_image: PptxSourceImageMetadata,
+    selected_image_sha256: String,
+    selected_media_part: String,
+    selected_media_compressed_range: Range<u64>,
+    selected_payload: Vec<u8>,
+    selected_payload_sha256: String,
+    media_ranges: Vec<Range<u64>>,
 }
 
 struct PptxCrossCopySemanticExpectation<'a> {
@@ -3689,6 +3731,67 @@ struct PptxSourceBackedCrossCopySummary {
     destination_read_bytes: Vec<u64>,
 }
 
+/// Exact metadata and positional-source evidence for the three source-backed
+/// PPTX picture-query selectors. The corpus is the source side of the
+/// existing media-rich cross-copy fixture, whose selected slide contains
+/// several direct pictures in deterministic scene order. Query timing is
+/// isolated from package construction and slide-handle preparation; source
+/// and cache vectors come from a separate replay of each retained sample.
+#[derive(Clone, Debug, Serialize)]
+struct PptxSourceImageQuerySummary {
+    implementation: &'static str,
+    operation: &'static str,
+    timing_scope: &'static str,
+    performance_claim: &'static str,
+    source_evidence_scope: &'static str,
+    source_archive_sha256: String,
+    source_archive_bytes: u64,
+    source_slide: usize,
+    picture_count: usize,
+    selected_position: usize,
+    picture_metadata: Vec<PptxSourceImageMetadata>,
+    picture_metadata_sha256: String,
+    selected_image: PptxSourceImageMetadata,
+    selected_image_metadata_sha256: String,
+    selected_media_part: String,
+    selected_media_compressed_range_bytes: u64,
+    selected_payload_bytes: u64,
+    selected_payload_sha256: String,
+    observed_picture_metadata_sha256: Vec<String>,
+    observed_selected_image_metadata_sha256: Vec<String>,
+    observed_payload_sha256: Vec<String>,
+    source_read_calls: Vec<u64>,
+    source_read_bytes: Vec<u64>,
+    source_read_range_overlap_bytes: Vec<u64>,
+    ordinary_payload_read_calls: Vec<u64>,
+    ordinary_payload_read_bytes: Vec<u64>,
+    selected_media_read_calls: Vec<u64>,
+    selected_media_read_bytes: Vec<u64>,
+    max_in_flight_reads: Vec<u64>,
+    cache_diagnostics: OpcCacheDiagnosticsSummary,
+    metadata_no_payload_reads_verified: bool,
+    selected_payload_read_verified: bool,
+    exact_source_counters_verified: bool,
+    exact_cache_counters_verified: bool,
+}
+
+/// Owned, serializable projection of one `SourceImageDescriptor`. Keeping
+/// every stable descriptor field in the corpus identity makes scene ordering,
+/// shape ownership, relationship identity, bounds, and target metadata part
+/// of the correctness gate rather than relying on a picture count alone.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+struct PptxSourceImageMetadata {
+    position: usize,
+    shape_position: usize,
+    id: Option<u32>,
+    name: Option<String>,
+    bounds: Option<[i64; 4]>,
+    relationship_id: String,
+    target_part: Option<String>,
+    target_content_type: Option<String>,
+    external_target: Option<String>,
+}
+
 #[derive(Clone, Debug, Serialize)]
 struct PptxCrossCopySummary {
     implementation: &'static str,
@@ -3769,6 +3872,8 @@ struct SourceSummary {
     pptx_cross_copy: Option<PptxCrossCopySummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pptx_source_backed_cross_copy: Option<PptxSourceBackedCrossCopySummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pptx_source_image_query: Option<PptxSourceImageQuerySummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pptx_slide_boundaries: Option<pptx_slide_boundaries::PptxSlideBoundarySummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -7945,6 +8050,22 @@ fn validate_docx_section_layout_options(
     Ok(())
 }
 
+fn validate_pptx_source_image_query_options(
+    cases: &[Case],
+    shapes: &[CorpusShape],
+    payloads: &[PayloadKind],
+) -> Result<(), Box<dyn Error>> {
+    if cases.iter().any(|case| case.is_pptx_source_image_query())
+        && (shapes != CorpusShape::ALL.as_slice() || payloads != PayloadKind::ALL.as_slice())
+    {
+        return Err(
+            "PPTX source image queries use a fixed picture-heavy source slide; omit --shape and --payload"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 fn validate_xls_source_options(
     cases: &[Case],
     shapes: &[CorpusShape],
@@ -8012,6 +8133,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         &options.payloads,
     )?;
     validate_docx_section_layout_options(&options.cases, &options.shapes, &options.payloads)?;
+    validate_pptx_source_image_query_options(&options.cases, &options.shapes, &options.payloads)?;
     validate_xls_source_options(
         &options.cases,
         &options.shapes,
@@ -8168,6 +8290,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_pptx_source_edit_save()
                     && !case.is_pptx_cross_copy()
                     && !case.is_pptx_source_backed_cross_copy()
+                    && !case.is_pptx_source_image_query()
                     && !case.is_pptx_slide_boundary()
                     && !case.is_xlsx_calculation_metadata_edit_save()
                     && !case.is_xlsx_defined_names_edit_save()
@@ -8767,6 +8890,27 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         {
             let corpus = build_pptx_source_backed_cross_copy_corpus(case)?;
             results.push(run_pptx_source_backed_cross_copy(
+                case,
+                &corpus,
+                options.warmup_iterations,
+                options.samples,
+            )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_pptx_source_image_query())
+    {
+        let corpus = build_pptx_source_image_query_corpus()?;
+        for case in options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_pptx_source_image_query())
+        {
+            results.push(run_pptx_source_image_query(
                 case,
                 &corpus,
                 options.warmup_iterations,
@@ -10301,6 +10445,9 @@ fn parse_case(value: &str) -> Option<Case> {
         "pptx_cross_copy_plain" => Some(Case::PptxCrossCopyPlain),
         "pptx_cross_copy_media_rich" => Some(Case::PptxCrossCopyMediaRich),
         "pptx_source_backed_cross_copy_plain" => Some(Case::PptxSourceBackedCrossCopyPlain),
+        "pptx_source_backed_images_query" => Some(Case::PptxSourceBackedImagesQuery),
+        "pptx_source_backed_image_query" => Some(Case::PptxSourceBackedImageQuery),
+        "pptx_source_backed_read_image_query" => Some(Case::PptxSourceBackedReadImageQuery),
         "pptx_slide_remove_boundary_save" => Some(Case::PptxSlideRemoveBoundarySave),
         "pptx_slide_move_boundary_save" => Some(Case::PptxSlideMoveBoundarySave),
         "xlsx_eager_calculation_metadata_edit_save" => {
@@ -10831,6 +10978,9 @@ fn usage_text() -> String {
                                        pptx_source_backed_multi_slide_batch_edit_save,\n\
                                        pptx_cross_copy_plain,pptx_cross_copy_media_rich,\n\
                                        pptx_source_backed_cross_copy_plain,\n\
+                                       pptx_source_backed_images_query,\n\
+                                       pptx_source_backed_image_query,\n\
+                                       pptx_source_backed_read_image_query,\n\
                                        pptx_slide_remove_boundary_save,\n\
                                        pptx_slide_move_boundary_save,\n\
                                        xlsx_eager_calculation_metadata_edit_save,\n\
@@ -13568,6 +13718,668 @@ fn build_pptx_source_backed_cross_copy_corpus(
         destination_slide_count,
         added_slide_payload_bytes,
         gates,
+    })
+}
+
+fn pptx_source_image_metadata(
+    descriptor: &litchi_pptx::SourceImageDescriptor,
+) -> Result<PptxSourceImageMetadata, Box<dyn Error>> {
+    let (target_part, target_content_type, external_target) = match descriptor.target() {
+        litchi_pptx::SourceImageTarget::Internal {
+            part_uri,
+            content_type,
+        } => (
+            Some(part_uri.as_str().to_owned()),
+            Some(content_type.to_owned()),
+            None,
+        ),
+        litchi_pptx::SourceImageTarget::External { target } => {
+            (None, None, Some(target.to_owned()))
+        },
+        _ => return Err("PPTX source image target variant is unsupported".into()),
+    };
+    Ok(PptxSourceImageMetadata {
+        position: descriptor.position(),
+        shape_position: descriptor.shape_position(),
+        id: descriptor.id(),
+        name: descriptor.name().map(str::to_owned),
+        bounds: descriptor
+            .bounds()
+            .map(|bounds| [bounds.x(), bounds.y(), bounds.width(), bounds.height()]),
+        relationship_id: descriptor.relationship_id().to_owned(),
+        target_part,
+        target_content_type,
+        external_target,
+    })
+}
+
+fn pptx_source_image_metadata_sha256(
+    metadata: &[PptxSourceImageMetadata],
+) -> Result<String, Box<dyn Error>> {
+    Ok(sha256_hex(&serde_json::to_vec(metadata)?))
+}
+
+fn build_pptx_source_image_query_corpus() -> Result<PptxSourceImageQueryCorpus, Box<dyn Error>> {
+    // This deliberately reuses the already generated media-rich cross-copy
+    // source. The direct-picture inventory below is a hard gate so a future
+    // change to that corpus cannot silently turn these selectors into a
+    // text-only or single-picture workload.
+    let baseline = build_pptx_cross_copy_corpus(Case::PptxCrossCopyMediaRich)?;
+    let archive = baseline.source_archive;
+    let source_slide = baseline.source_slide;
+    let source = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(
+        OwnedSource::new(archive.clone()),
+    ))?;
+    if source.slide_count() != PPTX_CROSS_COPY_SOURCE_SLIDE_COUNT {
+        return Err("PPTX source image corpus changed its slide count".into());
+    }
+    let slide = source
+        .slide(source_slide)
+        .ok_or("PPTX source image corpus selected slide is missing")?;
+    let descriptors = slide.images()?;
+    if descriptors.len() != PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT || descriptors.len() < 2 {
+        return Err(format!(
+            "PPTX source image corpus requires {} direct pictures, found {}",
+            PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT,
+            descriptors.len()
+        )
+        .into());
+    }
+    let expected_images = descriptors
+        .iter()
+        .map(pptx_source_image_metadata)
+        .collect::<Result<Vec<_>, _>>()?;
+    for (position, image) in expected_images.iter().enumerate() {
+        let expected_name = format!("litchi-perf-cross-copy-picture-{position:02}");
+        let expected_target = format!("/ppt/media/litchi-perf-cross-copy-media-{position:02}.png");
+        let expected_relationship_id =
+            format!("rId{}", PPTX_SOURCE_IMAGE_QUERY_FIRST_RELATIONSHIP_ID + position);
+        let expected_shape_position = PPTX_SOURCE_IMAGE_QUERY_FIRST_SHAPE_POSITION + position;
+        let expected_shape_id = Some(
+            PPTX_SOURCE_IMAGE_QUERY_FIRST_SHAPE_ID
+                .checked_add(u32::try_from(position)?)
+                .ok_or("PPTX source image corpus shape ID overflow")?,
+        );
+        if image.position != position
+            || image.shape_position != expected_shape_position
+            || image.id != expected_shape_id
+            || image.name.as_deref() != Some(expected_name.as_str())
+            || image.bounds != Some(PPTX_SOURCE_IMAGE_QUERY_BOUNDS)
+            || image.relationship_id != expected_relationship_id
+            || image.target_part.as_deref() != Some(expected_target.as_str())
+            || image.target_content_type.as_deref() != Some("image/png")
+            || image.external_target.is_some()
+        {
+            return Err(
+                "PPTX source image corpus direct-picture metadata differs from its specification"
+                    .into(),
+            );
+        }
+    }
+    let selected_position = PPTX_SOURCE_IMAGE_QUERY_SELECTED_POSITION;
+    let selected_image = expected_images
+        .get(selected_position)
+        .cloned()
+        .ok_or("PPTX source image corpus selected picture is missing")?;
+    let selected_payload = slide.read_image(selected_position)?.bytes().to_vec();
+    let selected_media_part = selected_image
+        .target_part
+        .clone()
+        .ok_or("PPTX source image corpus selected picture is external")?;
+    let member_ranges = zip_member_ranges(&archive)?;
+    let media_ranges = member_ranges
+        .iter()
+        .filter(|(name, _range)| name.starts_with("ppt/media/"))
+        .map(|(_name, range)| range.clone())
+        .collect::<Vec<_>>();
+    if media_ranges.len() != PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT {
+        return Err("PPTX source image corpus media-member count differs from its direct-picture count".into());
+    }
+    let selected_media_member = selected_media_part
+        .strip_prefix('/')
+        .ok_or("PPTX source image corpus selected media part is not absolute")?;
+    let selected_media_compressed_range = member_ranges
+        .iter()
+        .find_map(|(name, range)| (selected_media_member == name).then_some(range.clone()))
+        .ok_or("PPTX source image corpus selected media member is missing")?;
+    let source_opc = OpcPackage::from_bytes(&archive)?;
+    let uncompressed_payload_bytes = source_opc.iter_parts().try_fold(0usize, |total, part| {
+        total
+            .checked_add(part.blob().len())
+            .ok_or("PPTX source image corpus logical payload bytes overflow")
+    })?;
+    let expected_images_sha256 = pptx_source_image_metadata_sha256(&expected_images)?;
+    let selected_image_sha256 = pptx_source_image_metadata_sha256(std::slice::from_ref(
+        &selected_image,
+    ))?;
+    let selected_payload_sha256 = sha256_hex(&selected_payload);
+    let manifest = CorpusManifest {
+        name: "pptx-source-backed-image-query".to_owned(),
+        generator: PPTX_SOURCE_IMAGE_QUERY_CORPUS_GENERATOR,
+        package_format: "PPTX/OPC/ZIP",
+        shape: "picture-heavy-selected-slide",
+        payload_kind: "deterministic-incompressible-media-and-slide-text",
+        compression: "deflate",
+        entry_count: source_opc.part_count(),
+        archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+        entry_bytes: selected_payload.len(),
+        uncompressed_payload_bytes,
+        archive_bytes: archive.len(),
+        archive_sha256: sha256_hex(&archive),
+        target_entry: format!("slide:{source_slide}/picture:{selected_position}"),
+        target_payload_bytes: selected_payload.len(),
+        target_payload_sha256: selected_payload_sha256.clone(),
+        rtf_variant: None,
+        xlsx: None,
+    };
+    Ok(PptxSourceImageQueryCorpus {
+        manifest,
+        archive,
+        source_slide,
+        expected_images,
+        expected_images_sha256,
+        selected_position,
+        selected_image,
+        selected_image_sha256,
+        selected_media_part,
+        selected_media_compressed_range,
+        selected_payload,
+        selected_payload_sha256,
+        media_ranges,
+    })
+}
+
+enum PptxSourceImageQueryRaw {
+    Images(Vec<litchi_pptx::SourceImageDescriptor>),
+    Image(litchi_pptx::SourceImageDescriptor),
+    ReadImage(litchi_pptx::SourceImage),
+}
+
+fn execute_pptx_source_image_query_raw(
+    case: Case,
+    slide: &litchi_pptx::SourceSlide,
+    selected_position: usize,
+) -> Result<PptxSourceImageQueryRaw, Box<dyn Error>> {
+    match case {
+        Case::PptxSourceBackedImagesQuery => Ok(PptxSourceImageQueryRaw::Images(slide.images()?)),
+        Case::PptxSourceBackedImageQuery => {
+            Ok(PptxSourceImageQueryRaw::Image(slide.image(selected_position)?))
+        },
+        Case::PptxSourceBackedReadImageQuery => Ok(PptxSourceImageQueryRaw::ReadImage(
+            slide.read_image(selected_position)?,
+        )),
+        _ => Err("non-PPTX source image query case passed to its query helper".into()),
+    }
+}
+
+#[derive(Clone, Debug)]
+struct PptxSourceImageQueryOutput {
+    all_images: Option<Vec<PptxSourceImageMetadata>>,
+    selected_image: PptxSourceImageMetadata,
+    payload: Option<Vec<u8>>,
+}
+
+fn project_pptx_source_image_query(
+    raw: PptxSourceImageQueryRaw,
+    selected_position: usize,
+) -> Result<PptxSourceImageQueryOutput, Box<dyn Error>> {
+    match raw {
+        PptxSourceImageQueryRaw::Images(descriptors) => {
+            let all_images = descriptors
+                .iter()
+                .map(pptx_source_image_metadata)
+                .collect::<Result<Vec<_>, _>>()?;
+            let selected_image = all_images
+                .get(selected_position)
+                .cloned()
+                .ok_or("PPTX images query selected picture is missing")?;
+            Ok(PptxSourceImageQueryOutput {
+                all_images: Some(all_images),
+                selected_image,
+                payload: None,
+            })
+        },
+        PptxSourceImageQueryRaw::Image(descriptor) => Ok(PptxSourceImageQueryOutput {
+            all_images: None,
+            selected_image: pptx_source_image_metadata(&descriptor)?,
+            payload: None,
+        }),
+        PptxSourceImageQueryRaw::ReadImage(image) => Ok(PptxSourceImageQueryOutput {
+            all_images: None,
+            selected_image: pptx_source_image_metadata(image.descriptor())?,
+            payload: Some(image.bytes().to_vec()),
+        }),
+    }
+}
+
+fn execute_pptx_source_image_query(
+    case: Case,
+    slide: &litchi_pptx::SourceSlide,
+    selected_position: usize,
+) -> Result<PptxSourceImageQueryOutput, Box<dyn Error>> {
+    project_pptx_source_image_query(
+        execute_pptx_source_image_query_raw(case, slide, selected_position)?,
+        selected_position,
+    )
+}
+
+fn pptx_source_image_query_operation(case: Case) -> Result<&'static str, Box<dyn Error>> {
+    match case {
+        Case::PptxSourceBackedImagesQuery => Ok("images"),
+        Case::PptxSourceBackedImageQuery => Ok("image"),
+        Case::PptxSourceBackedReadImageQuery => Ok("read_image"),
+        _ => Err("non-PPTX source image query case passed to operation helper".into()),
+    }
+}
+
+fn record_pptx_source_image_cache(
+    summary: &mut OpcCacheDiagnosticsSummary,
+    before: SourceCacheDiagnostics,
+    after: SourceCacheDiagnostics,
+) -> Result<(), Box<dyn Error>> {
+    summary.record(opc_cache_counter_delta(before, after)?, after);
+    Ok(())
+}
+
+fn reorder_pptx_source_image_cache(
+    summary: &mut OpcCacheDiagnosticsSummary,
+    sample_order: &[usize],
+) -> Result<(), Box<dyn Error>> {
+    reorder_sample_vector(&mut summary.hits, sample_order)?;
+    reorder_sample_vector(&mut summary.cold_loads, sample_order)?;
+    reorder_sample_vector(&mut summary.waiter_joins, sample_order)?;
+    reorder_sample_vector(&mut summary.successful_loads, sample_order)?;
+    reorder_sample_vector(&mut summary.failed_loads, sample_order)?;
+    reorder_sample_vector(&mut summary.evictions, sample_order)?;
+    reorder_sample_vector(&mut summary.bypasses, sample_order)?;
+    reorder_sample_vector(&mut summary.oversized_bypasses, sample_order)?;
+    reorder_sample_vector(&mut summary.allocation_bypasses, sample_order)?;
+    reorder_sample_vector(&mut summary.budget_reservation_failures, sample_order)?;
+    reorder_sample_vector(&mut summary.retained_entries, sample_order)?;
+    reorder_sample_vector(&mut summary.retained_bytes, sample_order)?;
+    reorder_sample_vector(&mut summary.in_flight_loads, sample_order)?;
+    reorder_sample_vector(&mut summary.budget_memory_used, sample_order)?;
+    reorder_sample_vector(&mut summary.budget_cache_reserved_bytes, sample_order)?;
+    reorder_sample_vector(&mut summary.budget_memory_limit, sample_order)?;
+    Ok(())
+}
+
+fn run_pptx_source_image_query(
+    case: Case,
+    corpus: &PptxSourceImageQueryCorpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if !case.is_pptx_source_image_query()
+        || corpus.manifest.generator != PPTX_SOURCE_IMAGE_QUERY_CORPUS_GENERATOR
+        || corpus.manifest.shape != "picture-heavy-selected-slide"
+    {
+        return Err("PPTX source image query case requires its fixed picture-heavy corpus".into());
+    }
+    if corpus.expected_images.len() != PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT
+        || corpus.selected_position >= corpus.expected_images.len()
+        || corpus.selected_image != corpus.expected_images[corpus.selected_position]
+        || corpus.selected_payload != pptx_cross_copy_media_payload(corpus.selected_position)
+        || corpus.selected_payload_sha256 != sha256_hex(&corpus.selected_payload)
+        || corpus.manifest.archive_sha256 != sha256_hex(&corpus.archive)
+        || corpus.manifest.target_payload_sha256 != corpus.selected_payload_sha256
+    {
+        return Err("PPTX source image query corpus identity is inconsistent".into());
+    }
+    let operation = pptx_source_image_query_operation(case)?;
+    let iterations = iteration_count(warmup_iterations, samples)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
+
+    for iteration in 0..iterations {
+        // Package construction, root indexing, slide selection, and all
+        // source-backed preparation stay outside the timed operation.
+        let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+        let presentation = litchi_pptx::SourceBackedPresentation::from_read_at(source)?;
+        let slide = presentation
+            .slide(corpus.source_slide)
+            .ok_or("PPTX source image query selected slide is missing")?;
+        let allocation_region = allocation_metrics::begin();
+        let started = Instant::now();
+        let raw_output =
+            execute_pptx_source_image_query_raw(case, &slide, corpus.selected_position)?;
+        std::hint::black_box(&raw_output);
+        let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
+        let output = project_pptx_source_image_query(raw_output, corpus.selected_position)?;
+        if output.selected_image != corpus.selected_image {
+            return Err(format!(
+                "PPTX {operation} query returned a different selected image identity"
+            )
+            .into());
+        }
+        if let Some(images) = output.all_images.as_ref() {
+            if images != &corpus.expected_images {
+                return Err("PPTX images query returned an unexpected ordered picture inventory".into());
+            }
+        }
+        if let Some(payload) = output.payload.as_ref() {
+            if payload != &corpus.selected_payload
+                || sha256_hex(payload) != corpus.selected_payload_sha256
+            {
+                return Err("PPTX read_image query returned an unexpected payload".into());
+            }
+        }
+        std::hint::black_box(&output);
+        if iteration >= warmup_iterations {
+            let elapsed_ns = elapsed_ns(duration)?;
+            elapsed.push(elapsed_ns);
+            observations.push(operation_metrics::InProcessObservation {
+                elapsed_ns,
+                process_metrics: None,
+                allocation_metrics,
+            });
+        }
+    }
+
+    let mut source_summary = PptxSourceImageQuerySummary {
+        implementation: "presentation::SourceBackedPresentation",
+        operation,
+        timing_scope: "selected source-backed slide query after untimed package/open/slide preparation",
+        performance_claim: "none: opt-in correctness/counter evidence only; no eager/source speedup, allocation, RSS, physical-I/O, or cold-cache claim",
+        source_evidence_scope: "separate untimed InstrumentedSource replay per retained sample; source preparation/open excluded",
+        source_archive_sha256: corpus.manifest.archive_sha256.clone(),
+        source_archive_bytes: u64::try_from(corpus.archive.len())?,
+        source_slide: corpus.source_slide,
+        picture_count: corpus.expected_images.len(),
+        selected_position: corpus.selected_position,
+        picture_metadata: corpus.expected_images.clone(),
+        picture_metadata_sha256: corpus.expected_images_sha256.clone(),
+        selected_image: corpus.selected_image.clone(),
+        selected_image_metadata_sha256: corpus.selected_image_sha256.clone(),
+        selected_media_part: corpus.selected_media_part.clone(),
+        selected_media_compressed_range_bytes: u64::try_from(
+            corpus.selected_media_compressed_range.end
+                .saturating_sub(corpus.selected_media_compressed_range.start),
+        )?,
+        selected_payload_bytes: u64::try_from(corpus.selected_payload.len())?,
+        selected_payload_sha256: corpus.selected_payload_sha256.clone(),
+        observed_picture_metadata_sha256: Vec::with_capacity(samples),
+        observed_selected_image_metadata_sha256: Vec::with_capacity(samples),
+        observed_payload_sha256: Vec::new(),
+        source_read_calls: Vec::with_capacity(samples),
+        source_read_bytes: Vec::with_capacity(samples),
+        source_read_range_overlap_bytes: Vec::with_capacity(samples),
+        ordinary_payload_read_calls: Vec::with_capacity(samples),
+        ordinary_payload_read_bytes: Vec::with_capacity(samples),
+        selected_media_read_calls: Vec::with_capacity(samples),
+        selected_media_read_bytes: Vec::with_capacity(samples),
+        max_in_flight_reads: Vec::with_capacity(samples),
+        cache_diagnostics: OpcCacheDiagnosticsSummary::default(),
+        metadata_no_payload_reads_verified: true,
+        selected_payload_read_verified: true,
+        exact_source_counters_verified: true,
+        exact_cache_counters_verified: true,
+    };
+    let mut expected_source: Option<SourceSnapshot> = None;
+    let mut expected_cache: Option<(OpcCacheCounterDelta, SourceCacheDiagnostics)> = None;
+    for _sample in 0..samples {
+        let mut instrumented = InstrumentedSource::new(corpus.archive.clone(), corpus.media_ranges.clone());
+        instrumented.track_read_ranges = true;
+        let source = Arc::new(instrumented);
+        let read_at: Arc<dyn ReadAt> = source.clone();
+        let presentation = litchi_pptx::SourceBackedPresentation::from_read_at(read_at)?;
+        let slide = presentation
+            .slide(corpus.source_slide)
+            .ok_or("PPTX source image replay selected slide is missing")?;
+        source.reset();
+        let before = presentation.cache_diagnostics();
+        let output = execute_pptx_source_image_query(case, &slide, corpus.selected_position)?;
+        let after = presentation.cache_diagnostics();
+        if after.in_flight_loads != 0 {
+            return Err("PPTX source image replay left an in-flight cache load".into());
+        }
+        if output.selected_image != corpus.selected_image {
+            return Err("PPTX source image replay selected-image identity differs from corpus".into());
+        }
+        let observed_images_sha256 = output
+            .all_images
+            .as_ref()
+            .map(|images| pptx_source_image_metadata_sha256(images))
+            .transpose()?
+            .unwrap_or_default();
+        if case == Case::PptxSourceBackedImagesQuery
+            && (observed_images_sha256 != corpus.expected_images_sha256
+                || output.all_images.as_deref() != Some(corpus.expected_images.as_slice()))
+        {
+            return Err("PPTX images source replay disagrees with ordered metadata oracle".into());
+        }
+        let observed_selected_sha256 = pptx_source_image_metadata_sha256(
+            std::slice::from_ref(&output.selected_image),
+        )?;
+        let payload_digest = output.payload.as_ref().map(|payload| sha256_hex(payload));
+        if case == Case::PptxSourceBackedReadImageQuery
+            && payload_digest.as_deref() != Some(corpus.selected_payload_sha256.as_str())
+        {
+            return Err("PPTX read_image source replay disagrees with payload hash oracle".into());
+        }
+        let snapshot = source.snapshot();
+        let delta = opc_cache_counter_delta(before, after)?;
+        let metadata_selector = case != Case::PptxSourceBackedReadImageQuery;
+        if metadata_selector {
+            if snapshot.ordinary_payload_read_calls != 0
+                || snapshot.ordinary_payload_read_bytes != 0
+            {
+                return Err("PPTX metadata image query read an embedded media payload".into());
+            }
+        } else if snapshot.ordinary_payload_read_calls == 0
+            || snapshot.ordinary_payload_read_bytes == 0
+        {
+            return Err("PPTX read_image query did not read its embedded media payload".into());
+        }
+        let selected_media_compressed_bytes = corpus
+            .selected_media_compressed_range
+            .end
+            .saturating_sub(corpus.selected_media_compressed_range.start);
+        let (selected_media_read_calls, selected_media_read_bytes) = if metadata_selector {
+            (0, 0)
+        } else {
+            // Re-run the same query with only the selected media member marked
+            // as payload. The all-media replay above must have the exact same
+            // overlap, proving that no other embedded image was read.
+            let mut selected_instrumented = InstrumentedSource::new(
+                corpus.archive.clone(),
+                vec![corpus.selected_media_compressed_range.clone()],
+            );
+            selected_instrumented.track_read_ranges = true;
+            let selected_source = Arc::new(selected_instrumented);
+            let selected_read_at: Arc<dyn ReadAt> = selected_source.clone();
+            let selected_presentation =
+                litchi_pptx::SourceBackedPresentation::from_read_at(selected_read_at)?;
+            let selected_slide = selected_presentation
+                .slide(corpus.source_slide)
+                .ok_or("PPTX selected-media replay selected slide is missing")?;
+            selected_source.reset();
+            let selected_output = execute_pptx_source_image_query(
+                case,
+                &selected_slide,
+                corpus.selected_position,
+            )?;
+            if selected_output.selected_image != corpus.selected_image
+                || selected_output
+                    .payload
+                    .as_ref()
+                    .map(|payload| sha256_hex(payload))
+                    .as_deref()
+                    != Some(corpus.selected_payload_sha256.as_str())
+            {
+                return Err("PPTX selected-media replay returned a different image".into());
+            }
+            let selected_snapshot = selected_source.snapshot();
+            if selected_snapshot.ordinary_payload_read_calls == 0
+                || selected_snapshot.ordinary_payload_read_bytes != selected_media_compressed_bytes
+                || snapshot.ordinary_payload_read_bytes != selected_media_compressed_bytes
+                || snapshot.ordinary_payload_read_calls
+                    != selected_snapshot.ordinary_payload_read_calls
+            {
+                return Err(
+                    "PPTX read_image query did not stay within the selected media compressed range"
+                        .into(),
+                );
+            }
+            (
+                selected_snapshot.ordinary_payload_read_calls,
+                selected_snapshot.ordinary_payload_read_bytes,
+            )
+        };
+        if let Some(previous) = expected_source {
+            if previous != snapshot {
+                source_summary.exact_source_counters_verified = false;
+                return Err("PPTX source image query source counters changed across samples".into());
+            }
+        } else {
+            expected_source = Some(snapshot);
+        }
+        if let Some((previous_delta, previous_after)) = expected_cache {
+            if previous_delta != delta || previous_after != after {
+                source_summary.exact_cache_counters_verified = false;
+                return Err("PPTX source image query cache counters changed across samples".into());
+            }
+        } else {
+            expected_cache = Some((delta, after));
+        }
+        if !observed_images_sha256.is_empty() {
+            source_summary
+                .observed_picture_metadata_sha256
+                .push(observed_images_sha256);
+        }
+        source_summary
+            .observed_selected_image_metadata_sha256
+            .push(observed_selected_sha256);
+        if let Some(payload_digest) = payload_digest {
+            source_summary.observed_payload_sha256.push(payload_digest);
+        }
+        source_summary.source_read_calls.push(snapshot.read_calls);
+        source_summary.source_read_bytes.push(snapshot.read_bytes);
+        source_summary
+            .source_read_range_overlap_bytes
+            .push(snapshot.read_range_overlap_bytes);
+        source_summary
+            .ordinary_payload_read_calls
+            .push(snapshot.ordinary_payload_read_calls);
+        source_summary
+            .ordinary_payload_read_bytes
+            .push(snapshot.ordinary_payload_read_bytes);
+        source_summary
+            .selected_media_read_calls
+            .push(selected_media_read_calls);
+        source_summary
+            .selected_media_read_bytes
+            .push(selected_media_read_bytes);
+        source_summary
+            .max_in_flight_reads
+            .push(snapshot.max_in_flight_reads);
+        record_pptx_source_image_cache(&mut source_summary.cache_diagnostics, before, after)?;
+    }
+
+    let metadata_selector = case != Case::PptxSourceBackedReadImageQuery;
+    source_summary.metadata_no_payload_reads_verified = !metadata_selector
+        || source_summary
+            .ordinary_payload_read_calls
+            .iter()
+            .all(|calls| *calls == 0)
+            && source_summary
+                .ordinary_payload_read_bytes
+                .iter()
+                .all(|bytes| *bytes == 0);
+    source_summary.selected_payload_read_verified = if metadata_selector {
+        source_summary
+            .ordinary_payload_read_calls
+            .iter()
+            .all(|calls| *calls == 0)
+            && source_summary
+                .ordinary_payload_read_bytes
+                .iter()
+                .all(|bytes| *bytes == 0)
+    } else {
+        source_summary
+            .ordinary_payload_read_calls
+            .iter()
+            .all(|calls| *calls > 0)
+            && source_summary
+                .ordinary_payload_read_bytes
+                .iter()
+                .all(|bytes| *bytes > 0)
+    };
+    if !source_summary.metadata_no_payload_reads_verified
+        || !source_summary.selected_payload_read_verified
+        || !source_summary.exact_source_counters_verified
+        || !source_summary.exact_cache_counters_verified
+    {
+        return Err("PPTX source image query evidence gates are incomplete".into());
+    }
+    let elapsed_statistics = statistics(elapsed);
+    let sample_order = elapsed_statistics.sample_order.clone();
+    if !source_summary.observed_picture_metadata_sha256.is_empty() {
+        reorder_sample_vector(
+            &mut source_summary.observed_picture_metadata_sha256,
+            &sample_order,
+        )?;
+    }
+    reorder_sample_vector(
+        &mut source_summary.observed_selected_image_metadata_sha256,
+        &sample_order,
+    )?;
+    if !source_summary.observed_payload_sha256.is_empty() {
+        reorder_sample_vector(&mut source_summary.observed_payload_sha256, &sample_order)?;
+    }
+    reorder_sample_vector(&mut source_summary.source_read_calls, &sample_order)?;
+    reorder_sample_vector(&mut source_summary.source_read_bytes, &sample_order)?;
+    reorder_sample_vector(
+        &mut source_summary.source_read_range_overlap_bytes,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut source_summary.ordinary_payload_read_calls,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut source_summary.ordinary_payload_read_bytes,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut source_summary.selected_media_read_calls,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut source_summary.selected_media_read_bytes,
+        &sample_order,
+    )?;
+    reorder_sample_vector(&mut source_summary.max_in_flight_reads, &sample_order)?;
+    reorder_pptx_source_image_cache(&mut source_summary.cache_diagnostics, &sample_order)?;
+    let operation_metrics = operation_metrics::from_in_process_observations_without_sink(
+        &observations,
+    )?;
+    let output_digest = match case {
+        Case::PptxSourceBackedImagesQuery => corpus.expected_images_sha256.clone(),
+        Case::PptxSourceBackedImageQuery => corpus.selected_image_sha256.clone(),
+        Case::PptxSourceBackedReadImageQuery => corpus.selected_payload_sha256.clone(),
+        _ => unreachable!("validated PPTX source image query case"),
+    };
+    let source = SourceSummary {
+        read_calls: source_summary.source_read_calls.clone(),
+        read_bytes: source_summary.source_read_bytes.clone(),
+        ordinary_payload_read_calls: source_summary.ordinary_payload_read_calls.clone(),
+        ordinary_payload_read_bytes: source_summary.ordinary_payload_read_bytes.clone(),
+        max_in_flight_reads: source_summary.max_in_flight_reads.clone(),
+        pptx_source_image_query: Some(source_summary),
+        ..SourceSummary::default()
+    };
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: elapsed_statistics,
+        sink: None,
+        source: Some(source),
+        execution: None,
+        output_sha256: Some(output_digest),
+        operation_metrics: Some(operation_metrics),
     })
 }
 
@@ -19449,6 +20261,11 @@ fn run_case_with_config(
         | Case::PptxCrossCopyMediaRich
         | Case::PptxSourceBackedCrossCopyPlain => {
             Err("PPTX cross-copy cases use their dedicated corpus runner".into())
+        },
+        Case::PptxSourceBackedImagesQuery
+        | Case::PptxSourceBackedImageQuery
+        | Case::PptxSourceBackedReadImageQuery => {
+            Err("PPTX source image queries use their dedicated fixed corpus runner".into())
         },
         Case::PptxSlideRemoveBoundarySave | Case::PptxSlideMoveBoundarySave => {
             Err("PPTX slide-boundary cases use their dedicated corpus runner".into())
@@ -51539,6 +52356,7 @@ mod tests {
         ODT_RESOURCE_BATCH_COUNT, OOXML_TRACKER_CORPUS_GENERATOR, OpcCacheMode, PPT_PICTURE_BYTES,
         PPT_PICTURE_COUNT, PPT_PICTURES_CORPUS_GENERATOR, PPT_REPEATED_QUERY_COUNT,
         PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT, PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind,
+        PPTX_SOURCE_IMAGE_QUERY_SELECTED_POSITION,
         RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
         RtfSemanticVariant, SemanticShape, SimulatedCursor, SimulatedRangeMetrics,
         SimulatedRangeSource, SinkSummary, SourceBackedPackage, WindowedHashingSink, Workbook,
@@ -51552,6 +52370,7 @@ mod tests {
         build_odt_resource_batch_corpus, build_ole_common_corpus, build_ooxml_tracker_corpus,
         build_opc_corpus, build_opc_relationship_corpus, build_ppt_pictures_corpus,
         build_pptx_cross_copy_corpus, build_pptx_slide_name_index_corpus,
+        build_pptx_source_image_query_corpus,
         build_pptx_source_backed_cross_copy_corpus, build_pptx_source_edit_corpus,
         build_rtf_lifecycle_corpus, build_rtf_picture_corpus, build_semantic_docx_corpus,
         build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
@@ -51576,6 +52395,7 @@ mod tests {
         run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
         run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_cross_copy, run_pptx_source_backed_one_edit_save,
+        run_pptx_source_image_query,
         run_rtf_picture_crud, run_scaling_case, run_streaming_creation, run_xls_comments_edit_save,
         run_xls_visibility_edit_save, run_xlsx_auto_filter_edit_save,
         run_xlsx_calculation_metadata_edit_save, run_xlsx_conditional_formatting_edit_save,
@@ -51585,6 +52405,7 @@ mod tests {
         run_xlsx_print_options_edit_save, run_xlsx_sheet_protection_edit_save, sha256_hex,
         simulated_request_delay, statistics, updated_writer_text, usage_text,
         validate_xls_source_locality, validate_xls_source_options, verify_xlsx_cells, writer_shape,
+        validate_pptx_source_image_query_options,
         xls_source_family_dispatch_cases, xls_writer_semantic_dispatch_selected, xlsb_cells_digest,
         xlsb_expected_cells, xlsx_cell_count, xlsx_spec,
     };
@@ -51755,6 +52576,160 @@ mod tests {
         );
         assert!(!Case::DEFAULT.contains(&Case::PptPicturesEagerOpenAllImages));
         assert!(!Case::DEFAULT.contains(&Case::PptPicturesSourceBackedOpenAllImages));
+    }
+
+    #[test]
+    fn pptx_source_image_queries_are_opt_in_and_exactly_evidenced() {
+        let corpus = build_pptx_source_image_query_corpus().unwrap();
+        let again = build_pptx_source_image_query_corpus().unwrap();
+        assert_eq!(corpus.archive, again.archive);
+        assert_eq!(corpus.manifest.archive_sha256, again.manifest.archive_sha256);
+        assert_eq!(corpus.manifest.target_entry, again.manifest.target_entry);
+        assert_eq!(corpus.manifest.target_payload_sha256, again.manifest.target_payload_sha256);
+        assert_eq!(corpus.expected_images, again.expected_images);
+        assert_eq!(corpus.expected_images.len(), PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT);
+        assert_eq!(
+            corpus.selected_position,
+            PPTX_SOURCE_IMAGE_QUERY_SELECTED_POSITION
+        );
+        assert_eq!(corpus.selected_image, corpus.expected_images[corpus.selected_position]);
+        assert!(validate_pptx_source_image_query_options(
+            &[Case::PptxSourceBackedImagesQuery],
+            CorpusShape::ALL.as_slice(),
+            PayloadKind::ALL.as_slice(),
+        )
+        .is_ok());
+        assert!(validate_pptx_source_image_query_options(
+            &[Case::PptxSourceBackedImagesQuery],
+            &[CorpusShape::Tiny],
+            PayloadKind::ALL.as_slice(),
+        )
+        .is_err());
+        assert_eq!(
+            corpus.selected_payload_sha256,
+            sha256_hex(&corpus.selected_payload)
+        );
+        for case in [
+            Case::PptxSourceBackedImagesQuery,
+            Case::PptxSourceBackedImageQuery,
+            Case::PptxSourceBackedReadImageQuery,
+        ] {
+            const RETAINED_SAMPLES: usize = 2;
+            assert!(!Case::DEFAULT.contains(&case));
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(usage_text().contains(case.name()));
+            assert!(case.is_pptx_source_image_query());
+            let measured =
+                run_pptx_source_image_query(case, &corpus, 0, RETAINED_SAMPLES).unwrap();
+            assert_eq!(measured.case, case.name());
+            assert_eq!(measured.elapsed_ns.samples.len(), RETAINED_SAMPLES);
+            let sample_order = measured.elapsed_ns.sample_order.clone();
+            let mut sorted_sample_order = sample_order.clone();
+            sorted_sample_order.sort_unstable();
+            assert_eq!(
+                sorted_sample_order,
+                (0..RETAINED_SAMPLES).collect::<Vec<_>>()
+            );
+            assert_eq!(
+                measured.corpus.archive_sha256,
+                corpus.manifest.archive_sha256
+            );
+            let source = measured.source.unwrap();
+            assert_eq!(source.read_calls.len(), RETAINED_SAMPLES);
+            assert_eq!(source.read_bytes.len(), RETAINED_SAMPLES);
+            assert_eq!(source.max_in_flight_reads.len(), RETAINED_SAMPLES);
+            let evidence = source.pptx_source_image_query.unwrap();
+            for values in [
+                &evidence.source_read_calls,
+                &evidence.source_read_bytes,
+                &evidence.source_read_range_overlap_bytes,
+                &evidence.ordinary_payload_read_calls,
+                &evidence.ordinary_payload_read_bytes,
+                &evidence.selected_media_read_calls,
+                &evidence.selected_media_read_bytes,
+                &evidence.max_in_flight_reads,
+            ] {
+                assert_eq!(values.len(), RETAINED_SAMPLES);
+                assert!(values.windows(2).all(|window| window[0] == window[1]));
+            }
+            let cache = &evidence.cache_diagnostics;
+            assert_eq!(cache.hits.len(), RETAINED_SAMPLES);
+            assert_eq!(cache.cold_loads.len(), RETAINED_SAMPLES);
+            assert_eq!(cache.waiter_joins.len(), RETAINED_SAMPLES);
+            assert_eq!(cache.successful_loads.len(), RETAINED_SAMPLES);
+            assert_eq!(cache.failed_loads.len(), RETAINED_SAMPLES);
+            assert_eq!(cache.evictions.len(), RETAINED_SAMPLES);
+            assert_eq!(cache.bypasses.len(), RETAINED_SAMPLES);
+            assert_eq!(cache.oversized_bypasses.len(), RETAINED_SAMPLES);
+            assert_eq!(cache.allocation_bypasses.len(), RETAINED_SAMPLES);
+            assert_eq!(cache.budget_reservation_failures.len(), RETAINED_SAMPLES);
+            assert_eq!(cache.retained_entries.len(), RETAINED_SAMPLES);
+            assert_eq!(cache.retained_bytes.len(), RETAINED_SAMPLES);
+            assert_eq!(cache.in_flight_loads.len(), RETAINED_SAMPLES);
+            assert_eq!(cache.budget_memory_used.len(), RETAINED_SAMPLES);
+            assert_eq!(cache.budget_cache_reserved_bytes.len(), RETAINED_SAMPLES);
+            assert_eq!(cache.budget_memory_limit.len(), RETAINED_SAMPLES);
+            assert_eq!(evidence.picture_count, PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT);
+            assert_eq!(evidence.selected_position, corpus.selected_position);
+            assert_eq!(evidence.picture_metadata, corpus.expected_images);
+            assert_eq!(
+                evidence.picture_metadata_sha256,
+                corpus.expected_images_sha256
+            );
+            assert_eq!(evidence.selected_image, corpus.selected_image);
+            assert!(evidence.exact_source_counters_verified);
+            assert!(evidence.exact_cache_counters_verified);
+            assert!(evidence.metadata_no_payload_reads_verified);
+            if case == Case::PptxSourceBackedReadImageQuery {
+                assert!(evidence.selected_payload_read_verified);
+                assert_eq!(
+                    evidence.ordinary_payload_read_bytes,
+                    evidence.selected_media_read_bytes
+                );
+                assert!(evidence.selected_media_read_bytes[0] > 0);
+                assert!(evidence.selected_media_read_calls[0] > 0);
+                assert_eq!(
+                    evidence.selected_media_read_bytes[0],
+                    evidence.selected_media_compressed_range_bytes
+                );
+                assert_eq!(
+                    evidence.observed_payload_sha256,
+                    vec![corpus.selected_payload_sha256.clone(); RETAINED_SAMPLES]
+                );
+                assert_eq!(
+                    measured.output_sha256.as_deref(),
+                    Some(corpus.selected_payload_sha256.as_str())
+                );
+            } else {
+                assert_eq!(
+                    evidence.ordinary_payload_read_calls,
+                    vec![0; RETAINED_SAMPLES]
+                );
+                assert_eq!(
+                    evidence.ordinary_payload_read_bytes,
+                    vec![0; RETAINED_SAMPLES]
+                );
+                assert_eq!(
+                    evidence.selected_media_read_calls,
+                    vec![0; RETAINED_SAMPLES]
+                );
+                assert_eq!(
+                    evidence.selected_media_read_bytes,
+                    vec![0; RETAINED_SAMPLES]
+                );
+                assert!(evidence.selected_payload_read_verified);
+            }
+            let operation = measured
+                .operation_metrics
+                .as_ref()
+                .expect("PPTX source image query publishes operation metrics");
+            assert_eq!(operation.sample_count, RETAINED_SAMPLES);
+            assert_eq!(
+                operation.sample_indices,
+                sample_order
+            );
+            assert!(operation.sink.output_bytes.values.is_none());
+        }
     }
 
     #[test]
@@ -52157,7 +53132,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 408);
+        assert_eq!(selectable_count, 411);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
