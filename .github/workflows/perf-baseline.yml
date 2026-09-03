@@ -1380,6 +1380,109 @@ jobs:
       - name: Build release harness
         run: cargo build --release --locked --manifest-path "$PERF_MANIFEST"
 
+      - name: Run current-HEAD resource profile
+        run: |
+          mkdir -p target/perf
+          python3 tools/perf_resource_profile.py run \
+            --binary "$CARGO_TARGET_DIR/release/litchi-perf-baseline" \
+            --output target/perf/resource-profile.json \
+            --only opc-source-one-part,xlsx-managed-batch,rtf-streaming,cfb-selective,cfb-save,opc-scaling,cfb-scaling \
+            --warmup 1 \
+            --samples 3 \
+            --timeout 600
+
+      - name: Validate current-HEAD resource profile report
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          expected_workloads = [
+              "opc-source-one-part",
+              "xlsx-managed-batch",
+              "rtf-streaming",
+              "cfb-selective",
+              "cfb-save",
+              "opc-scaling",
+              "cfb-scaling",
+          ]
+          expected_tools = {
+              "time",
+              "heaptrack",
+              "heaptrack_print",
+              "perf",
+              "strace",
+              "taskset",
+          }
+
+          report = json.loads(Path("target/perf/resource-profile.json").read_text())
+          assert report["schema_version"] == 1
+          tool = report["tool"]
+          assert tool["name"] == "litchi-resource-profile"
+          assert isinstance(tool["version"], str) and tool["version"]
+          scope = report["scope"]
+          assert scope["excluded_formats"] == ["iWork"]
+
+          configuration = report["configuration"]
+          assert configuration["workloads"] == expected_workloads
+          assert configuration["warmup_iterations"] == 1
+          assert configuration["samples"] == 3
+          assert configuration["timeout_seconds"] == 600.0
+
+          tools = report["tools"]
+          assert set(tools) == expected_tools
+          for name in expected_tools:
+              descriptor = tools[name]
+              # ``available`` is an explicit boolean status.  False is valid
+              # for an unavailable or permission-denied optional profiler.
+              assert isinstance(descriptor.get("available"), bool), name
+              assert "returncode" in descriptor, name
+
+          def status_values(value):
+              if isinstance(value, dict):
+                  values = []
+                  if "status" in value:
+                      values.append(value["status"])
+                  for nested in value.values():
+                      values.extend(status_values(nested))
+                  return values
+              if isinstance(value, list):
+                  values = []
+                  for nested in value:
+                      values.extend(status_values(nested))
+                  return values
+              return []
+
+          workloads = report["workloads"]
+          assert len(workloads) == len(expected_workloads)
+          assert [item["id"] for item in workloads] == expected_workloads
+          for item in workloads:
+              assert item["harness"]["returncode"] == 0
+              assert item["harness"]["report"]["present"] is True
+              assert item["harness"]["logical_measurements"]
+              for profile_name, profile in item["external_profiles"].items():
+                  assert isinstance(profile, dict), (item["id"], profile_name)
+                  statuses = status_values(profile)
+                  assert any(
+                      isinstance(status, str) and status for status in statuses
+                  ), (item["id"], profile_name)
+                  if "command" in profile:
+                      assert isinstance(profile["command"], list)
+                      assert profile["command"]
+                      assert "returncode" in profile
+                  else:
+                      # Unsupported tools may have no attempted command, but
+                      # must retain a human-readable explicit reason/status.
+                      assert isinstance(profile.get("status"), str)
+                      assert isinstance(profile.get("reason"), str)
+                      assert profile["reason"]
+                  if profile_name == "heaptrack" and "print" in profile:
+                      printed = profile["print"]
+                      assert isinstance(printed, dict)
+                      assert isinstance(printed.get("parsed"), dict)
+                      assert isinstance(printed["parsed"].get("status"), str)
+          PY
+
       - name: Run full release baseline matrix
         run: |
           mkdir -p target/perf
@@ -2339,6 +2442,7 @@ jobs:
           path: |
             target/perf/container-baseline.json
             target/perf/container-baseline.corpus-manifest-v2.json
+            target/perf/resource-profile.json
             target/perf/xlsx-commit-read-baseline.json
             target/perf/opc-source-overlay-baseline.json
             target/perf/docx-source-edit-baseline.json
