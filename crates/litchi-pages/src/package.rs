@@ -56,7 +56,7 @@ use crate::{
 
 pub use body_footnote::{
     BodyFootnoteCommit, BodyFootnoteDiagnostics, BodyFootnoteEdit, BodyFootnoteError,
-    BodyFootnoteLimitKind, BodyFootnotePatch,
+    BodyFootnoteLimitKind, BodyFootnotePatch, BodyFootnoteSnapshot,
 };
 pub use body_table_appearance::{
     BodyTableAppearanceCommit, BodyTableAppearanceDiagnostics, BodyTableAppearanceEdit,
