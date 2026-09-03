@@ -13,14 +13,40 @@
 //! ```
 
 use crate::constants;
-use crate::core::{OwnedPackage, PreparedPackage, package::read_owned_input};
+use crate::core::{
+    ArchiveLimits, OwnedPackage, PreparedPackage, SourcePackageLimits,
+    package::{PreparedCatalogFacts, read_owned_input},
+};
 use litchi_core::{Error, ReadAt, Resource, ResourceLimit, Result, SourceVersion};
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
+#[cfg(test)]
+use std::cell::Cell;
 use std::collections::HashSet;
 use std::io::{Read, Seek, SeekFrom};
+use std::sync::Arc;
+
+#[cfg(test)]
+thread_local! {
+    static READER_SNAPSHOT_READS: Cell<usize> = const { Cell::new(0) };
+}
+
+#[cfg(test)]
+fn note_reader_snapshot() {
+    READER_SNAPSHOT_READS.with(|count| count.set(count.get().saturating_add(1)));
+}
+
+#[cfg(test)]
+fn reset_reader_snapshot_reads() {
+    READER_SNAPSHOT_READS.with(|count| count.set(0));
+}
+
+#[cfg(test)]
+fn reader_snapshot_reads() -> usize {
+    READER_SNAPSHOT_READS.with(Cell::get)
+}
 
 /// Neutral file classification returned by the detector.
 pub use litchi_core::FileFormat as Format;
@@ -149,6 +175,43 @@ impl Default for Limits {
     fn default() -> Self {
         Self::new(DEFAULT_MAX_INPUT_BYTES)
     }
+}
+
+/// The neutral catalog decision retained by the reader preparation handoff.
+///
+/// This deliberately does not reuse the borrowed catalog probe's
+/// `Option<bool>` value.  The decision is derived from the same owned strict
+/// archive index that is handed to the ODF family owner.
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CatalogDecision {
+    /// The bounded canonical catalog has no OPC content-types member.
+    Ordinary,
+    /// The bounded canonical catalog has an OPC content-types member.
+    OoxmlMarker,
+    /// The retained archive is valid ODF-shaped input but catalog facts are
+    /// intentionally uncertain (for example ZIP64, descriptors, or trailing
+    /// bytes), so OOXML must retain precedence.
+    Unknown,
+}
+
+/// ODF-owned one-shot reader preparation result.
+///
+/// `Prepared` retains the exact immutable snapshot through both the ODF
+/// package and an `Arc` handle used by the facade's lower-precedence OOXML
+/// probe. `Fallback` returns the original `Vec` allocation when strict ODF
+/// preparation cannot be completed; the facade then runs its historical
+/// catalog and byte-detector sequence. `Ok(None)` from
+/// [`reader_preparation_with_limits`] performs no full input read when the
+/// fixed local ODF MIME framing is absent.
+#[doc(hidden)]
+pub enum ReaderPreparation {
+    Prepared {
+        package: PreparedPackage,
+        snapshot: Arc<Vec<u8>>,
+        catalog: CatalogDecision,
+    },
+    Fallback(Vec<u8>),
 }
 
 /// Classify the raw contents of an ODF `mimetype` member.
@@ -676,6 +739,152 @@ pub fn prepared_package(value: Vec<u8>) -> Option<PreparedPackage> {
     prepared(value)
 }
 
+/// Prepare an ODF-shaped seekable reader once for a facade detector.
+///
+/// The fixed local `mimetype` probe runs before any owned input allocation, so
+/// ordinary OOXML ZIP readers do not get a second full-source copy.  A
+/// recognized ODF candidate is then read through the existing bounded
+/// `read_owned_input` path and indexed under the strict ODF package policy
+/// exactly once.  The returned `PreparedPackage` and `snapshot` share the
+/// same immutable `Arc<Vec<u8>>` allocation.
+///
+/// `Ok(None)` means the fixed local framing did not identify an ODF candidate.
+/// A bounded read or seek error is treated as detector uncertainty after a
+/// successful cursor restoration, so the caller can retain its historical
+/// reader fallback. Every successful or failed operation restores the cursor
+/// supplied on entry; a restore failure is returned as an error.
+#[doc(hidden)]
+pub fn reader_preparation_with_limits<R: Read + Seek>(
+    reader: &mut R,
+    limits: Limits,
+    catalog_limits: CatalogProbeLimits,
+) -> Result<Option<ReaderPreparation>> {
+    limits.validate()?;
+    let original = reader.stream_position()?;
+    let detected: Result<Option<ReaderPreparation>> = (|| {
+        reader.seek(SeekFrom::Start(0))?;
+        let Some(format) = packaged_mime_from_reader_with_limits(reader, limits)? else {
+            return Ok(None);
+        };
+
+        reader.seek(SeekFrom::Start(0))?;
+        #[cfg(test)]
+        note_reader_snapshot();
+        let snapshot =
+            read_owned_input(&mut *reader, limits.max_input_bytes, "ODF detector input")?;
+        let length = u64::try_from(snapshot.len()).map_err(|_| {
+            Error::InvalidFormat("ODF detector input exceeds platform limits".into())
+        })?;
+        let package_limits = preparation_limits(limits, catalog_limits, length);
+        let package = match OwnedPackage::from_prepared_bytes_or_recover_with_limits(
+            snapshot,
+            package_limits,
+        ) {
+            Ok(package) => package,
+            Err(snapshot) => return Ok(Some(ReaderPreparation::Fallback(snapshot))),
+        };
+
+        if !package.is_stored(MIMETYPE_PATH).unwrap_or(false) {
+            return Ok(Some(ReaderPreparation::Fallback(package.into_inner())));
+        }
+
+        let catalog = prepared_catalog_decision(&package, length, catalog_limits);
+        let snapshot = package.shared_bytes();
+        Ok(Some(ReaderPreparation::Prepared {
+            package: PreparedPackage::new(package, format),
+            snapshot,
+            catalog,
+        }))
+    })();
+    // An operation failure is ordinary detector uncertainty once the cursor
+    // has been restored: the facade can continue through its historical
+    // reader path. A restoration failure is different; returning it lets the
+    // facade stop without ever probing from an unknown cursor.
+    reader
+        .seek(SeekFrom::Start(original))
+        .map_err(Error::from)?;
+    Ok(detected.ok().flatten())
+}
+
+fn packaged_mime_from_reader_with_limits<R: Read + Seek>(
+    reader: &mut R,
+    limits: Limits,
+) -> Result<Option<Format>> {
+    let end = reader.seek(SeekFrom::End(0))?;
+    if end > limits.max_input_bytes {
+        return Ok(None);
+    }
+    reader.seek(SeekFrom::Start(0))?;
+
+    let mut header = [0_u8; LOCAL_HEADER_BYTES];
+    reader.read_exact(&mut header)?;
+    let mut name = [0_u8; MIMETYPE_NAME.len()];
+    reader.read_exact(&mut name)?;
+    let Some((data_start, compressed, expected_crc)) = packaged_mime_layout(&header, &name) else {
+        return Ok(None);
+    };
+    let data_end = u64::try_from(data_start)
+        .ok()
+        .and_then(|start| start.checked_add(u64::try_from(compressed).ok()?));
+    if data_end.is_none_or(|data_end| data_end > end) {
+        return Ok(None);
+    }
+
+    let mut data = [0_u8; MAX_MIMETYPE_BYTES];
+    reader.read_exact(&mut data[..compressed])?;
+    if soapberry_zip::crc32(&data[..compressed]) != expected_crc {
+        return Ok(None);
+    }
+    Ok(mime(&data[..compressed]))
+}
+
+fn preparation_limits(
+    limits: Limits,
+    catalog_limits: CatalogProbeLimits,
+    length: u64,
+) -> SourcePackageLimits {
+    let archive = if length <= catalog_limits.max_input_bytes {
+        ArchiveLimits::new(
+            catalog_limits.max_members,
+            catalog_limits.max_member_name_bytes,
+            catalog_limits.max_metadata_bytes,
+            catalog_limits.max_compressed_bytes,
+            catalog_limits.max_entry_bytes,
+            catalog_limits.max_total_bytes,
+        )
+    } else {
+        ArchiveLimits::default()
+    };
+    SourcePackageLimits::new(limits.max_input_bytes, archive)
+}
+
+fn prepared_catalog_decision(
+    package: &OwnedPackage,
+    length: u64,
+    limits: CatalogProbeLimits,
+) -> CatalogDecision {
+    if length > limits.max_input_bytes {
+        return CatalogDecision::Unknown;
+    }
+
+    let facts: PreparedCatalogFacts = package.prepared_catalog_facts(OOXML_CATALOG_NAME);
+    if !facts.canonical_names
+        || !facts.duplicate_free
+        || !facts.all_local_spans_bounded
+        || facts.has_data_descriptor_entries
+        || facts.has_zip64_metadata
+        || facts.has_encrypted_entries
+        || facts.archive_end_offset != length
+    {
+        return CatalogDecision::Unknown;
+    }
+    if facts.exact_catalog_marker {
+        CatalogDecision::OoxmlMarker
+    } else {
+        CatalogDecision::Ordinary
+    }
+}
+
 /// Detect a packaged or flat `OpenDocument` stream.
 ///
 /// Detection reads the complete stream from its beginning and restores the
@@ -1164,6 +1373,278 @@ mod tests {
     }
 
     #[test]
+    fn reader_preparation_reuses_one_snapshot_and_index_for_odf_families() {
+        for (mimetype, expected) in [
+            (constants::ODF_TEXT, Format::Odt),
+            (constants::ODF_SPREADSHEET, Format::Ods),
+            (constants::ODF_PRESENTATION, Format::Odp),
+        ] {
+            let mut writer = crate::core::PackageWriter::new();
+            writer
+                .set_mimetype(mimetype)
+                .unwrap_or_else(|error| panic!("test package MIME must be accepted: {error}"));
+            writer
+                .add_file("content.xml", b"<office:document-content/>")
+                .expect("test content must be accepted");
+            let bytes = writer
+                .finish_to_bytes()
+                .expect("test package must be writable");
+
+            let mut reader = Cursor::new(bytes.clone());
+            reader.set_position(7);
+            reset_reader_snapshot_reads();
+            crate::package::reset_index_build_count();
+            let preparation = reader_preparation_with_limits(
+                &mut reader,
+                Limits::default(),
+                CatalogProbeLimits::default(),
+            )
+            .expect("reader preparation must not fail")
+            .expect("canonical ODF must be prepared");
+
+            assert_eq!(reader.position(), 7);
+            match preparation {
+                ReaderPreparation::Prepared {
+                    package,
+                    snapshot,
+                    catalog,
+                } => {
+                    assert_eq!(package.format(), expected);
+                    assert_eq!(catalog, CatalogDecision::Ordinary);
+                    assert_eq!(snapshot.as_slice(), bytes.as_slice());
+                    let package_bytes = package.package().shared_bytes();
+                    assert!(Arc::ptr_eq(&snapshot, &package_bytes));
+                    let index_identity = package.prepared_index_identity();
+                    assert_ne!(index_identity, 0);
+                    assert_eq!(package.prepared_index_identity(), index_identity);
+                },
+                ReaderPreparation::Fallback(_) => {
+                    panic!("canonical ODF must retain its prepared index")
+                },
+            }
+            assert_eq!(reader_snapshot_reads(), 1);
+            assert_eq!(crate::package::index_build_count(), 1);
+        }
+    }
+
+    #[test]
+    fn reader_preparation_retains_catalog_tri_state_and_conservative_fallbacks() {
+        let ordinary = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("content.xml", b"<content/>"),
+        ]);
+
+        let mut marker_writer = crate::core::PackageWriter::new();
+        marker_writer
+            .set_mimetype(constants::ODF_TEXT)
+            .expect("test package MIME must be accepted");
+        marker_writer
+            .add_file("[Content_Types].xml", b"<broken/>")
+            .expect("test catalog must be accepted");
+        let marker = marker_writer
+            .finish_to_bytes()
+            .expect("test package must be writable");
+
+        let catalog_over_limit = CatalogProbeLimits::default()
+            .with_max_input_bytes(u64::try_from(ordinary.len() - 1).expect("test package length"));
+        let mut reader = Cursor::new(marker);
+        let preparation = reader_preparation_with_limits(
+            &mut reader,
+            Limits::default(),
+            CatalogProbeLimits::default(),
+        )
+        .expect("marker preparation must not fail")
+        .expect("marker package must be an ODF candidate");
+        match preparation {
+            ReaderPreparation::Prepared { catalog, .. } => {
+                assert_eq!(catalog, CatalogDecision::OoxmlMarker)
+            },
+            ReaderPreparation::Fallback(_) => panic!("marker package should retain its index"),
+        }
+
+        let mut reader = Cursor::new(ordinary.clone());
+        let preparation =
+            reader_preparation_with_limits(&mut reader, Limits::default(), catalog_over_limit)
+                .expect("catalog uncertainty must not be an operation failure")
+                .expect("ordinary package must be an ODF candidate");
+        match preparation {
+            ReaderPreparation::Prepared { catalog, .. } => {
+                assert_eq!(catalog, CatalogDecision::Unknown)
+            },
+            ReaderPreparation::Fallback(_) => {
+                panic!("an otherwise valid package should retain an uncertain catalog fact")
+            },
+        }
+
+        // The cheap historical catalog still calls this canonical/no-marker,
+        // while strict preparation rejects the central/local compression
+        // mismatch for the required offset-zero mimetype member. The owned
+        // snapshot must therefore be recoverable for the exact fallback.
+        let mut strict_mimetype_mismatch = ordinary.clone();
+        let mimetype_central = central_record(&strict_mimetype_mismatch, b"mimetype");
+        strict_mimetype_mismatch[mimetype_central + 10..mimetype_central + 12]
+            .copy_from_slice(&8_u16.to_le_bytes());
+        assert_eq!(
+            packaged_has_ooxml_catalog(&strict_mimetype_mismatch),
+            Some(false)
+        );
+        let mut reader = Cursor::new(strict_mimetype_mismatch);
+        assert!(matches!(
+            reader_preparation_with_limits(
+                &mut reader,
+                Limits::default(),
+                CatalogProbeLimits::default(),
+            )
+            .expect("strict mimetype mismatch must remain recoverable"),
+            Some(ReaderPreparation::Fallback(_))
+        ));
+
+        let mut prefixed = b"prefix".to_vec();
+        prefixed.extend_from_slice(&ordinary);
+        reset_reader_snapshot_reads();
+        crate::package::reset_index_build_count();
+        let mut reader = Cursor::new(prefixed);
+        reader.set_position(3);
+        assert!(matches!(
+            reader_preparation_with_limits(
+                &mut reader,
+                Limits::default(),
+                CatalogProbeLimits::default(),
+            )
+            .expect("prefix is ordinary detector uncertainty"),
+            None
+        ));
+        assert_eq!(reader.position(), 3);
+        assert_eq!(reader_snapshot_reads(), 0);
+        assert_eq!(crate::package::index_build_count(), 0);
+
+        let mut trailing = ordinary.clone();
+        trailing.extend_from_slice(b"trailing");
+        assert_preparation_unknown(&trailing);
+
+        let mut malformed = ordinary.clone();
+        malformed.pop();
+        assert_preparation_fallback_or_unknown(&malformed);
+
+        let alias = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("./content.xml", b"<content/>"),
+        ]);
+        assert_preparation_fallback_or_unknown(&alias);
+
+        let mut duplicate = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("content.xm2", b"one"),
+            ("content.xml", b"two"),
+        ]);
+        rename_entry(&mut duplicate, b"content.xm2", b"content.xml");
+        assert_preparation_fallback_or_unknown(&duplicate);
+
+        let mut descriptor = ordinary.clone();
+        let descriptor_central = central_record(&descriptor, b"content.xml");
+        descriptor[descriptor_central + 8..descriptor_central + 10]
+            .copy_from_slice(&0x0008_u16.to_le_bytes());
+        assert_preparation_unknown(&descriptor);
+
+        let mut encrypted = ordinary.clone();
+        let encrypted_central = central_record(&encrypted, b"content.xml");
+        encrypted[encrypted_central + 8..encrypted_central + 10]
+            .copy_from_slice(&0x0001_u16.to_le_bytes());
+        assert_preparation_unknown(&encrypted);
+
+        let mut crossing = ordinary.clone();
+        let crossing_central = central_record(&crossing, b"content.xml");
+        let declared = u32::try_from(crossing.len()).expect("test package length");
+        crossing[crossing_central + 20..crossing_central + 24]
+            .copy_from_slice(&declared.to_le_bytes());
+        crossing[crossing_central + 24..crossing_central + 28]
+            .copy_from_slice(&declared.to_le_bytes());
+        assert_preparation_unknown(&crossing);
+
+        let mut directory = zip_with_directory();
+        let directory_central = central_record(&directory, b"META-INF/");
+        let declared = u32::try_from(directory.len()).expect("test package length");
+        directory[directory_central + 20..directory_central + 24]
+            .copy_from_slice(&declared.to_le_bytes());
+        directory[directory_central + 24..directory_central + 28]
+            .copy_from_slice(&declared.to_le_bytes());
+        assert_preparation_unknown(&directory);
+
+        let mut zip64 = ordinary;
+        let eocd = zip64
+            .windows(4)
+            .rposition(|signature| signature == b"PK\x05\x06")
+            .expect("test ZIP must have EOCD");
+        zip64[eocd + 8..eocd + 12].copy_from_slice(&[0xff, 0xff, 0xff, 0xff]);
+        assert_preparation_fallback_or_unknown(&zip64);
+    }
+
+    fn assert_preparation_unknown(bytes: &[u8]) {
+        let mut reader = Cursor::new(bytes.to_vec());
+        let preparation = reader_preparation_with_limits(
+            &mut reader,
+            Limits::default(),
+            CatalogProbeLimits::default(),
+        )
+        .expect("catalog uncertainty must not be an operation failure")
+        .expect("local ODF MIME must identify a candidate");
+        assert_eq!(reader.position(), 0);
+        match preparation {
+            ReaderPreparation::Prepared { catalog, .. } => {
+                assert_eq!(catalog, CatalogDecision::Unknown)
+            },
+            ReaderPreparation::Fallback(_) => {
+                panic!("strictly indexable catalog uncertainty must retain its prepared archive")
+            },
+        }
+    }
+
+    fn assert_preparation_fallback_or_unknown(bytes: &[u8]) {
+        let mut reader = Cursor::new(bytes.to_vec());
+        let preparation = reader_preparation_with_limits(
+            &mut reader,
+            Limits::default(),
+            CatalogProbeLimits::default(),
+        )
+        .expect("strict failure must be recoverable as a fallback")
+        .expect("local ODF MIME must identify a candidate");
+        assert_eq!(reader.position(), 0);
+        match preparation {
+            ReaderPreparation::Prepared { catalog, .. } => {
+                assert_eq!(catalog, CatalogDecision::Unknown)
+            },
+            ReaderPreparation::Fallback(_) => {},
+        }
+    }
+
+    fn zip_with_directory() -> Vec<u8> {
+        let mut output = Cursor::new(Vec::new());
+        let mut writer = zip::ZipWriter::new(&mut output);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        writer.start_file("mimetype", options).unwrap();
+        writer.write_all(constants::ODF_TEXT.as_bytes()).unwrap();
+        writer.add_directory("META-INF/", options).unwrap();
+        writer.start_file("content.xml", options).unwrap();
+        writer.write_all(b"<content/>").unwrap();
+        writer.finish().unwrap();
+        output.into_inner()
+    }
+
+    fn rename_entry(bytes: &mut [u8], old_name: &[u8], new_name: &[u8]) {
+        assert_eq!(old_name.len(), new_name.len());
+        let central = central_record(bytes, old_name);
+        let local = usize::try_from(u32::from_le_bytes(
+            bytes[central + 42..central + 46]
+                .try_into()
+                .expect("local offset"),
+        ))
+        .expect("test local offset");
+        bytes[local + 30..local + 30 + old_name.len()].copy_from_slice(new_name);
+        bytes[central + 46..central + 46 + old_name.len()].copy_from_slice(new_name);
+    }
+
+    #[test]
     fn bounded_reader_uses_max_plus_one_and_restores_position() {
         let mut reader = Cursor::new(b"xx".to_vec());
         reader.set_position(1);
@@ -1493,6 +1974,48 @@ mod tests {
         }
     }
 
+    struct ReadFailureReader {
+        cursor: Cursor<Vec<u8>>,
+        fail_at: u64,
+    }
+
+    impl Read for ReadFailureReader {
+        fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+            if self.cursor.position() >= self.fail_at {
+                return Err(std::io::Error::other("test read failure"));
+            }
+            let remaining =
+                usize::try_from(self.fail_at - self.cursor.position()).expect("test read bound");
+            let count = output.len().min(remaining);
+            self.cursor.read(&mut output[..count])
+        }
+    }
+
+    impl Seek for ReadFailureReader {
+        fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+            self.cursor.seek(position)
+        }
+    }
+
+    struct EndSeekFailureReader {
+        cursor: Cursor<Vec<u8>>,
+    }
+
+    impl Read for EndSeekFailureReader {
+        fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+            self.cursor.read(output)
+        }
+    }
+
+    impl Seek for EndSeekFailureReader {
+        fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+            if matches!(position, SeekFrom::End(_)) {
+                return Err(std::io::Error::other("test end seek failure"));
+            }
+            self.cursor.seek(position)
+        }
+    }
+
     #[test]
     fn reader_catalog_probe_handles_short_reads_and_restore_failures() {
         let ordinary = zip_with_entries(&[
@@ -1515,6 +2038,72 @@ mod tests {
         };
         failing.cursor.set_position(failing.refused_position);
         assert_eq!(packaged_has_ooxml_catalog_from_reader(&mut failing), None);
+    }
+
+    #[test]
+    fn reader_preparation_restores_after_short_read_and_seek_errors() {
+        let ordinary = zip_with_entries(&[
+            ("mimetype", constants::ODF_TEXT.as_bytes()),
+            ("content.xml", b"<content/>"),
+        ]);
+
+        let mut short = Cursor::new(ordinary[..LOCAL_HEADER_BYTES - 1].to_vec());
+        short.set_position(5);
+        assert!(matches!(
+            reader_preparation_with_limits(
+                &mut short,
+                Limits::default(),
+                CatalogProbeLimits::default(),
+            )
+            .expect("short input is detector uncertainty"),
+            None
+        ));
+        assert_eq!(short.position(), 5);
+
+        let mut read_failure = ReadFailureReader {
+            cursor: Cursor::new(ordinary.clone()),
+            fail_at: 10,
+        };
+        read_failure.cursor.set_position(6);
+        assert!(matches!(
+            reader_preparation_with_limits(
+                &mut read_failure,
+                Limits::default(),
+                CatalogProbeLimits::default(),
+            )
+            .expect("read failure is detector uncertainty"),
+            None
+        ));
+        assert_eq!(read_failure.cursor.position(), 6);
+
+        let mut seek_failure = EndSeekFailureReader {
+            cursor: Cursor::new(ordinary.clone()),
+        };
+        seek_failure.cursor.set_position(8);
+        assert!(matches!(
+            reader_preparation_with_limits(
+                &mut seek_failure,
+                Limits::default(),
+                CatalogProbeLimits::default(),
+            )
+            .expect("seek failure is detector uncertainty"),
+            None
+        ));
+        assert_eq!(seek_failure.cursor.position(), 8);
+
+        let mut restore_failure = RestoreFailReader {
+            cursor: Cursor::new(ordinary),
+            refused_position: 9,
+        };
+        restore_failure.cursor.set_position(9);
+        assert!(
+            reader_preparation_with_limits(
+                &mut restore_failure,
+                Limits::default(),
+                CatalogProbeLimits::default(),
+            )
+            .is_err()
+        );
     }
 
     #[test]

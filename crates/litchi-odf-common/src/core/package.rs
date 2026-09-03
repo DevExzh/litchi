@@ -73,6 +73,25 @@ pub struct OwnedPackage {
     index: PreparedArchive,
     password: Option<Zeroizing<String>>,
     limits: SourcePackageLimits,
+    strict_package: bool,
+}
+
+/// Metadata facts captured by the retained strict package index.
+///
+/// This type stays inside the ODF common crate.  It deliberately contains no
+/// `soapberry-zip` records or wayfinders; callers use it only to reconstruct
+/// the detector's conservative tri-state catalog decision without another
+/// central-directory pass.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PreparedCatalogFacts {
+    pub(crate) canonical_names: bool,
+    pub(crate) duplicate_free: bool,
+    pub(crate) all_local_spans_bounded: bool,
+    pub(crate) has_data_descriptor_entries: bool,
+    pub(crate) has_zip64_metadata: bool,
+    pub(crate) has_encrypted_entries: bool,
+    pub(crate) archive_end_offset: u64,
+    pub(crate) exact_catalog_marker: bool,
 }
 
 /// Resource limits for ODF package ingress.
@@ -1428,8 +1447,15 @@ impl OwnedPackage {
     pub(crate) fn from_prepared_bytes_or_recover(
         data: Vec<u8>,
     ) -> std::result::Result<Self, Vec<u8>> {
+        Self::from_prepared_bytes_or_recover_with_limits(data, SourcePackageLimits::default())
+    }
+
+    pub(crate) fn from_prepared_bytes_or_recover_with_limits(
+        data: Vec<u8>,
+        limits: SourcePackageLimits,
+    ) -> std::result::Result<Self, Vec<u8>> {
         let data = Arc::new(data);
-        match Self::from_shared_bytes_with_strict_policy(Arc::clone(&data)) {
+        match Self::from_shared_bytes_with_strict_policy_and_limits(Arc::clone(&data), limits) {
             Ok(package) => Ok(package),
             Err(_error) => {
                 let Some(data) = Arc::into_inner(data) else {
@@ -1479,16 +1505,11 @@ impl OwnedPackage {
             index,
             password: None,
             limits,
+            strict_package: matches!(
+                policy,
+                soapberry_zip::office::ArchiveValidationPolicy::StrictPackage
+            ),
         })
-    }
-
-    /// Build a strict prepared archive through the fallible ZIP index path.
-    ///
-    /// Positional materialization uses this explicit constructor so the
-    /// strict package policy and structured resource-limit errors are retained
-    /// at the transition to the owning representation.
-    pub(crate) fn from_shared_bytes_with_strict_policy(data: Arc<Vec<u8>>) -> Result<Self> {
-        Self::from_shared_bytes_with_strict_policy_and_limits(data, SourcePackageLimits::default())
     }
 
     pub(crate) fn from_shared_bytes_with_strict_policy_and_limits(
@@ -1562,6 +1583,7 @@ impl OwnedPackage {
             index,
             password: _,
             limits: _,
+            strict_package: _,
         } = self;
         match Arc::try_unwrap(index) {
             Ok(index) => {
@@ -1607,6 +1629,7 @@ impl OwnedPackage {
             index: Arc::clone(&self.index),
             password: None,
             limits: self.limits,
+            strict_package: self.strict_package,
         }
     }
 
@@ -1618,6 +1641,28 @@ impl OwnedPackage {
     #[must_use]
     pub fn has_zip_encrypted_entries(&self) -> bool {
         self.index.has_encrypted_entries()
+    }
+
+    /// Return the central-directory facts retained by a strict prepared
+    /// archive.  This is hidden ODF detector plumbing; no ZIP record crosses
+    /// the package boundary and no archive pass is performed here.
+    pub(crate) fn prepared_catalog_facts(&self, marker: &str) -> PreparedCatalogFacts {
+        PreparedCatalogFacts {
+            canonical_names: self.strict_package,
+            // Every successful indexed construction rejects duplicate
+            // normalized names.  Strict preparation additionally proves the
+            // raw spelling is canonical.
+            duplicate_free: true,
+            all_local_spans_bounded: self.index.all_local_spans_bounded(),
+            has_data_descriptor_entries: self.index.has_data_descriptor_entries(),
+            has_zip64_metadata: self.index.has_zip64_metadata(),
+            has_encrypted_entries: self.index.has_encrypted_entries(),
+            archive_end_offset: self.index.archive_end_offset(),
+            exact_catalog_marker: self
+                .index
+                .file_names()
+                .any(|name| name.eq_ignore_ascii_case(marker)),
+        }
     }
 
     /// Return a stable identity for the retained archive index.

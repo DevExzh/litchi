@@ -733,6 +733,23 @@ pub struct IndexedArchive<R> {
     directories: HashMap<String, Metadata>,
     order: Vec<EntryId>,
     has_encrypted_entries: bool,
+    /// Whether any central-directory record declares a data descriptor.
+    ///
+    /// This is captured while the index is built so opaque package owners can
+    /// make a metadata-only catalog decision without iterating the central
+    /// directory again.
+    has_data_descriptor_entries: bool,
+    /// Whether the located archive or any central-directory record uses ZIP64
+    /// metadata.
+    ///
+    /// The archive-level bit is retained separately from per-entry ZIP64
+    /// fields because either layout is intentionally uncertain to the
+    /// metadata-only Office catalog probes.
+    has_zip64_metadata: bool,
+    /// Whether every central record's declared local span ends before the
+    /// located central directory.  This includes directory records and is
+    /// intentionally computed from the same central pass as the index.
+    all_local_spans_bounded: bool,
     /// A successful strict local-layout proof. The `ReaderAt` source must
     /// remain byte-stable during construction and for this archive's lifetime.
     strict_layout_cache: StrictLayoutCache,
@@ -2459,6 +2476,9 @@ where
         let mut total_uncompressed_size = 0_u64;
         let mut strict_mimetype = None;
         let mut has_encrypted_entries = false;
+        let mut has_data_descriptor_entries = false;
+        let mut has_zip64_metadata = archive.is_zip64();
+        let mut all_local_spans_bounded = true;
         let mut buffer = Vec::new();
         buffer
             .try_reserve_exact(RECOMMENDED_BUFFER_SIZE)
@@ -2474,6 +2494,15 @@ where
             let mut central_entries = archive.entries_with_metadata_limit(&mut buffer, u64::MAX);
             while let Some(entry) = central_entries.next_entry()? {
                 has_encrypted_entries |= entry.flags() & 1 != 0;
+                has_data_descriptor_entries |= entry.has_data_descriptor();
+                has_zip64_metadata |= entry.is_zip64();
+                let local_span_end = entry
+                    .local_header_offset()
+                    .checked_add(30)
+                    .and_then(|offset| offset.checked_add(entry.metadata_size_hint()))
+                    .and_then(|offset| offset.checked_add(entry.compressed_size_hint()));
+                all_local_spans_bounded &=
+                    local_span_end.is_some_and(|end| end <= archive.directory_offset());
                 let path = entry.file_path();
                 let member_name_bytes = path.as_ref().len() as u64;
                 if member_name_bytes > limits.max_member_name_bytes {
@@ -2695,6 +2724,9 @@ where
             directories,
             order,
             has_encrypted_entries,
+            has_data_descriptor_entries,
+            has_zip64_metadata,
+            all_local_spans_bounded,
             strict_layout_cache: StrictLayoutCache::new(),
         })
     }
@@ -2725,6 +2757,41 @@ where
     #[inline]
     pub fn has_encrypted_entries(&self) -> bool {
         self.has_encrypted_entries
+    }
+
+    /// Whether any indexed central record declares a data descriptor.
+    ///
+    /// This accessor is hidden implementation plumbing for format owners
+    /// that retain an [`IndexedArchive`].  It returns the fact captured by the
+    /// archive's existing central-directory pass and never exposes a raw ZIP
+    /// record or wayfinder.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn has_data_descriptor_entries(&self) -> bool {
+        self.has_data_descriptor_entries
+    }
+
+    /// Whether the located archive or any indexed central record uses ZIP64
+    /// metadata.
+    ///
+    /// This accessor is hidden implementation plumbing for format owners
+    /// that need a conservative catalog decision without a second central
+    /// directory pass.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn has_zip64_metadata(&self) -> bool {
+        self.has_zip64_metadata
+    }
+
+    /// Whether every central record's declared local span is bounded by the
+    /// located central directory.
+    ///
+    /// Directory records are included.  The result is captured during index
+    /// construction and is therefore a zero-pass metadata fact for callers.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn all_local_spans_bounded(&self) -> bool {
+        self.all_local_spans_bounded
     }
 
     /// Whether this archive has no indexed non-directory members.
