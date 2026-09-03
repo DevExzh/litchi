@@ -1,5 +1,25 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0390 compliance update
+
+The indexed decoder session is opaque operation-scoped state: unmanaged OPC
+materialization creates it only after managed refusal and passes it only through
+cold loader/bypass reads. Stored entries bypass it, cache hits/waiters do not
+use it, and no session or archive handle crosses an ordinary format/facade API.
+Lookup, limits, reservation failure, Store/Deflate verification, accounting,
+cancellation, cache rollback/publication, freshness, and managed reservation
+boundaries remain unchanged.
+
+The matched allocator evidence records one decoder session per unmanaged full
+materialization, with exact reductions of 4/160,640, 510/20,481,600, and
+6/240,960 allocation calls/bytes for the three deterministic corpora. Logical
+reads, returned bytes, and Part counts remain invariant. The focused ZIP/OPC
+tests and in-memory checked-comparison test pass under stable Rust 1.98.1.
+Latency, operation-local peak/RSS, copied/decompressed/physical-I/O, and
+broad/default OPC claims remain withheld. Evidence is recorded in [Change
+0390](changes/0390-opc-materialization-decoder-session.md).
+`performance_claim: none`; `claim_authorized: false`.
+
 ## Change 0387 compliance update
 
 The change remains inside the `litchi-opc` package owner and reuses its existing

@@ -42,7 +42,7 @@ use crate::path::{RawPath, ZipFilePath};
 use crate::reader_at::validate_read_count;
 use crate::{
     CompressionMethod, Error, ErrorKind, PreservationIndex, RECOMMENDED_BUFFER_SIZE, ReaderAt,
-    ZipArchive, ZipArchiveWriter, ZipLocator, ZipOperationAccounting, ZipSliceArchive,
+    ZipArchive, ZipArchiveWriter, ZipLocator, ZipOperationAccounting, ZipReader, ZipSliceArchive,
     ZipVerification,
 };
 use flate2::Compression;
@@ -759,6 +759,167 @@ impl<'a, R> Iterator for IndexedArchiveNames<'a, R> {
 }
 
 impl<R> ExactSizeIterator for IndexedArchiveNames<'_, R> {}
+
+/// Reusable decoder state for one sequential operation over an indexed ZIP
+/// archive.
+///
+/// The session borrows its archive and is intentionally mutable: a single
+/// Deflate decoder is reset between members, while Store members bypass it.
+/// It is not a cache and does not change archive ownership or verification
+/// policy. Create a fresh session for each independent operation.
+pub struct IndexedReadSession<'a, R>
+where
+    R: ReaderAt,
+{
+    archive: &'a IndexedArchive<R>,
+    decoder: Option<DeflateDecoder<CountingReader<ZipReader<&'a R>>>>,
+}
+
+impl<'a, R> IndexedReadSession<'a, R>
+where
+    R: ReaderAt,
+{
+    /// Create a sequential read session borrowing an indexed archive.
+    #[must_use]
+    pub fn new(archive: &'a IndexedArchive<R>) -> Self {
+        Self {
+            archive,
+            decoder: None,
+        }
+    }
+
+    /// Read and verify one member by its stable opaque entry ID.
+    ///
+    /// Deflate decoder state is reused only within this session. Store
+    /// members continue to use their independent positional reader and never
+    /// initialize the decoder.
+    pub fn read_entry(&mut self, entry_id: EntryId) -> Result<Vec<u8>, Error> {
+        let mut accounting = ZipOperationAccounting::default();
+        self.read_entry_with_accounting(entry_id, &mut accounting)
+    }
+
+    /// Read and verify one indexed member while recording actual payload work.
+    pub fn read_entry_with_accounting(
+        &mut self,
+        entry_id: EntryId,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<Vec<u8>, Error> {
+        let indexed = self.archive.indexed_entry(entry_id)?;
+        let entry = self.archive.archive.get_entry(indexed.info.wayfinder)?;
+        let size = usize::try_from(indexed.info.uncompressed_size).map_err(|_| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: format!(
+                    "archive entry size {} does not fit this platform",
+                    indexed.info.uncompressed_size
+                ),
+            })
+        })?;
+        let read_limit = indexed
+            .info
+            .uncompressed_size
+            .checked_add(1)
+            .ok_or_else(|| {
+                Error::from(ErrorKind::InvalidInput {
+                    msg: format!(
+                        "archive entry size {} cannot be bounded with an overrun sentinel",
+                        indexed.info.uncompressed_size
+                    ),
+                })
+            })?;
+        let read_capacity = usize::try_from(read_limit).map_err(|_| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: format!(
+                    "archive entry size {} plus an overrun sentinel does not fit this platform",
+                    indexed.info.uncompressed_size
+                ),
+            })
+        })?;
+        let mut output = Vec::new();
+        output.try_reserve_exact(read_capacity).map_err(|source| {
+            Error::from(ErrorKind::Allocation {
+                resource: "indexed archive entry output",
+                source,
+            })
+        })?;
+
+        match indexed.info.compression_method {
+            CompressionMethod::Store => {
+                let mut source = CountingReader::new(entry.reader());
+                let result = entry
+                    .verifying_reader(&mut source)
+                    .take(read_limit)
+                    .read_to_end(&mut output)
+                    .map_err(Error::from);
+                let accounting_result = accounting
+                    .add_stored_payload_bytes_read(source.count())
+                    .and_then(|()| {
+                        accounting.add_stored_payload_bytes_accepted(usize_to_u64(
+                            output.len(),
+                            "stored payload bytes accepted",
+                        )?)
+                    });
+                if let Err(error) = result {
+                    drop(accounting_result);
+                    return Err(error);
+                }
+                accounting_result?;
+            },
+            CompressionMethod::Deflate => {
+                let (result, compressed_read, produced) = {
+                    let decoder = match self.decoder.as_mut() {
+                        Some(decoder) => {
+                            let _previous = decoder.reset(CountingReader::new(entry.reader()));
+                            decoder
+                        },
+                        None => self
+                            .decoder
+                            .insert(DeflateDecoder::new(CountingReader::new(entry.reader()))),
+                    };
+                    let (result, produced_count) = {
+                        let mut produced_reader = CountingReader::new(&mut *decoder);
+                        let result = entry
+                            .verifying_reader(&mut produced_reader)
+                            .take(read_limit)
+                            .read_to_end(&mut output)
+                            .map_err(Error::from);
+                        let produced_count = produced_reader.count();
+                        (result, produced_count)
+                    };
+                    let compressed_read = decoder.get_ref().count();
+                    (result, compressed_read, produced_count)
+                };
+                let accounting_result = accounting
+                    .add_compressed_deflate_payload_bytes_read(compressed_read)
+                    .and_then(|()| accounting.add_deflate_bytes_produced(produced))
+                    .and_then(|()| {
+                        accounting.add_deflate_bytes_accepted(usize_to_u64(
+                            output.len(),
+                            "decompressed Deflate bytes accepted",
+                        )?)
+                    });
+                if let Err(error) = result {
+                    drop(accounting_result);
+                    return Err(error);
+                }
+                accounting_result?;
+            },
+            other => {
+                return Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
+                    other.as_id().as_u16(),
+                )));
+            },
+        }
+
+        if output.len() != size {
+            return Err(ErrorKind::InvalidSize {
+                expected: indexed.info.uncompressed_size,
+                actual: usize_to_u64(output.len(), "decompressed ZIP bytes")?,
+            }
+            .into());
+        }
+        Ok(output)
+    }
+}
 
 #[derive(Debug, Clone)]
 struct IndexedEntry {
@@ -2727,6 +2888,12 @@ where
         })
     }
 
+    /// Start a sequential read operation that can reuse Deflate decoder state.
+    #[must_use]
+    pub fn read_session(&self) -> IndexedReadSession<'_, R> {
+        IndexedReadSession::new(self)
+    }
+
     /// Read and verify one member by name.
     pub fn read(&self, name: &str) -> Result<Vec<u8>, Error> {
         let mut accounting = ZipOperationAccounting::default();
@@ -2957,8 +3124,8 @@ where
     /// ZIP local-header, data-descriptor, decompressed-size, and CRC checks are
     /// intentionally deferred until this method is called.
     pub fn read_entry(&self, entry_id: EntryId) -> Result<Vec<u8>, Error> {
-        let mut accounting = ZipOperationAccounting::default();
-        self.read_entry_with_accounting(entry_id, &mut accounting)
+        let mut session = self.read_session();
+        session.read_entry(entry_id)
     }
 
     /// Read and verify one indexed member while recording actual payload work.
@@ -2967,113 +3134,8 @@ where
         entry_id: EntryId,
         accounting: &mut ZipOperationAccounting,
     ) -> Result<Vec<u8>, Error> {
-        let indexed = self.indexed_entry(entry_id)?;
-        let entry = self.archive.get_entry(indexed.info.wayfinder)?;
-        let size = usize::try_from(indexed.info.uncompressed_size).map_err(|_| {
-            Error::from(ErrorKind::InvalidInput {
-                msg: format!(
-                    "archive entry size {} does not fit this platform",
-                    indexed.info.uncompressed_size
-                ),
-            })
-        })?;
-        let read_limit = indexed
-            .info
-            .uncompressed_size
-            .checked_add(1)
-            .ok_or_else(|| {
-                Error::from(ErrorKind::InvalidInput {
-                    msg: format!(
-                        "archive entry size {} cannot be bounded with an overrun sentinel",
-                        indexed.info.uncompressed_size
-                    ),
-                })
-            })?;
-        let read_capacity = usize::try_from(read_limit).map_err(|_| {
-            Error::from(ErrorKind::InvalidInput {
-                msg: format!(
-                    "archive entry size {} plus an overrun sentinel does not fit this platform",
-                    indexed.info.uncompressed_size
-                ),
-            })
-        })?;
-        let mut output = Vec::new();
-        output.try_reserve_exact(read_capacity).map_err(|source| {
-            Error::from(ErrorKind::Allocation {
-                resource: "indexed archive entry output",
-                source,
-            })
-        })?;
-
-        match indexed.info.compression_method {
-            CompressionMethod::Store => {
-                let mut source = CountingReader::new(entry.reader());
-                let result = entry
-                    .verifying_reader(&mut source)
-                    .take(read_limit)
-                    .read_to_end(&mut output)
-                    .map_err(Error::from);
-                let accounting_result = accounting
-                    .add_stored_payload_bytes_read(source.count())
-                    .and_then(|()| {
-                        accounting.add_stored_payload_bytes_accepted(usize_to_u64(
-                            output.len(),
-                            "stored payload bytes accepted",
-                        )?)
-                    });
-                if let Err(error) = result {
-                    drop(accounting_result);
-                    return Err(error);
-                }
-                accounting_result?;
-            },
-            CompressionMethod::Deflate => {
-                let (result, compressed_read, produced) = {
-                    let mut source = CountingReader::new(entry.reader());
-                    let mut decoder = DeflateDecoder::new(&mut source);
-                    let (result, produced_count) = {
-                        let mut produced_reader = CountingReader::new(&mut decoder);
-                        let result = entry
-                            .verifying_reader(&mut produced_reader)
-                            .take(read_limit)
-                            .read_to_end(&mut output)
-                            .map_err(Error::from);
-                        let produced_count = produced_reader.count();
-                        (result, produced_count)
-                    };
-                    drop(decoder);
-                    (result, source.count(), produced_count)
-                };
-                let accounting_result = accounting
-                    .add_compressed_deflate_payload_bytes_read(compressed_read)
-                    .and_then(|()| accounting.add_deflate_bytes_produced(produced))
-                    .and_then(|()| {
-                        accounting.add_deflate_bytes_accepted(usize_to_u64(
-                            output.len(),
-                            "decompressed Deflate bytes accepted",
-                        )?)
-                    });
-                if let Err(error) = result {
-                    drop(accounting_result);
-                    return Err(error);
-                }
-                accounting_result?;
-            },
-            other => {
-                return Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
-                    other.as_id().as_u16(),
-                )));
-            },
-        }
-
-        if output.len() != size {
-            return Err(ErrorKind::InvalidSize {
-                expected: indexed.info.uncompressed_size,
-                actual: usize_to_u64(output.len(), "decompressed ZIP bytes")?,
-            }
-            .into());
-        }
-        Ok(output)
+        let mut session = self.read_session();
+        session.read_entry_with_accounting(entry_id, accounting)
     }
 
     /// Decompress and verify one indexed member directly into a caller-owned
@@ -7636,6 +7698,161 @@ mod tests {
     }
 
     #[test]
+    fn indexed_read_session_reuses_deflate_state_with_accounting_parity() {
+        let stored_first = b"stored first descriptor-free payload";
+        let deflated_first = b"deflated first payload with a data descriptor";
+        let stored_second = b"stored second payload with a data descriptor";
+        let deflated_second = b"deflated second payload with a data descriptor";
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("stored-first", stored_first).unwrap();
+        writer
+            .write_deflated("deflated-first", deflated_first)
+            .unwrap();
+        writer
+            .write_stored_stream("stored-second", Cursor::new(stored_second.to_vec()))
+            .unwrap();
+        writer
+            .write_deflated("deflated-second", deflated_second)
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        assert!(local_member_has_data_descriptor(&bytes, b"deflated-first"));
+        assert!(local_member_has_data_descriptor(&bytes, b"stored-second"));
+        assert!(local_member_has_data_descriptor(&bytes, b"deflated-second"));
+
+        let archive = indexed_archive(bytes);
+        let members = [
+            ("stored-first", stored_first.as_slice()),
+            ("deflated-first", deflated_first.as_slice()),
+            ("stored-second", stored_second.as_slice()),
+            ("deflated-second", deflated_second.as_slice()),
+        ];
+        let mut expected = Vec::new();
+        for (name, payload) in members {
+            let entry_id = archive.entry_id(name).unwrap();
+            let mut accounting = ZipOperationAccounting::default();
+            let decoded = archive
+                .read_entry_with_accounting(entry_id, &mut accounting)
+                .unwrap();
+            assert_eq!(decoded, payload);
+            expected.push((decoded, accounting));
+        }
+
+        let mut session = archive.read_session();
+        for ((name, payload), (expected_payload, expected_accounting)) in
+            members.into_iter().zip(expected)
+        {
+            let entry_id = archive.entry_id(name).unwrap();
+            let mut accounting = ZipOperationAccounting::default();
+            let decoded = session
+                .read_entry_with_accounting(entry_id, &mut accounting)
+                .unwrap();
+            assert_eq!(decoded, payload);
+            assert_eq!(decoded, expected_payload);
+            assert_eq!(accounting, expected_accounting);
+        }
+    }
+
+    #[test]
+    fn indexed_read_session_resets_after_crc_and_corrupt_deflate_failures() {
+        const VALID: &[u8] = b"valid payload after a failed Deflate read";
+
+        let mut crc_writer = StreamingArchiveWriter::new();
+        crc_writer
+            .write_deflated_sized("bad-crc", b"payload with a bad CRC")
+            .unwrap();
+        crc_writer.write_deflated_sized("valid", VALID).unwrap();
+        let mut crc_bytes = crc_writer.finish_to_bytes().unwrap();
+        let crc_central = central_header_offset_for_name(&crc_bytes, b"bad-crc");
+        let crc = u32::from_le_bytes(
+            crc_bytes[crc_central + 16..crc_central + 20]
+                .try_into()
+                .unwrap(),
+        );
+        crc_bytes[crc_central + 16..crc_central + 20].copy_from_slice(&(crc ^ 1).to_le_bytes());
+        let crc_archive = indexed_archive(crc_bytes);
+        let bad_crc = crc_archive.entry_id("bad-crc").unwrap();
+        let valid = crc_archive.entry_id("valid").unwrap();
+        let mut session = crc_archive.read_session();
+        let error = session.read_entry(bad_crc).unwrap_err();
+        assert_materialized_checksum_error(error);
+        assert_eq!(session.read_entry(valid).unwrap(), VALID);
+
+        let mut corrupt_writer = StreamingArchiveWriter::new();
+        corrupt_writer
+            .write_deflated_sized("corrupt", b"payload with corrupt Deflate bytes")
+            .unwrap();
+        corrupt_writer.write_deflated_sized("valid", VALID).unwrap();
+        let mut corrupt_bytes = corrupt_writer.finish_to_bytes().unwrap();
+        let corrupt_local = local_header_offset_for_name(&corrupt_bytes, b"corrupt");
+        let name_len = usize::from(u16::from_le_bytes(
+            corrupt_bytes[corrupt_local + 26..corrupt_local + 28]
+                .try_into()
+                .unwrap(),
+        ));
+        let extra_len = usize::from(u16::from_le_bytes(
+            corrupt_bytes[corrupt_local + 28..corrupt_local + 30]
+                .try_into()
+                .unwrap(),
+        ));
+        let compressed_start = corrupt_local + 30 + name_len + extra_len;
+        corrupt_bytes[compressed_start] ^= 0xff;
+        let corrupt_archive = indexed_archive(corrupt_bytes);
+        let corrupt = corrupt_archive.entry_id("corrupt").unwrap();
+        let valid = corrupt_archive.entry_id("valid").unwrap();
+        let mut session = corrupt_archive.read_session();
+        assert!(session.read_entry(corrupt).is_err());
+        assert_eq!(session.read_entry(valid).unwrap(), VALID);
+
+        let mut truncated_writer = StreamingArchiveWriter::new();
+        truncated_writer
+            .write_deflated_sized("truncated", b"payload with a truncated Deflate stream")
+            .unwrap();
+        truncated_writer
+            .write_deflated_sized("valid", VALID)
+            .unwrap();
+        let mut truncated_bytes = truncated_writer.finish_to_bytes().unwrap();
+        let truncated_local = local_header_offset_for_name(&truncated_bytes, b"truncated");
+        let truncated_central = central_header_offset_for_name(&truncated_bytes, b"truncated");
+        let compressed_size = u32::from_le_bytes(
+            truncated_bytes[truncated_local + 18..truncated_local + 22]
+                .try_into()
+                .unwrap(),
+        );
+        assert!(compressed_size > 1);
+        truncated_bytes[truncated_local + 18..truncated_local + 22]
+            .copy_from_slice(&(compressed_size - 1).to_le_bytes());
+        truncated_bytes[truncated_central + 20..truncated_central + 24]
+            .copy_from_slice(&(compressed_size - 1).to_le_bytes());
+        let truncated_archive = indexed_archive(truncated_bytes);
+        let truncated = truncated_archive.entry_id("truncated").unwrap();
+        let valid = truncated_archive.entry_id("valid").unwrap();
+        let mut session = truncated_archive.read_session();
+        assert!(session.read_entry(truncated).is_err());
+        assert_eq!(session.read_entry(valid).unwrap(), VALID);
+    }
+
+    #[test]
+    fn indexed_read_session_resets_after_declared_size_overrun_and_underrun() {
+        const ACTUAL: &[u8] = b"payload whose declared size is intentionally wrong";
+        const VALID: &[u8] = b"valid payload after a size failure";
+
+        for declared_size in [3_u32, 128_u32] {
+            let mut writer = StreamingArchiveWriter::new();
+            writer.write_deflated_sized("bad-size", ACTUAL).unwrap();
+            writer.write_deflated_sized("valid", VALID).unwrap();
+            let mut bytes = writer.finish_to_bytes().unwrap();
+            rewrite_uncompressed_size(&mut bytes, b"bad-size", declared_size);
+            let archive = indexed_archive(bytes);
+            let bad_size = archive.entry_id("bad-size").unwrap();
+            let valid = archive.entry_id("valid").unwrap();
+            let mut session = archive.read_session();
+            let error = session.read_entry(bad_size).unwrap_err();
+            assert_materialized_size_error(error);
+            assert_eq!(session.read_entry(valid).unwrap(), VALID);
+        }
+    }
+
+    #[test]
     fn indexed_read_to_reports_typed_crc_failure_for_data_descriptor() {
         let mut writer = StreamingArchiveWriter::new();
         writer
@@ -10735,6 +10952,24 @@ mod tests {
                 }
             },
             other => panic!("expected materialized size error, got {other:?}"),
+        }
+    }
+
+    fn assert_materialized_checksum_error(error: Error) {
+        match error.kind() {
+            ErrorKind::InvalidChecksum { .. } => {},
+            ErrorKind::IO(io_error) | ErrorKind::Io(io_error) => {
+                let source = io_error
+                    .get_ref()
+                    .and_then(|source| source.downcast_ref::<Error>());
+                match source {
+                    Some(source) => {
+                        assert!(matches!(source.kind(), ErrorKind::InvalidChecksum { .. }));
+                    },
+                    None => panic!("expected nested ZIP checksum error, got {io_error}"),
+                }
+            },
+            other => panic!("expected materialized checksum error, got {other:?}"),
         }
     }
 
