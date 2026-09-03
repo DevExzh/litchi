@@ -561,7 +561,7 @@ pub(super) fn run(
         corpus: corpus.base.manifest.clone(),
         elapsed_ns: super::statistics(elapsed),
         sink: None,
-        source: Some(source),
+        source: Some(Box::new(source)),
         execution: None,
         output_sha256: Some(prepared.output_sha256),
         operation_metrics: None,

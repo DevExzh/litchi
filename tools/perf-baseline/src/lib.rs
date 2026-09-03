@@ -90,6 +90,26 @@ const OPC_CORPUS_GENERATOR: &str = "litchi-opc-synthetic-v2";
 const OPC_RELATIONSHIP_CORPUS_GENERATOR: &str = "litchi-opc-relationship-heavy-v1";
 const OPC_SOURCE_OVERLAY_MULTI_CORPUS_GENERATOR: &str = "litchi-opc-source-overlay-multi-part-v1";
 const OPC_SOURCE_OVERLAY_MULTI_PART_COUNTS: [usize; 3] = [2, 8, 32];
+const OPC_CASEFOLD_LOOKUP_CORPUS_GENERATOR: &str = "litchi-opc-casefold-lookup-v1";
+const OPC_CASEFOLD_PART_COUNTS: [usize; 3] = [256, 2_048, 16_384];
+const OPC_CASEFOLD_PART_BYTES: usize = 32;
+const OPC_CASEFOLD_QUERY_REPETITIONS: usize = 16;
+const OPC_CASEFOLD_QUERY_COUNT: usize = 9;
+const OPC_CASEFOLD_QUERY_CLASSES: [&str; OPC_CASEFOLD_QUERY_COUNT] = [
+    "exact_first",
+    "exact_middle",
+    "exact_last",
+    "case_alias_first",
+    "case_alias_middle",
+    "case_alias_last",
+    "miss_first",
+    "miss_middle",
+    "miss_last",
+];
+const OPC_CASEFOLD_CONTENT_TYPES_XML: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="bin" ContentType="application/octet-stream"/><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/></Types>"#;
+const OPC_CASEFOLD_PACKAGE_RELS_XML: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdCasefoldFirst" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="casefold/ordinary-00000.bin"/></Relationships>"#;
+const OPC_CASEFOLD_EQUIVALENT_CORPUS_GENERATOR: &str =
+    "litchi-opc-casefold-equivalent-name-gate-v1";
 const OPC_RELATIONSHIP_PART_COUNT: usize = 256;
 const OPC_RELATIONSHIP_PART_BYTES: usize = 96;
 const OPC_RELATIONSHIP_TYPE: &str = "https://litchi.dev/performance/relationship-heavy";
@@ -965,6 +985,10 @@ enum Case {
     OpcSourceOverlayMultiPartChanged,
     OpcSourceOverlayMultiPartNoop,
     OpcSourceOverlayMultiPartMixed,
+    OpcCasefoldEagerOpen,
+    OpcCasefoldSourceOpen,
+    OpcCasefoldEagerLookup,
+    OpcCasefoldSourceLookup,
     OpcFileEagerOpen,
     OpcFileSourceOpen,
     OpcFileEagerOnePartAtomicSave,
@@ -1420,6 +1444,10 @@ impl Case {
             Self::OpcSourceOverlayMultiPartChanged => "opc_source_overlay_multi_part_changed",
             Self::OpcSourceOverlayMultiPartNoop => "opc_source_overlay_multi_part_noop",
             Self::OpcSourceOverlayMultiPartMixed => "opc_source_overlay_multi_part_mixed",
+            Self::OpcCasefoldEagerOpen => "opc_casefold_eager_open",
+            Self::OpcCasefoldSourceOpen => "opc_casefold_source_open",
+            Self::OpcCasefoldEagerLookup => "opc_casefold_eager_lookup",
+            Self::OpcCasefoldSourceLookup => "opc_casefold_source_lookup",
             Self::OpcFileEagerOpen => "opc_file_eager_open",
             Self::OpcFileSourceOpen => "opc_file_source_open",
             Self::OpcFileEagerOnePartAtomicSave => "opc_file_eager_one_part_atomic_save",
@@ -1988,6 +2016,30 @@ impl Case {
 
     const fn is_opc_relationship_open(self) -> bool {
         matches!(self, Self::OpcRelationshipOpen)
+    }
+
+    const fn is_opc_casefold_lookup(self) -> bool {
+        matches!(
+            self,
+            Self::OpcCasefoldEagerOpen
+                | Self::OpcCasefoldSourceOpen
+                | Self::OpcCasefoldEagerLookup
+                | Self::OpcCasefoldSourceLookup
+        )
+    }
+
+    const fn is_opc_casefold_open(self) -> bool {
+        matches!(
+            self,
+            Self::OpcCasefoldEagerOpen | Self::OpcCasefoldSourceOpen
+        )
+    }
+
+    const fn is_opc_casefold_source_backed(self) -> bool {
+        matches!(
+            self,
+            Self::OpcCasefoldSourceOpen | Self::OpcCasefoldSourceLookup
+        )
     }
 
     const fn is_fresh_writer(self) -> bool {
@@ -3120,6 +3172,28 @@ struct Corpus {
     xlsx: Option<XlsxCorpus>,
 }
 
+#[derive(Clone, Debug)]
+struct OpcCasefoldQuery {
+    class: &'static str,
+    position: Option<usize>,
+    partname: PackURI,
+    expected_index: Option<usize>,
+}
+
+#[derive(Debug)]
+struct OpcCasefoldCorpus {
+    manifest: CorpusManifest,
+    archive: Vec<u8>,
+    part_names: Vec<String>,
+    canonical_partnames: Vec<PackURI>,
+    ordinary_payload_ranges: Vec<Range<u64>>,
+    part_payload_sha256: String,
+    queries: Vec<OpcCasefoldQuery>,
+    canonical_name_oracle_sha256: String,
+    expected_lookup_sha256: String,
+    malformed_equivalent_name_gate_verified: bool,
+}
+
 /// Fixed relationship-heavy OPC input used only by the opt-in structural
 /// open selector. The ordinary `Corpus` fields retain the compatibility
 /// manifest shape; the identity below records the ZIP members that change
@@ -3392,7 +3466,7 @@ struct CaseResult {
     elapsed_ns: Statistics,
     sink: Option<SinkSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    source: Option<SourceSummary>,
+    source: Option<Box<SourceSummary>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     execution: Option<ExecutionSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -3792,6 +3866,44 @@ struct PptxSourceImageMetadata {
     external_target: Option<String>,
 }
 
+/// Untimed corpus identity, fixed query-vector oracle, and source counters for
+/// the opt-in OPC case-fold lookup probe. The open and repeated-lookup
+/// selectors use the same record shape so reports keep their phase boundary
+/// explicit without implying a speedup or recommending an index.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct OpcCasefoldLookupSummary {
+    implementation: &'static str,
+    operation: &'static str,
+    timing_scope: &'static str,
+    performance_claim: &'static str,
+    corpus_generator: &'static str,
+    corpus_part_count: usize,
+    corpus_part_bytes: usize,
+    corpus_archive_member_count: usize,
+    corpus_archive_bytes: u64,
+    corpus_archive_sha256: String,
+    corpus_payload_sha256: String,
+    canonical_name_oracle_sha256: String,
+    query_count: usize,
+    query_repetitions: usize,
+    query_classes: Vec<&'static str>,
+    query_positions: Vec<Option<usize>>,
+    query_expected_found: Vec<bool>,
+    lookup_count: usize,
+    expected_output_sha256: String,
+    observed_output_sha256: Vec<String>,
+    source_counter_scope: &'static str,
+    source_read_calls: Vec<u64>,
+    source_read_bytes: Vec<u64>,
+    source_version_calls: Vec<u64>,
+    source_payload_read_calls: Vec<u64>,
+    source_payload_read_bytes: Vec<u64>,
+    source_max_in_flight_reads: Vec<u64>,
+    equivalent_name_corpus_generator: &'static str,
+    equivalent_name_error: &'static str,
+    malformed_equivalent_name_gate_verified: bool,
+}
+
 #[derive(Clone, Debug, Serialize)]
 struct PptxCrossCopySummary {
     implementation: &'static str,
@@ -3875,6 +3987,8 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pptx_source_image_query: Option<PptxSourceImageQuerySummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    opc_casefold_lookup: Option<OpcCasefoldLookupSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pptx_slide_boundaries: Option<pptx_slide_boundaries::PptxSlideBoundarySummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     odp_media: Option<OdpMediaSourceSummary>,
@@ -3919,6 +4033,10 @@ struct SourceSummary {
         Option<docx_story_hyperlink_publication::DocxStoryHyperlinkPublicationSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     docx_section_layout: Option<DocxSectionLayoutSummary>,
+}
+
+fn boxed_source(source: SourceSummary) -> Option<Box<SourceSummary>> {
+    Some(Box::new(source))
 }
 
 /// Exact, untimed identity and per-sample count gates for the relationship
@@ -8066,6 +8184,22 @@ fn validate_pptx_source_image_query_options(
     Ok(())
 }
 
+fn validate_opc_casefold_lookup_options(
+    cases: &[Case],
+    shapes: &[CorpusShape],
+    payloads: &[PayloadKind],
+) -> Result<(), Box<dyn Error>> {
+    if cases.iter().any(|case| case.is_opc_casefold_lookup())
+        && (shapes != CorpusShape::ALL.as_slice() || payloads != PayloadKind::ALL.as_slice())
+    {
+        return Err(
+            "OPC case-fold lookup selectors use fixed 256/2048/16384-part corpora; omit --shape and --payload"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 fn validate_xls_source_options(
     cases: &[Case],
     shapes: &[CorpusShape],
@@ -8134,6 +8268,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     )?;
     validate_docx_section_layout_options(&options.cases, &options.shapes, &options.payloads)?;
     validate_pptx_source_image_query_options(&options.cases, &options.shapes, &options.payloads)?;
+    validate_opc_casefold_lookup_options(&options.cases, &options.shapes, &options.payloads)?;
     validate_xls_source_options(
         &options.cases,
         &options.shapes,
@@ -8227,6 +8362,30 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_opc_casefold_lookup())
+    {
+        let selected = options
+            .cases
+            .iter()
+            .copied()
+            .filter(|case| case.is_opc_casefold_lookup())
+            .collect::<Vec<_>>();
+        for &part_count in &OPC_CASEFOLD_PART_COUNTS {
+            let corpus = build_opc_casefold_corpus(part_count)?;
+            for &case in &selected {
+                results.push(run_opc_casefold_lookup(
+                    case,
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                )?);
+            }
+        }
+    }
+
     for shape in &options.shapes {
         for payload in &options.payloads {
             let opc_corpus = options
@@ -8280,6 +8439,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.uses_odp_text_box_batch()
                     && !case.is_opc_source_overlay_save()
                     && !case.is_opc_source_cache_evidence()
+                    && !case.is_opc_casefold_lookup()
                     && !case.is_filesystem()
                     && !case.is_docx_source_edit_save()
                     && !case.is_docx_section_layout_edit_save()
@@ -10308,6 +10468,10 @@ fn parse_case(value: &str) -> Option<Case> {
         "opc_source_overlay_multi_part_changed" => Some(Case::OpcSourceOverlayMultiPartChanged),
         "opc_source_overlay_multi_part_noop" => Some(Case::OpcSourceOverlayMultiPartNoop),
         "opc_source_overlay_multi_part_mixed" => Some(Case::OpcSourceOverlayMultiPartMixed),
+        "opc_casefold_eager_open" => Some(Case::OpcCasefoldEagerOpen),
+        "opc_casefold_source_open" => Some(Case::OpcCasefoldSourceOpen),
+        "opc_casefold_eager_lookup" => Some(Case::OpcCasefoldEagerLookup),
+        "opc_casefold_source_lookup" => Some(Case::OpcCasefoldSourceLookup),
         "opc_file_eager_open" => Some(Case::OpcFileEagerOpen),
         "opc_file_source_open" => Some(Case::OpcFileSourceOpen),
         "opc_file_eager_one_part_atomic_save" => Some(Case::OpcFileEagerOnePartAtomicSave),
@@ -10931,6 +11095,8 @@ fn usage_text() -> String {
                                        opc_noop_save,opc_mutated_save,opc_source_open,\n\
                                        opc_source_open_main_read,opc_source_cached_main_read,\n\
                                        opc_source_materialize,\n\
+                                       opc_casefold_eager_open,opc_casefold_source_open,\n\
+                                       opc_casefold_eager_lookup,opc_casefold_source_lookup,\n\
                                        opc_source_concurrent_same_part,\n\
                                        opc_source_cache_budget_boundary,\n\
                                        opc_source_cache_control_contention,\n\
@@ -11322,6 +11488,297 @@ fn build_opc_corpus(
         target_name,
         target_payload,
         xlsx: None,
+    })
+}
+
+fn opc_casefold_shape_name(part_count: usize) -> &'static str {
+    match part_count {
+        256 => "parts_256",
+        2_048 => "parts_2048",
+        16_384 => "parts_16384",
+        _ => unreachable!("unsupported OPC case-fold corpus size"),
+    }
+}
+
+fn opc_casefold_part_name(index: usize) -> String {
+    format!("casefold/ordinary-{index:05}.bin")
+}
+
+fn opc_casefold_part_payload(index: usize) -> Vec<u8> {
+    let mut state = (index as u64)
+        .wrapping_mul(0x9e37_79b9_7f4a_7c15)
+        .wrapping_add(0xd1b5_4a32_d192_ed03);
+    let mut payload = Vec::with_capacity(OPC_CASEFOLD_PART_BYTES);
+    for offset in 0..OPC_CASEFOLD_PART_BYTES {
+        state ^= state >> 30;
+        state = state.wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        state ^= state >> 27;
+        state = state.wrapping_mul(0x94d0_49bb_1331_11eb);
+        state ^= state >> 31;
+        payload.push(state.rotate_left((offset as u32) & 63) as u8);
+    }
+    payload
+}
+
+fn opc_casefold_canonical_name_digest(part_names: &[String]) -> String {
+    let mut names = part_names.to_vec();
+    names.sort();
+    let mut framed = Vec::new();
+    for name in names {
+        let name_len = u64::try_from(name.len()).unwrap_or(u64::MAX);
+        framed.extend_from_slice(&name_len.to_le_bytes());
+        framed.extend_from_slice(name.as_bytes());
+    }
+    sha256_hex(&framed)
+}
+
+fn build_opc_casefold_queries(
+    part_names: &[String],
+) -> Result<Vec<OpcCasefoldQuery>, Box<dyn Error>> {
+    if part_names.len() < 3 {
+        return Err("OPC case-fold query corpus needs at least three ordinary parts".into());
+    }
+    let positions = [0, part_names.len() / 2, part_names.len() - 1];
+    let mut queries = Vec::with_capacity(OPC_CASEFOLD_QUERY_COUNT);
+    for (slot, &position) in positions.iter().enumerate() {
+        queries.push(OpcCasefoldQuery {
+            class: OPC_CASEFOLD_QUERY_CLASSES[slot],
+            position: Some(position),
+            partname: PackURI::new(format!("/{}", part_names[position]))?,
+            expected_index: Some(position),
+        });
+    }
+    for (slot, &position) in positions.iter().enumerate() {
+        queries.push(OpcCasefoldQuery {
+            class: OPC_CASEFOLD_QUERY_CLASSES[slot + 3],
+            position: Some(position),
+            partname: PackURI::new(format!("/{}", part_names[position].to_ascii_uppercase()))?,
+            expected_index: Some(position),
+        });
+    }
+    for slot in 0..3 {
+        let name = ["first", "middle", "last"][slot];
+        queries.push(OpcCasefoldQuery {
+            class: OPC_CASEFOLD_QUERY_CLASSES[slot + 6],
+            position: None,
+            partname: PackURI::new(format!("/casefold/genuine-miss-{name}.bin"))?,
+            expected_index: None,
+        });
+    }
+    if queries.len() != OPC_CASEFOLD_QUERY_COUNT {
+        return Err("OPC case-fold query vector has an unexpected fixed count".into());
+    }
+    Ok(queries)
+}
+
+fn opc_casefold_lookup_digest(
+    queries: &[OpcCasefoldQuery],
+    outcomes: &[Option<usize>],
+    part_names: &[String],
+) -> Result<String, Box<dyn Error>> {
+    if queries.len() != outcomes.len() || queries.len() != OPC_CASEFOLD_QUERY_COUNT {
+        return Err("OPC case-fold query/output vectors have differing fixed counts".into());
+    }
+    let mut framed = Vec::new();
+    for (query, outcome) in queries.iter().zip(outcomes) {
+        let class_len = u64::try_from(query.class.len()).unwrap_or(u64::MAX);
+        framed.extend_from_slice(&class_len.to_le_bytes());
+        framed.extend_from_slice(query.class.as_bytes());
+        match outcome {
+            Some(index) => {
+                let name = part_names
+                    .get(*index)
+                    .ok_or("OPC case-fold lookup outcome index is outside the corpus")?;
+                framed.push(1);
+                let name_len = u64::try_from(name.len()).unwrap_or(u64::MAX);
+                framed.extend_from_slice(&name_len.to_le_bytes());
+                framed.extend_from_slice(name.as_bytes());
+            },
+            None => framed.push(0),
+        }
+    }
+    Ok(sha256_hex(&framed))
+}
+
+fn verify_opc_casefold_equivalent_name_gate() -> Result<(), Box<dyn Error>> {
+    let package_relationships = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdCasefoldEquivalent" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="casefold/equivalent-00000.bin"/></Relationships>"#;
+    let mut writer = StreamingArchiveWriter::new();
+    writer.write_stored("[Content_Types].xml", OPC_CASEFOLD_CONTENT_TYPES_XML)?;
+    writer.write_stored("_rels/.rels", package_relationships)?;
+    writer.write_stored("casefold/equivalent-00000.bin", b"equivalent-lower")?;
+    writer.write_stored("casefold/EQUIVALENT-00000.bin", b"equivalent-upper")?;
+    let archive = writer.finish_to_bytes()?;
+
+    let eager_error = match OpcPackage::from_bytes(&archive) {
+        Ok(_) => return Err("malformed OPC case-fold corpus was accepted eagerly".into()),
+        Err(error) => error,
+    };
+    if !matches!(eager_error, OpcError::EquivalentPartNames { .. }) {
+        return Err(format!(
+            "malformed eager OPC case-fold corpus returned {eager_error:?} instead of EquivalentPartNames"
+        )
+        .into());
+    }
+
+    let source = Arc::new(InstrumentedSource::new(archive, Vec::new()));
+    let source_error = match SourceBackedPackage::from_read_at(source) {
+        Ok(_) => {
+            return Err("malformed OPC case-fold corpus was accepted by source-backed open".into());
+        },
+        Err(error) => error,
+    };
+    if !matches!(source_error, OpcError::EquivalentPartNames { .. }) {
+        return Err(format!(
+            "malformed source-backed OPC case-fold corpus returned {source_error:?} instead of EquivalentPartNames"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn build_opc_casefold_corpus(part_count: usize) -> Result<OpcCasefoldCorpus, Box<dyn Error>> {
+    if !OPC_CASEFOLD_PART_COUNTS.contains(&part_count) {
+        return Err("unsupported OPC case-fold lookup corpus size".into());
+    }
+    verify_opc_casefold_equivalent_name_gate()?;
+
+    let mut writer = StreamingArchiveWriter::new();
+    writer.write_stored("[Content_Types].xml", OPC_CASEFOLD_CONTENT_TYPES_XML)?;
+    writer.write_stored("_rels/.rels", OPC_CASEFOLD_PACKAGE_RELS_XML)?;
+    let mut part_names = Vec::with_capacity(part_count);
+    let mut canonical_partnames = Vec::with_capacity(part_count);
+    let mut payload_framed = Vec::new();
+    let mut first_payload = None;
+    for index in 0..part_count {
+        let name = opc_casefold_part_name(index);
+        let partname = PackURI::new(format!("/{name}"))?;
+        let payload = opc_casefold_part_payload(index);
+        if index == 0 {
+            first_payload = Some(payload.clone());
+        }
+        writer.write_stored(&name, &payload)?;
+        let name_len = u64::try_from(name.len()).unwrap_or(u64::MAX);
+        let payload_len = u64::try_from(payload.len()).unwrap_or(u64::MAX);
+        payload_framed.extend_from_slice(&name_len.to_le_bytes());
+        payload_framed.extend_from_slice(name.as_bytes());
+        payload_framed.extend_from_slice(&payload_len.to_le_bytes());
+        payload_framed.extend_from_slice(&payload);
+        part_names.push(name);
+        canonical_partnames.push(partname);
+    }
+    let archive = writer.finish_to_bytes()?;
+    let archive_reader = ArchiveReader::new(&archive)?;
+    let archive_member_count = archive_reader.file_names().count();
+    if archive_member_count != part_count + 2 {
+        return Err("OPC case-fold archive member count differs from fixed corpus identity".into());
+    }
+    if archive_reader.read("[Content_Types].xml")? != OPC_CASEFOLD_CONTENT_TYPES_XML
+        || archive_reader.read("_rels/.rels")? != OPC_CASEFOLD_PACKAGE_RELS_XML
+    {
+        return Err("OPC case-fold structural members differ from fixed corpus identity".into());
+    }
+    let mut archive_payload_framed = Vec::new();
+    for name in &part_names {
+        let payload = archive_reader.read(name)?;
+        if payload.len() != OPC_CASEFOLD_PART_BYTES {
+            return Err("OPC case-fold archive payload differs from fixed part size".into());
+        }
+        let name_len = u64::try_from(name.len()).unwrap_or(u64::MAX);
+        let payload_len = u64::try_from(payload.len()).unwrap_or(u64::MAX);
+        archive_payload_framed.extend_from_slice(&name_len.to_le_bytes());
+        archive_payload_framed.extend_from_slice(name.as_bytes());
+        archive_payload_framed.extend_from_slice(&payload_len.to_le_bytes());
+        archive_payload_framed.extend_from_slice(&payload);
+    }
+    if archive_payload_framed != payload_framed {
+        return Err("OPC case-fold archive payloads differ from deterministic payloads".into());
+    }
+    let mut member_ranges = zip_member_ranges(&archive)?
+        .into_iter()
+        .collect::<BTreeMap<_, _>>();
+    let mut ordinary_payload_ranges = Vec::with_capacity(part_count);
+    for name in &part_names {
+        let range = member_ranges
+            .remove(name)
+            .ok_or_else(|| format!("OPC case-fold payload member {name} has no source range"))?;
+        if range.start >= range.end {
+            return Err(
+                format!("OPC case-fold payload member {name} has an empty source range").into(),
+            );
+        }
+        ordinary_payload_ranges.push(range);
+    }
+    if ordinary_payload_ranges.len() != part_count {
+        return Err("OPC case-fold ordinary source-range count differs from fixed corpus".into());
+    }
+
+    let canonical_name_oracle_sha256 = opc_casefold_canonical_name_digest(&part_names);
+    let mut expected_names = part_names.clone();
+    expected_names.sort();
+    let eager = OpcPackage::from_bytes(&archive)?;
+    let mut eager_names = eager
+        .iter_parts()
+        .map(|part| part.partname().as_str().trim_start_matches('/').to_owned())
+        .collect::<Vec<_>>();
+    eager_names.sort();
+    if eager_names != expected_names {
+        return Err("eager OPC case-fold corpus names differ from fixed archive names".into());
+    }
+    let source = SourceBackedPackage::from_read_at(Arc::new(InstrumentedSource::new(
+        archive.clone(),
+        ordinary_payload_ranges.clone(),
+    )))?;
+    let mut source_names = source
+        .iter_parts()
+        .map(|part| part.partname().as_str().trim_start_matches('/').to_owned())
+        .collect::<Vec<_>>();
+    source_names.sort();
+    if source_names != expected_names {
+        return Err(
+            "source-backed OPC case-fold corpus names differ from fixed archive names".into(),
+        );
+    }
+    let queries = build_opc_casefold_queries(&part_names)?;
+    let expected_outcomes = queries
+        .iter()
+        .map(|query| query.expected_index)
+        .collect::<Vec<_>>();
+    let expected_lookup_sha256 =
+        opc_casefold_lookup_digest(&queries, &expected_outcomes, &part_names)?;
+    let first_payload = first_payload.ok_or("OPC case-fold corpus has no first payload")?;
+    let uncompressed_payload_bytes = part_count
+        .checked_mul(OPC_CASEFOLD_PART_BYTES)
+        .ok_or("OPC case-fold corpus payload byte count overflow")?;
+
+    Ok(OpcCasefoldCorpus {
+        manifest: CorpusManifest {
+            name: format!("opc-casefold-{}", opc_casefold_shape_name(part_count)),
+            generator: OPC_CASEFOLD_LOOKUP_CORPUS_GENERATOR,
+            package_format: "OPC/ZIP",
+            shape: opc_casefold_shape_name(part_count),
+            payload_kind: "ordinary_tiny",
+            compression: "stored",
+            entry_count: part_count,
+            archive_member_count,
+            entry_bytes: OPC_CASEFOLD_PART_BYTES,
+            uncompressed_payload_bytes,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: part_names[0].clone(),
+            target_payload_bytes: first_payload.len(),
+            target_payload_sha256: sha256_hex(&first_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        part_names,
+        canonical_partnames,
+        ordinary_payload_ranges,
+        part_payload_sha256: sha256_hex(&archive_payload_framed),
+        queries,
+        canonical_name_oracle_sha256,
+        expected_lookup_sha256,
+        malformed_equivalent_name_gate_verified: true,
     })
 }
 
@@ -12426,7 +12883,7 @@ fn run_ppt_pictures(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: None,
-        source,
+        source: source.map(Box::new),
         execution: None,
         output_sha256: None,
         operation_metrics: None,
@@ -14376,7 +14833,7 @@ fn run_pptx_source_image_query(
         corpus: corpus.manifest.clone(),
         elapsed_ns: elapsed_statistics,
         sink: None,
-        source: Some(source),
+        source: boxed_source(source),
         execution: None,
         output_sha256: Some(output_digest),
         operation_metrics: Some(operation_metrics),
@@ -20164,6 +20621,12 @@ fn run_case_with_config(
         Case::OpcRelationshipOpen => {
             Err("OPC relationship-heavy case uses its dedicated corpus runner".into())
         },
+        Case::OpcCasefoldEagerOpen
+        | Case::OpcCasefoldSourceOpen
+        | Case::OpcCasefoldEagerLookup
+        | Case::OpcCasefoldSourceLookup => {
+            Err("OPC case-fold lookup uses its fixed dedicated corpus runner".into())
+        },
         Case::OpcNoopSave => run_opc_noop_save(corpus, warmup_iterations, samples),
         Case::OpcMutatedSave => run_opc_mutated_save(corpus, warmup_iterations, samples),
         Case::OpcSourceOpen => run_opc_source_open(corpus, warmup_iterations, samples, false),
@@ -24136,7 +24599,7 @@ fn run_xls_source_backed_case(
     let mut output = result(case, corpus, elapsed, None);
     output.output_sha256 = Some(expected_digest);
     if source_case_for_case(case) {
-        output.source = Some(source_summary);
+        output.source = boxed_source(source_summary);
     }
     Ok(output)
 }
@@ -24728,7 +25191,7 @@ fn run_xls_visibility_edit_save(
             &sink_summaries,
             "XLS visibility publication",
         )?),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -25277,7 +25740,7 @@ fn run_xls_comments_edit_save(
             &sink_summaries,
             "XLS comment publication",
         )?),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -27055,7 +27518,7 @@ fn run_rtf_paragraph_split_merge(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(SourceSummary {
+        source: boxed_source(SourceSummary {
             rtf_paragraph_split_merge: Some(summary),
             ..SourceSummary::default()
         }),
@@ -27654,7 +28117,7 @@ fn run_rtf_picture_crud(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(SourceSummary {
+        source: boxed_source(SourceSummary {
             rtf_picture_crud: Some(summary),
             ..SourceSummary::default()
         }),
@@ -28713,7 +29176,7 @@ fn run_odf_mimetype_repair_plan(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(SourceSummary {
+        source: boxed_source(SourceSummary {
             odf_repair: Some(repair_summary),
             ..SourceSummary::default()
         }),
@@ -35942,7 +36405,7 @@ fn run_ods_cell_sweep(
             corpus: corpus.manifest.clone(),
             elapsed_ns: statistics(elapsed),
             sink: None,
-            source: Some(SourceSummary {
+            source: boxed_source(SourceSummary {
                 ods_cell_sweep: Some(summary),
                 ..SourceSummary::default()
             }),
@@ -36170,7 +36633,7 @@ fn run_ods_cell_batch_sweep(
             corpus: corpus.manifest.clone(),
             elapsed_ns: statistics(elapsed),
             sink: None,
-            source: Some(SourceSummary {
+            source: boxed_source(SourceSummary {
                 ods_cell_batch_sweep: Some(summary),
                 ..SourceSummary::default()
             }),
@@ -38444,7 +38907,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -38746,7 +39209,7 @@ fn run_xlsx_row_visibility_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(deterministic_sink_summary(&sink_summaries, case.name())?),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -39092,7 +39555,7 @@ fn run_xlsx_cell_values_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: source_backed.then_some(source_summary),
+        source: source_backed.then(|| Box::new(source_summary)),
         execution: None,
         output_sha256: output_digests.first().cloned().or(Some(expected_digest)),
         operation_metrics: None,
@@ -39998,7 +40461,7 @@ fn run_xlsx_edit_composition(
         execution: None,
         output_sha256: expected_digest.clone(),
         operation_metrics: None,
-        source: Some(SourceSummary {
+        source: boxed_source(SourceSummary {
             xlsx_edit_composition: Some(XlsxEditCompositionSummary {
                 implementation: "owned-workbook",
                 operation: case.name(),
@@ -42264,7 +42727,7 @@ fn run_opc_source_materialize(
         corpus: corpus.manifest.clone(),
         elapsed_ns: elapsed_statistics,
         sink: None,
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: None,
         operation_metrics: Some(operation_metrics),
@@ -42531,7 +42994,7 @@ fn run_opc_source_overlay_one_part_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: Some(operation_metrics),
@@ -43064,7 +43527,7 @@ fn run_opc_source_overlay_multi_part(
         corpus: result_corpus,
         elapsed_ns: elapsed_statistics,
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(output_sha256),
         operation_metrics: None,
@@ -43409,7 +43872,7 @@ fn run_docx_source_backed_one_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -43955,7 +44418,7 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: elapsed_statistics,
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -44163,7 +44626,7 @@ fn run_pptx_source_backed_one_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -44334,7 +44797,7 @@ fn run_pptx_batch_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -44510,7 +44973,7 @@ fn run_pptx_multi_slide_batch_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -44717,7 +45180,7 @@ fn run_pptx_cross_copy(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -44939,7 +45402,7 @@ fn run_pptx_source_backed_cross_copy(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -45142,7 +45605,7 @@ fn run_xlsx_defined_names_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -45328,7 +45791,7 @@ fn run_xlsx_calculation_metadata_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -46514,7 +46977,7 @@ fn run_xlsx_page_break_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -46806,7 +47269,7 @@ fn run_xlsx_page_margin_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -47015,7 +47478,7 @@ fn run_xlsx_page_setup_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -47215,7 +47678,7 @@ fn run_xlsx_print_options_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -47454,7 +47917,7 @@ fn run_xlsx_sheet_protection_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -47744,7 +48207,7 @@ fn run_xlsx_auto_filter_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -49009,7 +49472,7 @@ fn run_xlsx_conditional_formatting_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -49201,7 +49664,7 @@ fn run_xlsx_data_validation_edit_save(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: Some(sink),
-        source: Some(source_summary),
+        source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(expected_digest),
         operation_metrics: None,
@@ -49230,6 +49693,511 @@ fn run_opc_open(
         )?;
     }
     Ok(result(Case::OpcOpen, corpus, elapsed, None))
+}
+
+#[derive(Default)]
+struct OpcCasefoldRunEvidence {
+    elapsed: Vec<u64>,
+    observations: Vec<operation_metrics::InProcessObservation>,
+    observed_output_sha256: Vec<String>,
+    source_read_calls: Vec<u64>,
+    source_read_bytes: Vec<u64>,
+    source_version_calls: Vec<u64>,
+    source_payload_read_calls: Vec<u64>,
+    source_payload_read_bytes: Vec<u64>,
+    source_max_in_flight_reads: Vec<u64>,
+}
+
+impl OpcCasefoldRunEvidence {
+    fn record(
+        &mut self,
+        iteration: usize,
+        warmup_iterations: usize,
+        duration: Duration,
+        allocation_metrics: Option<allocation_metrics::Sample>,
+        output_digest: String,
+        source: Option<(SourceSnapshot, u64)>,
+    ) -> Result<(), Box<dyn Error>> {
+        if iteration < warmup_iterations {
+            return Ok(());
+        }
+        let elapsed_ns = elapsed_ns(duration)?;
+        self.elapsed.push(elapsed_ns);
+        self.observations
+            .push(operation_metrics::InProcessObservation {
+                elapsed_ns,
+                process_metrics: None,
+                allocation_metrics,
+            });
+        self.observed_output_sha256.push(output_digest);
+        if let Some((snapshot, version_calls)) = source {
+            self.source_read_calls.push(snapshot.read_calls);
+            self.source_read_bytes.push(snapshot.read_bytes);
+            self.source_version_calls.push(version_calls);
+            self.source_payload_read_calls
+                .push(snapshot.ordinary_payload_read_calls);
+            self.source_payload_read_bytes
+                .push(snapshot.ordinary_payload_read_bytes);
+            self.source_max_in_flight_reads
+                .push(snapshot.max_in_flight_reads);
+        }
+        Ok(())
+    }
+}
+
+fn opc_casefold_eager_name_digest(
+    package: &OpcPackage,
+    corpus: &OpcCasefoldCorpus,
+) -> Result<String, Box<dyn Error>> {
+    let mut names = package
+        .iter_parts()
+        .map(|part| part.partname().as_str().trim_start_matches('/').to_owned())
+        .collect::<Vec<_>>();
+    names.sort();
+    let mut expected = corpus.part_names.clone();
+    expected.sort();
+    if names != expected {
+        return Err("eager OPC case-fold name oracle differs from corpus".into());
+    }
+    Ok(opc_casefold_canonical_name_digest(&names))
+}
+
+fn opc_casefold_source_name_digest(
+    package: &SourceBackedPackage,
+    corpus: &OpcCasefoldCorpus,
+) -> Result<String, Box<dyn Error>> {
+    let mut names = package
+        .iter_parts()
+        .map(|part| part.partname().as_str().trim_start_matches('/').to_owned())
+        .collect::<Vec<_>>();
+    names.sort();
+    let mut expected = corpus.part_names.clone();
+    expected.sort();
+    if names != expected {
+        return Err("source-backed OPC case-fold name oracle differs from corpus".into());
+    }
+    Ok(opc_casefold_canonical_name_digest(&names))
+}
+
+fn validate_opc_casefold_lookup_partname(
+    query: &OpcCasefoldQuery,
+    observed: Option<&PackURI>,
+    corpus: &OpcCasefoldCorpus,
+) -> Result<Option<usize>, Box<dyn Error>> {
+    match (observed, query.expected_index) {
+        (Some(partname), Some(expected_index)) => {
+            let expected_partname = corpus
+                .canonical_partnames
+                .get(expected_index)
+                .ok_or("OPC case-fold expected index is outside the corpus")?;
+            if partname != expected_partname {
+                return Err(format!(
+                    "OPC case-fold {} resolved to a non-canonical part name",
+                    query.class
+                )
+                .into());
+            }
+            Ok(Some(expected_index))
+        },
+        (None, None) => Ok(None),
+        (Some(_), None) => Err(format!(
+            "OPC case-fold genuine miss {} unexpectedly resolved",
+            query.class
+        )
+        .into()),
+        (None, Some(_)) => Err(format!("OPC case-fold {} unexpectedly missed", query.class).into()),
+    }
+}
+
+fn execute_opc_casefold_eager_lookup<'a>(
+    package: &'a OpcPackage,
+    corpus: &OpcCasefoldCorpus,
+    outcomes: &mut [[Option<&'a PackURI>; OPC_CASEFOLD_QUERY_COUNT];
+             OPC_CASEFOLD_QUERY_REPETITIONS],
+) -> Result<(), Box<dyn Error>> {
+    for repetition in 0..OPC_CASEFOLD_QUERY_REPETITIONS {
+        for (query_index, query) in corpus.queries.iter().enumerate() {
+            outcomes[repetition][query_index] = match package.get_part(&query.partname) {
+                Ok(part) => Some(part.partname()),
+                Err(OpcError::PartNotFound(_)) => None,
+                Err(error) => return Err(error.into()),
+            };
+        }
+    }
+    std::hint::black_box(outcomes);
+    Ok(())
+}
+
+fn execute_opc_casefold_source_lookup<'a>(
+    package: &'a SourceBackedPackage,
+    corpus: &OpcCasefoldCorpus,
+    outcomes: &mut [[Option<&'a PackURI>; OPC_CASEFOLD_QUERY_COUNT];
+             OPC_CASEFOLD_QUERY_REPETITIONS],
+) -> Result<(), Box<dyn Error>> {
+    for repetition in 0..OPC_CASEFOLD_QUERY_REPETITIONS {
+        for (query_index, query) in corpus.queries.iter().enumerate() {
+            outcomes[repetition][query_index] = match package.part(&query.partname) {
+                Ok(part) => Some(part.partname()),
+                Err(OpcError::PartNotFound(_)) => None,
+                Err(error) => return Err(error.into()),
+            };
+        }
+    }
+    std::hint::black_box(outcomes);
+    Ok(())
+}
+
+fn finalize_opc_casefold_lookup_outcomes(
+    raw_outcomes: &[[Option<&PackURI>; OPC_CASEFOLD_QUERY_COUNT]; OPC_CASEFOLD_QUERY_REPETITIONS],
+    corpus: &OpcCasefoldCorpus,
+) -> Result<[Option<usize>; OPC_CASEFOLD_QUERY_COUNT], Box<dyn Error>> {
+    let mut outcomes = [None; OPC_CASEFOLD_QUERY_COUNT];
+    for (repetition, raw_repetition) in raw_outcomes.iter().enumerate() {
+        for (query_index, query) in corpus.queries.iter().enumerate() {
+            let outcome =
+                validate_opc_casefold_lookup_partname(query, raw_repetition[query_index], corpus)?;
+            if repetition == 0 {
+                outcomes[query_index] = outcome;
+            } else if outcomes[query_index] != outcome {
+                return Err("OPC case-fold lookup result changed across repetitions".into());
+            }
+        }
+    }
+    Ok(outcomes)
+}
+
+fn run_opc_casefold_eager_open(
+    corpus: &OpcCasefoldCorpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<OpcCasefoldRunEvidence, Box<dyn Error>> {
+    let mut evidence = OpcCasefoldRunEvidence::default();
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        // The archive clone and all fixed corpus state are outside the timed
+        // constructor/allocation region; this selector measures eager open.
+        let owned = corpus.archive.clone();
+        let allocation_region = allocation_metrics::begin();
+        let started = Instant::now();
+        let package = OpcPackage::from_bytes(&owned)?;
+        std::hint::black_box(&package);
+        let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
+        let output_digest = opc_casefold_eager_name_digest(&package, corpus)?;
+        if output_digest != corpus.canonical_name_oracle_sha256 {
+            return Err("eager OPC case-fold open returned an unstable name oracle".into());
+        }
+        evidence.record(
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+            output_digest,
+            None,
+        )?;
+    }
+    Ok(evidence)
+}
+
+fn run_opc_casefold_source_open(
+    corpus: &OpcCasefoldCorpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<OpcCasefoldRunEvidence, Box<dyn Error>> {
+    let mut evidence = OpcCasefoldRunEvidence::default();
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        // Source ownership is preparation; only the production-like
+        // SourceBackedPackage::from_read_at call is timed here. Exact logical
+        // counters come from an independent replay after the sample so range
+        // classification and counter atomics cannot affect elapsed time.
+        let read_at: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+        let allocation_region = allocation_metrics::begin();
+        let started = Instant::now();
+        let package = SourceBackedPackage::from_read_at(read_at)?;
+        std::hint::black_box(&package);
+        let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
+        let output_digest = opc_casefold_source_name_digest(&package, corpus)?;
+        if output_digest != corpus.canonical_name_oracle_sha256 {
+            return Err("source-backed OPC case-fold open returned an unstable name oracle".into());
+        }
+
+        let source_evidence = if iteration < warmup_iterations {
+            None
+        } else {
+            let source = Arc::new(InstrumentedSource::new(
+                corpus.archive.clone(),
+                corpus.ordinary_payload_ranges.clone(),
+            ));
+            let replay_read_at: Arc<dyn ReadAt> = source.clone();
+            let replay_package = SourceBackedPackage::from_read_at(replay_read_at)?;
+            let snapshot = source.snapshot();
+            let version_calls = source.version_calls();
+            let replay_digest = opc_casefold_source_name_digest(&replay_package, corpus)?;
+            if replay_digest != output_digest {
+                return Err(
+                    "source-backed OPC case-fold open replay differs from timed output".into(),
+                );
+            }
+            Some((snapshot, version_calls))
+        };
+        evidence.record(
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+            output_digest,
+            source_evidence,
+        )?;
+    }
+    Ok(evidence)
+}
+
+fn run_opc_casefold_eager_lookup(
+    corpus: &OpcCasefoldCorpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<OpcCasefoldRunEvidence, Box<dyn Error>> {
+    let owned = corpus.archive.clone();
+    let package = OpcPackage::from_bytes(&owned)?;
+    let setup_digest = opc_casefold_eager_name_digest(&package, corpus)?;
+    if setup_digest != corpus.canonical_name_oracle_sha256 {
+        return Err("eager OPC case-fold lookup setup differs from corpus oracle".into());
+    }
+    let mut evidence = OpcCasefoldRunEvidence::default();
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut raw_outcomes = [[None; OPC_CASEFOLD_QUERY_COUNT]; OPC_CASEFOLD_QUERY_REPETITIONS];
+        let allocation_region = allocation_metrics::begin();
+        let started = Instant::now();
+        execute_opc_casefold_eager_lookup(&package, corpus, &mut raw_outcomes)?;
+        let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
+        let outcomes = finalize_opc_casefold_lookup_outcomes(&raw_outcomes, corpus)?;
+        let output_digest =
+            opc_casefold_lookup_digest(&corpus.queries, &outcomes, &corpus.part_names)?;
+        if output_digest != corpus.expected_lookup_sha256 {
+            return Err("eager OPC case-fold lookup output differs from fixed oracle".into());
+        }
+        evidence.record(
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+            output_digest,
+            None,
+        )?;
+    }
+    Ok(evidence)
+}
+
+fn run_opc_casefold_source_lookup(
+    corpus: &OpcCasefoldCorpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<OpcCasefoldRunEvidence, Box<dyn Error>> {
+    let read_at: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+    let package = SourceBackedPackage::from_read_at(read_at)?;
+    let setup_digest = opc_casefold_source_name_digest(&package, corpus)?;
+    if setup_digest != corpus.canonical_name_oracle_sha256 {
+        return Err("source-backed OPC case-fold lookup setup differs from corpus oracle".into());
+    }
+
+    let replay_source = Arc::new(InstrumentedSource::new(
+        corpus.archive.clone(),
+        corpus.ordinary_payload_ranges.clone(),
+    ));
+    let replay_read_at: Arc<dyn ReadAt> = replay_source.clone();
+    let replay_package = SourceBackedPackage::from_read_at(replay_read_at)?;
+    let replay_setup_digest = opc_casefold_source_name_digest(&replay_package, corpus)?;
+    if replay_setup_digest != setup_digest {
+        return Err("source-backed OPC case-fold replay setup differs from timed setup".into());
+    }
+    replay_source.reset();
+    let mut evidence = OpcCasefoldRunEvidence::default();
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let mut raw_outcomes = [[None; OPC_CASEFOLD_QUERY_COUNT]; OPC_CASEFOLD_QUERY_REPETITIONS];
+        let allocation_region = allocation_metrics::begin();
+        let started = Instant::now();
+        execute_opc_casefold_source_lookup(&package, corpus, &mut raw_outcomes)?;
+        let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
+        let outcomes = finalize_opc_casefold_lookup_outcomes(&raw_outcomes, corpus)?;
+        let output_digest =
+            opc_casefold_lookup_digest(&corpus.queries, &outcomes, &corpus.part_names)?;
+        if output_digest != corpus.expected_lookup_sha256 {
+            return Err(
+                "source-backed OPC case-fold lookup output differs from fixed oracle".into(),
+            );
+        }
+
+        let source_evidence = if iteration < warmup_iterations {
+            None
+        } else {
+            replay_source.reset();
+            let mut replay_raw_outcomes =
+                [[None; OPC_CASEFOLD_QUERY_COUNT]; OPC_CASEFOLD_QUERY_REPETITIONS];
+            execute_opc_casefold_source_lookup(&replay_package, corpus, &mut replay_raw_outcomes)?;
+            let snapshot = replay_source.snapshot();
+            let version_calls = replay_source.version_calls();
+            let replay_outcomes =
+                finalize_opc_casefold_lookup_outcomes(&replay_raw_outcomes, corpus)?;
+            let replay_digest =
+                opc_casefold_lookup_digest(&corpus.queries, &replay_outcomes, &corpus.part_names)?;
+            if replay_digest != output_digest {
+                return Err(
+                    "source-backed OPC case-fold lookup replay differs from timed output".into(),
+                );
+            }
+            Some((snapshot, version_calls))
+        };
+        evidence.record(
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+            output_digest,
+            source_evidence,
+        )?;
+    }
+    Ok(evidence)
+}
+
+fn run_opc_casefold_lookup(
+    case: Case,
+    corpus: &OpcCasefoldCorpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    if !case.is_opc_casefold_lookup() {
+        return Err("invalid case passed to OPC case-fold lookup runner".into());
+    }
+    let open = case.is_opc_casefold_open();
+    let source_backed = case.is_opc_casefold_source_backed();
+    let mut evidence = if open {
+        if source_backed {
+            run_opc_casefold_source_open(corpus, warmup_iterations, samples)?
+        } else {
+            run_opc_casefold_eager_open(corpus, warmup_iterations, samples)?
+        }
+    } else if source_backed {
+        run_opc_casefold_source_lookup(corpus, warmup_iterations, samples)?
+    } else {
+        run_opc_casefold_eager_lookup(corpus, warmup_iterations, samples)?
+    };
+
+    let elapsed_statistics = statistics(evidence.elapsed);
+    let sample_order = elapsed_statistics.sample_order.clone();
+    reorder_sample_vector(&mut evidence.observed_output_sha256, &sample_order)?;
+    if source_backed {
+        reorder_sample_vector(&mut evidence.source_read_calls, &sample_order)?;
+        reorder_sample_vector(&mut evidence.source_read_bytes, &sample_order)?;
+        reorder_sample_vector(&mut evidence.source_version_calls, &sample_order)?;
+        reorder_sample_vector(&mut evidence.source_payload_read_calls, &sample_order)?;
+        reorder_sample_vector(&mut evidence.source_payload_read_bytes, &sample_order)?;
+        reorder_sample_vector(&mut evidence.source_max_in_flight_reads, &sample_order)?;
+    }
+    let operation_metrics =
+        operation_metrics::from_in_process_observations_without_sink(&evidence.observations)?;
+    let query_classes = corpus.queries.iter().map(|query| query.class).collect();
+    let query_positions = corpus.queries.iter().map(|query| query.position).collect();
+    let query_expected_found = corpus
+        .queries
+        .iter()
+        .map(|query| query.expected_index.is_some())
+        .collect();
+    let lookup_count = if open {
+        0
+    } else {
+        OPC_CASEFOLD_QUERY_COUNT
+            .checked_mul(OPC_CASEFOLD_QUERY_REPETITIONS)
+            .ok_or("OPC case-fold lookup count overflows usize")?
+    };
+    let expected_output_sha256 = if open {
+        corpus.canonical_name_oracle_sha256.clone()
+    } else {
+        corpus.expected_lookup_sha256.clone()
+    };
+    if evidence
+        .observed_output_sha256
+        .iter()
+        .any(|digest| digest != &expected_output_sha256)
+    {
+        return Err("OPC case-fold measured output digests are unstable".into());
+    }
+    let source_counter_scope = if source_backed {
+        if open {
+            "independent_untimed_instrumented_source_open_replay"
+        } else {
+            "independent_untimed_instrumented_source_repeated_lookup_replay"
+        }
+    } else {
+        "not_applicable_eager_opc"
+    };
+    let custom_summary = OpcCasefoldLookupSummary {
+        implementation: if source_backed {
+            "SourceBackedPackage"
+        } else {
+            "OpcPackage"
+        },
+        operation: if open { "open" } else { "repeated_lookup" },
+        timing_scope: if open {
+            if source_backed {
+                "SourceBackedPackage::from_read_at over litchi_core::OwnedSource only; source ownership, instrumented replay, and post-open name oracle excluded"
+            } else {
+                "OpcPackage::from_bytes only; archive clone and post-open name oracle excluded"
+            }
+        } else if source_backed {
+            "fixed pre-open SourceBackedPackage over litchi_core::OwnedSource; nine-query vector repeated 16 times; instrumented replay excluded"
+        } else {
+            "fixed pre-open OpcPackage; nine-query vector repeated 16 times"
+        },
+        performance_claim: "none",
+        corpus_generator: OPC_CASEFOLD_LOOKUP_CORPUS_GENERATOR,
+        corpus_part_count: corpus.manifest.entry_count,
+        corpus_part_bytes: corpus.manifest.entry_bytes,
+        corpus_archive_member_count: corpus.manifest.archive_member_count,
+        corpus_archive_bytes: u64::try_from(corpus.manifest.archive_bytes)?,
+        corpus_archive_sha256: corpus.manifest.archive_sha256.clone(),
+        corpus_payload_sha256: corpus.part_payload_sha256.clone(),
+        canonical_name_oracle_sha256: corpus.canonical_name_oracle_sha256.clone(),
+        query_count: corpus.queries.len(),
+        query_repetitions: OPC_CASEFOLD_QUERY_REPETITIONS,
+        query_classes,
+        query_positions,
+        query_expected_found,
+        lookup_count,
+        expected_output_sha256: expected_output_sha256.clone(),
+        observed_output_sha256: evidence.observed_output_sha256.clone(),
+        source_counter_scope,
+        source_read_calls: evidence.source_read_calls.clone(),
+        source_read_bytes: evidence.source_read_bytes.clone(),
+        source_version_calls: evidence.source_version_calls.clone(),
+        source_payload_read_calls: evidence.source_payload_read_calls.clone(),
+        source_payload_read_bytes: evidence.source_payload_read_bytes.clone(),
+        source_max_in_flight_reads: evidence.source_max_in_flight_reads.clone(),
+        equivalent_name_corpus_generator: OPC_CASEFOLD_EQUIVALENT_CORPUS_GENERATOR,
+        equivalent_name_error: "EquivalentPartNames",
+        malformed_equivalent_name_gate_verified: corpus.malformed_equivalent_name_gate_verified,
+    };
+    let source = SourceSummary {
+        read_calls: evidence.source_read_calls,
+        read_bytes: evidence.source_read_bytes,
+        ordinary_payload_read_calls: evidence.source_payload_read_calls.clone(),
+        ordinary_payload_read_bytes: evidence.source_payload_read_bytes.clone(),
+        max_in_flight_reads: evidence.source_max_in_flight_reads.clone(),
+        opc_casefold_lookup: Some(custom_summary),
+        ..SourceSummary::default()
+    };
+    Ok(CaseResult {
+        case: case.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: elapsed_statistics,
+        sink: None,
+        source: boxed_source(source),
+        execution: None,
+        output_sha256: Some(expected_output_sha256),
+        operation_metrics: Some(operation_metrics),
+    })
 }
 
 fn run_opc_relationship_open(
@@ -49317,7 +50285,7 @@ fn run_opc_relationship_open(
         corpus: corpus.corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: None,
-        source: Some(SourceSummary {
+        source: boxed_source(SourceSummary {
             opc_relationships: Some(source),
             ..SourceSummary::default()
         }),
@@ -51942,7 +52910,7 @@ fn result_with_source(
         corpus: corpus.manifest.clone(),
         elapsed_ns: statistics(elapsed),
         sink: None,
-        source: Some(source),
+        source: boxed_source(source),
         execution: None,
         output_sha256: None,
         operation_metrics: None,
@@ -52368,7 +53336,8 @@ mod tests {
         build_odf_repair_corpus, build_odp_media_corpus, build_odp_text_box_batch_corpus,
         build_ods_media_corpus, build_odt_media_corpus, build_odt_repeated_text_corpus,
         build_odt_resource_batch_corpus, build_ole_common_corpus, build_ooxml_tracker_corpus,
-        build_opc_corpus, build_opc_relationship_corpus, build_ppt_pictures_corpus,
+        build_opc_casefold_corpus, build_opc_corpus, build_opc_relationship_corpus,
+        build_ppt_pictures_corpus,
         build_pptx_cross_copy_corpus, build_pptx_slide_name_index_corpus,
         build_pptx_source_image_query_corpus,
         build_pptx_source_backed_cross_copy_corpus, build_pptx_source_edit_corpus,
@@ -52405,6 +53374,7 @@ mod tests {
         run_xlsx_print_options_edit_save, run_xlsx_sheet_protection_edit_save, sha256_hex,
         simulated_request_delay, statistics, updated_writer_text, usage_text,
         validate_xls_source_locality, validate_xls_source_options, verify_xlsx_cells, writer_shape,
+        zip_member_ranges,
         validate_pptx_source_image_query_options,
         xls_source_family_dispatch_cases, xls_writer_semantic_dispatch_selected, xlsb_cells_digest,
         xlsb_expected_cells, xlsx_cell_count, xlsx_spec,
@@ -52854,6 +53824,160 @@ mod tests {
     }
 
     #[test]
+    fn opc_casefold_lookup_selectors_are_opt_in_and_have_fixed_oracles() {
+        let sizes = [256, 2_048, 16_384];
+        for part_count in sizes {
+            let first = build_opc_casefold_corpus(part_count).unwrap();
+            let second = build_opc_casefold_corpus(part_count).unwrap();
+            assert_eq!(first.archive, second.archive);
+            assert_eq!(
+                first.manifest.archive_sha256,
+                second.manifest.archive_sha256
+            );
+            assert_eq!(first.part_payload_sha256, second.part_payload_sha256);
+            assert_eq!(
+                first.canonical_name_oracle_sha256,
+                second.canonical_name_oracle_sha256
+            );
+            assert_eq!(first.expected_lookup_sha256, second.expected_lookup_sha256);
+            assert_eq!(first.manifest.entry_count, part_count);
+            assert_eq!(first.manifest.entry_bytes, 32);
+            assert_eq!(first.manifest.archive_member_count, part_count + 2);
+            assert_eq!(first.ordinary_payload_ranges.len(), part_count);
+            assert_eq!(
+                first.ordinary_payload_ranges,
+                second.ordinary_payload_ranges
+            );
+            let expected_ranges = zip_member_ranges(&first.archive)
+                .unwrap()
+                .into_iter()
+                .collect::<BTreeMap<_, _>>();
+            assert_eq!(
+                first.ordinary_payload_ranges,
+                first
+                    .part_names
+                    .iter()
+                    .map(|name| expected_ranges.get(name).cloned().unwrap())
+                    .collect::<Vec<_>>()
+            );
+            assert!(
+                first
+                    .ordinary_payload_ranges
+                    .iter()
+                    .all(|range| range.start < range.end)
+            );
+            assert_eq!(first.queries.len(), 9);
+            assert_eq!(
+                first
+                    .queries
+                    .iter()
+                    .map(|query| query.class)
+                    .collect::<Vec<_>>(),
+                super::OPC_CASEFOLD_QUERY_CLASSES.to_vec()
+            );
+            assert_eq!(
+                first
+                    .queries
+                    .iter()
+                    .map(|query| query.position)
+                    .collect::<Vec<_>>(),
+                vec![
+                    Some(0),
+                    Some(part_count / 2),
+                    Some(part_count - 1),
+                    Some(0),
+                    Some(part_count / 2),
+                    Some(part_count - 1),
+                    None,
+                    None,
+                    None,
+                ]
+            );
+        }
+
+        super::verify_opc_casefold_equivalent_name_gate().unwrap();
+        let corpus = build_opc_casefold_corpus(256).unwrap();
+        let cases = [
+            Case::OpcCasefoldEagerOpen,
+            Case::OpcCasefoldSourceOpen,
+            Case::OpcCasefoldEagerLookup,
+            Case::OpcCasefoldSourceLookup,
+        ];
+        for case in cases {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(!Case::DEFAULT.contains(&case));
+            assert!(usage_text().contains(case.name()));
+            let measured = super::run_opc_casefold_lookup(case, &corpus, 0, 1).unwrap();
+            assert_eq!(measured.elapsed_ns.samples.len(), 1);
+            assert_eq!(measured.corpus.entry_count, 256);
+            assert_eq!(measured.corpus.archive_member_count, 258);
+            let source = measured.source.unwrap();
+            let summary = source
+                .opc_casefold_lookup
+                .expect("OPC case-fold lookup summary");
+            assert_eq!(summary.performance_claim, "none");
+            assert_eq!(summary.query_count, 9);
+            assert_eq!(summary.query_repetitions, 16);
+            assert_eq!(
+                summary.query_classes,
+                super::OPC_CASEFOLD_QUERY_CLASSES.to_vec()
+            );
+            assert!(summary.malformed_equivalent_name_gate_verified);
+            assert_eq!(
+                summary.equivalent_name_corpus_generator,
+                super::OPC_CASEFOLD_EQUIVALENT_CORPUS_GENERATOR
+            );
+            assert_eq!(summary.equivalent_name_error, "EquivalentPartNames");
+            assert_eq!(summary.observed_output_sha256.len(), 1);
+            assert_eq!(
+                summary.observed_output_sha256[0],
+                summary.expected_output_sha256
+            );
+            assert_eq!(
+                summary.lookup_count,
+                if case.is_opc_casefold_open() {
+                    0
+                } else {
+                    9 * 16
+                }
+            );
+            if case.is_opc_casefold_source_backed() {
+                assert_eq!(
+                    summary.source_counter_scope,
+                    if case == Case::OpcCasefoldSourceOpen {
+                        "independent_untimed_instrumented_source_open_replay"
+                    } else {
+                        "independent_untimed_instrumented_source_repeated_lookup_replay"
+                    }
+                );
+                assert_eq!(summary.source_read_calls.len(), 1);
+                assert_eq!(summary.source_read_bytes.len(), 1);
+                assert_eq!(summary.source_version_calls.len(), 1);
+                assert_eq!(summary.source_payload_read_calls.len(), 1);
+                assert_eq!(summary.source_payload_read_bytes.len(), 1);
+                assert_eq!(summary.source_max_in_flight_reads.len(), 1);
+                if case == Case::OpcCasefoldSourceOpen {
+                    assert!(summary.source_read_calls[0] > 0);
+                    assert!(summary.source_read_bytes[0] > 0);
+                    assert_eq!(summary.source_payload_read_calls, vec![0]);
+                    assert_eq!(summary.source_payload_read_bytes, vec![0]);
+                } else {
+                    assert_eq!(summary.source_read_calls, vec![0]);
+                    assert_eq!(summary.source_read_bytes, vec![0]);
+                    assert_eq!(summary.source_version_calls, vec![9 * 16]);
+                    assert_eq!(summary.source_payload_read_calls, vec![0]);
+                    assert_eq!(summary.source_payload_read_bytes, vec![0]);
+                }
+            } else {
+                assert_eq!(summary.source_counter_scope, "not_applicable_eager_opc");
+                assert!(summary.source_read_calls.is_empty());
+                assert!(summary.source_version_calls.is_empty());
+            }
+            assert!(measured.operation_metrics.is_some());
+        }
+    }
+
+    #[test]
     fn zip_index_retains_member_count_oracle_and_actual_samples() {
         let corpus = build_opc_corpus(CorpusShape::ManySmall, PayloadKind::Compressible).unwrap();
         let measured = run_case(Case::ZipIndex, &corpus, 1, 2).unwrap();
@@ -53132,7 +54256,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 411);
+        assert_eq!(selectable_count, 415);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
