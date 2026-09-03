@@ -222,7 +222,7 @@ fn case_input(result: &CaseResult) -> Result<CaseInput, InputError> {
         logical_tasks: execution.map(|execution| execution.logical_tasks),
         opc_cache_worker_count,
         persistent_worker_teams_created,
-        chunk_evidence: source_chunk_evidence(source)?,
+        chunk_evidence: source_chunk_evidence(source.map(Box::as_ref))?,
         elapsed_sample_count: result.elapsed_ns.samples.len(),
         elapsed_sample_order: result.elapsed_ns.sample_order.clone(),
     })
@@ -570,13 +570,13 @@ mod tests {
             corpus: corpus(),
             elapsed_ns: super::super::statistics(vec![20, 10]),
             sink: None,
-            source: Some(super::super::SourceSummary {
+            source: Some(Box::new(super::super::SourceSummary {
                 simulation: Some(super::super::RangeSimulationSummary {
                     physical_request_count: vec![11, 22],
                     ..Default::default()
                 }),
                 ..Default::default()
-            }),
+            })),
             execution: Some(super::super::ExecutionSummary {
                 worker_count: 2,
                 logical_tasks: 3,

@@ -810,6 +810,56 @@ release measurement yet because the host workload is noisy. The selectors
 raise the current selectable registry from 408 to 411 cases and do not change
 the default 36 cases / 198 records.
 
+## OPC case-fold lookup baseline (change 0394)
+
+Four additional selectors are opt-in:
+
+```text
+opc_casefold_eager_open
+opc_casefold_source_open
+opc_casefold_eager_lookup
+opc_casefold_source_lookup
+```
+
+They use one deterministic stored OPC corpus at each of exactly 256, 2,048,
+and 16,384 ordinary tiny parts. Every part is a stable five-digit
+`casefold/ordinary-*.bin` member with a 32-byte payload; the two fixed
+structural members are `[Content_Types].xml` and `_rels/.rels`. The corpus
+generator, archive/member identity, payload hash, and canonical-name hash are
+reported in every result.
+
+The open selectors time only the corresponding `OpcPackage::from_bytes` or
+`SourceBackedPackage::from_read_at` constructor. Source-backed elapsed and
+allocator samples use an immutable `litchi_core::OwnedSource`. The lookup
+selectors open their package once outside timing, then repeat one prebuilt
+nine-query vector 16 times in fixed order: exact first/middle/last, case-only
+aliases at the same three positions (forcing the case-insensitive scan), and
+three genuine misses. Lookup counts, query classes/canonical corpus positions,
+canonical-name outcomes, and the output digest are fixed oracles; query-vector
+construction and all correctness hashing remain outside timed/allocation
+regions.
+
+Each opt-in build also runs an untimed malformed equivalent-name corpus gate
+(`litchi-opc-casefold-equivalent-name-gate-v1`) for both implementations and
+requires `EquivalentPartNames`. Source-backed results expose exact source
+read, version, payload, and in-flight counters from an independent untimed
+`InstrumentedSource` replay whose semantic digest must match the timed
+operation. Range classification and counter atomics therefore do not affect
+elapsed or allocation samples; eager results mark those counters not
+applicable.
+
+Operation-scoped allocator metrics are emitted only by the allocator target,
+and missing metrics are never inferred. These selectors set
+`performance_claim: none`, make no index recommendation, and raise the
+selectable registry from 411 to 415 without changing the default 36 cases /
+198 records.
+
+The serialized `CaseResult.source` record is heap-indirect. `SourceSummary`
+is a large tagged report union, and embedding it directly made the
+unoptimized CLI's `run` frame exceed a normal 8 MiB main-thread stack after
+this evidence type was added. The box is created during report assembly after
+the timed/allocation sample region and does not change the JSON schema.
+
 six additional matched simulated CFB selective-read cases
 (`cfb_selective_simulated_{mini,mini_4095,fat}_{legacy,shared}_read`) reuse the
 same deterministic final-position targets while applying the configured

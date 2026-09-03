@@ -1978,7 +1978,7 @@ pub(crate) fn run(
         corpus: corpus.manifest.clone(),
         elapsed_ns: super::statistics(elapsed),
         sink: Some(sink),
-        source: Some(source),
+        source: Some(Box::new(source)),
         execution: None,
         output_sha256: Some(expected.output_digest),
         operation_metrics: None,

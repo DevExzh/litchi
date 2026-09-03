@@ -1183,7 +1183,7 @@ pub(super) fn run(
         corpus: corpus.manifest.clone(),
         elapsed_ns: super::statistics(elapsed),
         sink: Some(sink),
-        source: Some(source),
+        source: Some(Box::new(source)),
         execution: None,
         output_sha256: Some(output_hash),
         operation_metrics: None,
