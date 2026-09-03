@@ -237,6 +237,23 @@ def _has_non_symlink_guard(step: str) -> bool:
 
 
 CARGO_WORKLOAD_JOBS = ("smoke", "full")
+RESOURCE_PROFILE_WORKLOAD_IDS = (
+    "opc-source-one-part",
+    "xlsx-managed-batch",
+    "rtf-streaming",
+    "cfb-selective",
+    "cfb-save",
+    "opc-scaling",
+    "cfb-scaling",
+)
+RESOURCE_PROFILE_TOOLS = (
+    "time",
+    "heaptrack",
+    "heaptrack_print",
+    "perf",
+    "strace",
+    "taskset",
+)
 
 
 class PerformanceWorkflowPolicyTests(unittest.TestCase):
@@ -435,6 +452,126 @@ class PerformanceWorkflowPolicyTests(unittest.TestCase):
             uploads[0],
             r"(?m)^\s*target/perf/container-baseline\.corpus-manifest-v2\.json\s*$",
         )
+
+    def test_full_resource_profile_uses_bounded_prebuilt_release_harness(self) -> None:
+        profile_steps = [
+            step
+            for step in _steps(self.jobs["full"])
+            if "Run current-HEAD resource profile" in step
+        ]
+        self.assertEqual(len(profile_steps), 1)
+        run = _run_body(profile_steps[0])
+        self.assertRegex(
+            run,
+            r"python3\s+tools/perf_resource_profile\.py\s+run\b",
+        )
+        self.assertRegex(
+            run,
+            r'--binary\s+"\$CARGO_TARGET_DIR/release/litchi-perf-baseline"',
+        )
+        self.assertNotRegex(run, r"--build\b")
+        self.assertRegex(run, r"--warmup\s+1\b")
+        self.assertRegex(run, r"--samples\s+3\b")
+        self.assertRegex(run, r"--timeout\s+600\b")
+        self.assertRegex(
+            run,
+            r"--only\s+"
+            + re.escape(",".join(RESOURCE_PROFILE_WORKLOAD_IDS))
+            + r"\b",
+        )
+
+    def test_full_resource_profile_writes_and_validates_required_report_truth(self) -> None:
+        full_steps = _steps(self.jobs["full"])
+        profile_steps = [
+            step
+            for step in full_steps
+            if "Run current-HEAD resource profile" in step
+        ]
+        self.assertEqual(len(profile_steps), 1)
+        self.assertRegex(
+            _run_body(profile_steps[0]),
+            r"--output\s+target/perf/resource-profile\.json",
+        )
+
+        validation_steps = [
+            step
+            for step in full_steps
+            if "Validate current-HEAD resource profile report" in step
+        ]
+        self.assertEqual(len(validation_steps), 1)
+        validation = _run_body(validation_steps[0])
+        for expression in (
+            r"target/perf/resource-profile\.json",
+            r"schema_version",
+            r"litchi-resource-profile",
+            r"excluded_formats",
+            r"iWork",
+            r"expected_workloads",
+            r"warmup_iterations",
+            r"samples",
+            r"expected_tools",
+            r"available",
+            r"returncode",
+            r"def status_values",
+            r"for nested in value\.values\(\)",
+            r"profile\.get\(\"status\"\)",
+            r"profile\[\"command\"\]",
+            r"\"returncode\"\s+in\s+profile",
+            r"external_profiles",
+            r"logical_measurements",
+        ):
+            self.assertRegex(validation, expression)
+        for workload_id in RESOURCE_PROFILE_WORKLOAD_IDS:
+            self.assertIn(workload_id, validation)
+        for tool_name in RESOURCE_PROFILE_TOOLS:
+            self.assertIn(f'"{tool_name}"', validation)
+        self.assertRegex(validation, r"profile_name\s*==\s*\"heaptrack\"")
+        self.assertRegex(validation, r"profile\[\"print\"\]")
+        self.assertRegex(validation, r"printed\[\"parsed\"\]\.get\(\"status\"\)")
+
+    def test_resource_profile_upload_is_always_run_with_full_baseline_artifact(self) -> None:
+        uploads = [
+            step
+            for step in _steps(self.jobs["full"])
+            if re.search(r"uses:\s*actions/upload-artifact@", step)
+            and "container-performance-baseline" in step
+        ]
+        self.assertEqual(len(uploads), 1)
+        self.assertTrue(_has_always_condition(uploads[0]))
+        self.assertRegex(
+            uploads[0],
+            r"(?m)^\s*target/perf/resource-profile\.json\s*$",
+        )
+
+    def test_resource_profile_is_full_job_only(self) -> None:
+        profile_commands = [
+            name
+            for name, job in self.jobs.items()
+            for step in _steps(job)
+            if "tools/perf_resource_profile.py" in _run_body(step)
+        ]
+        self.assertEqual(profile_commands, ["full"])
+        self.assertRegex(
+            self.jobs["full"],
+            r"if:\s*github\.event_name\s*==\s*'schedule'\s*\|\|\s*"
+            r"github\.event_name\s*==\s*'workflow_dispatch'",
+        )
+
+    def test_resource_profile_files_are_in_push_and_pull_request_path_triggers(self) -> None:
+        required_paths = (
+            "tools/perf_resource_profile.py",
+            "tools/test_perf_resource_profile.py",
+            "tools/test_perf_workflow_policy.py",
+            ".github/workflows/perf-baseline.yml",
+        )
+        for event in ("push", "pull_request"):
+            section = _top_level_section(self.workflow, event)
+            for path in required_paths:
+                self.assertRegex(
+                    section,
+                    rf"(?m)^\s*-\s*['\"]?{re.escape(path)}['\"]?\s*(?:#.*)?$",
+                    msg=f"{event} path filter must include {path}",
+                )
 
     def test_smoke_preserves_default_matrix_without_corpus_catalog_sidecar(self) -> None:
         smoke_runs = "\n".join(_run_body(step) for step in _steps(self.jobs["smoke"]))
