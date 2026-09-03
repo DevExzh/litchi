@@ -96,6 +96,10 @@ fn clone_error(error: &Error) -> Error {
     }
 }
 
+fn allocation_error(resource: &'static str, amount: usize) -> Error {
+    Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
+}
+
 /// A mutable single-file Pages, Numbers, or Keynote package.
 ///
 /// All ZIP members are retained as raw uncompressed bytes. IWA entries can be
@@ -397,9 +401,9 @@ fn read_bounded_source(
         })?
         .min(64 * 1024);
     let mut bytes = Vec::new();
-    bytes.try_reserve_exact(capacity).map_err(|_error| {
-        Error::InvalidFormat("could not allocate iWork package input".to_owned())
-    })?;
+    bytes
+        .try_reserve_exact(capacity)
+        .map_err(|_error| allocation_error("iWork package input", capacity))?;
 
     let mut buffer = [0u8; 8 * 1024];
     loop {
@@ -452,7 +456,21 @@ fn reserve_source_growth(bytes: &mut Vec<u8>, required: usize, maximum: usize) -
     })?;
     bytes
         .try_reserve_exact(additional)
-        .map_err(|_error| Error::InvalidFormat("could not allocate iWork package input".to_owned()))
+        .map_err(|_error| allocation_error("iWork package input", target))
+}
+
+fn own_bounded_source(bytes: &[u8], limits: PackageLimits) -> Result<Arc<[u8]>> {
+    let input_size = u64::try_from(bytes.len()).map_err(|_| {
+        Error::InvalidFormat("iWork package input length does not fit u64".to_owned())
+    })?;
+    limits.check_input_size(input_size, "iWork package input")?;
+
+    let mut source = Vec::new();
+    source
+        .try_reserve_exact(bytes.len())
+        .map_err(|_error| allocation_error("iWork package source bytes", bytes.len()))?;
+    source.extend_from_slice(bytes);
+    Ok(source.into())
 }
 
 impl IWorkPackage {
@@ -520,7 +538,7 @@ impl IWorkPackage {
     /// retained for flat packages, so an unchanged package can be written
     /// back byte-for-byte without rebuilding the ZIP envelope.
     pub fn from_bytes_with_limits(bytes: &[u8], limits: PackageLimits) -> Result<Self> {
-        Self::from_shared_bytes_with_limits(bytes.to_vec().into(), limits)
+        Self::from_shared_bytes_with_limits(own_bounded_source(bytes, limits)?, limits)
     }
 
     /// Parse an already-owned package source under caller-selected ingress
@@ -1479,6 +1497,36 @@ mod tests {
         let bytes = read_bounded_source(&mut initially_empty, 0, limits)?;
         assert_eq!(bytes.as_ref(), &[1, 2, 3, 4]);
         Ok(())
+    }
+
+    #[test]
+    fn borrowed_input_limit_is_checked_before_package_ownership() {
+        let bytes = b"not a package";
+        let limits = PackageLimits::default()
+            .with_input_bytes(u64::try_from(bytes.len() - 1).unwrap())
+            .unwrap();
+
+        let error = IWorkPackage::from_bytes_with_limits(bytes, limits).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::InvalidFormat(message)
+                if message.contains("iWork package input")
+                    && message.contains("exceeding the")
+        ));
+    }
+
+    #[test]
+    fn source_growth_reports_typed_allocation_failures() {
+        let mut bytes = Vec::new();
+        let error = reserve_source_growth(&mut bytes, usize::MAX, usize::MAX).unwrap_err();
+
+        assert!(matches!(
+            error,
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+                resource: "iWork package input",
+                amount: usize::MAX,
+            })
+        ));
     }
 
     #[test]

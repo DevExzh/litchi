@@ -448,9 +448,10 @@ impl PagesEditor {
                 object_identifier,
             )?;
         }
+        let mut object_index = PagesObjectIndex::build(&staged, &source.object_ids)?;
         for identifier in &source.object_ids {
-            let object_archive = find_object_archive(&staged, *identifier)?;
-            staged.update_archive(&object_archive, |archive| {
+            let object_archive = object_index.archive_name(*identifier)?;
+            staged.update_archive(object_archive, |archive| {
                 archive.remove_object(*identifier).ok_or_else(|| {
                     Error::InvalidFormat(format!(
                         "Pages audio object {identifier} is missing from {object_archive}"
@@ -458,9 +459,10 @@ impl PagesEditor {
                 })?;
                 Ok(())
             })?;
+            object_index.mark_removed(*identifier)?;
         }
         for identifier in &source.object_ids {
-            if package_references_object(&staged, *identifier)? {
+            if object_index.references_object(*identifier) {
                 return Err(Error::InvalidFormat(format!(
                     "Pages audio object {identifier} remains referenced after deletion"
                 )));

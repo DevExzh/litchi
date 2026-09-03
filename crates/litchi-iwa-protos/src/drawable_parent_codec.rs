@@ -741,6 +741,32 @@ mod tests {
         output
     }
 
+    fn fixed32_field(field: u32, value: u32) -> Vec<u8> {
+        let mut output = Vec::new();
+        push_varint(&mut output, (u64::from(field) << 3) | 5);
+        output.extend_from_slice(&value.to_le_bytes());
+        output
+    }
+
+    fn fixed64_field(field: u32, value: u64) -> Vec<u8> {
+        let mut output = Vec::new();
+        push_varint(&mut output, (u64::from(field) << 3) | 1);
+        output.extend_from_slice(&value.to_le_bytes());
+        output
+    }
+
+    fn start_group(field: u32) -> Vec<u8> {
+        let mut output = Vec::new();
+        push_varint(&mut output, (u64::from(field) << 3) | 3);
+        output
+    }
+
+    fn end_group(field: u32) -> Vec<u8> {
+        let mut output = Vec::new();
+        push_varint(&mut output, (u64::from(field) << 3) | 4);
+        output
+    }
+
     fn length_field(field: u32, payload: &[u8]) -> Vec<u8> {
         let mut output = Vec::new();
         push_varint(&mut output, (u64::from(field) << 3) | 2);
@@ -766,36 +792,140 @@ mod tests {
         }
     }
 
-    fn source_with_parent(identifier: u64) -> Vec<u8> {
+    fn source_with_parent_values(
+        identifier: u64,
+        deprecated_type: Option<i32>,
+        deprecated_is_external: Option<bool>,
+    ) -> Vec<u8> {
         let reference = tsd::DrawableArchive {
             parent: Some(crate::tsp::Reference {
                 identifier,
-                deprecated_type: Some(-7),
-                deprecated_is_external: Some(false),
+                deprecated_type,
+                deprecated_is_external,
             }),
             ..Default::default()
         };
         reference.encode_to_vec()
     }
 
+    fn source_with_parent(identifier: u64) -> Vec<u8> {
+        source_with_parent_values(identifier, Some(-7), Some(false))
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct ReferenceFacts {
+        identifier_present: bool,
+        identifier: u64,
+        deprecated_type: Option<i32>,
+        deprecated_is_external: Option<bool>,
+    }
+
+    fn prost_reference_facts(reference: &crate::tsp::Reference) -> ReferenceFacts {
+        ReferenceFacts {
+            identifier_present: true,
+            identifier: reference.identifier,
+            deprecated_type: reference.deprecated_type,
+            deprecated_is_external: reference.deprecated_is_external,
+        }
+    }
+
+    fn buffa_reference_facts(reference: projection::ReferenceLazyView<'_>) -> ReferenceFacts {
+        ReferenceFacts {
+            identifier_present: reference.has_identifier(),
+            identifier: reference.identifier,
+            deprecated_type: reference.deprecated_type,
+            deprecated_is_external: reference.deprecated_is_external,
+        }
+    }
+
+    fn assert_prost_parent_parity(source: &[u8]) -> Option<ReferenceFacts> {
+        let native = tsd::DrawableArchive::decode(source).expect("native decode");
+        let view: projection::DrawableArchiveLazyView<'_> = DecodeOptions::for_source(source)
+            .with_max_fields(usize::MAX)
+            .with_max_work_bytes(usize::MAX)
+            .buffa()
+            .decode_lazy_view(source)
+            .expect("Buffa view");
+        let projected = view
+            .parent
+            .get()
+            .expect("parent view")
+            .map(buffa_reference_facts);
+        let expected = native.parent.as_ref().map(prost_reference_facts);
+        assert_eq!(projected, expected);
+        expected
+    }
+
     #[test]
-    fn parent_projection_matches_prost_and_returns_non_zero_identifier() {
-        let source = source_with_parent(41);
-        let native = tsd::DrawableArchive::decode(source.as_slice()).expect("native decode");
-        let snapshot = decode_parent(&source, options(&source)).expect("projection");
-        assert_eq!(snapshot.parent().map(NonZeroU64::get), Some(41));
+    fn parent_projection_matches_every_prost_reference_field() {
+        for (identifier, deprecated_type, deprecated_is_external) in [
+            (41, Some(-7), Some(false)),
+            (0, None, None),
+            (7, Some(0), Some(true)),
+            (u64::MAX, Some(i32::MIN), Some(true)),
+        ] {
+            let source =
+                source_with_parent_values(identifier, deprecated_type, deprecated_is_external);
+            let expected = assert_prost_parent_parity(&source).expect("parent is present");
+            assert_eq!(expected.identifier, identifier);
+            assert_eq!(expected.deprecated_type, deprecated_type);
+            assert_eq!(expected.deprecated_is_external, deprecated_is_external);
+
+            let snapshot = decode_parent(&source, options(&source)).expect("projection");
+            assert_eq!(
+                snapshot.parent().map(NonZeroU64::get),
+                NonZeroU64::new(identifier).map(NonZeroU64::get)
+            );
+        }
+    }
+
+    #[test]
+    fn absent_parent_matches_prost_and_returns_absent_snapshot() {
+        let source = tsd::DrawableArchive::default().encode_to_vec();
+        assert_eq!(assert_prost_parent_parity(&source), None);
         assert_eq!(
-            native.parent.as_ref().map(|reference| reference.identifier),
-            Some(41)
+            decode_parent(&source, options(&source)).expect("absent parent"),
+            DrawableParentSnapshot::default()
         );
     }
 
     #[test]
-    fn unknown_fields_are_scanned_but_not_retained() {
+    fn unknown_wire_kinds_and_balanced_groups_are_scanned_but_not_retained() {
         let mut source = source_with_parent(9);
         source.extend(varint_field(99, 0xfeed));
+        source.extend(fixed32_field(100, 0xfeed_face));
+        source.extend(fixed64_field(101, 0xfeed_face_cafe_beef));
+        source.extend(length_field(102, b"opaque"));
+        source.extend(start_group(103));
+        source.extend(varint_field(104, 7));
+        source.extend(fixed32_field(105, 0xdecafbad));
+        source.extend(start_group(106));
+        source.extend(length_field(107, b"nested"));
+        source.extend(end_group(106));
+        source.extend(end_group(103));
+
         let snapshot = decode_parent(&source, options(&source)).expect("unknown is opaque");
         assert_eq!(snapshot.parent().map(NonZeroU64::get), Some(9));
+    }
+
+    #[test]
+    fn malformed_unknown_groups_are_rejected() {
+        let cases = [
+            (
+                [start_group(99), end_group(100)].concat(),
+                buffa::DecodeError::InvalidEndGroup(100),
+            ),
+            (
+                [start_group(99), varint_field(100, 7)].concat(),
+                buffa::DecodeError::UnexpectedEof,
+            ),
+            (end_group(99), buffa::DecodeError::InvalidEndGroup(99)),
+        ];
+
+        for (source, expected) in cases {
+            let error = decode_parent(&source, options(&source)).expect_err("malformed group");
+            assert_eq!(error.kind, DecodeErrorKind::Wire(expected));
+        }
     }
 
     #[test]
@@ -839,6 +969,82 @@ mod tests {
             error.resource_limit(),
             Some(DecodeLimit::Fields { .. })
         ));
+    }
+
+    #[test]
+    fn exact_and_one_under_message_byte_limits_are_enforced() {
+        let source = source_with_parent(3);
+        let exact = DecodeOptions::new(source.len(), usize::MAX, usize::MAX, 1);
+        assert!(decode_parent(&source, exact).is_ok());
+
+        let one_under = DecodeOptions::new(source.len() - 1, usize::MAX, usize::MAX, 1);
+        let error = decode_parent(&source, one_under).expect_err("one byte under");
+        assert_eq!(
+            error.resource_limit(),
+            Some(DecodeLimit::Bytes {
+                observed: source.len(),
+                maximum: source.len() - 1,
+            })
+        );
+    }
+
+    #[test]
+    fn exact_and_one_under_field_limits_are_enforced() {
+        let source = source_with_parent(3);
+        let exact = DecodeOptions::new(source.len(), 4, usize::MAX, 1);
+        assert!(decode_parent(&source, exact).is_ok());
+
+        let one_under = DecodeOptions::new(source.len(), 3, usize::MAX, 1);
+        let error = decode_parent(&source, one_under).expect_err("one field under");
+        assert_eq!(
+            error.resource_limit(),
+            Some(DecodeLimit::Fields {
+                observed: 4,
+                maximum: 3,
+            })
+        );
+    }
+
+    #[test]
+    fn exact_and_one_under_work_limits_are_enforced() {
+        let identifier = 3;
+        let reference = crate::tsp::Reference {
+            identifier,
+            deprecated_type: Some(-7),
+            deprecated_is_external: Some(false),
+        };
+        let nested = reference.encode_to_vec();
+        let source = source_with_parent(identifier);
+        let exact_work = source.len().saturating_add(nested.len()).saturating_mul(2);
+        let exact = DecodeOptions::new(source.len(), usize::MAX, exact_work, 1);
+        assert!(decode_parent(&source, exact).is_ok());
+
+        let one_under = DecodeOptions::new(source.len(), usize::MAX, exact_work - 1, 1);
+        let error = decode_parent(&source, one_under).expect_err("one work byte under");
+        assert_eq!(
+            error.resource_limit(),
+            Some(DecodeLimit::Work {
+                observed: exact_work,
+                maximum: exact_work - 1,
+            })
+        );
+    }
+
+    #[test]
+    fn exact_and_one_under_recursion_limits_are_enforced() {
+        let source = source_with_parent(3);
+        let exact = DecodeOptions::new(source.len(), usize::MAX, usize::MAX, 1);
+        assert!(decode_parent(&source, exact).is_ok());
+
+        let one_under = DecodeOptions::new(source.len(), usize::MAX, usize::MAX, 0);
+        let error = decode_parent(&source, one_under).expect_err("one nesting level under");
+        assert_eq!(
+            error.resource_limit(),
+            Some(DecodeLimit::Nesting {
+                observed: 1,
+                maximum: 0,
+            })
+        );
     }
 
     #[test]

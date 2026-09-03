@@ -11,6 +11,7 @@ mod rendering_invalidation;
 mod save;
 pub(crate) mod show_settings;
 mod slide_background;
+mod slide_build_order;
 mod slide_chart_arrangement;
 mod slide_chart_axis_title;
 mod slide_chart_caption;
@@ -93,6 +94,10 @@ pub use save::SaveError;
 pub use slide_background::{
     SlideBackgroundCommit, SlideBackgroundDiagnostics, SlideBackgroundEdit, SlideBackgroundError,
     SlideBackgroundLimitKind, SlideBackgroundPatch,
+};
+pub use slide_build_order::{
+    SlideBuildOrderCommit, SlideBuildOrderDiagnostics, SlideBuildOrderEdit, SlideBuildOrderError,
+    SlideBuildOrderLimitKind, SlideBuildOrderPatch,
 };
 pub use slide_chart_arrangement::{
     ChartArrangementCommit, ChartArrangementDiagnostics, ChartArrangementEdit,

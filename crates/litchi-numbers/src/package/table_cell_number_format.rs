@@ -13,7 +13,11 @@ use litchi_iwa_archive::package::{EntryEdit, OwnedExactArtifacts};
 use litchi_iwa_core::SnappyStream;
 use thiserror::Error as ThisError;
 
-use super::{Package, table_cell_control_native as native, table_cell_pop_up_menu as popup};
+use super::{
+    Package,
+    physical_entry_index::{Error as PhysicalEntryIndexError, PhysicalEntryIndex},
+    table_cell_control_native as native, table_cell_pop_up_menu as popup,
+};
 use crate::{CellPosition, SheetSelector, TableSelector, cell::data_format::number::Number};
 
 /// A content-free location associated with a Number-format operation.
@@ -502,8 +506,7 @@ impl Package {
         if after != patch.after {
             return Err(Error::Verification);
         }
-        verify_number_package_locality(self, &candidate)?;
-        let touched_components = changed_member_count(catalog, candidate_catalog);
+        let touched_components = verify_number_package_locality(self, &candidate)?;
         Ok(Commit {
             package: candidate,
             patch: patch.clone(),
@@ -692,9 +695,9 @@ fn rewrite(
     if candidate_value != after {
         return Err(Error::Verification);
     }
-    verify_number_package_locality_with_members(source, &candidate, &changed_names)?;
+    let touched_components =
+        verify_number_package_locality_with_members(source, &candidate, &changed_names)?;
     let target_owner = candidate_catalog.__source_owner();
-    let touched_components = changed_member_count(source_catalog, candidate_catalog);
     Ok(Commit {
         package: candidate,
         patch: Patch {
@@ -813,38 +816,61 @@ const fn map_limit_kind(kind: popup::LimitKind) -> LimitKind {
     }
 }
 
-fn changed_member_count(
-    source: &litchi_iwa_archive::SourceCatalog,
-    candidate: &litchi_iwa_archive::SourceCatalog,
-) -> usize {
-    source
-        .package()
-        .iter()
-        .filter(|entry| !entry.name().starts_with("preview"))
-        .filter(|entry| {
-            candidate
-                .package()
-                .iter()
-                .find(|other| other.name() == entry.name())
-                .is_some_and(|other| other.data() != entry.data())
-        })
-        .count()
-}
-
-fn verify_number_package_locality(source: &Package, candidate: &Package) -> Result<(), Error> {
+fn verify_number_package_locality(source: &Package, candidate: &Package) -> Result<usize, Error> {
     let source_catalog =
         super::table_headers::rewrite::physical_source(source).map_err(|_| Error::Verification)?;
     let candidate_catalog = super::table_headers::rewrite::physical_source(candidate)
         .map_err(|_| Error::Verification)?;
-    let changed = changed_member_names(source_catalog, candidate_catalog);
-    verify_number_package_locality_with_members(source, candidate, &changed)
+    let source_index = physical_entry_index(source_catalog)?;
+    let candidate_index = physical_entry_index(candidate_catalog)?;
+    let changed = changed_member_names(
+        source_catalog,
+        candidate_catalog,
+        &source_index,
+        &candidate_index,
+    )?;
+    verify_number_package_locality_with_indexes(
+        source,
+        candidate,
+        &changed,
+        source_catalog,
+        candidate_catalog,
+        &source_index,
+        &candidate_index,
+    )
 }
 
 fn verify_number_package_locality_with_members(
     source: &Package,
     candidate: &Package,
     changed_members: &[String],
-) -> Result<(), Error> {
+) -> Result<usize, Error> {
+    let source_catalog =
+        super::table_headers::rewrite::physical_source(source).map_err(|_| Error::Verification)?;
+    let candidate_catalog = super::table_headers::rewrite::physical_source(candidate)
+        .map_err(|_| Error::Verification)?;
+    let source_index = physical_entry_index(source_catalog)?;
+    let candidate_index = physical_entry_index(candidate_catalog)?;
+    verify_number_package_locality_with_indexes(
+        source,
+        candidate,
+        changed_members,
+        source_catalog,
+        candidate_catalog,
+        &source_index,
+        &candidate_index,
+    )
+}
+
+fn verify_number_package_locality_with_indexes(
+    source: &Package,
+    candidate: &Package,
+    changed_members: &[String],
+    source_catalog: &litchi_iwa_archive::SourceCatalog,
+    candidate_catalog: &litchi_iwa_archive::SourceCatalog,
+    source_index: &PhysicalEntryIndex<'_>,
+    candidate_index: &PhysicalEntryIndex<'_>,
+) -> Result<usize, Error> {
     if changed_members
         .iter()
         .any(|name| name == super::metadata::ENTRY_NAME || name.starts_with("preview"))
@@ -857,17 +883,11 @@ fn verify_number_package_locality_with_members(
         .collect::<Vec<_>>();
     popup::verify_package_locality_for_members(source, candidate, &native_members)
         .map_err(|_| Error::Verification)?;
-    let source_catalog =
-        super::table_headers::rewrite::physical_source(source).map_err(|_| Error::Verification)?;
-    let candidate_catalog = super::table_headers::rewrite::physical_source(candidate)
-        .map_err(|_| Error::Verification)?;
     for source_entry in source_catalog.package().iter().filter(|entry| {
         entry.name() == super::metadata::ENTRY_NAME || entry.name().starts_with("preview")
     }) {
-        let candidate_entry = candidate_catalog
-            .package()
-            .iter()
-            .find(|entry| entry.name() == source_entry.name())
+        let candidate_entry = candidate_index
+            .get(source_entry.name())
             .ok_or(Error::Verification)?;
         if !super::table_headers::rewrite::package_member_preserved(source_entry, candidate_entry) {
             return Err(Error::Verification);
@@ -876,31 +896,38 @@ fn verify_number_package_locality_with_members(
     for candidate_entry in candidate_catalog.package().iter().filter(|entry| {
         entry.name() == super::metadata::ENTRY_NAME || entry.name().starts_with("preview")
     }) {
-        let source_entry = source_catalog
-            .package()
-            .iter()
-            .find(|entry| entry.name() == candidate_entry.name())
+        let source_entry = source_index
+            .get(candidate_entry.name())
             .ok_or(Error::Verification)?;
         if !super::table_headers::rewrite::package_member_preserved(source_entry, candidate_entry) {
             return Err(Error::Verification);
         }
     }
-    Ok(())
+    Ok(changed_member_count(source_catalog, candidate_index))
 }
 
 fn changed_member_names(
     source: &litchi_iwa_archive::SourceCatalog,
     candidate: &litchi_iwa_archive::SourceCatalog,
-) -> Vec<String> {
+    source_index: &PhysicalEntryIndex<'_>,
+    candidate_index: &PhysicalEntryIndex<'_>,
+) -> Result<Vec<String>, Error> {
+    let capacity = source
+        .package()
+        .iter()
+        .count()
+        .checked_add(candidate.package().iter().count())
+        .ok_or(Error::Verification)?;
     let mut changed = Vec::new();
+    changed
+        .try_reserve_exact(capacity)
+        .map_err(|_| Error::Verification)?;
     for source_entry in source.package().iter() {
         if source_entry.name().starts_with("preview") {
             continue;
         }
-        let differs = candidate
-            .package()
-            .iter()
-            .find(|entry| entry.name() == source_entry.name())
+        let differs = candidate_index
+            .get(source_entry.name())
             .is_none_or(|entry| entry.data() != source_entry.data());
         if differs {
             changed.push(source_entry.name().to_owned());
@@ -910,15 +937,37 @@ fn changed_member_names(
         if candidate_entry.name().starts_with("preview") {
             continue;
         }
-        if source
-            .package()
-            .iter()
-            .all(|entry| entry.name() != candidate_entry.name())
-        {
+        if source_index.get(candidate_entry.name()).is_none() {
             changed.push(candidate_entry.name().to_owned());
         }
     }
     changed.sort_unstable();
     changed.dedup();
-    changed
+    Ok(changed)
+}
+
+fn physical_entry_index(
+    catalog: &litchi_iwa_archive::SourceCatalog,
+) -> Result<PhysicalEntryIndex<'_>, Error> {
+    PhysicalEntryIndex::new(catalog.package()).map_err(|error| match error {
+        PhysicalEntryIndexError::Allocation { .. } | PhysicalEntryIndexError::Duplicate => {
+            Error::Verification
+        },
+    })
+}
+
+fn changed_member_count(
+    source: &litchi_iwa_archive::SourceCatalog,
+    candidate_index: &PhysicalEntryIndex<'_>,
+) -> usize {
+    source
+        .package()
+        .iter()
+        .filter(|entry| !entry.name().starts_with("preview"))
+        .filter(|entry| {
+            candidate_index
+                .get(entry.name())
+                .is_some_and(|candidate| candidate.data() != entry.data())
+        })
+        .count()
 }

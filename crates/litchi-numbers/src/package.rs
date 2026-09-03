@@ -35,6 +35,7 @@ mod limits;
 mod metadata;
 /// Exact-source sheet and table name transactions.
 pub(crate) mod names;
+mod physical_entry_index;
 mod save;
 #[allow(
     dead_code,

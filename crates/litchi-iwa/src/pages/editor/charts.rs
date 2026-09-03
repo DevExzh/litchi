@@ -623,6 +623,7 @@ impl PagesEditor {
                 &group.object_ids,
             )?);
         }
+        let mut object_index = PagesObjectIndex::build(&staged, &source.object_ids)?;
         for group in &source.archive_groups {
             staged.update_archive(&group.archive_name, |archive| {
                 for identifier in &group.object_ids {
@@ -635,9 +636,12 @@ impl PagesEditor {
                 }
                 Ok(())
             })?;
+            for identifier in &group.object_ids {
+                object_index.mark_removed(*identifier)?;
+            }
         }
         for identifier in &source.object_ids {
-            if package_references_object(&staged, *identifier)? {
+            if object_index.references_object(*identifier) {
                 return Err(Error::InvalidFormat(format!(
                     "Pages chart object {identifier} remains referenced after deletion"
                 )));

@@ -6,8 +6,6 @@ use litchi_iwa::numbers::{
     FormulaCachedValue, FormulaCellReference, FormulaExpression, NumbersEditor,
 };
 use litchi_iwa::pages::PagesEditor;
-#[allow(deprecated)]
-use litchi_iwa::raw::package::IWorkPackage;
 
 fn parse_cell(address: &str) -> Result<FormulaCellReference, String> {
     let letter_count = address.bytes().take_while(u8::is_ascii_alphabetic).count();
@@ -87,10 +85,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         extension => return Err(format!("unsupported iWork extension {extension:?}").into()),
     }
 
-    let package = IWorkPackage::open(output)?;
-    println!(
-        "saved {output} with calculation engine {:?}",
-        package.calculation_engine_entry_name()?
-    );
+    println!("saved {output}");
     Ok(())
 }

@@ -5,7 +5,7 @@
 //! module so native identifiers, component routes, and wire values cannot
 //! escape through `litchi-pages`.
 
-use std::{fmt, num::NonZeroU64, sync::Arc};
+use std::{fmt, mem::size_of, num::NonZeroU64, sync::Arc};
 
 use litchi_iwa_archive::{
     SourceCatalog,
@@ -1401,15 +1401,44 @@ struct MetadataFactsVisitor {
     data_metadata_maps: Vec<(u64, bool)>,
 }
 
+fn metadata_try_reserve<T>(values: &mut Vec<T>) -> Result<(), MetadataRewriteError> {
+    let requested = values
+        .len()
+        .checked_add(1)
+        .ok_or_else(|| MetadataRewriteError::allocation(usize::MAX))?;
+    values
+        .try_reserve(1)
+        .map_err(|_| MetadataRewriteError::allocation(requested))?;
+    Ok(())
+}
+
+fn metadata_try_push<T>(values: &mut Vec<T>, value: T) -> Result<(), MetadataRewriteError> {
+    metadata_try_reserve(values)?;
+    values.push(value);
+    Ok(())
+}
+
+fn metadata_try_string(value: &str) -> Result<String, MetadataRewriteError> {
+    let mut output = String::new();
+    output
+        .try_reserve_exact(value.len())
+        .map_err(|_| MetadataRewriteError::allocation(value.len()))?;
+    output.push_str(value);
+    Ok(output)
+}
+
 impl PackageMetadataVisitor for MetadataFactsVisitor {
     fn visit_component(
         &mut self,
         component: package_metadata_codec::ComponentDescriptor<'_>,
     ) -> Result<(), MetadataRewriteError> {
+        metadata_try_reserve(&mut self.components)?;
+        let preferred = metadata_try_string(component.preferred_locator())?;
+        let locator = component.locator().map(metadata_try_string).transpose()?;
         self.components.push(MetadataComponent {
             identifier: component.identifier(),
-            preferred: component.preferred_locator().to_owned(),
-            locator: component.locator().map(str::to_owned),
+            preferred,
+            locator,
             current: component.is_current(),
         });
         Ok(())
@@ -1419,42 +1448,48 @@ impl PackageMetadataVisitor for MetadataFactsVisitor {
         &mut self,
         binding: package_metadata_codec::ObjectUuidDescriptor<'_>,
     ) -> Result<(), MetadataRewriteError> {
-        self.uuids.push(MetadataUuid {
-            component: binding.component().identifier(),
-            object: binding.object_identifier(),
-            uuid: binding.uuid(),
-            current: binding.component().is_current(),
-        });
-        Ok(())
+        metadata_try_push(
+            &mut self.uuids,
+            MetadataUuid {
+                component: binding.component().identifier(),
+                object: binding.object_identifier(),
+                uuid: binding.uuid(),
+                current: binding.component().is_current(),
+            },
+        )
     }
 
     fn visit_external_reference(
         &mut self,
         reference: package_metadata_codec::ExternalReferenceDescriptor<'_>,
     ) -> Result<(), MetadataRewriteError> {
-        self.externals.push(MetadataExternal {
-            source: reference.source().identifier(),
-            target: reference.target_component_identifier(),
-            object: reference.object_identifier(),
-            weak: reference.is_weak(),
-            current: reference.source().is_current() && !reference.is_versioned(),
-        });
-        Ok(())
+        metadata_try_push(
+            &mut self.externals,
+            MetadataExternal {
+                source: reference.source().identifier(),
+                target: reference.target_component_identifier(),
+                object: reference.object_identifier(),
+                weak: reference.is_weak(),
+                current: reference.source().is_current() && !reference.is_versioned(),
+            },
+        )
     }
 
     fn visit_data_reference_owner(
         &mut self,
         owner: package_metadata_codec::DataReferenceOwnerDescriptor<'_>,
     ) -> Result<(), MetadataRewriteError> {
-        self.data_owners.push(MetadataDataOwner {
-            component: owner.component().identifier(),
-            data: owner.data_identifier(),
-            object: owner.object_identifier(),
-            count: owner.count(),
-            current: owner.component().is_current(),
-            unknown: owner.has_unknown_fields(),
-        });
-        Ok(())
+        metadata_try_push(
+            &mut self.data_owners,
+            MetadataDataOwner {
+                component: owner.component().identifier(),
+                data: owner.data_identifier(),
+                object: owner.object_identifier(),
+                count: owner.count(),
+                current: owner.component().is_current(),
+                unknown: owner.has_unknown_fields(),
+            },
+        )
     }
 
     fn visit_ambiguous_object_identifier(
@@ -1462,8 +1497,7 @@ impl PackageMetadataVisitor for MetadataFactsVisitor {
         component: package_metadata_codec::ComponentDescriptor<'_>,
         identifier: u64,
     ) -> Result<(), MetadataRewriteError> {
-        self.ambiguous.push((component.identifier(), identifier));
-        Ok(())
+        metadata_try_push(&mut self.ambiguous, (component.identifier(), identifier))
     }
 
     fn visit_data_metadata_map(
@@ -1471,18 +1505,19 @@ impl PackageMetadataVisitor for MetadataFactsVisitor {
         object_identifier: u64,
         has_unknown_fields: bool,
     ) -> Result<(), MetadataRewriteError> {
-        self.data_metadata_maps
-            .push((object_identifier, has_unknown_fields));
-        Ok(())
+        metadata_try_push(
+            &mut self.data_metadata_maps,
+            (object_identifier, has_unknown_fields),
+        )
     }
 }
 
-struct MetadataLocation {
-    member: String,
-    archive: Archive,
+struct MetadataLocation<'source> {
+    member: &'source str,
+    archive: &'source Archive,
     object_index: usize,
     message_index: usize,
-    payload: Vec<u8>,
+    payload: &'source [u8],
 }
 
 struct MetadataRewrite {
@@ -1490,14 +1525,16 @@ struct MetadataRewrite {
     compressed: Vec<u8>,
 }
 
-fn metadata_location(source: &Package) -> Result<MetadataLocation, BodyFootnoteError> {
+fn metadata_location<'source>(
+    source: &'source Package,
+) -> Result<MetadataLocation<'source>, BodyFootnoteError> {
     let component = source
         .state
         .source
         .components()
         .get("Index/Metadata.iwa")
         .ok_or(BodyFootnoteError::UnsupportedDependency)?;
-    let archive = component.archive().clone();
+    let archive = component.archive();
     let mut location = None;
     for (object_index, object) in archive.objects.iter().enumerate() {
         for (message_index, message) in object.messages.iter().enumerate() {
@@ -1510,10 +1547,10 @@ fn metadata_location(source: &Package) -> Result<MetadataLocation, BodyFootnoteE
     }
     let (object_index, message_index) = location.ok_or(BodyFootnoteError::InvalidSource)?;
     Ok(MetadataLocation {
-        member: component.name().to_owned(),
+        member: component.name(),
         payload: archive.objects[object_index].messages[message_index]
             .data
-            .clone(),
+            .as_slice(),
         archive,
         object_index,
         message_index,
@@ -1555,13 +1592,13 @@ fn metadata_options(
 
 fn metadata_facts(
     source: &Package,
-    location: &MetadataLocation,
+    location: &MetadataLocation<'_>,
     budget: &mut TransactionBudget,
 ) -> Result<(MetadataFactsVisitor, u64), BodyFootnoteError> {
     let options = metadata_options(source, location.payload.len())?;
     let mut visitor = MetadataFactsVisitor::default();
     let inspection = package_metadata_codec::inspect_package_metadata_with_visitor(
-        &location.payload,
+        location.payload,
         options,
         &mut visitor,
     )
@@ -1647,9 +1684,26 @@ fn component_for_member<'a>(
     found.ok_or(BodyFootnoteError::UnsupportedDependency)
 }
 
+fn current_metadata_component(
+    facts: &MetadataFactsVisitor,
+    identifier: u64,
+) -> Result<&MetadataComponent, BodyFootnoteError> {
+    let mut found = None;
+    for component in facts
+        .components
+        .iter()
+        .filter(|component| component.current && component.identifier == identifier)
+    {
+        if found.replace(component).is_some() {
+            return Err(BodyFootnoteError::InvalidSource);
+        }
+    }
+    found.ok_or(BodyFootnoteError::InvalidSource)
+}
+
 fn rewrite_metadata_archive(
     source: &Package,
-    mut location: MetadataLocation,
+    location: MetadataLocation<'_>,
     payload: Vec<u8>,
     budget: &mut TransactionBudget,
 ) -> Result<MetadataRewrite, BodyFootnoteError> {
@@ -1659,12 +1713,15 @@ fn rewrite_metadata_archive(
         .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let object_identifier = location.archive.objects[location.object_index]
+    // The strict metadata pass above is complete and charged before this
+    // copy-on-write archive clone. Read-only callers and rejected metadata
+    // batches therefore retain only borrowed source data.
+    let mut archive = location.archive.clone();
+    let object_identifier = archive.objects[location.object_index]
         .archive_info
         .identifier
         .ok_or(BodyFootnoteError::InvalidSource)?;
-    let object = location
-        .archive
+    let object = archive
         .object_mut(object_identifier)
         .ok_or(BodyFootnoteError::InvalidSource)?;
     object
@@ -1677,15 +1734,13 @@ fn rewrite_metadata_archive(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let encoded_length = location
-        .archive
+    let encoded_length = archive
         .encoded_len_with_limits(archive_limits)
         .map_err(map_core_error)?;
     let maximum_compressed =
         SnappyStream::maximum_compressed_len(encoded_length).map_err(map_core_error)?;
     budget.charge_archive_output(encoded_length, maximum_compressed)?;
-    let bytes = location
-        .archive
+    let bytes = archive
         .to_bytes_with_limits(archive_limits)
         .map_err(map_core_error)?;
     if bytes.len() != encoded_length {
@@ -1696,7 +1751,7 @@ fn rewrite_metadata_archive(
         return Err(BodyFootnoteError::Verification);
     }
     Ok(MetadataRewrite {
-        member: location.member,
+        member: location.member.to_owned(),
         compressed,
     })
 }
@@ -1771,7 +1826,7 @@ fn metadata_addition(
     let batch = package_metadata_codec::AdditionSaveTokenBatch::new(additions, save_tokens);
     let options = metadata_options(source, location.payload.len())?;
     let prepared = package_metadata_codec::prepare_package_metadata_additions_and_save_tokens(
-        &location.payload,
+        location.payload,
         batch,
         options,
     )
@@ -1816,76 +1871,102 @@ fn metadata_removal(
     {
         return Err(BodyFootnoteError::UnsupportedDependency);
     }
-    let matching_uuids: Vec<_> = facts
+    let mut matching_uuid_count = 0usize;
+    let mut current_uuid = None;
+    let mut has_versioned_uuid = false;
+    for binding in facts
         .uuids
         .iter()
         .filter(|binding| binding.object == storage_identifier)
-        .collect();
-    let current_uuid = matching_uuids
-        .iter()
-        .copied()
-        .find(|binding| binding.current)
-        .ok_or(BodyFootnoteError::UnsupportedDependency)?;
-    if matching_uuids.iter().any(|binding| !binding.current) {
+    {
+        matching_uuid_count = matching_uuid_count
+            .checked_add(1)
+            .ok_or(BodyFootnoteError::InvalidSource)?;
+        if binding.current {
+            if current_uuid.is_none() {
+                current_uuid = Some(*binding);
+            }
+        } else {
+            has_versioned_uuid = true;
+        }
+    }
+    let current_uuid = current_uuid.ok_or(BodyFootnoteError::UnsupportedDependency)?;
+    if has_versioned_uuid {
         return Err(BodyFootnoteError::UnsupportedDependency);
     }
-    if matching_uuids.len() != 1 {
+    if matching_uuid_count != 1 {
         return Err(BodyFootnoteError::InvalidSource);
     }
-    let target = facts
-        .components
-        .iter()
-        .filter(|component| component.current && component.identifier == current_uuid.component)
-        .collect::<Vec<_>>();
-    if target.len() != 1 {
-        return Err(BodyFootnoteError::InvalidSource);
-    }
-    let target_selector = ComponentSelector::new(target[0].identifier, target[0].effective());
+    let target = current_metadata_component(&facts, current_uuid.component)?;
+    let target_selector = ComponentSelector::new(target.identifier, target.effective());
     let uuid_removals = [ObjectUuidRemoval::new(
         target_selector,
         storage_identifier,
         current_uuid.uuid,
     )];
 
-    let matching_external: Vec<_> = facts
-        .externals
-        .iter()
-        .filter(|reference| {
-            reference.target == current_uuid.component
-                && reference.object == Some(storage_identifier)
-        })
-        .collect();
-    if matching_external.iter().any(|reference| !reference.current) {
+    let mut matching_external_count = 0usize;
+    let mut has_versioned_external = false;
+    for reference in facts.externals.iter().filter(|reference| {
+        reference.target == current_uuid.component && reference.object == Some(storage_identifier)
+    }) {
+        matching_external_count = matching_external_count
+            .checked_add(1)
+            .ok_or(BodyFootnoteError::InvalidSource)?;
+        if !reference.current {
+            has_versioned_external = true;
+        }
+    }
+    if has_versioned_external {
         return Err(BodyFootnoteError::UnsupportedDependency);
     }
-    let matching_data: Vec<_> = facts
+    let mut matching_data_count = 0usize;
+    let mut has_unsupported_data = false;
+    for owner in facts
         .data_owners
         .iter()
         .filter(|owner| owner.object == storage_identifier)
-        .collect();
-    if matching_data
-        .iter()
-        .any(|owner| !owner.current || owner.unknown)
     {
+        matching_data_count = matching_data_count
+            .checked_add(1)
+            .ok_or(BodyFootnoteError::InvalidSource)?;
+        if !owner.current || owner.unknown {
+            has_unsupported_data = true;
+        }
+    }
+    if has_unsupported_data {
         return Err(BodyFootnoteError::UnsupportedDependency);
     }
 
     let mut external_removals = Vec::new();
+    external_removals
+        .try_reserve_exact(matching_external_count)
+        .map_err(|_| BodyFootnoteError::Allocation {
+            amount: matching_external_count,
+        })?;
     let mut data_removals = Vec::new();
-    let mut token_selectors = vec![target_selector];
-    for reference in matching_external {
-        let source_components: Vec<_> = facts
-            .components
-            .iter()
-            .filter(|component| component.current && component.identifier == reference.source)
-            .collect();
-        if source_components.len() != 1 {
-            return Err(BodyFootnoteError::InvalidSource);
-        }
-        let source_selector = ComponentSelector::new(
-            source_components[0].identifier,
-            source_components[0].effective(),
-        );
+    data_removals
+        .try_reserve_exact(matching_data_count)
+        .map_err(|_| BodyFootnoteError::Allocation {
+            amount: matching_data_count,
+        })?;
+    let token_capacity = matching_external_count
+        .checked_add(matching_data_count)
+        .and_then(|count| count.checked_add(1))
+        .ok_or(BodyFootnoteError::InvalidSource)?;
+    let mut token_selectors = Vec::new();
+    token_selectors
+        .try_reserve_exact(token_capacity)
+        .map_err(|_| BodyFootnoteError::Allocation {
+            amount: token_capacity,
+        })?;
+    token_selectors.push(target_selector);
+    for reference in facts.externals.iter().filter(|reference| {
+        reference.target == current_uuid.component && reference.object == Some(storage_identifier)
+    }) {
+        let source_component = current_metadata_component(&facts, reference.source)?;
+        let source_selector =
+            ComponentSelector::new(source_component.identifier, source_component.effective());
         external_removals.push(ExternalReferenceRemoval::new(
             source_selector,
             target_selector,
@@ -1899,19 +1980,14 @@ fn metadata_removal(
             token_selectors.push(source_selector);
         }
     }
-    for owner in matching_data {
-        let source_components: Vec<_> = facts
-            .components
-            .iter()
-            .filter(|component| component.current && component.identifier == owner.component)
-            .collect();
-        if source_components.len() != 1 {
-            return Err(BodyFootnoteError::InvalidSource);
-        }
-        let source_selector = ComponentSelector::new(
-            source_components[0].identifier,
-            source_components[0].effective(),
-        );
+    for owner in facts
+        .data_owners
+        .iter()
+        .filter(|owner| owner.object == storage_identifier)
+    {
+        let source_component = current_metadata_component(&facts, owner.component)?;
+        let source_selector =
+            ComponentSelector::new(source_component.identifier, source_component.effective());
         data_removals.push(DataReferenceOwnerRemoval::new(
             source_selector,
             owner.data,
@@ -1935,7 +2011,7 @@ fn metadata_removal(
     let batch = RemovalSaveTokenBatch::new(removal, save_tokens);
     let options = metadata_options(source, location.payload.len())?;
     let prepared = package_metadata_codec::prepare_package_metadata_removals_and_save_tokens(
-        &location.payload,
+        location.payload,
         batch,
         options,
     )
@@ -2128,14 +2204,11 @@ fn insert_lifecycle(
 fn rewrite_remove(source: &Package, position: Position) -> Result<Package, BodyFootnoteError> {
     let mut budget = TransactionBudget::new(source)?;
     let graphs = super::footnote_text::native_footnotes(source).map_err(map_text_error)?;
-    budget.charge(BodyFootnoteLimitKind::Entries, graphs.len())?;
-    budget.charge(
-        BodyFootnoteLimitKind::WireWork,
-        source.state.source.source_bytes().len(),
-    )?;
-    let graph = graphs
-        .into_iter()
-        .find(|graph| graph.position == position)
+    let (graph_index, graph) = graphs
+        .iter()
+        .enumerate()
+        .find(|(_, graph)| graph.position == position)
+        .map(|(index, graph)| (index, *graph))
         .ok_or(BodyFootnoteError::NotFound)?;
     let source_catalog = &source.state.source;
     let body_component = component_for_object(source, graph.body_identifier.get())?;
@@ -2175,13 +2248,9 @@ fn rewrite_remove(source: &Package, position: Position) -> Result<Package, BodyF
         graph.reference_identifier.get(),
         false,
     )?;
-    prove_exclusive_graph(
-        source,
-        graph.reference_identifier.get(),
-        graph.storage_identifier.get(),
-        graph.marker_identifier.get(),
-        &mut budget,
-    )?;
+    let census = GraphCensus::new(source, &graphs, &mut budget)?;
+    prove_exclusive_graph(graph_index, &graph, &census)?;
+    drop(census);
     for id in [
         graph.reference_identifier,
         graph.storage_identifier,
@@ -3081,88 +3150,170 @@ fn update_body_header_reference(
     Ok(())
 }
 
-fn prove_exclusive_graph(
-    package: &Package,
-    reference: u64,
-    storage: u64,
-    marker: u64,
-    budget: &mut TransactionBudget,
-) -> Result<(), BodyFootnoteError> {
-    let mut incoming = [0usize; 3];
-    let mut typed_incoming = [0usize; 3];
-    let graphs = super::footnote_text::native_footnotes(package).map_err(map_text_error)?;
-    budget.charge(BodyFootnoteLimitKind::Entries, graphs.len())?;
-    budget.charge(
-        BodyFootnoteLimitKind::WireWork,
-        package.state.source.source_bytes().len(),
-    )?;
-    let selected = graphs.iter().find(|graph| {
-        graph.reference_identifier.get() == reference
-            || graph.storage_identifier.get() == storage
-            || graph.marker_identifier.get() == marker
-    });
-    if selected.is_none_or(|graph| {
-        graph.reference_identifier.get() != reference
-            || graph.storage_identifier.get() != storage
-            || graph.marker_identifier.get() != marker
-    }) {
-        return Err(BodyFootnoteError::UnsupportedDependency);
-    }
-    for component in package.state.source.components().iter() {
-        for object in &component.archive().objects {
-            for info in &object.archive_info.message_infos {
-                for target in &info.object_references {
-                    match *target {
-                        value if value == reference => {
-                            incoming[0] = incoming[0]
+#[derive(Debug, Clone, Copy)]
+struct GraphCensusEntry {
+    identifier: u64,
+    graph_index: usize,
+    slot: usize,
+    incoming: usize,
+    typed_incoming: usize,
+    unsupported: bool,
+    ambiguous: bool,
+}
+
+struct GraphCensus {
+    entries: Vec<GraphCensusEntry>,
+}
+
+impl GraphCensus {
+    fn new(
+        package: &Package,
+        graphs: &[super::footnote_text::NativeFootnote],
+        budget: &mut TransactionBudget,
+    ) -> Result<Self, BodyFootnoteError> {
+        let entry_count = graphs
+            .len()
+            .checked_mul(3)
+            .ok_or(BodyFootnoteError::InvalidSource)?;
+        budget.charge(BodyFootnoteLimitKind::Entries, graphs.len())?;
+        budget.charge(
+            BodyFootnoteLimitKind::WireWork,
+            package.state.source.source_bytes().len(),
+        )?;
+        let census_bytes = entry_count
+            .checked_mul(size_of::<GraphCensusEntry>())
+            .ok_or(BodyFootnoteError::InvalidSource)?;
+        budget.charge(BodyFootnoteLimitKind::ScratchBytes, census_bytes)?;
+        let mut entries = Vec::new();
+        if entry_count != 0 {
+            budget.charge(BodyFootnoteLimitKind::Allocations, 1)?;
+            entries
+                .try_reserve_exact(entry_count)
+                .map_err(|_| BodyFootnoteError::Allocation {
+                    amount: entry_count,
+                })?;
+        }
+        for (graph_index, graph) in graphs.iter().enumerate() {
+            for (slot, identifier) in [
+                graph.reference_identifier.get(),
+                graph.storage_identifier.get(),
+                graph.marker_identifier.get(),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                entries.push(GraphCensusEntry {
+                    identifier,
+                    graph_index,
+                    slot,
+                    incoming: 0,
+                    typed_incoming: 0,
+                    unsupported: false,
+                    ambiguous: false,
+                });
+            }
+        }
+        entries.sort_unstable_by_key(|entry| entry.identifier);
+        for index in 1..entries.len() {
+            if entries[index - 1].identifier == entries[index].identifier {
+                entries[index - 1].ambiguous = true;
+                entries[index].ambiguous = true;
+            }
+        }
+
+        let mut census = Self { entries };
+        for component in package.state.source.components().iter() {
+            for object in &component.archive().objects {
+                for info in &object.archive_info.message_infos {
+                    for target in &info.object_references {
+                        if let Some(entry) = census.entry_mut(*target) {
+                            entry.incoming = entry
+                                .incoming
                                 .checked_add(1)
                                 .ok_or(BodyFootnoteError::InvalidSource)?;
-                        },
-                        value if value == storage => {
-                            incoming[1] = incoming[1]
-                                .checked_add(1)
-                                .ok_or(BodyFootnoteError::InvalidSource)?;
-                        },
-                        value if value == marker => {
-                            incoming[2] = incoming[2]
-                                .checked_add(1)
-                                .ok_or(BodyFootnoteError::InvalidSource)?;
-                        },
-                        _ => {},
-                    }
-                }
-                for target in &info.data_references {
-                    if [reference, storage, marker].contains(target) {
-                        return Err(BodyFootnoteError::UnsupportedDependency);
-                    }
-                }
-                for field in &info.field_infos {
-                    for target in &field.object_references {
-                        let Some(slot) = graph_edge_slot(*target, reference, storage, marker)
-                        else {
-                            continue;
-                        };
-                        let expected_path = match slot {
-                            0 => &[16, 1, 2][..],
-                            1 => &[2][..],
-                            _ => &[9, 1, 2][..],
-                        };
-                        if field.path.path != expected_path {
-                            return Err(BodyFootnoteError::UnsupportedDependency);
                         }
-                        typed_incoming[slot] = typed_incoming[slot]
-                            .checked_add(1)
-                            .ok_or(BodyFootnoteError::InvalidSource)?;
                     }
-                    for target in &field.data_references {
-                        if [reference, storage, marker].contains(target) {
-                            return Err(BodyFootnoteError::UnsupportedDependency);
+                    for target in &info.data_references {
+                        if let Some(entry) = census.entry_mut(*target) {
+                            entry.unsupported = true;
+                        }
+                    }
+                    for field in &info.field_infos {
+                        for target in &field.object_references {
+                            let Some(entry) = census.entry_mut(*target) else {
+                                continue;
+                            };
+                            let expected_path = graph_edge_path(entry.slot);
+                            if field.path.path != expected_path {
+                                entry.unsupported = true;
+                            } else {
+                                entry.typed_incoming = entry
+                                    .typed_incoming
+                                    .checked_add(1)
+                                    .ok_or(BodyFootnoteError::InvalidSource)?;
+                            }
+                        }
+                        for target in &field.data_references {
+                            if let Some(entry) = census.entry_mut(*target) {
+                                entry.unsupported = true;
+                            }
                         }
                     }
                 }
             }
         }
+        Ok(census)
     }
+
+    fn entry(&self, identifier: u64) -> Option<&GraphCensusEntry> {
+        let index = self
+            .entries
+            .binary_search_by_key(&identifier, |entry| entry.identifier)
+            .ok()?;
+        let entry = &self.entries[index];
+        (!entry.ambiguous).then_some(entry)
+    }
+
+    fn entry_mut(&mut self, identifier: u64) -> Option<&mut GraphCensusEntry> {
+        let index = self
+            .entries
+            .binary_search_by_key(&identifier, |entry| entry.identifier)
+            .ok()?;
+        if self.entries[index].ambiguous {
+            return None;
+        }
+        Some(&mut self.entries[index])
+    }
+}
+
+fn graph_edge_path(slot: usize) -> &'static [u32] {
+    match slot {
+        0 => &[16, 1, 2],
+        1 => &[2],
+        _ => &[9, 1, 2],
+    }
+}
+
+fn prove_exclusive_graph(
+    graph_index: usize,
+    graph: &super::footnote_text::NativeFootnote,
+    census: &GraphCensus,
+) -> Result<(), BodyFootnoteError> {
+    let selected = [
+        census.entry(graph.reference_identifier.get()),
+        census.entry(graph.storage_identifier.get()),
+        census.entry(graph.marker_identifier.get()),
+    ];
+    if selected.iter().enumerate().any(|(slot, entry)| {
+        entry.is_none_or(|entry| entry.graph_index != graph_index || entry.slot != slot)
+    }) {
+        return Err(BodyFootnoteError::UnsupportedDependency);
+    }
+    if selected.iter().flatten().any(|entry| entry.unsupported) {
+        return Err(BodyFootnoteError::UnsupportedDependency);
+    }
+    let incoming = selected.map(|entry| entry.map_or(0, |entry| entry.incoming));
+    let typed_incoming = selected.map(|entry| entry.map_or(0, |entry| entry.typed_incoming));
     // The source graph has exactly body -> reference -> storage -> marker.
     if incoming != [1, 1, 1] || typed_incoming.iter().any(|count| *count > 1) {
         return Err(BodyFootnoteError::UnsupportedDependency);
@@ -3175,21 +3326,11 @@ fn validate_existing_footnote_graphs(
     budget: &mut TransactionBudget,
 ) -> Result<(), BodyFootnoteError> {
     let graphs = super::footnote_text::native_footnotes(source).map_err(map_text_error)?;
-    budget.charge(BodyFootnoteLimitKind::Entries, graphs.len())?;
-    budget.charge(
-        BodyFootnoteLimitKind::WireWork,
-        source.state.source.source_bytes().len(),
-    )?;
     let location = metadata_location(source)?;
     let (facts, _) = metadata_facts(source, &location, budget)?;
-    for graph in graphs {
-        prove_exclusive_graph(
-            source,
-            graph.reference_identifier.get(),
-            graph.storage_identifier.get(),
-            graph.marker_identifier.get(),
-            budget,
-        )?;
+    let census = GraphCensus::new(source, &graphs, budget)?;
+    for (graph_index, graph) in graphs.iter().enumerate() {
+        prove_exclusive_graph(graph_index, graph, &census)?;
         validate_storage_attachment_owners(
             source,
             graph.storage_identifier.get(),
@@ -3207,12 +3348,21 @@ fn validate_existing_footnote_graphs(
         }) {
             return Err(BodyFootnoteError::UnsupportedDependency);
         }
-        let storage_bindings = facts
+        let mut storage_binding_count = 0usize;
+        let mut has_unsupported_storage_binding = false;
+        for binding in facts
             .uuids
             .iter()
             .filter(|binding| binding.object == graph.storage_identifier.get())
-            .collect::<Vec<_>>();
-        if storage_bindings.len() != 1 || storage_bindings.iter().any(|binding| !binding.current) {
+        {
+            storage_binding_count = storage_binding_count
+                .checked_add(1)
+                .ok_or(BodyFootnoteError::InvalidSource)?;
+            if !binding.current {
+                has_unsupported_storage_binding = true;
+            }
+        }
+        if storage_binding_count != 1 || has_unsupported_storage_binding {
             return Err(BodyFootnoteError::UnsupportedDependency);
         }
     }
@@ -3245,14 +3395,17 @@ fn validate_storage_attachment_owners(
         .map_err(|_| BodyFootnoteError::InvalidSource)?;
     let storage = WireView::parse_with_limits(&storage_message.data, limits)
         .map_err(|_| BodyFootnoteError::InvalidSource)?;
-    let attachment_fields = storage
-        .fields()
-        .filter(|field| field.number() == 9)
-        .collect::<Vec<_>>();
-    if attachment_fields.len() != 1 || attachment_fields[0].wire_type() != 2 {
+    let mut attachment_field = None;
+    for field in storage.fields().filter(|field| field.number() == 9) {
+        if attachment_field.replace(field).is_some() {
+            return Err(BodyFootnoteError::InvalidSource);
+        }
+    }
+    let attachment_field = attachment_field.ok_or(BodyFootnoteError::InvalidSource)?;
+    if attachment_field.wire_type() != 2 {
         return Err(BodyFootnoteError::InvalidSource);
     }
-    let table = WireView::parse_with_limits(attachment_fields[0].payload(), limits)
+    let table = WireView::parse_with_limits(attachment_field.payload(), limits)
         .map_err(|_| BodyFootnoteError::InvalidSource)?;
     let mut marker_count = 0usize;
     for entry_field in table.fields().filter(|field| field.number() == 1) {
@@ -3261,26 +3414,32 @@ fn validate_storage_attachment_owners(
         }
         let entry = WireView::parse_with_limits(entry_field.payload(), limits)
             .map_err(|_| BodyFootnoteError::InvalidSource)?;
-        let references = entry
-            .fields()
-            .filter(|field| field.number() == 2)
-            .collect::<Vec<_>>();
-        if references.len() != 1 || references[0].wire_type() != 2 {
+        let mut reference_field = None;
+        for field in entry.fields().filter(|field| field.number() == 2) {
+            if reference_field.replace(field).is_some() {
+                return Err(BodyFootnoteError::InvalidSource);
+            }
+        }
+        let reference_field = reference_field.ok_or(BodyFootnoteError::InvalidSource)?;
+        if reference_field.wire_type() != 2 {
             return Err(BodyFootnoteError::InvalidSource);
         }
-        let reference = WireView::parse_with_limits(references[0].payload(), limits)
+        let reference = WireView::parse_with_limits(reference_field.payload(), limits)
             .map_err(|_| BodyFootnoteError::InvalidSource)?;
-        let identifiers = reference
-            .fields()
-            .filter(|field| field.number() == 1)
-            .collect::<Vec<_>>();
-        if identifiers.len() != 1 || identifiers[0].wire_type() != 0 {
+        let mut identifier_field = None;
+        for field in reference.fields().filter(|field| field.number() == 1) {
+            if identifier_field.replace(field).is_some() {
+                return Err(BodyFootnoteError::InvalidSource);
+            }
+        }
+        let identifier_field = identifier_field.ok_or(BodyFootnoteError::InvalidSource)?;
+        if identifier_field.wire_type() != 0 {
             return Err(BodyFootnoteError::InvalidSource);
         }
         let (identifier, width) =
-            litchi_iwa_common::decode_varint_from_bytes(identifiers[0].payload())
+            litchi_iwa_common::decode_varint_from_bytes(identifier_field.payload())
                 .map_err(|_| BodyFootnoteError::InvalidSource)?;
-        if width != identifiers[0].payload().len() || identifier != marker_identifier {
+        if width != identifier_field.payload().len() || identifier != marker_identifier {
             return Err(BodyFootnoteError::UnsupportedDependency);
         }
         marker_count = marker_count
@@ -3291,18 +3450,6 @@ fn validate_storage_attachment_owners(
         return Err(BodyFootnoteError::UnsupportedDependency);
     }
     Ok(())
-}
-
-fn graph_edge_slot(target: u64, reference: u64, storage: u64, marker: u64) -> Option<usize> {
-    if target == reference {
-        Some(0)
-    } else if target == storage {
-        Some(1)
-    } else if target == marker {
-        Some(2)
-    } else {
-        None
-    }
 }
 
 #[cfg(test)]
@@ -3351,5 +3498,80 @@ mod tests {
 
         assert!(Arc::ptr_eq(&snapshot.values, &clone.values));
         assert_eq!(snapshot.as_slice(), clone.as_slice());
+    }
+
+    #[test]
+    fn metadata_fact_vectors_stage_through_fallible_growth() {
+        let mut values = Vec::new();
+        metadata_try_push(&mut values, 7u64).unwrap();
+        metadata_try_push(&mut values, 11u64).unwrap();
+
+        assert_eq!(values, [7, 11]);
+    }
+
+    #[test]
+    fn metadata_singleton_lookup_rejects_duplicate_current_components() {
+        let facts = MetadataFactsVisitor {
+            components: vec![
+                MetadataComponent {
+                    identifier: 7,
+                    preferred: "Document".to_owned(),
+                    locator: None,
+                    current: true,
+                },
+                MetadataComponent {
+                    identifier: 7,
+                    preferred: "Document".to_owned(),
+                    locator: None,
+                    current: true,
+                },
+            ],
+            ..MetadataFactsVisitor::default()
+        };
+
+        assert!(matches!(
+            current_metadata_component(&facts, 7),
+            Err(BodyFootnoteError::InvalidSource)
+        ));
+    }
+
+    #[test]
+    fn graph_census_index_rejects_ambiguous_targets() {
+        let census = GraphCensus {
+            entries: vec![
+                GraphCensusEntry {
+                    identifier: 7,
+                    graph_index: 0,
+                    slot: 0,
+                    incoming: 1,
+                    typed_incoming: 1,
+                    unsupported: false,
+                    ambiguous: false,
+                },
+                GraphCensusEntry {
+                    identifier: 11,
+                    graph_index: 0,
+                    slot: 1,
+                    incoming: 1,
+                    typed_incoming: 1,
+                    unsupported: false,
+                    ambiguous: false,
+                },
+            ],
+        };
+        assert_eq!(census.entry(7).map(|entry| entry.slot), Some(0));
+
+        let ambiguous = GraphCensus {
+            entries: vec![GraphCensusEntry {
+                identifier: 7,
+                graph_index: 0,
+                slot: 0,
+                incoming: 1,
+                typed_incoming: 1,
+                unsupported: false,
+                ambiguous: true,
+            }],
+        };
+        assert!(ambiguous.entry(7).is_none());
     }
 }

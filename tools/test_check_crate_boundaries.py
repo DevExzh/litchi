@@ -86,6 +86,13 @@ def valid_snapshot(policy: boundaries.Policy) -> boundaries.Snapshot:
     )
 
 
+def write_cargo_manifest_fixture(root: Path, relative: str, source: str) -> Path:
+    path = root / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(source, encoding="utf-8")
+    return path
+
+
 def add_iwa_table_cell_borders_scaffold(root: Path) -> None:
     """Install the minimal common-owner and host-import boundary fixture."""
 
@@ -4807,6 +4814,219 @@ class BoundaryPolicyTests(unittest.TestCase):
             frozenset({"reqwest"}),
         )
 
+    def test_manifest_dependency_inventory_rejects_root_workspace_dependency(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_cargo_manifest_fixture(
+                root,
+                "Cargo.toml",
+                "[workspace]\nmembers = []\n\n"
+                "[workspace.dependencies]\n"
+                "legacy_iwa = { package = \"litchi-iwa\", version = \"0.1\" }\n",
+            )
+
+            violations = boundaries.audit_manifest_dependency_inventory(
+                root, self.policy
+            )
+
+            self.assertEqual(len(violations), 1)
+            self.assertIn(
+                "Cargo.toml [workspace.dependencies] alias=legacy_iwa, "
+                "package=litchi-iwa",
+                violations[0],
+            )
+
+    def test_manifest_dependency_inventory_rejects_underscore_host_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_cargo_manifest_fixture(
+                root,
+                "tools/fixture/Cargo.toml",
+                "[package]\nname = \"fixture\"\nversion = \"0.1\"\n\n"
+                "[dependencies]\n"
+                "litchi_iwa = \"0.1\"\n",
+            )
+
+            violations = boundaries.audit_manifest_dependency_inventory(
+                root, self.policy
+            )
+
+            self.assertEqual(len(violations), 1)
+            self.assertIn(
+                "tools/fixture/Cargo.toml [dependencies] alias=litchi_iwa, "
+                "package=litchi-iwa",
+                violations[0],
+            )
+
+    def test_manifest_dependency_inventory_rejects_nested_fuzz_dependency(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_cargo_manifest_fixture(
+                root,
+                "crates/litchi-iwa/Cargo.toml",
+                "[package]\nname = \"litchi-iwa\"\nversion = \"0.1\"\n",
+            )
+            write_cargo_manifest_fixture(
+                root,
+                "crates/litchi/fuzz/Cargo.toml",
+                "[package]\nname = \"litchi-fuzz\"\nversion = \"0.1\"\n\n"
+                "[dependencies]\n"
+                "legacy_iwa = { package = \"litchi-iwa\", path = \"../../litchi-iwa\" }\n",
+            )
+
+            violations = boundaries.audit_manifest_dependency_inventory(
+                root, self.policy
+            )
+
+            self.assertEqual(len(violations), 1)
+            self.assertIn(
+                "crates/litchi/fuzz/Cargo.toml [dependencies] alias=legacy_iwa, "
+                "package=litchi-iwa",
+                violations[0],
+            )
+
+    def test_manifest_dependency_inventory_rejects_workspace_excluded_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_cargo_manifest_fixture(
+                root,
+                "Cargo.toml",
+                "[workspace]\nmembers = []\nexclude = [\"excluded\"]\n",
+            )
+            write_cargo_manifest_fixture(
+                root,
+                "excluded/tool/Cargo.toml",
+                "[package]\nname = \"excluded-tool\"\nversion = \"0.1\"\n\n"
+                "[dev-dependencies]\n"
+                "iwa_fixture = { package = \"litchi-iwa\", version = \"0.1\" }\n",
+            )
+
+            violations = boundaries.audit_manifest_dependency_inventory(
+                root, self.policy
+            )
+
+            self.assertEqual(len(violations), 1)
+            self.assertIn(
+                "excluded/tool/Cargo.toml [dev-dependencies] alias=iwa_fixture, "
+                "package=litchi-iwa",
+                violations[0],
+            )
+
+    def test_manifest_dependency_inventory_rejects_target_dev_and_build_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_cargo_manifest_fixture(
+                root,
+                "tools/fixture/Cargo.toml",
+                "[package]\nname = \"fixture\"\nversion = \"0.1\"\n\n"
+                "[target.'cfg(unix)'.dependencies]\n"
+                "iwa_target = { package = \"litchi-iwa\", version = \"0.1\" }\n\n"
+                "[target.'cfg(unix)'.dev-dependencies]\n"
+                "iwa_dev = { package = \"litchi-iwa\", version = \"0.1\" }\n\n"
+                "[target.'cfg(unix)'.build-dependencies]\n"
+                "iwa_build = { package = \"litchi-iwa\", version = \"0.1\" }\n",
+            )
+
+            violations = boundaries.audit_manifest_dependency_inventory(
+                root, self.policy
+            )
+
+            self.assertEqual(len(violations), 3)
+            for table_name, alias in (
+                ("target.cfg(unix).dependencies", "iwa_target"),
+                ("target.cfg(unix).dev-dependencies", "iwa_dev"),
+                ("target.cfg(unix).build-dependencies", "iwa_build"),
+            ):
+                self.assertTrue(
+                    any(
+                        f"[{table_name}]" in item
+                        and f"alias={alias}, package=litchi-iwa" in item
+                        for item in violations
+                    ),
+                    (table_name, alias, violations),
+                )
+
+    def test_manifest_dependency_inventory_rejects_patch_replace_and_path_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_cargo_manifest_fixture(
+                root,
+                "crates/litchi-iwa/Cargo.toml",
+                "[package]\nname = \"litchi-iwa\"\nversion = \"0.1\"\n",
+            )
+            write_cargo_manifest_fixture(
+                root,
+                "crates/consumer/Cargo.toml",
+                "[package]\nname = \"consumer\"\nversion = \"0.1\"\n\n"
+                "[dependencies]\n"
+                "path_alias = { path = \"../litchi-iwa\" }\n\n"
+                "[patch.crates-io]\n"
+                "patched_iwa = { package = \"litchi-iwa\", path = \"../litchi-iwa\" }\n\n"
+                "[replace]\n"
+                "\"litchi-iwa:0.1.0\" = { path = \"../litchi-iwa\" }\n",
+            )
+
+            violations = boundaries.audit_manifest_dependency_inventory(
+                root, self.policy
+            )
+
+            self.assertEqual(len(violations), 3)
+            for table_name in (
+                "dependencies",
+                "patch.crates-io",
+                "replace",
+            ):
+                self.assertTrue(
+                    any(f"[{table_name}]" in item for item in violations),
+                    (table_name, violations),
+                )
+            self.assertTrue(
+                any("alias=path_alias, package=litchi-iwa" in item for item in violations),
+                violations,
+            )
+
+    def test_manifest_dependency_inventory_allows_current_host_fuzz_support(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_cargo_manifest_fixture(
+                root,
+                "crates/litchi-iwa/Cargo.toml",
+                "[package]\nname = \"litchi-iwa\"\nversion = \"0.1\"\n",
+            )
+            write_cargo_manifest_fixture(
+                root,
+                "crates/litchi-iwa/fuzz/Cargo.toml",
+                "[package]\nname = \"litchi-iwa-fuzz\"\nversion = \"0.1\"\n\n"
+                "[dependencies]\n"
+                "litchi-iwa = { path = \"..\" }\n",
+            )
+            write_cargo_manifest_fixture(
+                root,
+                "crates/litchi-iwa-archive/Cargo.toml",
+                "[package]\nname = \"litchi-iwa-archive\"\nversion = \"0.1\"\n",
+            )
+            write_cargo_manifest_fixture(
+                root,
+                "tools/legacy-alias/Cargo.toml",
+                "[package]\nname = \"legacy-alias\"\nversion = \"0.1\"\n\n"
+                "[dependencies]\n"
+                "litchi-iwa = { package = \"litchi-iwa-archive\", version = \"0.1\" }\n",
+            )
+
+            self.assertEqual(
+                boundaries.audit_manifest_dependency_inventory(root, self.policy), []
+            )
+
+    def test_manifest_dependency_inventory_is_in_main_dispatch(self) -> None:
+        self.assertIn(
+            "+ audit_manifest_dependency_inventory(policy=policy)",
+            inspect.getsource(boundaries.main),
+        )
+
     def test_xlsb_cannot_depend_on_concrete_xlsx(self) -> None:
         snapshot = valid_snapshot(self.policy)
         edge = boundaries.Edge("litchi-xlsb", "litchi-xlsx")
@@ -5103,7 +5323,7 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             self.assertEqual(boundaries.audit_litchi_facade_source_topology(root), [])
 
-    def test_iwa_raw_facade_requires_an_explicit_deprecation_marker(self) -> None:
+    def test_iwa_raw_facade_cannot_return(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             facade = root / boundaries.IWA_FACADE_SOURCE
@@ -5113,7 +5333,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertEqual(
                 boundaries.audit_iwa_raw_facade_source_topology(root),
                 [
-                    "litchi-iwa raw facade must remain deprecated: "
+                    "retired litchi-iwa raw facade returned: "
                     "crates/litchi-iwa/src/lib.rs:1"
                 ],
             )
@@ -5123,16 +5343,23 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "pub mod raw { pub mod package {} }\n",
                 encoding="utf-8",
             )
-            self.assertEqual(boundaries.audit_iwa_raw_facade_source_topology(root), [])
+            self.assertEqual(
+                boundaries.audit_iwa_raw_facade_source_topology(root),
+                [
+                    "retired litchi-iwa raw facade returned: "
+                    "crates/litchi-iwa/src/lib.rs:2"
+                ],
+            )
 
-    def test_iwa_raw_facade_does_not_accept_an_unrelated_attribute(self) -> None:
+    def test_iwa_raw_facade_audit_masks_trivia(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             facade = root / boundaries.IWA_FACADE_SOURCE
             facade.parent.mkdir(parents=True)
             facade.write_text(
-                "#[allow(deprecated)]\n"
-                "pub mod raw { pub mod package {} }\n",
+                "// pub mod raw { pub mod package {} }\n"
+                'const NOTE: &str = "pub mod raw";\n'
+                "pub(crate) mod raw { pub mod package {} }\n",
                 encoding="utf-8",
             )
 
@@ -5141,8 +5368,8 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertEqual(
                 violations,
                 [
-                    "litchi-iwa raw facade must remain deprecated: "
-                    "crates/litchi-iwa/src/lib.rs:2"
+                    "retired litchi-iwa raw facade returned: "
+                    "crates/litchi-iwa/src/lib.rs:3"
                 ],
             )
 

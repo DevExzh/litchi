@@ -15,14 +15,15 @@
     reason = "The transaction redacts native graph failures at the semantic boundary."
 )]
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_core::Position;
 use litchi_iwa_archive::{
     SourceCatalog,
-    package::{EntryEdit, ExactArtifacts, ReassemblyExecutionLimits},
+    package::{Catalog, Entry, EntryEdit, ExactArtifacts, ReassemblyExecutionLimits},
 };
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes,
@@ -1874,16 +1875,16 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
         .effective_archive_limits()
         .map_err(map_archive_error)?;
     let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
+    let entries = entry_index(catalog.package(), budget, ChartCaptionError::InvalidSource)?;
     budget.charge_allocation(1, 0)?;
     let mut archives = Vec::new();
     archives
         .try_reserve_exact(2)
         .map_err(|_| ChartCaptionError::Allocation { amount: 2 })?;
     for name in [&slide_name, &metadata_name] {
-        let entry = catalog
-            .package()
-            .iter()
-            .find(|entry| entry.name() == name.as_str())
+        let entry = entries
+            .get(name.as_str())
+            .copied()
             .ok_or(ChartCaptionError::InvalidSource)?;
         if entry.is_opaque() {
             return Err(ChartCaptionError::InvalidSource);
@@ -3067,14 +3068,10 @@ fn patch_caption_edge(
     if expected_identifier == replacement_identifier {
         return Err(ChartCaptionError::InvalidSource);
     }
+    let aggregate_frequencies = reference_frequencies(&info.object_references, budget)?;
     if info.data_references.contains(&expected_identifier)
         || info.data_references.contains(&replacement_identifier)
-        || info
-            .object_references
-            .iter()
-            .filter(|identifier| **identifier == expected_identifier)
-            .count()
-            != 1
+        || aggregate_frequencies.get(&expected_identifier).copied() != Some(1)
         || info.object_references.contains(&replacement_identifier)
     {
         return Err(ChartCaptionError::UnsupportedDependency);
@@ -3092,11 +3089,11 @@ fn patch_caption_edge(
             amount: info.field_infos.len(),
         })?;
     for field in &info.field_infos {
-        let count = field
-            .object_references
-            .iter()
-            .filter(|identifier| **identifier == expected_identifier)
-            .count();
+        let field_frequencies = reference_frequencies(&field.object_references, budget)?;
+        let count = field_frequencies
+            .get(&expected_identifier)
+            .copied()
+            .unwrap_or(0);
         if field.data_references.contains(&expected_identifier)
             || field.data_references.contains(&replacement_identifier)
             || field.object_references.contains(&replacement_identifier)
@@ -3396,8 +3393,9 @@ fn verify_graph_transition(
     candidate: &Package,
     before: &CaptionSelection,
     target: &CaptionSelection,
+    budget: &mut CaptionBudget,
 ) -> Result<(), ChartCaptionError> {
-    verify_caption_graph_transition(
+    verify_caption_graph_transition_with_budget(
         source,
         candidate,
         &before.slide_component_name,
@@ -3411,6 +3409,7 @@ fn verify_graph_transition(
         target.storage_identifier,
         target.placement_identifier,
         target.style_identifier,
+        budget,
     )
 }
 
@@ -3436,12 +3435,61 @@ pub(super) fn verify_caption_graph_transition(
     target_placement: Option<u64>,
     target_style: Option<u64>,
 ) -> Result<(), ChartCaptionError> {
+    let mut budget = CaptionBudget::for_package(source)?;
+    verify_caption_graph_transition_with_budget(
+        source,
+        candidate,
+        slide_component_name,
+        before_reference,
+        before_caption_info,
+        before_storage,
+        before_placement,
+        before_style,
+        target_reference,
+        target_caption_info,
+        target_storage,
+        target_placement,
+        target_style,
+        &mut budget,
+    )
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "The private verifier carries the complete before/target graph census explicitly."
+)]
+fn verify_caption_graph_transition_with_budget(
+    source: &Package,
+    candidate: &Package,
+    slide_component_name: &str,
+    before_reference: Option<u64>,
+    before_caption_info: Option<u64>,
+    before_storage: Option<u64>,
+    before_placement: Option<u64>,
+    before_style: Option<u64>,
+    target_reference: Option<u64>,
+    target_caption_info: Option<u64>,
+    target_storage: Option<u64>,
+    target_placement: Option<u64>,
+    target_style: Option<u64>,
+    budget: &mut CaptionBudget,
+) -> Result<(), ChartCaptionError> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
     let metadata_name = metadata_member_name(source_catalog, source)?;
     if metadata_member_name(candidate_catalog, candidate)? != metadata_name {
         return Err(ChartCaptionError::Verification);
     }
+    let _source_entries = entry_index(
+        source_catalog.package(),
+        budget,
+        ChartCaptionError::Verification,
+    )?;
+    let candidate_entries = entry_index(
+        candidate_catalog.package(),
+        budget,
+        ChartCaptionError::Verification,
+    )?;
     let slide_name = slide_component_name;
     for entry in source_catalog.package().iter() {
         if PREVIEW_ENTRY_NAMES.contains(&entry.name())
@@ -3450,10 +3498,9 @@ pub(super) fn verify_caption_graph_transition(
         {
             continue;
         }
-        let candidate_entry = candidate_catalog
-            .package()
-            .iter()
-            .find(|candidate_entry| candidate_entry.name() == entry.name())
+        let candidate_entry = candidate_entries
+            .get(entry.name())
+            .copied()
             .ok_or(ChartCaptionError::Verification)?;
         if entry.data() != candidate_entry.data() {
             return Err(ChartCaptionError::Verification);
@@ -3529,6 +3576,70 @@ pub(super) fn verify_caption_graph_transition(
         }
     }
     Ok(())
+}
+
+/// Build a bounded physical-member index for graph locality checks.
+///
+/// The graph transition must never compare an arbitrary first duplicate ZIP
+/// record.  Reserve the map up front and reject duplicate names so each
+/// provenance lookup is both fallible and unambiguous.
+fn entry_index<'a>(
+    catalog: &'a Catalog,
+    budget: &mut CaptionBudget,
+    duplicate_error: ChartCaptionError,
+) -> Result<HashMap<&'a str, &'a Entry>, ChartCaptionError> {
+    let count = catalog.iter().count();
+    budget.charge_allocation(
+        usize::from(count != 0),
+        count
+            .checked_mul(size_of::<(&str, &Entry)>())
+            .ok_or(ChartCaptionError::InvalidSource)?,
+    )?;
+    let mut index = HashMap::new();
+    index
+        .try_reserve(count)
+        .map_err(|_| ChartCaptionError::Allocation { amount: count })?;
+    for entry in catalog.iter() {
+        budget.charge_work(
+            entry
+                .name()
+                .len()
+                .checked_add(1)
+                .ok_or(ChartCaptionError::InvalidSource)?,
+        )?;
+        if index.insert(entry.name(), entry).is_some() {
+            return Err(duplicate_error.clone());
+        }
+    }
+    Ok(index)
+}
+
+/// Count reference occurrences in one aggregate with a single fallible pass.
+fn reference_frequencies(
+    values: &[u64],
+    budget: &mut CaptionBudget,
+) -> Result<HashMap<u64, usize>, ChartCaptionError> {
+    budget.charge_work(values.len())?;
+    budget.charge_allocation(
+        usize::from(!values.is_empty()),
+        values
+            .len()
+            .checked_mul(size_of::<(u64, usize)>())
+            .ok_or(ChartCaptionError::InvalidSource)?,
+    )?;
+    let mut frequencies = HashMap::new();
+    frequencies
+        .try_reserve(values.len())
+        .map_err(|_| ChartCaptionError::Allocation {
+            amount: values.len(),
+        })?;
+    for value in values {
+        let count = frequencies.entry(*value).or_insert(0usize);
+        *count = count
+            .checked_add(1)
+            .ok_or(ChartCaptionError::InvalidSource)?;
+    }
+    Ok(frequencies)
 }
 
 fn archive_for_member(package: &Package, name: &str) -> Result<Archive, ChartCaptionError> {
@@ -3629,7 +3740,7 @@ fn verify_caption_candidate(
             .map_err(map_slide_text_error)?;
         }
     } else {
-        verify_graph_transition(source, candidate, before, target)?;
+        verify_graph_transition(source, candidate, before, target, budget)?;
         if require_invalidated_previews
             && !super::rendering_invalidation::root_previews_absent(
                 candidate.state.source.package(),
@@ -4325,4 +4436,41 @@ pub(super) fn map_slide_text_error(error: super::slide_text::SlideTextError) -> 
 
 fn usize_to_u64(value: usize) -> u64 {
     u64::try_from(value).unwrap_or(u64::MAX)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn unbounded_budget() -> CaptionBudget {
+        CaptionBudget {
+            maximum_input: usize::MAX,
+            maximum_output: usize::MAX,
+            maximum_fields: usize::MAX,
+            maximum_work: usize::MAX,
+            maximum_depth: u32::MAX,
+            maximum_components: usize::MAX,
+            maximum_references: usize::MAX,
+            maximum_allocations: usize::MAX,
+            input: 0,
+            output: 0,
+            fields: 0,
+            max_depth: 0,
+            components: 0,
+            references: 0,
+            work: 0,
+            allocations: 0,
+            retained_bytes: 0,
+            scratch_bytes: 0,
+            candidate_reopens: 0,
+        }
+    }
+
+    #[test]
+    fn reference_frequency_index_counts_duplicate_edges() {
+        let mut budget = unbounded_budget();
+        let frequencies = reference_frequencies(&[4, 9, 4], &mut budget).unwrap();
+        assert_eq!(frequencies.get(&4), Some(&2));
+        assert_eq!(frequencies.get(&9), Some(&1));
+    }
 }

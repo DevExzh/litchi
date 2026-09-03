@@ -324,8 +324,10 @@ impl SlideOrderPatch {
 
     /// Return whether this patch preserves the exact source order and bytes.
     #[must_use]
-    pub const fn is_noop(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.source_position.get() == self.destination.get()
+            && (Arc::ptr_eq(&self.source_bytes, &self.target_bytes)
+                || self.source_bytes.as_ref() == self.target_bytes.as_ref())
     }
 
     /// Return an exact reversible patch from the committed package back to its
@@ -1057,4 +1059,41 @@ fn fingerprint(bytes: &[u8]) -> u64 {
         value = value.wrapping_mul(0x0000_0100_0000_01b3);
     }
     value
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn same_position_with_different_target_bytes_is_not_a_noop() {
+        let source = Arc::<[u8]>::from(&b"source bytes"[..]);
+        let target = Arc::<[u8]>::from(&b"target bytes"[..]);
+        let patch = SlideOrderPatch {
+            source_bytes: Arc::clone(&source),
+            target_bytes: target,
+            source_fingerprint: fingerprint(&source),
+            target_fingerprint: fingerprint(b"target bytes"),
+            source_position: Position::new(1),
+            destination: Position::new(1),
+        };
+
+        assert!(!patch.is_noop());
+    }
+
+    #[test]
+    fn same_position_with_equal_target_bytes_is_a_noop() {
+        let source = Arc::<[u8]>::from(&b"source bytes"[..]);
+        let target = Arc::<[u8]>::from(&b"source bytes"[..]);
+        let patch = SlideOrderPatch {
+            source_bytes: Arc::clone(&source),
+            target_bytes: target,
+            source_fingerprint: fingerprint(&source),
+            target_fingerprint: fingerprint(&source),
+            source_position: Position::new(1),
+            destination: Position::new(1),
+        };
+
+        assert!(patch.is_noop());
+    }
 }

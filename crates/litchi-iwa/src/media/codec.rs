@@ -1,6 +1,7 @@
 //! Media signatures, catalog validation, and iWork metadata wire edits.
 
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::hash::Hash;
 use std::io::Write;
 use std::path::{Component, Path};
 
@@ -19,6 +20,87 @@ use super::model::{EmbeddedMediaAsset, MediaAsset, MediaAssetId, MediaLimits, Me
 pub(crate) const PACKAGE_METADATA_ENTRY: &str = "Index/Metadata.iwa";
 pub(crate) const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
 const DATA_METADATA_MAP_MESSAGE_TYPE: u32 = 11_015;
+
+fn reserve_hash_map<K, V>(
+    values: &mut HashMap<K, V>,
+    additional: usize,
+    resource: &'static str,
+) -> Result<()>
+where
+    K: Eq + Hash,
+{
+    let requested = values.len().checked_add(additional).ok_or_else(|| {
+        Error::InvalidFormat(format!("{resource} collection size overflows usize"))
+    })?;
+    values.try_reserve(additional).map_err(|_allocation| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource,
+            amount: requested,
+        })
+    })
+}
+
+fn reserve_hash_set<T>(
+    values: &mut HashSet<T>,
+    additional: usize,
+    resource: &'static str,
+) -> Result<()>
+where
+    T: Eq + Hash,
+{
+    let requested = values.len().checked_add(additional).ok_or_else(|| {
+        Error::InvalidFormat(format!("{resource} collection size overflows usize"))
+    })?;
+    values.try_reserve(additional).map_err(|_allocation| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource,
+            amount: requested,
+        })
+    })
+}
+
+fn reserve_vec<T>(values: &mut Vec<T>, additional: usize, resource: &'static str) -> Result<()> {
+    let requested = values.len().checked_add(additional).ok_or_else(|| {
+        Error::InvalidFormat(format!("{resource} collection size overflows usize"))
+    })?;
+    values.try_reserve(additional).map_err(|_allocation| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource,
+            amount: requested,
+        })
+    })
+}
+
+fn reserve_queue<T>(
+    values: &mut VecDeque<T>,
+    additional: usize,
+    resource: &'static str,
+) -> Result<()> {
+    let requested = values.len().checked_add(additional).ok_or_else(|| {
+        Error::InvalidFormat(format!("{resource} collection size overflows usize"))
+    })?;
+    values.try_reserve(additional).map_err(|_allocation| {
+        Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource,
+            amount: requested,
+        })
+    })
+}
+
+fn charge_reachability_work(work: &mut usize, additional: usize, limits: WireLimits) -> Result<()> {
+    let observed = work.checked_add(additional).ok_or_else(|| {
+        Error::InvalidFormat("Media reachability work overflows usize".to_owned())
+    })?;
+    if observed > limits.max_rewrite_work() {
+        return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: LimitKind::RewriteWork,
+            observed,
+            limit: limits.max_rewrite_work(),
+        }));
+    }
+    *work = observed;
+    Ok(())
+}
 
 pub(crate) fn insert_unique_asset(
     assets: &mut HashMap<String, MediaAsset>,
@@ -56,6 +138,7 @@ pub(crate) fn insert_unique_asset(
             limits.max_total_bytes
         )));
     }
+    reserve_hash_map(assets, 1, "media asset index")?;
     assets.insert(asset.filename.clone(), asset);
     *total_size = new_total;
     Ok(())
@@ -166,6 +249,8 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
     let mut component_counts = HashMap::<u64, u64>::new();
     let mut component_record_counts = HashMap::<u64, usize>::new();
     let mut referencing_objects = HashMap::<u64, HashSet<ObjectId>>::new();
+    let work_limits = WireLimits::default();
+    let mut work = 0usize;
     for component in metadata
         .components
         .iter()
@@ -173,7 +258,22 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
     {
         for reference in &component.data_references {
             let data_identifier = MediaAssetId::try_from(reference.data_identifier)?.get();
-            let record_count = component_record_counts.entry(data_identifier).or_default();
+            charge_reachability_work(&mut work, 1, work_limits)?;
+            if !component_record_counts.contains_key(&data_identifier) {
+                reserve_hash_map(
+                    &mut component_record_counts,
+                    1,
+                    "media component reference index",
+                )?;
+                component_record_counts.insert(data_identifier, 0);
+            }
+            let record_count = component_record_counts
+                .get_mut(&data_identifier)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "Media component reference index lost its inserted entry".to_owned(),
+                    )
+                })?;
             *record_count = record_count.checked_add(1).ok_or_else(|| {
                 Error::Bundle("Component data reference record count overflow".to_owned())
             })?;
@@ -184,7 +284,15 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
                 .ok_or_else(|| {
                     Error::Bundle("Component data reference count overflow".to_owned())
                 })?;
-            let current = component_counts.entry(data_identifier).or_default();
+            if !component_counts.contains_key(&data_identifier) {
+                reserve_hash_map(&mut component_counts, 1, "media component count index")?;
+                component_counts.insert(data_identifier, 0);
+            }
+            let current = component_counts.get_mut(&data_identifier).ok_or_else(|| {
+                Error::InvalidFormat(
+                    "Media component count index lost its inserted entry".to_owned(),
+                )
+            })?;
             *current = current.checked_add(count).ok_or_else(|| {
                 Error::Bundle("Component data reference count overflow".to_owned())
             })?;
@@ -196,10 +304,23 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
                         ))
                     },
                 )?;
-                referencing_objects
-                    .entry(data_identifier)
-                    .or_default()
-                    .insert(object_identifier);
+                charge_reachability_work(&mut work, 1, work_limits)?;
+                if !referencing_objects.contains_key(&data_identifier) {
+                    reserve_hash_map(&mut referencing_objects, 1, "media object reference index")?;
+                    referencing_objects.insert(data_identifier, HashSet::new());
+                }
+                let object_ids =
+                    referencing_objects
+                        .get_mut(&data_identifier)
+                        .ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "Media object reference index lost its inserted entry".to_owned(),
+                            )
+                        })?;
+                if !object_ids.contains(&object_identifier) {
+                    reserve_hash_set(object_ids, 1, "media referencing object IDs")?;
+                    object_ids.insert(object_identifier);
+                }
             }
         }
     }
@@ -235,7 +356,15 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
                             })?;
                         for data_identifier in data_metadata_identifiers(message.data.as_slice())? {
                             let data_identifier = MediaAssetId::try_from(data_identifier)?;
-                            data_metadata_ids.insert(data_identifier.get());
+                            if !data_metadata_ids.contains(&data_identifier.get()) {
+                                charge_reachability_work(&mut work, 1, work_limits)?;
+                                reserve_hash_set(
+                                    &mut data_metadata_ids,
+                                    1,
+                                    "media data metadata identifiers",
+                                )?;
+                                data_metadata_ids.insert(data_identifier.get());
+                            }
                         }
                     }
                 }
@@ -243,14 +372,40 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
             for info in object.archive_info.message_infos {
                 for identifier in info.data_references {
                     let data_identifier = MediaAssetId::try_from(identifier)?.get();
-                    let count = message_counts.entry(data_identifier).or_default();
+                    charge_reachability_work(&mut work, 1, work_limits)?;
+                    if !message_counts.contains_key(&data_identifier) {
+                        reserve_hash_map(&mut message_counts, 1, "media message reference index")?;
+                        message_counts.insert(data_identifier, 0);
+                    }
+                    let count = message_counts.get_mut(&data_identifier).ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "Media message reference index lost its inserted entry".to_owned(),
+                        )
+                    })?;
                     *count = count.checked_add(1).ok_or_else(|| {
                         Error::Bundle("Message data reference count overflow".to_owned())
                     })?;
-                    referencing_objects
-                        .entry(data_identifier)
-                        .or_default()
-                        .insert(object_identifier);
+                    if !referencing_objects.contains_key(&data_identifier) {
+                        reserve_hash_map(
+                            &mut referencing_objects,
+                            1,
+                            "media object reference index",
+                        )?;
+                        referencing_objects.insert(data_identifier, HashSet::new());
+                    }
+                    let object_ids =
+                        referencing_objects
+                            .get_mut(&data_identifier)
+                            .ok_or_else(|| {
+                                Error::InvalidFormat(
+                                    "Media object reference index lost its inserted entry"
+                                        .to_owned(),
+                                )
+                            })?;
+                    if !object_ids.contains(&object_identifier) {
+                        reserve_hash_set(object_ids, 1, "media referencing object IDs")?;
+                        object_ids.insert(object_identifier);
+                    }
                 }
             }
         }
@@ -270,14 +425,11 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
         limits,
     )?;
     let mut identifiers = std::collections::HashSet::new();
-    identifiers
-        .try_reserve(metadata.datas.len())
-        .map_err(|_allocation| {
-            Error::IwaCommon(litchi_iwa_common::Error::Allocation {
-                resource: "media asset identifiers",
-                amount: metadata.datas.len(),
-            })
-        })?;
+    reserve_hash_set(
+        &mut identifiers,
+        metadata.datas.len(),
+        "media asset identifiers",
+    )?;
     for data in metadata.datas {
         let data_identifier = MediaAssetId::try_from(data.identifier)?;
         if !identifiers.insert(data.identifier) {
@@ -325,11 +477,16 @@ pub(crate) fn embedded_assets(package: &IWorkPackage) -> Result<Vec<EmbeddedMedi
             message_reference_count: message_counts.get(&data.identifier).copied().unwrap_or(0),
             has_data_metadata: data_metadata_ids.contains(&data.identifier),
             referencing_object_ids: {
-                let mut identifiers = referencing_objects
+                let object_ids = referencing_objects
                     .remove(&data.identifier)
-                    .unwrap_or_default()
-                    .into_iter()
-                    .collect::<Vec<_>>();
+                    .unwrap_or_default();
+                let mut identifiers = Vec::new();
+                reserve_vec(
+                    &mut identifiers,
+                    object_ids.len(),
+                    "media asset referencing object IDs",
+                )?;
+                identifiers.extend(object_ids);
                 identifiers.sort_unstable();
                 identifiers
             },
@@ -345,6 +502,8 @@ pub(crate) fn reachable_embedded_assets(
 ) -> Result<Vec<EmbeddedMediaAsset>> {
     let assets = embedded_assets(package)?;
     let mut outgoing = HashMap::<ObjectId, Vec<ObjectId>>::new();
+    let work_limits = WireLimits::default();
+    let mut work = 0usize;
     for name in package.iwa_entry_names() {
         let archive = package.archive(name)?;
         for object in archive.objects {
@@ -354,16 +513,52 @@ pub(crate) fn reachable_embedded_assets(
             let identifier = ObjectId::try_from(identifier).map_err(|_| {
                 Error::InvalidFormat(format!("Object in {name} has a zero archive identifier"))
             })?;
-            let references = outgoing.entry(identifier).or_default();
-            for info in object.archive_info.message_infos {
-                for reference in info.object_references {
-                    let reference = ObjectId::try_from(reference).map_err(|_| {
+            let message_infos = object.archive_info.message_infos;
+            let mut reference_count = 0usize;
+            for info in &message_infos {
+                for &reference in &info.object_references {
+                    ObjectId::try_from(reference).map_err(|_| {
                         Error::InvalidFormat(format!(
                             "Object {} in {name} contains a zero object reference",
                             identifier.get()
                         ))
                     })?;
-                    if !references.contains(&reference) {
+                }
+                reference_count = reference_count
+                    .checked_add(info.object_references.len())
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "Media outgoing object reference count overflows usize".to_owned(),
+                        )
+                    })?;
+            }
+            let object_work = reference_count.checked_add(1).ok_or_else(|| {
+                Error::InvalidFormat("Media outgoing object work overflows usize".to_owned())
+            })?;
+            charge_reachability_work(&mut work, object_work, work_limits)?;
+            if !outgoing.contains_key(&identifier) {
+                reserve_hash_map(&mut outgoing, 1, "media outgoing object index")?;
+                outgoing.insert(identifier, Vec::new());
+            }
+            let references = outgoing.get_mut(&identifier).ok_or_else(|| {
+                Error::InvalidFormat(
+                    "Media outgoing object index lost its inserted entry".to_owned(),
+                )
+            })?;
+            if reference_count != 0 {
+                reserve_vec(
+                    references,
+                    reference_count,
+                    "media outgoing object references",
+                )?;
+                for info in message_infos {
+                    for reference in info.object_references {
+                        let reference = ObjectId::try_from(reference).map_err(|_| {
+                            Error::InvalidFormat(format!(
+                                "Object {} in {name} contains a zero object reference",
+                                identifier.get()
+                            ))
+                        })?;
                         references.push(reference);
                     }
                 }
@@ -371,32 +566,46 @@ pub(crate) fn reachable_embedded_assets(
         }
     }
 
+    for references in outgoing.values_mut() {
+        references.sort_unstable();
+        references.dedup();
+    }
+
     let mut reachable = HashSet::<ObjectId>::new();
-    let mut queue = roots
-        .into_iter()
-        .map(|root| {
-            ObjectId::try_from(root).map_err(|_| {
-                Error::InvalidFormat("Media reachability root must be non-zero".to_owned())
-            })
-        })
-        .collect::<Result<VecDeque<_>>>()?;
+    let mut queue = VecDeque::new();
+    for root in roots {
+        let root = ObjectId::try_from(root).map_err(|_| {
+            Error::InvalidFormat("Media reachability root must be non-zero".to_owned())
+        })?;
+        charge_reachability_work(&mut work, 1, work_limits)?;
+        reserve_queue(&mut queue, 1, "media reachability queue")?;
+        queue.push_back(root);
+    }
     while let Some(identifier) = queue.pop_front() {
-        if !reachable.insert(identifier) {
+        if reachable.contains(&identifier) {
             continue;
         }
+        charge_reachability_work(&mut work, 1, work_limits)?;
+        reserve_hash_set(&mut reachable, 1, "media reachable object IDs")?;
+        reachable.insert(identifier);
         if let Some(references) = outgoing.get(&identifier) {
+            reserve_queue(&mut queue, references.len(), "media reachability queue")?;
             queue.extend(references.iter().copied());
         }
     }
-    Ok(assets
-        .into_iter()
-        .filter(|asset| {
-            asset
-                .referencing_object_ids
-                .iter()
-                .any(|identifier| reachable.contains(identifier))
-        })
-        .collect())
+    let mut reachable_assets = Vec::new();
+    for asset in assets {
+        if asset
+            .referencing_object_ids
+            .iter()
+            .any(|identifier| reachable.contains(identifier))
+        {
+            charge_reachability_work(&mut work, 1, work_limits)?;
+            reserve_vec(&mut reachable_assets, 1, "media reachable assets")?;
+            reachable_assets.push(asset);
+        }
+    }
+    Ok(reachable_assets)
 }
 
 #[derive(Debug, Default)]
@@ -1556,6 +1765,8 @@ fn patch_data_info(data: &[u8], digest: &[u8], materialized_length: u64) -> Resu
 
 #[cfg(test)]
 mod tests {
+    use crate::archive::{Archive, ArchiveObject, RawMessage};
+
     use super::*;
 
     fn data_info(identifier: u64) -> Vec<u8> {
@@ -1573,6 +1784,77 @@ mod tests {
         append_wire_varint(&mut metadata, 1, 100);
         append_wire_bytes(&mut metadata, 4, data_info);
         metadata
+    }
+
+    fn package_with_media_reachability_graph() -> IWorkPackage {
+        let mut metadata = Vec::new();
+        append_wire_varint(&mut metadata, 1, 100);
+        append_wire_bytes(&mut metadata, 4, &data_info(8));
+        append_wire_bytes(&mut metadata, 4, &data_info(7));
+        let metadata_archive = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    2,
+                    vec![RawMessage {
+                        type_: PACKAGE_METADATA_MESSAGE_TYPE,
+                        data: metadata,
+                    }],
+                )
+                .expect("metadata object"),
+            ],
+        };
+
+        let mut root = ArchiveObject::new(
+            50,
+            vec![RawMessage {
+                type_: 999,
+                data: vec![1],
+            }],
+        )
+        .expect("root object");
+        root.archive_info.message_infos[0].object_references = vec![60, 60];
+
+        let mut middle = ArchiveObject::new(
+            60,
+            vec![RawMessage {
+                type_: 999,
+                data: vec![1],
+            }],
+        )
+        .expect("middle object");
+        middle.archive_info.message_infos[0].object_references = vec![70];
+
+        let mut reachable_leaf = ArchiveObject::new(
+            70,
+            vec![RawMessage {
+                type_: 999,
+                data: vec![1],
+            }],
+        )
+        .expect("reachable leaf object");
+        reachable_leaf.archive_info.message_infos[0].data_references = vec![7];
+
+        let mut unreachable_leaf = ArchiveObject::new(
+            80,
+            vec![RawMessage {
+                type_: 999,
+                data: vec![1],
+            }],
+        )
+        .expect("unreachable leaf object");
+        unreachable_leaf.archive_info.message_infos[0].data_references = vec![8];
+
+        let document_archive = Archive {
+            objects: vec![root, middle, reachable_leaf, unreachable_leaf],
+        };
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive(PACKAGE_METADATA_ENTRY, &metadata_archive)
+            .expect("metadata archive");
+        package
+            .replace_archive("Index/Document.iwa", &document_archive)
+            .expect("document archive");
+        package
     }
 
     fn uuid_entry(identifier: u64, lower: u64, upper: u64) -> Vec<u8> {
@@ -1639,5 +1921,35 @@ mod tests {
         append_wire_varint(&mut duplicate_reference, 1, 9);
         append_wire_varint(&mut duplicate_reference, 1, 10);
         assert!(decode_reference_identifier(&duplicate_reference).is_err());
+    }
+
+    #[test]
+    fn reachability_deduplicates_edges_and_keeps_only_reachable_media() {
+        let package = package_with_media_reachability_graph();
+        let assets = reachable_embedded_assets(&package, [50]).expect("reachable media");
+        assert_eq!(
+            assets
+                .iter()
+                .map(|asset| asset.data_identifier)
+                .collect::<Vec<_>>(),
+            [MediaAssetId::new(7).expect("asset identifier")]
+        );
+    }
+
+    #[test]
+    fn reachability_work_limit_is_typed() {
+        let limits = WireLimits::default()
+            .with_rewrite_work(1)
+            .expect("valid work limit");
+        let mut work = 0;
+        charge_reachability_work(&mut work, 1, limits).expect("first work unit");
+        assert!(matches!(
+            charge_reachability_work(&mut work, 1, limits),
+            Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: LimitKind::RewriteWork,
+                observed: 2,
+                limit: 1,
+            }))
+        ));
     }
 }

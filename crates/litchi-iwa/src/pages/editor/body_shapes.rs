@@ -879,6 +879,7 @@ impl PagesEditor {
                 *identifier,
             )?;
         }
+        let mut object_index = PagesObjectIndex::build(&staged, &graph.object_ids)?;
         staged.update_archive(&graph.archive_name, |archive| {
             for identifier in &graph.object_ids {
                 archive.remove_object(*identifier).ok_or_else(|| {
@@ -888,7 +889,10 @@ impl PagesEditor {
             Ok(())
         })?;
         for identifier in &graph.object_ids {
-            if package_references_object(&staged, *identifier)? {
+            object_index.mark_removed(*identifier)?;
+        }
+        for identifier in &graph.object_ids {
+            if object_index.references_object(*identifier) {
                 return Err(Error::InvalidFormat(format!(
                     "Pages shape object {identifier} remains referenced after deletion"
                 )));

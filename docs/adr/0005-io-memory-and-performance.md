@@ -2185,3 +2185,47 @@ canonical BNC edge does not close any migration debt or monolith gate. Current
 topology remains 64 packages, 238 declarations, 227 canonical edges, 11
 development-only edges, 11 debts with IDs
 `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
+
+## 2026-09-03 amendment: package-scale indexing and fallible staging
+
+This wave hardens package-scale paths without changing their semantic owners.
+The migration host now checks borrowed package input length before allocating
+or copying it and uses fallible reservation; allocation failure maps to the
+existing typed allocation error. Its object index preflights cardinality,
+builds duplicate/archive/name catalogs once, and batches resolution without
+repeated map reconstruction. Pages host graph deletion uses one fallibly
+reserved object-location/inbound-reference index, and host media reachability
+uses bounded maps/sets plus sorted linear deduplication instead of quadratic
+`Vec::contains` scans. Existing traversal order and failure behavior remain
+authoritative.
+
+Focused owners receive the same locality treatment. Numbers comment metadata
+and reply validation use reserved ID/UUID/location indexes and one inbound
+census; the five scalar display-format owners and persisted sort share a
+duplicate-rejecting physical-entry index. Pages footnote validation borrows
+metadata until preflight, uses fallible visitor growth, and reuses one sorted
+package graph census. Keynote chart-caption, movie-playback, table-title,
+table-header, and table-appearance verification replace nested scans with
+fallible catalogs and reference-frequency maps. These changes improve admitted
+paths from repeated quadratic scans to expected linear or indexed lookup while
+charging retained memory/work to existing transaction budgets; they do not
+establish package-wide peak-RSS, latency, or zero-copy claims.
+
+The focused Keynote build-order owner added in the same wave performs fallible
+preflight before retaining build/chunk references, preserves complete nested
+reference bytes, reserves chunk groups before publication, and uses checked
+global chunk offsets after a permutation. Exact no-op classification requires
+both semantic identity and exact artifact equality. Prost/Buffa differential
+tests now cover every projected drawable-parent `Reference` field, absent
+parents, unknown wire kinds/groups, malformed groups, and exact limits; the
+text-storage codec gains Unicode/empty repeated parity, source borrowing,
+UTF-8, group-policy, and boundary tests. This test expansion changes no
+production wire ownership.
+
+Focused verification passed 694 `litchi-iwa-protos` library tests, 425 Numbers
+library tests (421 passed, four external-oracle tests ignored), 131 Pages
+library tests, and 189 Keynote library tests, plus focused clippy gates. The
+topology remains 64 workspace packages, 238 internal declarations, 227
+canonical edges, 11 development-only edges, debts
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. No
+dependency, debt, host, or ADR 0028 deletion gate closes.

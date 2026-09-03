@@ -170,7 +170,8 @@ Pages (`.pages`), `litchi-keynote` owns Keynote (`.key`), and `litchi-numbers`
 owns Numbers (`.numbers`). Their shared IWA archive, protocol, and package
 layers do not constitute a fourth user-facing format. At the `litchi` facade,
 the `pages`, `keynote`, and `numbers` feature leaves enable those parsers
-independently; `iwork` is only the aggregate of all three.
+independently. `iwork` is both their aggregate dependency gate and a bounded,
+format-neutral read-only facade; it is not a fourth native format or writer.
 
 ## Cross-format capability index
 

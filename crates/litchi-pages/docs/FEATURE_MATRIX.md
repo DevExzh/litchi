@@ -8,9 +8,10 @@ rendering fidelity, or every revision of Apple's private protobuf schema.
 `Package` is the exact-source adapter: it accepts regular package files or ZIP bytes, retains the
 physical artifact, and exposes selected source-bound transactions. `Document` is an immutable,
 archive-free semantic snapshot: it can read a ZIP or an app-authored package directory, but it
-does not retain exact bytes, media, previews, or unsupported members. A successful package write
-is a stream to a caller-owned sink; callers must provide their own durable or atomic filesystem
-publication policy.
+does not retain exact bytes, media, previews, or unsupported members. `Package::write_to` streams
+to a caller-owned sink, while `Package::save` delegates staged regular-file publication, sync,
+identity checks, and atomic replacement to the archive-owned save boundary; the documented
+platform and filesystem durability caveats still apply.
 
 The broad Pages builder under `litchi-iwa` is a migration host, not evidence for a focused
 `litchi-pages` row. Its capabilities are listed separately below.
@@ -109,7 +110,7 @@ canonical root previews on changed publication; persisted sort and lock edits pr
 | External resources, actions, macros, controls, and embedded code | 🟡 | 🟡 | 🟡 | Unsupported payloads may remain inert and opaque in an exact package artifact, but no external target is resolved or fetched and no action, macro, control, or embedded code is activated or executed. Changed transactions refuse unsupported dependency graphs. Evidence: [`package preservation boundary`](../src/package.rs), [`legacy host policy`](../../litchi-iwa/README.md). |
 | Cryptographic signatures and trust | ❌ | ❌ | ❌ | Exact no-op output can preserve bytes that happen to be signed; the focused crate has no signature verification, certificate trust, invalidation, or re-signing model. |
 | Durable patch serialization, composition, merge, and history | ❌ | N/A | ❌ | Focused patches retain process-local source/target artifacts or logical deltas; there is no stable patch format, composition/merge protocol, or persistent history API. |
-| Durable atomic filesystem publication | ❌ | N/A | ❌ | Focused commits return a verified in-memory `Package`; `write_to` only streams bytes and does not flush, sync, rename, or atomically replace a path. The caller owns durable publication policy. |
+| Durable atomic filesystem publication | 🟡 | N/A | 🟡 | [`Package::save`](../src/package.rs) delegates staged regular-file publication, flush/sync, identity checks, and atomic replacement to the archive-owned save boundary. Platform/filesystem durability caveats and committed post-replacement errors remain explicit; `write_to` is still only a caller-owned streaming sink. |
 
 ## Legacy-host delta
 

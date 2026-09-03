@@ -42,7 +42,7 @@ use litchi_iwa_protos::package_metadata_codec::{
 use thiserror::Error;
 
 use super::{Package, PhysicalSource, ReadError, SLIDE_MESSAGE_TYPE, SemanticLimitKind};
-use crate::{Background, Gradient, Kind, Opaque, SlideSelector, SlideSelectorError, Stop};
+use crate::{Background, Gradient, Kind, SlideSelector, SlideSelectorError, Stop};
 
 const SLIDE_STYLE_MESSAGE_TYPE: u32 = 9;
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
@@ -247,7 +247,9 @@ impl<'a> SlideBackgroundEdit<'a> {
 
     /// Stage a semantic background value, including explicit [`Background::None`].
     pub fn set(mut self, background: Background) -> Result<Self, SlideBackgroundError> {
-        validate_background(self.source, &background)?;
+        if matches!(&background, Background::Unsupported) {
+            return Err(SlideBackgroundError::UnsupportedSource);
+        }
         self.desired = Desired::Set(background);
         Ok(self)
     }
@@ -260,11 +262,6 @@ impl<'a> SlideBackgroundEdit<'a> {
     /// Stage a validated native gradient.
     pub fn set_gradient(self, gradient: Gradient) -> Result<Self, SlideBackgroundError> {
         self.set(Background::Gradient(gradient))
-    }
-
-    /// Stage a bounded opaque native fill payload.
-    pub fn set_opaque(self, opaque: Opaque) -> Result<Self, SlideBackgroundError> {
-        self.set(Background::Opaque(opaque))
     }
 
     /// Stage removal of the direct override and restoration of inheritance.
@@ -688,30 +685,21 @@ fn snapshot_to_background(
 ) -> Result<Background, SlideBackgroundError> {
     match snapshot {
         codec::BackgroundSnapshot::None { .. } => Ok(Background::None),
-        codec::BackgroundSnapshot::Opaque { raw }
-        | codec::BackgroundSnapshot::Image { raw, .. } => Opaque::from_slice(raw)
-            .map(Background::Opaque)
-            .map_err(|_| SlideBackgroundError::InvalidSource),
-        codec::BackgroundSnapshot::Solid { raw, color } => {
-            rgba_from_color(color).map(Background::Solid).or_else(|_| {
-                Opaque::from_slice(raw)
-                    .map(Background::Opaque)
-                    .map_err(|_| SlideBackgroundError::InvalidSource)
-            })
+        codec::BackgroundSnapshot::Opaque { .. } | codec::BackgroundSnapshot::Image { .. } => {
+            Ok(Background::Unsupported)
         },
-        codec::BackgroundSnapshot::Gradient { raw, gradient } => {
+        codec::BackgroundSnapshot::Solid { color, .. } => Ok(match rgba_from_color(color) {
+            Ok(color) => Background::Solid(color),
+            Err(_) => Background::Unsupported,
+        }),
+        codec::BackgroundSnapshot::Gradient { gradient, .. } => {
             if gradient_wire_has_only_semantic_fields(gradient, wire_limits)? {
-                gradient_from_snapshot(gradient, options)
-                    .map(Background::Gradient)
-                    .or_else(|_| {
-                        Opaque::from_slice(raw)
-                            .map(Background::Opaque)
-                            .map_err(|_| SlideBackgroundError::InvalidSource)
-                    })
+                Ok(match gradient_from_snapshot(gradient, options) {
+                    Ok(gradient) => Background::Gradient(gradient),
+                    Err(_) => Background::Unsupported,
+                })
             } else {
-                Opaque::from_slice(raw)
-                    .map(Background::Opaque)
-                    .map_err(|_| SlideBackgroundError::InvalidSource)
+                Ok(Background::Unsupported)
             }
         },
     }
@@ -842,35 +830,6 @@ fn gradient_from_snapshot(
         .map_err(|_| SlideBackgroundError::InvalidSource)
 }
 
-fn validate_background(
-    package: &Package,
-    background: &Background,
-) -> Result<(), SlideBackgroundError> {
-    if let Background::Opaque(opaque) = background {
-        let snapshot = codec::decode_slide_background(
-            opaque.as_bytes(),
-            codec_options(package, opaque.as_bytes())?,
-        )
-        .map_err(map_codec_error)?;
-        if matches!(snapshot, codec::BackgroundSnapshot::Image { .. }) {
-            // ImageFillArchive carries data/object references that cannot be
-            // published by a fresh style object without cloning the native
-            // ownership metadata.  Refuse this branch rather than emitting
-            // an unindexed resource reference.
-            return Err(SlideBackgroundError::InvalidSource);
-        }
-        let root = WireView::parse_with_limits(opaque.as_bytes(), WireLimits::default())
-            .map_err(map_wire_error)?;
-        if root.fields().any(|field| field.number() == 3) {
-            // A mixed FillArchive (for example color plus image) can be
-            // projected as opaque by the codec, but field 3 still carries
-            // ImageFillArchive resource references.
-            return Err(SlideBackgroundError::InvalidSource);
-        }
-    }
-    Ok(())
-}
-
 fn commit_edit(
     edit: SlideBackgroundEdit<'_>,
 ) -> Result<SlideBackgroundCommit, SlideBackgroundError> {
@@ -921,6 +880,9 @@ fn commit_edit(
             patch,
             diagnostics: SlideBackgroundDiagnostics::unchanged(),
         });
+    }
+    if edit.before == Background::Unsupported {
+        return Err(SlideBackgroundError::UnsupportedSource);
     }
     if !catalog.source_is_exact() {
         return Err(SlideBackgroundError::UnsupportedSource);
@@ -2316,11 +2278,7 @@ fn encode_background(
                 options,
             )
         },
-        Background::Opaque(opaque) => codec::rewrite_slide_background_with_report(
-            inherited,
-            codec::BackgroundWrite::Raw(opaque.as_bytes()),
-            options,
-        ),
+        Background::Unsupported => return Err(SlideBackgroundError::UnsupportedSource),
     };
     rewritten
         .map(|(bytes, _report)| bytes)
