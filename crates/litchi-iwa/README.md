@@ -1083,12 +1083,13 @@ carry the properties through native-style duplication.
 The same media APIs expose the archive-free
 `litchi_iwa_common::media::playback::{MediaPlaybackSettings, MediaVolume,
 MediaLoopMode}` vocabulary for typed trim boundaries, poster position, repeat
-mode, and volume. Update the returned settings and write them through the
-matching `*_playback_settings` method (for example,
-`set_body_movie_playback_settings` or
-`set_slide_audio_playback_settings`). The update preserves unrelated and
-unknown movie-archive fields; the common builders reject invalid levels and
-trim ranges, and `MediaLoopMode::Unknown` allows a newer native repeat value to
+mode, and volume. Body and sheet media continue to use their matching host
+`*_playback_settings` methods. Keynote slide-media playback is owned by
+`litchi_keynote::Package::edit_slide_movie_playback_settings` and its typed
+`SlideSelector`/`MovieSelector` selectors; audio controls are included in that
+source-ordered media collection. The update preserves unrelated and unknown
+movie-archive fields; the common builders reject invalid levels and trim
+ranges, and `MediaLoopMode::Unknown` allows a newer native repeat value to
 round-trip.
 
 ### Edit existing documents through the migration host

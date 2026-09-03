@@ -12,8 +12,8 @@ use super::slide_movies::graph::{
 };
 use super::*;
 use crate::data_reference_registry::add_component_data_reference;
+use crate::media::MediaAssetId;
 use crate::media_playback::media_playback_settings;
-use crate::media_playback::replace_movie_playback_settings;
 use crate::shapes::{
     DrawablePoint, DrawableProperties, drawable_properties, geometry_from_drawable,
 };
@@ -26,7 +26,7 @@ const AUDIO_ARCHIVE_MESSAGE_TYPE: u32 = 3_007;
 pub struct KeynoteSlideAudioInfo {
     pub slide_index: usize,
     pub drawable_object_id: u64,
-    pub audio_data_identifier: u64,
+    pub audio_data_identifier: MediaAssetId,
     pub position: DrawablePoint,
     /// Shared drawable metadata, including accessibility description and lock state.
     pub properties: DrawableProperties,
@@ -40,7 +40,7 @@ pub struct KeynoteSlideAudioInfo {
 pub struct RemovedKeynoteSlideAudio {
     pub audio: KeynoteSlideAudioInfo,
     /// Assets culled because the removed clip held their final package reference.
-    pub removed_data_identifiers: Vec<u64>,
+    pub removed_data_identifiers: Vec<MediaAssetId>,
 }
 
 impl KeynoteEditor {
@@ -120,7 +120,7 @@ impl KeynoteEditor {
         let created_graph = verified.slide_movie_graph(slide_index, ids.drawable)?;
         let expected_duration = Duration::try_from_secs_f64(f64::from(duration_seconds))
             .map_err(|error| Error::ParseError(error.to_string()))?;
-        if created.audio_data_identifier != asset.data_identifier.get()
+        if created.audio_data_identifier != asset.data_identifier
             || created.position != options.position()
             || created.duration != expected_duration
             || created_graph.info.kind != MovieKind::Audio
@@ -229,47 +229,6 @@ impl KeynoteEditor {
         Ok(())
     }
 
-    /// Read trim, poster, repeat, and volume settings for one slide audio clip.
-    pub fn slide_audio_playback_settings(
-        &self,
-        slide_index: usize,
-        drawable_object_id: u64,
-    ) -> Result<MediaPlaybackSettings> {
-        Ok(require_audio(self, slide_index, drawable_object_id)?.playback)
-    }
-
-    /// Update playback settings while retaining unrelated and unknown audio fields.
-    pub fn set_slide_audio_playback_settings(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-        settings: MediaPlaybackSettings,
-    ) -> Result<()> {
-        let source = self.slide_movie_graph(slide_index, drawable_object_id)?;
-        if source.info.kind != MovieKind::Audio {
-            return Err(Error::ParseError(format!(
-                "Keynote media {drawable_object_id} is {:?}, not slide audio",
-                source.info.kind
-            )));
-        }
-        let mut staged = self.package().clone();
-        let expected = replace_movie_playback_settings(
-            &mut staged,
-            &source.archive_name,
-            drawable_object_id,
-            "Keynote audio",
-            settings,
-        )?;
-        let verified = Self::from_package(staged)?;
-        if verified.slide_audio_playback_settings(slide_index, drawable_object_id)? != expected {
-            return Err(Error::InvalidFormat(
-                "Keynote audio playback update failed validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(())
-    }
-
     /// Duplicate one slide audio control using Keynote's native placement.
     ///
     /// The audio, title/caption stand-ins, and automatic Start Audio build
@@ -310,7 +269,7 @@ impl KeynoteEditor {
         replacement: &[u8],
     ) -> Result<Vec<u8>> {
         let source = require_audio(self, slide_index, drawable_object_id)?;
-        self.replace_media(source.audio_data_identifier, replacement)
+        self.replace_media(source.audio_data_identifier.get(), replacement)
     }
 
     /// Remove an audio clip, its automatic build, private graph, and unshared asset.
@@ -321,14 +280,18 @@ impl KeynoteEditor {
     ) -> Result<RemovedKeynoteSlideAudio> {
         let audio = require_audio(self, slide_index, drawable_object_id)?;
         let removed = self.remove_slide_media(slide_index, drawable_object_id, MovieKind::Audio)?;
-        if removed.movie.movie_data_identifier != Some(audio.audio_data_identifier) {
+        if removed.movie.movie_data_identifier != Some(audio.audio_data_identifier.get()) {
             return Err(Error::InvalidFormat(
                 "Keynote audio deletion removed a mismatched media graph".to_owned(),
             ));
         }
         Ok(RemovedKeynoteSlideAudio {
             audio,
-            removed_data_identifiers: removed.removed_data_identifiers,
+            removed_data_identifiers: removed
+                .removed_data_identifiers
+                .into_iter()
+                .map(MediaAssetId::try_from)
+                .collect::<Result<Vec<_>>>()?,
         })
     }
 }
@@ -364,14 +327,16 @@ fn audio_info(
             "Keynote media {drawable_object_id} is not an audio-only archive"
         )));
     }
-    let audio_data_identifier = audio
-        .movie_data
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Keynote audio {drawable_object_id} has no data reference"
-            ))
-        })?
-        .identifier;
+    let audio_data_identifier = MediaAssetId::try_from(
+        audio
+            .movie_data
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Keynote audio {drawable_object_id} has no data reference"
+                ))
+            })?
+            .identifier,
+    )?;
     let position = geometry_from_drawable(&audio.super_)?
         .position
         .ok_or_else(|| {
@@ -435,7 +400,9 @@ mod tests {
         );
         assert_eq!(created.position, POSITION);
         assert_eq!(
-            editor.extract_media(created.audio_data_identifier).unwrap(),
+            editor
+                .extract_media(created.audio_data_identifier.get())
+                .unwrap(),
             AUDIO
         );
         let builds = editor.slide_builds(0).unwrap();
@@ -455,18 +422,32 @@ mod tests {
             volume: Some(MediaVolume::new(0.75).unwrap()),
             ..created.playback
         };
-        editor
-            .set_slide_audio_playback_settings(0, created.drawable_object_id, changed_playback)
+        let package = KeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let commit = package
+            .edit_slide_movie_playback_settings(SlideSelector::index(0), MovieSelector::index(0))
+            .unwrap()
+            .set(changed_playback.try_into().unwrap())
+            .unwrap()
+            .commit()
             .unwrap();
+        let mut bytes = Vec::new();
+        commit.package().write_to(&mut bytes).unwrap();
+        editor = KeynoteEditor::from_bytes(&bytes).unwrap();
         assert_eq!(
-            editor
-                .slide_audio_playback_settings(0, created.drawable_object_id)
-                .unwrap(),
-            changed_playback
+            editor.slide_audio(0).unwrap().first().unwrap().playback,
+            changed_playback,
         );
-        editor
-            .set_slide_audio_playback_settings(0, created.drawable_object_id, created.playback)
+        let package = KeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let commit = package
+            .edit_slide_movie_playback_settings(SlideSelector::index(0), MovieSelector::index(0))
+            .unwrap()
+            .set(created.playback.try_into().unwrap())
+            .unwrap()
+            .commit()
             .unwrap();
+        let mut bytes = Vec::new();
+        commit.package().write_to(&mut bytes).unwrap();
+        editor = KeynoteEditor::from_bytes(&bytes).unwrap();
 
         let changed_properties = properties("Accessible Keynote audio");
         editor
@@ -509,7 +490,9 @@ mod tests {
             AUDIO
         );
         assert_eq!(
-            editor.extract_media(created.audio_data_identifier).unwrap(),
+            editor
+                .extract_media(created.audio_data_identifier.get())
+                .unwrap(),
             REPLACEMENT_AUDIO
         );
 
@@ -618,7 +601,9 @@ mod tests {
             AUDIO
         );
         assert_eq!(
-            editor.extract_media(source.audio_data_identifier).unwrap(),
+            editor
+                .extract_media(source.audio_data_identifier.get())
+                .unwrap(),
             REPLACEMENT_AUDIO
         );
 

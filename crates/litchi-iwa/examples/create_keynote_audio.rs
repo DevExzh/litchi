@@ -5,10 +5,11 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use litchi_iwa::keynote::KeynoteDocumentBuilder;
+use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa_common::media::playback::{MediaLoopMode, MediaVolume};
 use litchi_iwa_common::shape::geometry::Point;
 use litchi_keynote::slide::audio::Options as SlideAudioOptions;
+use litchi_keynote::{MovieSelector, Package as KeynotePackage, SlideSelector};
 
 const SLIDE_CENTER: Point = Point { x: 960.0, y: 540.0 };
 
@@ -41,14 +42,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut properties = editor.slide_audio_properties(0, created.drawable_object_id)?;
     properties.accessibility_description = Some(format!("Embedded audio: {preferred_filename}"));
     editor.set_slide_audio_properties(0, created.drawable_object_id, properties)?;
-    editor.set_slide_audio_playback_settings(
-        0,
-        created.drawable_object_id,
-        created
-            .playback
-            .with_loop_mode(Some(MediaLoopMode::Repeat))
-            .with_volume(Some(MediaVolume::new(0.75)?)),
-    )?;
+    let playback = created
+        .playback
+        .with_loop_mode(Some(MediaLoopMode::Repeat))
+        .with_volume(Some(MediaVolume::new(0.75)?));
+    let package = KeynotePackage::from_bytes(&editor.to_bytes()?)?;
+    let commit = package
+        .edit_slide_movie_playback_settings(SlideSelector::index(0), MovieSelector::index(0))?
+        .set(playback.try_into()?)?
+        .commit()?;
+    let mut bytes = Vec::new();
+    commit.package().write_to(&mut bytes)?;
+    editor = KeynoteEditor::from_bytes(&bytes)?;
     editor.save(output)?;
     println!(
         "created Keynote audio {} backed by data {}",

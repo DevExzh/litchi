@@ -806,10 +806,12 @@ output/field/work/allocation ceilings. The preset and network discovery
 projections are replayed through both plain and reported decoders and probe
 their input/field/work/nesting ceilings one below the reported requirement.
 Malformed, duplicate, wrong-wire, non-canonical, truncated, and unbalanced-
-group inputs are observed without mutating their caller-owned source. The
+group inputs are observed without mutating their caller-owned source. A fixed
+bounded parent/child pair also exercises successful inheritance and a
+self-parent cycle, matching the Keynote table-appearance host cutover. The
 recipes under `corpus/table_appearance/` include canonical known properties,
 unknown overlong scalars/groups, preset/network reference failures,
-style-edge rewrites, and strict failure shapes.
+style-edge rewrites, the inheritance child, and strict failure shapes.
 
 List and type-check the target from this directory:
 

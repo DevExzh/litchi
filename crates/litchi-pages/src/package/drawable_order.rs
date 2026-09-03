@@ -646,7 +646,7 @@ fn read_order(
             return Err(BodyDrawableOrderError::InvalidSource);
         }
         if identifier.get() == ROOT_OBJECT_IDENTIFIER
-            || zorder_identifier == Some(identifier)
+            || identifier == zorder_identifier
             || body_storage_identifier == Some(identifier)
         {
             return Err(BodyDrawableOrderError::InvalidSource);

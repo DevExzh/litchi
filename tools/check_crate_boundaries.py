@@ -45979,6 +45979,7 @@ def _audit_iwa_keynote_slide_table_config_source_topology(
 
     violations: list[str] = []
     focused_call_seen = False
+    physical_route_seen = False
     scanned_source = False
     source_root = root / IWA_KEYNOTE_SOURCE_ROOT
     declaration = re.compile(
@@ -45988,7 +45989,7 @@ def _audit_iwa_keynote_slide_table_config_source_topology(
     )
 
     def inspect_source(path: Path, *, example: bool) -> None:
-        nonlocal focused_call_seen, scanned_source
+        nonlocal focused_call_seen, physical_route_seen, scanned_source
         raw_source = path.read_text(encoding="utf-8")
         production_source = _mask_rust_cfg_test_items(raw_source)
         code = _mask_rust_non_code(production_source)
@@ -45996,6 +45997,8 @@ def _audit_iwa_keynote_slide_table_config_source_topology(
         relative = path.relative_to(root)
         for match in declaration.finditer(code):
             name = match.group(1)
+            if name in physical_methods:
+                physical_route_seen = True
             if name in retired_methods:
                 line_number = code.count("\n", 0, match.start()) + 1
                 scope = "example " if example else ""
@@ -46048,6 +46051,7 @@ def _audit_iwa_keynote_slide_table_config_source_topology(
             # calls to them no longer pass this ratchet. Numbers executor
             # helpers have distinct names and are not matched here.
             if method in physical_methods:
+                physical_route_seen = True
                 continue
             line_number = code.count("\n", 0, match.start("method")) + 1
             scope = "example " if example else ""
@@ -46081,7 +46085,13 @@ def _audit_iwa_keynote_slide_table_config_source_topology(
                 continue
             inspect_source(path, example=True)
 
-    if scanned_source and not focused_call_seen:
+    # A retained compatibility Sort Now route must demonstrate that persisted
+    # configuration is read through the focused package. Once that physical
+    # host route is deleted entirely, requiring an otherwise-unused focused
+    # call would recreate the coupling this retirement ratchet is meant to
+    # eliminate. Title and dimension owners retain their existing requirement.
+    require_focused_call = feature != "sort" or physical_route_seen
+    if scanned_source and require_focused_call and not focused_call_seen:
         violations.append(
             f"litchi-iwa Keynote slide-table-{label} persisted configuration must "
             "call the focused litchi-keynote Package"

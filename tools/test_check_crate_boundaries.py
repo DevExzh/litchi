@@ -16507,6 +16507,11 @@ fn rewrite_movie_title_operation(
             violations = boundaries.audit_iwa_keynote_slide_table_sort_source_topology(root)
             self.assertTrue(any("must call the focused litchi-keynote Package" in item for item in violations), violations)
 
+            host.write_text("fn unrelated_keynote_host_code() {}\n", encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_sort_source_topology(root), []
+            )
+
             example = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_CONFIG_EXAMPLE_ROOT / "mixed_iwork.rs"
             example.parent.mkdir(parents=True, exist_ok=True)
             example.write_text(

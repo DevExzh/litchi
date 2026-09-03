@@ -187,6 +187,7 @@ pub use slide_text::{
 pub use litchi_iwa_archive::Limits;
 
 const DOCUMENT_MESSAGE_TYPE: u32 = 1;
+const LITCHI_SOURCE_BUILT_TEMPLATE: &str = "Application/Litchi/Blank/Wide";
 const SHOW_MESSAGE_TYPE: u32 = 2;
 const SLIDE_NODE_MESSAGE_TYPE: u32 = 4;
 const SLIDE_MESSAGE_TYPE: u32 = 5;
@@ -966,6 +967,25 @@ impl Package {
         Ok(())
     }
 
+    /// Classify the private source-builder compatibility marker.
+    ///
+    /// This is an internal migration seam for the legacy facade. It borrows a
+    /// strict Buffa-era projection of the native root and does not expose the
+    /// marker or any raw archive identity to normal focused-package callers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the root document or its required envelopes are
+    /// missing, ambiguous, malformed, or outside the configured wire limits.
+    #[doc(hidden)]
+    pub fn __is_litchi_source_built_compatibility(&self) -> ReadResult<bool> {
+        let marker = decode_root_template_identifier(
+            self.root_document_payload()?,
+            self.semantic_wire_limits()?,
+        )?;
+        Ok(marker == Some(LITCHI_SOURCE_BUILT_TEMPLATE))
+    }
+
     /// Return package measurements after resolving the semantic slide tree.
     ///
     /// # Errors
@@ -984,7 +1004,7 @@ impl Package {
             .get_or_try_init(|| Ok(Document::from_show(self.decode_show()?)))
     }
 
-    fn root_show_identifier(&self) -> ReadResult<u64> {
+    fn root_document_payload(&self) -> ReadResult<&[u8]> {
         let mut roots = self
             .state
             .source
@@ -1002,12 +1022,15 @@ impl Package {
         let object = root.archive().object(1).ok_or_else(|| {
             ReadError::InvalidFormat("Keynote root object 1 is missing".to_owned())
         })?;
-        let payload = unique_payload(
+        unique_payload(
             &object.messages,
             &[DOCUMENT_MESSAGE_TYPE],
             "Keynote root document",
-        )?;
-        decode_root_show_identifier(payload, self.semantic_wire_limits()?)
+        )
+    }
+
+    fn root_show_identifier(&self) -> ReadResult<u64> {
+        decode_root_show_identifier(self.root_document_payload()?, self.semantic_wire_limits()?)
     }
 
     fn decode_show(&self) -> ReadResult<Show> {
@@ -1785,6 +1808,42 @@ fn decode_root_show_identifier(payload: &[u8], wire_limits: WireLimits) -> ReadR
         } else {
             ReadError::InvalidFormat(format!(
                 "Keynote root document projection is malformed: {error}"
+            ))
+        }
+    })
+}
+
+fn decode_root_template_identifier(
+    payload: &[u8],
+    wire_limits: WireLimits,
+) -> ReadResult<Option<&str>> {
+    let recursion_limit = u32::try_from(wire_limits.max_nesting()).map_err(|_error| {
+        ReadError::InvalidFormat("Keynote root nesting limit does not fit u32".to_owned())
+    })?;
+    keynote_document_codec::decode_template_identifier(
+        payload,
+        keynote_document_codec::DecodeOptions::new(payload.len(), recursion_limit)
+            .with_max_fields(wire_limits.max_fields())
+            .with_max_work_bytes(wire_limits.max_rewrite_work()),
+    )
+    .map_err(|error| {
+        if let Some((observed, maximum)) = error.field_limit_values() {
+            ReadError::PayloadLimit {
+                kind: PayloadLimitKind::Fields,
+                observed,
+                maximum,
+                path: SemanticPath::Package,
+            }
+        } else if let Some((observed, maximum)) = error.work_limit_values() {
+            ReadError::PayloadLimit {
+                kind: PayloadLimitKind::Work,
+                observed,
+                maximum,
+                path: SemanticPath::Package,
+            }
+        } else {
+            ReadError::InvalidFormat(format!(
+                "Keynote root template projection is malformed: {error}"
             ))
         }
     })

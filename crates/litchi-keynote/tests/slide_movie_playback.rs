@@ -18,9 +18,14 @@ const METADATA_LAST_IDENTIFIER: u64 = 1_000;
 const SLIDE_NODE: u64 = 3;
 const SLIDE: u64 = 4;
 const MOVIES: [u64; 2] = [100, 101];
+const AUDIO: u64 = 102;
 const TITLES: [u64; 2] = [110, 111];
 const CAPTIONS: [u64; 2] = [130, 131];
 const STYLES: [u64; 2] = [160, 161];
+const AUDIO_TITLE: u64 = 112;
+const AUDIO_CAPTION: u64 = 132;
+const AUDIO_STYLE: u64 = 162;
+const AUDIO_DATA: u64 = 2_003;
 const THEME: u64 = 80;
 const STYLESHEET: u64 = 81;
 const MOVIE_MESSAGE_TYPE: u32 = 3_007;
@@ -101,6 +106,50 @@ fn movie_payload(movie: usize, full_playback: bool) -> Vec<u8> {
     payload
 }
 
+fn audio_payload() -> Vec<u8> {
+    let value = tsd::MovieArchive {
+        super_: tsd::DrawableArchive {
+            geometry: Some(tsd::GeometryArchive {
+                position: Some(tsp::Point { x: 320.0, y: 240.0 }),
+                size: Some(tsp::Size {
+                    width: 0.0,
+                    height: 0.0,
+                }),
+                ..Default::default()
+            }),
+            parent: Some(reference(SLIDE)),
+            title: Some(reference(AUDIO_TITLE)),
+            caption: Some(reference(AUDIO_CAPTION)),
+            accessibility_description: Some("Playback test audio".to_owned()),
+            ..Default::default()
+        },
+        movie_data: Some(tsp::DataReference {
+            identifier: AUDIO_DATA,
+        }),
+        style: Some(reference(AUDIO_STYLE)),
+        original_size: Some(tsp::Size {
+            width: 0.0,
+            height: 0.0,
+        }),
+        natural_size: Some(tsp::Size {
+            width: 0.0,
+            height: 0.0,
+        }),
+        flags: Some(0),
+        audio_only: Some(true),
+        start_time: Some(0.5),
+        end_time: Some(12.25),
+        poster_time: Some(0.0),
+        loop_option: Some(1),
+        volume: Some(0.6),
+        ..Default::default()
+    };
+    let mut payload = value.encode_to_vec();
+    append_length_delimited_field(&mut payload, UNKNOWN_FIELD, UNKNOWN_MARKER)
+        .expect("unknown playback field");
+    payload
+}
+
 fn metadata_uuid_entry(identifier: u64) -> tsp::ObjectUuidMapEntry {
     tsp::ObjectUuidMapEntry {
         identifier,
@@ -132,7 +181,25 @@ fn metadata_component_payload(
 
 fn metadata_payload(last_identifier: u64) -> TestResult<Vec<u8>> {
     let ids = [
-        1, 2, 3, 4, THEME, STYLESHEET, 90, 100, 101, 110, 111, 130, 131, 160, 161,
+        1,
+        2,
+        3,
+        4,
+        THEME,
+        STYLESHEET,
+        90,
+        100,
+        101,
+        AUDIO,
+        110,
+        111,
+        AUDIO_TITLE,
+        130,
+        131,
+        AUDIO_CAPTION,
+        160,
+        161,
+        AUDIO_STYLE,
     ];
     let document = metadata_component_payload(DOCUMENT_COMPONENT, "Document", 10, &ids)?;
     let unrelated = metadata_component_payload(UNRELATED_COMPONENT, "Unrelated", 7, &[900])?;
@@ -189,8 +256,14 @@ fn synthetic_package() -> TestResult<Vec<u8>> {
     let slide = kn::SlideArchive {
         style: reference(90),
         transition: kn::TransitionArchive::default(),
-        owned_drawables: MOVIES.iter().copied().map(reference).collect(),
-        drawables_z_order: MOVIES.iter().copied().map(reference).collect(),
+        owned_drawables: [MOVIES[0], MOVIES[1], AUDIO]
+            .into_iter()
+            .map(reference)
+            .collect(),
+        drawables_z_order: [MOVIES[0], MOVIES[1], AUDIO]
+            .into_iter()
+            .map(reference)
+            .collect(),
         name: Some("Playback".to_owned()),
         in_document: true,
         ..Default::default()
@@ -199,7 +272,12 @@ fn synthetic_package() -> TestResult<Vec<u8>> {
         object(1, 1, document.encode_to_vec())?,
         object(2, 2, show.encode_to_vec())?,
         object(SLIDE_NODE, 4, node.encode_to_vec())?,
-        object_with_references(SLIDE, 5, slide.encode_to_vec(), MOVIES.to_vec())?,
+        object_with_references(
+            SLIDE,
+            5,
+            slide.encode_to_vec(),
+            [MOVIES[0], MOVIES[1], AUDIO].to_vec(),
+        )?,
         object(THEME, 10, Vec::new())?,
         object(STYLESHEET, 9_002, Vec::new())?,
         object(90, 9_003, Vec::new())?,
@@ -215,6 +293,15 @@ fn synthetic_package() -> TestResult<Vec<u8>> {
         objects.push(object(CAPTIONS[movie], STANDIN_MESSAGE_TYPE, Vec::new())?);
         objects.push(object(STYLES[movie], 2_025, Vec::new())?);
     }
+    objects.push(object_with_references(
+        AUDIO,
+        MOVIE_MESSAGE_TYPE,
+        audio_payload(),
+        vec![AUDIO_TITLE, AUDIO_CAPTION, AUDIO_STYLE],
+    )?);
+    objects.push(object(AUDIO_TITLE, STANDIN_MESSAGE_TYPE, Vec::new())?);
+    objects.push(object(AUDIO_CAPTION, STANDIN_MESSAGE_TYPE, Vec::new())?);
+    objects.push(object(AUDIO_STYLE, 2_025, Vec::new())?);
     let metadata = component(vec![object(
         METADATA_OBJECT,
         11_006,
@@ -225,6 +312,7 @@ fn synthetic_package() -> TestResult<Vec<u8>> {
             ("Data/sentinel.bin", b"unrelated ZIP sentinel".as_slice()),
             ("Data/movie.mov", b"synthetic movie bytes".as_slice()),
             ("Data/poster.png", b"synthetic poster bytes".as_slice()),
+            ("Data/audio.wav", b"synthetic audio bytes".as_slice()),
             ("preview.jpg", b"large preview".as_slice()),
             ("preview-micro.jpg", b"micro preview".as_slice()),
             ("preview-web.jpg", b"web preview".as_slice()),
@@ -543,7 +631,7 @@ fn malformed_known_fields_are_rejected_without_publication() -> TestResult<()> {
 }
 
 #[test]
-fn unknown_fields_are_retained_and_non_file_movies_are_refused() -> TestResult<()> {
+fn unknown_fields_are_retained_and_unsupported_media_are_refused() -> TestResult<()> {
     let source = synthetic_package()?;
     let payload = movie_payload_from_package(&source, MOVIES[0])?;
     let mut rewritten = payload.clone();
@@ -575,6 +663,11 @@ fn unknown_fields_are_retained_and_non_file_movies_are_refused() -> TestResult<(
         target
             .windows(5)
             .any(|window| window == [0xd0, 0x05, 0x96, 0x81, 0x00])
+    );
+    assert!(
+        package
+            .slide_movie_playback_settings(SlideSelector::index(0), MovieSelector::index(2))?
+            .is_some()
     );
     let non_file = strip_movie_data(&source)?;
     assert_playback_rejected(&non_file)?;

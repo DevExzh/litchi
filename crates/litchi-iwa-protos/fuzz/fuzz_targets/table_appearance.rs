@@ -20,6 +20,19 @@ const MAX_WORK_BYTES: usize = 512 * 1024;
 const MAX_RECURSION: u32 = 64;
 const MAX_STYLES: usize = 4 * 1024;
 
+// A compact valid parent/child pair keeps the Keynote table-appearance host
+// cutover's inheritance seam reachable independently of package discovery.
+// Both payloads stay well below the target's finite input/output ceilings.
+const STYLE_INHERITANCE_BASE: &[u8] = &[
+    0x0a, 0x06, 0x20, 0x00, 0x2a, 0x02, 0x08, 0x08, 0x5a, 0x03, 0x88, 0x02, 0x00,
+];
+const STYLE_INHERITANCE_CHILD: &[u8] = &[
+    0x0a, 0x0a, 0x1a, 0x02, 0x08, 0x09, 0x20, 0x01, 0x2a, 0x02, 0x08, 0x08, 0x5a, 0x02, 0x08, 0x01,
+];
+const STYLE_INHERITANCE_CYCLE: &[u8] = &[
+    0x0a, 0x0a, 0x1a, 0x02, 0x08, 0x0a, 0x20, 0x01, 0x2a, 0x02, 0x08, 0x08, 0x5a, 0x02, 0x08, 0x01,
+];
+
 const FIXED_CASES: &[&[u8]] = &[
     // TableModelArchive.table_style = Reference { identifier: 7 }.
     &[0x1a, 0x02, 0x08, 0x07],
@@ -93,6 +106,7 @@ fuzz_target!(|data: &[u8]| {
         for fixed in FIXED_CASES {
             exercise_source(fixed, b"fixed-table-appearance");
         }
+        exercise_inheritance_fixtures();
     });
 });
 
@@ -395,6 +409,39 @@ fn exercise_style_inheritance(snapshot: codec::TableStyleSnapshot<'_>, data: &[u
     } else if let Err(error) = result {
         observe_error(error);
     }
+}
+
+fn exercise_inheritance_fixtures() {
+    let base = codec::decode_table_style(STYLE_INHERITANCE_BASE, options(STYLE_INHERITANCE_BASE))
+        .unwrap_or_else(|error| panic!("valid style inheritance base rejected: {error}"));
+    let child =
+        codec::decode_table_style(STYLE_INHERITANCE_CHILD, options(STYLE_INHERITANCE_CHILD))
+            .unwrap_or_else(|error| panic!("valid style inheritance child rejected: {error}"));
+    let nodes = [
+        codec::TableStyleNode::new(9, base),
+        codec::TableStyleNode::new(10, child),
+    ];
+    let effective = codec::resolve_table_style_appearance(
+        &nodes,
+        10,
+        options(STYLE_INHERITANCE_CHILD).with_max_styles(nodes.len()),
+    )
+    .unwrap_or_else(|error| panic!("valid style inheritance chain rejected: {error}"));
+    assert!(effective.row_banding);
+    assert!(!effective.body_horizontal);
+    black_box(effective);
+
+    let cycle =
+        codec::decode_table_style(STYLE_INHERITANCE_CYCLE, options(STYLE_INHERITANCE_CYCLE))
+            .unwrap_or_else(|error| panic!("valid style inheritance cycle rejected: {error}"));
+    let cycle_nodes = [codec::TableStyleNode::new(10, cycle)];
+    let error = codec::resolve_table_style_appearance(
+        &cycle_nodes,
+        10,
+        options(STYLE_INHERITANCE_CYCLE).with_max_styles(cycle_nodes.len()),
+    )
+    .expect_err("style inheritance cycle was accepted");
+    black_box(error);
 }
 
 fn exercise_variation(data: &[u8]) {
