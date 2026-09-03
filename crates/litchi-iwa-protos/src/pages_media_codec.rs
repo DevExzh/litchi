@@ -1,7 +1,7 @@
 //! Strict private Buffa projection for one Pages media discriminator.
 //!
 //! Pages movies and audio clips share `TSD.MovieArchive`. The graph reader
-//! needs only the `audioOnly` discriminator while discovering body
+//! needs only the `audioOnly` and `is_live_video` discriminators while discovering body
 //! attachments; the complete archive remains caller-owned and is decoded by
 //! the existing graph validation path. A handwritten wire pass owns framing,
 //! canonical scalar validation, and resource accounting before a private
@@ -19,6 +19,7 @@ use buffa::DecodeOptions as BuffaDecodeOptions;
 use crate::buffa_pages_media_generated::LitchiIwaProjection as projection;
 
 const AUDIO_ONLY_FIELD: u32 = 9;
+const IS_LIVE_VIDEO_FIELD: u32 = 30;
 const MAX_RECURSION_LIMIT: u32 = 64;
 
 /// Explicit finite resource policy for one Pages media payload.
@@ -72,6 +73,7 @@ impl DecodeOptions {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MovieAudioFlagSnapshot {
     audio_only: Option<bool>,
+    is_live_video: Option<bool>,
 }
 
 impl MovieAudioFlagSnapshot {
@@ -80,7 +82,21 @@ impl MovieAudioFlagSnapshot {
     pub const fn audio_only(self) -> Option<bool> {
         self.audio_only
     }
+
+    /// Native `is_live_video` field, preserving field presence.
+    #[must_use]
+    pub const fn is_live_video(self) -> Option<bool> {
+        self.is_live_video
+    }
 }
+
+/// Selected `TSD.MovieArchive` media flags used by Pages discovery.
+///
+/// The historical name [`MovieAudioFlagSnapshot`] remains the concrete type
+/// so downstream internal callers compiled against the first projection keep
+/// their source compatibility. This alias describes the complete selected
+/// flag set without exposing the native archive or raw IDs.
+pub type MovieMediaFlagSnapshot = MovieAudioFlagSnapshot;
 
 /// Failure from strict Pages media preflight or its Buffa cross-check.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -234,23 +250,36 @@ impl From<buffa::DecodeError> for DecodeError {
     }
 }
 
-/// Decode the selected `TSD.MovieArchive.audioOnly` discriminator.
-pub fn decode_movie_audio_only(
+/// Decode the selected `TSD.MovieArchive` media discriminators.
+pub fn decode_movie_media_flags(
     source: &[u8],
     options: DecodeOptions,
-) -> Result<MovieAudioFlagSnapshot, DecodeError> {
+) -> Result<MovieMediaFlagSnapshot, DecodeError> {
     validate_decode_input(source, options)?;
     let mut budget = Budget::new(options);
     let strict = preflight(source, options, &mut budget)?;
     let view: projection::MovieAudioFlagArchiveLazyView<'_> =
         options.buffa().decode_lazy_view(source)?;
-    let projected = MovieAudioFlagSnapshot {
+    let projected = MovieMediaFlagSnapshot {
         audio_only: view.audio_only,
+        is_live_video: view.is_live_video,
     };
     if projected != strict {
         return Err(DecodeError::projection());
     }
     Ok(strict)
+}
+
+/// Decode the selected `TSD.MovieArchive` media discriminators.
+///
+/// This name is retained for compatibility with the original audio-only
+/// projection. It now also validates and returns `is_live_video`, ensuring
+/// movie and audio discovery share one strict wire contract.
+pub fn decode_movie_audio_only(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<MovieMediaFlagSnapshot, DecodeError> {
+    decode_movie_media_flags(source, options)
 }
 
 fn validate_decode_input(source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
@@ -325,19 +354,33 @@ fn preflight(
 ) -> Result<MovieAudioFlagSnapshot, DecodeError> {
     budget.charge_message(source.len())?;
     let mut audio_only = None;
+    let mut is_live_video = None;
     let mut remaining = source;
     while let Some(field) = next_strict_field(&mut remaining, options, budget)? {
-        if field.number != AUDIO_ONLY_FIELD {
-            continue;
+        match field.number {
+            AUDIO_ONLY_FIELD => {
+                if audio_only.is_some() {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSD.MovieArchive.audioOnly",
+                    ));
+                }
+                audio_only = Some(require_canonical_bool(field.varint()?)?);
+            },
+            IS_LIVE_VIDEO_FIELD => {
+                if is_live_video.is_some() {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSD.MovieArchive.is_live_video",
+                    ));
+                }
+                is_live_video = Some(require_canonical_bool(field.varint()?)?);
+            },
+            _ => {},
         }
-        if audio_only.is_some() {
-            return Err(DecodeError::duplicate_singular(
-                "TSD.MovieArchive.audioOnly",
-            ));
-        }
-        audio_only = Some(require_canonical_bool(field.varint()?)?);
     }
-    Ok(MovieAudioFlagSnapshot { audio_only })
+    Ok(MovieAudioFlagSnapshot {
+        audio_only,
+        is_live_video,
+    })
 }
 
 fn require_canonical_bool(value: u64) -> Result<bool, DecodeError> {
@@ -550,15 +593,18 @@ mod tests {
     fn canonical_movie_audio_flag_matches_projection() {
         let source = tsd::MovieArchive {
             audio_only: Some(true),
+            is_live_video: Some(true),
             ..tsd::MovieArchive::default()
         }
         .encode_to_vec();
-        assert_eq!(
-            decode_movie_audio_only(&source, options(&source))
-                .expect("canonical movie payload")
-                .audio_only(),
-            Some(true)
-        );
+        let snapshot =
+            decode_movie_media_flags(&source, options(&source)).expect("canonical movie payload");
+        assert_eq!(snapshot.audio_only(), Some(true));
+        assert_eq!(snapshot.is_live_video(), Some(true));
+
+        let compatibility = decode_movie_audio_only(&source, options(&source))
+            .expect("compatibility movie payload");
+        assert_eq!(compatibility, snapshot);
     }
 
     #[test]
@@ -570,23 +616,29 @@ mod tests {
                 .audio_only(),
             None
         );
+        assert_eq!(
+            decode_movie_media_flags(&absent, options(&absent))
+                .expect("absent live-video discriminator")
+                .is_live_video(),
+            None
+        );
         let explicit_false = tsd::MovieArchive {
             audio_only: Some(false),
+            is_live_video: Some(false),
             ..tsd::MovieArchive::default()
         }
         .encode_to_vec();
-        assert_eq!(
-            decode_movie_audio_only(&explicit_false, options(&explicit_false))
-                .expect("explicit false discriminator")
-                .audio_only(),
-            Some(false)
-        );
+        let snapshot = decode_movie_media_flags(&explicit_false, options(&explicit_false))
+            .expect("explicit false discriminator");
+        assert_eq!(snapshot.audio_only(), Some(false));
+        assert_eq!(snapshot.is_live_video(), Some(false));
     }
 
     #[test]
     fn unknown_fields_are_ignored_without_reencoding() {
         let mut source = tsd::MovieArchive {
             audio_only: Some(true),
+            is_live_video: Some(false),
             ..tsd::MovieArchive::default()
         }
         .encode_to_vec();
@@ -596,6 +648,12 @@ mod tests {
                 .expect("unknown movie field")
                 .audio_only(),
             Some(true)
+        );
+        assert_eq!(
+            decode_movie_media_flags(&source, options(&source))
+                .expect("unknown movie field")
+                .is_live_video(),
+            Some(false)
         );
     }
 
@@ -616,11 +674,28 @@ mod tests {
             error.noncanonical_reason(),
             Some("bool scalar is not zero or one")
         );
+
+        let duplicate_live_video = [0xf0, 0x01, 0x01, 0xf0, 0x01, 0x00];
+        let error = decode_movie_media_flags(&duplicate_live_video, options(&duplicate_live_video))
+            .expect_err("duplicate is_live_video");
+        assert_eq!(
+            error.duplicate_singular_field(),
+            Some("TSD.MovieArchive.is_live_video")
+        );
+
+        let noncanonical_live_video = [0xf0, 0x01, 0x02];
+        let error =
+            decode_movie_media_flags(&noncanonical_live_video, options(&noncanonical_live_video))
+                .expect_err("noncanonical is_live_video");
+        assert_eq!(
+            error.noncanonical_reason(),
+            Some("bool scalar is not zero or one")
+        );
     }
 
     #[test]
     fn field_and_work_limits_are_finite() {
-        let source = [0x10, 0x01, 0x18, 0x01];
+        let source = [0x10, 0x01, 0x18, 0x01, 0xf0, 0x01, 0x00];
         let field_limited = DecodeOptions::new(source.len(), 1, source.len() * 8, 8);
         let error = decode_movie_audio_only(&source, field_limited).expect_err("field limit");
         assert_eq!(error.field_limit_values(), Some((2, 1)));

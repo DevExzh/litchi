@@ -7,6 +7,7 @@ use crate::shapes::{
     DrawableProperties, drawable_properties, geometry_from_drawable, patch_drawable_geometry,
     patch_wrapped_drawable_properties,
 };
+use litchi_iwa_protos::pages_media_codec;
 use litchi_pages::movie::Options as PagesMovieOptions;
 
 const THEME_MESSAGE_TYPE: u32 = 10_001;
@@ -192,8 +193,7 @@ pub(super) fn body_movie_infos(editor: &PagesEditor) -> Result<Vec<PagesMovieInf
                 drawable.identifier
             )));
         };
-        let movie = tsd::MovieArchive::decode(message.data.as_slice())?;
-        if movie.audio_only == Some(true) || movie.is_live_video == Some(true) {
+        if !movie_is_discoverable(message.data.as_slice(), drawable.identifier)? {
             continue;
         }
         movies.push(movie_info(
@@ -215,6 +215,19 @@ pub(super) fn body_movie_infos(editor: &PagesEditor) -> Result<Vec<PagesMovieInf
         )));
     }
     Ok(movies)
+}
+
+fn movie_is_discoverable(source: &[u8], drawable_object_id: u64) -> Result<bool> {
+    let flags = pages_media_codec::decode_movie_media_flags(
+        source,
+        pages_media_codec::DecodeOptions::for_source(source),
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Pages movie {drawable_object_id} has malformed media flags: {error}"
+        ))
+    })?;
+    Ok(flags.audio_only() != Some(true) && flags.is_live_video() != Some(true))
 }
 
 pub(super) fn body_movie_graph(
@@ -832,5 +845,61 @@ fn reference(identifier: u64) -> tsp::Reference {
     tsp::Reference {
         identifier,
         ..Default::default()
+    }
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::expect_used,
+    reason = "The discovery predicate tests use small canonical protobuf fixtures."
+)]
+mod tests {
+    use prost::Message as _;
+
+    use super::*;
+
+    fn media_payload(audio_only: Option<bool>, is_live_video: Option<bool>) -> Vec<u8> {
+        tsd::MovieArchive {
+            audio_only,
+            is_live_video,
+            ..tsd::MovieArchive::default()
+        }
+        .encode_to_vec()
+    }
+
+    #[test]
+    fn movie_discovery_excludes_audio_and_live_video_payloads() {
+        assert!(movie_is_discoverable(&media_payload(None, None), 101).expect("flags"));
+        assert!(
+            movie_is_discoverable(&media_payload(Some(false), Some(false)), 102)
+                .expect("explicit false flags")
+        );
+        assert!(
+            !movie_is_discoverable(&media_payload(Some(true), Some(false)), 103)
+                .expect("audio-only flags")
+        );
+        assert!(
+            !movie_is_discoverable(&media_payload(Some(false), Some(true)), 104)
+                .expect("live-video flags")
+        );
+        assert!(
+            !movie_is_discoverable(&media_payload(Some(true), Some(true)), 105)
+                .expect("audio/live flags")
+        );
+    }
+
+    #[test]
+    fn movie_discovery_routes_flags_through_the_focused_projection() {
+        let source = include_str!("graph.rs");
+        let production = source
+            .split_once("#[cfg(test)]")
+            .map_or(source, |(production, _tests)| production);
+        assert_eq!(
+            production
+                .matches("pages_media_codec::decode_movie_media_flags(")
+                .count(),
+            1
+        );
+        assert!(!production.contains("tsd::MovieArchive::decode(message.data.as_slice())"));
     }
 }

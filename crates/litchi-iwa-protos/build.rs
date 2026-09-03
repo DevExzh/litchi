@@ -1306,8 +1306,8 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
         ),
         (
             "TSDMovieAudioFlagArchive.proto",
-            251,
-            "e4306fa9440c13f2f77587f2edfb25c81eab639087d217bf88f5738ce416c2a9",
+            287,
+            "2bcd9bd1076612f32ed09bafbbb0a0ce6b3ff804e16dd9478444308d7468cda4",
         ),
         (
             "TSDMoviePlaybackArchive.proto",
@@ -5635,11 +5635,15 @@ fn enforce_pages_media_projection_provenance(
     projection_directory: &Path,
 ) -> Result<(), Box<dyn Error>> {
     const MOVIE_AUDIO_ONLY: &str = "optional bool audioOnly = 9;";
-    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\npackage LitchiIwaProjection;\nmessage MovieAudioFlagArchive {\noptional bool audio_only = 9;\n}";
-    const CODEC_MARKERS: [&str; 7] = [
+    const MOVIE_IS_LIVE_VIDEO: &str = "optional bool is_live_video = 30 [default = false];";
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\npackage LitchiIwaProjection;\nmessage MovieAudioFlagArchive {\noptional bool audio_only = 9;\noptional bool is_live_video = 30;\n}";
+    const CODEC_MARKERS: [&str; 10] = [
         "const AUDIO_ONLY_FIELD: u32 = 9;",
+        "const IS_LIVE_VIDEO_FIELD: u32 = 30;",
         "const MAX_RECURSION_LIMIT: u32 = 64;",
         "pub struct MovieAudioFlagSnapshot",
+        "pub type MovieMediaFlagSnapshot = MovieAudioFlagSnapshot;",
+        "pub fn decode_movie_media_flags(",
         "pub fn decode_movie_audio_only(",
         "decode_lazy_view",
         "crate::buffa_pages_media_generated::",
@@ -5658,6 +5662,7 @@ fn enforce_pages_media_projection_provenance(
     let codec = fs::read_to_string("src/pages_media_codec.rs")?;
     let production_codec = production_codec_source(&codec);
     if tsd.matches(MOVIE_AUDIO_ONLY).count() != 1
+        || tsd.matches(MOVIE_IS_LIVE_VIDEO).count() != 1
         || projection_schema != PROJECTION_SCHEMA
         || projection.len() > 1024
         || projection.contains("repeated ")
@@ -5668,7 +5673,7 @@ fn enforce_pages_media_projection_provenance(
             .iter()
             .any(|fragment| production_codec.contains(fragment))
     {
-        return Err("Pages media projection/codec drifted from TSD.MovieArchive.audioOnly, exceeded its source budget, introduced repeated storage, or added production Prost/encoding".into());
+        return Err("Pages media projection/codec drifted from TSD.MovieArchive audioOnly/is_live_video flags, exceeded its source budget, introduced repeated storage, or added production Prost/encoding".into());
     }
     Ok(())
 }
