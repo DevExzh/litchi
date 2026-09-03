@@ -3,13 +3,13 @@
 //! This module owns the public transaction boundary. Native style objects,
 //! package metadata, wire framing, and physical member names remain private.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_iwa_archive::package::EntryEdit;
+use litchi_iwa_archive::package::{Catalog, Entry, EntryEdit};
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes, varint::encoded_len, wire::WireView,
 };
@@ -1408,6 +1408,11 @@ fn rewrite_native_appearance(
     component_names.sort_unstable();
     component_names.dedup();
     let physical = physical_source(source)?;
+    let entries = entry_index(
+        physical.package(),
+        budget,
+        SlideTableAppearanceError::InvalidSource,
+    )?;
     let archive_limits = source
         .state
         .options
@@ -1433,10 +1438,9 @@ fn rewrite_native_appearance(
             amount: component_names.len(),
         })?;
     for name in component_names {
-        let entry = physical
-            .package()
-            .iter()
-            .find(|entry| entry.name() == name)
+        let entry = entries
+            .get(name.as_str())
+            .copied()
             .ok_or(SlideTableAppearanceError::InvalidSource)?;
         if entry.is_opaque() {
             return Err(SlideTableAppearanceError::UnsupportedSource);
@@ -2505,9 +2509,8 @@ fn replace_model_in_archive(
             .ok_or(SlideTableAppearanceError::InvalidSource)?,
     )?;
     let before = info.object_references.clone();
-    if before.iter().filter(|value| **value == old_style).count() != 1
-        || before.contains(&new_style)
-    {
+    let frequencies = reference_frequencies(&before, budget)?;
+    if frequencies.get(&old_style).copied() != Some(1) || before.contains(&new_style) {
         return Err(SlideTableAppearanceError::InvalidSource);
     }
     let after_len = before_len;
@@ -2909,6 +2912,31 @@ fn verify_candidate_locality(
     if !preview_transition_is_forward && !preview_transition_is_inverse {
         return Err(SlideTableAppearanceError::Verification);
     }
+    let source_entries = entry_index(
+        source_catalog.package(),
+        budget,
+        SlideTableAppearanceError::Verification,
+    )?;
+    let candidate_entries = entry_index(
+        candidate_catalog.package(),
+        budget,
+        SlideTableAppearanceError::Verification,
+    )?;
+    let mut expected_set = HashSet::new();
+    expected_set
+        .try_reserve(expected_members.len())
+        .map_err(|_| SlideTableAppearanceError::Allocation {
+            amount: expected_members.len(),
+        })?;
+    budget.retained(
+        expected_members
+            .len()
+            .checked_mul(size_of::<&str>())
+            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+    )?;
+    for name in expected_members {
+        expected_set.insert(name.as_str());
+    }
     let mut before_entries = source_catalog
         .package()
         .iter()
@@ -2920,15 +2948,22 @@ fn verify_candidate_locality(
     loop {
         match (before_entries.next(), after_entries.next()) {
             (Some(before), Some(after)) if before.name() == after.name() => {
-                let changed = before.raw_name() != after.raw_name()
-                    || before.data() != after.data()
-                    || before.metadata() != after.metadata()
-                    || before.raw_record().local_record() != after.raw_record().local_record()
-                    || before.raw_record().compressed_data()
-                        != after.raw_record().compressed_data();
-                let expected = expected_members
-                    .iter()
-                    .any(|name| name.as_str() == before.name());
+                let indexed_before = source_entries
+                    .get(before.name())
+                    .copied()
+                    .ok_or(SlideTableAppearanceError::Verification)?;
+                let indexed_after = candidate_entries
+                    .get(after.name())
+                    .copied()
+                    .ok_or(SlideTableAppearanceError::Verification)?;
+                let changed = indexed_before.raw_name() != indexed_after.raw_name()
+                    || indexed_before.data() != indexed_after.data()
+                    || indexed_before.metadata() != indexed_after.metadata()
+                    || indexed_before.raw_record().local_record()
+                        != indexed_after.raw_record().local_record()
+                    || indexed_before.raw_record().compressed_data()
+                        != indexed_after.raw_record().compressed_data();
+                let expected = expected_set.contains(before.name());
                 if changed != expected {
                     return Err(SlideTableAppearanceError::Verification);
                 }
@@ -2975,8 +3010,8 @@ fn select_table_with_budget(
             maximum: package.semantic_limits().max_references() as u64,
         });
     }
-    reject_duplicates(&owned, budget)?;
-    reject_duplicates(&z_order, budget)?;
+    let owned_set = reject_duplicates(&owned, budget)?;
+    let _z_order_set = reject_duplicates(&z_order, budget)?;
     validate_slide_metadata(
         package,
         slide,
@@ -3043,12 +3078,7 @@ fn select_table_with_budget(
             }
             continue;
         }
-        if owned
-            .iter()
-            .filter(|value| **value == table_info_identifier)
-            .count()
-            != 1
-        {
+        if !owned_set.contains(&table_info_identifier) {
             return Err(SlideTableAppearanceError::InvalidSource);
         }
         validate_role(
@@ -3399,7 +3429,7 @@ fn strict_reference(payload: &[u8], limits: WireLimits) -> Result<u64, SlideTabl
 fn reject_duplicates(
     values: &[u64],
     budget: &mut AppearanceBudget,
-) -> Result<(), SlideTableAppearanceError> {
+) -> Result<HashSet<u64>, SlideTableAppearanceError> {
     budget.allocations(1)?;
     budget.scratch(
         values
@@ -3417,7 +3447,72 @@ fn reject_duplicates(
             return Err(SlideTableAppearanceError::InvalidSource);
         }
     }
-    Ok(())
+    Ok(seen)
+}
+
+/// Build a bounded physical-member index for a transaction pass.
+///
+/// The caller supplies the duplicate-name error because malformed source
+/// records are an invalid source during rewrite, while an ambiguous name in a
+/// reopened candidate is a verification failure.
+fn entry_index<'a>(
+    catalog: &'a Catalog,
+    budget: &mut AppearanceBudget,
+    duplicate_error: SlideTableAppearanceError,
+) -> Result<HashMap<&'a str, &'a Entry>, SlideTableAppearanceError> {
+    let count = catalog.iter().count();
+    budget.allocations(usize::from(count != 0))?;
+    budget.retained(
+        count
+            .checked_mul(size_of::<(&str, &Entry)>())
+            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+    )?;
+    let mut index = HashMap::new();
+    index
+        .try_reserve(count)
+        .map_err(|_| SlideTableAppearanceError::Allocation { amount: count })?;
+    for entry in catalog.iter() {
+        budget.transaction_work(
+            entry
+                .name()
+                .len()
+                .checked_add(1)
+                .ok_or(SlideTableAppearanceError::InvalidSource)?,
+        )?;
+        if index.insert(entry.name(), entry).is_some() {
+            return Err(duplicate_error);
+        }
+    }
+    Ok(index)
+}
+
+/// Count reference occurrences in one aggregate using one fallibly reserved
+/// frequency map instead of a scan for each queried identifier.
+fn reference_frequencies(
+    values: &[u64],
+    budget: &mut AppearanceBudget,
+) -> Result<HashMap<u64, usize>, SlideTableAppearanceError> {
+    budget.transaction_work(values.len())?;
+    budget.allocations(usize::from(!values.is_empty()))?;
+    budget.retained(
+        values
+            .len()
+            .checked_mul(size_of::<(u64, usize)>())
+            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+    )?;
+    let mut frequencies = HashMap::new();
+    frequencies
+        .try_reserve(values.len())
+        .map_err(|_| SlideTableAppearanceError::Allocation {
+            amount: values.len(),
+        })?;
+    for value in values {
+        let count = frequencies.entry(*value).or_insert(0usize);
+        *count = count
+            .checked_add(1)
+            .ok_or(SlideTableAppearanceError::InvalidSource)?;
+    }
+    Ok(frequencies)
 }
 
 fn is_appearance_role_message(message_type: u32) -> bool {
@@ -3497,13 +3592,11 @@ fn validate_slide_metadata(
             expected.push(*identifier);
         }
     }
-    if expected.iter().any(|identifier| {
-        info.object_references
-            .iter()
-            .filter(|reference| *reference == identifier)
-            .count()
-            != 1
-    }) {
+    let frequencies = reference_frequencies(&info.object_references, budget)?;
+    if expected
+        .iter()
+        .any(|identifier| frequencies.get(identifier).copied() != Some(1))
+    {
         return Err(SlideTableAppearanceError::InvalidSource);
     }
     let mut owned_fields = 0usize;
@@ -3564,13 +3657,8 @@ fn validate_table_info_metadata(
     validate_message_header(object, index)?;
     let info = &object.archive_info.message_infos[index];
     validate_resolvable_aggregate_references(package, info, budget)?;
-    if info
-        .object_references
-        .iter()
-        .filter(|identifier| **identifier == model_identifier)
-        .count()
-        != 1
-    {
+    let frequencies = reference_frequencies(&info.object_references, budget)?;
+    if frequencies.get(&model_identifier).copied() != Some(1) {
         return Err(SlideTableAppearanceError::InvalidSource);
     }
     let mut model_fields = 0usize;
@@ -3611,13 +3699,8 @@ fn validate_model_metadata(
         style_preset_identifier.map(|identifier| (identifier, 48))
     };
     if let Some((identifier, path)) = expected {
-        if info
-            .object_references
-            .iter()
-            .filter(|reference| **reference == identifier)
-            .count()
-            != 1
-        {
+        let frequencies = reference_frequencies(&info.object_references, budget)?;
+        if frequencies.get(&identifier).copied() != Some(1) {
             return Err(SlideTableAppearanceError::InvalidSource);
         }
         let mut selected_fields = 0usize;
@@ -4254,11 +4337,11 @@ fn ensure_unique_table_owner(
         .map(|component| component.archive().objects.len())
         .try_fold(0usize, |total, count| total.checked_add(count))
         .ok_or(SlideTableAppearanceError::InvalidSource)?;
-    let pair_work = object_count
-        .checked_mul(z_order.len().saturating_add(1))
+    let scan_work = object_count
+        .checked_add(z_order.len())
         .ok_or(SlideTableAppearanceError::InvalidSource)?;
-    budget.transaction_work(pair_work)?;
-    budget.allocations(2)?;
+    budget.transaction_work(scan_work)?;
+    budget.allocations(3)?;
     budget.scratch(
         z_order
             .len()
@@ -4278,22 +4361,26 @@ fn ensure_unique_table_owner(
             amount: z_order.len(),
         })?;
     z_order_set.extend(z_order.iter().copied());
-    let selected_table_count = owned
-        .iter()
-        .filter(|identifier| z_order_set.contains(identifier))
-        .count();
+    let selected_table_count = owned.iter().fold(0usize, |count, identifier| {
+        count + usize::from(z_order_set.contains(identifier))
+    });
     if selected_table_count != z_order.len() {
         return Err(SlideTableAppearanceError::InvalidSource);
     }
     let mut slide_owned_count = 0usize;
     let mut slide_z_order_count = 0usize;
-    let mut model_owner_count = Vec::new();
-    model_owner_count
-        .try_reserve_exact(z_order.len())
-        .map_err(|_| SlideTableAppearanceError::Allocation {
+    budget.retained(
+        z_order
+            .len()
+            .checked_mul(size_of::<(u64, usize)>())
+            .ok_or(SlideTableAppearanceError::InvalidSource)?,
+    )?;
+    let mut model_owner_count = HashMap::new();
+    model_owner_count.try_reserve(z_order.len()).map_err(|_| {
+        SlideTableAppearanceError::Allocation {
             amount: z_order.len(),
-        })?;
-    model_owner_count.resize(z_order.len(), 0);
+        }
+    })?;
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
             for message in &object.messages {
@@ -4309,14 +4396,16 @@ fn ensure_unique_table_owner(
                 let current_z =
                     repeated_references(&message.data, SLIDE_Z_ORDER_FIELD, limits, budget)?;
                 if object.archive_info.identifier == Some(slide_identifier) {
-                    slide_owned_count += current_owned
-                        .iter()
-                        .filter(|value| z_order_set.contains(value))
-                        .count();
-                    slide_z_order_count += current_z
-                        .iter()
-                        .filter(|value| z_order_set.contains(value))
-                        .count();
+                    slide_owned_count = slide_owned_count
+                        .checked_add(current_owned.iter().fold(0usize, |count, value| {
+                            count + usize::from(z_order_set.contains(value))
+                        }))
+                        .ok_or(SlideTableAppearanceError::InvalidSource)?;
+                    slide_z_order_count = slide_z_order_count
+                        .checked_add(current_z.iter().fold(0usize, |count, value| {
+                            count + usize::from(z_order_set.contains(value))
+                        }))
+                        .ok_or(SlideTableAppearanceError::InvalidSource)?;
                 }
             }
             if object
@@ -4324,9 +4413,12 @@ fn ensure_unique_table_owner(
                 .iter()
                 .any(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
             {
-                for (index, table) in z_order.iter().copied().enumerate() {
-                    if object.archive_info.identifier == Some(table) {
-                        model_owner_count[index] += 1;
+                if let Some(identifier) = object.archive_info.identifier {
+                    if z_order_set.contains(&identifier) {
+                        let count = model_owner_count.entry(identifier).or_insert(0usize);
+                        *count = count
+                            .checked_add(1)
+                            .ok_or(SlideTableAppearanceError::InvalidSource)?;
                     }
                 }
             }
@@ -4334,7 +4426,7 @@ fn ensure_unique_table_owner(
     }
     if slide_owned_count != z_order.len()
         || slide_z_order_count != z_order.len()
-        || z_order.iter().enumerate().any(|(index, identifier)| {
+        || z_order.iter().any(|identifier| {
             package
                 .object_with_component(*identifier)
                 .map(|(_, object)| {
@@ -4342,7 +4434,7 @@ fn ensure_unique_table_owner(
                         .messages
                         .iter()
                         .any(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
-                        && model_owner_count[index] != 1
+                        && model_owner_count.get(identifier).copied().unwrap_or(0) != 1
                 })
                 .unwrap_or(true)
         })

@@ -794,18 +794,6 @@ impl Bundle {
     ///
     /// * `Result<Self>` - Parsed bundle on success, error on failure
     ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// #![allow(deprecated)]
-    /// use litchi_iwa::raw::bundle::Bundle;
-    /// use std::fs;
-    ///
-    /// let data = fs::read("document.pages")?;
-    /// let bundle = Bundle::from_bytes(&data)?;
-    /// println!("Archives: {}", bundle.iter_archives().count());
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes_with_limits(bytes, BundleLimits::default())
     }

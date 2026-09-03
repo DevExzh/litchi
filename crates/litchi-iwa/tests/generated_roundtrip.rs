@@ -48,12 +48,10 @@ fn builders_emit_packages_that_all_public_readers_can_open() -> Result<(), Box<d
     Ok(())
 }
 
-#[allow(deprecated)]
 fn verify_package(path: &Path, expected: Application) -> Result<(), Box<dyn Error>> {
     let bytes = fs::read(path)?;
 
     let document = Document::open(path)?;
-    assert_send_sync::<litchi_iwa::raw::bundle::Bundle>();
     assert_send_sync::<litchi_iwa::Document>();
     assert_send_sync::<PagesSemanticDocument>();
     assert_send_sync::<NumbersSemanticDocument>();

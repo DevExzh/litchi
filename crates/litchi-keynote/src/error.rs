@@ -78,12 +78,6 @@ pub enum Error {
     /// A build path exceeded the bounded semantic collection budget.
     #[error("Keynote build path exceeds the semantic collection budget")]
     BuildTooLarge,
-    /// An opaque background payload cannot be empty.
-    #[error("Keynote opaque background payload cannot be empty")]
-    EmptyBackgroundPayload,
-    /// An opaque background payload exceeded the bounded semantic storage budget.
-    #[error("Keynote opaque background payload exceeds the semantic byte budget")]
-    BackgroundPayloadTooLarge,
 }
 
 /// Result type for semantic Keynote operations.

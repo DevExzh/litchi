@@ -3996,3 +3996,39 @@ The current inventory is 64 workspace packages, 238 internal dependency
 declarations, 227 canonical edges, 11 development-only edges, 11 ordered
 migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
 migration host. No debt, host, or monolith-deletion gate closes.
+
+## 2026-09-03 amendment: current ownership after raw-facade retirement
+
+The dated soundtrack and Numbers relocation/format paragraphs above remain
+historical snapshots. Rooted soundtrack-item read/add/insert/replace/remove is
+owned by `litchi-keynote::Package`; the old `litchi-iwa` item implementation
+and public item API are absent. Soundtrack creation, broad media/slide-media
+work, and remaining compatibility stay in the migration host, so debt 014 and
+its host edge remain open. The dedicated public `NumbersEditor` Number,
+Percentage, Currency, Scientific, and Fraction convenience routes are absent,
+as is public `NumbersEditor::move_table`; generic source-built/cross-format
+`DataFormat` mutation and a crate-private populated-sheet relocation bridge
+remain. Debt 015 and its host edge therefore remain open.
+
+The deprecated public `litchi_iwa::raw::{bundle, package}` facade, eight raw-only
+inspection examples, and its raw-package no-op integration test are removed.
+This does not remove the private host bundle/package implementation or the
+remaining broad editors. The recursively hardened manifest ratchet still finds
+the explicitly admitted nested `crates/litchi-iwa/fuzz -> litchi-iwa` edge;
+that edge, hundreds of host-owned operations, host-referenced generation
+guards, and debts `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]` continue to block
+the deletion gate.
+
+Focused Keynote ownership expands by one E1-only existing-build playback-order
+transaction. It has no new dependency edge and does not transfer build effects,
+timing, lifecycle, or native acceptance from the host. Keynote background
+unknown/image fills now cross the public boundary only as
+`Background::Unsupported`; raw preservation remains private. Package-scale
+indexing/fallible-allocation hardening in the host and focused format owners
+likewise changes no ownership edge.
+
+The current inventory is 64 workspace packages, 238 internal declarations,
+227 canonical edges, 11 development-only edges, debts
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. The root
+`litchi::iwork` facade remains host-free and bounded/read-only. No dependency,
+debt, migration host, or monolith-deletion gate closes.

@@ -678,7 +678,7 @@ impl Workbook {
     pub fn text(&self) -> Result<String> {
         match &self.inner {
             #[cfg(feature = "numbers")]
-            WorkbookImpl::Numbers(doc) => doc.text().map_err(|e| {
+            WorkbookImpl::Numbers(doc) => doc.document().plain_text().map_err(|e| {
                 Box::new(Error::ParseError(format!(
                     "Failed to extract text from Numbers: {}",
                     e

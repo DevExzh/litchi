@@ -8,9 +8,9 @@ and `.key` files.
 `litchi-iwa` reads Apple iWork bundles using their IWA (iWork Archive) layout:
 a ZIP container holding Snappy-compressed, protobuf-encoded object streams
 along with media assets and metadata. It is the legacy migration host, not the
-supported format facade. Its remaining public surface is for raw archive and
-package work, compatibility adapters, and editor capabilities that have not
-yet moved to a concrete format crate.
+supported format facade. Its remaining public surface is for compatibility
+adapters and editor capabilities that have not yet moved to a concrete format
+crate.
 This package is intentionally unpublished (`publish = false`); use it only as
 a workspace or source-checkout dependency while migrating existing callers.
 
@@ -185,7 +185,7 @@ println!("objects: {}", stats.total_objects);
 - Native Numbers cell-comment and direct-reply CRUD with table-list refcounts,
   copy-on-write threads, annotation authors, dates, and UUIDs
 
-## Legacy and raw editing
+## Legacy editing
 
 The examples in this section document remaining migration-host APIs. They are
 appropriate when a workflow explicitly needs an unmigrated editor capability
@@ -2568,8 +2568,8 @@ document-component UUID mappings. The clone is offset by 12 points in each
 axis so it remains independently selectable in Pages. Deletion reverses those
 registrations and safely releases a contiguous identifier suffix. Clone/delete
 cycles restore every decompressed IWA member exactly, including unknown fields,
-package metadata, and reference metadata. See `duplicate_pages_text_box`,
-`remove_pages_text_box`, and `inspect_pages_text_boxes`.
+package metadata, and reference metadata. See `duplicate_pages_text_box` and
+`remove_pages_text_box`.
 Reachable ordinary text boxes also expose typed position, size, geometry flags,
 and rotation in degrees. Optional zero-valued fields retain their raw presence semantics;
 updates preserve unknown fields nested inside the geometry, point, and size
@@ -2959,36 +2959,10 @@ are not reachable from the application document root. `remove_unreferenced`
 removes only records absent from component records, message data references,
 and `DataMetadataMap`; referenced deletion is rejected transactionally.
 
-## Low-level raw CRUD (migration and compatibility only)
-
-The `raw` namespace deliberately exposes native package and IWA primitives.
-It is deprecated and is not a stable semantic facade: callers must understand
-IWA object identities, message types, and preservation obligations. It remains
-available only for migration-host compatibility and low-level integrations;
-use focused format-semantic APIs where they cover the operation. Concrete
-format APIs must not re-export these values.
-
-```rust
-use litchi_iwa::raw::package::IWorkPackage;
-use litchi_iwa_archive::iwa::RawMessage;
-
-let mut package = IWorkPackage::open("document.pages")?;
-package.update_archive("Index/Document.iwa", |archive| {
-    let object = archive.object_mut(1).expect("document root");
-    object.replace_message(0, RawMessage {
-        type_: object.messages[0].type_,
-        data: object.messages[0].data.clone(),
-    })?;
-    Ok(())
-})?;
-package.save("updated.pages")?;
-# Ok::<(), litchi_iwa::Error>(())
-```
-
 Pre-iWork '13 single-file documents that wrap a directory-style bundle are
 normalized by this legacy host on import. Their IWA components, operation log,
-media, previews, and metadata remain available to its compatibility and raw
-APIs. This does not make normalized legacy sources generally editable through
+media, previews, and metadata remain available to its compatibility APIs. This
+does not make normalized legacy sources generally editable through
 the concrete package crates: a changed selector-first transaction may return
 `UnsupportedSource` until it has an explicit preservation-safe owner.
 

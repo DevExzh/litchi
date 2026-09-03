@@ -18,9 +18,7 @@ use litchi_iwa_core::{
     Archive, ArchiveObject, FieldInfo, FieldType, MessageInfo, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tss};
-use litchi_keynote::{
-    Background, Opaque, Package, Position, SlideSelector, background::MAX_BACKGROUND_PAYLOAD_BYTES,
-};
+use litchi_keynote::{Background, Package, Position, SlideSelector};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -171,7 +169,6 @@ fn fill_payload(background: &Background) -> Vec<u8> {
         Background::None => tsd::FillArchive::default().encode_to_vec(),
         Background::Solid(_) => native_solid_payload(background),
         Background::Gradient(value) => native_gradient_payload(value),
-        Background::Opaque(value) => value.as_bytes().to_vec(),
         _ => panic!("unsupported test background variant"),
     }
 }
@@ -561,31 +558,6 @@ fn package_metadata(package: &[u8]) -> TestResult<tsp::PackageMetadata> {
     )?)
 }
 
-fn assert_only_document_and_style_payloads_changed(before: &[u8], after: &[u8]) -> TestResult<()> {
-    let before_catalog = Catalog::from_bytes(before)?;
-    let after_catalog = Catalog::from_bytes(after)?;
-    let mut changed = 0;
-    for (before_entry, after_entry) in before_catalog.iter().zip(after_catalog.iter()) {
-        assert_eq!(before_entry.name(), after_entry.name());
-        if matches!(
-            before_entry.name(),
-            DOCUMENT_MEMBER
-                | STYLESHEET_MEMBER
-                | FIRST_SLIDE_MEMBER
-                | SECOND_SLIDE_MEMBER
-                | METADATA_MEMBER
-        ) {
-            if before_entry.data() != after_entry.data() {
-                changed += 1;
-            }
-        } else {
-            assert_eq!(before_entry.data(), after_entry.data());
-        }
-    }
-    assert!(changed >= 1);
-    Ok(())
-}
-
 #[test]
 fn reads_effective_and_direct_backgrounds_and_selects_by_name_or_position() -> TestResult {
     let package = Package::from_bytes(&synthetic_package()?)?;
@@ -604,10 +576,8 @@ fn reads_effective_and_direct_backgrounds_and_selects_by_name_or_position() -> T
 }
 
 #[test]
-fn set_solid_gradient_explicit_none_and_opaque_round_trip_with_reversible_patch() -> TestResult<()>
-{
+fn set_solid_gradient_and_explicit_none_round_trip_with_reversible_patch() -> TestResult<()> {
     let package = Package::from_bytes(&synthetic_package()?)?;
-    let source = exact_bytes(&package)?;
 
     let solid_commit = package
         .edit_slide_background("Alpha")?
@@ -642,37 +612,6 @@ fn set_solid_gradient_explicit_none_and_opaque_round_trip_with_reversible_patch(
     assert_eq!(
         none_commit.package().slide_background_override(0usize)?,
         Some(Background::None)
-    );
-
-    let mut opaque_bytes = Vec::new();
-    append_unknown(&mut opaque_bytes, UNKNOWN_FILL_FIELD, 7_305)?;
-    let opaque = Background::Opaque(Opaque::from_slice(&opaque_bytes)?);
-    let opaque_source = exact_bytes(none_commit.package())?;
-    let opaque_commit = none_commit
-        .package()
-        .edit_slide_background(0usize)?
-        .set_opaque(Opaque::from_slice(&opaque_bytes)?)?
-        .commit()?;
-    assert_eq!(opaque_commit.package().slide_background(0usize)?, opaque);
-    assert!(!opaque_commit.patch().is_noop());
-    assert!(opaque_commit.diagnostics().changed());
-    assert_only_document_and_style_payloads_changed(
-        &source,
-        &exact_bytes(opaque_commit.package())?,
-    )?;
-
-    let applied = package.apply_slide_background(opaque_commit.patch());
-    assert!(
-        applied.is_err(),
-        "a patch from a later source must conflict"
-    );
-    let restored = opaque_commit
-        .package()
-        .apply_slide_background(&opaque_commit.patch().inverse())?;
-    assert_eq!(exact_bytes(restored.package())?, opaque_source);
-    assert_eq!(
-        restored.package().slide_background(0usize)?,
-        Background::None
     );
     Ok(())
 }
@@ -837,8 +776,7 @@ fn shared_variation_is_copy_on_write_and_unselected_slide_is_unchanged() -> Test
 }
 
 #[test]
-fn future_gradient_extensions_remain_opaque_and_lossless() -> TestResult<()> {
-    let package = Package::from_bytes(&synthetic_package()?)?;
+fn unsupported_backgrounds_are_preserved_and_refuse_changed_edits_atomically() -> TestResult<()> {
     let canonical = native_gradient_payload(&gradient());
     let view = WireView::parse(&canonical)?;
     let mut gradient_payload = view
@@ -849,20 +787,45 @@ fn future_gradient_extensions_remain_opaque_and_lossless() -> TestResult<()> {
         .to_vec();
     append_unknown(&mut gradient_payload, 99, 73)?;
     let future = replace_first_length_delimited(&canonical, 2, &gradient_payload)?;
-    let opaque = Opaque::from_slice(&future)?;
 
-    let commit = package
-        .edit_slide_background(0usize)?
-        .set_opaque(Opaque::from_slice(&future)?)?
-        .commit()?;
+    let bytes = synthetic_package_with_style_state(
+        VARIATION_STYLE_ID,
+        BASE_STYLE_ID,
+        Some(fill_payload(&white())),
+        Some(future),
+        false,
+    )?;
+    let package = Package::from_bytes(&bytes)?;
+    assert_eq!(package.slide_background(0usize)?, Background::Unsupported);
     assert_eq!(
-        commit.package().slide_background(0usize)?,
-        Background::Opaque(opaque.clone())
+        package.slide_background_override(0usize)?,
+        Some(Background::Unsupported)
     );
-    assert_eq!(
-        commit.package().slide_background_override(0usize)?,
-        Some(Background::Opaque(opaque))
-    );
+
+    let source = exact_bytes(&package)?;
+    let noop = package.edit_slide_background(0usize)?.commit()?;
+    assert!(noop.patch().is_noop());
+    assert_eq!(noop.patch().before(), &Background::Unsupported);
+    assert_eq!(exact_bytes(noop.package())?, source);
+
+    assert!(matches!(
+        package
+            .edit_slide_background(0usize)?
+            .set(Background::Unsupported),
+        Err(litchi_keynote::SlideBackgroundError::UnsupportedSource)
+    ));
+    assert!(matches!(
+        package
+            .edit_slide_background(0usize)?
+            .set_solid(green_color())?
+            .commit(),
+        Err(litchi_keynote::SlideBackgroundError::UnsupportedSource)
+    ));
+    assert!(matches!(
+        package.edit_slide_background(0usize)?.clear()?.commit(),
+        Err(litchi_keynote::SlideBackgroundError::UnsupportedSource)
+    ));
+    assert_eq!(exact_bytes(&package)?, source);
     Ok(())
 }
 
@@ -1739,7 +1702,7 @@ fn stylesheet_cull_flag_is_authoritative() -> TestResult<()> {
 }
 
 #[test]
-fn output_limits_are_atomic_and_opaque_payload_budget_is_checked() -> TestResult<()> {
+fn output_limits_are_atomic() -> TestResult<()> {
     let bytes = synthetic_package()?;
     let source = Package::from_bytes(&bytes)?;
     let target = source
@@ -1762,9 +1725,5 @@ fn output_limits_are_atomic_and_opaque_payload_budget_is_checked() -> TestResult
         .commit();
     assert!(result.is_err());
     assert_eq!(exact_bytes(&limited)?, source_bytes);
-
-    let boundary = vec![0_u8; MAX_BACKGROUND_PAYLOAD_BYTES];
-    assert!(Opaque::from_slice(&boundary).is_ok());
-    assert!(Opaque::from_slice(&[0_u8; 1]).is_ok());
     Ok(())
 }

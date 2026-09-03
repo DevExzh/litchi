@@ -12,7 +12,11 @@
 //! provide a future multi-member implementation; silently editing only the
 //! representative member would make a reply/list/BNC ownership edge stale.
 
-use std::{collections::HashSet, fmt, mem::size_of};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+    mem::size_of,
+};
 
 use litchi_iwa_common::wire::{
     append_length_delimited_field, append_varint_field, patch_length_delimited_field,
@@ -315,10 +319,148 @@ impl storage_codec::StorageVisitor for ListProbe {
     }
 }
 
-#[derive(Debug, Default)]
+/// A fallible, direct identifier index used by the native reply validator.
+///
+/// The archive itself stores objects in source order, so this index is only a
+/// lookup aid; it never becomes an ordering authority.  Reserving the map
+/// before the first insertion makes malformed attacker-sized object/fact
+/// collections fail as a typed allocation or budget error instead of growing
+/// through an unaccounted sequence of rehashes.
+#[derive(Debug)]
+struct IdIndex {
+    positions: HashMap<u64, usize>,
+}
+
+impl IdIndex {
+    fn with_capacity(
+        capacity: usize,
+        budget: &mut TransactionBudget,
+        path: BudgetPath,
+    ) -> Result<Self> {
+        let entry_size = size_of::<u64>()
+            .checked_add(size_of::<usize>())
+            .ok_or(NativeReplyError::InvalidSource)?;
+        let scratch = capacity
+            .checked_mul(entry_size)
+            .ok_or(NativeReplyError::InvalidSource)?;
+        budget
+            .charge_allocations(1, path)
+            .and_then(|_| budget.charge_scratch_bytes(scratch, path))
+            .and_then(|_| budget.charge_transaction_work(capacity, path))
+            .map_err(|_| NativeReplyError::Limit)?;
+        Self::try_with_capacity(capacity)
+    }
+
+    fn try_with_capacity(capacity: usize) -> Result<Self> {
+        let mut positions = HashMap::new();
+        positions
+            .try_reserve(capacity)
+            .map_err(|_| NativeReplyError::Allocation)?;
+        Ok(Self { positions })
+    }
+
+    fn insert(&mut self, identifier: u64, position: usize) -> Option<usize> {
+        self.positions.insert(identifier, position)
+    }
+
+    fn get(&self, identifier: u64) -> Option<usize> {
+        self.positions.get(&identifier).copied()
+    }
+
+    #[allow(dead_code)]
+    fn len(&self) -> usize {
+        self.positions.len()
+    }
+}
+
+fn reserved_id_set(
+    capacity: usize,
+    budget: &mut TransactionBudget,
+    path: BudgetPath,
+) -> Result<HashSet<u64>> {
+    let scratch = capacity
+        .checked_mul(size_of::<u64>())
+        .ok_or(NativeReplyError::InvalidSource)?;
+    budget
+        .charge_allocations(1, path)
+        .and_then(|_| budget.charge_scratch_bytes(scratch, path))
+        .and_then(|_| budget.charge_transaction_work(capacity, path))
+        .map_err(|_| NativeReplyError::Limit)?;
+    let mut identifiers = HashSet::new();
+    identifiers
+        .try_reserve(capacity)
+        .map_err(|_| NativeReplyError::Allocation)?;
+    Ok(identifiers)
+}
+
+fn fallible_u64_vec(capacity: usize) -> Result<Vec<u64>> {
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(capacity)
+        .map_err(|_| NativeReplyError::Allocation)?;
+    Ok(values)
+}
+
+#[derive(Debug)]
 struct ReplyProbe {
     identifiers: Vec<u64>,
+    identifier_set: HashSet<u64>,
+    capacity: usize,
     unsupported_reference: bool,
+    allocation_failed: bool,
+}
+
+impl ReplyProbe {
+    fn with_capacity(capacity: usize) -> Result<Self> {
+        let identifiers = fallible_u64_vec(capacity)?;
+        let mut identifier_set = HashSet::new();
+        identifier_set
+            .try_reserve(capacity)
+            .map_err(|_| NativeReplyError::Allocation)?;
+        Ok(Self {
+            identifiers,
+            identifier_set,
+            capacity,
+            unsupported_reference: false,
+            allocation_failed: false,
+        })
+    }
+
+    fn record_identifier(
+        &mut self,
+        identifier: u64,
+        deprecated_type: Option<i32>,
+        deprecated_is_external: Option<bool>,
+    ) {
+        if self.allocation_failed {
+            return;
+        }
+        if identifier == 0
+            || deprecated_type.is_some_and(|value| value != 0)
+            || deprecated_is_external == Some(true)
+            || self.identifier_set.contains(&identifier)
+        {
+            self.unsupported_reference = true;
+            return;
+        }
+        if self.identifiers.len() >= self.capacity {
+            self.allocation_failed = true;
+            return;
+        }
+        // Keep the callback infallible from the codec's perspective while
+        // making both attacker-scaled collections explicitly fallible.  The
+        // initial reservation is sized from the complete source envelope;
+        // these one-item checks also cover any future change to that bound.
+        if self.identifiers.try_reserve(1).is_err() || self.identifier_set.try_reserve(1).is_err() {
+            self.allocation_failed = true;
+            return;
+        }
+        if !self.identifier_set.insert(identifier) {
+            self.unsupported_reference = true;
+            return;
+        }
+        self.identifiers.push(identifier);
+    }
 }
 
 impl comment_storage_codec::CommentStorageVisitor for ReplyProbe {
@@ -327,15 +469,11 @@ impl comment_storage_codec::CommentStorageVisitor for ReplyProbe {
         reply: comment_storage_codec::ReferenceRecord<'_>,
     ) -> std::result::Result<(), comment_storage_codec::DecodeError> {
         let reference = reply.reference();
-        if reference.identifier() == 0
-            || reference.deprecated_type().is_some_and(|value| value != 0)
-            || reference.deprecated_is_external() == Some(true)
-            || self.identifiers.contains(&reference.identifier())
-        {
-            self.unsupported_reference = true;
-            return Ok(());
-        }
-        self.identifiers.push(reference.identifier());
+        self.record_identifier(
+            reference.identifier(),
+            reference.deprecated_type(),
+            reference.deprecated_is_external(),
+        );
         Ok(())
     }
 }
@@ -693,17 +831,7 @@ fn storage_id_set(
         .iter()
         .try_fold(0usize, |total, list| total.checked_add(list.entries.len()))
         .ok_or(NativeReplyError::InvalidSource)?;
-    let scratch = capacity
-        .checked_mul(size_of::<u64>())
-        .ok_or(NativeReplyError::InvalidSource)?;
-    budget
-        .charge_allocations(1, path)
-        .and_then(|_| budget.charge_scratch_bytes(scratch, path))
-        .map_err(|_| NativeReplyError::Limit)?;
-    let mut identifiers = HashSet::new();
-    identifiers
-        .try_reserve(capacity)
-        .map_err(|_| NativeReplyError::Allocation)?;
+    let mut identifiers = reserved_id_set(capacity, budget, path)?;
     for list in lists {
         for entry in &list.entries {
             if !identifiers.insert(entry.storage_identifier) {
@@ -771,10 +899,21 @@ fn decode_storage<'a>(
     budget: &mut TransactionBudget,
     limits: Limits,
 ) -> Result<(comment_storage_codec::CommentStorageSnapshot<'a>, Vec<u64>)> {
-    let mut probe = ReplyProbe::default();
+    // A length-delimited reply reference needs at least the outer tag and
+    // length plus the nested identifier tag and value.  This is a safe upper
+    // bound for both the ordered reply vector and its membership set, so the
+    // visitor never has to grow either collection infallibly.
+    let reply_capacity = (payload.len() / 4).min(limits.max_metadata_items().max(1));
+    let reply_scratch = reply_capacity
+        .checked_mul(2)
+        .and_then(|count| count.checked_mul(size_of::<u64>()))
+        .ok_or(NativeReplyError::InvalidSource)?;
     budget
-        .charge_allocations(1, BUDGET_PATH)
+        .charge_allocations(2, BUDGET_PATH)
+        .and_then(|_| budget.charge_scratch_bytes(reply_scratch, BUDGET_PATH))
+        .and_then(|_| budget.charge_transaction_work(reply_capacity, BUDGET_PATH))
         .map_err(|_| NativeReplyError::Limit)?;
+    let mut probe = ReplyProbe::with_capacity(reply_capacity)?;
     let (snapshot, report) = comment_storage_codec::decode_comment_storage_archive_with_visitor(
         payload,
         comment_options(payload, limits),
@@ -782,7 +921,13 @@ fn decode_storage<'a>(
     )
     .map_err(|_| NativeReplyError::Codec)?;
     charge_comment_report(budget, report, BUDGET_PATH)?;
+    if probe.allocation_failed {
+        return Err(NativeReplyError::Allocation);
+    }
     if probe.unsupported_reference {
+        return Err(NativeReplyError::InvalidSource);
+    }
+    if report.replies() != probe.identifiers.len() {
         return Err(NativeReplyError::InvalidSource);
     }
     if snapshot.storage_uuid().is_none() {
@@ -802,6 +947,83 @@ fn decode_storage<'a>(
         return Err(NativeReplyError::InvalidSource);
     }
     Ok((snapshot, probe.identifiers))
+}
+
+/// The exact source-ordered aggregate object-reference list for one storage
+/// object, together with a constant-time membership index.  The ordered list
+/// is retained for ArchiveInfo equality and transition authorization; the set
+/// is only a validation aid and never changes source order.
+#[derive(Debug, PartialEq, Eq)]
+struct StorageReferenceAggregate {
+    ordered: Vec<u64>,
+    identifiers: HashSet<u64>,
+}
+
+impl StorageReferenceAggregate {
+    fn new(
+        author_identifier: Option<u64>,
+        reply_identifiers: &[u64],
+        budget: &mut TransactionBudget,
+        path: BudgetPath,
+    ) -> Result<Self> {
+        let capacity = reply_identifiers
+            .len()
+            .checked_add(usize::from(author_identifier.is_some()))
+            .ok_or(NativeReplyError::InvalidSource)?;
+        let set_scratch = capacity
+            .checked_mul(size_of::<u64>())
+            .ok_or(NativeReplyError::InvalidSource)?;
+        budget
+            .charge_allocations(1, path)
+            .and_then(|_| budget.charge_scratch_bytes(set_scratch, path))
+            .and_then(|_| budget.charge_transaction_work(capacity, path))
+            .map_err(|_| NativeReplyError::Limit)?;
+        let vector_scratch = capacity
+            .checked_mul(size_of::<u64>())
+            .ok_or(NativeReplyError::InvalidSource)?;
+        budget
+            .charge_allocations(1, path)
+            .and_then(|_| budget.charge_scratch_bytes(vector_scratch, path))
+            .and_then(|_| budget.charge_transaction_work(capacity, path))
+            .map_err(|_| NativeReplyError::Limit)?;
+        Self::try_from_parts(author_identifier, reply_identifiers)
+    }
+
+    fn try_from_parts(author_identifier: Option<u64>, reply_identifiers: &[u64]) -> Result<Self> {
+        let capacity = reply_identifiers
+            .len()
+            .checked_add(usize::from(author_identifier.is_some()))
+            .ok_or(NativeReplyError::InvalidSource)?;
+        let mut identifiers = HashSet::new();
+        identifiers
+            .try_reserve(capacity)
+            .map_err(|_| NativeReplyError::Allocation)?;
+        let mut ordered = fallible_u64_vec(capacity)?;
+        if let Some(author) = author_identifier {
+            if author == 0 || !identifiers.insert(author) {
+                return Err(NativeReplyError::InvalidSource);
+            }
+            ordered.push(author);
+        }
+        for identifier in reply_identifiers {
+            if *identifier == 0 || !identifiers.insert(*identifier) {
+                return Err(NativeReplyError::InvalidSource);
+            }
+            ordered.push(*identifier);
+        }
+        Ok(Self {
+            ordered,
+            identifiers,
+        })
+    }
+
+    fn as_slice(&self) -> &[u64] {
+        &self.ordered
+    }
+
+    fn contains(&self, identifier: &u64) -> bool {
+        self.identifiers.contains(identifier)
+    }
 }
 
 fn collect_storage_facts(
@@ -836,8 +1058,20 @@ fn collect_storage_facts(
         .and_then(|_| budget.charge_scratch_bytes(payload_bytes, BUDGET_PATH))
         .and_then(|_| budget.charge_transaction_work(payload_bytes, BUDGET_PATH))
         .map_err(|_| NativeReplyError::Limit)?;
+    let uuid_scratch = storage_objects
+        .checked_mul(2)
+        .and_then(|count| count.checked_mul(size_of::<u64>()))
+        .ok_or(NativeReplyError::InvalidSource)?;
+    budget
+        .charge_allocations(1, BUDGET_PATH)
+        .and_then(|_| budget.charge_scratch_bytes(uuid_scratch, BUDGET_PATH))
+        .and_then(|_| budget.charge_transaction_work(storage_objects, BUDGET_PATH))
+        .map_err(|_| NativeReplyError::Limit)?;
     let mut facts = Vec::new();
-    let mut uuids = Vec::new();
+    let mut uuids = HashSet::new();
+    uuids
+        .try_reserve(storage_objects)
+        .map_err(|_| NativeReplyError::Allocation)?;
     for object in &archive.objects {
         let Some(object_identifier) = object.archive_info.identifier else {
             return Err(NativeReplyError::InvalidSource);
@@ -873,16 +1107,16 @@ fn collect_storage_facts(
             .storage_uuid()
             .ok_or(NativeReplyError::InvalidSource)?;
         let uuid_pair = (uuid.lower(), uuid.upper());
-        if uuids.contains(&uuid_pair) {
+        if !uuids.insert(uuid_pair) {
             return Err(NativeReplyError::UnsupportedDependency);
         }
-        uuids
-            .try_reserve_exact(1)
-            .map_err(|_| NativeReplyError::Allocation)?;
-        uuids.push(uuid_pair);
         let author_identifier = snapshot.author().map(|reference| reference.identifier());
-        let expected_aggregate =
-            expected_storage_references(author_identifier, &reply_identifiers)?;
+        let expected_aggregate = expected_storage_references(
+            author_identifier,
+            &reply_identifiers,
+            budget,
+            BUDGET_PATH,
+        )?;
         validate_storage_message_info(
             info,
             author_identifier,
@@ -895,7 +1129,7 @@ fn collect_storage_facts(
         facts.push(StorageFact {
             object_identifier,
             author_identifier,
-            reply_identifiers: reply_identifiers.to_vec(),
+            reply_identifiers,
             uuid: uuid_pair,
         });
     }
@@ -908,37 +1142,19 @@ fn collect_storage_facts(
 fn expected_storage_references(
     author_identifier: Option<u64>,
     reply_identifiers: &[u64],
-) -> Result<Vec<u64>> {
-    let mut expected = Vec::new();
-    expected
-        .try_reserve_exact(
-            usize::from(author_identifier.is_some()).saturating_add(reply_identifiers.len()),
-        )
-        .map_err(|_| NativeReplyError::Allocation)?;
-    if let Some(author) = author_identifier {
-        if author == 0 {
-            return Err(NativeReplyError::InvalidSource);
-        }
-        expected.push(author);
-    }
-    expected.extend_from_slice(reply_identifiers);
-    if expected
-        .iter()
-        .enumerate()
-        .any(|(index, identifier)| *identifier == 0 || expected[index + 1..].contains(identifier))
-    {
-        return Err(NativeReplyError::InvalidSource);
-    }
-    Ok(expected)
+    budget: &mut TransactionBudget,
+    path: BudgetPath,
+) -> Result<StorageReferenceAggregate> {
+    StorageReferenceAggregate::new(author_identifier, reply_identifiers, budget, path)
 }
 
 fn validate_storage_message_info(
     info: &litchi_iwa_core::MessageInfo,
     author_identifier: Option<u64>,
-    expected_aggregate: &[u64],
+    expected_aggregate: &StorageReferenceAggregate,
     reply_identifiers: &[u64],
 ) -> Result<()> {
-    if info.object_references != expected_aggregate {
+    if info.object_references != expected_aggregate.as_slice() {
         return Err(NativeReplyError::InvalidSource);
     }
     if info.field_infos.is_empty() {
@@ -1007,14 +1223,19 @@ fn validate_storage_message_info(
     Ok(())
 }
 
-fn validate_archive_headers(archive: &Archive, limits: Limits) -> Result<()> {
-    let mut identifiers = HashSet::new();
-    for object in &archive.objects {
+fn validate_archive_headers(
+    archive: &Archive,
+    limits: Limits,
+    budget: &mut TransactionBudget,
+    path: BudgetPath,
+) -> Result<IdIndex> {
+    let mut identifiers = IdIndex::with_capacity(archive.objects.len(), budget, path)?;
+    for (object_index, object) in archive.objects.iter().enumerate() {
         let identifier = object
             .archive_info
             .identifier
             .ok_or(NativeReplyError::InvalidSource)?;
-        if identifier == 0 || !identifiers.insert(identifier) {
+        if identifier == 0 || identifiers.insert(identifier, object_index).is_some() {
             return Err(NativeReplyError::UnsupportedDependency);
         }
         if object.messages.len() != object.archive_info.message_infos.len() {
@@ -1033,12 +1254,30 @@ fn validate_archive_headers(archive: &Archive, limits: Limits) -> Result<()> {
             .validate_with_limits(limits)
             .map_err(|_| NativeReplyError::Archive)?;
     }
-    Ok(())
+    Ok(identifiers)
+}
+
+fn storage_fact_index(
+    facts: &[StorageFact],
+    budget: &mut TransactionBudget,
+    path: BudgetPath,
+) -> Result<IdIndex> {
+    let mut identifiers = IdIndex::with_capacity(facts.len(), budget, path)?;
+    for (fact_index, fact) in facts.iter().enumerate() {
+        if fact.object_identifier == 0
+            || identifiers
+                .insert(fact.object_identifier, fact_index)
+                .is_some()
+        {
+            return Err(NativeReplyError::UnsupportedDependency);
+        }
+    }
+    Ok(identifiers)
 }
 
 /// Charge the parsed-archive envelope before any helper that allocates a
 /// registry or walks ArchiveInfo.  `Archive::validate_with_limits` and the
-/// HashSet in `validate_archive_headers` do not expose a report, so their
+/// ID index in `validate_archive_headers` do not expose a report, so their
 /// object/message/payload envelope is conservatively reserved here while the
 /// exact codec reports are charged by their callers.
 fn preflight_archive(
@@ -1158,19 +1397,43 @@ fn validate_list_refcounts(
     lists: &[CommentListFact],
     counts: &[(u32, u32)],
     storage_ids: &HashSet<u64>,
+    budget: &mut TransactionBudget,
 ) -> Result<()> {
-    let mut seen_keys = HashSet::new();
     let capacity = lists
         .iter()
         .try_fold(0usize, |total, list| total.checked_add(list.entries.len()))
         .ok_or(NativeReplyError::InvalidSource)?;
+    let seen_scratch = capacity
+        .checked_mul(size_of::<u32>())
+        .ok_or(NativeReplyError::InvalidSource)?;
+    let count_scratch = counts
+        .len()
+        .checked_mul(size_of::<u32>() * 2)
+        .ok_or(NativeReplyError::InvalidSource)?;
+    budget
+        .charge_allocations(2, BUDGET_PATH)
+        .and_then(|_| budget.charge_scratch_bytes(seen_scratch, BUDGET_PATH))
+        .and_then(|_| budget.charge_scratch_bytes(count_scratch, BUDGET_PATH))
+        .and_then(|_| budget.charge_transaction_work(capacity, BUDGET_PATH))
+        .and_then(|_| budget.charge_transaction_work(counts.len(), BUDGET_PATH))
+        .map_err(|_| NativeReplyError::Limit)?;
+    let mut seen_keys = HashSet::new();
     seen_keys
         .try_reserve(capacity)
         .map_err(|_| NativeReplyError::Allocation)?;
+    let mut count_index = HashMap::new();
+    count_index
+        .try_reserve(counts.len())
+        .map_err(|_| NativeReplyError::Allocation)?;
+    for (identifier, count) in counts {
+        if count_index.insert(*identifier, *count).is_some() {
+            return Err(NativeReplyError::InvalidSource);
+        }
+    }
     for list in lists {
         for entry in &list.entries {
             if !storage_ids.contains(&entry.storage_identifier)
-                || count_for(counts, entry.key) != entry.ref_count
+                || count_index.get(&entry.key).copied().unwrap_or(0) != entry.ref_count
                 || !seen_keys.insert(entry.key)
             {
                 return Err(NativeReplyError::InvalidSource);
@@ -1190,12 +1453,17 @@ fn selected_list<'a>(
     lists: &'a [CommentListFact],
     route: NativeReplyObjectRoute,
     archive: &Archive,
+    object_index: &IdIndex,
 ) -> Result<&'a CommentListFact> {
     if route.member_index != 0 {
         return Err(NativeReplyError::UnsupportedDependency);
     }
+    let object_index = object_index
+        .get(route.identifier)
+        .ok_or(NativeReplyError::InvalidSource)?;
     let object = archive
-        .object(route.identifier)
+        .objects
+        .get(object_index)
         .ok_or(NativeReplyError::InvalidSource)?;
     let _ = object
         .messages
@@ -1210,16 +1478,22 @@ fn selected_list<'a>(
     Ok(list)
 }
 
-fn route_object(
-    archive: &Archive,
+fn route_object<'archive>(
+    archive: &'archive Archive,
+    object_index: &IdIndex,
     route: NativeReplyObjectRoute,
     expected_type: Option<u32>,
-) -> Result<&ArchiveObject> {
+) -> Result<&'archive ArchiveObject> {
     if route.member_index != 0 || route.identifier == 0 {
         return Err(NativeReplyError::UnsupportedDependency);
     }
     let object = archive
-        .object(route.identifier)
+        .objects
+        .get(
+            object_index
+                .get(route.identifier)
+                .ok_or(NativeReplyError::InvalidSource)?,
+        )
         .ok_or(NativeReplyError::InvalidSource)?;
     let message = object
         .messages
@@ -1233,8 +1507,12 @@ fn route_object(
     Ok(object)
 }
 
-fn storage_route_payload(archive: &Archive, route: NativeReplyObjectRoute) -> Result<&[u8]> {
-    let object = route_object(archive, route, Some(COMMENT_STORAGE_TYPE))?;
+fn storage_route_payload<'archive>(
+    archive: &'archive Archive,
+    object_index: &IdIndex,
+    route: NativeReplyObjectRoute,
+) -> Result<&'archive [u8]> {
+    let object = route_object(archive, object_index, route, Some(COMMENT_STORAGE_TYPE))?;
     Ok(&object
         .messages
         .get(route.message_index)
@@ -1242,8 +1520,13 @@ fn storage_route_payload(archive: &Archive, route: NativeReplyObjectRoute) -> Re
         .data)
 }
 
-fn validate_routes(request: &NativeReplyRequest<'_>, archive: &Archive) -> Result<()> {
-    route_object(archive, request.model, None).and_then(|object| {
+fn validate_routes(
+    request: &NativeReplyRequest<'_>,
+    archive: &Archive,
+    object_index: &IdIndex,
+    budget: &mut TransactionBudget,
+) -> Result<()> {
+    route_object(archive, object_index, request.model, None).and_then(|object| {
         let message = object
             .messages
             .get(request.model.message_index)
@@ -1253,11 +1536,20 @@ fn validate_routes(request: &NativeReplyRequest<'_>, archive: &Archive) -> Resul
         }
         Ok(())
     })?;
-    route_object(archive, request.tile, Some(TILE_TYPE))?;
-    route_object(archive, request.list, None)?;
-    route_object(archive, request.root, Some(COMMENT_STORAGE_TYPE))?;
+    route_object(archive, object_index, request.tile, Some(TILE_TYPE))?;
+    route_object(archive, object_index, request.list, None)?;
+    route_object(
+        archive,
+        object_index,
+        request.root,
+        Some(COMMENT_STORAGE_TYPE),
+    )?;
+    let mut reply_ids = reserved_id_set(request.replies.len(), budget, BUDGET_PATH)?;
     for reply in request.replies {
-        route_object(archive, *reply, Some(COMMENT_STORAGE_TYPE))?;
+        route_object(archive, object_index, *reply, Some(COMMENT_STORAGE_TYPE))?;
+        if !reply_ids.insert(reply.identifier) {
+            return Err(NativeReplyError::InvalidSource);
+        }
     }
     if request.comment_key == 0 || request.new_root.identifier == 0 {
         return Err(NativeReplyError::InvalidSource);
@@ -1289,47 +1581,44 @@ fn validate_routes(request: &NativeReplyRequest<'_>, archive: &Archive) -> Resul
     {
         return Err(NativeReplyError::UnsupportedDependency);
     }
-    if request.replies.iter().enumerate().any(|(index, route)| {
-        request.replies[index + 1..]
-            .iter()
-            .any(|other| other.identifier == route.identifier)
-    }) {
-        return Err(NativeReplyError::InvalidSource);
-    }
     Ok(())
 }
 
 fn validate_reply_graph(
     archive: &Archive,
+    object_index: &IdIndex,
     request: &NativeReplyRequest<'_>,
     root_fact: &StorageFact,
     facts: &[StorageFact],
+    fact_index: &IdIndex,
+    budget: &mut TransactionBudget,
 ) -> Result<()> {
     if root_fact.object_identifier != request.root.identifier
         || root_fact.reply_identifiers.len() != request.replies.len()
     {
         return Err(NativeReplyError::InvalidSource);
     }
-    let mut reply_ids = Vec::new();
-    reply_ids
-        .try_reserve_exact(request.replies.len())
-        .map_err(|_| NativeReplyError::Allocation)?;
+    let mut reply_ids = reserved_id_set(request.replies.len(), budget, BUDGET_PATH)?;
     for route in request.replies {
         let id = route.identifier;
-        if id == request.root.identifier || !reply_ids.iter().all(|other| *other != id) {
+        if id == request.root.identifier || !reply_ids.insert(id) {
             return Err(NativeReplyError::InvalidSource);
         }
-        reply_ids.push(id);
-        let fact = facts
-            .iter()
-            .find(|fact| fact.object_identifier == id)
+        let fact = fact_index
+            .get(id)
+            .and_then(|index| facts.get(index))
             .ok_or(NativeReplyError::InvalidSource)?;
         if !fact.reply_identifiers.is_empty() {
             return Err(NativeReplyError::UnsupportedDependency);
         }
-        let _ = storage_route_payload(archive, *route)?;
+        let _ = storage_route_payload(archive, object_index, *route)?;
     }
-    if root_fact.reply_identifiers != reply_ids {
+    if !root_fact
+        .reply_identifiers
+        .iter()
+        .zip(request.replies)
+        .all(|(expected, route)| *expected == route.identifier)
+    {
         return Err(NativeReplyError::InvalidSource);
     }
     if request
@@ -1338,10 +1627,7 @@ fn validate_reply_graph(
     {
         return Err(NativeReplyError::InvalidSource);
     }
-    if root_fact
-        .reply_identifiers
-        .contains(&root_fact.object_identifier)
-    {
+    if reply_ids.contains(&root_fact.object_identifier) {
         return Err(NativeReplyError::UnsupportedDependency);
     }
     Ok(())
@@ -1350,11 +1636,13 @@ fn validate_reply_graph(
 /// Validate every comment-storage object in the supplied member, not only the
 /// selected root.  This prevents an orphan or nested storage object from
 /// becoming an implicit cull/reuse target when the selected list changes.
-fn validate_all_reply_graphs(facts: &[StorageFact], root_ids: &HashSet<u64>) -> Result<()> {
-    let mut referenced_replies = HashSet::new();
-    referenced_replies
-        .try_reserve(facts.len())
-        .map_err(|_| NativeReplyError::Allocation)?;
+fn validate_all_reply_graphs(
+    facts: &[StorageFact],
+    root_ids: &HashSet<u64>,
+    fact_index: &IdIndex,
+    budget: &mut TransactionBudget,
+) -> Result<()> {
+    let mut referenced_replies = reserved_id_set(facts.len(), budget, BUDGET_PATH)?;
     for fact in facts {
         let is_root = root_ids.contains(&fact.object_identifier);
         if !is_root && !fact.reply_identifiers.is_empty() {
@@ -1370,24 +1658,23 @@ fn validate_all_reply_graphs(facts: &[StorageFact], root_ids: &HashSet<u64>) -> 
             {
                 return Err(NativeReplyError::UnsupportedDependency);
             }
-            let reply = facts
-                .iter()
-                .find(|candidate| candidate.object_identifier == *reply_identifier)
+            let reply = fact_index
+                .get(*reply_identifier)
+                .and_then(|index| facts.get(index))
                 .ok_or(NativeReplyError::InvalidSource)?;
             if !reply.reply_identifiers.is_empty() {
                 return Err(NativeReplyError::UnsupportedDependency);
             }
         }
     }
-    if root_ids.iter().any(|identifier| {
-        !facts
-            .iter()
-            .any(|fact| fact.object_identifier == *identifier)
-    }) || facts.len()
-        != root_ids
-            .len()
-            .checked_add(referenced_replies.len())
-            .ok_or(NativeReplyError::InvalidSource)?
+    if root_ids
+        .iter()
+        .any(|identifier| fact_index.get(*identifier).is_none())
+        || facts.len()
+            != root_ids
+                .len()
+                .checked_add(referenced_replies.len())
+                .ok_or(NativeReplyError::InvalidSource)?
         || facts.iter().any(|fact| {
             !root_ids.contains(&fact.object_identifier)
                 && !referenced_replies.contains(&fact.object_identifier)
@@ -1401,13 +1688,24 @@ fn validate_all_reply_graphs(facts: &[StorageFact], root_ids: &HashSet<u64>) -> 
 fn validate_uuid_inputs(
     request: &NativeReplyRequest<'_>,
     facts: &[StorageFact],
-    archive: &Archive,
+    object_index: &IdIndex,
+    budget: &mut TransactionBudget,
 ) -> Result<()> {
     let valid =
         |identity: NativeReplyStorageIdentity| identity.uuid_lower != 0 || identity.uuid_upper != 0;
     if !valid(request.new_root) || request.new_reply.is_some_and(|identity| !valid(identity)) {
         return Err(NativeReplyError::InvalidSource);
     }
+    let uuid_scratch = facts
+        .len()
+        .checked_mul(2)
+        .and_then(|count| count.checked_mul(size_of::<u64>()))
+        .ok_or(NativeReplyError::InvalidSource)?;
+    budget
+        .charge_allocations(1, BUDGET_PATH)
+        .and_then(|_| budget.charge_scratch_bytes(uuid_scratch, BUDGET_PATH))
+        .and_then(|_| budget.charge_transaction_work(facts.len(), BUDGET_PATH))
+        .map_err(|_| NativeReplyError::Limit)?;
     let mut uuids = HashSet::new();
     uuids
         .try_reserve(facts.len())
@@ -1428,19 +1726,28 @@ fn validate_uuid_inputs(
     {
         return Err(NativeReplyError::UnsupportedDependency);
     }
-    if archive.object(request.new_root.identifier).is_some()
+    if object_index.get(request.new_root.identifier).is_some()
         || request
             .new_reply
-            .is_some_and(|identity| archive.object(identity.identifier).is_some())
+            .is_some_and(|identity| object_index.get(identity.identifier).is_some())
     {
         return Err(NativeReplyError::UnsupportedDependency);
     }
     Ok(())
 }
 
-fn validate_author_object(archive: &Archive, identifier: u64) -> Result<()> {
+fn validate_author_object(
+    archive: &Archive,
+    object_index: &IdIndex,
+    identifier: u64,
+) -> Result<()> {
     let object = archive
-        .object(identifier)
+        .objects
+        .get(
+            object_index
+                .get(identifier)
+                .ok_or(NativeReplyError::InvalidSource)?,
+        )
         .ok_or(NativeReplyError::InvalidSource)?;
     let mut matching = 0usize;
     for message in &object.messages {
@@ -1473,8 +1780,10 @@ fn reply_field_transitions<'a>(
     before: &'a [u64],
     after: &'a [u64],
     mutation: ReplyFieldMutation,
+    budget: &mut TransactionBudget,
 ) -> Result<Vec<FieldObjectReferenceTransition<'a>>> {
-    let before_aggregate = expected_storage_references(author_identifier, before)?;
+    let before_aggregate =
+        expected_storage_references(author_identifier, before, budget, BUDGET_PATH)?;
     validate_storage_message_info(info, author_identifier, &before_aggregate, before)?;
     let mut fields = Vec::new();
     fields
@@ -1833,26 +2142,36 @@ fn rewrite_comment_list(
     Ok(output)
 }
 
-fn archive_has_reference(
+fn archive_reference_presence(
     archive: &Archive,
-    identifier: u64,
+    first_identifier: u64,
+    second_identifier: Option<u64>,
     limits: Limits,
     budget: &mut TransactionBudget,
     path: BudgetPath,
-) -> Result<bool> {
+) -> Result<(bool, bool)> {
     struct Search {
-        identifier: u64,
-        found: bool,
+        first_identifier: u64,
+        second_identifier: Option<u64>,
+        first_found: bool,
+        second_found: bool,
     }
     impl ArchiveReferenceVisitor for Search {
         fn visit_reference(
             &mut self,
             occurrence: ArchiveReferenceOccurrence,
         ) -> litchi_iwa_core::Result<()> {
-            if occurrence.kind == ArchiveReferenceKind::Object
-                && occurrence.referenced_identifier == self.identifier
+            if occurrence.kind != ArchiveReferenceKind::Object {
+                return Ok(());
+            }
+            if occurrence.referenced_identifier == self.first_identifier {
+                self.first_found = true;
+            }
+            if self
+                .second_identifier
+                .is_some_and(|identifier| occurrence.referenced_identifier == identifier)
             {
-                self.found = true;
+                self.second_found = true;
             }
             Ok(())
         }
@@ -1876,8 +2195,10 @@ fn archive_has_reference(
         .and_then(|_| budget.charge_transaction_work(work, path))
         .map_err(|_| NativeReplyError::Limit)?;
     let mut search = Search {
-        identifier,
-        found: false,
+        first_identifier,
+        second_identifier,
+        first_found: false,
+        second_found: false,
     };
     for object in &archive.objects {
         object
@@ -1888,7 +2209,7 @@ fn archive_has_reference(
             )
             .map_err(|_| NativeReplyError::Archive)?;
     }
-    Ok(search.found)
+    Ok((search.first_found, search.second_found))
 }
 
 fn validate_known_archive_metadata(
@@ -1943,7 +2264,9 @@ fn validate_known_archive_metadata(
 /// additions and source removals must be explicitly authorized.
 fn verify_reply_archive_object_locality(
     source: &Archive,
+    source_index: &IdIndex,
     candidate: &Archive,
+    candidate_index: &IdIndex,
     changed_identifiers: &[u64],
 ) -> Result<()> {
     for source_object in &source.objects {
@@ -1955,7 +2278,12 @@ fn verify_reply_archive_object_locality(
             continue;
         }
         let candidate_object = candidate
-            .object(identifier)
+            .objects
+            .get(
+                candidate_index
+                    .get(identifier)
+                    .ok_or(NativeReplyError::InvalidSource)?,
+            )
             .ok_or(NativeReplyError::InvalidSource)?;
         if !source_object.same_content_ignoring_offsets(candidate_object) {
             return Err(NativeReplyError::InvalidSource);
@@ -1966,7 +2294,7 @@ fn verify_reply_archive_object_locality(
             .archive_info
             .identifier
             .ok_or(NativeReplyError::InvalidSource)?;
-        if source.object(identifier).is_none() && !changed_identifiers.contains(&identifier) {
+        if source_index.get(identifier).is_none() && !changed_identifiers.contains(&identifier) {
             return Err(NativeReplyError::InvalidSource);
         }
     }
@@ -1996,11 +2324,11 @@ pub(super) fn rewrite_native_comment_reply(
     }
     let source = member.archive;
     let decoded_bytes = preflight_archive(source, budget, BUDGET_PATH)?;
-    validate_archive_headers(source, request.limits)?;
-    validate_routes(&request, source)?;
+    let object_index = validate_archive_headers(source, request.limits, budget, BUDGET_PATH)?;
+    validate_routes(&request, source, &object_index, budget)?;
 
     let lists = collect_comment_lists(source, budget, request.limits, BUDGET_PATH)?;
-    let selected = selected_list(&lists, request.list, source)?;
+    let selected = selected_list(&lists, request.list, source, &object_index)?;
     let old_entry = selected
         .entries
         .iter()
@@ -2020,36 +2348,42 @@ pub(super) fn rewrite_native_comment_reply(
     {
         return Err(NativeReplyError::InvalidSource);
     }
-    let mut root_ids = HashSet::new();
-    root_ids
-        .try_reserve(storage_ids.len())
-        .map_err(|_| NativeReplyError::Allocation)?;
-    for list in &lists {
-        for entry in &list.entries {
-            root_ids.insert(entry.storage_identifier);
-        }
-    }
-    validate_all_reply_graphs(&facts, &root_ids)?;
-    validate_uuid_inputs(&request, &facts, source)?;
+    let fact_index = storage_fact_index(&facts, budget, BUDGET_PATH)?;
+    validate_all_reply_graphs(&facts, &storage_ids, &fact_index, budget)?;
+    validate_uuid_inputs(&request, &facts, &object_index, budget)?;
     validate_known_archive_metadata(source, request.limits, budget, BUDGET_PATH)?;
     let counts = collect_bnc_counts(source, budget, BUDGET_PATH)?;
-    validate_list_refcounts(&lists, &counts, &storage_ids)?;
+    validate_list_refcounts(&lists, &counts, &storage_ids, budget)?;
     if count_for(&counts, request.comment_key) != old_entry.ref_count {
         return Err(NativeReplyError::InvalidSource);
     }
     let root_fact = facts
-        .iter()
-        .find(|fact| fact.object_identifier == root_identifier)
+        .get(
+            fact_index
+                .get(root_identifier)
+                .ok_or(NativeReplyError::InvalidSource)?,
+        )
         .ok_or(NativeReplyError::InvalidSource)?;
+    let mut validated_authors = reserved_id_set(facts.len(), budget, BUDGET_PATH)?;
     for fact in &facts {
         if let Some(author) = fact.author_identifier {
             if storage_ids.contains(&author) {
                 return Err(NativeReplyError::UnsupportedDependency);
             }
-            validate_author_object(source, author)?;
+            if validated_authors.insert(author) {
+                validate_author_object(source, &object_index, author)?;
+            }
         }
     }
-    validate_reply_graph(source, &request, root_fact, &facts)?;
+    validate_reply_graph(
+        source,
+        &object_index,
+        &request,
+        root_fact,
+        &facts,
+        &fact_index,
+        budget,
+    )?;
     if request
         .operation
         .ordinal()
@@ -2089,44 +2423,41 @@ pub(super) fn rewrite_native_comment_reply(
         .charge_allocations(2, BUDGET_PATH)
         .and_then(|_| budget.charge_scratch_bytes(reply_id_scratch, BUDGET_PATH))
         .map_err(|_| NativeReplyError::Limit)?;
-    let before_reply_ids = root_fact.reply_identifiers.clone();
+    let mut before_reply_ids = fallible_u64_vec(root_fact.reply_identifiers.len())?;
+    before_reply_ids.extend_from_slice(&root_fact.reply_identifiers);
     let ordinal = request.operation.ordinal();
     let old_reply_identifier = ordinal.and_then(|index| before_reply_ids.get(index).copied());
-    let after_reply_ids = match request.operation {
+    let after_capacity = before_reply_ids
+        .len()
+        .checked_add(usize::from(matches!(
+            request.operation,
+            NativeReplyOperation::Append { .. }
+        )))
+        .ok_or(NativeReplyError::InvalidSource)?;
+    let mut after_reply_ids = fallible_u64_vec(after_capacity)?;
+    after_reply_ids.extend_from_slice(&before_reply_ids);
+    match request.operation {
         NativeReplyOperation::Append { .. } => {
             let identity = request.new_reply.ok_or(NativeReplyError::InvalidSource)?;
-            let mut ids = before_reply_ids.clone();
-            ids.push(identity.identifier);
-            ids
+            after_reply_ids.push(identity.identifier);
         },
         NativeReplyOperation::Replace { ordinal, .. } => {
             let identity = request.new_reply.ok_or(NativeReplyError::InvalidSource)?;
-            let mut ids = before_reply_ids.clone();
-            let slot = ids
+            let slot = after_reply_ids
                 .get_mut(ordinal)
                 .ok_or(NativeReplyError::InvalidSource)?;
             *slot = identity.identifier;
-            ids
         },
         NativeReplyOperation::Remove { ordinal, .. } => {
-            let mut ids = before_reply_ids.clone();
-            ids.remove(ordinal);
-            ids
+            after_reply_ids.remove(ordinal);
         },
-    };
-    if after_reply_ids
-        .iter()
-        .enumerate()
-        .any(|(index, identifier)| {
-            *identifier == 0 || after_reply_ids[index + 1..].contains(identifier)
-        })
-    {
-        return Err(NativeReplyError::InvalidSource);
     }
     let author_identifier = root_fact.author_identifier;
-    let before_aggregate = expected_storage_references(author_identifier, &before_reply_ids)?;
-    let after_aggregate = expected_storage_references(author_identifier, &after_reply_ids)?;
-    let root_payload = storage_route_payload(source, request.root)?;
+    let before_aggregate =
+        expected_storage_references(author_identifier, &before_reply_ids, budget, BUDGET_PATH)?;
+    let after_aggregate =
+        expected_storage_references(author_identifier, &after_reply_ids, budget, BUDGET_PATH)?;
+    let root_payload = storage_route_payload(source, &object_index, request.root)?;
     let root_rewrite = match request.operation {
         NativeReplyOperation::Append { .. } => {
             comment_storage_codec::CommentStorageReplyRewrite::append(
@@ -2216,7 +2547,12 @@ pub(super) fn rewrite_native_comment_reply(
         NativeReplyOperation::Remove { ordinal, .. } => ReplyFieldMutation::Remove(ordinal),
     };
     let root_info = source
-        .object(root_identifier)
+        .objects
+        .get(
+            object_index
+                .get(root_identifier)
+                .ok_or(NativeReplyError::InvalidSource)?,
+        )
         .ok_or(NativeReplyError::InvalidSource)?
         .archive_info
         .message_infos
@@ -2229,6 +2565,7 @@ pub(super) fn rewrite_native_comment_reply(
         &before_reply_ids,
         &after_reply_ids,
         reply_field_mutation,
+        budget,
     )?;
 
     // Build the private candidate only after the source graph and prepared
@@ -2246,7 +2583,12 @@ pub(super) fn rewrite_native_comment_reply(
         .map_err(|_| NativeReplyError::Limit)?;
     let mut candidate = source.clone();
     let root_source_object = source
-        .object(root_identifier)
+        .objects
+        .get(
+            object_index
+                .get(root_identifier)
+                .ok_or(NativeReplyError::InvalidSource)?,
+        )
         .ok_or(NativeReplyError::InvalidSource)?;
     budget
         .charge_allocations(6, BUDGET_PATH)
@@ -2267,8 +2609,8 @@ pub(super) fn rewrite_native_comment_reply(
             message_index: request.root.message_index,
         },
         root_rewritten,
-        &before_aggregate,
-        &after_aggregate,
+        before_aggregate.as_slice(),
+        after_aggregate.as_slice(),
         &root_fields,
         request.limits,
     )?;
@@ -2309,7 +2651,8 @@ pub(super) fn rewrite_native_comment_reply(
                 return Err(NativeReplyError::InvalidSource);
             },
         };
-        let template_payload = storage_route_payload(source, template_route)?.to_owned();
+        let template_payload =
+            storage_route_payload(source, &object_index, template_route)?.to_owned();
         let (template_snapshot, template_reply_ids) =
             decode_storage(&template_payload, budget, request.limits)?;
         if !template_reply_ids.is_empty() {
@@ -2322,7 +2665,12 @@ pub(super) fn rewrite_native_comment_reply(
         let reply_payload =
             patch_leaf_text_and_uuid(&template_payload, template_snapshot.text(), text, new_reply)?;
         let mut reply_object = source
-            .object(template_route.identifier)
+            .objects
+            .get(
+                object_index
+                    .get(template_route.identifier)
+                    .ok_or(NativeReplyError::InvalidSource)?,
+            )
             .ok_or(NativeReplyError::InvalidSource)?
             .clone();
         reply_object.archive_info.identifier = Some(new_reply.identifier);
@@ -2336,9 +2684,9 @@ pub(super) fn rewrite_native_comment_reply(
         let reply_author = template_snapshot
             .author()
             .map(|reference| reference.identifier());
-        let reply_aggregate = expected_storage_references(reply_author, &[])?;
+        let reply_aggregate = expected_storage_references(reply_author, &[], budget, BUDGET_PATH)?;
         validate_storage_message_info(info, reply_author, &reply_aggregate, &[])?;
-        info.object_references = reply_aggregate;
+        info.object_references = reply_aggregate.ordered;
         reply_object.messages[template_route.message_index].data = reply_payload;
         candidate.objects.push(reply_object);
     }
@@ -2348,7 +2696,12 @@ pub(super) fn rewrite_native_comment_reply(
     // the already-validated global BNC census and removed only at refcount one.
     let new_key = allocate_comment_key(&lists, selected.next_list_id)?;
     let list_payload = &source
-        .object(request.list.identifier)
+        .objects
+        .get(
+            object_index
+                .get(request.list.identifier)
+                .ok_or(NativeReplyError::InvalidSource)?,
+        )
         .ok_or(NativeReplyError::InvalidSource)?
         .messages
         .get(request.list.message_index)
@@ -2386,7 +2739,12 @@ pub(super) fn rewrite_native_comment_reply(
     }
     after_list_refs.push(request.new_root.identifier);
     let list_info = source
-        .object(request.list.identifier)
+        .objects
+        .get(
+            object_index
+                .get(request.list.identifier)
+                .ok_or(NativeReplyError::InvalidSource)?,
+        )
         .ok_or(NativeReplyError::InvalidSource)?
         .archive_info
         .message_infos
@@ -2425,7 +2783,12 @@ pub(super) fn rewrite_native_comment_reply(
     // retains all other scalar/style/unknown bytes and handles offset-table
     // width changes in the enclosing row.
     let tile_payload = &source
-        .object(request.tile.identifier)
+        .objects
+        .get(
+            object_index
+                .get(request.tile.identifier)
+                .ok_or(NativeReplyError::InvalidSource)?,
+        )
         .ok_or(NativeReplyError::InvalidSource)?
         .messages
         .get(request.tile.message_index)
@@ -2461,21 +2824,22 @@ pub(super) fn rewrite_native_comment_reply(
     // Culling is performed only after an unknown-metadata global inbound
     // census.  A shared root stays alive while another cell still owns the old
     // key; a shared reply likewise stays alive when another root references it.
-    let old_root_can_cull = old_entry.ref_count == 1
-        && !archive_has_reference(
-            &candidate,
-            root_identifier,
-            request.limits,
-            budget,
-            BUDGET_PATH,
-        )?;
+    let (root_referenced, old_reply_referenced) = archive_reference_presence(
+        &candidate,
+        root_identifier,
+        old_reply_identifier,
+        request.limits,
+        budget,
+        BUDGET_PATH,
+    )?;
+    let old_root_can_cull = old_entry.ref_count == 1 && !root_referenced;
     if old_root_can_cull {
         candidate
             .remove_object_checked_with_limits(root_identifier, request.limits)
             .map_err(|_| NativeReplyError::Archive)?;
     }
     if let Some(old_reply) = old_reply_identifier {
-        if !archive_has_reference(&candidate, old_reply, request.limits, budget, BUDGET_PATH)? {
+        if !old_reply_referenced {
             candidate
                 .remove_object_checked_with_limits(old_reply, request.limits)
                 .map_err(|_| NativeReplyError::Archive)?;
@@ -2489,7 +2853,8 @@ pub(super) fn rewrite_native_comment_reply(
     // identifier sets, so charge the candidate archive envelope before it is
     // entered as well as before its later semantic scans.
     let candidate_decoded_bytes = preflight_archive(&candidate, budget, BUDGET_PATH)?;
-    validate_archive_headers(&candidate, request.limits)?;
+    let candidate_index =
+        validate_archive_headers(&candidate, request.limits, budget, BUDGET_PATH)?;
     let changed_capacity = 6usize;
     let changed_scratch = changed_capacity
         .checked_mul(size_of::<u64>())
@@ -2512,11 +2877,22 @@ pub(super) fn rewrite_native_comment_reply(
     if old_root_can_cull {
         changed.push(root_identifier);
     }
-    verify_reply_archive_object_locality(source, &candidate, &changed)?;
+    verify_reply_archive_object_locality(
+        source,
+        &object_index,
+        &candidate,
+        &candidate_index,
+        &changed,
+    )?;
     let candidate_counts = collect_bnc_counts(&candidate, budget, BUDGET_PATH)?;
     let candidate_lists = collect_comment_lists(&candidate, budget, request.limits, BUDGET_PATH)?;
     let candidate_storage_ids = storage_id_set(&candidate_lists, budget, BUDGET_PATH)?;
-    validate_list_refcounts(&candidate_lists, &candidate_counts, &candidate_storage_ids)?;
+    validate_list_refcounts(
+        &candidate_lists,
+        &candidate_counts,
+        &candidate_storage_ids,
+        budget,
+    )?;
 
     // Archive serialization allocates its output buffer.  Compute both
     // source and candidate encoded bounds first, then charge the complete
@@ -2573,8 +2949,16 @@ pub(super) fn rewrite_native_comment_reply(
         member_name: member.member_name.to_owned(),
         member_bytes,
     });
-    let mut added_object_identifiers = vec![request.new_root.identifier];
+    let added_object_capacity = usize::from(request.new_reply.is_some()).saturating_add(1);
+    let mut added_object_identifiers = Vec::new();
+    added_object_identifiers
+        .try_reserve_exact(added_object_capacity)
+        .map_err(|_| NativeReplyError::Allocation)?;
+    added_object_identifiers.push(request.new_root.identifier);
     let mut removed_object_identifiers = Vec::new();
+    removed_object_identifiers
+        .try_reserve_exact(2)
+        .map_err(|_| NativeReplyError::Allocation)?;
     if let Some(new_reply) = request.new_reply {
         added_object_identifiers.push(new_reply.identifier);
     }
@@ -2582,12 +2966,22 @@ pub(super) fn rewrite_native_comment_reply(
         removed_object_identifiers.push(root_identifier);
     }
     if let Some(old_reply) = old_reply_identifier {
-        if candidate.object(old_reply).is_none() {
+        if candidate_index.get(old_reply).is_none() {
             removed_object_identifiers.push(old_reply);
         }
     }
     let mut added_edges = Vec::new();
+    added_edges
+        .try_reserve_exact(after_reply_ids.len())
+        .map_err(|_| NativeReplyError::Allocation)?;
     let mut removed_edges = Vec::new();
+    removed_edges
+        .try_reserve_exact(if old_root_can_cull {
+            before_reply_ids.len()
+        } else {
+            0
+        })
+        .map_err(|_| NativeReplyError::Allocation)?;
     for identifier in &after_reply_ids {
         added_edges.push(NativeReplyReferenceEdge {
             source_identifier: request.new_root.identifier,
@@ -2612,7 +3006,7 @@ pub(super) fn rewrite_native_comment_reply(
         target_cell,
         before_root_identifier: root_identifier,
         after_root_identifier: request.new_root.identifier,
-        before_reply_identifiers: before_reply_ids.clone(),
+        before_reply_identifiers: before_reply_ids,
         after_reply_identifiers: after_reply_ids,
         added_object_identifiers,
         removed_object_identifiers,
@@ -2624,11 +3018,85 @@ pub(super) fn rewrite_native_comment_reply(
             candidate_bytes: candidate_byte_count,
             fields: 0,
             work_bytes: decoded_bytes.saturating_add(candidate_decoded_bytes),
-            references: before_aggregate.len().saturating_add(after_aggregate.len()),
+            references: before_aggregate
+                .as_slice()
+                .len()
+                .saturating_add(after_aggregate.as_slice().len()),
             replies: reply_count,
             allocations: 8,
             scratch_bytes: decoded_bytes,
             retained_bytes: candidate_byte_count,
         },
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{IdIndex, NativeReplyError, ReplyProbe, StorageReferenceAggregate};
+
+    #[test]
+    fn reply_probe_handles_reverse_adversarial_order_and_duplicate() {
+        const COUNT: usize = 16_384;
+        let mut probe = ReplyProbe::with_capacity(COUNT)
+            .expect("the bounded reply probe should reserve both ID collections");
+        for identifier in (1..=u64::try_from(COUNT).expect("count fits in u64")).rev() {
+            probe.record_identifier(identifier, None, None);
+        }
+        assert!(!probe.allocation_failed);
+        assert!(!probe.unsupported_reference);
+        assert_eq!(probe.identifiers.len(), COUNT);
+        assert_eq!(
+            probe.identifiers[0],
+            u64::try_from(COUNT).expect("count fits in u64")
+        );
+        assert_eq!(probe.identifiers[COUNT - 1], 1);
+
+        probe.record_identifier(
+            u64::try_from(COUNT / 2).expect("count fits in u64"),
+            None,
+            None,
+        );
+        assert!(probe.unsupported_reference);
+        assert!(!probe.allocation_failed);
+        assert_eq!(probe.identifiers.len(), COUNT);
+    }
+
+    #[test]
+    fn reply_probe_capacity_exhaustion_is_staged_as_allocation() {
+        let mut probe = ReplyProbe::with_capacity(1).expect("one ID should reserve");
+        probe.record_identifier(11, None, None);
+        probe.record_identifier(12, None, None);
+        assert!(probe.allocation_failed);
+        assert_eq!(probe.identifiers, [11]);
+        assert!(!probe.unsupported_reference);
+    }
+
+    #[test]
+    fn id_index_is_direct_and_duplicate_typed() {
+        const COUNT: usize = 16_384;
+        let mut index = IdIndex::try_with_capacity(COUNT).expect("the ID index should reserve");
+        for position in (0..COUNT).rev() {
+            let identifier = u64::try_from(position + 1).expect("position fits in u64");
+            assert_eq!(index.insert(identifier, position), None);
+        }
+        assert_eq!(index.len(), COUNT);
+        for position in [0, COUNT / 2, COUNT - 1] {
+            let identifier = u64::try_from(position + 1).expect("position fits in u64");
+            assert_eq!(index.get(identifier), Some(position));
+        }
+        assert_eq!(index.insert(1, usize::MAX), Some(0));
+    }
+
+    #[test]
+    fn storage_reference_aggregate_preserves_order_and_rejects_duplicates() {
+        let aggregate = StorageReferenceAggregate::try_from_parts(Some(9), &[30, 10, 20])
+            .expect("unique references should be accepted");
+        assert_eq!(aggregate.as_slice(), [9, 30, 10, 20]);
+        assert!(aggregate.contains(&10));
+        assert!(!aggregate.contains(&99));
+        assert_eq!(
+            StorageReferenceAggregate::try_from_parts(Some(9), &[30, 9]),
+            Err(NativeReplyError::InvalidSource)
+        );
+    }
 }

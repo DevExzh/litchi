@@ -15644,3 +15644,67 @@ without reopening its identical target. The bounded soundtrack lifecycle fuzz
 oracle covers this canonicalization case and models repeat application of an
 identity patch as valid. This source-level hardening does not add native
 certification or close an operation, dependency, debt, host, or deletion gate.
+
+## 2026-09-03 amendment: raw-facade retirement, build-order E1, and Keynote Number E4
+
+The deprecated public `litchi_iwa::raw::{bundle, package}` facade is now
+absent. Eight raw-only inspection examples and the raw-package no-op integration
+test are deleted; the mixed formula example retains its semantic edit and drops
+only the raw package diagnostic. Private bundle/package machinery remains in
+the migration host for its still-owned operations. The boundary checker now
+rejects restoration of `pub mod raw` and recursively inventories nested Cargo
+manifests, including normal/dev/build, target-specific, workspace, patch,
+replace, renamed, and path dependencies. The explicitly recorded
+`crates/litchi-iwa/fuzz` host edge remains allowed migration debt, so this is
+surface retirement rather than monolith deletion.
+
+Keynote slide backgrounds no longer expose authorable opaque native bytes.
+Unknown, image, malformed-semantic, and future fills project to
+`Background::Unsupported`; their exact source bytes remain private and
+preserved. Exact no-ops remain byte-identical, while changing an unsupported
+source or trying to author `Unsupported` fails with the typed unsupported-source
+error. Separately, `litchi-keynote::Package` now owns a selector-first move of
+one existing build within a slide's modern playback order. It rewrites native
+fields 2 and 43 together, preserves complete reference records, validates
+contiguous chunk grouping and admitted start semantics, reopens/readbacks the
+candidate, and exposes exact conflict/inverse semantics without native IDs.
+Effect/timing mutation, add/remove/duplicate lifecycle, legacy field-3 lists,
+host cutover, and native acceptance remain outside this E1-only owner.
+
+The focused Keynote existing-cell Number owner now has current-producer E4
+evidence that supersedes the earlier disposable hashes. Through Computer Use,
+Keynote authored a presentation with marker `Litchi native Keynote table Number
+verification — 東京😀`, row label `Verified-number`, and B2 holding numeric
+`42.5` as Number with two fixed decimals, normal minus-sign negatives, and no
+thousands separator. The source was 551,367 bytes with SHA-256
+`702e85d7218a59617742452cd47710d0a97db8a2e09d413ea8fcbb68195051f0`.
+The focused transaction changed only B2 to three fixed decimals, reported two
+touched components and a full candidate reparse, and produced a 551,365-byte
+library candidate with SHA-256
+`49ed89396d1772b7f82338b057d85d1703db77bb4e6741e08e568343473bf740`.
+
+Keynote opened that candidate without repair or conversion, retained the
+Unicode marker and row label, displayed `42.500`, and exposed the Cell formatter
+as Number / 3 decimals / normal minus sign / thousands hidden. A native save
+normalized it to 551,483 bytes with SHA-256
+`fb6b2740581fd321d58d69f9ca1d3b4d1623647cbd934dd853c8cc0293091477`;
+close/reopen reproduced the same UI state without a repair prompt. Strict
+reread of the native-resaved artifact requested the same format and reported
+`changed=false`, zero touched components, and no full reparse. Its emitted
+artifact was byte-identical with the same SHA-256. The configured native
+round-trip test passed, and the example's in-memory inverse restored the exact
+source artifact. This proves only the bounded Number-format transaction, not
+other cell formats, value/formula authoring, arbitrary-producer parity, or
+package-wide native certification.
+
+The dated soundtrack-item and Numbers relocation/format paragraphs above are
+historical snapshots. The old host soundtrack-item implementation/API is
+already absent and rooted item lifecycle belongs to `litchi-keynote::Package`;
+soundtrack creation and broad media compatibility remain host-owned. Public
+`NumbersEditor::move_table` and the dedicated Number/Percentage/Currency/
+Scientific/Fraction convenience routes are absent; only crate-private
+relocation support plus generic source-built/cross-format `DataFormat`
+compatibility remain. The inventory is still 64 packages, 238 internal
+declarations, 227 canonical edges, 11 development-only edges, debts
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. No edge,
+debt, host, or deletion gate closes.

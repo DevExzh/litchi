@@ -52,12 +52,11 @@ fn semantic_numbers_cell_state_preserves_typed_presence() -> Result<(), Box<dyn 
     )?;
 
     assert_eq!(state.position(), position);
-    match state.storage() {
-        Storage::Stored(value) => {
-            assert_eq!(value.cell_type(), Type::Text);
-            assert!(matches!(value, Value::Text(_)));
-        },
-        Storage::Missing => panic!("fixture cell should be materialized"),
-    }
+    let value = state
+        .storage()
+        .value()
+        .ok_or_else(|| std::io::Error::other("fixture cell should be materialized"))?;
+    assert_eq!(value.cell_type(), Type::Text);
+    assert!(matches!(value, Value::Text(_)));
     Ok(())
 }

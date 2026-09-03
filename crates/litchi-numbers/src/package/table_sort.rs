@@ -26,7 +26,11 @@ use litchi_iwa_core::{
 use litchi_iwa_protos::table_sort_order_codec as codec;
 use thiserror::Error as ThisError;
 
-use super::{Package, table_headers};
+use super::{
+    Package,
+    physical_entry_index::{Error as PhysicalEntryIndexError, PhysicalEntryIndex},
+    table_headers,
+};
 use crate::{
     selector::{SheetSelector, TableSelector},
     table::{
@@ -1516,6 +1520,18 @@ fn verify_unchanged_entries(
     if source_catalog.package().iter().count() != candidate_catalog.package().iter().count() {
         return Err(Error::Verification);
     }
+    let source_index =
+        PhysicalEntryIndex::new(source_catalog.package()).map_err(|error| match error {
+            PhysicalEntryIndexError::Allocation { .. } | PhysicalEntryIndexError::Duplicate => {
+                Error::Verification
+            },
+        })?;
+    let candidate_index =
+        PhysicalEntryIndex::new(candidate_catalog.package()).map_err(|error| match error {
+            PhysicalEntryIndexError::Allocation { .. } | PhysicalEntryIndexError::Duplicate => {
+                Error::Verification
+            },
+        })?;
     let selected_name = source
         .state
         .components
@@ -1524,10 +1540,8 @@ fn verify_unchanged_entries(
         .ok_or(Error::Verification)?
         .name();
     for before in source_catalog.package().iter() {
-        let after = candidate_catalog
-            .package()
-            .iter()
-            .find(|entry| entry.name() == before.name())
+        let after = candidate_index
+            .get(before.name())
             .ok_or(Error::Verification)?;
         if before.name() == selected_name {
             continue;
@@ -1545,11 +1559,7 @@ fn verify_unchanged_entries(
         }
     }
     for after in candidate_catalog.package().iter() {
-        if source_catalog
-            .package()
-            .iter()
-            .all(|before| before.name() != after.name())
-        {
+        if source_index.get(after.name()).is_none() {
             return Err(Error::Verification);
         }
     }

@@ -15,12 +15,14 @@
     reason = "The semantic boundary deliberately redacts lower-layer failures."
 )]
 
+use std::collections::HashMap;
 use std::fmt;
+use std::mem::size_of;
 use std::sync::Arc;
 use std::time::Duration;
 
 use litchi_core::Position;
-use litchi_iwa_archive::package::{EntryEdit, ExactArtifacts};
+use litchi_iwa_archive::package::{Catalog, Entry, EntryEdit, ExactArtifacts};
 use litchi_iwa_common::{decode_varint_from_bytes, varint::encoded_len, wire::WireView};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::movie_playback_codec;
@@ -1144,11 +1146,12 @@ fn verify_locality(
     if source_catalog.package().len() != candidate_catalog.package().len() {
         return Err(SlideMoviePlaybackError::Verification);
     }
+    let source_entries = entry_index(source_catalog.package(), budget)?;
+    let candidate_entries = entry_index(candidate_catalog.package(), budget)?;
     for source_entry in source_catalog.package().iter() {
-        let candidate_entry = candidate_catalog
-            .package()
-            .iter()
-            .find(|entry| entry.name() == source_entry.name())
+        let candidate_entry = candidate_entries
+            .get(source_entry.name())
+            .copied()
             .ok_or(SlideMoviePlaybackError::Verification)?;
         if source_entry.name() != selection.slide_component_name.as_ref()
             && source_entry.data() != candidate_entry.data()
@@ -1157,11 +1160,7 @@ fn verify_locality(
         }
     }
     for candidate_entry in candidate_catalog.package().iter() {
-        if source_catalog
-            .package()
-            .iter()
-            .all(|entry| entry.name() != candidate_entry.name())
-        {
+        if !source_entries.contains_key(candidate_entry.name()) {
             return Err(SlideMoviePlaybackError::Verification);
         }
     }
@@ -1219,6 +1218,41 @@ fn verify_locality(
         budget.work(source_object.messages.len())?;
     }
     Ok(())
+}
+
+/// Build a bounded name index for physical members before any locality pass.
+///
+/// ZIP member names are expected to be unique.  Rejecting duplicates while
+/// constructing the index keeps the verification lookup linear and avoids
+/// silently selecting the first of two physical records with the same name.
+fn entry_index<'a>(
+    catalog: &'a Catalog,
+    budget: &mut PlaybackBudget,
+) -> Result<HashMap<&'a str, &'a Entry>, SlideMoviePlaybackError> {
+    let count = catalog.iter().count();
+    budget.allocations(usize::from(count != 0))?;
+    budget.retained(
+        count
+            .checked_mul(size_of::<(&str, &Entry)>())
+            .ok_or(SlideMoviePlaybackError::InvalidSource)?,
+    )?;
+    let mut index = HashMap::new();
+    index
+        .try_reserve(count)
+        .map_err(|_| SlideMoviePlaybackError::Allocation { amount: count })?;
+    for entry in catalog.iter() {
+        budget.work(
+            entry
+                .name()
+                .len()
+                .checked_add(1)
+                .ok_or(SlideMoviePlaybackError::InvalidSource)?,
+        )?;
+        if index.insert(entry.name(), entry).is_some() {
+            return Err(SlideMoviePlaybackError::Verification);
+        }
+    }
+    Ok(index)
 }
 
 fn component_archive(package: &Package, name: &str) -> Result<Archive, SlideMoviePlaybackError> {

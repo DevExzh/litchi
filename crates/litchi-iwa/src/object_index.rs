@@ -4,7 +4,7 @@
 //! locations in IWA files. This allows objects to reference each other
 //! across different archive files.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use crate::archive::{Archive, ArchiveObject, RawMessage};
@@ -99,17 +99,43 @@ impl ObjectIndexEntry<'_> {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct BatchObject<'a> {
+    request_position: usize,
+    entry: ObjectIndexEntry<'a>,
+}
+
 #[derive(Debug, Clone)]
 struct FragmentIndexEntry {
     id: FragmentId,
     name: Arc<str>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct IndexSnapshot {
     locations: Arc<NeutralObjectIndex>,
     metadata: Arc<[ArchiveObjectMetadata]>,
     fragments: Arc<[FragmentIndexEntry]>,
+    /// Fragment names keyed by their adapter-local identity.
+    ///
+    /// `fragments` remains name-sorted for the public name lookup, while this
+    /// sidecar keeps source resolution independent of the number of package
+    /// fragments. The names themselves stay shared through `Arc<str>`.
+    fragment_names: Arc<HashMap<FragmentId, Arc<str>>>,
+}
+
+impl std::fmt::Debug for IndexSnapshot {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Keep the private ID lookup sidecar out of diagnostics: HashMap's
+        // iteration order is randomized, while the published archive and
+        // object views are intentionally deterministic.
+        formatter
+            .debug_struct("IndexSnapshot")
+            .field("locations", &self.locations)
+            .field("metadata", &self.metadata)
+            .field("fragments", &self.fragments)
+            .finish()
+    }
 }
 
 /// Object index that maps object IDs to their locations.
@@ -137,15 +163,45 @@ impl ObjectIndex {
                 locations: Arc::new(NeutralObjectIndex::default()),
                 metadata: Arc::default(),
                 fragments: Arc::default(),
+                fragment_names: Arc::default(),
             }),
         }
     }
 
     /// Build object index from a bundle
     pub fn from_bundle(bundle: &Bundle) -> Result<Self> {
+        let cardinality = preflight_bundle(bundle)?;
         let mut builder = IndexBuilder::new();
         let mut metadata = Vec::new();
+        reserve_vec_exact(
+            &mut metadata,
+            cardinality.objects,
+            "object index pending metadata",
+        )?;
         let mut fragments = Vec::new();
+        reserve_vec_exact(
+            &mut fragments,
+            cardinality.fragments,
+            "object index fragment catalog",
+        )?;
+
+        // IndexBuilder keeps its own validation catalogs, but the adapter
+        // also needs the existing object's fragment to report a useful,
+        // deterministic cross-archive duplicate error. Pre-sizing this
+        // private map makes duplicate diagnostics O(1) even for a hostile
+        // package containing many repeated IDs.
+        let mut object_fragments = HashMap::new();
+        reserve_map(
+            &mut object_fragments,
+            cardinality.objects,
+            "object index object-fragment catalog",
+        )?;
+        let mut fragment_names = HashMap::new();
+        reserve_map(
+            &mut fragment_names,
+            cardinality.fragments,
+            "object index fragment-name catalog",
+        )?;
 
         // Bundle traversal is already sorted at ingress, so assigning private
         // fragment ordinals here makes the neutral snapshot deterministic.
@@ -153,6 +209,7 @@ impl ObjectIndex {
             let fragment_id = fragment_id(position)?;
             let name: Arc<str> = Arc::from(archive_name);
             builder.add_fragment(fragment_id).map_err(index_error)?;
+            fragment_names.insert(fragment_id, Arc::clone(&name));
             fragments.push(FragmentIndexEntry {
                 id: fragment_id,
                 name: Arc::clone(&name),
@@ -163,7 +220,8 @@ impl ObjectIndex {
                 fragment_id,
                 &mut builder,
                 &mut metadata,
-                &fragments,
+                &fragment_names,
+                &mut object_fragments,
             )?;
         }
 
@@ -189,12 +247,34 @@ impl ObjectIndex {
         if self
             .snapshot
             .fragments
-            .iter()
-            .any(|fragment| fragment.name.as_ref() == archive_name)
+            .binary_search_by(|fragment| fragment.name.as_ref().cmp(archive_name))
+            .is_ok()
         {
             return Err(Error::Archive(format!(
                 "archive {archive_name} occurs more than once in the object index"
             )));
+        }
+
+        let object_count = self
+            .snapshot
+            .locations
+            .len()
+            .checked_add(archive.objects.len())
+            .ok_or_else(|| {
+                Error::Archive("object index object cardinality overflows usize".to_owned())
+            })?;
+        let fragment_count = self
+            .snapshot
+            .fragments
+            .len()
+            .checked_add(1)
+            .ok_or_else(|| {
+                Error::Archive("object index fragment cardinality overflows usize".to_owned())
+            })?;
+        if fragment_count > u32::MAX as usize {
+            return Err(Error::Archive(
+                "IWA fragment catalog exceeds u32 capacity".to_owned(),
+            ));
         }
 
         let mut builder = IndexBuilder::new();
@@ -213,30 +293,62 @@ impl ObjectIndex {
         let fragment_id = fragment_id(self.snapshot.fragments.len())?;
         builder.add_fragment(fragment_id).map_err(index_error)?;
         let name: Arc<str> = Arc::from(archive_name);
-        let mut metadata = self
+        let mut metadata = Vec::new();
+        reserve_vec_exact(&mut metadata, object_count, "object index pending metadata")?;
+        for (record, object_metadata) in self
             .snapshot
             .locations
             .objects()
             .zip(self.snapshot.metadata.iter())
-            .map(|(record, metadata)| PendingObjectMetadata {
+        {
+            metadata.push(PendingObjectMetadata {
                 id: record.id(),
                 fragment_id: record.fragment(),
-                source_position: metadata.source_position,
-                object_type: metadata.object_type,
-            })
-            .collect::<Vec<_>>();
-        let mut fragments = self.snapshot.fragments.to_vec();
+                source_position: object_metadata.source_position,
+                object_type: object_metadata.object_type,
+            });
+        }
+        let mut fragments = Vec::new();
+        reserve_vec_exact(
+            &mut fragments,
+            fragment_count,
+            "object index fragment catalog",
+        )?;
+        fragments.extend(self.snapshot.fragments.iter().cloned());
         fragments.push(FragmentIndexEntry {
             id: fragment_id,
-            name,
+            name: Arc::clone(&name),
         });
+
+        let mut object_fragments = HashMap::new();
+        reserve_map(
+            &mut object_fragments,
+            object_count,
+            "object index object-fragment catalog",
+        )?;
+        for record in self.snapshot.locations.objects() {
+            object_fragments.insert(record.id(), record.fragment());
+        }
+
+        let mut fragment_names = HashMap::new();
+        reserve_map(
+            &mut fragment_names,
+            fragment_count,
+            "object index fragment-name catalog",
+        )?;
+        for fragment in self.snapshot.fragments.iter() {
+            fragment_names.insert(fragment.id, Arc::clone(&fragment.name));
+        }
+        fragment_names.insert(fragment_id, Arc::clone(&name));
+
         append_archive(
             archive_name,
             archive,
             fragment_id,
             &mut builder,
             &mut metadata,
-            &fragments,
+            &fragment_names,
+            &mut object_fragments,
         )?;
         self.snapshot = finish_snapshot(builder, metadata, fragments)?;
         Ok(())
@@ -285,10 +397,9 @@ impl ObjectIndex {
 
     fn fragment_name(&self, fragment_id: FragmentId) -> Result<&str> {
         self.snapshot
-            .fragments
-            .iter()
-            .find(|fragment| fragment.id == fragment_id)
-            .map(|fragment| fragment.name.as_ref())
+            .fragment_names
+            .get(&fragment_id)
+            .map(Arc::as_ref)
             .ok_or_else(|| {
                 Error::Archive(format!(
                     "object index references unregistered fragment {fragment_id:?}"
@@ -447,80 +558,108 @@ impl ObjectIndex {
         bundle: &'a Bundle,
         object_ids: &[ObjectId],
     ) -> Result<Vec<ResolvedObjectRef<'a>>> {
-        let mut requested = HashSet::with_capacity(object_ids.len());
-        for object_id in object_ids {
+        let mut requested = HashSet::new();
+        reserve_set(
+            &mut requested,
+            object_ids.len(),
+            "object index batch request catalog",
+        )?;
+        let mut requests = Vec::new();
+        reserve_vec_exact(
+            &mut requests,
+            object_ids.len(),
+            "object index batch request storage",
+        )?;
+        for (request_position, object_id) in object_ids.iter().enumerate() {
             if !requested.insert(*object_id) {
                 return Err(Error::Archive(format!(
                     "object {object_id:?} occurs more than once in a batch"
                 )));
             }
-            if !self.contains(*object_id) {
-                return Err(Error::Archive(format!(
+            let entry = self.entry(*object_id).ok_or_else(|| {
+                Error::Archive(format!(
                     "object {} is not present in the object index",
                     object_id.get()
-                )));
-            }
+                ))
+            })?;
+            requests.push(BatchObject {
+                request_position,
+                entry,
+            });
         }
 
-        let resolved = self.resolve_many_refs_inner(bundle, object_ids)?;
-        let resolved_ids: HashSet<_> = resolved.iter().map(ResolvedObjectRef::id).collect();
-        if let Some(missing) = object_ids
-            .iter()
-            .find(|object_id| !resolved_ids.contains(object_id))
-        {
-            return Err(Error::Bundle(format!(
-                "object {} could not be resolved from the bundle",
-                missing.get()
-            )));
+        let resolved = self.resolve_many_refs_inner(bundle, &requests)?;
+        let mut objects = Vec::new();
+        reserve_vec_exact(
+            &mut objects,
+            object_ids.len(),
+            "object index batch result storage",
+        )?;
+        for (request_position, object_id) in object_ids.iter().enumerate() {
+            let Some(object) = resolved[request_position] else {
+                return Err(Error::Bundle(format!(
+                    "object {} could not be resolved from the bundle",
+                    object_id.get()
+                )));
+            };
+            objects.push(object);
         }
-        Ok(resolved)
+        Ok(objects)
     }
 
     fn resolve_many_refs_inner<'a>(
         &self,
         bundle: &'a Bundle,
-        object_ids: &[ObjectId],
-    ) -> Result<Vec<ResolvedObjectRef<'a>>> {
-        // Group typed IDs by their neutral fragment to minimize archive
-        // lookups. BTreeMap keeps archive traversal and error ordering
-        // deterministic, and the caller has already rejected duplicate IDs,
-        // so a Vec is sufficient for each group.
-        let mut objects_by_fragment: BTreeMap<FragmentId, Vec<ObjectId>> = BTreeMap::new();
+        requests: &[BatchObject<'_>],
+    ) -> Result<Vec<Option<ResolvedObjectRef<'a>>>> {
+        // Group typed requests by fragment to minimize archive lookups. The
+        // request position is part of the sort key, retaining caller order
+        // within each archive while making fragment traversal deterministic.
+        let mut grouped = Vec::new();
+        reserve_vec_exact(
+            &mut grouped,
+            requests.len(),
+            "object index grouped batch requests",
+        )?;
+        grouped.extend_from_slice(requests);
+        grouped.sort_unstable_by_key(|request| {
+            (request.entry.fragment_id(), request.request_position)
+        });
 
-        for &object_id in object_ids {
-            let entry = self.entry(object_id).ok_or_else(|| {
-                Error::Archive(format!(
-                    "object {} is missing from the neutral index",
-                    object_id.get()
-                ))
-            })?;
-            objects_by_fragment
-                .entry(entry.fragment_id())
-                .or_default()
-                .push(object_id);
-        }
-
-        let mut resolved_by_id = HashMap::with_capacity(object_ids.len());
+        let mut resolved_slots = Vec::new();
+        reserve_vec_exact(
+            &mut resolved_slots,
+            requests.len(),
+            "object index batch resolution slots",
+        )?;
+        resolved_slots.resize(requests.len(), None);
 
         // Resolve objects archive by archive. The indexed source position
         // avoids rescanning each archive for sparse batches.
-        for (fragment_id, ids) in objects_by_fragment {
+        let mut group_start = 0;
+        while let Some(first) = grouped.get(group_start) {
+            let fragment_id = first.entry.fragment_id();
+            let mut group_end = group_start.saturating_add(1);
+            while grouped
+                .get(group_end)
+                .is_some_and(|request| request.entry.fragment_id() == fragment_id)
+            {
+                group_end = group_end.saturating_add(1);
+            }
             let fragment_name = self.fragment_name(fragment_id)?;
             if let Some(archive) = bundle.get_archive(fragment_name) {
-                for object_id in ids {
-                    let entry = self.entry(object_id).ok_or_else(|| {
-                        Error::Archive(format!(
-                            "object {} is missing from the neutral index",
-                            object_id.get()
-                        ))
-                    })?;
-                    let object = indexed_object(archive, &entry, object_id, fragment_name)?;
-                    let resolved = ResolvedObjectRef {
+                for request in &grouped[group_start..group_end] {
+                    let object_id = request.entry.id();
+                    let object = indexed_object(archive, &request.entry, object_id, fragment_name)?;
+                    let resolved_object = ResolvedObjectRef {
                         id: object_id,
                         archive_info: &object.archive_info,
                         messages: &object.messages,
                     };
-                    if resolved_by_id.insert(object_id, resolved).is_some() {
+                    if resolved_slots[request.request_position]
+                        .replace(resolved_object)
+                        .is_some()
+                    {
                         return Err(Error::Archive(format!(
                             "object {} occurs in more than one archive",
                             object_id.get()
@@ -528,12 +667,10 @@ impl ObjectIndex {
                     }
                 }
             }
+            group_start = group_end;
         }
 
-        Ok(object_ids
-            .iter()
-            .filter_map(|object_id| resolved_by_id.remove(object_id))
-            .collect())
+        Ok(resolved_slots)
     }
 
     /// Batch-resolve objects through the validated identity API.
@@ -542,12 +679,15 @@ impl ObjectIndex {
         bundle: &Bundle,
         object_ids: &[ObjectId],
     ) -> Result<Vec<ResolvedObject>> {
-        self.resolve_many_refs(bundle, object_ids).map(|objects| {
-            objects
-                .into_iter()
-                .map(ResolvedObjectRef::into_owned)
-                .collect()
-        })
+        let references = self.resolve_many_refs(bundle, object_ids)?;
+        let mut objects = Vec::new();
+        reserve_vec_exact(
+            &mut objects,
+            references.len(),
+            "object index owned batch result storage",
+        )?;
+        objects.extend(references.into_iter().map(ResolvedObjectRef::into_owned));
+        Ok(objects)
     }
 
     /// Resolve an object and its typed dependency closure.
@@ -595,6 +735,76 @@ impl ObjectIndex {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct IndexCardinality {
+    fragments: usize,
+    objects: usize,
+}
+
+/// Count package-scale index inputs before publishing any storage.
+///
+/// Archive ingress already validates each individual archive, but the index
+/// owns aggregate vectors and catalogs. Counting those inputs first lets the
+/// adapter reject arithmetic overflow and reserve the complete package shape
+/// before traversal starts, rather than growing collections opportunistically
+/// as an archive is consumed.
+fn preflight_bundle(bundle: &Bundle) -> Result<IndexCardinality> {
+    let mut cardinality = IndexCardinality::default();
+    for (_archive_name, archive) in bundle.iter_archives() {
+        cardinality.fragments = cardinality.fragments.checked_add(1).ok_or_else(|| {
+            Error::Archive("object index fragment cardinality overflows usize".to_owned())
+        })?;
+        cardinality.objects = cardinality
+            .objects
+            .checked_add(archive.objects.len())
+            .ok_or_else(|| {
+                Error::Archive("object index object cardinality overflows usize".to_owned())
+            })?;
+    }
+    if cardinality.fragments > u32::MAX as usize {
+        return Err(Error::Archive(
+            "IWA fragment catalog exceeds u32 capacity".to_owned(),
+        ));
+    }
+    Ok(cardinality)
+}
+
+fn reserve_vec_exact<T>(values: &mut Vec<T>, capacity: usize, resource: &str) -> Result<()> {
+    values.try_reserve_exact(capacity).map_err(|_error| {
+        Error::Archive(format!("could not reserve {resource} for {capacity} items"))
+    })
+}
+
+fn reserve_map<K, V>(values: &mut HashMap<K, V>, additional: usize, resource: &str) -> Result<()>
+where
+    K: Eq + std::hash::Hash,
+{
+    let requested = values
+        .len()
+        .checked_add(additional)
+        .ok_or_else(|| Error::Archive(format!("{resource} cardinality overflows usize")))?;
+    values.try_reserve(additional).map_err(|_error| {
+        Error::Archive(format!(
+            "could not reserve {resource} for {requested} items"
+        ))
+    })
+}
+
+fn reserve_set<K>(values: &mut HashSet<K>, additional: usize, resource: &str) -> Result<()>
+where
+    K: Eq + std::hash::Hash,
+{
+    let requested = values
+        .len()
+        .checked_add(additional)
+        .ok_or_else(|| Error::Archive(format!("{resource} cardinality overflows usize")))?;
+    values.try_reserve(additional).map_err(|_error| {
+        Error::Archive(format!(
+            "could not reserve {resource} for {requested} items"
+        ))
+    })
+}
+
 fn fragment_id(position: usize) -> Result<FragmentId> {
     let ordinal = position
         .checked_add(1)
@@ -610,7 +820,8 @@ fn append_archive(
     fragment_id: FragmentId,
     builder: &mut IndexBuilder,
     metadata: &mut Vec<PendingObjectMetadata>,
-    fragments: &[FragmentIndexEntry],
+    fragment_names: &HashMap<FragmentId, Arc<str>>,
+    object_fragments: &mut HashMap<ObjectId, FragmentId>,
 ) -> Result<()> {
     for (object_position, object) in archive.objects.iter().enumerate() {
         let identifier = object.archive_info.identifier.ok_or_else(|| {
@@ -630,20 +841,27 @@ fn append_archive(
                 "archive {archive_name} object {identifier} has an invalid byte span: {error}"
             ))
         })?;
+        if let Some(existing_fragment_id) = object_fragments.get(&object_id)
+            && let Some(existing_name) = fragment_names.get(existing_fragment_id)
+        {
+            return Err(Error::Archive(format!(
+                "object {identifier} occurs in archives {} and {archive_name}",
+                existing_name
+            )));
+        }
         if let Err(error) = builder.add_object(ObjectRecord::new(object_id, fragment_id, span)) {
             if matches!(error, IndexError::DuplicateObject(_))
-                && let Some(existing) = metadata.iter().find(|entry| entry.id == object_id)
-                && let Some(existing_fragment) = fragments
-                    .iter()
-                    .find(|fragment| fragment.id == existing.fragment_id)
+                && let Some(existing_fragment_id) = object_fragments.get(&object_id)
+                && let Some(existing_name) = fragment_names.get(existing_fragment_id)
             {
                 return Err(Error::Archive(format!(
                     "object {identifier} occurs in archives {} and {archive_name}",
-                    existing_fragment.name
+                    existing_name
                 )));
             }
             return Err(index_error(error));
         }
+        object_fragments.insert(object_id, fragment_id);
         metadata.push(PendingObjectMetadata {
             id: object_id,
             fragment_id,
@@ -700,6 +918,24 @@ fn finish_snapshot(
         )));
     }
 
+    let mut fragment_names = HashMap::new();
+    reserve_map(
+        &mut fragment_names,
+        fragments.len(),
+        "object index fragment-name catalog",
+    )?;
+    for fragment in &fragments {
+        if fragment_names
+            .insert(fragment.id, Arc::clone(&fragment.name))
+            .is_some()
+        {
+            return Err(Error::Archive(format!(
+                "object index contains duplicate fragment identity {:?}",
+                fragment.id
+            )));
+        }
+    }
+
     let mut adapter_metadata = Vec::new();
     adapter_metadata
         .try_reserve_exact(metadata.len())
@@ -718,6 +954,7 @@ fn finish_snapshot(
         locations: Arc::new(locations),
         metadata: Arc::from(adapter_metadata.into_boxed_slice()),
         fragments: Arc::from(fragments.into_boxed_slice()),
+        fragment_names: Arc::new(fragment_names),
     }))
 }
 
@@ -806,7 +1043,7 @@ pub struct ResolvedObject {
 
 /// A borrowed view of an indexed object and its immutable payloads.
 ///
-/// The view is tied to the [`crate::raw::bundle::Bundle`] used for resolution. It is the
+/// The view is tied to the private bundle used for resolution. It is the
 /// allocation-free read path for traversal and extraction; callers that need
 /// an owned value can consume it with [`Self::into_owned`].
 #[derive(Debug, Clone, Copy)]
@@ -889,6 +1126,89 @@ mod tests {
         assert!(index.snapshot.locations.is_empty());
         assert!(index.snapshot.metadata.is_empty());
         assert!(index.snapshot.fragments.is_empty());
+        assert!(index.snapshot.fragment_names.is_empty());
+    }
+
+    #[test]
+    fn package_index_preflight_counts_cardinality_before_building() {
+        let object = |identifier| {
+            ArchiveObject::new(
+                identifier,
+                vec![RawMessage {
+                    type_: 42,
+                    data: Vec::new(),
+                }],
+            )
+            .unwrap()
+        };
+        let mut package = crate::IWorkPackage::new();
+        package
+            .replace_archive(
+                "Index/Z.iwa",
+                &Archive {
+                    objects: vec![object(30), object(10)],
+                },
+            )
+            .unwrap();
+        package
+            .replace_archive(
+                "Index/A.iwa",
+                &Archive {
+                    objects: vec![object(20)],
+                },
+            )
+            .unwrap();
+        let bundle = Bundle::from_bytes(&package.to_bytes().unwrap()).unwrap();
+
+        assert_eq!(
+            preflight_bundle(&bundle).unwrap(),
+            IndexCardinality {
+                fragments: 2,
+                objects: 3,
+            }
+        );
+        let index = ObjectIndex::from_bundle(&bundle).unwrap();
+        assert_eq!(
+            index
+                .iter_object_ids()
+                .map(ObjectId::get)
+                .collect::<Vec<_>>(),
+            vec![10, 20, 30]
+        );
+        assert_eq!(
+            index
+                .snapshot
+                .fragment_names
+                .values()
+                .map(Arc::as_ref)
+                .collect::<HashSet<_>>()
+                .len(),
+            2
+        );
+    }
+
+    #[test]
+    fn package_index_reservations_report_typed_archive_errors() {
+        let mut vector = Vec::<u8>::new();
+        let vector_error = reserve_vec_exact(&mut vector, usize::MAX, "test vector").unwrap_err();
+        assert!(matches!(
+            vector_error,
+            Error::Archive(message) if message.contains("could not reserve test vector")
+        ));
+
+        let mut map = HashMap::<u64, u64>::new();
+        let map_error = reserve_map(&mut map, usize::MAX, "test map").unwrap_err();
+        assert!(matches!(
+            map_error,
+            Error::Archive(message) if message.contains("could not reserve test map")
+        ));
+
+        let mut set = HashSet::<u64>::new();
+        let set_error = reserve_set(&mut set, usize::MAX, "test set").unwrap_err();
+        assert!(matches!(
+            set_error,
+            Error::Archive(message) if message.contains("could not reserve test set")
+        ));
     }
 
     #[test]

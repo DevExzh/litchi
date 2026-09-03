@@ -175,30 +175,8 @@ pub mod comments;
 /// Cross-application content extractors
 pub mod shapes;
 
-/// Explicit low-level access to the native iWork archive and package layers.
-///
-/// The ordinary crate root is reserved for semantic document APIs. Consumers
-/// that intentionally need archive/package primitives must opt into this
-/// namespace so that the native boundary remains visible at every call site.
-#[deprecated(
-    since = "0.0.1",
-    note = "legacy migration-host raw IWA/package facade; use focused format-semantic APIs where available; retained for low-level compatibility"
-)]
-pub mod raw {
-    /// Native iWork bundle parsing and metadata primitives.
-    pub mod bundle {
-        pub use crate::bundle::*;
-    }
-
-    /// Mutable native iWork package and snapshot primitives.
-    pub mod package {
-        pub use crate::package::*;
-    }
-}
-
-// Internal modules use a short alias while the public API keeps this native
-// primitive behind the explicit `raw` namespace above.
-#[allow(deprecated)]
+// Internal modules use short aliases while the native bundle and package
+// implementations remain private to this migration host.
 pub use comments::IWorkDrawableCommentEditor;
 pub use document::Document;
 pub use drawable_order::DrawableLayerMove;
@@ -309,7 +287,7 @@ impl Error {
     ///
     /// The focused Pages, Numbers, and Keynote crates expose their own typed
     /// save errors directly. This accessor preserves the same committed-state
-    /// information for callers that still use [`raw::package::IWorkPackage`].
+    /// information for callers that still use the legacy package save path.
     /// Destination-shape failures retain the legacy [`Error::Bundle`]
     /// categorization and therefore return `None` here.
     #[must_use]

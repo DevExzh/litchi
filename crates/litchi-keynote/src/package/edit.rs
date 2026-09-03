@@ -257,10 +257,12 @@ impl Patch {
         self.after
     }
 
-    /// Return whether this patch changes the semantic skip state.
+    /// Return whether this patch preserves both semantic state and exact bytes.
     #[must_use]
-    pub const fn is_noop(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before == self.after
+            && (Arc::ptr_eq(&self.source, &self.target)
+                || self.source.as_ref() == self.target.as_ref())
     }
 
     /// Return the reversible semantic inverse of this patch.
@@ -538,4 +540,43 @@ fn fingerprint(bytes: &[u8]) -> u64 {
         value = value.wrapping_mul(0x0000_0100_0000_01b3);
     }
     value
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn equal_skip_state_with_different_target_bytes_is_not_a_noop() {
+        let source = Arc::<[u8]>::from(&b"source bytes"[..]);
+        let target = Arc::<[u8]>::from(&b"target bytes"[..]);
+        let patch = Patch {
+            source: Arc::clone(&source),
+            target,
+            source_fingerprint: fingerprint(&source),
+            target_fingerprint: fingerprint(b"target bytes"),
+            position: Position::new(1),
+            before: false,
+            after: false,
+        };
+
+        assert!(!patch.is_noop());
+    }
+
+    #[test]
+    fn equal_skip_state_with_equal_target_bytes_is_a_noop() {
+        let source = Arc::<[u8]>::from(&b"source bytes"[..]);
+        let target = Arc::<[u8]>::from(&b"source bytes"[..]);
+        let patch = Patch {
+            source: Arc::clone(&source),
+            target,
+            source_fingerprint: fingerprint(&source),
+            target_fingerprint: fingerprint(&source),
+            position: Position::new(1),
+            before: false,
+            after: false,
+        };
+
+        assert!(patch.is_noop());
+    }
 }

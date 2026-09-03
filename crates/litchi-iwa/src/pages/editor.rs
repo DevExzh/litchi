@@ -2255,9 +2255,10 @@ impl PagesEditor {
         let mut staged = text_editor.into_package();
         patch_pages_zorder(&mut staged, Some(drawable_object_id), None)?;
 
+        let mut object_index = PagesObjectIndex::build(&staged, &graph.object_ids)?;
         for identifier in &graph.object_ids {
-            let archive_name = find_object_archive(&staged, *identifier)?;
-            staged.update_archive(&archive_name, |archive| {
+            let archive_name = object_index.archive_name(*identifier)?;
+            staged.update_archive(archive_name, |archive| {
                 archive.remove_object(*identifier).ok_or_else(|| {
                     Error::InvalidFormat(format!(
                         "Pages text-box object {identifier} is missing from {archive_name}"
@@ -2265,9 +2266,10 @@ impl PagesEditor {
                 })?;
                 Ok(())
             })?;
+            object_index.mark_removed(*identifier)?;
         }
         for identifier in &graph.object_ids {
-            if package_references_object(&staged, *identifier)? {
+            if object_index.references_object(*identifier) {
                 return Err(Error::InvalidFormat(format!(
                     "Pages text-box object {identifier} remains referenced after deletion"
                 )));
@@ -2595,8 +2597,10 @@ impl PagesEditor {
             },
         )?;
         let mut removed_object_ids = Vec::new();
-        for identifier in graph.removal_order() {
-            if package_references_object(&staged, identifier)? {
+        let removal_order = graph.removal_order();
+        let mut object_index = PagesObjectIndex::build(&staged, &removal_order)?;
+        for identifier in removal_order {
+            if object_index.references_object(identifier) {
                 if identifier == section_id {
                     return Err(Error::InvalidFormat(format!(
                         "Pages section object {section_id} remains referenced after removing its boundary"
@@ -2604,8 +2608,8 @@ impl PagesEditor {
                 }
                 continue;
             }
-            let archive_name = find_object_archive(&staged, identifier)?;
-            staged.update_archive(&archive_name, |archive| {
+            let archive_name = object_index.archive_name(identifier)?;
+            staged.update_archive(archive_name, |archive| {
                 archive.remove_object(identifier).ok_or_else(|| {
                     Error::InvalidFormat(format!(
                         "Pages section-graph object {identifier} is missing"
@@ -2613,6 +2617,7 @@ impl PagesEditor {
                 })?;
                 Ok(())
             })?;
+            object_index.mark_removed(identifier)?;
             removed_object_ids.push(identifier);
         }
         if remove_marker {
@@ -4572,6 +4577,205 @@ fn update_reference_list(references: &mut Vec<u64>, old: Option<u64>, new: Optio
     }
 }
 
+/// A package-local index used by Pages graph deletion paths.
+///
+/// The legacy deletion loops repeatedly walk every IWA component to resolve
+/// one object location and then walk every message again to determine whether
+/// that object is still referenced.  This index scopes the catalog to the
+/// graph being removed, while retaining the source object for every inbound
+/// edge so callers can model objects removed earlier in the same deletion.
+/// Archive values are owned because the package is mutated after the index is
+/// built.  The package pass is charged against the shared rewrite-work ceiling
+/// before retained metadata can grow without bound.
+#[derive(Debug)]
+struct PagesObjectIndex {
+    objects: HashMap<u64, PagesObjectIndexEntry>,
+    removed: HashSet<u64>,
+}
+
+#[derive(Debug, Default)]
+struct PagesObjectIndexBudget {
+    work: usize,
+}
+
+#[derive(Debug)]
+struct PagesObjectIndexEntry {
+    archive_name: Option<String>,
+    duplicate: bool,
+    inbound_sources: Vec<Option<u64>>,
+}
+
+impl PagesObjectIndexBudget {
+    fn charge(&mut self, additional: usize) -> Result<()> {
+        let observed = self.work.checked_add(additional).ok_or_else(|| {
+            Error::InvalidFormat("Pages deletion object index work overflows usize".to_owned())
+        })?;
+        if observed > WireLimits::MAX_REWRITE_WORK {
+            return Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::RewriteWork,
+                observed,
+                limit: WireLimits::MAX_REWRITE_WORK,
+            }));
+        }
+        self.work = observed;
+        Ok(())
+    }
+}
+
+impl PagesObjectIndex {
+    /// Build an index for exactly the object identifiers in `object_ids`.
+    ///
+    /// Only requested identifiers are cataloged.  This keeps unrelated
+    /// duplicate object IDs compatible with the old per-identifier lookup and
+    /// bounds retained location storage by the graph under deletion.
+    fn build(package: &IWorkPackage, object_ids: &[u64]) -> Result<Self> {
+        let mut budget = PagesObjectIndexBudget::default();
+        budget.charge(object_ids.len())?;
+        let mut objects = HashMap::new();
+        objects.try_reserve(object_ids.len()).map_err(|_| {
+            pages_object_index_allocation("Pages deletion object index entries", object_ids.len())
+        })?;
+        for &identifier in object_ids {
+            objects
+                .entry(identifier)
+                .or_insert_with(|| PagesObjectIndexEntry {
+                    archive_name: None,
+                    duplicate: false,
+                    inbound_sources: Vec::new(),
+                });
+        }
+
+        // Resolve locations and collect inbound edges in one package pass.
+        // Missing and duplicate locations are retained as states and
+        // reported by `archive_name` at the same point a legacy deletion loop
+        // would resolve that object.
+        for name in package.iwa_entry_names() {
+            budget.charge(1)?;
+            let archive = package.archive(name)?;
+            for object in &archive.objects {
+                budget.charge(1)?;
+                if let Some(identifier) = object.archive_info.identifier
+                    && let Some(entry) = objects.get_mut(&identifier)
+                {
+                    if entry.archive_name.is_some() {
+                        entry.duplicate = true;
+                    } else {
+                        let mut archive_name = String::new();
+                        archive_name.try_reserve(name.len()).map_err(|_| {
+                            pages_object_index_allocation(
+                                "Pages deletion object index archive names",
+                                name.len(),
+                            )
+                        })?;
+                        archive_name.push_str(name);
+                        entry.archive_name = Some(archive_name);
+                    }
+                }
+
+                // Build inbound edges from both message-level and field-level
+                // metadata, matching the previous package reference scan
+                // exactly. The source is optional because an opaque archive
+                // object without an identifier can still hold a reference and
+                // can never be removed by this index.
+                let source = object.archive_info.identifier;
+                for message in &object.archive_info.message_infos {
+                    budget.charge(1)?;
+                    budget.charge(message.object_references.len())?;
+                    for &target in &message.object_references {
+                        Self::record_inbound(&mut objects, target, source)?;
+                    }
+                    for field in &message.field_infos {
+                        budget.charge(1)?;
+                        budget.charge(field.object_references.len())?;
+                        for &target in &field.object_references {
+                            Self::record_inbound(&mut objects, target, source)?;
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut removed = HashSet::new();
+        removed.try_reserve(object_ids.len()).map_err(|_| {
+            pages_object_index_allocation(
+                "Pages deletion object index removed identifiers",
+                object_ids.len(),
+            )
+        })?;
+        Ok(Self { objects, removed })
+    }
+
+    fn record_inbound(
+        objects: &mut HashMap<u64, PagesObjectIndexEntry>,
+        target: u64,
+        source: Option<u64>,
+    ) -> Result<()> {
+        let Some(entry) = objects.get_mut(&target) else {
+            return Ok(());
+        };
+        let requested = entry.inbound_sources.len().saturating_add(1);
+        entry.inbound_sources.try_reserve(1).map_err(|_| {
+            pages_object_index_allocation(
+                "Pages deletion object index inbound references",
+                requested,
+            )
+        })?;
+        entry.inbound_sources.push(source);
+        Ok(())
+    }
+
+    fn archive_name(&self, identifier: u64) -> Result<&str> {
+        let Some(entry) = self.objects.get(&identifier) else {
+            return Err(Error::InvalidFormat(format!(
+                "Object {identifier} is missing"
+            )));
+        };
+        if self.removed.contains(&identifier) || entry.archive_name.is_none() {
+            return Err(Error::InvalidFormat(format!(
+                "Object {identifier} is missing"
+            )));
+        }
+        if entry.duplicate {
+            return Err(Error::Archive(format!(
+                "Object {identifier} occurs in multiple IWA components"
+            )));
+        }
+        entry
+            .archive_name
+            .as_deref()
+            .ok_or_else(|| Error::InvalidFormat(format!("Object {identifier} is missing")))
+    }
+
+    fn mark_removed(&mut self, identifier: u64) -> Result<()> {
+        if !self.removed.contains(&identifier) {
+            // The build reserves the graph's upper bound, but keep this
+            // operation fallible if a caller ever marks an additional source.
+            let requested = self.removed.len().saturating_add(1);
+            self.removed.try_reserve(1).map_err(|_| {
+                pages_object_index_allocation(
+                    "Pages deletion object index removed identifiers",
+                    requested,
+                )
+            })?;
+            self.removed.insert(identifier);
+        }
+        Ok(())
+    }
+
+    fn references_object(&self, identifier: u64) -> bool {
+        self.objects.get(&identifier).is_some_and(|entry| {
+            entry
+                .inbound_sources
+                .iter()
+                .any(|source| source.is_none_or(|source| !self.removed.contains(&source)))
+        })
+    }
+}
+
+fn pages_object_index_allocation(resource: &'static str, amount: usize) -> Error {
+    Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
+}
+
 fn find_object_archive(package: &IWorkPackage, identifier: u64) -> Result<String> {
     let mut found = None;
     for name in package.iwa_entry_names() {
@@ -4955,5 +5159,123 @@ mod strict_selector_tests {
             PagesEditor::set_drawable_comment_reply;
         let _: fn(&mut PagesEditor, DrawableId, StorageId) -> Result<()> =
             PagesEditor::remove_drawable_comment_reply;
+    }
+}
+
+#[cfg(test)]
+mod pages_object_index_tests {
+    use super::*;
+    use crate::archive::Archive;
+
+    #[test]
+    fn indexes_locations_and_tracks_removed_inbound_sources() {
+        let mut first_source = index_test_object(10);
+        first_source.archive_info.message_infos[0]
+            .object_references
+            .push(20);
+        let mut second_source = index_test_object(11);
+        second_source.archive_info.message_infos[0]
+            .field_infos
+            .push(crate::archive::FieldInfo {
+                path: crate::archive::FieldPath::new(vec![1, 2]),
+                object_references: vec![20],
+                ..Default::default()
+            });
+        let target = index_test_object(20);
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive(
+                "Index/A.iwa",
+                &Archive {
+                    objects: vec![first_source, second_source],
+                },
+            )
+            .unwrap();
+        package
+            .replace_archive(
+                "Index/B.iwa",
+                &Archive {
+                    objects: vec![target],
+                },
+            )
+            .unwrap();
+
+        let mut index = PagesObjectIndex::build(&package, &[20, 10, 11]).unwrap();
+        assert_eq!(index.archive_name(20).unwrap(), "Index/B.iwa");
+        assert!(index.references_object(20));
+        index.mark_removed(10).unwrap();
+        assert!(index.references_object(20));
+        index.mark_removed(11).unwrap();
+        assert!(!index.references_object(20));
+    }
+
+    #[test]
+    fn reports_missing_and_duplicate_requested_locations() {
+        let mut missing_package = IWorkPackage::new();
+        missing_package
+            .replace_archive(
+                "Index/A.iwa",
+                &Archive {
+                    objects: vec![index_test_object(10)],
+                },
+            )
+            .unwrap();
+        let missing_index = PagesObjectIndex::build(&missing_package, &[20]).unwrap();
+        let missing = missing_index.archive_name(20).unwrap_err();
+        assert!(
+            matches!(missing, Error::InvalidFormat(message) if message.contains("Object 20 is missing"))
+        );
+
+        let mut duplicate_package = IWorkPackage::new();
+        duplicate_package
+            .replace_archive(
+                "Index/A.iwa",
+                &Archive {
+                    objects: vec![index_test_object(20)],
+                },
+            )
+            .unwrap();
+        duplicate_package
+            .replace_archive(
+                "Index/B.iwa",
+                &Archive {
+                    objects: vec![index_test_object(20)],
+                },
+            )
+            .unwrap();
+        let duplicate_index = PagesObjectIndex::build(&duplicate_package, &[20]).unwrap();
+        let duplicate = duplicate_index.archive_name(20).unwrap_err();
+        assert!(
+            matches!(duplicate, Error::Archive(message) if message.contains("Object 20 occurs in multiple IWA components"))
+        );
+    }
+
+    #[test]
+    fn bounds_index_work_before_counter_overflow() {
+        let mut budget = PagesObjectIndexBudget {
+            work: WireLimits::MAX_REWRITE_WORK,
+        };
+        let error = budget.charge(1).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::RewriteWork,
+                observed,
+                limit,
+            })
+                if observed == WireLimits::MAX_REWRITE_WORK + 1
+                    && limit == WireLimits::MAX_REWRITE_WORK
+        ));
+    }
+
+    fn index_test_object(identifier: u64) -> ArchiveObject {
+        ArchiveObject::new(
+            identifier,
+            vec![RawMessage {
+                type_: 1,
+                data: Vec::new(),
+            }],
+        )
+        .unwrap()
     }
 }

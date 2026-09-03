@@ -6,6 +6,7 @@
 //! census, collision-safe identifiers, and one prepared atomic transition.
 
 use core::mem::size_of;
+use std::collections::HashSet;
 
 use litchi_iwa_core::{ArchiveReferencePolicy, ArchiveReferenceVisitor, Limits as ArchiveLimits};
 use litchi_iwa_protos::package_metadata_codec::{
@@ -396,13 +397,26 @@ impl<'source> MetadataRegistry<'source> {
         output
             .try_reserve_exact(owners.len())
             .map_err(|_| MetadataError::allocation(owners.len()))?;
-        for (index, &(component_index, object_identifier)) in owners.iter().enumerate() {
-            if owners[..index].contains(&(component_index, object_identifier)) {
+        // Both duplicate dimensions are bounded by the caller's owner batch;
+        // pre-reserving them keeps membership checks expected-linear and
+        // leaves `output` in the caller's source order.
+        let mut seen_owners: HashSet<(usize, u64)> = HashSet::new();
+        seen_owners
+            .try_reserve(owners.len())
+            .map_err(|_| MetadataError::allocation(owners.len()))?;
+        let mut seen_uuids: HashSet<UuidBits> = HashSet::new();
+        seen_uuids
+            .try_reserve(owners.len())
+            .map_err(|_| MetadataError::allocation(owners.len()))?;
+        for &(component_index, object_identifier) in owners {
+            if !seen_owners.insert((component_index, object_identifier)) {
                 return Err(MetadataError::kind(FailureKind::Conflict));
             }
             let uuid = self.current_uuid_if_registered(component_index, object_identifier)?;
-            if uuid.is_some_and(|value| output.iter().flatten().any(|item| *item == value)) {
-                return Err(MetadataError::kind(FailureKind::Conflict));
+            if let Some(uuid) = uuid {
+                if !seen_uuids.insert(uuid) {
+                    return Err(MetadataError::kind(FailureKind::Conflict));
+                }
             }
             output.push(uuid);
         }
@@ -701,37 +715,114 @@ pub(super) struct FreshIdentifier {
 }
 
 #[derive(Debug, Default)]
-struct PhysicalFacts {
+struct PhysicalFacts<'source> {
     maximum_identifier: u64,
     identifiers: Vec<u64>,
     duplicate_identifier: bool,
+    locator_index: PhysicalLocatorIndex<'source>,
 }
 
-fn physical_facts(source: &Package) -> Result<PhysicalFacts> {
-    let mut facts = PhysicalFacts::default();
-    for component in source.state.components.catalog().iter() {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PhysicalLocatorEntry<'source> {
+    locator: &'source str,
+    component_index: usize,
+}
+
+#[derive(Debug, Default)]
+struct PhysicalLocatorIndex<'source> {
+    entries: Vec<PhysicalLocatorEntry<'source>>,
+}
+
+impl<'source> PhysicalLocatorIndex<'source> {
+    fn with_capacity(capacity: usize) -> Result<Self> {
+        let mut entries = Vec::new();
+        entries
+            .try_reserve_exact(capacity)
+            .map_err(|_| MetadataError::allocation(capacity))?;
+        Ok(Self { entries })
+    }
+
+    fn push(&mut self, entry: PhysicalLocatorEntry<'source>) {
+        self.entries.push(entry);
+    }
+
+    fn sort(&mut self) {
+        self.entries.sort_unstable_by(|left, right| {
+            left.locator
+                .cmp(right.locator)
+                .then_with(|| left.component_index.cmp(&right.component_index))
+        });
+    }
+
+    fn find(&self, locator: &str) -> Option<usize> {
+        // The index is sorted once after the physical census.  A binary
+        // lookup plus the two adjacent entries is enough to reject every
+        // duplicate locator without scanning the catalog per descriptor.
+        let index = self
+            .entries
+            .binary_search_by(|entry| entry.locator.cmp(locator))
+            .ok()?;
+        let duplicate_before = index > 0 && self.entries[index - 1].locator == locator;
+        let duplicate_after =
+            index + 1 < self.entries.len() && self.entries[index + 1].locator == locator;
+        if duplicate_before || duplicate_after {
+            return None;
+        }
+        Some(self.entries[index].component_index)
+    }
+}
+
+fn physical_facts(source: &Package) -> Result<PhysicalFacts<'_>> {
+    let catalog = source.state.components.catalog();
+    let object_count = catalog
+        .iter()
+        .try_fold(0usize, |count, component| {
+            count.checked_add(component.archive().objects.len())
+        })
+        .ok_or_else(MetadataError::invalid)?;
+    // Reserve every attacker-sized validation structure before retaining any
+    // physical fact.  The source-order identifier vector remains the only
+    // retained ID sequence; the set is dropped before metadata facts escape.
+    let mut seen = HashSet::new();
+    seen.try_reserve(object_count)
+        .map_err(|_| MetadataError::allocation(object_count))?;
+    let mut locator_index = PhysicalLocatorIndex::with_capacity(catalog.len())?;
+    let mut identifiers = Vec::new();
+    identifiers
+        .try_reserve_exact(object_count)
+        .map_err(|_| MetadataError::allocation(object_count))?;
+    let mut duplicate_identifier = false;
+    let mut maximum_identifier = 0;
+    for (component_index, component) in catalog.iter().enumerate() {
+        locator_index.push(PhysicalLocatorEntry {
+            locator: metadata::normalized_locator(component.name()),
+            component_index,
+        });
         for object in &component.archive().objects {
             let identifier = object
                 .archive_info
                 .identifier
                 .filter(|value| *value != 0)
                 .ok_or_else(MetadataError::invalid)?;
-            facts
-                .identifiers
-                .try_reserve(1)
-                .map_err(|_| MetadataError::allocation(1))?;
-            if facts.identifiers.contains(&identifier) {
-                facts.duplicate_identifier = true;
+            if !seen.insert(identifier) {
+                duplicate_identifier = true;
             }
-            facts.identifiers.push(identifier);
-            facts.maximum_identifier = facts.maximum_identifier.max(identifier);
+            identifiers.push(identifier);
+            maximum_identifier = maximum_identifier.max(identifier);
         }
     }
-    Ok(facts)
+    locator_index.sort();
+    Ok(PhysicalFacts {
+        maximum_identifier,
+        identifiers,
+        duplicate_identifier,
+        locator_index,
+    })
 }
 
 struct RegistryVisitor<'source> {
     source: &'source Package,
+    physical: PhysicalFacts<'source>,
     components: Vec<ComponentFact>,
     uuids: Vec<UuidFact>,
     external_references: Vec<ExternalFact>,
@@ -744,9 +835,14 @@ struct RegistryVisitor<'source> {
 }
 
 impl<'source> RegistryVisitor<'source> {
-    fn new(source: &'source Package, allow_unmapped_current: bool) -> Self {
+    fn new(
+        source: &'source Package,
+        allow_unmapped_current: bool,
+        physical: PhysicalFacts<'source>,
+    ) -> Self {
         Self {
             source,
+            physical,
             components: Vec::new(),
             uuids: Vec::new(),
             external_references: Vec::new(),
@@ -778,45 +874,68 @@ impl<'source> RegistryVisitor<'source> {
         self,
         source: MetadataSource<'source>,
         inspection: PackageMetadataInspection,
-        physical: PhysicalFacts,
     ) -> Result<MetadataRegistry<'source>> {
-        if self.invalid || physical.duplicate_identifier {
+        if self.invalid || self.physical.duplicate_identifier {
             return Err(MetadataError::kind(FailureKind::Conflict));
         }
-        for (index, binding) in self.uuids.iter().enumerate() {
-            if self.uuids[index + 1..]
-                .iter()
-                .any(|other| other.uuid == binding.uuid)
-            {
-                return Err(MetadataError::kind(FailureKind::Conflict));
+        // These sets are validation-only scratch. Reserve them before the
+        // source-order facts are moved into the immutable registry so a
+        // failed allocation cannot expose a partial census.
+        {
+            let mut seen_uuids = HashSet::new();
+            seen_uuids
+                .try_reserve(self.uuids.len())
+                .map_err(|_| MetadataError::allocation(self.uuids.len()))?;
+            for binding in &self.uuids {
+                if !seen_uuids.insert(binding.uuid) {
+                    return Err(MetadataError::kind(FailureKind::Conflict));
+                }
             }
         }
-        let mut component_ids = Vec::new();
-        let mut locators = Vec::new();
-        for component in self.components.iter().filter(|item| item.current) {
-            if component.component_index.is_none() && !self.allow_unmapped_current {
-                return Err(MetadataError::invalid());
+        {
+            let current_count = self.components.iter().filter(|item| item.current).count();
+            let mut component_ids = HashSet::new();
+            component_ids
+                .try_reserve(current_count)
+                .map_err(|_| MetadataError::allocation(current_count))?;
+            let mut locators: HashSet<&str> = HashSet::new();
+            locators
+                .try_reserve(current_count)
+                .map_err(|_| MetadataError::allocation(current_count))?;
+            for component in self.components.iter().filter(|item| item.current) {
+                if component.component_index.is_none() && !self.allow_unmapped_current {
+                    return Err(MetadataError::invalid());
+                }
+                if !component_ids.insert(component.identifier)
+                    || !locators.insert(component.effective_locator.as_str())
+                {
+                    return Err(MetadataError::kind(FailureKind::AmbiguousRoute));
+                }
             }
-            if component_ids.contains(&component.identifier)
-                || locators.contains(&component.effective_locator)
-            {
-                return Err(MetadataError::kind(FailureKind::AmbiguousRoute));
-            }
-            component_ids.push(component.identifier);
-            locators.push(component.effective_locator.clone());
         }
-        let maximum_identifier = physical
+        let maximum_identifier = self
+            .physical
             .maximum_identifier
             .max(self.maximum_identifier)
             .max(inspection.last_object_identifier());
+        let RegistryVisitor {
+            physical,
+            components,
+            uuids,
+            external_references,
+            data_owners,
+            ambiguous_identifiers,
+            root_data_map_identifier,
+            ..
+        } = self;
         Ok(MetadataRegistry {
             source,
-            components: self.components,
-            uuids: self.uuids,
-            external_references: self.external_references,
-            data_owners: self.data_owners,
-            ambiguous_identifiers: self.ambiguous_identifiers,
-            root_data_map_identifier: self.root_data_map_identifier,
+            components,
+            uuids,
+            external_references,
+            data_owners,
+            ambiguous_identifiers,
+            root_data_map_identifier,
             last_object_identifier: inspection.last_object_identifier(),
             maximum_identifier,
             physical_identifiers: physical.identifiers,
@@ -837,7 +956,7 @@ impl PackageMetadataVisitor for RegistryVisitor<'_> {
     ) -> core::result::Result<(), RewriteError> {
         self.record(component.identifier());
         let component_index = find_physical_descriptor(
-            self.source,
+            &self.physical.locator_index,
             component.preferred_locator(),
             component.effective_locator(),
         );
@@ -866,7 +985,7 @@ impl PackageMetadataVisitor for RegistryVisitor<'_> {
             &mut self.uuids,
             UuidFact {
                 component_index: find_physical_descriptor(
-                    self.source,
+                    &self.physical.locator_index,
                     component.preferred_locator(),
                     component.effective_locator(),
                 ),
@@ -890,7 +1009,7 @@ impl PackageMetadataVisitor for RegistryVisitor<'_> {
             &mut self.external_references,
             ExternalFact {
                 source_component_index: find_physical_descriptor(
-                    self.source,
+                    &self.physical.locator_index,
                     source.preferred_locator(),
                     source.effective_locator(),
                 ),
@@ -969,10 +1088,10 @@ fn inspect_with_policy(
 ) -> Result<MetadataRegistry<'_>> {
     let metadata = strict_source(source)?;
     let physical = physical_facts(source)?;
-    let mut visitor = RegistryVisitor::new(source, allow_unmapped_current);
+    let mut visitor = RegistryVisitor::new(source, allow_unmapped_current, physical);
     let inspection = inspect_package_metadata_with_visitor(metadata.payload, options, &mut visitor)
         .map_err(map_rewrite_error)?;
-    visitor.finish(metadata, inspection, physical)
+    visitor.finish(metadata, inspection)
 }
 
 /// Strictly inspect every physical ArchiveInfo header under the deletion
@@ -1004,30 +1123,22 @@ pub(super) fn reject_unknown_archive_metadata(
     Ok(())
 }
 
-fn find_physical_component(source: &Package, locator: &str) -> Option<usize> {
-    let mut found = None;
-    for (index, component) in source.state.components.catalog().iter().enumerate() {
-        if metadata::normalized_locator(component.name()) != locator {
-            continue;
-        }
-        if found.replace(index).is_some() {
-            return None;
-        }
-    }
-    found
-}
-
 fn find_physical_descriptor(
-    source: &Package,
+    locator_index: &PhysicalLocatorIndex<'_>,
     preferred_locator: &str,
     effective_locator: &str,
 ) -> Option<usize> {
-    let preferred = find_physical_component(source, preferred_locator);
-    let effective = find_physical_component(source, effective_locator);
+    if preferred_locator == effective_locator {
+        return locator_index.find(preferred_locator);
+    }
+    let preferred = locator_index.find(preferred_locator);
+    let effective = locator_index.find(effective_locator);
     match (preferred, effective) {
-        // An explicit locator cannot silently redirect a descriptor while
-        // leaving a different preferred physical member in the package.  A
-        // caller must repair that ambiguity before a metadata transition.
+        // Preserve the strict descriptor rule: an explicit locator cannot
+        // silently redirect a descriptor while a different preferred physical
+        // member is also present. Both lookups are logarithmic in the single
+        // sorted index, so this retains the old fail-closed result without a
+        // per-descriptor catalog scan.
         (Some(preferred), Some(effective)) if preferred != effective => None,
         (_, effective) => effective,
     }
@@ -1132,4 +1243,148 @@ const fn mix(mut value: u64) -> u64 {
     value ^= value >> 27;
     value = value.wrapping_mul(0x94d0_49bb_1331_11eb);
     value ^ (value >> 31)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        FailureKind, MetadataRegistry, MetadataSource, PackageMetadataVisitor,
+        PhysicalLocatorEntry, PhysicalLocatorIndex, RewriteOptions, UuidFact,
+        find_physical_descriptor, inspect_package_metadata_with_visitor, metadata,
+    };
+    use litchi_iwa_protos::package_metadata_codec::UuidBits;
+
+    fn registry(uuids: Vec<UuidFact>) -> MetadataRegistry<'static> {
+        struct Noop;
+        impl PackageMetadataVisitor for Noop {}
+        const PAYLOAD: [u8; 2] = [0x08, 0x01];
+        let mut noop = Noop;
+        let inspection = inspect_package_metadata_with_visitor(
+            &PAYLOAD,
+            RewriteOptions::new(2, 2, 8, 8, 1, 8, 8, 8),
+            &mut noop,
+        )
+        .expect("an empty metadata payload should produce a report");
+        MetadataRegistry {
+            source: MetadataSource {
+                route: metadata::MessageRoute {
+                    component_index: 0,
+                    object_index: 0,
+                    message_index: 0,
+                },
+                payload: &[],
+            },
+            components: Vec::new(),
+            uuids,
+            external_references: Vec::new(),
+            data_owners: Vec::new(),
+            ambiguous_identifiers: Vec::new(),
+            root_data_map_identifier: None,
+            last_object_identifier: 0,
+            maximum_identifier: 0,
+            physical_identifiers: Vec::new(),
+            report: inspection.report(),
+        }
+    }
+
+    #[test]
+    fn physical_locator_index_binary_lookup_rejects_aliases() {
+        const COUNT: usize = 16_384;
+        let locators: Vec<(usize, String)> = (0..COUNT)
+            .rev()
+            .map(|component_index| (component_index, format!("member-{component_index}.iwa")))
+            .collect();
+        let alias = String::from("member-alias.iwa");
+        let mut index = PhysicalLocatorIndex::with_capacity(COUNT + 2)
+            .expect("the bounded physical locator index should reserve");
+        for (component_index, locator) in &locators {
+            index.push(PhysicalLocatorEntry {
+                locator: locator.as_str(),
+                component_index: *component_index,
+            });
+        }
+        index.push(PhysicalLocatorEntry {
+            locator: alias.as_str(),
+            component_index: COUNT,
+        });
+        index.push(PhysicalLocatorEntry {
+            locator: alias.as_str(),
+            component_index: COUNT + 1,
+        });
+        index.sort();
+
+        assert_eq!(index.find("member-123.iwa"), Some(123));
+        assert_eq!(index.find("member-alias.iwa"), None);
+        assert_eq!(
+            find_physical_descriptor(&index, "member-123.iwa", "member-123.iwa"),
+            Some(123)
+        );
+        assert_eq!(
+            find_physical_descriptor(&index, "generic.iwa", "member-123.iwa"),
+            Some(123)
+        );
+        assert_eq!(
+            find_physical_descriptor(&index, "member-124.iwa", "member-123.iwa"),
+            None
+        );
+        assert_eq!(
+            find_physical_descriptor(&index, "member-123.iwa", "missing.iwa"),
+            None
+        );
+    }
+
+    #[test]
+    fn current_uuid_batch_sets_preserve_input_order_and_reject_aliases() {
+        let uuid_a = UuidBits::new(1, 2);
+        let uuid_b = UuidBits::new(3, 4);
+        let unique_registry = registry(vec![
+            UuidFact {
+                component_index: Some(1),
+                object_identifier: 10,
+                uuid: uuid_a,
+                current: true,
+            },
+            UuidFact {
+                component_index: Some(1),
+                object_identifier: 20,
+                uuid: uuid_b,
+                current: true,
+            },
+        ]);
+        assert_eq!(
+            unique_registry
+                .current_uuids_if_registered(&[(1, 20), (1, 10)])
+                .expect("unique current owners should resolve"),
+            vec![Some(uuid_b), Some(uuid_a)]
+        );
+        assert_eq!(
+            unique_registry
+                .current_uuids_if_registered(&[(1, 10), (1, 10)])
+                .expect_err("repeated owners must fail closed")
+                .kind,
+            FailureKind::Conflict
+        );
+
+        let aliased = registry(vec![
+            UuidFact {
+                component_index: Some(1),
+                object_identifier: 10,
+                uuid: uuid_a,
+                current: true,
+            },
+            UuidFact {
+                component_index: Some(1),
+                object_identifier: 20,
+                uuid: uuid_a,
+                current: true,
+            },
+        ]);
+        assert_eq!(
+            aliased
+                .current_uuids_if_registered(&[(1, 10), (1, 20)])
+                .expect_err("UUID aliases must fail closed")
+                .kind,
+            FailureKind::Conflict
+        );
+    }
 }

@@ -7656,3 +7656,64 @@ No package, dependency edge, ordered migration debt, migration host, or whole
 monolith-exit deletion gate closes. The topology remains 64 workspace packages,
 238 internal dependency declarations, 227 canonical edges, 11 development-only
 edges, 11 ordered migration debts, and one migration host.
+
+## 2026-09-03 amendment: public raw exit, focused build order, and current E4 evidence
+
+The public raw-package escape hatch has closed. `litchi-iwa` no longer exports
+`raw::{bundle, package}`; eight raw-only inspection examples and
+`raw_package_noop_roundtrip` are deleted, while still-useful mixed semantic
+examples retain only their typed operations. The private host package/bundle
+implementation is deliberately retained because broad creation, tables,
+formulas, text, charts, shapes, media, and format-specific editors remain
+host-owned. Boundary tests reject a returning `pub mod raw`. Their dependency
+audit now recursively parses repository Cargo manifests and detects direct,
+renamed, target/dev/build, workspace, patch, replace, and path edges. The
+explicit nested host fuzz dependency remains an allowed migration edge, so
+deletion gate 1 is not promoted.
+
+The focused Keynote owner adds a selector-first transaction for moving one
+existing build in a slide's modern playback order. It rewrites the slide's
+field-2 build list and field-43 chunk list together, preserves exact nested
+reference records, validates contiguous build/chunk grouping and admitted
+start semantics, uses fallible bounded staging, reopens/readbacks changed
+candidates, and provides source-bound no-op/conflict/inverse behavior without
+public native IDs. Synthetic fixtures cover reorder, chunk preservation,
+start/group refusal, inverse, exact no-op, and conflict. Effects, timing,
+build add/remove/duplicate lifecycle, the legacy field-3 list, migration-host
+cutover, fuzz/native evidence, and general animation authoring remain open.
+
+Keynote slide backgrounds also stop exporting arbitrary native fill bytes.
+Unknown, image, malformed-semantic, and future fills are observable as
+`Background::Unsupported`; exact bytes remain private and preserved, and any
+changed edit from an unsupported source fails closed. The package-scale
+performance wave adds fallible input ownership, object/location/reference
+indexes, linear media reachability, Numbers comment/format indexes, Pages
+footnote graph census, and Keynote reference-frequency catalogs. Strict
+drawable-parent and text-storage Prost/Buffa parity tests expand malformed,
+unknown-group, borrowing, UTF-8, and exact-limit coverage. These improvements
+retire no dependency by themselves.
+
+Current-producer Keynote Number evidence supersedes the preceding disposable
+artifact hashes. Keynote authored the Unicode marker `Litchi native Keynote
+table Number verification — 東京😀`, row label `Verified-number`, and B2 numeric
+`42.5` displayed as `42.50`. The 551,367-byte source hash was
+`702e85d7218a59617742452cd47710d0a97db8a2e09d413ea8fcbb68195051f0`.
+The focused two-to-three-decimal transaction produced a 551,365-byte candidate
+hash `49ed89396d1772b7f82338b057d85d1703db77bb4e6741e08e568343473bf740`.
+Keynote opened it without repair/conversion, displayed `42.500`, and reported
+Number / 3 decimals / normal minus sign / thousands hidden. Native save then
+close/reopen preserved that semantic state and produced a 551,483-byte artifact
+hash `fb6b2740581fd321d58d69f9ca1d3b4d1623647cbd934dd853c8cc0293091477`.
+A strict same-format rerun emitted byte-identical output with `changed=false`,
+zero touched components, and no full reparse; the in-memory inverse restored
+the exact source. This is E4 only for the bounded existing-cell Number-format
+operation.
+
+Deletion gates remain open: the nested fuzz manifest still names the host;
+broad named ownership and package-wide semantic/native parity are incomplete;
+mutation/native evidence is operation-specific; and all 11 ordered migration
+debts remain. The root facade gate continues to pass in scope, but it does not
+override the other failures. The inventory remains 64 workspace packages, 238
+internal declarations, 227 canonical edges, 11 development-only edges, debts
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. No edge,
+debt, host, or whole-monolith deletion gate closes.

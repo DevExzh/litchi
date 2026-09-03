@@ -14,13 +14,13 @@
     reason = "the focused package boundary redacts lower-layer failure details"
 )]
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_iwa_archive::package::{EntryEdit, ExactArtifacts};
+use litchi_iwa_archive::package::{Catalog, Entry, EntryEdit, ExactArtifacts};
 use litchi_iwa_common::{
     WireLimits, decode_varint_from_bytes, varint::encoded_len, wire::WireView,
 };
@@ -1688,11 +1688,12 @@ fn verify_locality(
 ) -> Result<(), SlideTableHeaderError> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
+    let source_entries = entry_index(source_catalog.package(), budget)?;
+    let candidate_entries = entry_index(candidate_catalog.package(), budget)?;
     for entry in source_catalog.package().iter() {
-        let other = candidate_catalog
-            .package()
-            .iter()
-            .find(|value| value.name() == entry.name())
+        let other = candidate_entries
+            .get(entry.name())
+            .copied()
             .ok_or(SlideTableHeaderError::Verification)?;
         if entry.name() != selection.component_name.as_ref()
             && (entry.data() != other.data() || entry.metadata() != other.metadata())
@@ -1700,6 +1701,11 @@ fn verify_locality(
             return Err(SlideTableHeaderError::Verification);
         }
         budget.work(entry.data().len())?;
+    }
+    for entry in candidate_catalog.package().iter() {
+        if !source_entries.contains_key(entry.name()) {
+            return Err(SlideTableHeaderError::Verification);
+        }
     }
 
     let source_archive = component_archive(source, selection.component_name.as_ref())?;
@@ -1748,6 +1754,69 @@ fn verify_locality(
         }
     }
     Ok(())
+}
+
+/// Build a bounded physical-member index for locality verification.
+///
+/// A duplicate ZIP name has no unambiguous provenance.  Rejecting it while
+/// indexing prevents a verification pass from accidentally comparing only the
+/// first duplicate record.
+fn entry_index<'a>(
+    catalog: &'a Catalog,
+    budget: &mut HeaderBudget,
+) -> Result<HashMap<&'a str, &'a Entry>, SlideTableHeaderError> {
+    let count = catalog.iter().count();
+    budget.allocations(usize::from(count != 0))?;
+    budget.retained(
+        count
+            .checked_mul(size_of::<(&str, &Entry)>())
+            .ok_or(SlideTableHeaderError::InvalidSource)?,
+    )?;
+    let mut index = HashMap::new();
+    index
+        .try_reserve(count)
+        .map_err(|_| SlideTableHeaderError::Allocation { amount: count })?;
+    for entry in catalog.iter() {
+        budget.transaction_work(
+            entry
+                .name()
+                .len()
+                .checked_add(1)
+                .ok_or(SlideTableHeaderError::InvalidSource)?,
+        )?;
+        if index.insert(entry.name(), entry).is_some() {
+            return Err(SlideTableHeaderError::Verification);
+        }
+    }
+    Ok(index)
+}
+
+/// Count reference occurrences in one aggregate with a single bounded pass.
+fn reference_frequencies(
+    values: &[u64],
+    budget: &mut HeaderBudget,
+) -> Result<HashMap<u64, usize>, SlideTableHeaderError> {
+    budget.transaction_work(values.len())?;
+    budget.allocations(usize::from(!values.is_empty()))?;
+    budget.retained(
+        values
+            .len()
+            .checked_mul(size_of::<(u64, usize)>())
+            .ok_or(SlideTableHeaderError::InvalidSource)?,
+    )?;
+    let mut frequencies = HashMap::new();
+    frequencies
+        .try_reserve(values.len())
+        .map_err(|_| SlideTableHeaderError::Allocation {
+            amount: values.len(),
+        })?;
+    for value in values {
+        let count = frequencies.entry(*value).or_insert(0usize);
+        *count = count
+            .checked_add(1)
+            .ok_or(SlideTableHeaderError::InvalidSource)?;
+    }
+    Ok(frequencies)
 }
 
 fn component_archive(package: &Package, name: &str) -> Result<Archive, SlideTableHeaderError> {
@@ -1832,10 +1901,16 @@ fn ensure_unique_table_owner(
                     )?;
                     let z =
                         repeated_references(&message.data, SLIDE_Z_ORDER_FIELD, limits, budget)?;
-                    let owned_hits = owned.iter().filter(|id| **id == table_info).count();
-                    let z_hits = z.iter().filter(|id| **id == table_info).count();
-                    owned_count = owned_count.saturating_add(owned_hits);
-                    z_count = z_count.saturating_add(z_hits);
+                    let owned_frequencies = reference_frequencies(&owned, budget)?;
+                    let z_frequencies = reference_frequencies(&z, budget)?;
+                    let owned_hits = owned_frequencies.get(&table_info).copied().unwrap_or(0);
+                    let z_hits = z_frequencies.get(&table_info).copied().unwrap_or(0);
+                    owned_count = owned_count
+                        .checked_add(owned_hits)
+                        .ok_or(SlideTableHeaderError::InvalidSource)?;
+                    z_count = z_count
+                        .checked_add(z_hits)
+                        .ok_or(SlideTableHeaderError::InvalidSource)?;
                     if object.archive_info.identifier == Some(slide)
                         && owned_hits == 1
                         && z_hits == 1
@@ -2266,6 +2341,44 @@ fn map_core_error(error: litchi_iwa_core::Error) -> SlideTableHeaderError {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn unbounded_budget() -> HeaderBudget {
+        HeaderBudget {
+            max_input: usize::MAX,
+            max_output: usize::MAX,
+            max_fields: usize::MAX,
+            max_work: usize::MAX,
+            max_nesting: usize::MAX,
+            max_references: usize::MAX,
+            max_allocations: usize::MAX,
+            max_retained: usize::MAX,
+            max_scratch: usize::MAX,
+            max_transaction_work: usize::MAX,
+            input: 0,
+            output: 0,
+            fields: 0,
+            work: 0,
+            nesting: 0,
+            references: 0,
+            allocations: 0,
+            retained: 0,
+            scratch: 0,
+            transaction_work: 0,
+        }
+    }
+
+    #[test]
+    fn reference_frequency_index_preserves_duplicate_counts() {
+        let mut budget = unbounded_budget();
+        let frequencies = reference_frequencies(&[7, 9, 7, 7], &mut budget).unwrap();
+        assert_eq!(frequencies.get(&7), Some(&3));
+        assert_eq!(frequencies.get(&9), Some(&1));
+    }
+}
+
 fn parse_all_fields<'a>(
     payload: &'a [u8],
     limits: WireLimits,
@@ -2385,6 +2498,7 @@ fn validate_dependencies(
                     selection.model_message_index,
                     identifier,
                     &[PIVOT_FIELD],
+                    budget,
                 )?;
                 // Pivot ownership is an opaque graph dependency for this
                 // scalar transaction.  Even freeze/repeat-only edits could
@@ -2469,7 +2583,7 @@ fn has_rooted_header_name_manager(
     let reference_fields = parse_all_fields(engine_reference, limits)?;
     charge_wire_view(engine_reference, &reference_fields, budget)?;
     let engine_identifier = strict_reference(engine_reference, limits)?;
-    require_declared_reference(root, root_message_index, engine_identifier, &[3, 4])?;
+    require_declared_reference(root, root_message_index, engine_identifier, &[3, 4], budget)?;
     ensure_unique_identity(source, engine_identifier, budget)?;
     let engine = source
         .object_with_component(engine_identifier)
@@ -2487,7 +2601,13 @@ fn has_rooted_header_name_manager(
     let reference_fields = parse_all_fields(manager_reference, limits)?;
     charge_wire_view(manager_reference, &reference_fields, budget)?;
     let manager_identifier = strict_reference(manager_reference, limits)?;
-    require_declared_reference(engine, engine_message_index, manager_identifier, &[14])?;
+    require_declared_reference(
+        engine,
+        engine_message_index,
+        manager_identifier,
+        &[14],
+        budget,
+    )?;
     ensure_unique_identity(source, manager_identifier, budget)?;
     let manager = source
         .object_with_component(manager_identifier)
@@ -2575,6 +2695,7 @@ fn table_info_has_count_dependency(
                     selection.table_info_message_index,
                     identifier,
                     &[field.number()],
+                    budget,
                 )?;
                 // Native summary/category/pivot cache routes are all keyed to
                 // table coordinates.  Their mere presence blocks section
@@ -2851,6 +2972,7 @@ fn category_owner_reference_active(
         selection.model_message_index,
         owner_identifier,
         &[CATEGORY_OWNER_FIELD],
+        budget,
     )?;
     let owner_object = source
         .object_with_component(owner_identifier)
@@ -2927,7 +3049,13 @@ fn category_owner_reference_active(
             {
                 return Err(SlideTableHeaderError::InvalidSource);
             }
-            require_declared_reference(group_object, message_index, root_identifier, &[18])?;
+            require_declared_reference(
+                group_object,
+                message_index,
+                root_identifier,
+                &[18],
+                budget,
+            )?;
             let root_object = source
                 .object_with_component(root_identifier)
                 .map(|(_, object)| object)
@@ -2994,6 +3122,7 @@ fn require_declared_reference(
     message_index: usize,
     identifier: u64,
     accepted_path: &[u32],
+    budget: &mut HeaderBudget,
 ) -> Result<(), SlideTableHeaderError> {
     validate_message_header(object, message_index)?;
     let info = object
@@ -3001,22 +3130,14 @@ fn require_declared_reference(
         .message_infos
         .get(message_index)
         .ok_or(SlideTableHeaderError::InvalidSource)?;
-    if info
-        .object_references
-        .iter()
-        .filter(|candidate| **candidate == identifier)
-        .count()
-        != 1
-    {
+    let aggregate_frequencies = reference_frequencies(&info.object_references, budget)?;
+    if aggregate_frequencies.get(&identifier).copied() != Some(1) {
         return Err(SlideTableHeaderError::InvalidSource);
     }
     let mut field_occurrence = false;
     for field in &info.field_infos {
-        let count = field
-            .object_references
-            .iter()
-            .filter(|candidate| **candidate == identifier)
-            .count();
+        let field_frequencies = reference_frequencies(&field.object_references, budget)?;
+        let count = field_frequencies.get(&identifier).copied().unwrap_or(0);
         if count != 0 {
             if count != 1
                 || field_occurrence

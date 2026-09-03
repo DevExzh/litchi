@@ -8,6 +8,7 @@ import json
 import re
 import subprocess
 import sys
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
@@ -96,6 +97,13 @@ LOCAL_CANONICAL_SHEET_VIEW_TYPE = re.compile(
 FACADE_PACKAGE = "litchi"
 FACADE_REQUIRED_NORMAL_DEPENDENCIES = frozenset({"litchi-core"})
 RETIRED_FACADE_DEPENDENCIES = frozenset({"litchi-iwa"})
+# Standalone migration-host support manifests are intentionally outside the
+# Cargo workspace, so cargo metadata cannot account for their dependency
+# edges.  Keep the exception path-specific and tied to the current host
+# policy; every other manifest must keep retired hosts out of its tables.
+MIGRATION_HOST_MANIFEST_ALLOWLIST = {
+    "litchi-iwa": frozenset({Path("crates/litchi-iwa/fuzz/Cargo.toml")}),
+}
 IWA_FACADE_SOURCE = Path("crates/litchi-iwa/src/lib.rs")
 IWA_RAW_MODULE_DECLARATION = re.compile(
     r"^[ \t]*pub(?:\([^()]*\))?[ \t\r\n]+mod[ \t\r\n]+(?:r#)?raw\b",
@@ -14170,7 +14178,7 @@ def audit_litchi_facade_source_topology(root: Path = ROOT) -> list[str]:
 
 
 def audit_iwa_raw_facade_source_topology(root: Path = ROOT) -> list[str]:
-    """Keep the migration host's low-level raw facade explicitly deprecated."""
+    """Reject the retired migration-host low-level raw facade."""
 
     path = root / IWA_FACADE_SOURCE
     if not path.is_file():
@@ -14178,23 +14186,10 @@ def audit_iwa_raw_facade_source_topology(root: Path = ROOT) -> list[str]:
 
     source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
     violations: list[str] = []
-    module = IWA_RAW_MODULE_DECLARATION.search(source)
-    if module is None:
-        return []
-
-    # A deprecation attribute may span multiple lines. The nearest Rust
-    # attribute before `pub mod raw` must be `deprecated`; accepting any
-    # earlier marker would let an unrelated item accidentally satisfy this
-    # ratchet.
-    prefix = source[: module.start()]
-    attributes = list(re.finditer(r"^[ \t]*#[ \t]*\[", prefix, re.MULTILINE))
-    nearest = attributes[-1] if attributes else None
-    if nearest is None or not re.match(
-        r"[ \t]*#[ \t]*\[[ \t]*deprecated\b", prefix[nearest.start() :]
-    ):
+    for module in IWA_RAW_MODULE_DECLARATION.finditer(source):
         line_number = source.count("\n", 0, module.start()) + 1
         violations.append(
-            "litchi-iwa raw facade must remain deprecated: "
+            "retired litchi-iwa raw facade returned: "
             f"{IWA_FACADE_SOURCE}:{line_number}"
         )
 
@@ -14205,9 +14200,9 @@ def audit_iwa_theme_facade_source_topology(root: Path = ROOT) -> list[str]:
     """Keep the retired raw theme facade and external wrapper visibility out.
 
     Theme decoding is still an internal migration-host concern.  Once the
-    deprecated ``raw`` namespace stopped forwarding it, the wrapper and its
-    fields/methods must remain crate-private so a future edit cannot quietly
-    recreate a second low-level public entry point.
+    ``raw`` namespace was removed, the wrapper and its fields/methods must
+    remain crate-private so a future edit cannot quietly recreate a second
+    low-level public entry point.
     """
 
     violations: list[str] = []
@@ -49188,6 +49183,211 @@ def audit_pages_section_background_facade_source_topology(
     return sorted(set(violations))
 
 
+def _repository_cargo_manifests(root: Path) -> tuple[Path, ...]:
+    """Return every repository Cargo.toml outside generated metadata trees."""
+
+    root = root.resolve()
+    manifests: set[Path] = set()
+    for path in root.rglob("Cargo.toml"):
+        relative = path.relative_to(root)
+        if any(part in {".git", "target"} for part in relative.parts):
+            continue
+        if path.is_file():
+            manifests.add(path.resolve())
+    return tuple(sorted(manifests))
+
+
+def _cargo_dependency_tables(
+    document: dict[str, Any],
+) -> Iterable[tuple[str, dict[str, Any]]]:
+    """Yield dependency tables Cargo can use to introduce package edges."""
+
+    for kind in ("dependencies", "dev-dependencies", "build-dependencies"):
+        table = document.get(kind)
+        if isinstance(table, dict):
+            yield kind, table
+
+    targets = document.get("target")
+    if isinstance(targets, dict):
+        for target_name in sorted(targets):
+            target = targets[target_name]
+            if not isinstance(target, dict):
+                continue
+            for kind in ("dependencies", "dev-dependencies", "build-dependencies"):
+                table = target.get(kind)
+                if isinstance(table, dict):
+                    yield f"target.{target_name}.{kind}", table
+
+    workspace = document.get("workspace")
+    if isinstance(workspace, dict):
+        table = workspace.get("dependencies")
+        if isinstance(table, dict):
+            yield "workspace.dependencies", table
+
+    patch = document.get("patch")
+    if isinstance(patch, dict):
+        for source_name in sorted(patch):
+            table = patch[source_name]
+            if isinstance(table, dict):
+                yield f"patch.{source_name}", table
+
+    replace = document.get("replace")
+    if isinstance(replace, dict):
+        yield "replace", replace
+
+
+def _cargo_path_package_name(
+    manifest: Path,
+    path_value: Any,
+    cache: dict[Path, str | None],
+) -> str | None:
+    """Resolve a path dependency's package name for aliases without `package`."""
+
+    if not isinstance(path_value, str) or not path_value or "$" in path_value:
+        return None
+    target = Path(path_value)
+    path_component = target.name
+    if path_component == "Cargo.toml":
+        path_component = target.parent.name
+    if not target.is_absolute():
+        target = manifest.parent / target
+    try:
+        target = target.resolve()
+    except OSError:
+        return None
+    if target.is_dir():
+        target /= "Cargo.toml"
+    if target in cache:
+        return cache[target]
+
+    package_name: str | None = None
+    try:
+        document = tomllib.loads(target.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        # A removed path target may leave only the alias behind.  The final
+        # path component is still useful evidence, while other missing path
+        # targets remain Cargo errors.
+        if path_component:
+            package_name = path_component
+    else:
+        package = document.get("package")
+        if isinstance(package, dict) and isinstance(package.get("name"), str):
+            package_name = package["name"]
+    cache[target] = package_name
+    return package_name
+
+
+def _cargo_dependency_candidates(
+    manifest: Path,
+    table_name: str,
+    alias: str,
+    specification: Any,
+    path_cache: dict[Path, str | None],
+) -> frozenset[str]:
+    """Collect package names represented by one manifest dependency entry."""
+
+    if table_name == "replace":
+        candidates = {alias.split(":", 1)[0] if ":" in alias else alias}
+    elif isinstance(specification, dict) and "package" in specification:
+        # Cargo's `package` field names the real package; the table key is
+        # only a local dependency alias and must not create a false edge.
+        package_name = specification.get("package")
+        candidates = {package_name} if isinstance(package_name, str) else {alias}
+    else:
+        candidates = {alias}
+    if isinstance(specification, dict) and "package" not in specification:
+        path_name = _cargo_path_package_name(
+            manifest, specification.get("path"), path_cache
+        )
+        if path_name is not None:
+            candidates.add(path_name)
+    return frozenset(
+        variant
+        for candidate in candidates
+        for variant in (
+            candidate,
+            candidate.replace("_", "-"),
+            candidate.replace("-", "_"),
+        )
+    )
+
+
+def _manifest_relative_path(path: Path, root: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(root.resolve()))
+    except ValueError:
+        return str(path)
+
+
+def _manifest_is_migration_host_allowlisted(
+    manifest: Path,
+    root: Path,
+    package_name: str,
+) -> bool:
+    try:
+        relative = manifest.resolve().relative_to(root.resolve())
+    except ValueError:
+        return False
+    return relative in MIGRATION_HOST_MANIFEST_ALLOWLIST.get(package_name, ())
+
+
+def audit_manifest_dependency_inventory(
+    root: Path = ROOT,
+    policy: Policy | None = None,
+) -> list[str]:
+    """Reject retired migration-host edges in every repository Cargo manifest.
+
+    Cargo metadata only covers workspace members.  Standalone fuzz crates,
+    excluded tools, and root/workspace manifests still influence dependency
+    resolution, so inspect their TOML tables directly and fail closed on
+    unreadable or malformed manifests.
+    """
+
+    migration_hosts = (
+        policy.migration_hosts
+        if policy is not None
+        else RETIRED_FACADE_DEPENDENCIES
+    )
+    violations: list[str] = []
+    path_cache: dict[Path, str | None] = {}
+    for manifest in _repository_cargo_manifests(root):
+        try:
+            document = tomllib.loads(manifest.read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError) as error:
+            violations.append(
+                "Cargo manifest cannot be parsed: "
+                f"{_manifest_relative_path(manifest, root)} ({error})"
+            )
+            continue
+
+        for table_name, table in _cargo_dependency_tables(document):
+            for alias, specification in table.items():
+                if not isinstance(alias, str):
+                    continue
+                offending = sorted(
+                    _cargo_dependency_candidates(
+                        manifest,
+                        table_name,
+                        alias,
+                        specification,
+                        path_cache,
+                    )
+                    & migration_hosts
+                )
+                for package_name in offending:
+                    if _manifest_is_migration_host_allowlisted(
+                        manifest, root, package_name
+                    ):
+                        continue
+                    violations.append(
+                        "retired migration-host manifest dependency outside policy: "
+                        f"{_manifest_relative_path(manifest, root)} "
+                        f"[{table_name}] alias={alias}, package={package_name}"
+                    )
+
+    return sorted(set(violations))
+
+
 def audit_manifest_inventory(snapshot: Snapshot) -> list[str]:
     manifests = frozenset(path.resolve() for path in (ROOT / "crates").glob("*/Cargo.toml"))
     missing = manifests - snapshot.manifests
@@ -49552,6 +49752,7 @@ def main(argv: list[str] | None = None) -> int:
     snapshot = snapshot_from_metadata(cargo_metadata())
     violations = (
         audit_manifest_inventory(snapshot)
+        + audit_manifest_dependency_inventory(policy=policy)
         + audit_snapshot(snapshot, policy)
         + audit_litchi_facade_source_topology()
         + audit_iwa_raw_facade_source_topology()

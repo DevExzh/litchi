@@ -361,7 +361,7 @@ pub mod slide;
 pub mod soundtrack;
 pub mod transition;
 
-pub use background::{Angle, Background, Gradient, Kind, Opaque, Stop};
+pub use background::{Angle, Background, Gradient, Kind, Stop};
 pub use build::{AnimationType, Build};
 pub use chart::{
     Axis, ChartArrangement, ChartCatalog, ChartDescriptor, ChartSelector, ChartSelectorError,
@@ -394,13 +394,15 @@ pub use package::{
     Patch, PayloadLimitKind, ReadError, ReadOptions, SaveError, SemanticLimitKind, SemanticLimits,
     SemanticLimitsError, SemanticPath, SlideBackgroundCommit, SlideBackgroundDiagnostics,
     SlideBackgroundEdit, SlideBackgroundError, SlideBackgroundLimitKind, SlideBackgroundPatch,
-    SlideMovieCaptionCommit, SlideMovieCaptionDiagnostics, SlideMovieCaptionEdit,
-    SlideMovieCaptionError, SlideMovieCaptionLimitKind, SlideMovieCaptionPatch,
-    SlideMovieGeometryCommit, SlideMovieGeometryDiagnostics, SlideMovieGeometryEdit,
-    SlideMovieGeometryError, SlideMovieGeometryLimitKind, SlideMovieGeometryPatch,
-    SlideMoviePlaybackCommit, SlideMoviePlaybackDiagnostics, SlideMoviePlaybackEdit,
-    SlideMoviePlaybackError, SlideMoviePlaybackLimitKind, SlideMoviePlaybackPatch,
-    SlideMovieTitleCommit, SlideMovieTitleDiagnostics, SlideMovieTitleEdit, SlideMovieTitleError,
+    SlideBuildOrderCommit, SlideBuildOrderDiagnostics, SlideBuildOrderEdit, SlideBuildOrderError,
+    SlideBuildOrderLimitKind, SlideBuildOrderPatch, SlideMovieCaptionCommit,
+    SlideMovieCaptionDiagnostics, SlideMovieCaptionEdit, SlideMovieCaptionError,
+    SlideMovieCaptionLimitKind, SlideMovieCaptionPatch, SlideMovieGeometryCommit,
+    SlideMovieGeometryDiagnostics, SlideMovieGeometryEdit, SlideMovieGeometryError,
+    SlideMovieGeometryLimitKind, SlideMovieGeometryPatch, SlideMoviePlaybackCommit,
+    SlideMoviePlaybackDiagnostics, SlideMoviePlaybackEdit, SlideMoviePlaybackError,
+    SlideMoviePlaybackLimitKind, SlideMoviePlaybackPatch, SlideMovieTitleCommit,
+    SlideMovieTitleDiagnostics, SlideMovieTitleEdit, SlideMovieTitleError,
     SlideMovieTitleLimitKind, SlideMovieTitlePatch, SlideNotesCommit, SlideNotesDiagnostics,
     SlideNotesEdit, SlideNotesError, SlideNotesLimitKind, SlideNotesPatch, SlideOrderCommit,
     SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind, SlideOrderPatch,
