@@ -95,6 +95,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/numbers_formula_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_body_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_media_codec.rs");
+    println!("cargo:rerun-if-changed=src/drawable_parent_codec.rs");
     println!("cargo:rerun-if-changed=src/pages_movie_caption_codec.rs");
     println!("cargo:rerun-if-changed=src/keynote_movie_caption_codec.rs");
     println!("cargo:rerun-if-changed=src/movie_playback_codec.rs");
@@ -213,6 +214,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     enforce_pages_native_message_provenance(proto_directory)?;
     enforce_pages_body_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_media_projection_provenance(proto_directory, buffa_projection_directory)?;
+    enforce_drawable_parent_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_movie_caption_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_footnote_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_footnote_marker_projection_provenance(
@@ -599,6 +601,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         .idiomatic_field_names(true)
         .compile()?;
     enforce_numbers_sheet_order_projection_budget(&buffa_numbers_sheet_order_out_directory)?;
+
+    // Object-index reference extraction needs only the optional parent edge
+    // from a native drawable. Keep geometry, wrapping, accessibility, and
+    // annotation fields outside this private lazy closure.
+    let buffa_drawable_parent_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-drawable-parent");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSDDrawableParentArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_drawable_parent_out_directory)
+        .include_file("iwa_drawable_parent_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_drawable_parent_projection_budget(&buffa_drawable_parent_out_directory)?;
 
     // Pages drawable ordering needs only the scalar fields of each repeated
     // TSP.Reference. The repeated TP envelope stays handwritten and borrowed
@@ -1305,6 +1327,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "396d98fd78f6a417a57af4a1e7f3830362e3174753687aef2fe49aaf7a88087d",
         ),
         (
+            "TSDDrawableParentArchive.proto",
+            411,
+            "55c88e34fb819fd629da76c77b6875ab0c2898b29433ffc75843b7be7b4adb11",
+        ),
+        (
             "TSDMovieAudioFlagArchive.proto",
             287,
             "2bcd9bd1076612f32ed09bafbbb0a0ce6b3ff804e16dd9478444308d7468cda4",
@@ -1687,6 +1714,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "src/pages_media_codec.rs",
             "crate::buffa_pages_media_generated::",
             "mod buffa_pages_media_generated {",
+        ),
+        (
+            "src/drawable_parent_codec.rs",
+            "crate::buffa_drawable_parent_generated::",
+            "mod buffa_drawable_parent_generated {",
         ),
         (
             "src/pages_movie_caption_codec.rs",
@@ -5678,6 +5710,62 @@ fn enforce_pages_media_projection_provenance(
     Ok(())
 }
 
+fn enforce_drawable_parent_projection_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const TSP_REFERENCE: &str = "message Reference {\n  required uint64 identifier = 1;\n  optional int32 deprecated_type = 2;\n  optional bool deprecated_is_external = 3;\n}";
+    const TSD_DRAWABLE_PARENT: &str = "optional .TSP.Reference parent = 2;";
+    const PROJECTION_SCHEMA: &str = "syntax = \"proto2\";\npackage LitchiIwaProjection;\nmessage Reference {\nrequired uint64 identifier = 1;\noptional int32 deprecated_type = 2;\noptional bool deprecated_is_external = 3;\n}\nmessage DrawableArchive {\noptional .LitchiIwaProjection.Reference parent = 2;\n}";
+    const CODEC_MARKERS: [&str; 7] = [
+        "const DRAWABLE_PARENT_FIELD: u32 = 2;",
+        "const REFERENCE_IDENTIFIER_FIELD: u32 = 1;",
+        "pub struct DrawableParentSnapshot",
+        "pub fn decode_parent(",
+        "decode_lazy_view",
+        "crate::buffa_drawable_parent_generated::",
+        "fn preflight_reference(",
+    ];
+
+    let tsp = fs::read_to_string(proto_directory.join("TSPMessages.proto"))?;
+    let tsd = fs::read_to_string(proto_directory.join("TSDArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSDDrawableParentArchive.proto"))?;
+    let projection_schema = projection
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let Some(reference) = proto_message_block(&tsp, "Reference") else {
+        return Err("TSP.Reference declaration disappeared from canonical schema".into());
+    };
+    let Some(drawable) = proto_message_block(&tsd, "DrawableArchive") else {
+        return Err("TSD.DrawableArchive declaration disappeared from canonical schema".into());
+    };
+    let codec = fs::read_to_string("src/drawable_parent_codec.rs")?;
+    let production_codec = production_codec_source(&codec);
+    let lib = fs::read_to_string("src/lib.rs")?;
+    if reference != TSP_REFERENCE
+        || drawable.matches(TSD_DRAWABLE_PARENT).count() != 1
+        || projection_schema != PROJECTION_SCHEMA
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || !CODEC_MARKERS
+            .iter()
+            .all(|marker| production_codec.matches(marker).count() == 1)
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+        || !lib.contains("mod buffa_drawable_parent_generated {")
+        || !lib.contains("/buffa-drawable-parent/iwa_drawable_parent_buffa_protos.rs")
+    {
+        return Err("derived TSD drawable-parent projection/codec drifted from TSD.DrawableArchive.parent or TSP.Reference, exceeded its source budget, exposed repeated storage, or added production encoding".into());
+    }
+    Ok(())
+}
+
 fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(), Box<dyn Error>> {
     // Native IWA object type numbers are not part of the protobuf schemas.
     // Keep their workspace routes private and check them only as a build-time
@@ -8780,6 +8868,50 @@ fn enforce_pages_footnote_marker_projection_budget(directory: &Path) -> Result<(
     {
         return Err(format!(
             "Pages footnote-marker projection generated {files} files/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_drawable_parent_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    // One optional nested Reference is deliberately the entire generated
+    // closure. Keep enough headroom for Buffa's generated lazy-view helpers
+    // while rejecting accidental collection-valued schema expansion.
+    const MAX_GENERATED_BYTES: u64 = 128 * 1024;
+
+    let mut files = 0usize;
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    for entry_result in fs::read_dir(directory)? {
+        let entry = entry_result?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("drawable-parent generated file count overflow")?;
+        bytes = bytes
+            .checked_add(entry.metadata()?.len())
+            .ok_or("drawable-parent generated byte count overflow")?;
+        let generated = fs::read_to_string(entry.path())?;
+        repeated_views = repeated_views
+            .checked_add(generated.matches("RepeatedView").count())
+            .ok_or("drawable-parent repeated-view count overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(generated.matches("LazyRepeatedView").count())
+            .ok_or("drawable-parent lazy-repeated-view count overflow")?;
+    }
+
+    if files != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || repeated_views != 0
+        || lazy_repeated_views != 0
+    {
+        return Err(format!(
+            "TSD drawable-parent projection generated {files} files/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated views"
         )
         .into());
     }

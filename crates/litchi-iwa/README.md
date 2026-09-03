@@ -1337,14 +1337,6 @@ let copied_sheet = numbers.duplicate_sheet(SheetSelector::index(original_sheet.i
 numbers.remove_sheet(SheetSelector::index(copied_sheet.index))?;
 let new_sheet = numbers.add_empty_sheet("Archive")?;
 let new_table = numbers.add_empty_table(SheetSelector::index(new_sheet.index), "Log", 100, 6)?;
-numbers.move_table(
-    TableSelector::name(&table.name),
-    SheetSelector::index(new_sheet.index),
-)?;
-numbers.move_table(
-    TableSelector::name(&table.name),
-    SheetSelector::index(original_sheet.index),
-)?;
 numbers.remove_table(TableSelector::name(&new_table.name))?;
 numbers.remove_sheet(SheetSelector::index(new_sheet.index))?;
 if let Some(sheet) = numbers.sheets()?.first()
@@ -2414,16 +2406,18 @@ create/delete cycles.
 Focused `litchi_numbers::sheet::order` owns only the order of existing sheets:
 it rewrites the document and sidebar order owners together without exposing
 their physical identifiers. The migration host retains sheet creation,
-duplication, removal, and table moves.
+duplication, and removal. Public relocation of an existing table belongs to
+the focused `litchi_numbers::Package`; the host retains only a crate-private
+adapter used while duplicating populated legacy sheets.
 `NumbersEditor::add_empty_table` can also recreate the first native table after
 the workbook's last table was removed. It derives the style graph from the
 workbook theme, builds independent storage and row/column identities, and
 registers a fresh formula owner without relying on a hidden template table.
-Populated tables can also move between sheets without changing their object
-identity, cell stores, formulas, comments, styles, or geometry. The operation
-transfers the original raw drawable reference, rewrites the optional table
-parent, and updates both sheets' IWA reference metadata atomically. See
-`move_numbers_table`.
+Focused `litchi_numbers::Package::move_table` moves populated tables between
+existing sheets without exposing their object identities. The transaction
+preserves cell stores, formulas, comments, styles, geometry, unknown fields,
+and unrelated package members; it returns an exact-source patch and inverse.
+See the focused [`move_table` example](../litchi-numbers/examples/move_table.rs).
 
 Populated sheets can be duplicated adjacent to their source with preserved
 sheet settings, drawable order, table names and positions, local formula
@@ -3247,14 +3241,15 @@ selector-first (`SheetSelector` source and destination plus a source-sheet
 moves are exact no-ops; changed moves provide exact-source, conflict-checked
 patches and inverses with locality checks while preserving table content.
 
-The legacy `NumbersEditor::move_table` remains a compatibility entry point and
-delegates ordinary packages to the focused transaction. Historical host-built
-packages whose cell storage is outside the current semantic projection use a
-doc-hidden, selector-first physical-admission seam in `litchi-numbers`; that
-seam calls the same rewrite/verification engine and the legacy reader validates
-the candidate before publication. Unsupported graphs remain fail-closed. This
-note supersedes the older migration prose
-that described physical table moves as host-owned. It is a bounded ownership
-transfer only: no migration debt, dependency edge, host, or monolith-deletion
-claim changes, and the documented topology remains 64 packages, 237 internal
-declarations, 226 canonical edges, 11 ordered debts, and one migration host.
+The public legacy `NumbersEditor::move_table` entry point and its host example
+are retired. A crate-private adapter remains only for populated-sheet
+duplication: historical host-built packages whose cell storage is outside the
+current semantic projection use the doc-hidden, selector-first physical-
+admission seam in `litchi-numbers`; that seam calls the same rewrite and
+verification engine, and the legacy reader validates the candidate before
+publication. Unsupported graphs remain fail-closed. This note supersedes the
+older migration prose that described physical table moves as host-owned. It is
+a bounded ownership transfer only: no migration debt, dependency edge, host,
+or monolith-deletion claim changes. The current topology remains 64 packages,
+238 internal declarations, 227 canonical edges, 11 development-only edges, 11
+ordered debts, and one migration host.

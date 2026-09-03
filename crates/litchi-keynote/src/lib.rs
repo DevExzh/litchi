@@ -429,11 +429,21 @@ pub use package::{
     ChartValueAxisCommit, ChartValueAxisDiagnostics, ChartValueAxisEdit, ChartValueAxisError,
     ChartValueAxisLimitKind, ChartValueAxisPatch,
 };
+pub use package::{
+    SlideTableCellNumberFormatCommit, SlideTableCellNumberFormatDiagnostics,
+    SlideTableCellNumberFormatEdit, SlideTableCellNumberFormatError,
+    SlideTableCellNumberFormatLimitKind, SlideTableCellNumberFormatPatch,
+    SlideTableCellNumberFormatPath,
+};
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
 pub use slide::media::{MediaInfo, MovieInfo, MovieKind};
 pub use slide::movie::MovieSelector;
 pub use slide::table::TableSelector;
 pub use slide::table::name::{Error as SlideTableNameValueError, Name as SlideTableName};
+pub use slide::table::number_format::{
+    CellPosition, CellPositionError, DecimalPlaces, FixedDecimalPlaces, NegativeStyle, Number,
+    NumberError, ThousandsSeparator,
+};
 pub use slide::{Slide, Transition};
 pub use time::Seconds;
 pub(crate) use transition::Effect;

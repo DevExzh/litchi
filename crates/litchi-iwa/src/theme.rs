@@ -37,12 +37,12 @@ const BASE_THEME_FIELDS: &[u32] = &[
 /// The five strongly-typed preset families stored as `TSS.ThemeArchive`
 /// extensions by Pages, Numbers, and Keynote.
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct IWorkThemeExtensions {
-    pub drawing: Option<tsd::ThemePresetsArchive>,
-    pub text: Option<tswp::ThemePresetsArchive>,
-    pub chart: Option<tsch::ChartPresetsArchive>,
-    pub table: Option<tst::ThemePresetsArchive>,
-    pub application: Option<tsa::ThemePresetsArchive>,
+pub(crate) struct IWorkThemeExtensions {
+    pub(crate) drawing: Option<tsd::ThemePresetsArchive>,
+    pub(crate) text: Option<tswp::ThemePresetsArchive>,
+    pub(crate) chart: Option<tsch::ChartPresetsArchive>,
+    pub(crate) table: Option<tst::ThemePresetsArchive>,
+    pub(crate) application: Option<tsa::ThemePresetsArchive>,
 }
 
 /// An iWork application theme wrapper with extension fields retained.
@@ -50,9 +50,9 @@ pub struct IWorkThemeExtensions {
 /// Pages, Numbers, and Keynote all wrap `TSS.ThemeArchive` in the same single
 /// field. Unknown future fields are preserved byte-for-byte on round trip.
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct IWorkThemeArchive {
-    pub base: tss::ThemeArchive,
-    pub extensions: IWorkThemeExtensions,
+pub(crate) struct IWorkThemeArchive {
+    pub(crate) base: tss::ThemeArchive,
+    pub(crate) extensions: IWorkThemeExtensions,
     opaque_base_fields: Vec<Vec<u8>>,
     opaque_wrapper_fields: Vec<Vec<u8>>,
 }
@@ -63,7 +63,7 @@ impl IWorkThemeArchive {
     /// Unlike [`Self::decode`], a newly constructed theme has no opaque fields
     /// inherited from another package, making it suitable for documents built
     /// entirely from scratch.
-    pub fn new(base: tss::ThemeArchive, extensions: IWorkThemeExtensions) -> Self {
+    pub(crate) fn new(base: tss::ThemeArchive, extensions: IWorkThemeExtensions) -> Self {
         Self {
             base,
             extensions,
@@ -73,7 +73,7 @@ impl IWorkThemeArchive {
     }
 
     /// Decode an application theme without losing proto2 extension fields.
-    pub fn decode(data: &[u8]) -> Result<Self> {
+    pub(crate) fn decode(data: &[u8]) -> Result<Self> {
         let wrapper_fields = parse_wire_fields(data)?;
         let Some(theme_field) = unique_field(&wrapper_fields, THEME_SUPER_FIELD)? else {
             return Err(Error::InvalidFormat(format!(
@@ -112,7 +112,7 @@ impl IWorkThemeArchive {
     }
 
     /// Encode the complete theme wrapper, including all preset families.
-    pub fn encode(&self) -> Result<Vec<u8>> {
+    pub(crate) fn encode(&self) -> Result<Vec<u8>> {
         let mut theme = self.base.encode_to_vec();
         append_message(
             &mut theme,

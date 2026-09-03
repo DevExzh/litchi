@@ -457,6 +457,7 @@ mod tests {
         ),
         ("pages_body", include_str!("pages_body_codec.rs")),
         ("pages_media", include_str!("pages_media_codec.rs")),
+        ("drawable_parent", include_str!("drawable_parent_codec.rs")),
         (
             "pages_movie_caption",
             include_str!("pages_movie_caption_codec.rs"),

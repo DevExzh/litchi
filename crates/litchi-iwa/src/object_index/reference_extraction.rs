@@ -6,7 +6,8 @@ use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::varint::{decode_varint_from_bytes, encoded_len};
 use litchi_iwa_index::{IndexBuilder, ObjectId};
 use litchi_iwa_protos::{
-    comment_storage_codec, keynote_show_codec, numbers_table_cell_storage_codec,
+    comment_storage_codec, drawable_parent_codec, keynote_show_codec,
+    numbers_table_cell_storage_codec,
 };
 
 use super::{add_reference_if_absent, index_error};
@@ -977,14 +978,19 @@ pub(super) fn extract(
             // Based on TSDArchives.proto and libetonyek's reference extraction
             3002 => {
                 // TSD.DrawableArchive - base type for all drawables
-                if let Ok(drawable) = crate::protobuf::tsd::DrawableArchive::decode(&*raw_msg.data)
-                {
-                    // Extract parent reference (drawable hierarchy)
-                    if let Some(ref parent) = drawable.parent {
-                        extract_reference(source_id, builder, parent)?;
+                if let Ok(drawable) = drawable_parent_codec::decode_parent(
+                    &raw_msg.data,
+                    drawable_parent_codec::DecodeOptions::for_source(&raw_msg.data),
+                ) {
+                    // Extract the parent edge without materializing the full
+                    // drawable graph. The selected parent identifier is a
+                    // borrow-free scalar; the source payload remains the
+                    // preservation authority.
+                    if let Some(parent) = drawable.parent_identifier()
+                        && let Some(target_id) = ObjectId::new(parent.get())
+                    {
+                        add_reference_if_absent(builder, source_id, target_id)?;
                     }
-                    // Note: geometry is not a reference, just position/size data
-                    // exterior_text_wrap is configuration, not a reference
                 }
             },
             3003 => {
@@ -1406,6 +1412,55 @@ mod tests {
             !production
                 .contains("numbers_table_cell_storage_codec::decode_data_store_with_report(")
         );
+    }
+
+    #[test]
+    fn drawable_parent_ingress_stays_on_bounded_buffa_projection() {
+        let source = include_str!("reference_extraction.rs");
+        let production = source
+            .split_once("#[cfg(test)]")
+            .map_or(source, |(production, _tests)| production);
+        assert_eq!(
+            production
+                .matches("drawable_parent_codec::decode_parent(")
+                .count(),
+            1
+        );
+        assert!(!production.contains("tsd::DrawableArchive::decode"));
+    }
+
+    #[test]
+    fn drawable_parent_projection_preserves_unknowns_and_parent_edges() {
+        let drawable = tsd::DrawableArchive {
+            parent: Some(reference(20)),
+            ..Default::default()
+        };
+        let mut data = drawable.encode_to_vec();
+        // The strict borrowed projection ignores this unknown field while
+        // retaining the original source bytes as the preservation authority.
+        data.extend_from_slice(&[0x98, 0x06, 0x81, 0x01]);
+
+        let index = index_for_payload(3_002, data);
+        assert_eq!(outgoing(&index), vec![ObjectId::new(20).expect("parent")]);
+    }
+
+    #[test]
+    fn malformed_drawable_parent_does_not_publish_a_staged_edge() {
+        let drawable = tsd::DrawableArchive {
+            parent: Some(reference(20)),
+            ..Default::default()
+        };
+        let mut duplicate_parent = drawable.encode_to_vec();
+        duplicate_parent.extend_from_slice(
+            &tsd::DrawableArchive {
+                parent: Some(reference(30)),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        );
+
+        let index = index_for_payload(3_002, duplicate_parent);
+        assert!(outgoing(&index).is_empty());
     }
 
     #[test]

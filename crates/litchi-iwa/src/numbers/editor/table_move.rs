@@ -1,21 +1,22 @@
-//! Compatibility bridge for transferring an existing table between workbook sheets.
+//! Private compatibility bridge for transferring an existing table between workbook sheets.
+//!
+//! The focused [`litchi_numbers::Package`] transaction owns the physical graph
+//! rewrite.  This adapter remains crate-private solely because populated-sheet
+//! duplication still builds its new sheet through the legacy editor before it
+//! can hand the cloned table to the focused owner.  No migration-host move API
+//! is exported from `litchi-iwa`.
 
 use super::*;
 use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelector};
 
 impl NumbersEditor {
-    /// Move an existing table to another sheet, preserving its object identity and contents.
+    /// Move an existing table for the internal populated-sheet duplication path.
     ///
-    /// This compatibility method resolves the historical workbook-wide table selector to the
-    /// focused sheet/table positions, delegates the package mutation to
-    /// [`litchi_numbers::Package::move_table`], and validates the legacy readback before
-    /// publishing it. The table is appended to the destination sheet's drawable order, matching
-    /// the former native implementation.
-    #[deprecated(
-        since = "0.0.1",
-        note = "legacy workbook-wide Numbers table move; use litchi_numbers::Package::move_table with source and destination SheetSelector values and a sheet-scoped TableSelector"
-    )]
-    pub fn move_table(
+    ///
+    /// The historical workbook-wide public route was retired; this narrow
+    /// crate-private method keeps only the duplication implementation's
+    /// selector adaptation and legacy readback validation.
+    pub(crate) fn move_table(
         &mut self,
         selector: TableSelector,
         target: SheetSelector,
@@ -78,41 +79,5 @@ impl NumbersEditor {
 
         self.package = verified.package;
         Ok(verified_table)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::numbers::NumbersDocumentBuilder;
-
-    #[test]
-    fn moves_table_with_name_and_sheet_selectors() {
-        let mut editor = NumbersDocumentBuilder::new()
-            .table_name("Revenue")
-            .table_dimensions(2, 2)
-            .build()
-            .unwrap();
-        let target = editor.add_empty_sheet("Archive").unwrap();
-        let table_id = editor.tables().unwrap()[0].object_id;
-
-        let moved = editor
-            .move_table(
-                TableSelector::name("Revenue"),
-                SheetSelector::name("Archive"),
-            )
-            .unwrap();
-        assert_eq!(moved.object_id, table_id);
-        assert_eq!(
-            find_table_owner(editor.package(), table_id)
-                .unwrap()
-                .sheet_id,
-            target.object_id
-        );
-        assert!(
-            editor
-                .move_table(TableSelector::index(1), SheetSelector::index(0))
-                .is_err()
-        );
     }
 }

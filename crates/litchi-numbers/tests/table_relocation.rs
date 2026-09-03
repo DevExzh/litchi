@@ -367,6 +367,34 @@ fn with_malformed_table_info(source: &[u8]) -> TestResult<Vec<u8>> {
     })
 }
 
+fn with_projection_unsupported_model(source: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_component(source, TABLES_MEMBER, |archive| {
+        let model = archive
+            .object_mut(BETA_MODEL_ID)
+            .ok_or_else(|| io::Error::other("selected table model is missing"))?;
+        let message = model
+            .messages
+            .first()
+            .cloned()
+            .ok_or_else(|| io::Error::other("selected table model payload is missing"))?;
+        let mut decoded = tst::TableModelArchive::decode(message.data.as_slice())?;
+        // The physical relocation owner only needs the model's identity and
+        // message framing.  An oversized row count deliberately makes the
+        // semantic cell projection refuse the source before relocation, so
+        // this test exercises the focused physical-admission compatibility
+        // path rather than accidentally taking the ordinary Package route.
+        decoded.number_of_rows = 1_048_577;
+        model.replace_message(
+            0,
+            RawMessage {
+                type_: message.type_,
+                data: decoded.encode_to_vec(),
+            },
+        )?;
+        Ok(())
+    })
+}
+
 fn with_wrong_sheet_reference_type(source: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_component(source, DOCUMENT_MEMBER, |archive| {
         let sheet = archive
@@ -750,6 +778,37 @@ fn malformed_or_ambiguous_ownership_is_refused_without_partial_mutation() -> Tes
         &with_wrong_parent_reference_path(&bytes)?,
         "wrong table parent reference path",
     )?;
+    Ok(())
+}
+
+#[test]
+fn physical_compatibility_relocates_projection_unsupported_model() -> TestResult {
+    let source = with_projection_unsupported_model(&fixture()?)?;
+    assert!(
+        Package::from_bytes(&source).is_err(),
+        "the oversized model must stay outside the semantic projection"
+    );
+
+    let target = Package::__move_table_from_bytes_for_compatibility(
+        &source,
+        SOURCE_SHEET_NAME,
+        BETA_TABLE_NAME,
+        DESTINATION_SHEET_NAME,
+    )?;
+    assert_eq!(
+        sheet_drawable_ids(&target, SOURCE_SHEET_ID)?,
+        vec![ALPHA_INFO_ID]
+    );
+    assert_eq!(
+        sheet_drawable_ids(&target, DESTINATION_SHEET_ID)?,
+        vec![GAMMA_INFO_ID, BETA_INFO_ID]
+    );
+    assert_eq!(table_parent(&target, BETA_INFO_ID)?, DESTINATION_SHEET_ID);
+    assert_locality(&source, &target)?;
+    assert!(
+        Package::from_bytes(&target).is_err(),
+        "compatibility relocation must not silently promote an unsupported model"
+    );
     Ok(())
 }
 

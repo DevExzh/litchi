@@ -7588,3 +7588,71 @@ No package, dependency edge, ordered migration debt, migration host, or whole
 monolith-exit deletion gate closes. The topology remains 64 workspace packages,
 238 internal dependency declarations, 227 canonical edges, 11 development-only
 edges, 11 ordered migration debts, and one migration host.
+
+## 2026-09-03 amendment: focused Number ownership, lazy parent projection, and host-surface retirement
+
+This wave retires more public migration-host surface without weakening the
+remaining compatibility paths. The raw `litchi_iwa::theme::theme` facade is no
+longer public, and eleven unused generated root aliases (`knsos`, `tnsos`,
+`tpsos`, `tsasos`, `tschsos`, `tsck`, `tscksos`, `tsdsos`, `tsssos`, `tstsos`,
+and `tswpsos`) are removed. Public Numbers table relocation now belongs only to
+the selector-first focused `litchi-numbers` owner; the obsolete host example and
+public `NumbersEditor::move_table` route are removed. A crate-private relocation
+bridge remains solely for the migration host's populated-sheet duplication
+implementation. Boundary tests reject reintroduction of each retired public
+route while preserving that internal dependency until its owner migrates.
+
+Object-index extraction for the type-3002 `TSD.DrawableArchive` parent edge now
+uses a strict borrowed Buffa projection rather than materializing the generated
+Prost message. Its private 411-byte projection schema is bound to digest
+`55c88e34fb819fd629da76c77b6875ab0c2898b29433ffc75843b7be7b4adb11`;
+the current generated closure is five files totaling 57,389 bytes with no
+repeated-field views, underneath its build-time size budget. Canonical framing,
+exact message type and multiplicity,
+wire types, value ranges, and bounded decode work are validated before the
+borrowed parent is admitted. In an allocation-instrumented representative set
+of 100 decodes, the former Prost route performed 700 allocations totaling
+860,800 bytes, while the borrowed Buffa route performed zero allocations and
+retained zero owned decode bytes. Raw records remain authoritative for package
+preservation and mutation.
+
+Drawable-order parsing is now exercised at both ownership layers. The direct
+strict codec fuzzer covers canonical type-3055 framing, malformed wire data,
+limits, duplicate positions, round trips, and unknown-field preservation; its
+sanitizer smoke consumed nine corpus seeds in ten runs. The focused Pages owner
+fuzzer drives selector resolution and transaction admission over checked-in
+descriptor seeds; its AddressSanitizer smoke consumed twelve seeds in thirteen
+runs. These finite smoke runs complement the existing deterministic tests and
+do not constitute exhaustive fuzzing or broaden the Pages drawable-order native
+evidence recorded below.
+
+The focused `litchi-keynote::Package` now owns one existing table cell's Number
+display format through a slide selector, positional table selector, and checked
+Keynote-local `CellPosition`. Its public semantic vocabulary covers automatic or
+fixed decimal places, negative style, and thousands separators without exposing
+native object IDs, BNC records, format-list keys, or a dependency on a sibling
+format-owner crate. Strict wire and graph admission precedes source-bound
+read/edit/apply transactions; exact no-op, inverse, reset, conflict, locality,
+candidate reopen, and semantic readback behavior are verified. This owner does
+not change the cell value or formula, synthesize cells, cover non-Number format
+families, or claim general table-cell CRUD.
+
+Operation-specific native evidence was produced and accepted in Apple Keynote.
+Keynote authored a presentation containing the marker `Litchi native Keynote
+table Number verification — 東京😀`, row label `Verified-number`, and B2 as
+numeric `42.5` displayed with Number and two fixed decimals (`42.50`). The
+focused transaction changed only the requested display format to three fixed
+decimals. Keynote opened the library-produced artifact, displayed B2 as
+`42.500`, retained the marker and table, presented no repair or conversion UI,
+and repeated the same result after close/reopen. The source SHA-256 is
+`b1f45b2533bfc803f5c2619e8811bd9401d81e276c441c2432bbcd9cd28e6a1a`;
+the changed candidate SHA-256 is
+`8bd3384916ae62861055667afd925ffb6df2167b36038c57f10222893691d931`;
+applying the inverse restored the exact source bytes and source hash. This is
+evidence for this bounded Number-format transaction, not arbitrary-producer or
+package-wide native certification.
+
+No package, dependency edge, ordered migration debt, migration host, or whole
+monolith-exit deletion gate closes. The topology remains 64 workspace packages,
+238 internal dependency declarations, 227 canonical edges, 11 development-only
+edges, 11 ordered migration debts, and one migration host.

@@ -21,6 +21,8 @@ mod generated {
         clippy::arbitrary_source_item_ordering,
         clippy::module_name_repetitions,
         clippy::pedantic,
+        dead_code,
+        unreachable_pub,
         reason = "prost-build output is generated from the native IWA schemas."
     )]
 
@@ -1243,6 +1245,44 @@ mod buffa_pages_media_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for the parent edge of a native
+/// `TSD.DrawableArchive`. The complete drawable graph remains caller-owned;
+/// only the optional nested `TSP.Reference` is projected.
+#[doc(hidden)]
+mod buffa_drawable_parent_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "Buffa generated output is private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-drawable-parent/iwa_drawable_parent_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for the Pages movie caption metadata
 /// edge. The strict codec validates selected fields before forcing this view;
 /// caller-owned source bytes remain the preservation representation.
@@ -1665,6 +1705,11 @@ pub mod pages_body_codec;
 #[doc(hidden)]
 pub mod pages_media_codec;
 
+/// Internal strict TSD drawable-parent projection. Generated types remain
+/// private and the caller-owned drawable payload remains authoritative.
+#[doc(hidden)]
+pub mod drawable_parent_codec;
+
 /// Internal strict Pages movie-caption metadata projection. Generated types
 /// remain private and caller-owned raw bytes remain authoritative.
 #[doc(hidden)]
@@ -1875,10 +1920,11 @@ pub mod keynote_slide_transition_codec;
 #[doc(hidden)]
 pub mod keynote_slide_background_codec;
 
-pub use generated::{
-    kn, knsos, tn, tnsos, tp, tpsos, tsa, tsasos, tsce, tsch, tschsos, tsck, tscksos, tsd, tsdsos,
-    tsk, tsp, tss, tsssos, tst, tstsos, tswp, tswpsos,
-};
+// Keep only schema modules with current workspace consumers at the crate root.
+// The generated collaboration/change-set modules (`*_sos`) and `tsck` remain
+// available to the private include above for wire-schema completeness, but do
+// not form part of the supported raw-protobuf surface.
+pub use generated::{kn, tn, tp, tsa, tsce, tsch, tsd, tsk, tsp, tss, tst, tswp};
 
 #[cfg(test)]
 mod tests {

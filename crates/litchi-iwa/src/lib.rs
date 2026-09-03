@@ -194,11 +194,6 @@ pub mod raw {
     pub mod package {
         pub use crate::package::*;
     }
-
-    /// Native theme/protobuf extension codec.
-    pub mod theme {
-        pub use crate::theme::*;
-    }
 }
 
 // Internal modules use a short alias while the public API keeps this native
