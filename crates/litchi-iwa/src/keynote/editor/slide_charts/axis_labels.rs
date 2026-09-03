@@ -54,6 +54,19 @@ fn set_slide_chart_axis_labels_visible(
     visible: bool,
 ) -> Result<()> {
     let graph = chart_graph(editor, slide_index, drawable_object_id)?;
+    // Keep an exact no-op in the original editor.  The low-level setter also
+    // has this guard, but checking before cloning avoids staging and parsing
+    // an unchanged package on the compatibility path.
+    if read_native_chart_axis_labels_visible(
+        editor.package(),
+        &graph.archive_name,
+        drawable_object_id,
+        "Keynote",
+        axis,
+    )? == visible
+    {
+        return Ok(());
+    }
     let mut staged = editor.package().clone();
     set_native_chart_axis_labels_visible(
         &mut staged,
