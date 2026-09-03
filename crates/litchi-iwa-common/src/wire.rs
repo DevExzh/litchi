@@ -549,6 +549,695 @@ impl WireField {
     }
 }
 
+/// Finite limits for a source-bound raw wire scan.
+///
+/// Unlike [`WireLimits`], these limits apply to a structural scan that also
+/// understands the deprecated protobuf group wire types. Groups are retained
+/// as one top-level field while their contents are checked recursively, so the
+/// field and work totals include every start, value, and end-group record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RawWireLimits {
+    max_input_bytes: usize,
+    max_fields: usize,
+    max_depth: usize,
+    max_work: usize,
+}
+
+impl RawWireLimits {
+    /// Absolute input-byte ceiling inherited from the common wire layer.
+    pub const MAX_INPUT_BYTES: usize = WireLimits::MAX_INPUT_BYTES;
+    /// Absolute structural-field ceiling inherited from the common wire layer.
+    pub const MAX_FIELDS: usize = WireLimits::MAX_FIELDS;
+    /// Absolute group nesting ceiling inherited from the common wire layer.
+    pub const MAX_DEPTH: usize = WireLimits::MAX_NESTING;
+    /// Absolute structural-work ceiling.
+    ///
+    /// Four times the input ceiling leaves room for key and framing work while
+    /// remaining finite on 32-bit targets. Group payload bytes are charged by
+    /// their child records rather than again by the enclosing group record.
+    pub const MAX_WORK: usize = Self::MAX_INPUT_BYTES * 4;
+
+    /// Construct an explicit raw-wire scan profile.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidLimit`] when a non-depth value is zero or any
+    /// value exceeds its non-bypassable hard ceiling. A zero depth budget is
+    /// valid and permits scalar fields while rejecting every group.
+    pub fn new(
+        max_input_bytes: usize,
+        max_fields: usize,
+        max_depth: usize,
+        max_work: usize,
+    ) -> Result<Self> {
+        Ok(Self {
+            max_input_bytes: raw_limit("input bytes", max_input_bytes, Self::MAX_INPUT_BYTES)?,
+            max_fields: raw_limit("fields", max_fields, Self::MAX_FIELDS)?,
+            max_depth: raw_depth_limit(max_depth, Self::MAX_DEPTH)?,
+            max_work: raw_limit("work", max_work, Self::MAX_WORK)?,
+        })
+    }
+
+    /// Tighten the input-byte budget.
+    pub fn with_input_bytes(mut self, value: usize) -> Result<Self> {
+        self.max_input_bytes = raw_limit("input bytes", value, Self::MAX_INPUT_BYTES)?;
+        Ok(self)
+    }
+
+    /// Tighten the structural-field budget.
+    pub fn with_fields(mut self, value: usize) -> Result<Self> {
+        self.max_fields = raw_limit("fields", value, Self::MAX_FIELDS)?;
+        Ok(self)
+    }
+
+    /// Tighten the group-nesting budget.
+    pub fn with_depth(mut self, value: usize) -> Result<Self> {
+        self.max_depth = raw_depth_limit(value, Self::MAX_DEPTH)?;
+        Ok(self)
+    }
+
+    /// Tighten the structural-work budget.
+    pub fn with_work(mut self, value: usize) -> Result<Self> {
+        self.max_work = raw_limit("work", value, Self::MAX_WORK)?;
+        Ok(self)
+    }
+
+    /// Maximum input bytes accepted by this profile.
+    #[must_use]
+    pub const fn max_input_bytes(self) -> usize {
+        self.max_input_bytes
+    }
+
+    /// Maximum structural records accepted by this profile.
+    #[must_use]
+    pub const fn max_fields(self) -> usize {
+        self.max_fields
+    }
+
+    /// Maximum nested group depth accepted by this profile.
+    #[must_use]
+    pub const fn max_depth(self) -> usize {
+        self.max_depth
+    }
+
+    /// Maximum structural work accepted by this profile.
+    #[must_use]
+    pub const fn max_work(self) -> usize {
+        self.max_work
+    }
+}
+
+impl Default for RawWireLimits {
+    fn default() -> Self {
+        Self {
+            max_input_bytes: Self::MAX_INPUT_BYTES,
+            max_fields: Self::MAX_FIELDS,
+            max_depth: Self::MAX_DEPTH,
+            max_work: Self::MAX_WORK,
+        }
+    }
+}
+
+fn raw_limit(field: &'static str, value: usize, maximum: usize) -> Result<usize> {
+    if value == 0 || value > maximum {
+        return Err(Error::InvalidLimit {
+            field,
+            value,
+            maximum,
+        });
+    }
+    Ok(value)
+}
+
+fn raw_depth_limit(value: usize, maximum: usize) -> Result<usize> {
+    if value > maximum {
+        return Err(Error::InvalidLimit {
+            field: "depth",
+            value,
+            maximum,
+        });
+    }
+    Ok(value)
+}
+
+/// A source-bound structural field view that retains the original framing.
+///
+/// The iterator yields immediate fields of a message. A start-group field is
+/// yielded as one field whose raw range includes its matching end-group; the
+/// [`Self::group_payload`] range contains only the bytes between those two
+/// records. Use [`RawWireFields::next_with`] when a caller needs to inspect
+/// every nested group record without reparsing or copying the source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RawWireField<'source> {
+    source: &'source [u8],
+    number: u32,
+    wire_type: u8,
+    depth: usize,
+    start: usize,
+    key_end: usize,
+    payload_start: usize,
+    payload_end: usize,
+    end: usize,
+    key_canonical: bool,
+    length_canonical: bool,
+    value_canonical: bool,
+    group_fields: usize,
+    group_depth: usize,
+}
+
+impl<'source> RawWireField<'source> {
+    /// Protobuf field number.
+    #[must_use]
+    pub const fn number(self) -> u32 {
+        self.number
+    }
+
+    /// Protobuf wire type tag.
+    #[must_use]
+    pub const fn wire_type(self) -> u8 {
+        self.wire_type
+    }
+
+    /// Depth of the message containing this field. Root fields have depth 0.
+    #[must_use]
+    pub const fn depth(self) -> usize {
+        self.depth
+    }
+
+    /// Byte offset at which the encoded field key begins.
+    #[must_use]
+    pub const fn start(self) -> usize {
+        self.start
+    }
+
+    /// Byte offset immediately after the encoded field key.
+    #[must_use]
+    pub const fn key_end(self) -> usize {
+        self.key_end
+    }
+
+    /// Byte offset at which the field payload begins.
+    #[must_use]
+    pub const fn payload_start(self) -> usize {
+        self.payload_start
+    }
+
+    /// Byte offset immediately after the field payload.
+    ///
+    /// For a start-group field this is the offset of its matching end-group
+    /// key. For an end-group field it equals [`Self::key_end`].
+    #[must_use]
+    pub const fn payload_end(self) -> usize {
+        self.payload_end
+    }
+
+    /// Byte offset immediately after the complete encoded field.
+    #[must_use]
+    pub const fn end(self) -> usize {
+        self.end
+    }
+
+    /// Return the complete encoded field, including group framing.
+    #[must_use]
+    pub fn raw(self) -> &'source [u8] {
+        &self.source[self.start..self.end]
+    }
+
+    /// Return the encoded field key.
+    #[must_use]
+    pub fn key(self) -> &'source [u8] {
+        &self.source[self.start..self.key_end]
+    }
+
+    /// Return the field payload, excluding a length prefix when present.
+    ///
+    /// For a start-group field this is the nested bytes between the start and
+    /// matching end-group records. End-group fields have an empty payload.
+    #[must_use]
+    pub fn payload(self) -> &'source [u8] {
+        &self.source[self.payload_start..self.payload_end]
+    }
+
+    /// Whether the field key uses its canonical varint representation.
+    #[must_use]
+    pub const fn key_is_canonical(self) -> bool {
+        self.key_canonical
+    }
+
+    /// Whether a length-delimited field's length prefix is canonical.
+    ///
+    /// This is always true for wire types without a length prefix.
+    #[must_use]
+    pub const fn length_is_canonical(self) -> bool {
+        self.length_canonical
+    }
+
+    /// Whether a varint value uses its canonical representation.
+    ///
+    /// This is always true for wire types without a varint value.
+    #[must_use]
+    pub const fn value_is_canonical(self) -> bool {
+        self.value_canonical
+    }
+
+    /// Whether this field is a start-group record.
+    #[must_use]
+    pub const fn is_group_start(self) -> bool {
+        self.wire_type == 3
+    }
+
+    /// Whether this field is an end-group record.
+    #[must_use]
+    pub const fn is_group_end(self) -> bool {
+        self.wire_type == 4
+    }
+
+    /// Number of records nested beneath a start-group field.
+    ///
+    /// The count includes the matching end-group and recursively includes all
+    /// records in nested groups. Non-group fields report zero.
+    #[must_use]
+    pub const fn group_fields(self) -> usize {
+        self.group_fields
+    }
+
+    /// Maximum group depth beneath a start-group field.
+    ///
+    /// A group containing no nested group reports depth 1. Non-group fields
+    /// report zero.
+    #[must_use]
+    pub const fn group_depth(self) -> usize {
+        self.group_depth
+    }
+
+    /// Return the nested bytes of a start-group field, or `None` otherwise.
+    #[must_use]
+    pub fn group_payload(self) -> Option<&'source [u8]> {
+        self.is_group_start().then(|| self.payload())
+    }
+}
+
+/// A bounded source-bound iterator over immediate raw wire fields.
+///
+/// Structural parsing understands all protobuf wire types 0 through 5 and
+/// verifies that every start-group has a matching end-group. Unknown fields
+/// are never normalized: callers can copy [`RawWireField::raw`] directly from
+/// the original source. The optional visitor sees nested group records too,
+/// which lets format crates apply schema policy without duplicating framing.
+#[derive(Debug)]
+pub struct RawWireFields<'source> {
+    source: &'source [u8],
+    offset: usize,
+    limits: RawWireLimits,
+    fields: usize,
+    work: usize,
+    input_checked: bool,
+    poisoned: Option<Error>,
+}
+
+impl<'source> RawWireFields<'source> {
+    /// Begin a scan under [`RawWireLimits::default`].
+    pub fn new(source: &'source [u8]) -> Self {
+        Self::with_limits(source, RawWireLimits::default())
+    }
+
+    /// Begin a scan under an explicit finite resource profile.
+    pub const fn with_limits(source: &'source [u8], limits: RawWireLimits) -> Self {
+        Self {
+            source,
+            offset: 0,
+            limits,
+            fields: 0,
+            work: 0,
+            input_checked: false,
+            poisoned: None,
+        }
+    }
+
+    /// Number of structural records consumed so far, including nested groups.
+    #[must_use]
+    pub const fn fields(&self) -> usize {
+        self.fields
+    }
+
+    /// Structural work charged so far.
+    #[must_use]
+    pub const fn work(&self) -> usize {
+        self.work
+    }
+
+    /// Return the limits used by this scan.
+    #[must_use]
+    pub const fn limits(&self) -> RawWireLimits {
+        self.limits
+    }
+
+    /// Yield the next immediate field.
+    #[allow(
+        clippy::should_implement_trait,
+        reason = "The fallible Result<Option<_>> API reports malformed source without hiding it in Iterator::Item"
+    )]
+    pub fn next(&mut self) -> Result<Option<RawWireField<'source>>> {
+        self.next_with(|_| Ok(()))
+    }
+
+    /// Yield the next immediate field and visit every nested group record.
+    ///
+    /// The visitor is called for nested records before the enclosing group
+    /// record. It receives the matching end-group record as well as the start
+    /// and value records, all bound to this iterator's source.
+    pub fn next_with<F>(&mut self, mut visitor: F) -> Result<Option<RawWireField<'source>>>
+    where
+        F: FnMut(RawWireField<'source>) -> Result<()>,
+    {
+        if let Some(error) = &self.poisoned {
+            return Err(error.clone());
+        }
+
+        let result = self.next_with_unpoisoned(&mut visitor);
+        if let Err(error) = &result {
+            self.poisoned = Some(error.clone());
+        }
+        result
+    }
+
+    fn next_with_unpoisoned<F>(&mut self, visitor: &mut F) -> Result<Option<RawWireField<'source>>>
+    where
+        F: FnMut(RawWireField<'source>) -> Result<()>,
+    {
+        self.ensure_input()?;
+        if self.offset == self.source.len() {
+            return Ok(None);
+        }
+        let field = parse_raw_wire_field(
+            self.source,
+            self.offset,
+            self.source.len(),
+            0,
+            &mut RawWireBudget {
+                limits: self.limits,
+                fields: &mut self.fields,
+                work: &mut self.work,
+            },
+            visitor,
+        )?;
+        if field.is_group_end() {
+            return Err(Error::InvalidFormat(format!(
+                "unexpected protobuf end-group field {}",
+                field.number()
+            )));
+        }
+        visitor(field)?;
+        self.offset = field.end();
+        Ok(Some(field))
+    }
+
+    fn ensure_input(&mut self) -> Result<()> {
+        if self.input_checked {
+            return Ok(());
+        }
+        self.input_checked = true;
+        if self.source.len() > self.limits.max_input_bytes() {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::InputBytes,
+                observed: self.source.len(),
+                limit: self.limits.max_input_bytes(),
+            });
+        }
+        Ok(())
+    }
+}
+
+struct RawWireBudget<'limits> {
+    limits: RawWireLimits,
+    fields: &'limits mut usize,
+    work: &'limits mut usize,
+}
+
+impl RawWireBudget<'_> {
+    fn charge(&mut self, work: usize) -> Result<()> {
+        let fields = self
+            .fields
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidFormat("raw protobuf field count overflow".to_owned()))?;
+        if fields > self.limits.max_fields() {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::Fields,
+                observed: fields,
+                limit: self.limits.max_fields(),
+            });
+        }
+        let total_work = self
+            .work
+            .checked_add(work)
+            .ok_or_else(|| Error::InvalidFormat("raw protobuf work overflow".to_owned()))?;
+        if total_work > self.limits.max_work() {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::RewriteWork,
+                observed: total_work,
+                limit: self.limits.max_work(),
+            });
+        }
+        *self.fields = fields;
+        *self.work = total_work;
+        Ok(())
+    }
+
+    fn ensure_depth(&self, depth: usize) -> Result<()> {
+        if depth > self.limits.max_depth() {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::Nesting,
+                observed: depth,
+                limit: self.limits.max_depth(),
+            });
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RawGroupScan {
+    payload_end: usize,
+    end: usize,
+    fields: usize,
+    depth: usize,
+}
+
+fn parse_raw_wire_field<'source, F>(
+    source: &'source [u8],
+    start: usize,
+    message_end: usize,
+    depth: usize,
+    budget: &mut RawWireBudget<'_>,
+    visitor: &mut F,
+) -> Result<RawWireField<'source>>
+where
+    F: FnMut(RawWireField<'source>) -> Result<()>,
+{
+    let encoded = source.get(start..message_end).ok_or_else(|| {
+        Error::InvalidFormat("protobuf raw field range is outside the message".to_owned())
+    })?;
+    let (key_value, key_length) = crate::varint::decode_varint_from_bytes(encoded)
+        .map_err(|error| Error::InvalidFormat(format!("invalid protobuf key: {error}")))?;
+    let key_end = start
+        .checked_add(key_length)
+        .ok_or_else(|| Error::InvalidFormat("protobuf raw key offset overflow".to_owned()))?;
+    let number = u32::try_from(key_value >> 3).map_err(|_conversion| {
+        Error::InvalidFormat("protobuf raw field number exceeds u32".to_owned())
+    })?;
+    if number == 0 || number > 0x1fff_ffff {
+        return Err(Error::InvalidFormat(
+            "protobuf raw field number is outside the valid range".to_owned(),
+        ));
+    }
+    let wire_type = u8::try_from(key_value & 7).map_err(|_conversion| {
+        Error::InvalidFormat("protobuf raw wire type exceeds u8".to_owned())
+    })?;
+    if wire_type > 5 {
+        return Err(Error::InvalidFormat(format!(
+            "invalid protobuf wire type {wire_type}"
+        )));
+    }
+    let key_canonical = key_length == crate::varint::encoded_len(key_value);
+    let (
+        payload_start,
+        payload_end,
+        end,
+        length_canonical,
+        value_canonical,
+        group_fields,
+        group_depth,
+    ) =
+        match wire_type {
+            0 => {
+                let value_source = source.get(key_end..message_end).ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "protobuf raw varint range is outside the message".to_owned(),
+                    )
+                })?;
+                let (value, value_length) = crate::varint::decode_varint_from_bytes(value_source)
+                    .map_err(|error| {
+                    Error::InvalidFormat(format!("invalid protobuf varint value: {error}"))
+                })?;
+                let value_canonical = value_length == crate::varint::encoded_len(value);
+                let end = key_end.checked_add(value_length).ok_or_else(|| {
+                    Error::InvalidFormat("protobuf raw varint offset overflow".to_owned())
+                })?;
+                budget.charge(key_length.checked_add(value_length).ok_or_else(|| {
+                    Error::InvalidFormat("protobuf raw work overflow".to_owned())
+                })?)?;
+                (key_end, end, end, true, value_canonical, 0, 0)
+            },
+            1 => {
+                let end = key_end.checked_add(8).ok_or_else(|| {
+                    Error::InvalidFormat("protobuf raw fixed64 offset overflow".to_owned())
+                })?;
+                budget.charge(key_length.checked_add(8).ok_or_else(|| {
+                    Error::InvalidFormat("protobuf raw work overflow".to_owned())
+                })?)?;
+                (key_end, end, end, true, true, 0, 0)
+            },
+            2 => {
+                let length_source = source.get(key_end..message_end).ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "protobuf raw length range is outside the message".to_owned(),
+                    )
+                })?;
+                let (encoded_length, prefix_length) =
+                    crate::varint::decode_varint_from_bytes(length_source).map_err(|error| {
+                        Error::InvalidFormat(format!("invalid protobuf length: {error}"))
+                    })?;
+                let payload_start = key_end.checked_add(prefix_length).ok_or_else(|| {
+                    Error::InvalidFormat("protobuf raw length-prefix overflow".to_owned())
+                })?;
+                let length_canonical = prefix_length == crate::varint::encoded_len(encoded_length);
+                let payload_length = usize::try_from(encoded_length).map_err(|_conversion| {
+                    Error::InvalidFormat("protobuf raw length exceeds usize".to_owned())
+                })?;
+                let end = payload_start.checked_add(payload_length).ok_or_else(|| {
+                    Error::InvalidFormat("protobuf raw payload range overflow".to_owned())
+                })?;
+                let work = key_length
+                    .checked_add(prefix_length)
+                    .and_then(|value| value.checked_add(payload_length))
+                    .ok_or_else(|| Error::InvalidFormat("protobuf raw work overflow".to_owned()))?;
+                budget.charge(work)?;
+                (payload_start, end, end, length_canonical, true, 0, 0)
+            },
+            3 => {
+                let nested_depth = depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("protobuf raw group depth overflow".to_owned())
+                })?;
+                budget.ensure_depth(nested_depth)?;
+                budget.charge(key_length)?;
+                let group = scan_raw_group(
+                    source,
+                    key_end,
+                    message_end,
+                    number,
+                    nested_depth,
+                    budget,
+                    visitor,
+                )?;
+                (
+                    key_end,
+                    group.payload_end,
+                    group.end,
+                    true,
+                    true,
+                    group.fields,
+                    group.depth,
+                )
+            },
+            4 => {
+                budget.charge(key_length)?;
+                (key_end, key_end, key_end, true, true, 0, 0)
+            },
+            5 => {
+                let end = key_end.checked_add(4).ok_or_else(|| {
+                    Error::InvalidFormat("protobuf raw fixed32 offset overflow".to_owned())
+                })?;
+                budget.charge(key_length.checked_add(4).ok_or_else(|| {
+                    Error::InvalidFormat("protobuf raw work overflow".to_owned())
+                })?)?;
+                (key_end, end, end, true, true, 0, 0)
+            },
+            _ => unreachable!("wire type was checked above"),
+        };
+    if end > message_end {
+        return Err(Error::InvalidFormat(
+            "truncated protobuf raw field".to_owned(),
+        ));
+    }
+    Ok(RawWireField {
+        source,
+        number,
+        wire_type,
+        depth,
+        start,
+        key_end,
+        payload_start,
+        payload_end,
+        end,
+        key_canonical,
+        length_canonical,
+        value_canonical,
+        group_fields,
+        group_depth,
+    })
+}
+
+fn scan_raw_group<'source, F>(
+    source: &'source [u8],
+    mut offset: usize,
+    message_end: usize,
+    expected_number: u32,
+    depth: usize,
+    budget: &mut RawWireBudget<'_>,
+    visitor: &mut F,
+) -> Result<RawGroupScan>
+where
+    F: FnMut(RawWireField<'source>) -> Result<()>,
+{
+    let mut fields = 0usize;
+    let mut maximum_depth = depth;
+    loop {
+        if offset >= message_end {
+            return Err(Error::InvalidFormat(format!(
+                "protobuf start-group field {expected_number} is not terminated"
+            )));
+        }
+        let field = parse_raw_wire_field(source, offset, message_end, depth, budget, visitor)?;
+        if field.is_group_end() {
+            if field.number() != expected_number {
+                return Err(Error::InvalidFormat(format!(
+                    "protobuf end-group field {} does not match start-group field {expected_number}",
+                    field.number()
+                )));
+            }
+            fields = fields.checked_add(1).ok_or_else(|| {
+                Error::InvalidFormat("protobuf raw group field count overflow".to_owned())
+            })?;
+            visitor(field)?;
+            return Ok(RawGroupScan {
+                payload_end: field.start(),
+                end: field.end(),
+                fields,
+                depth: maximum_depth,
+            });
+        }
+        visitor(field)?;
+        let nested_fields = field.group_fields().checked_add(1).ok_or_else(|| {
+            Error::InvalidFormat("protobuf raw group field count overflow".to_owned())
+        })?;
+        fields = fields.checked_add(nested_fields).ok_or_else(|| {
+            Error::InvalidFormat("protobuf raw group field count overflow".to_owned())
+        })?;
+        maximum_depth = maximum_depth.max(field.group_depth());
+        offset = field.end();
+    }
+}
+
 /// Typed replacement for one leaf in a batched nested-field rewrite.
 ///
 /// `None` clears a present leaf, or validates that an absent leaf remains
@@ -3138,6 +3827,198 @@ mod tests {
         let mut field = Vec::new();
         append_length_delimited_field(&mut field, number, payload).unwrap();
         field
+    }
+
+    fn group_field(number: u32, payload: &[u8]) -> Vec<u8> {
+        let mut field = crate::varint::encode_varint((u64::from(number) << 3) | 3);
+        field.extend_from_slice(payload);
+        field.extend(crate::varint::encode_varint((u64::from(number) << 3) | 4));
+        field
+    }
+
+    #[test]
+    fn raw_wire_fields_accept_all_wire_types_and_retain_exact_spans() {
+        let overlong_varint = [0x08, 0x81, 0x00];
+        let fixed64 = [0x09, 1, 2, 3, 4, 5, 6, 7, 8];
+        let overlong_length = [0x12, 0x81, 0x00, b'x'];
+        let group = group_field(90, &overlong_varint);
+        let fixed32 = [0x25, 9, 8, 7, 6];
+        let source = [
+            overlong_varint.as_slice(),
+            fixed64.as_slice(),
+            overlong_length.as_slice(),
+            group.as_slice(),
+            fixed32.as_slice(),
+        ]
+        .concat();
+
+        let mut fields = RawWireFields::new(&source);
+        let first = fields.next().unwrap().unwrap();
+        let second = fields.next().unwrap().unwrap();
+        let third = fields.next().unwrap().unwrap();
+        let fourth = fields.next().unwrap().unwrap();
+        let fifth = fields.next().unwrap().unwrap();
+
+        assert_eq!(first.wire_type(), 0);
+        assert!(!first.value_is_canonical());
+        assert_eq!(first.raw(), overlong_varint);
+        assert_eq!(first.payload(), &overlong_varint[1..]);
+        assert_eq!(second.wire_type(), 1);
+        assert!(second.value_is_canonical());
+        assert_eq!(second.payload(), &fixed64[1..]);
+        assert_eq!(third.wire_type(), 2);
+        assert!(!third.length_is_canonical());
+        assert_eq!(third.payload(), b"x");
+        assert_eq!(fourth.wire_type(), 3);
+        assert!(fourth.is_group_start());
+        assert_eq!(fourth.raw(), group);
+        assert_eq!(fourth.group_payload(), Some(overlong_varint.as_slice()));
+        assert_eq!(fourth.group_fields(), 2);
+        assert_eq!(fourth.group_depth(), 1);
+        assert_eq!(fifth.wire_type(), 5);
+        assert_eq!(fifth.payload(), &fixed32[1..]);
+        assert!(fields.next().unwrap().is_none());
+        assert_eq!(fields.fields(), 7);
+        assert!(fields.work() <= source.len());
+
+        // The additive scanner understands groups; the legacy parser keeps
+        // its deliberately narrower behavior unchanged.
+        assert!(parse_wire_fields(&source).is_err());
+    }
+
+    #[test]
+    fn raw_wire_fields_visitor_sees_nested_group_records_with_depth() {
+        let nested = group_field(92, &varint_field(93, 2));
+        let payload = [varint_field(91, 1), nested].concat();
+        let source = group_field(90, &payload);
+        let mut visited = Vec::new();
+        let mut fields = RawWireFields::new(&source);
+        let outer = fields
+            .next_with(|field| {
+                visited.push((field.number(), field.wire_type(), field.depth()));
+                Ok(())
+            })
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(outer.number(), 90);
+        assert_eq!(outer.depth(), 0);
+        assert_eq!(outer.group_fields(), 5);
+        assert_eq!(outer.group_depth(), 2);
+        assert!(visited.contains(&(91, 0, 1)));
+        assert!(visited.contains(&(92, 3, 1)));
+        assert!(visited.contains(&(92, 4, 2)));
+        assert!(visited.contains(&(90, 4, 1)));
+        assert_eq!(fields.next().unwrap(), None);
+    }
+
+    #[test]
+    fn raw_wire_fields_enforce_input_field_depth_and_work_limits() {
+        let source = [varint_field(1, 1), varint_field(2, 2)].concat();
+        let fields_limit = RawWireLimits::default().with_fields(1).unwrap();
+        let mut fields = RawWireFields::with_limits(&source, fields_limit);
+        assert!(fields.next().unwrap().is_some());
+        assert!(matches!(
+            fields.next(),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::Fields,
+                observed: 2,
+                limit: 1,
+            })
+        ));
+
+        let nested = group_field(90, &group_field(91, &[]));
+        let depth_limit = RawWireLimits::default().with_depth(1).unwrap();
+        assert!(matches!(
+            RawWireFields::with_limits(&nested, depth_limit).next(),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::Nesting,
+                observed: 2,
+                limit: 1,
+            })
+        ));
+
+        let one_field = varint_field(1, 1);
+        let work_limit = RawWireLimits::default()
+            .with_input_bytes(one_field.len())
+            .unwrap()
+            .with_work(one_field.len() - 1)
+            .unwrap();
+        assert!(matches!(
+            RawWireFields::with_limits(&one_field, work_limit).next(),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::RewriteWork,
+                ..
+            })
+        ));
+
+        let input_limit = RawWireLimits::default().with_input_bytes(1).unwrap();
+        assert!(matches!(
+            RawWireFields::with_limits(&one_field, input_limit).next(),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::InputBytes,
+                observed: 2,
+                limit: 1,
+            })
+        ));
+    }
+
+    #[test]
+    fn raw_wire_fields_reject_unbalanced_or_mismatched_groups() {
+        let start_only = crate::varint::encode_varint((90_u64 << 3) | 3);
+        assert!(matches!(
+            RawWireFields::new(&start_only).next(),
+            Err(Error::InvalidFormat(message)) if message.contains("not terminated")
+        ));
+
+        let mismatched = [
+            crate::varint::encode_varint((90_u64 << 3) | 3),
+            crate::varint::encode_varint((91_u64 << 3) | 4),
+        ]
+        .concat();
+        assert!(matches!(
+            RawWireFields::new(&mismatched).next(),
+            Err(Error::InvalidFormat(message)) if message.contains("does not match")
+        ));
+
+        let end_only = crate::varint::encode_varint((90_u64 << 3) | 4);
+        assert!(matches!(
+            RawWireFields::new(&end_only).next(),
+            Err(Error::InvalidFormat(message)) if message.contains("unexpected")
+        ));
+    }
+
+    #[test]
+    fn raw_wire_fields_poison_after_parser_or_visitor_error() {
+        let malformed_group = [
+            crate::varint::encode_varint((90_u64 << 3) | 3),
+            crate::varint::encode_varint((91_u64 << 3) | 4),
+        ]
+        .concat();
+        let mut parser_failed = RawWireFields::new(&malformed_group);
+        let parser_error = parser_failed.next().unwrap_err();
+        let parser_fields = parser_failed.fields();
+        let parser_work = parser_failed.work();
+        assert_eq!(parser_failed.next().unwrap_err(), parser_error);
+        assert_eq!(parser_failed.fields(), parser_fields);
+        assert_eq!(parser_failed.work(), parser_work);
+
+        let source = varint_field(1, 1);
+        let mut visitor_failed = RawWireFields::new(&source);
+        let mut calls = 0usize;
+        let visitor_error = visitor_failed
+            .next_with(|_| {
+                calls += 1;
+                Err(Error::InvalidFormat("visitor sentinel".to_owned()))
+            })
+            .unwrap_err();
+        assert_eq!(calls, 1);
+        let visitor_fields = visitor_failed.fields();
+        let visitor_work = visitor_failed.work();
+        assert_eq!(visitor_failed.next().unwrap_err(), visitor_error);
+        assert_eq!(calls, 1);
+        assert_eq!(visitor_failed.fields(), visitor_fields);
+        assert_eq!(visitor_failed.work(), visitor_work);
     }
 
     #[test]

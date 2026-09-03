@@ -15,7 +15,6 @@ use crate::shapes::{DrawableGeometry, DrawableProperties, DrawableSize, geometry
 use litchi_iwa_common::media::playback::MediaPlaybackSettings;
 
 mod builds;
-mod caption;
 pub(in crate::keynote::editor) mod geometry;
 pub(in crate::keynote::editor) mod graph;
 
@@ -887,6 +886,80 @@ mod tests {
             .unwrap()
     }
 
+    // Keep editor setup/teardown local to these host tests while exercising
+    // the focused package's selector-first movie title/caption APIs directly.
+    fn focused_movie_package(editor: &KeynoteEditor) -> KeynotePackage {
+        KeynotePackage::from_bytes(&editor.to_bytes().unwrap()).unwrap()
+    }
+
+    fn replace_with_focused_movie_package(editor: &mut KeynoteEditor, package: &KeynotePackage) {
+        let mut bytes = Vec::new();
+        package.write_to(&mut bytes).unwrap();
+        *editor = KeynoteEditor::from_bytes(&bytes).unwrap();
+    }
+
+    fn movie_title(editor: &KeynoteEditor, movie: MovieSelector) -> Option<String> {
+        focused_movie_package(editor)
+            .slide_movie_title(SlideSelector::index(0), movie)
+            .unwrap()
+    }
+
+    fn set_movie_title(editor: &mut KeynoteEditor, movie: MovieSelector, title: &str) {
+        let package = focused_movie_package(editor);
+        let commit = package
+            .edit_slide_movie_title(SlideSelector::index(0), movie)
+            .unwrap()
+            .set(title)
+            .unwrap()
+            .commit()
+            .unwrap();
+        replace_with_focused_movie_package(editor, commit.package());
+    }
+
+    fn remove_movie_title(editor: &mut KeynoteEditor, movie: MovieSelector) -> bool {
+        let package = focused_movie_package(editor);
+        let edit = package
+            .edit_slide_movie_title(SlideSelector::index(0), movie)
+            .unwrap();
+        let had_title = edit.before().is_some();
+        let commit = edit.clear().unwrap().commit().unwrap();
+        if !commit.patch().is_noop() {
+            replace_with_focused_movie_package(editor, commit.package());
+        }
+        had_title
+    }
+
+    fn movie_caption(editor: &KeynoteEditor, movie: MovieSelector) -> Option<String> {
+        focused_movie_package(editor)
+            .slide_movie_caption(SlideSelector::index(0), movie)
+            .unwrap()
+    }
+
+    fn set_movie_caption(editor: &mut KeynoteEditor, movie: MovieSelector, caption: &str) {
+        let package = focused_movie_package(editor);
+        let commit = package
+            .edit_slide_movie_caption(SlideSelector::index(0), movie)
+            .unwrap()
+            .set(caption)
+            .unwrap()
+            .commit()
+            .unwrap();
+        replace_with_focused_movie_package(editor, commit.package());
+    }
+
+    fn remove_movie_caption(editor: &mut KeynoteEditor, movie: MovieSelector) -> bool {
+        let package = focused_movie_package(editor);
+        let edit = package
+            .edit_slide_movie_caption(SlideSelector::index(0), movie)
+            .unwrap();
+        let had_caption = edit.before().is_some();
+        let commit = edit.clear().unwrap().commit().unwrap();
+        if !commit.patch().is_noop() {
+            replace_with_focused_movie_package(editor, commit.package());
+        }
+        had_caption
+    }
+
     fn properties(description: &str) -> DrawableProperties {
         DrawableProperties {
             hyperlink_url: Some("https://example.test/keynote-movie".to_owned()),
@@ -1122,56 +1195,26 @@ mod tests {
             .add_slide_movie(0, "movie.mov", MOVIE, "poster.png", POSTER, options())
             .unwrap();
 
+        assert_eq!(movie_title(&editor, MovieSelector::index(0)), None);
+        assert_eq!(movie_caption(&editor, MovieSelector::index(0)), None);
+        set_movie_title(&mut editor, MovieSelector::index(0), "Quarterly highlight");
+        set_movie_caption(&mut editor, MovieSelector::index(0), "Revenue overview");
         assert_eq!(
-            editor
-                .slide_movie_title_by_selector(Position::new(0), MovieSelector::index(0))
-                .unwrap(),
-            None
-        );
-        assert_eq!(
-            editor
-                .slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(0))
-                .unwrap(),
-            None
-        );
-        editor
-            .set_slide_movie_title_by_selector(
-                Position::new(0),
-                MovieSelector::index(0),
-                "Quarterly highlight",
-            )
-            .unwrap();
-        editor
-            .set_slide_movie_caption_by_selector(
-                Position::new(0),
-                MovieSelector::index(0),
-                "Revenue overview",
-            )
-            .unwrap();
-        assert_eq!(
-            editor
-                .slide_movie_title_by_selector(Position::new(0), MovieSelector::index(0))
-                .unwrap(),
+            movie_title(&editor, MovieSelector::index(0)),
             Some("Quarterly highlight".to_owned())
         );
         assert_eq!(
-            editor
-                .slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(0))
-                .unwrap(),
+            movie_caption(&editor, MovieSelector::index(0)),
             Some("Revenue overview".to_owned())
         );
 
-        editor
-            .set_slide_movie_caption_by_selector(
-                Position::new(0),
-                MovieSelector::index(0),
-                "Updated revenue overview",
-            )
-            .unwrap();
+        set_movie_caption(
+            &mut editor,
+            MovieSelector::index(0),
+            "Updated revenue overview",
+        );
         assert_eq!(
-            editor
-                .slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(0))
-                .unwrap(),
+            movie_caption(&editor, MovieSelector::index(0)),
             Some("Updated revenue overview".to_owned())
         );
 
@@ -1179,52 +1222,20 @@ mod tests {
             .duplicate_slide_movie(0, movie.drawable_object_id)
             .unwrap();
         assert_eq!(
-            editor
-                .slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(1))
-                .unwrap(),
+            movie_caption(&editor, MovieSelector::index(1)),
             Some("Updated revenue overview".to_owned())
         );
 
-        editor
-            .set_slide_movie_title_by_selector(
-                Position::new(0),
-                MovieSelector::index(0),
-                "Updated highlight",
-            )
-            .unwrap();
-        assert!(
-            editor
-                .remove_slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(0))
-                .unwrap()
-        );
-        assert!(
-            !editor
-                .remove_slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(0),)
-                .unwrap()
-        );
-        assert!(
-            editor
-                .remove_slide_movie_title_by_selector(Position::new(0), MovieSelector::index(0))
-                .unwrap()
-        );
-        assert_eq!(
-            editor
-                .slide_movie_title_by_selector(Position::new(0), MovieSelector::index(0))
-                .unwrap(),
-            None
-        );
-        assert_eq!(
-            editor
-                .slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(0))
-                .unwrap(),
-            None
-        );
+        set_movie_title(&mut editor, MovieSelector::index(0), "Updated highlight");
+        assert!(remove_movie_caption(&mut editor, MovieSelector::index(0)));
+        assert!(!remove_movie_caption(&mut editor, MovieSelector::index(0)));
+        assert!(remove_movie_title(&mut editor, MovieSelector::index(0)));
+        assert_eq!(movie_title(&editor, MovieSelector::index(0)), None);
+        assert_eq!(movie_caption(&editor, MovieSelector::index(0)), None);
 
         let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            reopened
-                .slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(1))
-                .unwrap(),
+            movie_caption(&reopened, MovieSelector::index(1)),
             Some("Updated revenue overview".to_owned())
         );
         editor = reopened;
@@ -1241,7 +1252,7 @@ mod tests {
     }
 
     #[test]
-    fn movie_caption_bridge_preserves_movie_selector_order_after_audio() {
+    fn movie_caption_package_preserves_movie_selector_order_after_audio() {
         let mut editor = KeynoteDocumentBuilder::new()
             .title("Movie caption selector order")
             .build()
@@ -1267,43 +1278,18 @@ mod tests {
             movie.drawable_object_id
         );
 
-        editor
-            .set_slide_movie_caption_by_selector(
-                Position::new(0),
-                MovieSelector::index(1),
-                "Caption after audio",
-            )
-            .unwrap();
-        editor
-            .set_slide_movie_title_by_selector(
-                Position::new(0),
-                MovieSelector::index(1),
-                "Title after audio",
-            )
-            .unwrap();
+        set_movie_caption(&mut editor, MovieSelector::index(1), "Caption after audio");
+        set_movie_title(&mut editor, MovieSelector::index(1), "Title after audio");
         assert_eq!(
-            editor
-                .slide_movie_title_by_selector(Position::new(0), MovieSelector::index(1))
-                .unwrap(),
+            movie_title(&editor, MovieSelector::index(1)),
             Some("Title after audio".to_owned())
         );
         assert_eq!(
-            editor
-                .slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(1))
-                .unwrap(),
+            movie_caption(&editor, MovieSelector::index(1)),
             Some("Caption after audio".to_owned())
         );
-        assert!(
-            editor
-                .remove_slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(1))
-                .unwrap()
-        );
-        assert_eq!(
-            editor
-                .slide_movie_caption_by_selector(Position::new(0), MovieSelector::index(1))
-                .unwrap(),
-            None
-        );
+        assert!(remove_movie_caption(&mut editor, MovieSelector::index(1)));
+        assert_eq!(movie_caption(&editor, MovieSelector::index(1)), None);
     }
 
     #[test]

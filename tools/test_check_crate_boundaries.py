@@ -86,6 +86,30 @@ def valid_snapshot(policy: boundaries.Policy) -> boundaries.Snapshot:
     )
 
 
+def add_iwa_table_cell_borders_scaffold(root: Path) -> None:
+    """Install the minimal common-owner and host-import boundary fixture."""
+
+    common = root / boundaries.IWA_TABLE_CELL_BORDERS_COMMON_SOURCE
+    common.parent.mkdir(parents=True, exist_ok=True)
+    common.write_text("pub struct Borders;\n", encoding="utf-8")
+
+    compatibility = root / boundaries.IWA_TABLE_CELL_BORDERS_COMPAT_SOURCE
+    compatibility.parent.mkdir(parents=True, exist_ok=True)
+    compatibility.write_text(
+        "#[deprecated(note = \"use the common owner\")]\n"
+        "pub use litchi_iwa_common::table::cell::Borders;\n",
+        encoding="utf-8",
+    )
+
+    for relative in boundaries.IWA_TABLE_CELL_BORDERS_HOST_IMPORT_SOURCES:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "use litchi_iwa_common::table::cell::{Borders};\n",
+            encoding="utf-8",
+        )
+
+
 def add_iwa_numbers_formula_renderer_scaffold(
     root: Path,
     *,
@@ -1157,32 +1181,8 @@ def add_numbers_table_cell_number_format_canonical_scaffold(root: Path) -> None:
     host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_SOURCE[0]
     host.parent.mkdir(parents=True, exist_ok=True)
     host.write_text(
-        "use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelector, CellPosition};\n"
-        "impl NumbersEditor {\n"
-        "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        "pub fn table_cell_number_format(&self, table_id: u64, row: usize, column: usize) -> Result<Option<Number>> {\n"
-        "    let source_built = !self.package.source_is_exact(); if source_built { cell_number_format(); }\n"
-        "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
-        "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
-        "    let position = CellPosition::try_from_usize(row, column)?;\n"
-        "    match package.table_cell_number_format(sheet, table, position) { Err(Unsupported) | Err(Ambiguous) => Err(Unsupported), result => result }\n"
-        "}\n"
-        "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        "pub fn set_table_cell_number_format(&mut self, table_id: u64, row: usize, column: usize, format: Number) -> Result<()> {\n"
-        "    let source_built = !self.package.source_is_exact(); if source_built || matches!(error, WrongFormatFamily) { set_cell_number_format(); }\n"
-        "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
-        "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
-        "    let position = CellPosition::try_from_usize(row, column)?;\n"
-        "    unsupported; ambiguous; package.edit_table_cell_number_format(sheet, table, position).set(format).commit()\n"
-        "}\n"
-        "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        "pub fn reset_table_cell_number_format(&mut self, table_id: u64, row: usize, column: usize) -> Result<bool> {\n"
-        "    let source_built = !self.package.source_is_exact(); if source_built || matches!(error, WrongFormatFamily) { reset_cell_number_format(); }\n"
-        "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
-        "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
-        "    let position = CellPosition::try_from_usize(row, column)?;\n"
-        "    unsupported; ambiguous; package.edit_table_cell_number_format(sheet, table, position).clear().commit()\n"
-        "}\n"
+        "fn generic_number_format_route() {\n"
+        "    cell_number_format(); set_cell_number_format(); reset_cell_number_format();\n"
         "}\n",
         encoding="utf-8",
     )
@@ -15439,6 +15439,10 @@ class BoundaryPolicyTests(unittest.TestCase):
     def test_keynote_movie_caption_audits_are_in_main_dispatch(self) -> None:
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
+            "+ audit_iwa_keynote_movie_title_caption_retirement_source_topology()",
+            main_source,
+        )
+        self.assertIn(
             "+ audit_iwa_keynote_movie_caption_source_topology()", main_source
         )
         self.assertIn(
@@ -15673,6 +15677,104 @@ fn rewrite_movie_caption_operation(
                 encoding="utf-8",
             )
             self.assertEqual(boundaries.audit_iwa_keynote_movie_title_source_topology(root), [])
+
+    def test_retired_iwa_keynote_movie_title_caption_surface_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            retired = root / boundaries.RETIRED_IWA_KEYNOTE_MOVIE_TITLE_CAPTION_SOURCE
+            retired.parent.mkdir(parents=True)
+            retired.write_text("// retired movie title/caption shell\n", encoding="utf-8")
+
+            module = root / boundaries.RETIRED_IWA_KEYNOTE_MOVIE_TITLE_CAPTION_MODULE_SOURCE
+            module.parent.mkdir(parents=True, exist_ok=True)
+            module.write_text("pub(crate) mod r#caption;\n", encoding="utf-8")
+
+            wrappers = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "legacy/movie.rs"
+            wrappers.parent.mkdir(parents=True, exist_ok=True)
+            wrappers.write_text(
+                "\n".join(
+                    f"fn {name}() {{}}"
+                    for name in boundaries.RETIRED_IWA_KEYNOTE_MOVIE_TITLE_CAPTION_METHODS
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_keynote_movie_title_caption_retirement_source_topology(
+                root
+            )
+            self.assertIn(
+                "retired litchi-iwa Keynote movie title/caption source returned: "
+                "crates/litchi-iwa/src/keynote/editor/slide_movies/caption.rs",
+                violations,
+            )
+            self.assertIn(
+                "retired litchi-iwa Keynote movie title/caption module caption: "
+                "crates/litchi-iwa/src/keynote/editor/slide_movies.rs:1",
+                violations,
+            )
+            for name in boundaries.RETIRED_IWA_KEYNOTE_MOVIE_TITLE_CAPTION_METHODS:
+                self.assertTrue(
+                    any(
+                        f"host wrapper/helper {name}: " in violation
+                        for violation in violations
+                    ),
+                    name,
+                )
+
+    def test_retired_iwa_keynote_movie_title_caption_module_variants(self) -> None:
+        for declaration in (
+            "mod caption;",
+            "pub(crate) mod caption;",
+            "pub(super) mod r#caption {}",
+            "pub(in crate::keynote)\nmod\nr#caption\n{}",
+            "pub mod caption { pub struct Legacy; }",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    module = root / boundaries.RETIRED_IWA_KEYNOTE_MOVIE_TITLE_CAPTION_MODULE_SOURCE
+                    module.parent.mkdir(parents=True)
+                    module.write_text(declaration + "\n", encoding="utf-8")
+
+                    self.assertEqual(
+                        boundaries.audit_iwa_keynote_movie_title_caption_retirement_source_topology(
+                            root
+                        ),
+                        [
+                            "retired litchi-iwa Keynote movie title/caption module caption: "
+                            "crates/litchi-iwa/src/keynote/editor/slide_movies.rs:1"
+                        ],
+                    )
+
+    def test_retired_iwa_keynote_movie_title_caption_surface_ignores_non_code_and_near_names(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            module = root / boundaries.RETIRED_IWA_KEYNOTE_MOVIE_TITLE_CAPTION_MODULE_SOURCE
+            module.parent.mkdir(parents=True)
+            module.write_text(
+                "// mod caption;\n"
+                'const NOTE: &str = "mod caption;";\n'
+                "pub(crate) mod caption_snapshot;\n",
+                encoding="utf-8",
+            )
+            source = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "legacy/movie.rs"
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text(
+                "// fn set_slide_movie_title_by_selector() {}\n"
+                'const NOTE: &str = "fn remove_slide_movie_caption_by_selector() {}";\n'
+                "fn set_slide_movie_title_by_selectors() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_movie_title_caption_retirement_source_topology(
+                    root
+                ),
+                [],
+            )
 
     def test_keynote_movie_title_codec_and_lifecycle_require_dual_edge_and_budget(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -34422,93 +34524,82 @@ fn rewrite_movie_title_operation(
                 violations,
             )
 
-    def test_numbers_table_cell_number_format_host_is_deprecated_focused_and_fallback_gated(
+    def test_numbers_table_cell_number_format_host_rejects_retired_raw_id_methods(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             add_numbers_table_cell_number_format_canonical_scaffold(root)
+            host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_SOURCE[0]
+            host.write_text(
+                "fn generic_number_format_route() {\n"
+                "    cell_number_format(); set_cell_number_format(); reset_cell_number_format();\n"
+                "}\n",
+                encoding="utf-8",
+            )
             self.assertEqual(
                 boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
                     root
                 ),
                 [],
             )
-            (root / boundaries.NUMBERS_TABLE_CELL_NUMBER_FORMAT_EXAMPLE).unlink()
-            violations = boundaries.audit_numbers_table_cell_number_format_facade_source_topology(
+
+            host.write_text(
+                "impl NumbersEditor {\n"
+                + "".join(
+                    f"pub fn {method}(&self) {{}}\n"
+                    for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_METHODS
+                )
+                + "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
                 root
             )
-            self.assertTrue(any("missing example" in item for item in violations), violations)
-            host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_SOURCE[0]
-            complete = host.read_text(encoding="utf-8")
+            for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_METHODS:
+                self.assertTrue(
+                    any(f"raw-ID method returned {method}" in item for item in violations),
+                    violations,
+                )
+
             host.write_text(
-                complete.replace(
-                    "#[deprecated(note = \"legacy compatibility shell\")]\n",
-                    "",
-                    1,
+                "// table_cell_number_format(); is only a comment\n"
+                'const DECOY: &str = "set_table_cell_number_format(";\n'
+                "#[cfg(test)]\n"
+                "fn test_decoy() { editor.reset_table_cell_number_format(); }\n"
+                "fn generic_number_format_route() {\n"
+                "    cell_number_format(); set_cell_number_format(); reset_cell_number_format();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
+                    root
                 ),
-                encoding="utf-8",
+                [],
             )
-            violations = boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
-                root
-            )
-            self.assertTrue(any("must remain deprecated table_cell_number_format" in item for item in violations), violations)
 
             host.write_text(
-                complete
-                + "fn production_number_route() { cell_number_format(); }\n"
-                + "fn old_caller(editor: &NumbersEditor) { editor.set_table_cell_number_format(); }\n"
-                + "fn old_read_caller(editor: &NumbersEditor) { editor.table_cell_number_format(); }\n",
+                "fn production_number_route(editor: &NumbersEditor) {\n"
+                "    editor.table_cell_number_format();\n"
+                "    editor.set_table_cell_number_format();\n"
+                "    editor.reset_table_cell_number_format();\n"
+                "    cell_number_format(); set_cell_number_format(); reset_cell_number_format();\n"
+                "}\n",
                 encoding="utf-8",
             )
             violations = boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
                 root
             )
-            self.assertTrue(any("production call set_table_cell_number_format" in item for item in violations), violations)
-            self.assertTrue(any("production call table_cell_number_format" in item for item in violations), violations)
-            self.assertFalse(any("helper call cell_number_format" in item for item in violations), violations)
-
-            host.write_text(
-                complete.replace("source_is_exact", "source_was_exact"),
-                encoding="utf-8",
-            )
-            violations = boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
-                root
-            )
-            self.assertTrue(
-                any("missing exact-source provenance gate" in item for item in violations),
+            for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_METHODS:
+                self.assertTrue(
+                    any(f"production call {method}" in item for item in violations),
+                    violations,
+                )
+            self.assertFalse(
+                any("production call cell_number_format" in item for item in violations),
                 violations,
             )
-
-            host.write_text(
-                complete.replace("WrongFormatFamily", "AnyFormatFamily"),
-                encoding="utf-8",
-            )
-            violations = boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
-                root
-            )
-            self.assertTrue(
-                any("missing the narrow family-replacement exception" in item for item in violations),
-                violations,
-            )
-
-            host.write_text(
-                complete.replace("package.table_cell_number_format", "self.table_cell_number_format"),
-                encoding="utf-8",
-            )
-            violations = boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
-                root
-            )
-            self.assertTrue(any("must delegate to focused Package" in item for item in violations), violations)
-
-            host.write_text(
-                complete.replace("FocusedNumbersPackage", "LegacyPackage"),
-                encoding="utf-8",
-            )
-            violations = boundaries.audit_iwa_numbers_table_cell_number_format_source_topology(
-                root
-            )
-            self.assertTrue(any("must delegate to focused Package" in item for item in violations), violations)
 
     def test_numbers_table_cell_number_format_owner_gate_masks_test_decoys(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -34619,6 +34710,75 @@ fn rewrite_movie_title_operation(
 
         self.assertEqual(result, 0)
         self.assertEqual(focused_calls, list(focused_names))
+
+    def test_iwa_table_cell_borders_boundary_accepts_common_owner_and_compatibility_reexport(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_table_cell_borders_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_table_cell_borders_source_topology(root), []
+            )
+
+    def test_iwa_table_cell_borders_boundary_rejects_duplicate_and_legacy_owners(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_table_cell_borders_scaffold(root)
+
+            compatibility = root / boundaries.IWA_TABLE_CELL_BORDERS_COMPAT_SOURCE
+            compatibility.write_text(
+                compatibility.read_text(encoding="utf-8")
+                + "pub struct Borders;\n",
+                encoding="utf-8",
+            )
+            legacy = root / boundaries.IWA_TABLE_CELL_BORDERS_HOST_IMPORT_SOURCES[0]
+            legacy.write_text(
+                "use crate::numbers::editor::table::cell::Borders;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_table_cell_borders_source_topology(root)
+
+            self.assertTrue(
+                any("duplicate model" in item for item in violations), violations
+            )
+            self.assertTrue(
+                any("old Numbers owner path" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("must import the common owner" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_table_cell_borders_boundary_requires_deprecated_compatibility_reexport(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_table_cell_borders_scaffold(root)
+            compatibility = root / boundaries.IWA_TABLE_CELL_BORDERS_COMPAT_SOURCE
+            compatibility.write_text(
+                "pub use litchi_iwa_common::table::cell::Borders;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_table_cell_borders_source_topology(root)
+
+            self.assertTrue(
+                any("deprecated common re-export" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_table_cell_borders_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_table_cell_borders_source_topology()",
+            main_source,
+        )
 
 
 if __name__ == "__main__":

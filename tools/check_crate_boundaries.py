@@ -1603,6 +1603,29 @@ IWA_KEYNOTE_MOVIE_TITLE_GRAPH_HELPERS = frozenset(
         "next_object_identifier",
     }
 )
+RETIRED_IWA_KEYNOTE_MOVIE_TITLE_CAPTION_SOURCE = IWA_KEYNOTE_MOVIE_TITLE_SOURCE
+RETIRED_IWA_KEYNOTE_MOVIE_TITLE_CAPTION_MODULE_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_movies.rs"
+)
+RETIRED_IWA_KEYNOTE_MOVIE_TITLE_CAPTION_METHODS = frozenset(
+    IWA_KEYNOTE_MOVIE_TITLE_TYPED_METHODS
+    | IWA_KEYNOTE_MOVIE_CAPTION_TYPED_METHODS
+    | IWA_KEYNOTE_MOVIE_TITLE_LEGACY_METHODS
+    | IWA_KEYNOTE_MOVIE_CAPTION_LEGACY_METHODS
+    | {
+        "focused_movie_caption_package",
+        "replace_from_focused_movie_caption_commit",
+        "map_focused_movie_caption_error",
+        "focused_movie_title_package",
+        "replace_from_focused_movie_title_commit",
+        "map_focused_movie_title_error",
+    }
+)
+RETIRED_IWA_KEYNOTE_MOVIE_TITLE_CAPTION_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?caption\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
 IWA_KEYNOTE_MOVIE_TITLE_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_KEYNOTE_MOVIE_TITLE_CODEC_CALL = re.compile(
     r"(?<![A-Za-z0-9_#])(?:r#)?(?:litchi_iwa_protos[ \t\r\n]*::[ \t\r\n]*)?"
@@ -6855,10 +6878,10 @@ NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_PUBLIC_GENERATED_MODULE = re.compile(
     rf"{re.escape(NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_GENERATED_MODULE)}\b"
 )
 
-# The migration host keeps these raw-ID methods as deprecated source-
-# compatibility shells. They must route through the focused owner first.
-# Existing generic DataFormat helpers, tests, and examples remain valid
-# compatibility coverage until the broader DataFormat migration owns them.
+# The migration host has retired these raw-ID methods. Keep their spellings
+# in one inventory so declarations and production calls cannot drift back in.
+# The generic DataFormat helper spellings below remain valid compatibility
+# coverage for the Pages/Keynote hosts and are intentionally not retired here.
 RETIRED_IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_METHODS = (
     "table_cell_number_format",
     "set_table_cell_number_format",
@@ -21681,13 +21704,11 @@ def audit_numbers_table_cell_number_format_facade_source_topology(
 def audit_iwa_numbers_table_cell_number_format_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Keep raw-ID Number-format methods deprecated and focused-owner first.
+    """Keep retired raw-ID Number-format methods out of the migration host.
 
-    The legacy generic DataFormat implementation is intentionally retained:
-    source-built documents still depend on it, and the historical setter may
-    replace an explicit non-Number family. Exact native sources must gate any
-    structural fallback by provenance so focused admission failures cannot
-    silently enter the permissive compatibility codec.
+    Generic DataFormat helpers remain valid compatibility vocabulary. Only
+    the three editor-facing raw-ID methods are forbidden after the focused
+    Number-format owner cutover.
     """
 
     if not _numbers_table_cell_number_format_owner_present(root):
@@ -21696,6 +21717,44 @@ def audit_iwa_numbers_table_cell_number_format_source_topology(
     violations: list[str] = []
     source_root = root / IWA_NUMBERS_SOURCE_ROOT
     source_paths = sorted(source_root.rglob("*.rs")) if source_root.is_dir() else []
+
+    # Ratchet both declarations and executable production calls. Test-only
+    # fixtures are deliberately out of scope; comments and string literals
+    # are masked before scanning so they cannot trip the production check.
+    for path in source_paths:
+        relative = path.relative_to(source_root)
+        if path.name == "tests.rs" or "tests" in relative.parts:
+            production = ""
+        else:
+            production = _mask_rust_cfg_test_items(
+                path.read_text(encoding="utf-8")
+            )
+        for name, line_number in _rust_function_declarations(production):
+            if name in RETIRED_IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_METHOD_SET:
+                violations.append(
+                    "retired litchi-iwa Numbers Number-format raw-ID method "
+                    f"returned {name}: {path.relative_to(root)}:{line_number}"
+                )
+        code = _mask_rust_non_code(production)
+        for match in IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_LEGACY_CALL.finditer(
+            code
+        ):
+            line_start = code.rfind("\n", 0, match.start()) + 1
+            line_end = code.find("\n", match.end())
+            if line_end < 0:
+                line_end = len(code)
+            line = code[line_start:line_end]
+            if re.search(
+                rf"\bfn\s+(?:r#)?{re.escape(match.group('method'))}\b",
+                line,
+            ):
+                continue
+            line_number = code.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "retired litchi-iwa Numbers Number-format raw-ID production call "
+                f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+            )
+
     production_sources: dict[Path, str] = {}
     function_records: dict[str, list[tuple[Path, str, int, int, int]]] = {}
 
@@ -40961,6 +41020,44 @@ def audit_keynote_movie_title_facade_source_topology(
     return sorted(set(violations))
 
 
+def audit_iwa_keynote_movie_title_caption_retirement_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the retired Keynote movie title/caption host shell deleted."""
+
+    violations: list[str] = []
+    retired_source = root / RETIRED_IWA_KEYNOTE_MOVIE_TITLE_CAPTION_SOURCE
+    if retired_source.exists():
+        violations.append(
+            "retired litchi-iwa Keynote movie title/caption source returned: "
+            f"{RETIRED_IWA_KEYNOTE_MOVIE_TITLE_CAPTION_SOURCE}"
+        )
+
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            source = path.read_text(encoding="utf-8")
+            for name, line_number in _rust_function_declarations(source):
+                if name not in RETIRED_IWA_KEYNOTE_MOVIE_TITLE_CAPTION_METHODS:
+                    continue
+                violations.append(
+                    "retired litchi-iwa Keynote movie title/caption host "
+                    f"wrapper/helper {name}: {path.relative_to(root)}:{line_number}"
+                )
+
+    module_path = root / RETIRED_IWA_KEYNOTE_MOVIE_TITLE_CAPTION_MODULE_SOURCE
+    if module_path.is_file():
+        source = _mask_rust_non_code(module_path.read_text(encoding="utf-8"))
+        for match in RETIRED_IWA_KEYNOTE_MOVIE_TITLE_CAPTION_MODULE.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote movie title/caption module caption: "
+                f"{RETIRED_IWA_KEYNOTE_MOVIE_TITLE_CAPTION_MODULE_SOURCE}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
 def audit_iwa_keynote_movie_title_source_topology(root: Path = ROOT) -> list[str]:
     """Require a typed movie-title bridge and retire its raw graph host."""
 
@@ -48498,6 +48595,109 @@ def audit_manifest_inventory(snapshot: Snapshot) -> list[str]:
     return violations
 
 
+IWA_TABLE_CELL_BORDERS_COMMON_SOURCE = Path(
+    "crates/litchi-iwa-common/src/table/cell.rs"
+)
+IWA_TABLE_CELL_BORDERS_COMPAT_SOURCE = Path(
+    "crates/litchi-iwa/src/numbers/editor.rs"
+)
+IWA_TABLE_CELL_BORDERS_HOST_IMPORT_SOURCES = (
+    Path("crates/litchi-iwa/src/numbers/editor/package.rs"),
+    Path("crates/litchi-iwa/src/numbers/editor/stroke_layers.rs"),
+    Path("crates/litchi-iwa/src/numbers/editor/semantic/table.rs"),
+    Path("crates/litchi-iwa/src/keynote/editor/slide_tables.rs"),
+    Path("crates/litchi-iwa/src/pages/editor/tables/mod.rs"),
+)
+IWA_TABLE_CELL_BORDERS_LEGACY_PATH = re.compile(
+    r"\b(?:crate::numbers::editor::table::cell|super::table::cell)::Borders\b"
+)
+IWA_TABLE_CELL_BORDERS_COMMON_IMPORT = re.compile(
+    r"\b(?:pub[ \t]+)?use[ \t]+litchi_iwa_common::table::cell::"
+    r"(?:Borders\b|\{[^;\n]*\bBorders\b)"
+)
+
+
+def audit_iwa_table_cell_borders_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep the cell-border value in common and the old path compatibility-only."""
+
+    violations: list[str] = []
+
+    common_path = root / IWA_TABLE_CELL_BORDERS_COMMON_SOURCE
+    if not common_path.is_file():
+        violations.append(
+            "common table-cell Borders owner is missing: "
+            f"{IWA_TABLE_CELL_BORDERS_COMMON_SOURCE}"
+        )
+    else:
+        common_source = _mask_rust_non_code(common_path.read_text(encoding="utf-8"))
+        if re.search(r"\bpub[ \t]+struct[ \t]+Borders\b", common_source) is None:
+            violations.append(
+                "common table-cell Borders owner is missing its canonical struct: "
+                f"{IWA_TABLE_CELL_BORDERS_COMMON_SOURCE}"
+            )
+
+    compatibility_path = root / IWA_TABLE_CELL_BORDERS_COMPAT_SOURCE
+    if not compatibility_path.is_file():
+        violations.append(
+            "Numbers table-cell Borders compatibility source is missing: "
+            f"{IWA_TABLE_CELL_BORDERS_COMPAT_SOURCE}"
+        )
+    else:
+        compatibility_source = compatibility_path.read_text(encoding="utf-8")
+        compatibility_code = _mask_rust_non_code(compatibility_source)
+        if re.search(r"\bpub[ \t]+struct[ \t]+Borders\b", compatibility_code):
+            violations.append(
+                "Numbers table-cell Borders compatibility source defines a duplicate model: "
+                f"{IWA_TABLE_CELL_BORDERS_COMPAT_SOURCE}"
+            )
+        if re.search(
+            r"(?s)#\s*\[\s*deprecated\b.*?\]\s*"
+            r"pub[ \t]+use[ \t]+litchi_iwa_common::table::cell::Borders\s*;",
+            compatibility_code,
+        ) is None:
+            violations.append(
+                "Numbers table-cell Borders compatibility source must retain a deprecated "
+                "common re-export: "
+                f"{IWA_TABLE_CELL_BORDERS_COMPAT_SOURCE}"
+            )
+
+    if compatibility_path.is_file():
+        compatibility_source = _mask_rust_non_code(
+            compatibility_path.read_text(encoding="utf-8")
+        )
+        if IWA_TABLE_CELL_BORDERS_LEGACY_PATH.search(compatibility_source):
+            violations.append(
+                "Numbers table-cell Borders compatibility source must not import its old "
+                f"owner path: {IWA_TABLE_CELL_BORDERS_COMPAT_SOURCE}"
+            )
+
+    for relative in IWA_TABLE_CELL_BORDERS_HOST_IMPORT_SOURCES:
+        path = root / relative
+        if not path.is_file():
+            violations.append(
+                "table-cell Borders host import source is missing: " f"{relative}"
+            )
+            continue
+        source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+        if IWA_TABLE_CELL_BORDERS_COMMON_IMPORT.search(source) is None:
+            violations.append(
+                "table-cell Borders host must import the common owner: " f"{relative}"
+            )
+
+    host_root = root / IWA_CORE_SOURCE_ROOT
+    if host_root.is_dir():
+        for path in sorted(host_root.rglob("*.rs")):
+            source = _mask_rust_non_code(path.read_text(encoding="utf-8"))
+            for match in IWA_TABLE_CELL_BORDERS_LEGACY_PATH.finditer(source):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "litchi-iwa table-cell Borders use retains the old Numbers owner path: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+
+    return sorted(set(violations))
+
+
 def audit_xlsb_source_topology(root: Path = ROOT) -> list[str]:
     """Reject retired XLSX implementation paths from the XLSB crate."""
 
@@ -48786,6 +48986,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_keynote_chart_axis_value_settings_facade_source_topology()
         + audit_keynote_chart_axis_value_settings_resource_source_topology()
         + audit_keynote_chart_axis_value_settings_completion_source_topology()
+        + audit_iwa_keynote_movie_title_caption_retirement_source_topology()
         + audit_keynote_movie_title_legacy_calls()
         + audit_iwa_keynote_movie_title_source_topology()
         + audit_keynote_movie_title_facade_source_topology()
@@ -48935,6 +49136,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_pages_section_settings_facade_source_topology()
         + audit_iwa_pages_section_background_source_topology()
         + audit_pages_section_background_facade_source_topology()
+        + audit_iwa_table_cell_borders_source_topology()
         + audit_xlsb_source_topology()
         + audit_spreadsheet_sheet_view_source_topology()
         + audit_spreadsheet_chart_source_topology()

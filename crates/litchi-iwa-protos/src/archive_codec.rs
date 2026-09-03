@@ -4,7 +4,88 @@ use std::fmt;
 
 use buffa::{DecodeOptions as BuffaDecodeOptions, Enumeration as _, Message as _};
 
-use crate::{buffa_generated::TSP as buffa_tsp, tsp};
+use crate::buffa_generated::TSP as buffa_tsp;
+
+/// Owned, schema-neutral representation of one `TSP.FieldPath`.
+///
+/// This DTO contains only fields understood by this codec. Unknown wire
+/// fields remain authoritative in the caller-owned source bytes and are not
+/// reconstructed from this projection after a semantic edit.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FieldPath {
+    /// Ordered payload field numbers.
+    pub path: Vec<u32>,
+}
+
+/// Owned, schema-neutral representation of one `TSP.FieldInfo`.
+///
+/// Closed-enum values remain raw `i32`s so a future value is not coerced to a
+/// known default. Unknown wire fields remain authoritative in the source
+/// bytes supplied to the codec.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FieldInfo {
+    /// Required field path.
+    pub path: FieldPath,
+    /// Raw `TSP.FieldInfo.Type` value, when present.
+    pub r#type: Option<i32>,
+    /// Raw `TSP.FieldInfo.UnknownFieldRule` value, when present.
+    pub unknown_field_rule: Option<i32>,
+    /// Aggregate object references attached to this field.
+    pub object_references: Vec<u64>,
+    /// Aggregate data references attached to this field.
+    pub data_references: Vec<u64>,
+    /// Raw `TSP.FieldInfo.KnownFieldRule` value, when present.
+    pub known_field_rule: Option<i32>,
+    /// Versions associated with the known field.
+    pub known_field_version: Vec<u32>,
+    /// Optional feature identifier associated with the known field.
+    pub known_field_feature_identifier: Option<String>,
+}
+
+/// Owned, schema-neutral representation of one `TSP.MessageInfo`.
+///
+/// Required-field presence is validated before publication. Unknown wire
+/// fields remain authoritative in the source bytes supplied to the codec.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MessageInfo {
+    /// Message type identifier.
+    pub r#type: u32,
+    /// Message version tuple.
+    pub version: Vec<u32>,
+    /// Encoded payload length.
+    pub length: u32,
+    /// Field-level compatibility metadata.
+    pub field_infos: Vec<FieldInfo>,
+    /// Object identifiers referenced by this message.
+    pub object_references: Vec<u64>,
+    /// Data identifiers referenced by this message.
+    pub data_references: Vec<u64>,
+    /// Optional base message index for a diff message.
+    pub base_message_index: Option<u32>,
+    /// Diff merge versions.
+    pub diff_merge_version: Vec<u32>,
+    /// Optional diff field path.
+    pub diff_field_path: Option<FieldPath>,
+    /// Paths removed by this diff message.
+    pub fields_to_remove: Vec<FieldPath>,
+    /// Diff read versions.
+    pub diff_read_version: Vec<u32>,
+}
+
+/// Owned, schema-neutral representation of one `TSP.ArchiveInfo`.
+///
+/// Unknown wire fields remain authoritative in the source bytes supplied to
+/// the codec. Callers that rewrite a header must explicitly authorize which
+/// known fields change and retain the original bytes for everything else.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ArchiveInfo {
+    /// Archive object identifier, when present.
+    pub identifier: Option<u64>,
+    /// Metadata for each payload immediately following this header.
+    pub message_infos: Vec<MessageInfo>,
+    /// Whether this archive should be merged with an existing object.
+    pub should_merge: Option<bool>,
+}
 
 /// Finite limits already established by the physical archive owner before a
 /// lazy header decode begins.
@@ -54,7 +135,7 @@ enum DecodeErrorKind {
     Wire(buffa::DecodeError),
     /// A required proto2 field was absent.
     MissingRequired(&'static str),
-    /// A compatibility projection allocation failed.
+    /// A neutral projection allocation failed.
     Allocation {
         resource: &'static str,
         requested: usize,
@@ -135,12 +216,12 @@ impl From<buffa::EncodeError> for EncodeError {
 }
 
 /// Decode one already-preflighted `TSP.ArchiveInfo` through Buffa's lazy
-/// view, validating every deferred child before returning an owned
-/// compatibility value.
+/// view, validating every deferred child before returning an owned neutral
+/// value.
 pub fn decode_archive_info(
     source: &[u8],
     options: DecodeOptions,
-) -> Result<tsp::ArchiveInfo, DecodeError> {
+) -> Result<ArchiveInfo, DecodeError> {
     let recursion_limit = options.recursion_limit;
     let view: buffa_tsp::ArchiveInfoLazyView<'_> = options.buffa().decode_lazy_view(source)?;
     archive_info_from_lazy(&view, recursion_limit)
@@ -151,23 +232,23 @@ pub fn decode_archive_info(
 pub fn decode_message_info(
     source: &[u8],
     options: DecodeOptions,
-) -> Result<tsp::MessageInfo, DecodeError> {
+) -> Result<MessageInfo, DecodeError> {
     let recursion_limit = options.recursion_limit;
     let view: buffa_tsp::MessageInfoLazyView<'_> = options.buffa().decode_lazy_view(source)?;
     message_info_from_lazy(&view, recursion_limit)
 }
 
-/// Return the Buffa canonical encoded length for a compatibility value.
-pub fn archive_info_encoded_len(info: &tsp::ArchiveInfo) -> Result<u32, EncodeError> {
+/// Return the Buffa canonical encoded length for a neutral value.
+pub fn archive_info_encoded_len(info: &ArchiveInfo) -> Result<u32, EncodeError> {
     archive_info_to_buffa(info)
         .try_encoded_len()
         .map_err(Into::into)
 }
 
-/// Encode one compatibility value canonically into a caller-owned,
+/// Encode one neutral value canonically into a caller-owned,
 /// pre-reserved buffer under an exact byte ceiling.
 pub fn encode_archive_info(
-    info: &tsp::ArchiveInfo,
+    info: &ArchiveInfo,
     maximum: u32,
     output: &mut Vec<u8>,
 ) -> Result<u32, EncodeError> {
@@ -179,7 +260,7 @@ pub fn encode_archive_info(
 fn archive_info_from_lazy(
     view: &buffa_tsp::ArchiveInfoLazyView<'_>,
     recursion_limit: u32,
-) -> Result<tsp::ArchiveInfo, DecodeError> {
+) -> Result<ArchiveInfo, DecodeError> {
     let mut message_infos = Vec::new();
     reserve_exact(
         &mut message_infos,
@@ -189,7 +270,7 @@ fn archive_info_from_lazy(
     for item in &view.message_infos {
         message_infos.push(message_info_from_lazy(&item?, recursion_limit)?);
     }
-    Ok(tsp::ArchiveInfo {
+    Ok(ArchiveInfo {
         identifier: view.identifier,
         message_infos,
         should_merge: view.should_merge,
@@ -199,7 +280,7 @@ fn archive_info_from_lazy(
 fn message_info_from_lazy(
     view: &buffa_tsp::MessageInfoLazyView<'_>,
     recursion_limit: u32,
-) -> Result<tsp::MessageInfo, DecodeError> {
+) -> Result<MessageInfo, DecodeError> {
     if !view.has_type() {
         return Err(DecodeError::missing_required_field("TSP.MessageInfo.type"));
     }
@@ -235,7 +316,7 @@ fn message_info_from_lazy(
         fields_to_remove.push(field_path_from_lazy(&item?)?);
     }
 
-    Ok(tsp::MessageInfo {
+    Ok(MessageInfo {
         r#type: view.r#type,
         version: copy_slice(&view.version, "MessageInfo versions")?,
         length: view.length,
@@ -262,7 +343,7 @@ fn field_info_from_lazy(
     view: &buffa_tsp::FieldInfoLazyView<'_>,
     source: &[u8],
     recursion_limit: u32,
-) -> Result<tsp::FieldInfo, DecodeError> {
+) -> Result<FieldInfo, DecodeError> {
     if !view.has_path() {
         return Err(DecodeError::missing_required_field("TSP.FieldInfo.path"));
     }
@@ -278,7 +359,7 @@ fn field_info_from_lazy(
         .map(|value| copy_string(value, "FieldInfo feature identifier"))
         .transpose()?;
 
-    Ok(tsp::FieldInfo {
+    Ok(FieldInfo {
         path,
         r#type: last_int32_field(source, 2, recursion_limit)?,
         unknown_field_rule: last_int32_field(source, 3, recursion_limit)?,
@@ -293,10 +374,8 @@ fn field_info_from_lazy(
     })
 }
 
-fn field_path_from_lazy(
-    view: &buffa_tsp::FieldPathLazyView<'_>,
-) -> Result<tsp::FieldPath, DecodeError> {
-    Ok(tsp::FieldPath {
+fn field_path_from_lazy(view: &buffa_tsp::FieldPathLazyView<'_>) -> Result<FieldPath, DecodeError> {
+    Ok(FieldPath {
         path: copy_slice(&view.path, "FieldPath components")?,
     })
 }
@@ -345,7 +424,7 @@ fn reserve_exact<T>(
         .map_err(|_allocation_error| DecodeError::allocation(resource, requested))
 }
 
-fn archive_info_to_buffa(value: &tsp::ArchiveInfo) -> buffa_tsp::ArchiveInfo {
+fn archive_info_to_buffa(value: &ArchiveInfo) -> buffa_tsp::ArchiveInfo {
     buffa_tsp::ArchiveInfo {
         identifier: value.identifier,
         message_infos: value
@@ -358,7 +437,7 @@ fn archive_info_to_buffa(value: &tsp::ArchiveInfo) -> buffa_tsp::ArchiveInfo {
     }
 }
 
-fn message_info_to_buffa(value: &tsp::MessageInfo) -> buffa_tsp::MessageInfo {
+fn message_info_to_buffa(value: &MessageInfo) -> buffa_tsp::MessageInfo {
     buffa_tsp::MessageInfo {
         r#type: value.r#type,
         version: value.version.clone(),
@@ -383,7 +462,7 @@ fn message_info_to_buffa(value: &tsp::MessageInfo) -> buffa_tsp::MessageInfo {
     }
 }
 
-fn field_info_to_buffa(value: &tsp::FieldInfo) -> buffa_tsp::FieldInfo {
+fn field_info_to_buffa(value: &FieldInfo) -> buffa_tsp::FieldInfo {
     let mut output = buffa_tsp::FieldInfo {
         path: buffa::MessageField::some(field_path_to_buffa(&value.path)),
         r#type: value.r#type.and_then(buffa_tsp::field_info::Type::from_i32),
@@ -436,7 +515,7 @@ fn preserve_unknown_enum<E>(
     }
 }
 
-fn field_path_to_buffa(value: &tsp::FieldPath) -> buffa_tsp::FieldPath {
+fn field_path_to_buffa(value: &FieldPath) -> buffa_tsp::FieldPath {
     buffa_tsp::FieldPath {
         path: value.path.clone(),
         ..Default::default()
@@ -447,7 +526,10 @@ fn field_path_to_buffa(value: &tsp::FieldPath) -> buffa_tsp::FieldPath {
 mod tests {
     use prost::Message as _;
 
-    use super::{DecodeOptions, decode_archive_info, decode_message_info, encode_archive_info};
+    use super::{
+        ArchiveInfo, DecodeOptions, FieldInfo, FieldPath, MessageInfo, decode_archive_info,
+        decode_message_info, encode_archive_info,
+    };
     use crate::{production_codec_guard::production_codec_source, tsp};
 
     fn options(length: usize) -> DecodeOptions {
@@ -464,6 +546,59 @@ mod tests {
         match u8::try_from(length) {
             Ok(byte_length) => byte_length,
             Err(error) => panic!("test payload must fit one-byte length: {error}"),
+        }
+    }
+
+    fn neutral_field_path(value: tsp::FieldPath) -> FieldPath {
+        FieldPath { path: value.path }
+    }
+
+    fn neutral_field_info(value: tsp::FieldInfo) -> FieldInfo {
+        FieldInfo {
+            path: neutral_field_path(value.path),
+            r#type: value.r#type,
+            unknown_field_rule: value.unknown_field_rule,
+            object_references: value.object_references,
+            data_references: value.data_references,
+            known_field_rule: value.known_field_rule,
+            known_field_version: value.known_field_version,
+            known_field_feature_identifier: value.known_field_feature_identifier,
+        }
+    }
+
+    fn neutral_message_info(value: tsp::MessageInfo) -> MessageInfo {
+        MessageInfo {
+            r#type: value.r#type,
+            version: value.version,
+            length: value.length,
+            field_infos: value
+                .field_infos
+                .into_iter()
+                .map(neutral_field_info)
+                .collect(),
+            object_references: value.object_references,
+            data_references: value.data_references,
+            base_message_index: value.base_message_index,
+            diff_merge_version: value.diff_merge_version,
+            diff_field_path: value.diff_field_path.map(neutral_field_path),
+            fields_to_remove: value
+                .fields_to_remove
+                .into_iter()
+                .map(neutral_field_path)
+                .collect(),
+            diff_read_version: value.diff_read_version,
+        }
+    }
+
+    fn neutral_archive_info(value: tsp::ArchiveInfo) -> ArchiveInfo {
+        ArchiveInfo {
+            identifier: value.identifier,
+            message_infos: value
+                .message_infos
+                .into_iter()
+                .map(neutral_message_info)
+                .collect(),
+            should_merge: value.should_merge,
         }
     }
 
@@ -503,19 +638,19 @@ mod tests {
 
     fn assert_message_info_parity(
         source: &[u8],
-    ) -> Result<tsp::MessageInfo, Box<dyn std::error::Error>> {
+    ) -> Result<MessageInfo, Box<dyn std::error::Error>> {
         let expected = tsp::MessageInfo::decode(source)?;
         let actual = decode_message_info(source, options(source.len()))?;
-        assert_eq!(actual, expected);
+        assert_eq!(actual, neutral_message_info(expected));
         Ok(actual)
     }
 
     fn assert_archive_info_parity(
         source: &[u8],
-    ) -> Result<tsp::ArchiveInfo, Box<dyn std::error::Error>> {
+    ) -> Result<ArchiveInfo, Box<dyn std::error::Error>> {
         let expected = tsp::ArchiveInfo::decode(source)?;
         let actual = decode_archive_info(source, options(source.len()))?;
-        assert_eq!(actual, expected);
+        assert_eq!(actual, neutral_archive_info(expected));
         Ok(actual)
     }
 
@@ -534,11 +669,11 @@ mod tests {
 
         assert_eq!(
             decode_message_info(&message, options(message.len()))?,
-            tsp::MessageInfo::decode(message.as_slice())?
+            neutral_message_info(tsp::MessageInfo::decode(message.as_slice())?)
         );
         assert_eq!(
             decode_archive_info(&archive, options(archive.len()))?,
-            tsp::ArchiveInfo::decode(archive.as_slice())?
+            neutral_archive_info(tsp::ArchiveInfo::decode(archive.as_slice())?)
         );
         Ok(())
     }
@@ -647,7 +782,7 @@ mod tests {
 
     #[test]
     fn buffa_canonical_encoding_matches_prost() -> Result<(), Box<dyn std::error::Error>> {
-        let info = tsp::ArchiveInfo {
+        let compatibility = tsp::ArchiveInfo {
             identifier: Some(42),
             message_infos: vec![tsp::MessageInfo {
                 r#type: 7,
@@ -667,7 +802,8 @@ mod tests {
             }],
             should_merge: Some(true),
         };
-        let expected = info.encode_to_vec();
+        let expected = compatibility.encode_to_vec();
+        let info = neutral_archive_info(compatibility);
         let mut actual = Vec::new();
         encode_archive_info(&info, u32::MAX, &mut actual)?;
         assert_eq!(actual, expected);
@@ -751,7 +887,7 @@ mod tests {
 
     #[test]
     fn bounded_encode_does_not_partially_write() {
-        let info = tsp::ArchiveInfo {
+        let info = ArchiveInfo {
             identifier: Some(42),
             message_infos: Vec::new(),
             should_merge: None,
@@ -808,7 +944,7 @@ mod tests {
             source.extend_from_slice(encoded_enum);
             assert_eq!(
                 decode_message_info(&source, options(source.len()))?,
-                tsp::MessageInfo::decode(source.as_slice())?
+                neutral_message_info(tsp::MessageInfo::decode(source.as_slice())?)
             );
         }
 
@@ -835,7 +971,7 @@ mod tests {
             }
             assert_eq!(
                 decode_message_info(&source, options(source.len()))?,
-                tsp::MessageInfo::decode(source.as_slice())?
+                neutral_message_info(tsp::MessageInfo::decode(source.as_slice())?)
             );
         }
         Ok(())

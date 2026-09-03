@@ -7395,6 +7395,23 @@ deletion gate closes. The current topology remains 64 workspace packages, 238
 internal dependency declarations, 227 canonical edges, 11 development-only
 edges, 11 ordered migration debts, and one migration host.
 
+## 2026-09-03 amendment: Numbers Number raw-ID convenience cutover
+
+The focused `litchi-numbers::Package` remains the canonical owner for
+existing-cell Number read/edit/apply transactions through semantic sheet and
+table selectors plus checked cell positions. The dedicated migration-host
+convenience methods
+`NumbersEditor::{table_cell_number_format,set_table_cell_number_format,reset_table_cell_number_format}`
+and their Number-specific focused bridge, fallback-policy, and host tests are
+removed. Existing generic source-built `DataFormat::Number` mutation and the
+shared attached-table helpers used by Pages and Keynote remain host-owned.
+
+This is a bounded API cutover: it does not claim generic display-format
+migration, broaden focused-owner native evidence, or remove the remaining
+Numbers host imports and wire compatibility paths. No package, dependency
+edge, ordered migration debt, migration host, or whole-monolith deletion gate
+closes; topology is unchanged.
+
 ## 2026-09-03 amendment: Pages table-model discovery uses a borrowed Buffa view
 
 Pages body-table discovery in the migration host now projects only the table
@@ -7413,3 +7430,24 @@ eager decode. No public API, package, dependency edge, ordered migration debt,
 host, or monolith-exit gate closes through this internal allocation and
 ownership improvement, and no new native Pages artifact is required because
 the emitted package bytes and mutation behavior are unchanged.
+
+## 2026-09-03 amendment: Keynote movie title/caption migration-host shell retirement
+
+The focused `litchi-keynote::Package` remains the canonical owner for Keynote
+slide movie title and caption read/edit/apply transactions through
+`SlideSelector` and `MovieSelector`. The migration host still owns the
+remaining slide-movie compatibility work, including discovery, media graph
+creation/removal, duplication, geometry, and playback. Its former
+`editor/slide_movies/caption.rs` shell, the six selector wrappers
+(`slide_movie_{title,caption}_by_selector`,
+`set_slide_movie_{title,caption}_by_selector`, and
+`remove_slide_movie_{title,caption}_by_selector`), focused conversion/error
+helpers, and `mod caption` wiring are deleted. The host example and tests now
+exercise the focused package owner directly.
+
+This is a bounded migration-host API cleanup, not deletion of the migration
+host. `litchi-iwa` remains the internal migration host and is intentionally
+unpublished (`publish = false`); no package, dependency edge, ordered migration
+debt, or monolith-exit gate closes through this shell retirement. The focused
+owner's existing strict graph, source-preserving, and reopen evidence is not
+broadened by the host cleanup.

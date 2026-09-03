@@ -496,6 +496,12 @@ fn absent_and_explicit_false_are_unlocked_noop_states() -> TestResult<()> {
         assert!(!commit.diagnostics().changed());
         assert_eq!(commit.diagnostics().touched_components(), 0);
         assert!(!commit.diagnostics().full_reparse_performed());
+        let applied = package.apply_body_table_lock(commit.patch())?;
+        assert_eq!(applied.package().exact_bytes(), source.as_slice());
+        assert!(applied.patch().is_noop());
+        assert!(!applied.diagnostics().changed());
+        assert_eq!(applied.diagnostics().touched_components(), 0);
+        assert!(!applied.diagnostics().full_reparse_performed());
         assert_eq!(
             lock_field(&table_info_payload(&commit.package().exact_bytes())?)?,
             locked

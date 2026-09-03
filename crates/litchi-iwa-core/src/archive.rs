@@ -37,7 +37,6 @@ use litchi_iwa_common::wire::{
 };
 use litchi_iwa_common::{Error as WireError, LimitKind as WireLimitKind, WireLimits};
 use litchi_iwa_protos::archive_codec;
-use litchi_iwa_protos::tsp;
 
 use crate::{Error, HeaderKind, HeaderOperation, LimitKind, Limits, Result};
 
@@ -475,7 +474,7 @@ impl ArchiveInfo {
                         error.to_string(),
                     )
                 })?;
-        let archive_info = archive_info_from_proto(decoded)?;
+        let archive_info = archive_info_from_codec(decoded)?;
         archive_info.validate_with_limits(limits)?;
         Ok(archive_info)
     }
@@ -595,7 +594,7 @@ impl MessageInfo {
                         error.to_string(),
                     )
                 })?;
-        let message_info = message_info_from_proto(decoded)?;
+        let message_info = message_info_from_codec(decoded)?;
         message_info.validate_with_limits(limits)?;
         Ok(message_info)
     }
@@ -6486,7 +6485,7 @@ fn restore_replaced_message(
     info.length = old_length;
 }
 
-fn archive_info_from_proto(value: tsp::ArchiveInfo) -> Result<ArchiveInfo> {
+fn archive_info_from_codec(value: archive_codec::ArchiveInfo) -> Result<ArchiveInfo> {
     let mut message_infos = Vec::new();
     message_infos
         .try_reserve_exact(value.message_infos.len())
@@ -6494,7 +6493,7 @@ fn archive_info_from_proto(value: tsp::ArchiveInfo) -> Result<ArchiveInfo> {
             Error::allocation("IWA neutral message metadata", value.message_infos.len())
         })?;
     for message_info in value.message_infos {
-        message_infos.push(message_info_from_proto(message_info)?);
+        message_infos.push(message_info_from_codec(message_info)?);
     }
     Ok(ArchiveInfo {
         identifier: value.identifier,
@@ -6503,7 +6502,7 @@ fn archive_info_from_proto(value: tsp::ArchiveInfo) -> Result<ArchiveInfo> {
     })
 }
 
-fn archive_info_to_proto(value: &ArchiveInfo) -> Result<tsp::ArchiveInfo> {
+fn archive_info_to_codec(value: &ArchiveInfo) -> Result<archive_codec::ArchiveInfo> {
     let mut message_infos = Vec::new();
     message_infos
         .try_reserve_exact(value.message_infos.len())
@@ -6514,22 +6513,22 @@ fn archive_info_to_proto(value: &ArchiveInfo) -> Result<tsp::ArchiveInfo> {
             )
         })?;
     for message_info in &value.message_infos {
-        message_infos.push(message_info_to_proto(message_info)?);
+        message_infos.push(message_info_to_codec(message_info)?);
     }
-    Ok(tsp::ArchiveInfo {
+    Ok(archive_codec::ArchiveInfo {
         identifier: value.identifier,
         message_infos,
         should_merge: value.should_merge,
     })
 }
 
-fn message_info_from_proto(value: tsp::MessageInfo) -> Result<MessageInfo> {
+fn message_info_from_codec(value: archive_codec::MessageInfo) -> Result<MessageInfo> {
     let mut field_infos = Vec::new();
     field_infos
         .try_reserve_exact(value.field_infos.len())
         .map_err(|_| Error::allocation("IWA neutral field metadata", value.field_infos.len()))?;
     for field_info in value.field_infos {
-        field_infos.push(field_info_from_proto(field_info));
+        field_infos.push(field_info_from_codec(field_info));
     }
 
     let mut fields_to_remove = Vec::new();
@@ -6542,7 +6541,7 @@ fn message_info_from_proto(value: tsp::MessageInfo) -> Result<MessageInfo> {
             )
         })?;
     for field_path in value.fields_to_remove {
-        fields_to_remove.push(field_path_from_proto(field_path));
+        fields_to_remove.push(field_path_from_codec(field_path));
     }
 
     Ok(MessageInfo {
@@ -6554,13 +6553,13 @@ fn message_info_from_proto(value: tsp::MessageInfo) -> Result<MessageInfo> {
         data_references: value.data_references,
         base_message_index: value.base_message_index,
         diff_merge_version: value.diff_merge_version,
-        diff_field_path: value.diff_field_path.map(field_path_from_proto),
+        diff_field_path: value.diff_field_path.map(field_path_from_codec),
         fields_to_remove,
         diff_read_version: value.diff_read_version,
     })
 }
 
-fn message_info_to_proto(value: &MessageInfo) -> Result<tsp::MessageInfo> {
+fn message_info_to_codec(value: &MessageInfo) -> Result<archive_codec::MessageInfo> {
     let mut field_infos = Vec::new();
     field_infos
         .try_reserve_exact(value.field_infos.len())
@@ -6568,7 +6567,7 @@ fn message_info_to_proto(value: &MessageInfo) -> Result<tsp::MessageInfo> {
             Error::allocation("IWA compatibility field metadata", value.field_infos.len())
         })?;
     for field_info in &value.field_infos {
-        field_infos.push(field_info_to_proto(field_info)?);
+        field_infos.push(field_info_to_codec(field_info)?);
     }
 
     let mut fields_to_remove = Vec::new();
@@ -6581,10 +6580,10 @@ fn message_info_to_proto(value: &MessageInfo) -> Result<tsp::MessageInfo> {
             )
         })?;
     for field_path in &value.fields_to_remove {
-        fields_to_remove.push(field_path_to_proto(field_path)?);
+        fields_to_remove.push(field_path_to_codec(field_path)?);
     }
 
-    Ok(tsp::MessageInfo {
+    Ok(archive_codec::MessageInfo {
         r#type: value.type_,
         version: try_copy_slice(&value.versions, "IWA compatibility message versions")?,
         length: value.length,
@@ -6605,7 +6604,7 @@ fn message_info_to_proto(value: &MessageInfo) -> Result<tsp::MessageInfo> {
         diff_field_path: value
             .diff_field_path
             .as_ref()
-            .map(field_path_to_proto)
+            .map(field_path_to_codec)
             .transpose()?,
         fields_to_remove,
         diff_read_version: try_copy_slice(
@@ -6615,9 +6614,9 @@ fn message_info_to_proto(value: &MessageInfo) -> Result<tsp::MessageInfo> {
     })
 }
 
-fn field_info_from_proto(value: tsp::FieldInfo) -> FieldInfo {
+fn field_info_from_codec(value: archive_codec::FieldInfo) -> FieldInfo {
     FieldInfo {
-        path: field_path_from_proto(value.path),
+        path: field_path_from_codec(value.path),
         r#type: value.r#type.map(FieldType::from_raw),
         unknown_field_rule: value.unknown_field_rule.map(UnknownFieldRule::from_raw),
         object_references: value.object_references,
@@ -6628,9 +6627,9 @@ fn field_info_from_proto(value: tsp::FieldInfo) -> FieldInfo {
     }
 }
 
-fn field_info_to_proto(value: &FieldInfo) -> Result<tsp::FieldInfo> {
-    Ok(tsp::FieldInfo {
-        path: field_path_to_proto(&value.path)?,
+fn field_info_to_codec(value: &FieldInfo) -> Result<archive_codec::FieldInfo> {
+    Ok(archive_codec::FieldInfo {
+        path: field_path_to_codec(&value.path)?,
         r#type: value.r#type.map(FieldType::raw_value),
         unknown_field_rule: value.unknown_field_rule.map(UnknownFieldRule::raw_value),
         object_references: try_copy_slice(
@@ -6656,12 +6655,12 @@ fn field_info_to_proto(value: &FieldInfo) -> Result<tsp::FieldInfo> {
     })
 }
 
-fn field_path_from_proto(value: tsp::FieldPath) -> FieldPath {
+fn field_path_from_codec(value: archive_codec::FieldPath) -> FieldPath {
     FieldPath { path: value.path }
 }
 
-fn field_path_to_proto(value: &FieldPath) -> Result<tsp::FieldPath> {
-    Ok(tsp::FieldPath {
+fn field_path_to_codec(value: &FieldPath) -> Result<archive_codec::FieldPath> {
+    Ok(archive_codec::FieldPath {
         path: try_copy_slice(&value.path, "IWA compatibility field path")?,
     })
 }
@@ -6696,7 +6695,7 @@ fn check_header_length(length: usize, limits: Limits) -> Result<()> {
 }
 
 fn encode_archive_info(info: &ArchiveInfo, limits: Limits) -> Result<Vec<u8>> {
-    let encoded_info = archive_info_to_proto(info)?;
+    let encoded_info = archive_info_to_codec(info)?;
     let header_length = usize::try_from(
         archive_codec::archive_info_encoded_len(&encoded_info).map_err(|error| {
             Error::header_codec(
@@ -6725,7 +6724,7 @@ fn encode_archive_info(info: &ArchiveInfo, limits: Limits) -> Result<Vec<u8>> {
 }
 
 fn archive_info_encoded_len(info: &ArchiveInfo) -> Result<usize> {
-    let compatibility = archive_info_to_proto(info)?;
+    let compatibility = archive_info_to_codec(info)?;
     usize::try_from(
         archive_codec::archive_info_encoded_len(&compatibility).map_err(|error| {
             Error::header_codec(
@@ -7421,15 +7420,17 @@ fn field_memory_charge(node: Option<HeaderNode>, visit: WireVisit<'_, '_>) -> us
         (Some(HeaderNode::MessageInfo), 5 | 6) | (Some(HeaderNode::FieldInfo), 4 | 5) => {
             scalar(size_of::<u64>())
         },
-        (Some(HeaderNode::MessageInfo), 4) => {
-            projected_message(size_of::<tsp::FieldInfo>(), size_of::<FieldInfo>())
-        },
+        (Some(HeaderNode::MessageInfo), 4) => projected_message(
+            size_of::<archive_codec::FieldInfo>(),
+            size_of::<FieldInfo>(),
+        ),
         (Some(HeaderNode::MessageInfo), 9) | (Some(HeaderNode::FieldInfo), 1) => {
-            message(size_of::<tsp::FieldPath>())
+            message(size_of::<archive_codec::FieldPath>())
         },
-        (Some(HeaderNode::MessageInfo), 10) => {
-            projected_message(size_of::<tsp::FieldPath>(), size_of::<FieldPath>())
-        },
+        (Some(HeaderNode::MessageInfo), 10) => projected_message(
+            size_of::<archive_codec::FieldPath>(),
+            size_of::<FieldPath>(),
+        ),
         (Some(HeaderNode::FieldInfo), 7) | (Some(HeaderNode::FieldPath), 1) => {
             scalar(size_of::<u32>())
         },

@@ -75,24 +75,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut playback_bytes = Vec::new();
     commit.package().write_to(&mut playback_bytes)?;
     editor = KeynoteEditor::from_bytes(&playback_bytes)?;
-    editor.set_slide_movie_title_by_selector(
-        litchi_core::Position::new(0),
-        litchi_keynote::MovieSelector::index(0),
-        "Source-built Keynote movie",
-    )?;
-    editor.set_slide_movie_caption_by_selector(
-        litchi_core::Position::new(0),
-        litchi_keynote::MovieSelector::index(0),
-        &format!("Native title and caption for {movie_filename}"),
-    )?;
-    let title = editor.slide_movie_title_by_selector(
-        litchi_core::Position::new(0),
-        litchi_keynote::MovieSelector::index(0),
-    )?;
-    let caption = editor.slide_movie_caption_by_selector(
-        litchi_core::Position::new(0),
-        litchi_keynote::MovieSelector::index(0),
-    )?;
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let title_commit = package
+        .edit_slide_movie_title(SlideSelector::index(0), MovieSelector::index(0))?
+        .set("Source-built Keynote movie")?
+        .commit()?;
+    let mut title_bytes = Vec::new();
+    title_commit.package().write_to(&mut title_bytes)?;
+    editor = KeynoteEditor::from_bytes(&title_bytes)?;
+
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let caption_commit = package
+        .edit_slide_movie_caption(SlideSelector::index(0), MovieSelector::index(0))?
+        .set(format!("Native title and caption for {movie_filename}"))?
+        .commit()?;
+    let mut caption_bytes = Vec::new();
+    caption_commit.package().write_to(&mut caption_bytes)?;
+    editor = KeynoteEditor::from_bytes(&caption_bytes)?;
+
+    let package = Package::from_bytes(&editor.to_bytes()?)?;
+    let title = package.slide_movie_title(SlideSelector::index(0), MovieSelector::index(0))?;
+    let caption = package.slide_movie_caption(SlideSelector::index(0), MovieSelector::index(0))?;
     editor.save(output)?;
     println!(
         "created Keynote movie {} backed by video {:?} and poster {:?} with title {title:?} and caption {caption:?}",

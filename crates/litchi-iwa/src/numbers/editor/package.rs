@@ -4,11 +4,10 @@
 //! mutations behind the semantic editor facade. They are crate-visible only;
 //! consumers operate through the typed [`super::NumbersEditor`] API.
 
-use super::table::cell::Borders;
 use super::*;
 use crate::text::{Alignment, Indents, LineSpacing, Spacing};
 use litchi_iwa_common::shape::stroke::Stroke;
-use litchi_iwa_common::table::cell::{BorderSide, layout::Layout};
+use litchi_iwa_common::table::cell::{BorderSide, Borders, layout::Layout};
 use litchi_numbers::table::dimension::{Dimension, Size};
 
 pub(crate) fn set_table_cell_in_package(

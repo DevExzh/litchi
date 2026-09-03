@@ -283,10 +283,13 @@ impl BodyTableLockPatch {
         self.after
     }
 
-    /// Return whether applying this patch changes semantic state.
+    /// Return whether this patch preserves both semantic state and exact bytes.
     #[must_use]
     pub fn is_noop(&self) -> bool {
         self.before == self.after
+            && self.source_fingerprint == self.target_fingerprint
+            && (Arc::ptr_eq(&self.source, &self.target)
+                || self.source.as_ref() == self.target.as_ref())
     }
 
     /// Return an exact-source inverse that restores the original artifact.
@@ -3509,5 +3512,65 @@ mod tests {
             Some(10 + 2 + MAX_VARINT_BYTES * 2)
         );
         assert!(table_info_rewrite_bound(usize::MAX, false).is_none());
+    }
+
+    #[test]
+    fn is_noop_requires_semantic_and_exact_artifact_identity() {
+        let identifier = NonZeroU64::new(1).expect("non-zero test identifier");
+        let target = BodyTableTarget {
+            table_position: 0,
+            table_name: "test-table".into(),
+            sheet_identifier: identifier,
+            sheet_component_index: 0,
+            sheet_object_index: 0,
+            sheet_message_index: 0,
+            sheet_message_type: 0,
+            attachment_identifier: identifier,
+            attachment_component_index: 0,
+            attachment_object_index: 0,
+            attachment_message_index: 0,
+            drawable_identifier: identifier,
+            model_identifier: identifier,
+            model_component_index: 0,
+            model_object_index: 0,
+            model_message_index: 0,
+            model_message_type: 0,
+            component_index: 0,
+            object_index: 0,
+            message_index: 0,
+            message_type: 0,
+            info_message_index: 0,
+            body_component_index: 0,
+            body_object_index: 0,
+            body_message_index: 0,
+            body_message_type: 0,
+            body_identifier: identifier,
+            explicit_locked: Some(false),
+        };
+        let source: Arc<[u8]> = Arc::from(&b"source"[..]);
+        let different_target: Arc<[u8]> = Arc::from(&b"target"[..]);
+
+        let semantic_only = BodyTableLockPatch {
+            source: Arc::clone(&source),
+            target: different_target,
+            source_fingerprint: 7,
+            target_fingerprint: 7,
+            proof: target.clone(),
+            before: State::Unlocked,
+            after: State::Unlocked,
+        };
+        assert!(!semantic_only.is_noop());
+
+        let equivalent_target: Arc<[u8]> = Arc::from(&b"source"[..]);
+        let exact = BodyTableLockPatch {
+            source: Arc::clone(&source),
+            target: equivalent_target,
+            source_fingerprint: 7,
+            target_fingerprint: 7,
+            proof: target,
+            before: State::Unlocked,
+            after: State::Unlocked,
+        };
+        assert!(exact.is_noop());
     }
 }

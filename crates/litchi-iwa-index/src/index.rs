@@ -471,7 +471,8 @@ impl ObjectIndex {
     /// # Errors
     ///
     /// Returns [`FragmentTraversalError::LimitExceeded`] when the fragment is
-    /// larger than `limit`.
+    /// larger than `limit`, or [`FragmentTraversalError::InvalidRange`] when
+    /// the immutable fragment catalog contains an invalid object range.
     #[must_use = "the bounded fragment query result must be checked"]
     pub fn fragment_object_ids_bounded(
         &self,
@@ -487,7 +488,18 @@ impl ObjectIndex {
             return Ok(None);
         };
 
-        let observed = entry.object_range.len();
+        let range = entry.object_range.clone();
+        let available = self.fragment_object_ids.len();
+        if range.start > range.end || range.end > available {
+            return Err(FragmentTraversalError::InvalidRange {
+                fragment,
+                start: range.start,
+                end: range.end,
+                available,
+            });
+        }
+
+        let observed = range.end - range.start;
         if observed > limit.max_objects() {
             return Err(FragmentTraversalError::LimitExceeded {
                 fragment,
@@ -496,7 +508,7 @@ impl ObjectIndex {
             });
         }
 
-        Ok(self.fragment_object_ids.get(entry.object_range.clone()))
+        Ok(Some(&self.fragment_object_ids[range]))
     }
 
     /// Traverse one fragment's neutral object records under an explicit
@@ -511,7 +523,9 @@ impl ObjectIndex {
     ///
     /// Returns [`FragmentTraversalError::LimitExceeded`] when the fragment is
     /// larger than `limit`, or [`FragmentTraversalError::MissingObject`] when
-    /// the fragment's immutable object catalog is inconsistent.
+    /// the fragment's immutable object catalog is inconsistent. It returns
+    /// [`FragmentTraversalError::InvalidRange`] when the fragment catalog
+    /// contains an invalid object range.
     #[must_use = "the bounded fragment query result must be checked"]
     pub fn fragment_objects_bounded(
         &self,
@@ -1162,6 +1176,36 @@ mod tests {
             Err(FragmentTraversalError::MissingObject {
                 fragment: actual_fragment,
             }) if actual_fragment == fragment_id
+        ));
+    }
+
+    #[test]
+    fn bounded_fragment_queries_reject_invalid_catalog_ranges() {
+        let fragment_id = fragment(1);
+        let index = ObjectIndex {
+            objects: Box::default(),
+            fragments: vec![FragmentEntry {
+                id: fragment_id,
+                object_range: 1..2,
+            }]
+            .into_boxed_slice(),
+            fragment_object_ids: vec![object(1)].into_boxed_slice(),
+            graph: ReferenceGraph::new().snapshot(),
+        };
+        let expected = FragmentTraversalError::InvalidRange {
+            fragment: fragment_id,
+            start: 1,
+            end: 2,
+            available: 1,
+        };
+
+        assert_eq!(
+            index.fragment_object_ids_bounded(fragment_id, FragmentTraversalLimit::new(1)),
+            Err(expected)
+        );
+        assert!(matches!(
+            index.fragment_objects_bounded(fragment_id, FragmentTraversalLimit::new(1)),
+            Err(actual) if actual == expected
         ));
     }
 
