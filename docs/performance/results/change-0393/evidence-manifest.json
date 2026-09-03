@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "change": "0393",
+  "protocol": "matched A1/B1/B2/A2 PPTX selected-image query evidence",
+  "control_revision": "4ba030c2a6cd68b88e502a117d5730c5a6202fee",
+  "candidate_base_revision": "4ba030c2a6cd68b88e502a117d5730c5a6202fee",
+  "candidate_patch_sha256": "4da5ce10d8f7475279ac4bdef639c3269d0baff30959b67c79b5f8869daf0559",
+  "control_binary_sha256": "c3262985314cfb9e78a9593f80bbffb53043c33f6d40a4aa7c62f95a29cf4ad0",
+  "candidate_binary_sha256": "85252c17b48d5ed98d2383da42fc7c97183fdf18977f2f423c225c9c4da10e1f",
+  "archive_sha256": "830928aafdc3ec8a5995a0d84a82ea9e2acb7f190f45008ddc017e2edfbf684b",
+  "artifacts": [
+    {
+      "role": "control_A1",
+      "path": "a1.json.zst",
+      "encoding": "zstd",
+      "compressed_bytes": 5014,
+      "compressed_sha256": "0ae290e22df9a0a2a855167a2bf8f837defc1c181411bdcb5b13d569f02be9e5",
+      "raw_bytes": 145930,
+      "raw_sha256": "cd8c7dafe0c8848abd778a2cb76b6259544c10e11622ce4f754dcbe0405c5920"
+    },
+    {
+      "role": "control_A2",
+      "path": "a2.json.zst",
+      "encoding": "zstd",
+      "compressed_bytes": 5006,
+      "compressed_sha256": "94426e760114c6e4e5a3146e5dfe512389963d5b042ff1f54144122a961b389c",
+      "raw_bytes": 145925,
+      "raw_sha256": "02ad63be98aae1b623af398dab18ccea545892ecf7badef8cc3ba84f22cfca8b"
+    },
+    {
+      "role": "candidate_B1",
+      "path": "b1.json.zst",
+      "encoding": "zstd",
+      "compressed_bytes": 5054,
+      "compressed_sha256": "711a69d3219c08a2258e96848191dbb95dc8e5b9fa55fd9ec3a104bea3a947fe",
+      "raw_bytes": 145948,
+      "raw_sha256": "0bed70b1fb47dcedfe677052aed487ded769ff2f53cef8207ff3bc5bb44c1dd0"
+    },
+    {
+      "role": "candidate_B2",
+      "path": "b2.json.zst",
+      "encoding": "zstd",
+      "compressed_bytes": 5044,
+      "compressed_sha256": "a8cf155fea513e48b66086e30a4ded9ade8f433c6dde8bc1c773c08257b4f7bc",
+      "raw_bytes": 145925,
+      "raw_sha256": "6a4e2e2b78b8fb25fe19bdfb0927c3edb587bc81d81a250f863cf4b1e2f9ee95"
+    },
+    {
+      "role": "capture_summary",
+      "path": "abba-summary.json",
+      "bytes": 11831,
+      "sha256": "7b9fbe3d335c395cecdf8c80309fc4c0a6d78d2f03e0ef1b2278b5cfc4644d76"
+    },
+    {
+      "role": "percent_delta_projection",
+      "path": "abba-metrics.tsv",
+      "bytes": 1049,
+      "sha256": "7a9ecf78cadde5405cc2598f4c3c2f604a87f5ec28d1c3c39da0b6d728627655"
+    },
+    {
+      "role": "operation_allocation_vectors",
+      "path": "allocation-metrics.json",
+      "bytes": 39435,
+      "sha256": "e6e475284b40896fe8fd05b05b01d916bbaf4b1893abc3211ed2361a4e9cd4f3"
+    },
+    {
+      "role": "parent_adjudication",
+      "path": "adjudication.json",
+      "bytes": 2123,
+      "sha256": "cbff93e13c60768c258c49f8987fd8f921fc87538d13e3ef624ff9f9ea5b7348"
+    },
+    {
+      "role": "human_readme",
+      "path": "README.md",
+      "bytes": 1307,
+      "sha256": "5211fedeebfe5d474985d060f5b04ae71b3dc507da0ac85d8fa35bf5ddfe18e8"
+    }
+  ]
+}
