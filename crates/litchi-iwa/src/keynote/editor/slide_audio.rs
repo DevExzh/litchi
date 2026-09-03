@@ -125,7 +125,7 @@ impl KeynoteEditor {
             || created.duration != expected_duration
             || created_graph.info.kind != MovieKind::Audio
             || created_graph.object_ids != ids.all()
-            || verified.extract_media(asset.data_identifier.get())? != data
+            || verified.extract_media(asset.data_identifier)? != data
         {
             return Err(Error::InvalidFormat(
                 "Keynote audio creation produced an inconsistent graph".to_owned(),
@@ -269,7 +269,7 @@ impl KeynoteEditor {
         replacement: &[u8],
     ) -> Result<Vec<u8>> {
         let source = require_audio(self, slide_index, drawable_object_id)?;
-        self.replace_media(source.audio_data_identifier.get(), replacement)
+        self.replace_media(source.audio_data_identifier, replacement)
     }
 
     /// Remove an audio clip, its automatic build, private graph, and unshared asset.
@@ -280,18 +280,14 @@ impl KeynoteEditor {
     ) -> Result<RemovedKeynoteSlideAudio> {
         let audio = require_audio(self, slide_index, drawable_object_id)?;
         let removed = self.remove_slide_media(slide_index, drawable_object_id, MovieKind::Audio)?;
-        if removed.movie.movie_data_identifier != Some(audio.audio_data_identifier.get()) {
+        if removed.movie.movie_data_identifier != Some(audio.audio_data_identifier) {
             return Err(Error::InvalidFormat(
                 "Keynote audio deletion removed a mismatched media graph".to_owned(),
             ));
         }
         Ok(RemovedKeynoteSlideAudio {
             audio,
-            removed_data_identifiers: removed
-                .removed_data_identifiers
-                .into_iter()
-                .map(MediaAssetId::try_from)
-                .collect::<Result<Vec<_>>>()?,
+            removed_data_identifiers: removed.removed_data_identifiers,
         })
     }
 }
@@ -400,9 +396,7 @@ mod tests {
         );
         assert_eq!(created.position, POSITION);
         assert_eq!(
-            editor
-                .extract_media(created.audio_data_identifier.get())
-                .unwrap(),
+            editor.extract_media(created.audio_data_identifier).unwrap(),
             AUDIO
         );
         let builds = editor.slide_builds(0).unwrap();
@@ -490,9 +484,7 @@ mod tests {
             AUDIO
         );
         assert_eq!(
-            editor
-                .extract_media(created.audio_data_identifier.get())
-                .unwrap(),
+            editor.extract_media(created.audio_data_identifier).unwrap(),
             REPLACEMENT_AUDIO
         );
 
@@ -601,9 +593,7 @@ mod tests {
             AUDIO
         );
         assert_eq!(
-            editor
-                .extract_media(source.audio_data_identifier.get())
-                .unwrap(),
+            editor.extract_media(source.audio_data_identifier).unwrap(),
             REPLACEMENT_AUDIO
         );
 

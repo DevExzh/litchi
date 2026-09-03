@@ -28,7 +28,7 @@ use graph::*;
 pub struct NumbersSheetAudioInfo {
     pub sheet_id: u64,
     pub drawable_object_id: u64,
-    pub audio_data_identifier: u64,
+    pub audio_data_identifier: MediaAssetId,
     /// Center point of Numbers' zero-size audio control, in sheet points.
     pub position: DrawablePoint,
     /// Shared drawable metadata, including accessibility description and lock state.
@@ -58,7 +58,7 @@ impl NumbersSheetAudioOptions {
 pub struct RemovedNumbersSheetAudio {
     pub audio: NumbersSheetAudioInfo,
     /// Assets culled because the removed clip held their final package reference.
-    pub removed_data_identifiers: Vec<u64>,
+    pub removed_data_identifiers: Vec<MediaAssetId>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -145,13 +145,13 @@ impl NumbersEditor {
                 Error::InvalidFormat("Numbers audio creation failed validation".to_owned())
             })?;
         let created_graph = audio_graph(&verified, sheet_id, ids.drawable)?;
-        if created.audio_data_identifier != asset.data_identifier.get()
+        if created.audio_data_identifier != asset.data_identifier
             || created.position != options.position
             || created.duration.as_secs_f32() != duration_seconds
             || created_graph.object_ids != ids.all()
             || created_graph.uuid_object_ids != ids.all()
             || created_graph.data_references != [(asset.data_identifier.get(), ids.drawable)]
-            || verified.extract_media(asset.data_identifier.get())? != data
+            || verified.extract_media(asset.data_identifier)? != data
         {
             return Err(Error::InvalidFormat(
                 "Numbers audio creation produced an inconsistent graph".to_owned(),
@@ -527,7 +527,7 @@ impl NumbersEditor {
                 .is_some_and(|asset| !asset.is_referenced())
             {
                 media.remove_unreferenced(identifier)?;
-                removed_data_identifiers.push(identifier.get());
+                removed_data_identifiers.push(identifier);
             }
         }
         removed_data_identifiers.sort_unstable();
@@ -541,7 +541,7 @@ impl NumbersEditor {
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_assets
                     .iter()
-                    .any(|asset| asset.data_identifier.get() == *identifier)
+                    .any(|asset| asset.data_identifier == *identifier)
             })
         {
             return Err(Error::InvalidFormat(

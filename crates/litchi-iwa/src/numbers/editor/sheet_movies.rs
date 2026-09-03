@@ -28,8 +28,8 @@ use graph::*;
 pub struct NumbersSheetMovieInfo {
     pub sheet_id: u64,
     pub drawable_object_id: u64,
-    pub movie_data_identifier: u64,
-    pub poster_image_data_identifier: u64,
+    pub movie_data_identifier: MediaAssetId,
+    pub poster_image_data_identifier: MediaAssetId,
     pub geometry: DrawableGeometry,
     /// Shared drawable metadata, including accessibility description and lock state.
     pub properties: DrawableProperties,
@@ -77,7 +77,7 @@ impl NumbersSheetMovieOptions {
 pub struct RemovedNumbersSheetMovie {
     pub movie: NumbersSheetMovieInfo,
     /// Assets culled because the removed movie held their final package reference.
-    pub removed_data_identifiers: Vec<u64>,
+    pub removed_data_identifiers: Vec<MediaAssetId>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -177,15 +177,15 @@ impl NumbersEditor {
                 Error::InvalidFormat("Numbers movie creation failed validation".to_owned())
             })?;
         let created_graph = movie_graph(&verified, sheet_id, ids.drawable)?;
-        if created.movie_data_identifier != movie_asset.data_identifier.get()
-            || created.poster_image_data_identifier != poster_asset.data_identifier.get()
+        if created.movie_data_identifier != movie_asset.data_identifier
+            || created.poster_image_data_identifier != poster_asset.data_identifier
             || created.geometry != geometry
             || created.original_size != Some(options.natural_size)
             || created.natural_size != Some(options.natural_size)
             || created.duration.as_secs_f32() != duration_seconds
             || created_graph.object_ids != ids.all()
-            || verified.extract_media(movie_asset.data_identifier.get())? != movie_data
-            || verified.extract_media(poster_asset.data_identifier.get())? != poster_data
+            || verified.extract_media(movie_asset.data_identifier)? != movie_data
+            || verified.extract_media(poster_asset.data_identifier)? != poster_data
         {
             return Err(Error::InvalidFormat(
                 "Numbers movie creation produced an inconsistent graph".to_owned(),
@@ -634,7 +634,7 @@ impl NumbersEditor {
                 .is_some_and(|asset| !asset.is_referenced())
             {
                 media.remove_unreferenced(identifier)?;
-                removed_data_identifiers.push(identifier.get());
+                removed_data_identifiers.push(identifier);
             }
         }
         removed_data_identifiers.sort_unstable();
@@ -648,7 +648,7 @@ impl NumbersEditor {
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_assets
                     .iter()
-                    .any(|asset| asset.data_identifier.get() == *identifier)
+                    .any(|asset| asset.data_identifier == *identifier)
             })
         {
             return Err(Error::InvalidFormat(

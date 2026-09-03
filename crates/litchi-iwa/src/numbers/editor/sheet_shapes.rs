@@ -1780,7 +1780,9 @@ mod tests {
             .unwrap();
         assert_eq!(
             editor
-                .extract_media(image.data_identifier().unwrap().get())
+                .extract_media(
+                    crate::MediaAssetId::try_from(image.data_identifier().unwrap().get()).unwrap(),
+                )
                 .unwrap(),
             bytes
         );

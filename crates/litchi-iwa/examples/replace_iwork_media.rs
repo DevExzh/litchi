@@ -66,11 +66,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
 
-        // The application-specific wrapper methods still use their native
-        // wire ID. Keep that value local while the shared media editor uses
-        // the checked semantic identifier above it.
-        let raw_data_identifier = arguments[2].parse::<u64>()?;
-        let data_identifier = MediaAssetId::try_from(raw_data_identifier)?;
+        // Parse the shared semantic identifier once; format editors reject
+        // the native zero sentinel at their public media boundary.
+        let data_identifier = MediaAssetId::try_from(arguments[2].parse::<u64>()?)?;
         let replacement = fs::read(&arguments[3])?;
         let previous = match Path::new(input)
             .extension()
@@ -78,13 +76,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         {
             Some("key") => {
                 let mut app = KeynoteEditor::open(input)?;
-                let previous = app.replace_media(raw_data_identifier, &replacement)?;
+                let previous = app.replace_media(data_identifier, &replacement)?;
                 app.save(output)?;
                 previous
             },
             Some("numbers") => {
                 let mut app = NumbersEditor::open(input)?;
-                let previous = app.replace_media(raw_data_identifier, &replacement)?;
+                let previous = app.replace_media(data_identifier, &replacement)?;
                 app.save(output)?;
                 previous
             },

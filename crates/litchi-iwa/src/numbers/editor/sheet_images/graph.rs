@@ -416,7 +416,7 @@ pub(super) fn image_graph(
     for identifier in
         std::iter::once(info.image_data_identifier).chain(info.thumbnail_data_identifier)
     {
-        if !data_references.contains(&(identifier, drawable_object_id)) {
+        if !data_references.contains(&(identifier.get(), drawable_object_id)) {
             return Err(Error::InvalidFormat(format!(
                 "Numbers image {drawable_object_id} data {identifier} is missing from archive metadata"
             )));
@@ -759,11 +759,16 @@ fn image_info(
             ))
         })?
         .identifier;
+    let image_data_identifier = MediaAssetId::try_from(image_data_identifier)?;
+    let thumbnail_data_identifier = image
+        .thumbnail_data
+        .map(|reference| MediaAssetId::try_from(reference.identifier))
+        .transpose()?;
     Ok(NumbersSheetImageInfo {
         sheet_id,
         drawable_object_id: identifier,
         image_data_identifier,
-        thumbnail_data_identifier: image.thumbnail_data.map(|reference| reference.identifier),
+        thumbnail_data_identifier,
         geometry: geometry_from_drawable(&image.super_)?,
         properties: drawable_properties(&image.super_),
         image_adjustments: image_adjustments_from_archive(&image)?,

@@ -5029,8 +5029,8 @@ impl KeynoteEditor {
         reachable_embedded_assets(self.package(), [slide.node_id, slide.slide_id])
     }
 
-    pub fn extract_media(&self, data_identifier: u64) -> Result<Vec<u8>> {
-        let data_identifier = MediaAssetId::try_from(data_identifier)?;
+    /// Extract one reachable, materialized media asset by its validated identifier.
+    pub fn extract_media(&self, data_identifier: MediaAssetId) -> Result<Vec<u8>> {
         if !self
             .media_assets()?
             .iter()
@@ -5043,9 +5043,12 @@ impl KeynoteEditor {
         IWorkMediaEditor::from_package(self.package().clone())?.extract(data_identifier)
     }
 
-    /// Replace a referenced materialized asset without changing its data identifier.
-    pub fn replace_media(&mut self, data_identifier: u64, replacement: &[u8]) -> Result<Vec<u8>> {
-        let data_identifier = MediaAssetId::try_from(data_identifier)?;
+    /// Replace one reachable, materialized asset without changing its identifier.
+    pub fn replace_media(
+        &mut self,
+        data_identifier: MediaAssetId,
+        replacement: &[u8],
+    ) -> Result<Vec<u8>> {
         if !self
             .media_assets()?
             .iter()

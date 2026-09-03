@@ -2456,6 +2456,18 @@ fn verify_physical_payloads(
         if source_count != candidate_count {
             return Err(Error::Verification { path });
         }
+        let candidate_row_limit = usize::try_from(candidate_plan.tile().num_rows())
+            .map_err(|_| Error::Verification { path })?;
+        let candidate_rows = index_records_by_position(
+            candidate_plan
+                .row_records()
+                .map(|record| (record.snapshot().tile_row_index(), record.raw())),
+            0,
+            candidate_row_limit,
+            candidate_count,
+            budget,
+            path,
+        )?;
         for source_record in source_plan.row_records() {
             let source_local = source_record.snapshot().tile_row_index();
             let source_global = tile_reference
@@ -2470,17 +2482,13 @@ fn verify_physical_payloads(
                 return Err(Error::Verification { path });
             }
             let destination_local = destination % tile_size;
-            let candidate_record = candidate_plan
-                .row_records()
-                .find(|record| record.snapshot().tile_row_index() == destination_local)
+            let destination_local =
+                usize::try_from(destination_local).map_err(|_| Error::Verification { path })?;
+            let candidate_record = candidate_rows
+                .get(destination_local)
+                .and_then(|record| *record)
                 .ok_or(Error::Verification { path })?;
-            same_wire_fields_except(
-                source_record.raw(),
-                candidate_record.raw(),
-                &[1],
-                budget,
-                path,
-            )?;
+            same_wire_fields_except(source_record.raw(), candidate_record, &[1], budget, path)?;
         }
     }
 
@@ -2533,9 +2541,27 @@ fn verify_physical_payloads(
             return Err(Error::Verification { path });
         }
         same_wire_fields_except(source_payload, candidate_payload, &[2], budget, path)?;
-        if source_plan.records().count() != candidate_plan.records().count() {
+        let source_count = source_plan.records().count();
+        let candidate_count = candidate_plan.records().count();
+        if source_count != candidate_count {
             return Err(Error::Verification { path });
         }
+        let bucket_span = usize::try_from(
+            row_limit
+                .checked_sub(bucket_start)
+                .ok_or(Error::Verification { path })?,
+        )
+        .map_err(|_| Error::Verification { path })?;
+        let candidate_headers = index_records_by_position(
+            candidate_plan
+                .records()
+                .map(|record| (record.snapshot().index(), record.raw())),
+            bucket_start,
+            bucket_span,
+            candidate_count,
+            budget,
+            path,
+        )?;
         for source_record in source_plan.records() {
             let source_index = source_record.snapshot().index();
             let source_usize =
@@ -2546,17 +2572,17 @@ fn verify_physical_payloads(
             if destination / HEADER_BUCKET_ROWS != bucket.bucket_index {
                 return Err(Error::Verification { path });
             }
-            let candidate_record = candidate_plan
-                .records()
-                .find(|record| record.snapshot().index() == destination)
+            let destination_local = usize::try_from(
+                destination
+                    .checked_sub(bucket_start)
+                    .ok_or(Error::Verification { path })?,
+            )
+            .map_err(|_| Error::Verification { path })?;
+            let candidate_record = candidate_headers
+                .get(destination_local)
+                .and_then(|record| *record)
                 .ok_or(Error::Verification { path })?;
-            same_wire_fields_except(
-                source_record.raw(),
-                candidate_record.raw(),
-                &[1],
-                budget,
-                path,
-            )?;
+            same_wire_fields_except(source_record.raw(), candidate_record, &[1], budget, path)?;
         }
     }
 
@@ -2938,6 +2964,81 @@ fn archive_clone_reservation(
             .checked_add(header_scratch)
             .ok_or(Error::InvalidSource { path })?,
     ))
+}
+
+/// Build a bounded direct-position index for one already validated record
+/// envelope.  The old verification path searched the candidate records from
+/// the beginning for every source record, turning a sparse or adversarial
+/// envelope into quadratic work.  A direct index touches each candidate once
+/// and bounds retained memory by the envelope's declared row span.
+fn index_records_by_position<'source, I>(
+    records: I,
+    index_base: u32,
+    index_limit: usize,
+    record_count: usize,
+    budget: &mut core::Budget,
+    path: Path,
+) -> Result<Vec<Option<&'source [u8]>>>
+where
+    I: IntoIterator<Item = (u32, &'source [u8])>,
+{
+    let work = index_limit
+        .checked_add(record_count)
+        .ok_or(Error::InvalidSource { path })?;
+    let retained = index_limit
+        .checked_mul(size_of::<Option<&'source [u8]>>())
+        .ok_or(Error::InvalidSource { path })?;
+    budget.work(work).map_err(|error| map_core(error, path))?;
+    if index_limit != 0 {
+        budget
+            .allocations(1)
+            .map_err(|error| map_core(error, path))?;
+        budget
+            .retained(retained)
+            .map_err(|error| map_core(error, path))?;
+    }
+    let mut index = Vec::new();
+    index
+        .try_reserve_exact(index_limit)
+        .map_err(|_| Error::Allocation {
+            amount: index_limit,
+            path,
+        })?;
+    index.resize_with(index_limit, || None);
+
+    populate_record_index(records, index_base, &mut index, record_count, path)?;
+    Ok(index)
+}
+
+fn populate_record_index<'source, I>(
+    records: I,
+    index_base: u32,
+    index: &mut [Option<&'source [u8]>],
+    record_count: usize,
+    path: Path,
+) -> Result<()>
+where
+    I: IntoIterator<Item = (u32, &'source [u8])>,
+{
+    let base = usize::try_from(index_base).map_err(|_| Error::Verification { path })?;
+    let mut observed = 0usize;
+    for (position, raw) in records {
+        observed = observed
+            .checked_add(1)
+            .ok_or(Error::InvalidSource { path })?;
+        let local = usize::try_from(position)
+            .ok()
+            .and_then(|position| position.checked_sub(base))
+            .ok_or(Error::Verification { path })?;
+        let slot = index.get_mut(local).ok_or(Error::Verification { path })?;
+        if slot.replace(raw).is_some() {
+            return Err(Error::Verification { path });
+        }
+    }
+    if observed != record_count {
+        return Err(Error::Verification { path });
+    }
+    Ok(())
 }
 
 fn changed_object_ids(
@@ -3742,5 +3843,36 @@ fn preview_deletion_count(source: &Package, candidate: &Package) -> usize {
     match (source, candidate) {
         (Some(source), Some(candidate)) => source.len().saturating_sub(candidate.len()),
         _ => 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Path, populate_record_index};
+
+    #[test]
+    fn direct_record_index_handles_reverse_adversarial_order_in_one_pass() {
+        const RECORDS: usize = 16_384;
+        let mut visits = 0usize;
+        let mut index = vec![None; RECORDS];
+        let result = populate_record_index(
+            (0..u32::try_from(RECORDS).expect("test size fits u32"))
+                .rev()
+                .map(|position| {
+                    visits = visits.saturating_add(1);
+                    (position, b"record".as_slice())
+                }),
+            0,
+            &mut index,
+            RECORDS,
+            Path::Package,
+        );
+
+        assert!(result.is_ok());
+        assert_eq!(visits, RECORDS);
+        assert_eq!(index.len(), RECORDS);
+        for position in (0..RECORDS).rev() {
+            assert!(index.get(position).is_some_and(|record| record.is_some()));
+        }
     }
 }

@@ -13,15 +13,6 @@ use crate::{Error, IWorkPackage, Result};
 
 mod archive;
 
-/// Native protobuf-backed chart data for advanced format-level integrations.
-#[deprecated(
-    since = "0.0.1",
-    note = "legacy migration-host raw chart archive; use focused chart semantic APIs where available; chart migration remains pending"
-)]
-pub mod raw {
-    pub use super::archive::IWorkChartArchive;
-}
-
 pub(crate) mod arrangement;
 pub(crate) mod axis;
 pub(crate) mod axis_bounds;
@@ -42,13 +33,6 @@ pub(crate) mod category_labels;
 mod data;
 pub(crate) mod depth_3d;
 pub(crate) mod donut_inner_radius;
-/// Archive-free error-bar values used by native chart adapters.
-pub mod error_bar {
-    pub use litchi_iwa_common::chart::error_bar::{
-        CustomValue, CustomValues, Direction, Error, FixedValue, Kind, MAX_CUSTOM_VALUES_PER_SIDE,
-        Percentage, Result, Series, Side, StandardDeviationCount, Unknown,
-    };
-}
 pub(crate) mod font;
 pub(crate) mod gaps;
 pub(crate) mod hidden_data;

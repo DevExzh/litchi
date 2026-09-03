@@ -5146,6 +5146,54 @@ class BoundaryPolicyTests(unittest.TestCase):
                 ],
             )
 
+    def test_iwa_charts_compatibility_exports_and_example_stay_retired(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.IWA_CHARTS_FACADE_SOURCE
+            facade.parent.mkdir(parents=True)
+            facade.write_text(
+                "// pub mod raw {}\n"
+                'const DECOY: &str = "pub mod error_bar {};";\n'
+                "#[cfg(test)]\n"
+                "pub mod raw {}\n"
+                "pub mod raw {}\n"
+                "pub(crate) mod error_bar {}\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.RETIRED_IWA_CHARTS_INSPECTION_EXAMPLE
+            example.parent.mkdir(parents=True)
+            example.write_text("fn main() {}\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_charts_compatibility_source_topology(root),
+                [
+                    "retired litchi-iwa chart inspection example returned: "
+                    "crates/litchi-iwa/examples/inspect_iwa_archive.rs",
+                    "retired litchi-iwa charts compatibility module error_bar: "
+                    "crates/litchi-iwa/src/charts/mod.rs:6",
+                    "retired litchi-iwa charts compatibility module raw: "
+                    "crates/litchi-iwa/src/charts/mod.rs:5",
+                ],
+            )
+
+            facade.write_text(
+                "mod archive;\n"
+                "pub(crate) use archive::IWorkChartArchive;\n",
+                encoding="utf-8",
+            )
+            example.unlink()
+
+            self.assertEqual(
+                boundaries.audit_iwa_charts_compatibility_source_topology(root), []
+            )
+
+    def test_iwa_charts_compatibility_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+
+        self.assertIn(
+            "audit_iwa_charts_compatibility_source_topology()", main_source
+        )
+
     def test_iwa_direct_core_path_rejects_production_source_and_examples(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

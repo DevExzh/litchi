@@ -1226,12 +1226,14 @@ fn verify_native_locality(
             Path::Package,
         )
         .map_err(map_transaction_error)?;
-    let source_entries = source_catalog.package().iter().collect::<Vec<_>>();
-    let candidate_entries = candidate_catalog.package().iter().collect::<Vec<_>>();
-    if source_entries.len() != candidate_entries.len() {
+    if source_catalog.package().len() != candidate_catalog.package().len() {
         return Err(SectionTextError::Verification);
     }
-    for (before, after) in source_entries.iter().zip(candidate_entries) {
+    for (before, after) in source_catalog
+        .package()
+        .iter()
+        .zip(candidate_catalog.package().iter())
+    {
         if before.name() != after.name() {
             return Err(SectionTextError::Verification);
         }

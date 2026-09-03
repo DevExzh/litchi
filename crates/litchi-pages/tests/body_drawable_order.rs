@@ -9,8 +9,10 @@ use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
 const SENTINEL_MEMBER: &str = "Data/drawable-order-sentinel.bin";
+const PREVIEW_MEMBERS: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"];
 const ROOT_IDENTIFIER: u64 = 1;
 const ZORDER_IDENTIFIER: u64 = 46;
+const BODY_STORAGE_IDENTIFIER: u64 = 47;
 const DRAWABLE_IDENTIFIERS: [u64; 3] = [101, 102, 103];
 
 type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
@@ -62,8 +64,39 @@ fn fixture_bytes(order: &[u64], sentinel: &[u8]) -> TestResult<Vec<u8>> {
     let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
-            (DOCUMENT_MEMBER, compressed.as_slice()),
             (SENTINEL_MEMBER, sentinel),
+            (PREVIEW_MEMBERS[0], b"full preview".as_slice()),
+            (PREVIEW_MEMBERS[1], b"micro preview".as_slice()),
+            (PREVIEW_MEMBERS[2], b"web preview".as_slice()),
+            (DOCUMENT_MEMBER, compressed.as_slice()),
+        ],
+        Limits::default(),
+    )?)
+}
+
+fn fixture_bytes_with_native_body_slot(sentinel: &[u8]) -> TestResult<Vec<u8>> {
+    let root = tp::DocumentArchive {
+        super_: tsa::DocumentArchive::default(),
+        body_storage: Some(reference(BODY_STORAGE_IDENTIFIER)),
+        drawables_zorder: Some(reference(ZORDER_IDENTIFIER)),
+        ..tp::DocumentArchive::default()
+    };
+    let mut native_order = vec![BODY_STORAGE_IDENTIFIER];
+    native_order.extend(DRAWABLE_IDENTIFIERS);
+    let objects = vec![
+        object(ROOT_IDENTIFIER, 10_000, root.encode_to_vec())?,
+        object(ZORDER_IDENTIFIER, 10_015, order_payload(&native_order)?)?,
+        object(BODY_STORAGE_IDENTIFIER, 2_001, Vec::new())?,
+        object(DRAWABLE_IDENTIFIERS[0], 9_000, b"back".to_vec())?,
+        object(DRAWABLE_IDENTIFIERS[1], 9_000, b"middle".to_vec())?,
+        object(DRAWABLE_IDENTIFIERS[2], 9_000, b"front".to_vec())?,
+    ];
+    let archive = Archive { objects };
+    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    Ok(litchi_iwa_archive::package::to_bytes(
+        [
+            (SENTINEL_MEMBER, sentinel),
+            (DOCUMENT_MEMBER, compressed.as_slice()),
         ],
         Limits::default(),
     )?)
@@ -122,6 +155,10 @@ fn selector_first_move_preserves_unknowns_and_unrelated_members() -> TestResult<
     );
     assert!(commit.diagnostics().full_reparse_performed());
     assert!(commit.diagnostics().changed());
+    assert_eq!(
+        commit.diagnostics().deleted_previews(),
+        PREVIEW_MEMBERS.len()
+    );
 
     let rewritten = zorder_payload_from_package(commit.package())?;
     let view = WireView::parse(&rewritten)?;
@@ -153,10 +190,17 @@ fn selector_first_move_preserves_unknowns_and_unrelated_members() -> TestResult<
         member_payload(commit.package(), SENTINEL_MEMBER)?,
         b"unchanged sentinel"
     );
+    let candidate_catalog = Catalog::from_bytes(&exact_bytes(commit.package())?)?;
+    assert!(
+        PREVIEW_MEMBERS
+            .iter()
+            .all(|name| candidate_catalog.iter().all(|entry| entry.name() != *name))
+    );
 
     let restored = commit
         .package()
         .apply_body_drawable_order(&commit.patch().inverse())?;
+    assert_eq!(restored.diagnostics().deleted_previews(), 0);
     assert_eq!(exact_bytes(&source)?, exact_bytes(restored.package())?);
     assert_eq!(
         source
@@ -166,6 +210,34 @@ fn selector_first_move_preserves_unknowns_and_unrelated_members() -> TestResult<
             .collect::<Vec<_>>(),
         [Position::new(0), Position::new(1), Position::new(2)]
     );
+    Ok(())
+}
+
+#[test]
+fn native_body_storage_slot_is_preserved_without_becoming_a_drawable() -> TestResult<()> {
+    let source = Package::from_bytes(&fixture_bytes_with_native_body_slot(b"native slot")?)?;
+    let handles = source.body_drawable_order()?;
+    assert_eq!(handles.len(), DRAWABLE_IDENTIFIERS.len());
+
+    let mut edit = source.edit_body_drawable_order()?;
+    assert!(edit.move_drawable(&handles[0], DrawableLayerMove::ToFront)?);
+    let commit = edit.commit()?;
+    let payload = zorder_payload_from_package(commit.package())?;
+    let (snapshot, _report) =
+        litchi_iwa_protos::pages_drawable_order_codec::decode_drawable_order_with_report(
+            &payload,
+            litchi_iwa_protos::pages_drawable_order_codec::DecodeOptions::for_source(&payload),
+        )?;
+    assert_eq!(
+        snapshot.identifiers().collect::<Vec<_>>(),
+        [
+            BODY_STORAGE_IDENTIFIER,
+            DRAWABLE_IDENTIFIERS[1],
+            DRAWABLE_IDENTIFIERS[2],
+            DRAWABLE_IDENTIFIERS[0],
+        ]
+    );
+    assert_eq!(commit.package().body_drawable_order()?.len(), handles.len());
     Ok(())
 }
 

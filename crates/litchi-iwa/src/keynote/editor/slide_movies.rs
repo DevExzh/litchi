@@ -37,8 +37,10 @@ pub struct KeynoteSlideMovieInfo {
     pub slide_index: usize,
     pub drawable_object_id: u64,
     pub kind: MovieKind,
-    pub movie_data_identifier: Option<u64>,
-    pub poster_image_data_identifier: Option<u64>,
+    /// Embedded video/audio data referenced by this movie, when materialized.
+    pub movie_data_identifier: Option<MediaAssetId>,
+    /// Embedded poster image data referenced by this movie, when materialized.
+    pub poster_image_data_identifier: Option<MediaAssetId>,
     pub geometry: DrawableGeometry,
     /// Shared drawable metadata, including accessibility description and lock state.
     pub properties: DrawableProperties,
@@ -54,7 +56,7 @@ pub struct KeynoteSlideMovieInfo {
 pub struct RemovedKeynoteSlideMovie {
     pub movie: KeynoteSlideMovieInfo,
     /// Assets culled because the removed movie held their final package reference.
-    pub removed_data_identifiers: Vec<u64>,
+    pub removed_data_identifiers: Vec<MediaAssetId>,
 }
 
 pub(in crate::keynote::editor) struct SlideMovieGraph {
@@ -194,14 +196,14 @@ impl KeynoteEditor {
             })?;
         let created_graph = verified.slide_movie_graph(slide_index, ids.drawable)?;
         if created.kind != MovieKind::File
-            || created.movie_data_identifier != Some(movie_asset.data_identifier.get())
-            || created.poster_image_data_identifier != Some(poster_asset.data_identifier.get())
+            || created.movie_data_identifier != Some(movie_asset.data_identifier)
+            || created.poster_image_data_identifier != Some(poster_asset.data_identifier)
             || created.geometry != geometry
             || created.original_size != Some(options.natural_size())
             || created.natural_size != Some(options.natural_size())
             || created_graph.object_ids != ids.all()
-            || verified.extract_media(movie_asset.data_identifier.get())? != movie_data
-            || verified.extract_media(poster_asset.data_identifier.get())? != poster_data
+            || verified.extract_media(movie_asset.data_identifier)? != movie_data
+            || verified.extract_media(poster_asset.data_identifier)? != poster_data
         {
             return Err(Error::InvalidFormat(
                 "Keynote movie creation produced an inconsistent graph".to_owned(),
@@ -589,7 +591,7 @@ impl KeynoteEditor {
                 .is_some_and(|asset| !asset.is_referenced())
             {
                 media.remove_unreferenced(identifier)?;
-                removed_data_identifiers.push(identifier.get());
+                removed_data_identifiers.push(identifier);
             }
         }
         removed_data_identifiers.sort_unstable();
@@ -607,7 +609,7 @@ impl KeynoteEditor {
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_media
                     .iter()
-                    .any(|asset| asset.data_identifier.get() == *identifier)
+                    .any(|asset| asset.data_identifier == *identifier)
             })
         {
             return Err(Error::InvalidFormat(
@@ -761,12 +763,27 @@ fn movie_info(
         movie_data_reference_identifier(raw, POSTER_IMAGE_DATA_FIELD, identifier)?;
     let movie: tsd::MovieArchive =
         graph.decode_type(identifier, MOVIE_MESSAGE_TYPE, "TSD.MovieArchive")?;
-    if movie.movie_data.map(|reference| reference.identifier) != movie_data_identifier
-        || movie
-            .poster_image_data
-            .map(|reference| reference.identifier)
-            != poster_image_data_identifier
-    {
+    let movie_data = movie
+        .movie_data
+        .as_ref()
+        .map(|reference| MediaAssetId::try_from(reference.identifier))
+        .transpose()
+        .map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Keynote movie {identifier} has an invalid video data identifier: {error}"
+            ))
+        })?;
+    let poster_image_data = movie
+        .poster_image_data
+        .as_ref()
+        .map(|reference| MediaAssetId::try_from(reference.identifier))
+        .transpose()
+        .map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Keynote movie {identifier} has an invalid poster data identifier: {error}"
+            ))
+        })?;
+    if movie_data != movie_data_identifier || poster_image_data != poster_image_data_identifier {
         return Err(Error::InvalidFormat(format!(
             "Keynote movie {identifier} data-reference projection disagrees with MovieArchive"
         )));
@@ -811,7 +828,7 @@ fn movie_data_reference_identifier(
     source: &[u8],
     field_number: u32,
     movie_identifier: u64,
-) -> Result<Option<u64>> {
+) -> Result<Option<MediaAssetId>> {
     let payloads = repeated_length_delimited_payloads(source, field_number)?;
     if payloads.len() > 1 {
         return Err(Error::InvalidFormat(format!(
@@ -821,16 +838,22 @@ fn movie_data_reference_identifier(
     let Some(payload) = payloads.first().copied() else {
         return Ok(None);
     };
-    keynote_media_codec::decode_data_reference(
+    let reference = keynote_media_codec::decode_data_reference(
         payload,
         keynote_media_codec::DecodeOptions::for_source(payload),
     )
-    .map(|reference| Some(reference.identifier()))
     .map_err(|error| {
         Error::InvalidFormat(format!(
             "Keynote movie {movie_identifier} field {field_number} has malformed data reference: {error}"
         ))
-    })
+    })?;
+    MediaAssetId::try_from(reference.identifier())
+        .map(Some)
+        .map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Keynote movie {movie_identifier} field {field_number} has an invalid data identifier: {error}"
+            ))
+        })
 }
 
 fn drawable_size(size: tsp::Size) -> DrawableSize {

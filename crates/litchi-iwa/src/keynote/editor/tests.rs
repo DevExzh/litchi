@@ -24,6 +24,10 @@ const TEST_MOVIE_VIDEO_REPLACEMENT: &[u8] = b"\0\0\0\x18ftypqt  replacement";
 const TEST_MOVIE_POSTER: &[u8] = b"\x89PNG\r\n\x1a\nmovie-poster";
 const TEST_MOVIE_POSTER_REPLACEMENT: &[u8] = b"\x89PNG\r\n\x1a\nreplacement";
 
+fn asset_id(raw: u64) -> MediaAssetId {
+    MediaAssetId::new(raw).expect("test media asset identifiers are non-zero")
+}
+
 fn focused_placeholder_visibility(
     editor: &KeynoteEditor,
     slide_index: usize,
@@ -3153,8 +3157,8 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
     let original = movies[0].clone();
     assert_eq!(original.kind, MovieKind::File);
     assert_eq!(original.drawable_object_id, 70);
-    assert_eq!(original.movie_data_identifier, Some(1));
-    assert_eq!(original.poster_image_data_identifier, Some(2));
+    assert_eq!(original.movie_data_identifier, Some(asset_id(1)));
+    assert_eq!(original.poster_image_data_identifier, Some(asset_id(2)));
     assert_eq!(
         original.original_size,
         Some(DrawableSize {
@@ -3245,7 +3249,7 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
         TEST_MOVIE_VIDEO
     );
     assert_eq!(
-        editor.extract_media(1).unwrap(),
+        editor.extract_media(asset_id(1)).unwrap(),
         TEST_MOVIE_VIDEO_REPLACEMENT
     );
     assert_eq!(
@@ -3255,7 +3259,7 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
         TEST_MOVIE_POSTER
     );
     assert_eq!(
-        editor.extract_media(2).unwrap(),
+        editor.extract_media(asset_id(2)).unwrap(),
         TEST_MOVIE_POSTER_REPLACEMENT
     );
 
@@ -3271,7 +3275,10 @@ fn slide_movie_crud_preserves_shared_assets_and_culls_final_references() {
 
     let removed_original = editor.remove_slide_movie(0, 70).unwrap();
     assert_eq!(removed_original.movie, original);
-    assert_eq!(removed_original.removed_data_identifiers, [1, 2]);
+    assert_eq!(
+        removed_original.removed_data_identifiers,
+        [asset_id(1), asset_id(2)]
+    );
     assert!(editor.slide_movies(0).unwrap().is_empty());
     assert!(editor.slide_builds(0).unwrap().is_empty());
     assert!(editor.media_assets().unwrap().is_empty());
