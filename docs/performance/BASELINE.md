@@ -1,5 +1,40 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0381: DOCX source-backed glossary entry batch
+
+Change 0381 extends the bounded source-backed glossary text owner from one
+entry to a general nonempty caller-bounded batch within one glossary. One
+topology resolution/materialization and one inventory pass resolve canonical
+source-order semantic selectors. Alias duplicates, overlapping selections,
+and duplicate paragraph intents fail closed. Only selected paragraphs are
+staged, with aggregate selector, entry, replacement, and output limits.
+
+Staging measures every replacement size before materialization, uses one
+temporary wrapper at a time, and remains cancellation-atomic. Publication
+changes exactly one glossary Part, preserves root, sibling, and opaque XML,
+and retains exact no-op, source-bound inverse, and source-freshness behavior.
+Glossary create/delete/rename/reorder and metadata edits, cross-part or
+general-story batching, managed editing, durable patch wire, and broad DOCX
+remain outside this tranche.
+
+The focused glossary-batch suite passed `18/18`; the existing story-text suite
+passed `11/11`; the default-feature library passed `926/926`; the all-features
+library passed `935/935` and all integration binaries passed; DOCX doctests
+passed `74` with `31` ignored. Strict Clippy passed with `-D warnings`. The
+crate-boundary gate passed for 64 workspace packages and 240 internal
+dependency declarations with 14 existing debt entries.
+
+Validation used one Cargo process and one test run at a time with
+`CARGO_BUILD_JOBS=1`, disabled incremental/debug build state, one dedicated
+target, serial test threads, a 6 GiB per-process virtual-memory cap, and a
+`>=10 GiB` available-memory launch threshold. This is an OOM-mitigating,
+resource-capped procedure, not proof of OOM prevention. No benchmark or
+memory measurement changes the baseline.
+
+`performance_claim: none`; `claim_authorized: false`. No latency, allocation,
+RSS, I/O, throughput, fixed-memory, broad-DOCX, or system-level
+OOM-prevention claim follows.
+
 ## Change 0380: PPTX source-backed cross-slide image copy
 
 Change 0380 extends the bounded source-backed PPTX cross-slide copy closure

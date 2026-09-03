@@ -1,5 +1,12 @@
 # Performance CRUD coverage
 
+## 2026-09-03: change 0381 adds DOCX source-backed glossary entry batches
+
+- The source-backed glossary text owner now accepts a general nonempty caller-bounded batch within one glossary. One topology resolution/materialization and one inventory pass resolve canonical source-order semantic selectors; alias duplicates, overlapping selections, and duplicate paragraph intents fail closed. Selected-only paragraphs are staged under aggregate selector, entry, replacement, and output limits, with every replacement size measured before materialization and at most one temporary wrapper at a time.
+- Cancellation-atomic staging and exact one-Part publication preserve root, sibling, and opaque XML plus no-op and source-bound inverse behavior. Glossary create/delete/rename/reorder and metadata edits, cross-part or general-story batching, managed editing, durable patch wire, and broad DOCX remain outside this CRUD tranche.
+- The focused glossary-batch suite passed `18/18`; the existing story-text suite passed `11/11`; the default-feature library passed `926/926`; the all-features library passed `935/935` and all integration binaries passed; DOCX doctests passed `74` with `31` ignored. Strict Clippy passed with `-D warnings`; the crate-boundary gate passed for 64 workspace packages and 240 internal declarations with 14 existing debt entries.
+- Validation used one Cargo process and one test run at a time, `CARGO_BUILD_JOBS=1`, disabled incremental/debug build state, one dedicated target, serial test threads, a 6 GiB per-process virtual-memory cap, and a `>=10 GiB` available-memory launch threshold. This is an OOM-mitigating, resource-capped procedure, not proof of OOM prevention. `performance_claim: none`; `claim_authorized: false`; no latency, allocation, RSS, physical-I/O, throughput, fixed-memory, or system-level OOM-prevention claim follows.
+
 ## 2026-09-02: change 0370 adds ODP source-backed catalog evidence
 
 - Three opt-in selectors add source-backed ODP catalog open, list, and selected-slide query evidence over a fixed 12-slide, 13-member media-rich corpus with eight 2 MiB `Pictures/*` members. This measures named catalog lifecycle scopes only; it adds no production CRUD API and is not CRUD-completion evidence.

@@ -1,5 +1,36 @@
 # Performance hotspot inventory
 
+## Change 0381 update
+
+Change 0381 is a DOCX correctness, CRUD-completeness, and bounded-resource
+batch, not a measured hotspot. A general nonempty caller-bounded batch within
+one glossary performs one topology resolution/materialization and one
+inventory pass, resolves canonical source-order semantic selectors, refuses
+alias duplicates/overlaps and duplicate paragraph intents, and stages selected
+paragraphs under aggregate selector, entry, replacement, and output limits.
+Every replacement size is measured before materialization and only one
+temporary wrapper is staged at a time. Exact one-Part publication, no-op,
+source-bound inverse, cancellation atomicity, and root/sibling/opaque XML
+preservation remain in force. Glossary create/delete/rename/reorder and
+metadata edits, cross-part or general-story batching, managed editing,
+durable patch wire, and broad DOCX remain outside the tranche.
+
+The focused glossary-batch suite passed `18/18`, the existing story-text suite
+passed `11/11`, the default-feature library passed `926/926`, the
+all-features library passed `935/935` with all integration binaries passing,
+and DOCX doctests passed `74` with `31` ignored. Strict Clippy and the
+64-package/240-declaration crate-boundary gate passed; the latter reports 14
+existing debt entries.
+
+The validation procedure used one Cargo process and one test run at a time,
+`CARGO_BUILD_JOBS=1`, a 6 GiB per-process virtual-memory cap, and a `>=10 GiB`
+available-memory launch threshold. These are OOM-mitigating,
+resource-capped operating constraints, not evidence that OOM is prevented.
+
+`performance_claim: none`; `claim_authorized: false`. This change establishes
+no hotspot rank, latency, allocation-volume, RSS, I/O, throughput,
+fixed-memory, broad-DOCX, or system-level OOM-prevention result.
+
 ## Change 0380 update
 
 Change 0380 is a PPTX correctness, CRUD-completeness, and bounded-resource
