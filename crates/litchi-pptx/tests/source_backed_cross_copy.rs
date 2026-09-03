@@ -1716,3 +1716,727 @@ where
         .finish_to_bytes()
         .map_err(|error| Error::Invalid(format!("cannot finish fixture ZIP: {error}")))
 }
+
+const SOURCE_PICTURE_MEDIA: &[u8] = b"source-only-media";
+const DESTINATION_COLLISION_MEDIA: &[u8] = b"destination-collision-media";
+
+#[test]
+fn source_backed_cross_copy_copies_one_embedded_picture_closure() -> TestResult {
+    let source_bytes = picture_source_fixture()?;
+    let destination_bytes = destination_fixture_with_media_collision()?;
+    let collision_uri = PackURI::new("/ppt/media/source-only.png").map_err(Error::Uri)?;
+    let expected_unrelated: Vec<u8> = (0..=31).collect();
+
+    let source = open_source(&source_bytes)?;
+    let source_image = source
+        .slide(0)
+        .ok_or_else(|| Error::Invalid("picture source slide is missing".into()))?
+        .read_image(0)?;
+    assert_eq!(source_image.bytes(), SOURCE_PICTURE_MEDIA);
+    assert_eq!(
+        source_image.descriptor().target().content_type(),
+        Some(ct::PNG)
+    );
+
+    for &(insertion_position, copied_position) in &[(1, 1), (2, 2)] {
+        let output = publish(&source_bytes, &destination_bytes, 0, 1, insertion_position)?;
+        let projection = slide_projection(&output)?;
+        assert_eq!(projection.len(), 3);
+        assert_eq!(projection[copied_position].1, "Source One");
+
+        let (target_uri, payload, content_type) = copied_media(&output)?;
+        assert_eq!(target_uri.as_str(), "/ppt/media/source-only-copy1.png");
+        assert_eq!(payload, SOURCE_PICTURE_MEDIA);
+        assert_eq!(content_type, ct::PNG);
+
+        let reopened = open_source(&output)?;
+        let copied_image = reopened
+            .slide(copied_position)
+            .ok_or_else(|| Error::Invalid("copied picture slide is missing".into()))?
+            .read_image(0)?;
+        assert_eq!(copied_image.bytes(), SOURCE_PICTURE_MEDIA);
+        assert_eq!(
+            copied_image.descriptor().target().content_type(),
+            Some(ct::PNG)
+        );
+        assert_eq!(
+            copied_image
+                .descriptor()
+                .target()
+                .part_uri()
+                .map(|uri| uri.as_str()),
+            Some(target_uri.as_str())
+        );
+
+        let package = Package::from_vec(output.clone())?;
+        let opc = package.opc()?;
+        let collision = opc.get_part(&collision_uri)?;
+        assert_eq!(collision.blob(), DESTINATION_COLLISION_MEDIA);
+        assert_eq!(collision.content_type(), "image/jpeg");
+        let unrelated_uri = PackURI::new("/ppt/media/unrelated.png").map_err(Error::Uri)?;
+        let unrelated = opc.get_part(&unrelated_uri)?;
+        assert_eq!(unrelated.blob(), expected_unrelated.as_slice());
+        assert_eq!(unrelated.content_type(), ct::PNG);
+
+        let repeat = publish(&source_bytes, &destination_bytes, 0, 1, insertion_position)?;
+        assert_eq!(output, repeat);
+    }
+    Ok(())
+}
+
+#[test]
+fn source_backed_cross_copy_refuses_unsupported_picture_media_closures() -> TestResult {
+    let valid = picture_source_fixture()?;
+    let destination = destination_fixture()?;
+    let external = external_picture_fixture(&valid)?;
+    let linked = replace_text_member(
+        &valid,
+        "ppt/slides/slide1.xml",
+        r#"r:embed="rIdSourceOnlyImage""#,
+        r#"r:link="rIdSourceOnlyImage""#,
+    )?;
+    let missing_media = replace_text_member(
+        &valid,
+        "ppt/slides/_rels/slide1.xml.rels",
+        r#"Target="../media/source-only.png""#,
+        r#"Target="../media/missing.png""#,
+    )?;
+    let wrong_media_type = replace_text_member(
+        &valid,
+        CONTENT_TYPES_XML,
+        ct::PNG,
+        "application/octet-stream",
+    )?;
+    let outbound_media = add_stored_member(
+        &valid,
+        "ppt/media/_rels/source-only.png.rels",
+        br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdOutbound" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.invalid/outbound" TargetMode="External"/></Relationships>"#,
+    )?;
+    let multiple_pictures = append_direct_picture(&valid, "rIdSourceOnlyImage")?;
+    let second_image = add_second_image_relationship(&valid)?;
+    let multiple_images = replace_text_member(
+        &second_image,
+        "ppt/slides/slide1.xml",
+        r#"<a:blip r:embed="rIdSourceOnlyImage"/>"#,
+        r#"<a:blip r:embed="rIdSourceOnlyImage"/><a:blip r:embed="rIdSecondImage"/>"#,
+    )?;
+    let unreferenced_image = second_image;
+    let mce = replace_text_member(
+        &valid,
+        "ppt/slides/slide1.xml",
+        "<p:sld",
+        "<p:sld xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" mc:Ignorable=\"p14\"",
+    )?;
+    let chart = append_slide_element(&valid, "<p:graphicFrame/>")?;
+    let table = append_slide_element(&valid, "<p:tbl/>")?;
+    let notes = append_slide_element(&valid, "<p:notes/>")?;
+    let ole = append_slide_element(&valid, "<p:oleObj/>")?;
+    let opaque = add_stored_member(&valid, "ppt/opaque.bin", b"opaque")?;
+
+    let _opened_source = open_source(&valid)?;
+    let _opened_destination = open_editor(&destination)?;
+    let cases = [
+        (
+            "external image",
+            external,
+            litchi_pptx::SlideCopyRefusal::UnsupportedRelationship,
+        ),
+        (
+            "linked image",
+            linked,
+            litchi_pptx::SlideCopyRefusal::UnsupportedRelationship,
+        ),
+        (
+            "missing media",
+            missing_media,
+            litchi_pptx::SlideCopyRefusal::AmbiguousTopology,
+        ),
+        (
+            "wrong media type",
+            wrong_media_type,
+            litchi_pptx::SlideCopyRefusal::AmbiguousTopology,
+        ),
+        (
+            "media outbound relationship",
+            outbound_media,
+            litchi_pptx::SlideCopyRefusal::UnsupportedRelationship,
+        ),
+        (
+            "multiple pictures",
+            multiple_pictures,
+            litchi_pptx::SlideCopyRefusal::AmbiguousTopology,
+        ),
+        (
+            "multiple images",
+            multiple_images,
+            litchi_pptx::SlideCopyRefusal::AmbiguousTopology,
+        ),
+        (
+            "unreferenced image relationship",
+            unreferenced_image,
+            litchi_pptx::SlideCopyRefusal::UnsupportedRelationship,
+        ),
+        (
+            "MCE",
+            mce,
+            litchi_pptx::SlideCopyRefusal::MarkupCompatibility,
+        ),
+        (
+            "chart",
+            chart,
+            litchi_pptx::SlideCopyRefusal::UnknownSemanticSurface,
+        ),
+        (
+            "table",
+            table,
+            litchi_pptx::SlideCopyRefusal::UnknownSemanticSurface,
+        ),
+        (
+            "notes",
+            notes,
+            litchi_pptx::SlideCopyRefusal::UnknownSemanticSurface,
+        ),
+        (
+            "OLE",
+            ole,
+            litchi_pptx::SlideCopyRefusal::UnknownSemanticSurface,
+        ),
+        (
+            "opaque member",
+            opaque,
+            litchi_pptx::SlideCopyRefusal::UnknownPhysicalMember,
+        ),
+    ];
+    for (label, candidate, expected) in cases {
+        expect_plan_refusal(label, &candidate, &destination, expected)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn source_backed_cross_copy_refuses_duplicate_scene_trees_and_misplaced_picture_blips() -> TestResult
+{
+    let valid = picture_source_fixture()?;
+    let destination = destination_fixture()?;
+    let duplicate_scene_tree = replace_text_member(
+        &valid,
+        "ppt/slides/slide1.xml",
+        "</p:spTree>",
+        "</p:spTree><p:spTree/>",
+    )?;
+    expect_plan_refusal(
+        "duplicate top-level shape trees",
+        &duplicate_scene_tree,
+        &destination,
+        litchi_pptx::SlideCopyRefusal::AmbiguousTopology,
+    )?;
+
+    let without_direct_blip = replace_text_member(
+        &valid,
+        "ppt/slides/slide1.xml",
+        r#"<p:blipFill><a:blip r:embed="rIdSourceOnlyImage"/>"#,
+        "<p:blipFill>",
+    )?;
+    let misplaced_blip = replace_text_member(
+        &without_direct_blip,
+        "ppt/slides/slide1.xml",
+        "</p:blipFill><p:spPr>",
+        r#"</p:blipFill><a:blip r:embed="rIdSourceOnlyImage"/><p:spPr>"#,
+    )?;
+    expect_plan_refusal(
+        "misplaced picture blip",
+        &misplaced_blip,
+        &destination,
+        litchi_pptx::SlideCopyRefusal::UnknownSemanticSurface,
+    )?;
+    Ok(())
+}
+
+#[test]
+fn source_backed_cross_copy_refuses_image_layout_relationship_id_collision_before_output()
+-> TestResult {
+    let destination = destination_fixture_with_media_collision()?;
+    let destination_package = Package::from_vec(destination.clone())?;
+    let destination_opc = destination_package.opc()?;
+    let anchor_uri = PackURI::new("/ppt/slides/slide2.xml").map_err(Error::Uri)?;
+    let anchor = destination_opc.get_part(&anchor_uri)?;
+    let destination_layout_id = anchor
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == rt::SLIDE_LAYOUT)
+        .map(|relationship| relationship.r_id().to_owned())
+        .ok_or_else(|| {
+            Error::Invalid("destination anchor layout relationship is missing".into())
+        })?;
+    let source = picture_source_with_image_relationship_id(&destination_layout_id)?;
+
+    let source_package = open_source(&source)?;
+    let editor = open_editor(&destination)?;
+    let error = match editor.plan_cross_slide_copy(&source_package, 0, 1, 1) {
+        Ok(_) => panic!("image/layout relationship-ID collision must be refused before output"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error,
+        Error::SlideCopyPlan {
+            kind: litchi_pptx::SlideCopyRefusal::AmbiguousTopology,
+            ..
+        }
+    ));
+    Ok(())
+}
+
+#[test]
+fn source_backed_cross_copy_reserves_before_reading_picture_media() -> TestResult {
+    let source_bytes = picture_source_fixture()?;
+    let destination_bytes = destination_fixture()?;
+    let (media_start, media_end) =
+        zip_member_data_range(&source_bytes, "ppt/media/source-only.png")?;
+    let source_slide_bytes = ArchiveReader::new(&source_bytes)
+        .map_err(|error| Error::Invalid(format!("cannot index source: {error}")))?
+        .read("ppt/slides/slide1.xml")
+        .map_err(|error| Error::Invalid(format!("cannot read source slide: {error}")))?;
+    let destination_presentation_bytes = ArchiveReader::new(&destination_bytes)
+        .map_err(|error| Error::Invalid(format!("cannot index destination: {error}")))?
+        .read(PRESENTATION_XML)
+        .map_err(|error| {
+            Error::Invalid(format!("cannot read destination presentation: {error}"))
+        })?;
+    let media_bytes = ArchiveReader::new(&source_bytes)
+        .map_err(|error| Error::Invalid(format!("cannot index source media: {error}")))?
+        .read("ppt/media/source-only.png")
+        .map_err(|error| Error::Invalid(format!("cannot read source media: {error}")))?;
+    let staged_bytes = source_slide_bytes
+        .len()
+        .checked_add(destination_presentation_bytes.len())
+        .and_then(|bytes| bytes.checked_add(media_bytes.len()))
+        .and_then(|bytes| bytes.checked_add(256))
+        .ok_or_else(|| Error::Invalid("picture staging size overflow".into()))?;
+    let execution_limits = single_execution_limits()?;
+
+    let measure_budget = Budget::root(
+        "pptx-picture-media-measure",
+        Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (measure_cancel, measure_token) = CancellationSource::pair();
+    let measure_context =
+        ExecutionContext::new(measure_budget.clone(), measure_token, execution_limits);
+    let measured_source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+        Arc::new(OwnedSource::new(source_bytes.clone())),
+        ReadLimits::default(),
+        measure_context.clone(),
+    )?;
+    let measured_editor =
+        SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+            Arc::new(OwnedSource::new(destination_bytes.clone())),
+            ReadLimits::default(),
+            measure_context,
+        )?;
+    let baseline = measure_budget.used(Resource::Memory);
+    drop(measured_editor);
+    drop(measured_source);
+    measure_cancel.cancel();
+    let memory_limit = baseline
+        .checked_add(u64::try_from(staged_bytes).map_err(|error| {
+            Error::Invalid(format!("picture staging size does not fit u64: {error}"))
+        })?)
+        .and_then(|bytes| bytes.checked_sub(1))
+        .ok_or_else(|| Error::Invalid("picture memory limit overflow".into()))?;
+
+    let overlaps = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let source_adapter = RangeCountingSource::new(
+        source_bytes.clone(),
+        media_start,
+        media_end,
+        Arc::clone(&overlaps),
+    );
+    let budget = Budget::root(
+        "pptx-picture-media-budget",
+        Limits::new(
+            memory_limit,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+        ),
+    );
+    let (_cancel, token) = CancellationSource::pair();
+    let context = ExecutionContext::new(budget, token, execution_limits);
+    let source = SourceBackedPresentation::from_read_at_with_limits_and_execution_context(
+        Arc::new(source_adapter),
+        ReadLimits::default(),
+        context.clone(),
+    )?;
+    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+        Arc::new(OwnedSource::new(destination_bytes)),
+        ReadLimits::default(),
+        context,
+    )?;
+    let error = match editor.plan_cross_slide_copy(&source, 0, 1, 1) {
+        Ok(_) => panic!("operation reservation must fail before image payload read"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error,
+        Error::Opc(OpcError::Execution(
+            litchi_core::ExecutionError::ResourceLimit(limit)
+        )) if limit.resource == Resource::Memory
+    ));
+    assert_eq!(
+        overlaps.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "budget refusal must not request bytes overlapping the image payload"
+    );
+    Ok(())
+}
+
+fn expect_plan_refusal(
+    label: &str,
+    source_bytes: &[u8],
+    destination_bytes: &[u8],
+    expected: litchi_pptx::SlideCopyRefusal,
+) -> TestResult {
+    let source = open_source(source_bytes)?;
+    let editor = open_editor(destination_bytes)?;
+    let error = match editor.plan_cross_slide_copy(&source, 0, 1, 1) {
+        Ok(_) => panic!("fixture must reach the cross-copy planner"),
+        Err(error) => error,
+    };
+    match error {
+        Error::SlideCopyPlan { kind, .. } => {
+            assert_eq!(kind, expected, "unexpected refusal for {label}");
+        },
+        other => panic!("unexpected error for {label}: {other:?}"),
+    }
+    Ok(())
+}
+
+fn picture_source_with_image_relationship_id(relationship_id: &str) -> TestResult<Vec<u8>> {
+    let bytes = picture_source_fixture()?;
+    let package = OpcPackage::from_vec(bytes.clone())?;
+    let slide_uri = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Uri)?;
+    let source_layout_id = package
+        .get_part(&slide_uri)?
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == rt::SLIDE_LAYOUT)
+        .map(|relationship| relationship.r_id().to_owned())
+        .ok_or_else(|| Error::Invalid("source layout relationship is missing".into()))?;
+    let source_layout_id = format!(r#"Id="{source_layout_id}""#);
+    let bytes = replace_text_member(
+        &bytes,
+        "ppt/slides/_rels/slide1.xml.rels",
+        &source_layout_id,
+        r#"Id="rIdSourceLayoutForTest""#,
+    )?;
+    let embedded = format!(r#"r:embed="{relationship_id}""#);
+    let bytes = replace_text_member(
+        &bytes,
+        "ppt/slides/slide1.xml",
+        r#"r:embed="rIdSourceOnlyImage""#,
+        &embedded,
+    )?;
+    let relation_id = format!(r#"Id="{relationship_id}""#);
+    replace_text_member(
+        &bytes,
+        "ppt/slides/_rels/slide1.xml.rels",
+        r#"Id="rIdSourceOnlyImage""#,
+        &relation_id,
+    )
+}
+
+fn single_execution_limits() -> TestResult<ExecutionLimits> {
+    ExecutionLimits::new(
+        std::num::NonZeroUsize::new(1).expect("nonzero workers"),
+        std::num::NonZeroUsize::new(1).expect("nonzero tasks"),
+        std::num::NonZeroU64::new(u64::MAX).expect("nonzero in-flight bytes"),
+        0,
+    )
+    .map_err(|error| Error::Invalid(error.to_string()))
+}
+
+#[derive(Clone)]
+struct RangeCountingSource {
+    source: OwnedSource,
+    range_start: u64,
+    range_end: u64,
+    overlaps: Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl RangeCountingSource {
+    fn new(
+        bytes: Vec<u8>,
+        range_start: u64,
+        range_end: u64,
+        overlaps: Arc<std::sync::atomic::AtomicUsize>,
+    ) -> Self {
+        Self {
+            source: OwnedSource::new(bytes),
+            range_start,
+            range_end,
+            overlaps,
+        }
+    }
+}
+
+impl ReadAt for RangeCountingSource {
+    fn len(&self) -> io::Result<u64> {
+        self.source.len()
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let request_end = offset.saturating_add(output.len() as u64);
+        if offset < self.range_end && request_end > self.range_start {
+            self.overlaps
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+        self.source.read_at(offset, output)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        self.source.version()
+    }
+}
+
+fn zip_member_data_range(bytes: &[u8], wanted: &str) -> TestResult<(u64, u64)> {
+    let eocd = bytes
+        .windows(4)
+        .rposition(|window| window == 0x0605_4b50_u32.to_le_bytes())
+        .ok_or_else(|| Error::Invalid("fixture ZIP has no EOCD".into()))?;
+    let count = u16::from_le_bytes(
+        bytes
+            .get(eocd + 10..eocd + 12)
+            .ok_or_else(|| Error::Invalid("fixture EOCD count is truncated".into()))?
+            .try_into()
+            .map_err(|_| Error::Invalid("fixture EOCD count is truncated".into()))?,
+    ) as usize;
+    let central_offset = u32::from_le_bytes(
+        bytes
+            .get(eocd + 16..eocd + 20)
+            .ok_or_else(|| Error::Invalid("fixture EOCD offset is truncated".into()))?
+            .try_into()
+            .map_err(|_| Error::Invalid("fixture EOCD offset is truncated".into()))?,
+    ) as usize;
+    let mut cursor = central_offset;
+    for _ in 0..count {
+        let fixed = bytes
+            .get(cursor..cursor + 46)
+            .ok_or_else(|| Error::Invalid("fixture central record is truncated".into()))?;
+        if fixed[..4] != 0x0201_4b50_u32.to_le_bytes() {
+            return Err(Error::Invalid(
+                "fixture central signature is invalid".into(),
+            ));
+        }
+        let read_u16 =
+            |offset: usize| u16::from_le_bytes([fixed[offset], fixed[offset + 1]]) as usize;
+        let compressed_size = u32::from_le_bytes(
+            fixed[20..24]
+                .try_into()
+                .map_err(|_| Error::Invalid("fixture compressed size is truncated".into()))?,
+        ) as u64;
+        let name_len = read_u16(28);
+        let extra_len = read_u16(30);
+        let comment_len = read_u16(32);
+        let local_offset = u32::from_le_bytes(
+            fixed[42..46]
+                .try_into()
+                .map_err(|_| Error::Invalid("fixture local offset is truncated".into()))?,
+        ) as usize;
+        let name = bytes
+            .get(cursor + 46..cursor + 46 + name_len)
+            .ok_or_else(|| Error::Invalid("fixture member name is truncated".into()))?;
+        if name == wanted.as_bytes() {
+            let local = bytes
+                .get(local_offset..local_offset + 30)
+                .ok_or_else(|| Error::Invalid("fixture local record is truncated".into()))?;
+            if local[..4] != 0x0403_4b50_u32.to_le_bytes() {
+                return Err(Error::Invalid("fixture local signature is invalid".into()));
+            }
+            let local_name_len = u16::from_le_bytes([local[26], local[27]]) as usize;
+            let local_extra_len = u16::from_le_bytes([local[28], local[29]]) as usize;
+            let start = local_offset
+                .checked_add(30)
+                .and_then(|value| value.checked_add(local_name_len))
+                .and_then(|value| value.checked_add(local_extra_len))
+                .ok_or_else(|| Error::Invalid("fixture local payload offset overflow".into()))?;
+            let end = start
+                .checked_add(usize::try_from(compressed_size).map_err(|_| {
+                    Error::Invalid("fixture compressed size does not fit usize".into())
+                })?)
+                .ok_or_else(|| Error::Invalid("fixture local payload range overflow".into()))?;
+            if end > bytes.len() {
+                return Err(Error::Invalid("fixture local payload is truncated".into()));
+            }
+            return Ok((
+                u64::try_from(start).map_err(|_| {
+                    Error::Invalid("fixture payload offset does not fit u64".into())
+                })?,
+                u64::try_from(end)
+                    .map_err(|_| Error::Invalid("fixture payload end does not fit u64".into()))?,
+            ));
+        }
+        cursor = cursor
+            .checked_add(46 + name_len + extra_len + comment_len)
+            .ok_or_else(|| Error::Invalid("fixture central cursor overflow".into()))?;
+    }
+    Err(Error::Invalid(format!(
+        "fixture has no member named {wanted}"
+    )))
+}
+
+fn picture_source_fixture() -> TestResult<Vec<u8>> {
+    let with_media = add_media_relationship(&source_fixture()?, "ppt/slides/slide1.xml")?;
+    append_direct_picture(&with_media, "rIdSourceOnlyImage")
+}
+
+fn destination_fixture_with_media_collision() -> TestResult<Vec<u8>> {
+    let mut package = OpcPackage::from_vec(destination_fixture()?)?;
+    package.try_add_part(Box::new(BlobPart::new(
+        PackURI::new("/ppt/media/source-only.png").map_err(Error::Uri)?,
+        "image/jpeg".to_owned(),
+        DESTINATION_COLLISION_MEDIA.to_vec(),
+    )))?;
+    Ok(PackageWriter::to_bytes(&package)?)
+}
+
+fn append_direct_picture(bytes: &[u8], relationship_id: &str) -> TestResult<Vec<u8>> {
+    rewrite_member(bytes, "ppt/slides/slide1.xml", |payload| {
+        let xml = std::str::from_utf8(payload)
+            .map_err(|error| Error::Invalid(format!("slide XML is not UTF-8: {error}")))?;
+        let marker = "</p:spTree>";
+        let insertion = xml
+            .rfind(marker)
+            .ok_or_else(|| Error::Invalid("picture fixture has no shape tree".into()))?;
+        let picture = format!(
+            r#"<p:pic><p:nvPicPr><p:cNvPr id="42" name="Photo"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="{relationship_id}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="1" y="2"/><a:ext cx="3" cy="4"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>"#
+        );
+        Ok(format!("{}{picture}{}", &xml[..insertion], &xml[insertion..]).into_bytes())
+    })
+}
+
+fn add_second_image_relationship(bytes: &[u8]) -> TestResult<Vec<u8>> {
+    let mut package = OpcPackage::from_vec(bytes.to_vec())?;
+    package.try_add_part(Box::new(BlobPart::new(
+        PackURI::new("/ppt/media/second-source.png").map_err(Error::Uri)?,
+        ct::PNG.to_owned(),
+        b"second-source-media".to_vec(),
+    )))?;
+    package
+        .get_part_mut(&PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Uri)?)?
+        .rels_mut()
+        .try_add_relationship(
+            rt::IMAGE.to_owned(),
+            "../media/second-source.png".to_owned(),
+            "rIdSecondImage".to_owned(),
+            litchi_opc::TargetMode::Internal,
+        )?;
+    Ok(PackageWriter::to_bytes(&package)?)
+}
+
+fn external_picture_fixture(bytes: &[u8]) -> TestResult<Vec<u8>> {
+    let bytes = replace_text_member(
+        bytes,
+        "ppt/slides/slide1.xml",
+        r#"r:embed="rIdSourceOnlyImage""#,
+        r#"r:embed="rIdExternalImage""#,
+    )?;
+    let bytes = replace_text_member(
+        &bytes,
+        "ppt/slides/_rels/slide1.xml.rels",
+        "rIdSourceOnlyImage",
+        "rIdExternalImage",
+    )?;
+    replace_text_member(
+        &bytes,
+        "ppt/slides/_rels/slide1.xml.rels",
+        r#"Target="../media/source-only.png""#,
+        r#"Target="https://example.invalid/picture.png" TargetMode="External""#,
+    )
+}
+
+fn append_slide_element(bytes: &[u8], element: &str) -> TestResult<Vec<u8>> {
+    rewrite_member(bytes, "ppt/slides/slide1.xml", |payload| {
+        let xml = std::str::from_utf8(payload)
+            .map_err(|error| Error::Invalid(format!("slide XML is not UTF-8: {error}")))?;
+        let marker = "</p:spTree>";
+        let insertion = xml
+            .rfind(marker)
+            .ok_or_else(|| Error::Invalid("surface fixture has no shape tree".into()))?;
+        Ok(format!("{}{element}{}", &xml[..insertion], &xml[insertion..]).into_bytes())
+    })
+}
+
+fn replace_text_member(bytes: &[u8], member: &str, from: &str, to: &str) -> TestResult<Vec<u8>> {
+    rewrite_member(bytes, member, |payload| {
+        let text = std::str::from_utf8(payload)
+            .map_err(|error| Error::Invalid(format!("fixture member is not UTF-8: {error}")))?;
+        if !text.contains(from) {
+            return Err(Error::Invalid(format!(
+                "fixture member {member} lacks replacement text"
+            )));
+        }
+        Ok(text.replace(from, to).into_bytes())
+    })
+}
+
+fn copied_slide_uri(bytes: &[u8]) -> TestResult<PackURI> {
+    let archive = ArchiveReader::new(bytes)
+        .map_err(|error| Error::Invalid(format!("cannot index copied ZIP: {error}")))?;
+    let marker = b"name=\"Source One\"";
+    let mut found = None;
+    for member in archive.file_names() {
+        if !member.starts_with("ppt/slides/slide") || !member.ends_with(".xml") {
+            continue;
+        }
+        let payload = archive.read(member).map_err(|error| {
+            Error::Invalid(format!("cannot read copied slide {member}: {error}"))
+        })?;
+        if payload.windows(marker.len()).any(|window| window == marker) {
+            if found.is_some() {
+                return Err(Error::Invalid(
+                    "copied ZIP contains multiple Source One slides".into(),
+                ));
+            }
+            found = Some(member.to_owned());
+        }
+    }
+    let member =
+        found.ok_or_else(|| Error::Invalid("copied ZIP has no Source One slide".into()))?;
+    PackURI::new(format!("/{member}")).map_err(Error::Uri)
+}
+
+fn copied_media(bytes: &[u8]) -> TestResult<(PackURI, Vec<u8>, String)> {
+    let slide_uri = copied_slide_uri(bytes)?;
+    let package = Package::from_vec(bytes.to_vec())?;
+    let opc = package.opc()?;
+    let slide = opc.get_part(&slide_uri)?;
+    let image_relationships = slide
+        .rels()
+        .iter()
+        .filter(|relationship| matches!(relationship.reltype(), rt::IMAGE | rt::STRICT_IMAGE))
+        .collect::<Vec<_>>();
+    if image_relationships.len() != 1 {
+        return Err(Error::Invalid(format!(
+            "copied slide has {} image relationships",
+            image_relationships.len()
+        )));
+    }
+    let target_uri = image_relationships[0].target_partname()?;
+    if !target_uri.as_str().starts_with("/ppt/media/") {
+        return Err(Error::Invalid(
+            "copied image relationship leaves /ppt/media".into(),
+        ));
+    }
+    let media = opc.get_part(&target_uri)?;
+    if !media.rels().is_empty() {
+        return Err(Error::Invalid(
+            "copied image target has outbound relationships".into(),
+        ));
+    }
+    Ok((
+        target_uri,
+        media.blob().to_vec(),
+        media.content_type().to_owned(),
+    ))
+}
