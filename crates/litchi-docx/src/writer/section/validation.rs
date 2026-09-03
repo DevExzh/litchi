@@ -351,8 +351,10 @@ mod tests {
         });
         assert!(header.validate().is_err());
 
-        let mut printer = SectionProperties::default();
-        printer.printer_settings_relationship_id = Some("not valid".to_owned());
+        let printer = SectionProperties {
+            printer_settings_relationship_id: Some("not valid".to_owned()),
+            ..SectionProperties::default()
+        };
         assert!(printer.validate().is_err());
     }
 

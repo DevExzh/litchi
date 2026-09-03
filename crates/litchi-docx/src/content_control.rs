@@ -2345,8 +2345,10 @@ mod tests {
     #[test]
     fn applies_configurable_event_depth_control_and_metadata_limits() {
         let xml = format!(r#"<w:sdtPr xmlns:w="{W}"><w:id w:val="1"/></w:sdtPr>"#);
-        let mut limits = Limits::default();
-        limits.max_content_controls = 1;
+        let mut limits = Limits {
+            max_content_controls: 1,
+            ..Limits::default()
+        };
         assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_ok());
         limits.max_events = 1;
         assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
@@ -2373,8 +2375,10 @@ mod tests {
         .unwrap()
         .xml
         .len();
-        let mut limits = Limits::default();
-        limits.max_output_bytes = 1;
+        let mut limits = Limits {
+            max_output_bytes: 1,
+            ..Limits::default()
+        };
         limits.max_mce_output_bytes = exact_mce_output;
         assert_eq!(
             Inventory::parse_with_limits(xml.as_bytes(), &limits)
@@ -2436,8 +2440,10 @@ mod tests {
         }
         xml.push_str("</w:document>");
 
-        let mut limits = Limits::default();
-        limits.max_depth = SCOPES + 2;
+        let mut limits = Limits {
+            max_depth: SCOPES + 2,
+            ..Limits::default()
+        };
         limits.max_bindings = PREFIXES * (SCOPES + 1);
         assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_ok());
         limits.max_bindings -= 1;
@@ -2451,9 +2457,11 @@ mod tests {
         let single_control = format!(
             r#"<w:sdtPr xmlns:w="{W}"><w:dropDownList>{one}{two}</w:dropDownList></w:sdtPr>"#
         );
-        let mut limits = Limits::default();
-        limits.max_list_items_per_control = 2;
-        limits.max_list_items = 2;
+        let mut limits = Limits {
+            max_list_items_per_control: 2,
+            max_list_items: 2,
+            ..Limits::default()
+        };
         assert_eq!(
             Inventory::parse_with_limits(single_control.as_bytes(), &limits)
                 .unwrap()

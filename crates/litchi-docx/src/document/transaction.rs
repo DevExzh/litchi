@@ -5,7 +5,6 @@ mod durable;
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_core::xml::escape_xml;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -24,7 +23,7 @@ pub use litchi_core::patch::{
     ThreeWayMergeFailure,
 };
 
-const MAX_DOCUMENT_XML_BYTES: usize = 32 * 1024 * 1024;
+pub(crate) const MAX_DOCUMENT_XML_BYTES: usize = 32 * 1024 * 1024;
 const MAX_DOCUMENT_DEPTH: usize = 256;
 const MAX_DOCUMENT_NODES: usize = 1_000_000;
 const MAX_OPERATIONS: usize = 4_096;
@@ -32,6 +31,13 @@ const MAX_REPLACEMENT_TEXT_BYTES: usize = 16 * 1024 * 1024;
 
 /// Result returned by main-document transaction operations.
 pub type TransactionResult<T> = Result<T, TransactionError>;
+
+pub(crate) fn validate_paragraph_text(position: Position, text: &str) -> TransactionResult<()> {
+    validate_authored_text(text).map_err(|reason| TransactionError::Refused {
+        position: position.get(),
+        reason,
+    })
+}
 
 /// A typed reason why a paragraph operation cannot be represented safely.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2001,13 +2007,8 @@ impl Edit {
                 crate::Error::InvalidFormat("paragraph offset does not fit usize".into())
             })?
         };
-        let paragraph = plain_paragraph(self.projected.conformance, &text);
-        let xml = replace_range(
-            self.projected.xml_bytes(),
-            offset,
-            offset,
-            paragraph.as_bytes(),
-        )?;
+        let paragraph = try_plain_paragraph(self.projected.conformance, &text)?;
+        let xml = replace_range(self.projected.xml_bytes(), offset, offset, &paragraph)?;
         let candidate = Snapshot::from_xml(xml)?;
         let readback = candidate
             .paragraph(position)
@@ -2362,8 +2363,8 @@ impl Edit {
         let start = checked_start(range, "paragraph")?;
         let end = checked_end(range, "paragraph")?;
         let source = checked_slice(self.projected.xml_bytes(), start, end, "paragraph")?;
-        let expected = plain_paragraph(self.projected.conformance, expected_text);
-        if source != expected.as_bytes() {
+        let expected = try_plain_paragraph(self.projected.conformance, expected_text)?;
+        if source != expected.as_slice() {
             return Err(TransactionError::SemanticPrecondition);
         }
         let xml = replace_range(self.projected.xml_bytes(), start, end, &[])?;
@@ -3408,27 +3409,137 @@ fn decode_text_fragment(xml: &[u8]) -> Result<String, Refusal> {
 }
 
 fn rewrite_text_owner(xml: &[u8], owner: &TextOwner, text: &str) -> TransactionResult<Vec<u8>> {
-    let characters = text.chars().collect::<Vec<_>>();
-    let mut cursor = 0usize;
-    let mut replacements = Vec::with_capacity(owner.slots.len());
+    preflight_text_owner_rewrite(xml, owner, text)?;
+    let total_characters = text.chars().count();
+    let mut characters = text.char_indices();
+    let mut character_cursor = 0usize;
+    let mut byte_cursor = 0usize;
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve_exact(owner.slots.len())
+        .map_err(|source| {
+            TransactionError::Document(crate::Error::Allocation {
+                resource: "paragraph replacements",
+                source,
+            })
+        })?;
     for (index, slot) in owner.slots.iter().enumerate() {
-        let remaining = characters.len().saturating_sub(cursor);
+        let remaining = total_characters
+            .checked_sub(character_cursor)
+            .ok_or_else(|| {
+                TransactionError::Document(crate::Error::InvalidFormat(
+                    "paragraph text slot cursor exceeded authored text".into(),
+                ))
+            })?;
         let count = if index + 1 == owner.slots.len() {
             remaining
         } else {
             slot.characters.min(remaining)
         };
-        let value = characters[cursor..cursor + count]
-            .iter()
-            .collect::<String>();
-        cursor = cursor.saturating_add(count);
-        replacements.push((
-            slot.start,
-            slot.end,
-            run_content_fragment(&slot.prefix, &slot.local_name, &value).into_bytes(),
-        ));
+        let value_start = byte_cursor;
+        for _ in 0..count {
+            let (_, character) = characters.next().ok_or_else(|| {
+                TransactionError::Document(crate::Error::InvalidFormat(
+                    "paragraph text slot is outside authored text".into(),
+                ))
+            })?;
+            byte_cursor =
+                byte_cursor
+                    .checked_add(character.len_utf8())
+                    .ok_or(TransactionError::Limit {
+                        resource: "replacement text bytes",
+                        max: MAX_REPLACEMENT_TEXT_BYTES,
+                        actual: usize::MAX,
+                    })?;
+        }
+        character_cursor = character_cursor
+            .checked_add(count)
+            .ok_or(TransactionError::Limit {
+                resource: "replacement text characters",
+                max: MAX_REPLACEMENT_TEXT_BYTES,
+                actual: usize::MAX,
+            })?;
+        let value = &text[value_start..byte_cursor];
+        let fragment = try_run_content_fragment(&slot.prefix, &slot.local_name, value)?;
+        replacements.push((slot.start, slot.end, fragment));
     }
     replace_ranges(xml, &replacements)
+}
+
+fn preflight_text_owner_rewrite(
+    xml: &[u8],
+    owner: &TextOwner,
+    text: &str,
+) -> TransactionResult<()> {
+    let total_characters = text.chars().count();
+    let mut characters = text.char_indices();
+    let mut character_cursor = 0usize;
+    let mut byte_cursor = 0usize;
+    let mut output_len = xml.len();
+    for (index, slot) in owner.slots.iter().enumerate() {
+        let remaining = total_characters
+            .checked_sub(character_cursor)
+            .ok_or_else(|| {
+                TransactionError::Document(crate::Error::InvalidFormat(
+                    "paragraph text slot cursor exceeded authored text".into(),
+                ))
+            })?;
+        let count = if index + 1 == owner.slots.len() {
+            remaining
+        } else {
+            slot.characters.min(remaining)
+        };
+        let value_start = byte_cursor;
+        for _ in 0..count {
+            let (_, character) = characters.next().ok_or_else(|| {
+                TransactionError::Document(crate::Error::InvalidFormat(
+                    "paragraph text slot is outside authored text".into(),
+                ))
+            })?;
+            byte_cursor =
+                byte_cursor
+                    .checked_add(character.len_utf8())
+                    .ok_or(TransactionError::Limit {
+                        resource: "replacement text bytes",
+                        max: MAX_REPLACEMENT_TEXT_BYTES,
+                        actual: usize::MAX,
+                    })?;
+        }
+        character_cursor = character_cursor
+            .checked_add(count)
+            .ok_or(TransactionError::Limit {
+                resource: "replacement text characters",
+                max: MAX_REPLACEMENT_TEXT_BYTES,
+                actual: usize::MAX,
+            })?;
+        let value = &text[value_start..byte_cursor];
+        let replacement_len = run_content_fragment_len(&slot.prefix, &slot.local_name, value)?;
+        let removed_len = slot.end.checked_sub(slot.start).ok_or_else(|| {
+            TransactionError::Document(crate::Error::InvalidFormat(
+                "paragraph text slot range is inverted".into(),
+            ))
+        })?;
+        output_len = output_len.checked_sub(removed_len).ok_or_else(|| {
+            TransactionError::Document(crate::Error::InvalidFormat(
+                "paragraph text slot range exceeds document XML".into(),
+            ))
+        })?;
+        output_len = output_len
+            .checked_add(replacement_len)
+            .ok_or(TransactionError::Limit {
+                resource: "XML bytes",
+                max: MAX_DOCUMENT_XML_BYTES,
+                actual: usize::MAX,
+            })?;
+    }
+    if output_len > MAX_DOCUMENT_XML_BYTES {
+        return Err(TransactionError::Limit {
+            resource: "XML bytes",
+            max: MAX_DOCUMENT_XML_BYTES,
+            actual: output_len,
+        });
+    }
+    Ok(())
 }
 
 fn is_transaction_fragment_word_name(
@@ -4664,85 +4775,272 @@ fn validate_authored_run_content(text: &str) -> Result<(), Refusal> {
     Ok(())
 }
 
-fn run_content_fragment(prefix: &[u8], original_local_name: &[u8], text: &str) -> String {
+fn run_content_fragment_len(
+    prefix: &[u8],
+    original_local_name: &[u8],
+    text: &str,
+) -> TransactionResult<usize> {
     let text_local_name = if original_local_name == b"delText" {
         b"delText".as_slice()
     } else {
         b"t".as_slice()
     };
     if text.is_empty() {
-        return text_element_named(prefix, text_local_name, "");
+        return text_element_named_len(prefix, text_local_name, "");
     }
-    let mut output = String::new();
-    let mut plain = String::new();
-    for character in text.chars() {
+    let mut output_len = 0usize;
+    let mut plain_start = 0usize;
+    for (index, character) in text.char_indices() {
         let structural = match character {
-            '\t' => Some("tab"),
-            '\n' => Some("br"),
-            '\r' => Some("cr"),
-            '\u{2011}' => Some("noBreakHyphen"),
-            '\u{00AD}' => Some("softHyphen"),
+            '\t' => Some(b"tab".as_slice()),
+            '\n' => Some(b"br".as_slice()),
+            '\r' => Some(b"cr".as_slice()),
+            '\u{2011}' => Some(b"noBreakHyphen".as_slice()),
+            '\u{00AD}' => Some(b"softHyphen".as_slice()),
             _ => None,
         };
         if let Some(local_name) = structural {
+            let plain = &text[plain_start..index];
             if !plain.is_empty() {
-                output.push_str(&text_element_named(prefix, text_local_name, &plain));
-                plain.clear();
+                output_len = replacement_len_add(
+                    output_len,
+                    text_element_named_len(prefix, text_local_name, plain)?,
+                )?;
             }
-            let prefix_text = String::from_utf8_lossy(prefix);
-            output.push('<');
-            if !prefix_text.is_empty() {
-                output.push_str(&prefix_text);
-                output.push(':');
-            }
-            output.push_str(local_name);
-            output.push_str("/>");
-        } else {
-            plain.push(character);
+            let name_len = qualified_name_len(prefix, local_name)?;
+            output_len = replacement_len_add(output_len, replacement_len_add(3, name_len)?)?;
+            plain_start =
+                index
+                    .checked_add(character.len_utf8())
+                    .ok_or(TransactionError::Limit {
+                        resource: "replacement text bytes",
+                        max: MAX_REPLACEMENT_TEXT_BYTES,
+                        actual: usize::MAX,
+                    })?;
         }
     }
+    let plain = &text[plain_start..];
     if !plain.is_empty() {
-        output.push_str(&text_element_named(prefix, text_local_name, &plain));
+        output_len = replacement_len_add(
+            output_len,
+            text_element_named_len(prefix, text_local_name, plain)?,
+        )?;
     }
-    output
+    Ok(output_len)
 }
 
-fn text_element(prefix: &[u8], text: &str) -> String {
-    text_element_named(prefix, b"t", text)
-}
-
-fn text_element_named(prefix: &[u8], local_name: &[u8], text: &str) -> String {
-    let prefix_text = String::from_utf8_lossy(prefix);
-    let local_name_text = String::from_utf8_lossy(local_name);
-    let name = if prefix_text.is_empty() {
-        local_name_text.into_owned()
+fn try_run_content_fragment(
+    prefix: &[u8],
+    original_local_name: &[u8],
+    text: &str,
+) -> TransactionResult<Vec<u8>> {
+    let capacity = run_content_fragment_len(prefix, original_local_name, text)?;
+    let text_local_name = if original_local_name == b"delText" {
+        b"delText".as_slice()
     } else {
-        format!("{prefix_text}:{local_name_text}")
+        b"t".as_slice()
     };
+    let mut output = Vec::new();
+    output.try_reserve_exact(capacity).map_err(|source| {
+        TransactionError::Document(crate::Error::Allocation {
+            resource: "paragraph replacement XML",
+            source,
+        })
+    })?;
     if text.is_empty() {
-        return format!("<{name}/>");
+        append_text_element_named(&mut output, prefix, text_local_name, text);
+        return Ok(output);
+    }
+    let mut plain_start = 0usize;
+    for (index, character) in text.char_indices() {
+        let structural = match character {
+            '\t' => Some(b"tab".as_slice()),
+            '\n' => Some(b"br".as_slice()),
+            '\r' => Some(b"cr".as_slice()),
+            '\u{2011}' => Some(b"noBreakHyphen".as_slice()),
+            '\u{00AD}' => Some(b"softHyphen".as_slice()),
+            _ => None,
+        };
+        if let Some(local_name) = structural {
+            let plain = &text[plain_start..index];
+            if !plain.is_empty() {
+                append_text_element_named(&mut output, prefix, text_local_name, plain);
+            }
+            output.push(b'<');
+            append_qualified_name(&mut output, prefix, local_name);
+            output.extend_from_slice(b"/>");
+            plain_start =
+                index
+                    .checked_add(character.len_utf8())
+                    .ok_or(TransactionError::Limit {
+                        resource: "replacement text bytes",
+                        max: MAX_REPLACEMENT_TEXT_BYTES,
+                        actual: usize::MAX,
+                    })?;
+        }
+    }
+    let plain = &text[plain_start..];
+    if !plain.is_empty() {
+        append_text_element_named(&mut output, prefix, text_local_name, plain);
+    }
+    debug_assert_eq!(output.len(), capacity);
+    Ok(output)
+}
+
+fn replacement_len_add(left: usize, right: usize) -> TransactionResult<usize> {
+    left.checked_add(right).ok_or(TransactionError::Limit {
+        resource: "replacement XML bytes",
+        max: MAX_DOCUMENT_XML_BYTES,
+        actual: usize::MAX,
+    })
+}
+
+fn qualified_name_len(prefix: &[u8], local_name: &[u8]) -> TransactionResult<usize> {
+    replacement_len_add(
+        replacement_len_add(prefix.len(), if prefix.is_empty() { 0 } else { 1 })?,
+        local_name.len(),
+    )
+}
+
+fn text_element_named_len(
+    prefix: &[u8],
+    local_name: &[u8],
+    text: &str,
+) -> TransactionResult<usize> {
+    let name_len = qualified_name_len(prefix, local_name)?;
+    if text.is_empty() {
+        return replacement_len_add(3, name_len);
+    }
+    let preserve = text.chars().next().is_some_and(char::is_whitespace)
+        || text.chars().next_back().is_some_and(char::is_whitespace);
+    let attribute_len = if preserve {
+        b" xml:space=\"preserve\"".len()
+    } else {
+        0
+    };
+    let mut length = replacement_len_add(5, name_len)?;
+    length = replacement_len_add(length, name_len)?;
+    length = replacement_len_add(length, attribute_len)?;
+    replacement_len_add(length, escaped_xml_len(text)?)
+}
+
+fn escaped_xml_len(text: &str) -> TransactionResult<usize> {
+    let mut length = 0usize;
+    for byte in text.bytes() {
+        let encoded_len = match byte {
+            b'&' => 5,
+            b'<' | b'>' => 4,
+            b'"' | b'\'' => 6,
+            _ => 1,
+        };
+        length = replacement_len_add(length, encoded_len)?;
+    }
+    Ok(length)
+}
+
+fn append_qualified_name(output: &mut Vec<u8>, prefix: &[u8], local_name: &[u8]) {
+    if !prefix.is_empty() {
+        output.extend_from_slice(prefix);
+        output.push(b':');
+    }
+    output.extend_from_slice(local_name);
+}
+
+fn append_text_element_named(output: &mut Vec<u8>, prefix: &[u8], local_name: &[u8], text: &str) {
+    output.push(b'<');
+    append_qualified_name(output, prefix, local_name);
+    if text.is_empty() {
+        output.extend_from_slice(b"/>");
+        return;
     }
     let preserve = text.chars().next().is_some_and(char::is_whitespace)
         || text.chars().next_back().is_some_and(char::is_whitespace);
     if preserve {
-        format!(
-            "<{name} xml:space=\"preserve\">{}</{name}>",
-            escape_xml(text)
-        )
-    } else {
-        format!("<{name}>{}</{name}>", escape_xml(text))
+        output.extend_from_slice(b" xml:space=\"preserve\"");
     }
+    output.push(b'>');
+    append_escaped_xml(output, text);
+    output.extend_from_slice(b"</");
+    append_qualified_name(output, prefix, local_name);
+    output.push(b'>');
 }
 
-fn plain_paragraph(conformance: Conformance, text: &str) -> String {
-    if text.is_empty() {
-        return format!("<w:p xmlns:w=\"{}\"/>", conformance.namespace());
+fn append_escaped_xml(output: &mut Vec<u8>, text: &str) {
+    let mut cursor = 0usize;
+    for (index, byte) in text.bytes().enumerate() {
+        let replacement = match byte {
+            b'&' => Some(b"&amp;".as_slice()),
+            b'<' => Some(b"&lt;".as_slice()),
+            b'>' => Some(b"&gt;".as_slice()),
+            b'"' => Some(b"&quot;".as_slice()),
+            b'\'' => Some(b"&apos;".as_slice()),
+            _ => None,
+        };
+        if let Some(replacement) = replacement {
+            output.extend_from_slice(&text.as_bytes()[cursor..index]);
+            output.extend_from_slice(replacement);
+            cursor = index + 1;
+        }
     }
-    format!(
-        "<w:p xmlns:w=\"{}\"><w:r>{}</w:r></w:p>",
-        conformance.namespace(),
-        text_element(b"w", text)
-    )
+    output.extend_from_slice(&text.as_bytes()[cursor..]);
+}
+
+fn try_plain_paragraph(conformance: Conformance, text: &str) -> TransactionResult<Vec<u8>> {
+    let namespace = conformance.namespace().as_bytes();
+    let prefix = b"<w:p xmlns:w=\"";
+    if text.is_empty() {
+        let capacity = replacement_len_add(
+            replacement_len_add(prefix.len(), namespace.len())?,
+            b"\"/>".len(),
+        )?;
+        if capacity > MAX_DOCUMENT_XML_BYTES {
+            return Err(TransactionError::Limit {
+                resource: "XML bytes",
+                max: MAX_DOCUMENT_XML_BYTES,
+                actual: capacity,
+            });
+        }
+        let mut paragraph = Vec::new();
+        paragraph.try_reserve_exact(capacity).map_err(|source| {
+            TransactionError::Document(crate::Error::Allocation {
+                resource: "plain paragraph XML",
+                source,
+            })
+        })?;
+        paragraph.extend_from_slice(prefix);
+        paragraph.extend_from_slice(namespace);
+        paragraph.extend_from_slice(b"\"/>");
+        return Ok(paragraph);
+    }
+    let text_len = text_element_named_len(b"w", b"t", text)?;
+    let capacity = replacement_len_add(
+        replacement_len_add(
+            replacement_len_add(prefix.len(), namespace.len())?,
+            b"\"><w:r>".len(),
+        )?,
+        replacement_len_add(text_len, b"</w:r></w:p>".len())?,
+    )?;
+    if capacity > MAX_DOCUMENT_XML_BYTES {
+        return Err(TransactionError::Limit {
+            resource: "XML bytes",
+            max: MAX_DOCUMENT_XML_BYTES,
+            actual: capacity,
+        });
+    }
+    let mut paragraph = Vec::new();
+    paragraph.try_reserve_exact(capacity).map_err(|source| {
+        TransactionError::Document(crate::Error::Allocation {
+            resource: "plain paragraph XML",
+            source,
+        })
+    })?;
+    paragraph.extend_from_slice(prefix);
+    paragraph.extend_from_slice(namespace);
+    paragraph.extend_from_slice(b"\"><w:r>");
+    append_text_element_named(&mut paragraph, b"w", b"t", text);
+    paragraph.extend_from_slice(b"</w:r></w:p>");
+    debug_assert_eq!(paragraph.len(), capacity);
+    Ok(paragraph)
 }
 
 fn replace_range(
@@ -4859,7 +5157,7 @@ mod tests {
 
         let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
         assert_eq!(restored.xml_bytes(), source.xml_bytes());
-        assert!(matches!(commit.patch().apply(&restored), Ok(_)));
+        assert!(commit.patch().apply(&restored).is_ok());
     }
 
     #[test]
@@ -5256,7 +5554,7 @@ mod tests {
             .plan_three_way(branch("left", "left"), branch("right", "right"))
             .unwrap();
         assert!(!conflict.is_clean());
-        assert!(conflict.conflicts().len() >= 1);
+        assert!(!conflict.conflicts().is_empty());
         conflict.resolve(MergeChoice::Left);
         let merged = conflict.finish().unwrap().commit().unwrap();
         assert!(

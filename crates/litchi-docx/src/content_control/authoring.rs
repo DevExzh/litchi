@@ -740,13 +740,17 @@ mod tests {
             .formatting_allowed(Some(FormattingAllowed::Allowed));
         assert!(write_sdt_pr(&invalid, &Limits::default()).is_err());
 
-        let mut limits = Limits::default();
-        limits.max_output_bytes = 16;
+        let limits = Limits {
+            max_output_bytes: 16,
+            ..Limits::default()
+        };
         let view = AuthoringView::new(1, Kind::Text, Lock::Unlocked);
         assert!(write_sdt_pr(&view, &limits).is_err());
 
-        let mut limits = Limits::default();
-        limits.max_metadata_bytes = 1;
+        let limits = Limits {
+            max_metadata_bytes: 1,
+            ..Limits::default()
+        };
         let view = AuthoringView::new(1, Kind::Text, Lock::Unlocked).tag(Some("ab"));
         assert!(write_sdt_pr(&view, &limits).is_err());
     }
@@ -770,9 +774,7 @@ mod tests {
         let authored = write_sdt_pr(&view, &Limits::default()).unwrap();
         assert_eq!(
             authored.xml(),
-            concat!(
-                r#"<w:sdtPr xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"><w:id w:val="1"/><w:date><mc:AlternateContent><mc:Choice Requires="w14"><w:calendar w:val="umalqura"/></mc:Choice><mc:Fallback><w:calendar w:val="hijri"/></mc:Fallback></mc:AlternateContent></w:date></w:sdtPr>"#
-            )
+            r#"<w:sdtPr xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"><w:id w:val="1"/><w:date><mc:AlternateContent><mc:Choice Requires="w14"><w:calendar w:val="umalqura"/></mc:Choice><mc:Fallback><w:calendar w:val="hijri"/></mc:Fallback></mc:AlternateContent></w:date></w:sdtPr>"#
         );
         assert!(authored.namespace_requirements().word_2010());
     }
@@ -835,12 +837,16 @@ mod tests {
             ("two".to_owned(), "2".to_owned()),
         ];
         let view = AuthoringView::new(1, Kind::Dropdown, Lock::Unlocked).list_items(&items);
-        let mut limits = Limits::default();
-        limits.max_list_items_per_control = 1;
+        let limits = Limits {
+            max_list_items_per_control: 1,
+            ..Limits::default()
+        };
         assert!(write_sdt_pr(&view, &limits).is_err());
 
-        let mut limits = Limits::default();
-        limits.max_list_items = 1;
+        let limits = Limits {
+            max_list_items: 1,
+            ..Limits::default()
+        };
         assert!(write_sdt_pr(&view, &limits).is_err());
     }
 }

@@ -1686,7 +1686,7 @@ mod tests {
             !matches!(
                 node,
                 Node::Element { local_name, .. }
-                    if removed.iter().any(|name| local_name.as_str() == *name)
+                    if removed.contains(&local_name.as_str())
             )
         });
         snapshot.dirty = Dirty {

@@ -1457,16 +1457,20 @@ mod tests {
     #[test]
     fn accepts_exact_configured_source_limit() {
         let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w14"><w:body><w:p><w14:conflictIns w:id="7" w:author="a"/></w:p></w:body></w:document>"#;
-        let mut limits = Limits::default();
-        limits.max_source_bytes = xml.len();
+        let limits = Limits {
+            max_source_bytes: xml.len(),
+            ..Limits::default()
+        };
         assert_eq!(parse(xml, limits).unwrap().conflicts.len(), 1);
     }
 
     #[test]
     fn mce_markers_fit_at_exact_source_limit_for_multiple_conflicts() {
         let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="w14"><w:body><w:p><w14:conflictIns w:id="1" w:author="a"/><w14:conflictDel w:id="2" w:author="b"/></w:p></w:body></w:document>"#;
-        let mut limits = Limits::default();
-        limits.max_source_bytes = xml.len();
+        let limits = Limits {
+            max_source_bytes: xml.len(),
+            ..Limits::default()
+        };
         assert_eq!(parse(xml, limits).unwrap().conflicts.len(), 2);
     }
 
@@ -1642,8 +1646,10 @@ mod tests {
     #[test]
     fn mce_prepass_observes_event_limits() {
         let xml = document("<w:p><w14:conflictIns w:id=\"1\" w:author=\"a\"/></w:p>");
-        let mut limits = Limits::default();
-        limits.max_events = 3;
+        let limits = Limits {
+            max_events: 3,
+            ..Limits::default()
+        };
         assert!(parse(xml.as_bytes(), limits).is_err());
     }
 
@@ -1668,8 +1674,10 @@ mod tests {
         let xml = document(
             "<w:p><w14:conflictIns w:id=\"1\" w:author=\"a\">a<![CDATA[b]]></w14:conflictIns></w:p>",
         );
-        let mut exact = Limits::default();
-        exact.max_text_segments = 2;
+        let mut exact = Limits {
+            max_text_segments: 2,
+            ..Limits::default()
+        };
         assert!(parse(xml.as_bytes(), exact).is_ok());
         exact.max_text_segments = 1;
         assert!(parse(xml.as_bytes(), exact).is_err());
@@ -1686,9 +1694,11 @@ mod tests {
             content.push_str("</w:customXml>");
         }
         content.push_str("</w:p>");
-        let mut limits = Limits::default();
-        limits.max_depth = 16;
-        limits.max_attributes = 5;
+        let limits = Limits {
+            max_depth: 16,
+            max_attributes: 5,
+            ..Limits::default()
+        };
         assert!(parse(document(&content).as_bytes(), limits).is_ok());
     }
 
@@ -1703,9 +1713,11 @@ mod tests {
         xml.push_str(
             r#"><w:body><w:p><w14:conflictIns w:id="1" w:author="a"/></w:p></w:body></w:document>"#,
         );
-        let mut limits = Limits::default();
-        limits.max_depth = 4;
-        limits.max_attributes = 2;
+        let limits = Limits {
+            max_depth: 4,
+            max_attributes: 2,
+            ..Limits::default()
+        };
         assert!(parse(xml.as_bytes(), limits).is_err());
     }
 
@@ -1714,8 +1726,10 @@ mod tests {
         let xml = document(
             "<w:p><w14:conflictIns w:id=\"1\" w:author=\"a\" w:ignored=\"unretained\"/></w:p>",
         );
-        let mut limits = Limits::default();
-        limits.max_metadata_bytes = 1;
+        let mut limits = Limits {
+            max_metadata_bytes: 1,
+            ..Limits::default()
+        };
         assert!(parse(xml.as_bytes(), limits).is_ok());
         limits.max_metadata_bytes = 0;
         assert!(parse(xml.as_bytes(), limits).is_err());
@@ -1726,8 +1740,10 @@ mod tests {
         let xml = document(
             "<w:p xmlns:x=\"urn:test\" x:large=\"this-ancestor-value-is-deliberately-too-large\"><w14:conflictIns w:id=\"1\" w:author=\"a\"/></w:p>",
         );
-        let mut limits = Limits::default();
-        limits.max_attribute_bytes = 32;
+        let mut limits = Limits {
+            max_attribute_bytes: 32,
+            ..Limits::default()
+        };
         assert!(parse(xml.as_bytes(), limits).is_err());
         limits.max_attribute_bytes = 96;
         limits.max_attributes = 5;
@@ -1784,8 +1800,10 @@ mod tests {
             xml.push_str("</x:wrapper>");
         }
         xml.push_str("</w:p></w:body></w:document>");
-        let mut limits = Limits::default();
-        limits.max_depth = 40;
+        let limits = Limits {
+            max_depth: 40,
+            ..Limits::default()
+        };
         assert_eq!(parse(xml.as_bytes(), limits).unwrap().conflicts.len(), 1);
     }
 
@@ -1818,9 +1836,11 @@ mod tests {
             xml.push_str("</w:customXml>");
         }
         xml.push_str("</w:p></w:body></w:document>");
-        let mut limits = Limits::default();
-        limits.max_attributes = 64;
-        limits.max_depth = 80;
+        let limits = Limits {
+            max_attributes: 64,
+            max_depth: 80,
+            ..Limits::default()
+        };
         assert!(parse(xml.as_bytes(), limits).is_err());
     }
 
@@ -1829,9 +1849,11 @@ mod tests {
         let xml = document(
             "<w:p><w14:conflictIns w:id=\"1\" w:author=\"a\"><w14:conflictDel w:id=\"2\" w:author=\"a\">x</w14:conflictDel></w14:conflictIns></w:p>",
         );
-        let mut limits = Limits::default();
-        limits.max_text_segments = 2;
-        limits.max_text_bytes = 2;
+        let mut limits = Limits {
+            max_text_segments: 2,
+            max_text_bytes: 2,
+            ..Limits::default()
+        };
         let parsed = parse(xml.as_bytes(), limits).unwrap();
         assert_eq!(parsed.conflicts[0].text.len(), 1);
         assert_eq!(parsed.conflicts[1].text.len(), 1);

@@ -1017,7 +1017,10 @@ impl<'accounting, D> VerifiedEntryBufReader<'accounting, D> {
 
     fn problem_io(&self) -> io::Error {
         self.problem.as_ref().map_or_else(
-            || io::Error::other("verified ZIP reader failed without a diagnostic"),
+            || io::Error::new(
+                io::ErrorKind::Other,
+                "verified ZIP reader failed without a diagnostic",
+            ),
             VerifiedReaderFailure::as_io_error,
         )
     }
@@ -1165,7 +1168,8 @@ impl<'accounting, D> VerifiedEntryBufReader<'accounting, D> {
                 Ok(buffer) => buffer.is_empty(),
                 Err(_) => {
                     return Err(self.problem.take().unwrap_or_else(|| {
-                        VerifiedReaderFailure::Transport(io::Error::other(
+                        VerifiedReaderFailure::Transport(io::Error::new(
+                            io::ErrorKind::Other,
                             "verified ZIP reader failed without a diagnostic",
                         ))
                     }));
@@ -2325,9 +2329,7 @@ where
                                 .to_string(),
                         }));
                     }
-                    let actual = total_metadata_bytes
-                        .checked_add(CENTRAL_FIXED_RECORD_BYTES)
-                        .unwrap_or(u64::MAX);
+                    let actual = total_metadata_bytes.saturating_add(CENTRAL_FIXED_RECORD_BYTES);
                     return Err(limit_error(
                         LimitResource::MetadataBytes,
                         actual,
@@ -3327,7 +3329,7 @@ fn normalize_str_fallibly(name: &str, resource: &'static str) -> Result<String, 
     normalized
         .try_reserve_exact(name.len())
         .map_err(|source| Error::from(ErrorKind::Allocation { resource, source }))?;
-    for component in name.split(|character| character == '/' || character == '\\') {
+    for component in name.split(['/', '\\']) {
         if component.is_empty() || component == "." {
             continue;
         }
