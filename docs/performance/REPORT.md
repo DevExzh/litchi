@@ -1,5 +1,31 @@
 # Performance program phase report
 
+## Change 0387: OPC source materialization shared payload
+
+Unmanaged `SourceBackedPackage` conversion now passes its cached immutable
+payload Arc directly into the owning Part factory. This removes the former
+per-Part payload `to_vec` and the subsequent Arc-owner allocation while
+preserving source/version/cancellation checks, relationships, signature policy,
+and copy-on-write mutation. Managed packages remain refused before ordinary
+payload reads.
+
+Across matched release allocator reports with three warmups and 15 retained
+samples, the candidate removes exactly two allocation calls per Part. Exact
+allocated-byte reductions are 1,656 bytes for three tiny Parts, 272,384 bytes
+for 256 small Parts, and 16,777,376 bytes for four Parts containing 16 MiB of
+logical payload. Part and logical-source vectors are unchanged. Allocation
+identity tests cover consuming and borrowed conversion, post-source lifetime,
+and owning mutation isolation.
+
+The [summary](results/opc-source-materialization-shared-0387-summary.json)
+and [compressed raw evidence](results/change-0387/) bind the
+control/candidate source blobs, exact patch, release binaries, environment,
+corpus catalogs, and report hashes. Latency is excluded by the selector's
+evidence-only identity and the unbalanced, unpinned protocol. Peak RSS is not
+operation-local; copied/decompressed/recompressed bytes and physical I/O are
+unavailable. Ordinary eager OPC opening and all-Part conversion remain.
+`performance_claim: none`; `claim_authorized: false`.
+
 ## Change 0377: XLSX source-backed missing numeric insert
 
 ### Implementation boundary

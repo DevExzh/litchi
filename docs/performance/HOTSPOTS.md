@@ -1,5 +1,25 @@
 # Performance hotspot inventory
 
+## Change 0387 update
+
+The source-backed OPC owning-conversion hotspot was confirmed at one
+`Arc -> Vec -> Arc` handoff per admitted Part. The unmanaged conversion now
+adopts the cache's immutable payload Arc directly. Operation-scoped allocator
+evidence is exact across 15 samples/shape: 3-Part tiny removes 6 calls/1,656
+bytes, 256-Part many-small removes 512 calls/272,384 bytes, and four-Part
+16 MiB few-large removes 8 calls/16,777,376 bytes. Logical Part counts and
+source read calls/bytes remain invariant. Pointer-identity and mutation tests
+prove independent owning lifetime and copy-on-write separation.
+
+This closes only the duplicate materialization handoff for explicitly selected
+unmanaged source-backed conversion. Default owning OPC open still eagerly
+loads all admitted Parts, and conversion remains proportional to every Part.
+Managed reservations still refuse escape. Broad lazy-default OPC ownership is
+therefore still the higher-impact unresolved hotspot. Timing, peak RSS,
+copied-byte, physical-I/O, decompression, and real-producer conclusions are
+withheld; see [Change 0387](changes/0387-opc-source-materialization-shared-payload.md).
+`performance_claim: none`; `claim_authorized: false`.
+
 ## Change 0382 update
 
 Change 0382 is a PPTX correctness, CRUD-completeness, and bounded-resource

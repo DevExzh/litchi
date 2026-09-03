@@ -1,5 +1,29 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0387 compliance update
+
+The change remains inside the `litchi-opc` package owner and reuses its existing
+private shared-Part constructor. No archive type, raw physical identifier,
+lock, runtime/executor handle, dependency edge, unsafe code, or public CRUD
+surface is introduced. Immutable payload ownership is shared only for
+unmanaged packages; existing Part mutation replaces the owning Arc and leaves
+the source cache unchanged.
+
+Managed `PartData` retains its hierarchical memory/object reservations and
+still refuses bare-Arc escape before ordinary payload reads. Source freshness,
+cancellation/execution, allocation failure, relationship copying, package
+construction, signature policy, final validation, and typed errors remain in
+the same fail-closed sequence. Focused pointer-identity/lifetime/COW tests,
+279 OPC library tests, 97 OPC integration tests, five doctests, strict library
+Clippy, and focused DOCX/PPTX owner gates passed on explicitly selected stable
+Rust 1.98.1; the pinned 1.95 installation lacked Cargo and lint/doc components.
+
+Matched operation-local allocator vectors confirm the exact removed allocation
+mechanism, while latency, RSS, copied-byte, physical-I/O, decompression,
+managed-package, and broad OPC/OOXML conclusions remain withheld. Evidence is
+recorded in [Change 0387](changes/0387-opc-source-materialization-shared-payload.md).
+`performance_claim: none`; `claim_authorized: false`.
+
 ## Change 0377 compliance update
 
 Change 0377 keeps SpreadsheetML cell ownership in `litchi-xlsx`, reuses the

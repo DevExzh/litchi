@@ -1,5 +1,31 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0387: source-backed OPC materialization shares payload allocations
+
+Unmanaged source-backed-to-owning conversion now adopts each cached
+`Arc<Vec<u8>>` through `PartFactory::load_shared` instead of copying the
+payload into a new `Vec` and then allocating a new Arc owner. Managed packages
+remain refused before ordinary payload reads because their cache handles retain
+hierarchical reservations.
+
+Matched release allocator reports used three warmups and 15 retained samples
+on stable Rust 1.98.1. The allocation-call and allocated-byte vectors were
+constant across the samples: tiny compressible removed 6 calls and 1,656
+allocated bytes; many-small incompressible removed 512 calls and 272,384
+bytes; few-large incompressible removed 8 calls and 16,777,376 bytes. In every
+case this is exactly two calls per Part and the uncompressed payload volume
+plus 40 bytes per Part. Part counts, logical source calls, and returned-byte
+vectors were unchanged.
+
+The [0387 summary](results/opc-source-materialization-shared-0387-summary.json)
+and [raw reports/catalogs](results/change-0387/) bind the exact source blobs,
+patch, binaries, environment, corpus hashes, and operation vectors. The
+repository-pinned 1.95 installation lacked Cargo, so the installed stable
+toolchain was selected explicitly. Because the run was not balanced ABBA or
+single-core pinned, latency is withheld. Peak RSS is process-lifetime rather
+than operation-local; copied/decompressed/recompressed bytes and physical I/O
+remain unavailable. `performance_claim: none`; `claim_authorized: false`.
+
 ## Change 0382: PPTX source-backed cross-slide image batch
 
 Change 0382 extends the bounded source-backed PPTX cross-slide copy closure
