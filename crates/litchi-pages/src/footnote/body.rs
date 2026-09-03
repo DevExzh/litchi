@@ -82,6 +82,12 @@ impl From<Position> for Selector {
     }
 }
 
+impl From<usize> for Selector {
+    fn from(index: usize) -> Self {
+        Self::Index(index)
+    }
+}
+
 /// One semantic footnote attached to the Pages body story.
 ///
 /// The body anchor position and user-visible text are retained; native

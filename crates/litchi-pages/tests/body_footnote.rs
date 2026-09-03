@@ -853,6 +853,39 @@ fn rich_fixture_reads_two_notes_and_preserves_metadata_identity_contract() -> Te
 }
 
 #[test]
+fn semantic_snapshot_is_selector_first_and_reuses_one_bounded_read() -> TestResult {
+    let fixture = build_fixture()?;
+    let package = Package::from_bytes(&fixture.bytes)?;
+    let snapshot = package.body_footnote_snapshot()?;
+
+    assert_eq!(snapshot.len(), 2);
+    assert!(!snapshot.is_empty());
+    assert_eq!(
+        snapshot.get(0).map(|note| note.text.as_ref()),
+        Some("First")
+    );
+    assert_eq!(
+        snapshot.select(1usize).map(|note| note.text.as_ref()),
+        Some("Second")
+    );
+    assert_eq!(
+        snapshot
+            .select(Position::from_utf16_index(5)?)
+            .map(|note| note.custom_mark.as_deref()),
+        Some(Some("†"))
+    );
+    assert!(snapshot.select(Selector::index(2)).is_none());
+    assert_eq!(snapshot.iter().count(), snapshot.len());
+    assert_eq!(snapshot.as_slice(), package.body_footnotes()?.as_slice());
+
+    let cloned = snapshot.clone();
+    assert_eq!(cloned.as_slice(), snapshot.as_slice());
+    let edit = package.edit_body_footnote(1usize)?;
+    assert_eq!(edit.before(), snapshot.get(1).expect("second footnote"));
+    Ok(())
+}
+
+#[test]
 fn insert_publishes_graph_metadata_tokens_external_reference_and_inverse() -> TestResult {
     let fixture = build_fixture()?;
     let package = Package::from_bytes(&fixture.bytes)?;

@@ -78,7 +78,7 @@ pub use litchi_iwa_text::{TextPosition, TextSpan};
 pub use package::{__is_valid_pages_text_storage, __semantic_document_from_prepared_source};
 pub use package::{
     BodyFootnoteCommit, BodyFootnoteDiagnostics, BodyFootnoteEdit, BodyFootnoteError,
-    BodyFootnoteLimitKind, BodyFootnotePatch,
+    BodyFootnoteLimitKind, BodyFootnotePatch, BodyFootnoteSnapshot,
 };
 pub use package::{
     BodyTableAppearanceCommit, BodyTableAppearanceDiagnostics, BodyTableAppearanceEdit,

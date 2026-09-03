@@ -567,6 +567,82 @@ pub struct BodyFootnoteEdit<'a> {
     after: Option<Footnote>,
 }
 
+/// Immutable semantic body-footnote values projected from one Pages package.
+///
+/// The snapshot owns only checked positions, user-visible text, and optional
+/// custom markers.  Native attachment, storage, marker, and package-object
+/// identities are deliberately not representable here.  Cloning a snapshot
+/// shares its bounded values through an `Arc`; callers can therefore resolve
+/// several selectors without repeatedly decoding the native graph or copying
+/// every footnote.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BodyFootnoteSnapshot {
+    values: Arc<[Footnote]>,
+}
+
+impl BodyFootnoteSnapshot {
+    fn from_values(values: Vec<Footnote>) -> Self {
+        Self {
+            values: Arc::from(values.into_boxed_slice()),
+        }
+    }
+
+    /// Return the number of rooted body footnotes in source order.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+
+    /// Return whether the rooted body has no footnotes.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
+    /// Borrow all semantic footnotes in their native source order.
+    #[must_use]
+    pub fn as_slice(&self) -> &[Footnote] {
+        &self.values
+    }
+
+    /// Borrow one footnote by zero-based source order.
+    #[must_use]
+    pub fn get(&self, index: usize) -> Option<&Footnote> {
+        self.values.get(index)
+    }
+
+    /// Resolve one position- or source-order selector without exposing native
+    /// object identifiers.
+    #[must_use]
+    pub fn select<S>(&self, selector: S) -> Option<&Footnote>
+    where
+        S: Into<Selector>,
+    {
+        match selector.into() {
+            Selector::Index(index) => self.get(index),
+            Selector::At(position) => self.values.iter().find(|value| value.position == position),
+        }
+    }
+
+    /// Iterate over semantic footnotes in native source order.
+    pub fn iter(&self) -> std::slice::Iter<'_, Footnote> {
+        self.values.iter()
+    }
+
+    fn shared_values(&self) -> Arc<[Footnote]> {
+        Arc::clone(&self.values)
+    }
+}
+
+impl<'a> IntoIterator for &'a BodyFootnoteSnapshot {
+    type Item = &'a Footnote;
+    type IntoIter = std::slice::Iter<'a, Footnote>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl fmt::Debug for BodyFootnoteEdit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -578,15 +654,13 @@ impl fmt::Debug for BodyFootnoteEdit<'_> {
 
 impl<'a> BodyFootnoteEdit<'a> {
     fn new(source: &'a Package, selector: Selector) -> Result<Self, BodyFootnoteError> {
-        let footnotes = source
-            .body_footnotes()
+        let snapshot = source
+            .body_footnote_snapshot()
             .map_err(|_error| BodyFootnoteError::InvalidSource)?;
-        let before = match selector {
-            Selector::Index(index) => footnotes.get(index),
-            Selector::At(position) => footnotes.iter().find(|value| value.position == position),
-        }
-        .ok_or(BodyFootnoteError::NotFound)?
-        .clone();
+        let before = snapshot
+            .select(selector)
+            .ok_or(BodyFootnoteError::NotFound)?
+            .clone();
         let position = before.position;
         Ok(Self {
             source,
@@ -854,12 +928,38 @@ impl BodyFootnoteCommit {
 }
 
 impl Package {
+    /// Read the rooted body-footnote graph into one immutable semantic
+    /// snapshot.
+    ///
+    /// The snapshot is selector-first and archive-free: callers can resolve
+    /// multiple positions or source-order indexes without retaining native
+    /// object identifiers or re-decoding the graph.  Physical source and
+    /// semantic text limits retained by this package are enforced before the
+    /// snapshot is published.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::PackageError::InvalidFormat`] when the rooted graph or
+    /// one of its strict footnote payloads is malformed, and a bounded
+    /// semantic error when the projected values exceed the package limits.
+    pub fn body_footnote_snapshot(&self) -> super::PackageResult<BodyFootnoteSnapshot> {
+        super::project_body_footnotes(
+            self.state.source.components(),
+            self.state.source.limits(),
+            super::effective_text_limit(self.state.source.limits()),
+        )
+        .map(BodyFootnoteSnapshot::from_values)
+    }
+
     /// Stage a selector-first edit of one existing body footnote.
-    pub fn edit_body_footnote(
+    pub fn edit_body_footnote<S>(
         &self,
-        selector: Selector,
-    ) -> Result<BodyFootnoteEdit<'_>, BodyFootnoteError> {
-        BodyFootnoteEdit::new(self, selector)
+        selector: S,
+    ) -> Result<BodyFootnoteEdit<'_>, BodyFootnoteError>
+    where
+        S: Into<Selector>,
+    {
+        BodyFootnoteEdit::new(self, selector.into())
     }
 
     /// Insert one body footnote at a checked UTF-16 position.
@@ -981,16 +1081,16 @@ fn current_footnote_at_optional(
     position: Position,
 ) -> Result<Option<Footnote>, BodyFootnoteError> {
     package
-        .body_footnotes()
+        .body_footnote_snapshot()
         .map_err(map_package_error)
-        .map(|values| values.into_iter().find(|value| value.position == position))
+        .map(|values| values.select(Selector::At(position)).cloned())
 }
 
 fn footnote_sequence(package: &Package) -> Result<Arc<[Footnote]>, BodyFootnoteError> {
     package
-        .body_footnotes()
+        .body_footnote_snapshot()
         .map_err(map_package_error)
-        .map(Into::into)
+        .map(|values| values.shared_values())
 }
 
 fn noop_commit(
@@ -3202,5 +3302,54 @@ fn graph_edge_slot(target: u64, reference: u64, storage: u64, marker: u64) -> Op
         Some(2)
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn footnote(position: u32, text: &'static str) -> Footnote {
+        Footnote::new(
+            Position::from_utf16_index(position as usize)
+                .unwrap_or_else(|error| panic!("valid position: {error}")),
+            text.to_owned().into_boxed_str(),
+        )
+        .unwrap_or_else(|error| panic!("valid footnote: {error}"))
+    }
+
+    #[test]
+    fn semantic_snapshot_resolves_typed_selectors_in_source_order() {
+        let snapshot =
+            BodyFootnoteSnapshot::from_values(vec![footnote(3, "first"), footnote(9, "second")]);
+
+        assert_eq!(snapshot.len(), 2);
+        assert!(!snapshot.is_empty());
+        assert_eq!(
+            snapshot.get(0).map(|value| value.text.as_ref()),
+            Some("first")
+        );
+        assert_eq!(
+            snapshot.select(1usize).map(|value| value.text.as_ref()),
+            Some("second")
+        );
+        assert_eq!(
+            snapshot
+                .select(Position::from_utf16_index(3).unwrap())
+                .map(|value| value.text.as_ref()),
+            Some("first")
+        );
+        assert!(snapshot.select(Selector::index(4)).is_none());
+        assert_eq!(snapshot.iter().count(), 2);
+        assert_eq!(snapshot.into_iter().count(), 2);
+    }
+
+    #[test]
+    fn semantic_snapshot_clone_shares_bounded_values() {
+        let snapshot = BodyFootnoteSnapshot::from_values(vec![footnote(0, "shared")]);
+        let clone = snapshot.clone();
+
+        assert!(Arc::ptr_eq(&snapshot.values, &clone.values));
+        assert_eq!(snapshot.as_slice(), clone.as_slice());
     }
 }
