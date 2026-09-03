@@ -3514,3 +3514,31 @@ MiB with approximately 15 GiB host availability and saturated swap; no
 additional pressure or OOM was observed. No speed, RSS, or OOM-prevention
 claim follows. DOCX, non-Unix, ODT, ODP prepared-package, public eager-smart,
 and selected-part materialization seams remain open.
+## Change 0383 update
+
+Change 0383 adds bounded source-backed cross-slide copying of zero or more
+direct ordinary chart graphic frames alongside the existing 0382 picture
+subset. Only self-contained internal canonical `/ppt/charts/` relationship-free
+leaf parts with a dialect-correct chart content type/root are admitted; ChartEx,
+workbooks, `externalData`, style/color, chart drawing/userShapes, outbound
+relationships, and broader chart graphs are refused. Distinct chart parts are
+copied once while separate slide bindings remain, with deterministic canonical
+part/relationship allocation and exact namespace-resolved `r:id` rewrites.
+Malformed/ambiguous/nested hosts, stray chart namespace content, MCE/DTD/PI,
+unresolved namespaces, stale/foreign/signed/limited inputs, cancellation, and
+unsupported collisions fail closed according to the source-backed contract.
+
+Correctness evidence is focused `52/52`, isolated typed cancellation `1/1`,
+default-feature library `531` passed plus one named filtered test,
+all-features primary library `533` passed plus one named filtered test,
+all-features integrations green with three existing exact exclusions, and
+doctests `6` passed/`2` ignored. Clippy is green with inherited
+`nonminimal_bool`, `clone_on_copy`, and `needless_lifetimes` allowances. The
+boundary audit is `64` packages/`240` internal dependencies/`14` debt edges.
+No performance measurement or performance claim is made.
+
+The run used one Cargo process, one build job, a 6 GiB virtual-memory cap, and
+a 10 GiB `MemAvailable` gate. This is resource-capped/OOM-mitigating execution
+policy, not proof of OOM prevention. See [Change 0383](changes/0383-pptx-source-backed-cross-slide-chart-leaf.md).
+
+`performance_claim: none`; `claim_authorized: false`.

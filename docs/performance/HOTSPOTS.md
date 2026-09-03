@@ -3461,3 +3461,33 @@ configured `ROWS`; quick-XML and observer allocations remain outside the
 fixed input-buffer claim. This is not selected-cell or full-worksheet
 streaming and makes no latency, RSS, or OOM-safety claim. See [Change 0361](changes/0361-bounded-streaming-x14ac-observers.md);
 `performance_claim: none`.
+## Change 0383 update
+
+This change is correctness and bounded-resource evidence for the PPTX
+source-backed cross-slide copy hotspot, not a performance optimization. The
+new chart leaf is admitted only as a direct ordinary graphic-frame leaf with a
+single internal canonical `/ppt/charts/` relationship-free target, matching
+dialect/content type/root, and no chart dependency graph. Distinct chart parts
+are copied once while each source binding remains represented; deterministic
+canonical part/rId allocation and exact namespace-resolved rewriting preserve
+the rest of the slide and package byte structure. The image boundary from 0382
+is unchanged.
+
+ChartEx, workbooks, `externalData`, style/color, chart drawing/userShapes,
+outbound or external links, malformed/ambiguous/nested hosts, stray chart
+namespace content, MCE/DTD/PI, unresolved namespaces, stale/foreign/signed or
+limit-invalid inputs, cancellation failures, and unsupported collisions are
+refused before publication. Source/destination preservation, partial sinks,
+and no durable inverse remain part of the contract.
+
+The evidence is focused `52/52`, isolated cancellation `1/1`, default lib
+`531` plus one named filtered test, all-features primary lib `533` plus one
+named filtered test, integrations green with three exact exclusions, doctests
+`6` passed/`2` ignored, Clippy green with the inherited three allowances, and
+boundary `64/240/14`. No latency, RSS, allocation, throughput, or other
+performance measurement is available or authorized. The serial run used one
+Cargo process/job, a 6 GiB virtual-memory cap, and a 10 GiB `MemAvailable`
+gate; these are resource-capped/OOM-mitigating controls, not proof of OOM
+prevention.
+
+`performance_claim: none`; `claim_authorized: false`.
