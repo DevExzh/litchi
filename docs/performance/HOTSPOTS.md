@@ -1,5 +1,34 @@
 # Performance hotspot inventory
 
+## Change 0379 update
+
+Change 0379 is a DOCX correctness, CRUD-completeness, and bounded-resource
+batch, not a measured hotspot. Source-backed story text now covers one
+existing glossary entry selected by unique Unicode-caseless name, canonical
+ID, combined name and ID, or checked source-order index. The scanner binds an
+exact part/body span and fingerprint, validates relationship/content-type
+ownership, inbound closure, dialect, namespace, entry, output, freshness, and
+signature boundaries, and publishes without re-resolving semantic identity.
+Unselected glossary metadata, sibling entries, opaque XML, unrelated parts,
+and package topology remain exact.
+
+The focused glossary suite passed `12/12`, the prior source-backed story suite
+passed `11/11`, the default-feature library passed `926/926`, the final
+all-features library passed `935/935` with all integration binaries passing,
+and DOCX doctests passed `74` with `31` ignored. Strict Clippy, the
+crate-boundary gate, and independent source-only reviews passed.
+
+The validation procedure used one Cargo process at a time,
+`CARGO_BUILD_JOBS=1`, a 6 GiB per-process virtual-memory cap, a dedicated
+target, serial test threads, and a `>=10 GiB` available-memory launch
+threshold. These are OOM-mitigating controls, not evidence that OOM is
+prevented.
+
+`performance_claim: none`; `claim_authorized: false`. This change establishes
+no hotspot rank, latency, allocation-volume, RSS, I/O, throughput,
+fixed-memory, broad-DOCX, or system-level OOM result. See
+[Change 0379](changes/0379-docx-source-backed-glossary-entry-text.md).
+
 ## Change 0378 update
 
 Change 0378 is a DOCX correctness, CRUD-completeness, and resource-boundary

@@ -1,5 +1,34 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0379: DOCX source-backed glossary entry text
+
+Change 0379 extends the bounded source-backed story-text lifecycle to one
+existing DOCX glossary entry selected by unique Unicode-caseless name,
+canonical ID, combined name and ID, or checked source-order index. Selection
+validates the exact glossary part, entry body span, package and XML dialect,
+relationship/content-type ownership, inbound closure, resource limits, and
+source fingerprint before text projection or editing. Publication applies the
+bound span without semantic re-resolution and preserves glossary properties,
+sibling entries, opaque XML, unrelated parts, and package topology.
+
+The focused glossary suite passed `12/12`; the existing source-backed
+story-text suite passed `11/11`; the default-feature library passed `926/926`;
+the final all-features library passed `935/935` and all integration binaries
+passed. DOCX doctests passed `74` with `31` ignored. Strict Clippy passed with
+`-D warnings`, the 64-package/240-declaration crate-boundary gate passed with
+14 existing debt entries, and independent API/compile and safety/test reviews
+accepted the bounded surface.
+
+Validation used one Cargo process at a time, `CARGO_BUILD_JOBS=1`, disabled
+incremental/debug build state, one dedicated target, serial test threads, a
+6 GiB per-process virtual-memory cap, and a `>=10 GiB` available-memory launch
+threshold. This is an OOM-mitigating, resource-capped procedure, not proof of
+OOM prevention. See [Change 0379](changes/0379-docx-source-backed-glossary-entry-text.md).
+
+`performance_claim: none`; `claim_authorized: false`. No benchmark, latency,
+allocation-volume, RSS, physical-I/O, cold-cache, throughput, scaling,
+fixed-memory, broad-DOCX, or system-level OOM-prevention claim follows.
+
 ## Change 0378: DOCX source-backed secondary-story text
 
 Change 0378 adds a bounded source-backed text lifecycle for selected DOCX
