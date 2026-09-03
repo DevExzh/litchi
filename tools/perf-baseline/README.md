@@ -738,8 +738,8 @@ do not change the default 36 cases / 198 records.
 
 ## ODP source-backed presentation catalog selectors (change 0370)
 
-The current harness exposes 408 selectable cases; the default matrix remains 36
-cases and 198 rows. The three selectors are opt-in and reuse the existing
+Change 0370 exposed 408 selectable cases; the default matrix remains 36 cases
+and 198 rows. The three selectors are opt-in and reuse the existing
 deterministic 12-slide/eight-media ODP corpus:
 
 ```text
@@ -778,6 +778,37 @@ source-version observations must remain deterministic across samples.
 semantic, and source-range evidence only. They make no generic latency,
 physical-I/O, allocation, decompression, cold-cache, throughput, or broad ODF
 claim, and they leave the default 36 cases / 198 records unchanged.
+
+## PPTX source-backed picture queries (change 0392)
+
+Three additional selectors are opt-in:
+
+```text
+pptx_source_backed_images_query
+pptx_source_backed_image_query
+pptx_source_backed_read_image_query
+```
+
+They reuse the existing media-rich `pptx_cross_copy_media_rich` source archive.
+Its selected source slide is the third slide (zero-based index 2) and is
+hard-gated to eight direct
+pictures in scene order. The `images()` selector returns the complete ordered
+metadata inventory; `image(3)` selects one exact descriptor; and
+`read_image(3)` reads that descriptor's embedded payload. Package/root open,
+slide selection, metadata oracles, and all source replay setup remain outside
+the timed query. The read-image evidence records the selected media member's
+compressed source range, exact payload SHA-256, and proves the replay's media
+overlap is limited to that selected range. Metadata selectors require zero
+media payload reads.
+
+Each retained sample carries exact source-read and source-cache counter vectors
+from an independent `InstrumentedSource` replay. The operation-metrics envelope
+uses an operation-scoped allocator vector only when the allocator target
+supports it; it never infers a peak or a production optimization. These are
+correctness and locality evidence only (`performance_claim: none`), with no
+release measurement yet because the host workload is noisy. The selectors
+raise the current selectable registry from 408 to 411 cases and do not change
+the default 36 cases / 198 records.
 
 six additional matched simulated CFB selective-read cases
 (`cfb_selective_simulated_{mini,mini_4095,fat}_{legacy,shared}_read`) reuse the
