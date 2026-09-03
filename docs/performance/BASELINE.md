@@ -1,5 +1,40 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0380: PPTX source-backed cross-slide image copy
+
+Change 0380 extends the bounded source-backed PPTX cross-slide copy closure
+from a dependency-free slide to exactly one direct embedded image leaf. The
+planner requires one direct `p:spTree`, one direct `p:pic`, and one direct
+`p:blipFill/a:blip r:embed` reference to an internal, relationship-free
+`/ppt/media/` `image/*` part. It copies the image bytes and content type as an
+inert payload and allocates a deterministic collision-free destination media
+URI. It does not decode, convert, or render the image.
+
+The focused cross-copy suite passed `22/22`. The default-feature library
+passed `531` tests with
+`stale_and_unsupported_raw_xml_fail_before_publication` excluded. The
+all-features library passed `533/533`, and all integration binaries passed
+with the exact audited exclusions
+`stale_and_unsupported_raw_xml_fail_before_publication`,
+`malformed_presentation_children_are_reported_by_their_owner`, and
+`noncanonical_style_target_survives_transactional_raw_save`. PPTX doctests
+passed `6` with `2` ignored. Strict Clippy passed with the three unrelated
+pre-existing allowances `clippy::nonminimal_bool`, `clippy::clone_on_copy`,
+and `clippy::needless_lifetimes`. The 64-package/240-declaration crate-boundary
+gate passed with 14 existing debt entries, and independent topology/API,
+resource/freshness, and test/compile reviews accepted the bounded closure.
+
+Validation used one Cargo process and one test run at a time,
+`CARGO_BUILD_JOBS=1`, disabled incremental/debug build state, one dedicated
+target, serial test threads, a 6 GiB per-process virtual-memory cap, and a
+`>=10 GiB` available-memory launch threshold. These are OOM-mitigating,
+resource-capped controls, not evidence of OOM prevention. See
+[Change 0380](changes/0380-pptx-source-backed-cross-slide-image-copy.md).
+
+`performance_claim: none`; `claim_authorized: false`. No latency, allocation,
+RSS, physical-I/O, cold-cache, throughput, fixed-memory, image-processing,
+broad media-rich, real-producer, or system-level OOM-prevention claim follows.
+
 ## Change 0379: DOCX source-backed glossary entry text
 
 Change 0379 extends the bounded source-backed story-text lifecycle to one
