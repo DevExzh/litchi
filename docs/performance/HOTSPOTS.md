@@ -1,5 +1,29 @@
 # Performance hotspot inventory
 
+## Change 0378 update
+
+Change 0378 is a DOCX correctness, CRUD-completeness, and resource-boundary
+batch, not a measured hotspot. Source-backed selectors now cover bounded text
+read and exact replacement for individual footnote, endnote, and comment
+entries, with entry ownership, package dialect, relationship/content-type,
+freshness, preservation, inverse, signature, and failure-atomicity checks.
+Glossary entry text remains explicitly deferred.
+
+The focused secondary-story suite passed `25/25`, the existing story-text
+suite passed `11/11`, the default-feature library passed `926/926`, the
+all-features library passed `935/935` with all integration binaries passing,
+and DOCX doctests passed `74` with `31` ignored. The crate-boundary policy
+passed. Strict Clippy passed with `-D warnings`.
+
+The validation procedure used one Cargo process and one test run at a time,
+`CARGO_BUILD_JOBS=1`, a 6 GiB per-process virtual-memory cap, and a `>=10 GiB`
+available-memory launch threshold. These are OOM-mitigating,
+resource-capped operating constraints, not evidence that OOM is prevented.
+
+`performance_claim: none`; `claim_authorized: false`. This change establishes
+no hotspot rank, latency, allocation-volume, RSS, I/O, throughput,
+fixed-memory, or system-level OOM-prevention result.
+
 ## Change 0377 update
 
 Change 0377 is a correctness and CRUD-completeness batch, not a measured

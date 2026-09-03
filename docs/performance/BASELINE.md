@@ -1,5 +1,33 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0378: DOCX source-backed secondary-story text
+
+Change 0378 adds a bounded source-backed text lifecycle for selected DOCX
+footnote, endnote, and comment entries. Selectors validate exact entry
+ownership, relationship/content-type topology, package dialect, and source
+freshness before streaming text or staging an exact text replacement. Forward
+publication preserves unrelated package bytes and the existing source,
+no-op, inverse, and signature fences; ambiguous, missing, managed,
+unsupported, or unsafe secondary-story structures fail closed. Glossary entry
+text is deliberately deferred to a later tranche.
+
+The focused secondary-story suite passed `25/25`; the existing story-text
+suite passed `11/11`; the default-feature library passed `926/926`; the
+all-features library passed `935/935` and all integration binaries passed;
+DOCX doctests passed `74` with `31` ignored. The crate-boundary policy passed.
+Strict Clippy passed with `-D warnings`.
+
+Validation used one Cargo process and one test run at a time with
+`CARGO_BUILD_JOBS=1`, disabled incremental/debug build state, one dedicated
+target, serial test threads, a 6 GiB per-process virtual-memory cap, and a
+`>=10 GiB` available-memory launch threshold. This is an OOM-mitigating,
+resource-capped procedure, not proof of OOM prevention. No benchmark or
+memory measurement changes the baseline.
+
+`performance_claim: none`; `claim_authorized: false`. No latency, allocation,
+RSS, I/O, throughput, fixed-memory, or system-level OOM-prevention claim
+follows.
+
 ## Change 0377: XLSX source-backed missing numeric insert
 
 Change 0377 closes the missing create verb in the guarded source-backed XLSX
