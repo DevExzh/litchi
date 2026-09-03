@@ -28,8 +28,8 @@ use graph::*;
 pub struct NumbersSheetImageInfo {
     pub sheet_id: u64,
     pub drawable_object_id: u64,
-    pub image_data_identifier: u64,
-    pub thumbnail_data_identifier: Option<u64>,
+    pub image_data_identifier: MediaAssetId,
+    pub thumbnail_data_identifier: Option<MediaAssetId>,
     pub geometry: DrawableGeometry,
     /// Shared drawable metadata, including accessibility description and lock state.
     pub properties: DrawableProperties,
@@ -73,7 +73,7 @@ impl NumbersSheetImageOptions {
 pub struct RemovedNumbersSheetImage {
     pub image: NumbersSheetImageInfo,
     /// Assets culled because the removed image held their final package reference.
-    pub removed_data_identifiers: Vec<u64>,
+    pub removed_data_identifiers: Vec<MediaAssetId>,
 }
 
 #[derive(Clone, Copy)]
@@ -160,13 +160,13 @@ impl NumbersEditor {
                 Error::InvalidFormat("Numbers image creation failed validation".to_owned())
             })?;
         let created_graph = image_graph(&verified, sheet_id, ids.drawable)?;
-        let created_data_identifier = MediaAssetId::try_from(created.image_data_identifier)?;
+        let created_data_identifier = created.image_data_identifier;
         if created_data_identifier != asset.data_identifier
             || created.geometry != geometry
             || created.original_size != Some(options.natural_size)
             || created.natural_size != Some(options.natural_size)
             || created_graph.object_ids != ids.all()
-            || verified.extract_media(created_data_identifier.get())? != data
+            || verified.extract_media(created_data_identifier)? != data
         {
             return Err(Error::InvalidFormat(
                 "Numbers image creation produced an inconsistent graph".to_owned(),
@@ -606,8 +606,7 @@ impl NumbersEditor {
         replacement: &[u8],
     ) -> Result<Vec<u8>> {
         let source = image_graph(self, sheet_id.get(), drawable_object_id.get())?;
-        let image_data_identifier = MediaAssetId::try_from(source.info.image_data_identifier)?;
-        self.replace_media(image_data_identifier.get(), replacement)
+        self.replace_media(source.info.image_data_identifier, replacement)
     }
 
     /// Remove an ordinary image, its private graph, and unshared assets.
@@ -678,7 +677,7 @@ impl NumbersEditor {
                 .is_some_and(|asset| !asset.is_referenced())
             {
                 media.remove_unreferenced(identifier)?;
-                removed_data_identifiers.push(identifier.get());
+                removed_data_identifiers.push(identifier);
             }
         }
         removed_data_identifiers.sort_unstable();
@@ -692,7 +691,7 @@ impl NumbersEditor {
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_assets
                     .iter()
-                    .any(|asset| asset.data_identifier.get() == *identifier)
+                    .any(|asset| asset.data_identifier == *identifier)
             })
         {
             return Err(Error::InvalidFormat(

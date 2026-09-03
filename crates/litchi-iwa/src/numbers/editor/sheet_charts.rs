@@ -4111,7 +4111,9 @@ mod tests {
         );
         assert_eq!(
             reopened
-                .extract_media(image.data_identifier().unwrap().get())
+                .extract_media(
+                    crate::MediaAssetId::try_from(image.data_identifier().unwrap().get()).unwrap(),
+                )
                 .unwrap(),
             image_bytes
         );
@@ -4201,7 +4203,9 @@ mod tests {
         );
         assert_eq!(
             reopened
-                .extract_media(image.data_identifier().unwrap().get())
+                .extract_media(
+                    crate::MediaAssetId::try_from(image.data_identifier().unwrap().get()).unwrap(),
+                )
                 .unwrap(),
             image_bytes
         );

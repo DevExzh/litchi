@@ -417,7 +417,7 @@ pub(super) fn movie_graph(
         info.movie_data_identifier,
         info.poster_image_data_identifier,
     ] {
-        if !data_references.contains(&(identifier, drawable_object_id)) {
+        if !data_references.contains(&(identifier.get(), drawable_object_id)) {
             return Err(Error::InvalidFormat(format!(
                 "Numbers movie {drawable_object_id} data {identifier} is missing from archive metadata"
             )));
@@ -474,12 +474,14 @@ fn movie_info(
             Error::InvalidFormat(format!("Numbers movie {identifier} has no video data"))
         })?
         .identifier;
+    let movie_data_identifier = MediaAssetId::try_from(movie_data_identifier)?;
     let poster_image_data_identifier = movie
         .poster_image_data
         .ok_or_else(|| {
             Error::InvalidFormat(format!("Numbers movie {identifier} has no poster data"))
         })?
         .identifier;
+    let poster_image_data_identifier = MediaAssetId::try_from(poster_image_data_identifier)?;
     let playback = media_playback_settings(&movie).map_err(|error| {
         Error::InvalidFormat(format!(
             "Numbers movie {identifier} has invalid playback settings: {error}"

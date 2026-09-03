@@ -726,7 +726,7 @@ pub(super) fn rewrite_native_popup_menu_multi(
     budget
         .charge_scratch_bytes(source_payload_bytes, input.path)
         .map_err(|_| NativePopUpError::Limit)?;
-    let (working, ownership) = merge_popup_members(&input)?;
+    let (working, ownership) = merge_popup_members(&input, budget)?;
     let placement = input
         .members
         .get(input.creation_member_index)
@@ -831,7 +831,7 @@ pub(super) fn existing_popup_model_identifiers_multi(
     budget
         .charge_scratch_bytes(source_payload_bytes, input.path)
         .map_err(|_| NativePopUpError::Limit)?;
-    let (working, _) = merge_popup_members(&input)?;
+    let (working, _) = merge_popup_members(&input, budget)?;
     let placement = input
         .members
         .get(input.creation_member_index)
@@ -855,7 +855,105 @@ pub(super) fn existing_popup_model_identifiers_multi(
     existing_popup_model_identifiers(synthetic, budget, input.path)
 }
 
-fn merge_popup_members(input: &NativePopUpGraphInput<'_>) -> Result<(Archive, Vec<(u64, usize)>)> {
+/// An exact object-ownership index for a private merged archive.
+///
+/// The source/archive order is intentionally kept in each entry so the
+/// projection can preserve physical object order after a binary lookup.  The
+/// index itself is sorted only after the source census is complete; inserting
+/// into a sorted vector would turn a hostile object sequence back into
+/// quadratic shifting work.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct NativeObjectIndexEntry {
+    identifier: u64,
+    member_index: usize,
+    object_index: usize,
+}
+
+#[derive(Debug)]
+struct NativeObjectIndex {
+    entries: Vec<NativeObjectIndexEntry>,
+}
+
+impl NativeObjectIndex {
+    fn with_capacity(capacity: usize) -> Result<Self> {
+        let mut entries = Vec::new();
+        entries
+            .try_reserve_exact(capacity)
+            .map_err(|_| NativePopUpError::Allocation)?;
+        Ok(Self { entries })
+    }
+
+    fn push(&mut self, entry: NativeObjectIndexEntry) {
+        self.entries.push(entry);
+    }
+
+    fn sort_and_reject_duplicates(&mut self) -> Result<()> {
+        self.entries.sort_unstable_by_key(|entry| entry.identifier);
+        if self
+            .entries
+            .windows(2)
+            .any(|window| window[0].identifier == window[1].identifier)
+        {
+            return Err(NativePopUpError::UnsupportedDependency);
+        }
+        Ok(())
+    }
+
+    fn get(&self, identifier: u64) -> Option<NativeObjectIndexEntry> {
+        self.entries
+            .binary_search_by_key(&identifier, |entry| entry.identifier)
+            .ok()
+            .map(|index| self.entries[index])
+    }
+
+    fn set_object_index(&mut self, identifier: u64, object_index: usize) -> Result<()> {
+        let index = self
+            .entries
+            .binary_search_by_key(&identifier, |entry| entry.identifier)
+            .map_err(|_| NativePopUpError::InvalidSource)?;
+        self.entries[index].object_index = object_index;
+        Ok(())
+    }
+
+    fn iter(&self) -> impl Iterator<Item = NativeObjectIndexEntry> + '_ {
+        self.entries.iter().copied()
+    }
+
+    const fn len(&self) -> usize {
+        self.entries.len()
+    }
+}
+
+/// Conservative comparison work for one in-place unstable sort.  The index
+/// is sorted once per private merge, so charging this logarithmic envelope
+/// keeps the budget proportional to the actual asymptotic work without
+/// charging the old quadratic duplicate scan.
+fn sorted_index_work(len: usize) -> Result<usize> {
+    if len < 2 {
+        return Ok(0);
+    }
+    let levels = usize::try_from(usize::BITS - (len - 1).leading_zeros())
+        .map_err(|_| NativePopUpError::InvalidSource)?;
+    len.checked_mul(levels)
+        .ok_or(NativePopUpError::InvalidSource)
+}
+
+/// Conservative comparison work for a bounded binary-search batch.
+fn binary_search_work(index_len: usize, lookup_count: usize) -> Result<usize> {
+    if index_len < 2 || lookup_count == 0 {
+        return Ok(0);
+    }
+    let levels = usize::try_from(usize::BITS - (index_len - 1).leading_zeros())
+        .map_err(|_| NativePopUpError::InvalidSource)?;
+    lookup_count
+        .checked_mul(levels)
+        .ok_or(NativePopUpError::InvalidSource)
+}
+
+fn merge_popup_members(
+    input: &NativePopUpGraphInput<'_>,
+    budget: &mut TransactionBudget,
+) -> Result<(Archive, NativeObjectIndex)> {
     if input.members.is_empty() {
         return Err(NativePopUpError::InvalidSource);
     }
@@ -877,10 +975,7 @@ fn merge_popup_members(input: &NativePopUpGraphInput<'_>) -> Result<(Archive, Ve
         .objects
         .try_reserve_exact(object_count)
         .map_err(|_| NativePopUpError::Allocation)?;
-    let mut ownership = Vec::new();
-    ownership
-        .try_reserve_exact(object_count)
-        .map_err(|_| NativePopUpError::Allocation)?;
+    let mut ownership = NativeObjectIndex::with_capacity(object_count)?;
     for (member_index, member) in input.members.iter().enumerate() {
         if member.member_name.is_empty()
             || input.members[..member_index].iter().any(|prior| {
@@ -890,24 +985,33 @@ fn merge_popup_members(input: &NativePopUpGraphInput<'_>) -> Result<(Archive, Ve
         {
             return Err(NativePopUpError::UnsupportedDependency);
         }
-        for object in &member.archive.objects {
+        for (object_index, object) in member.archive.objects.iter().enumerate() {
             let identifier = object
                 .archive_info
                 .identifier
                 .ok_or(NativePopUpError::InvalidSource)?;
-            if identifier == 0 || ownership.iter().any(|(id, _)| *id == identifier) {
+            if identifier == 0 {
                 return Err(NativePopUpError::UnsupportedDependency);
             }
-            ownership.push((identifier, member_index));
+            ownership.push(NativeObjectIndexEntry {
+                identifier,
+                member_index,
+                object_index,
+            });
             working.objects.push(object.clone());
         }
     }
+    let sort_work = sorted_index_work(ownership.len())?;
+    budget
+        .charge_transaction_work(sort_work, input.path)
+        .map_err(|_| NativePopUpError::Limit)?;
+    ownership.sort_and_reject_duplicates()?;
     Ok((working, ownership))
 }
 
 fn split_popup_candidate(
     input: &NativePopUpGraphInput<'_>,
-    ownership: &[(u64, usize)],
+    ownership: &NativeObjectIndex,
     candidate: &Archive,
     added: &[u64],
     removed: &[u64],
@@ -925,33 +1029,92 @@ fn split_popup_candidate(
             .map_err(|_| NativePopUpError::Allocation)?;
         per_member.push(archive);
     }
-    let mut seen = Vec::new();
-    seen.try_reserve_exact(candidate.objects.len())
-        .map_err(|_| NativePopUpError::Allocation)?;
+    // The old projection kept an unsorted `seen` list and linearly searched
+    // the complete ownership map for every candidate object.  A crafted
+    // archive could therefore force quadratic duplicate/ownership work before
+    // any physical member was emitted.  Build the candidate index in one
+    // source-order pass, sort it once, and use binary searches for the actual
+    // projection pass.  The candidate index replaces `seen`, so its capacity
+    // and sort work are explicitly part of the transaction budget.
+    budget
+        .charge_allocations(candidate.objects.len(), input.path)
+        .map_err(|_| NativePopUpError::Limit)?;
+    let mut candidate_index = NativeObjectIndex::with_capacity(candidate.objects.len())?;
+    let ownership_lookup_work = binary_search_work(ownership.len(), candidate.objects.len())?;
+    budget
+        .charge_transaction_work(ownership_lookup_work, input.path)
+        .map_err(|_| NativePopUpError::Limit)?;
     for object in &candidate.objects {
         let identifier = object
             .archive_info
             .identifier
             .ok_or(NativePopUpError::InvalidSource)?;
-        if seen.contains(&identifier) {
-            return Err(NativePopUpError::UnsupportedDependency);
-        }
-        seen.push(identifier);
-        let member_index =
-            if let Some((_, index)) = ownership.iter().find(|(id, _)| *id == identifier) {
-                *index
-            } else if added.contains(&identifier) {
-                input.creation_member_index
-            } else {
-                return Err(NativePopUpError::InvalidSource);
-            };
-        per_member
-            .get_mut(member_index)
-            .ok_or(NativePopUpError::InvalidSource)?
-            .objects
-            .push(object.clone());
+        let member_index = if let Some(entry) = ownership.get(identifier) {
+            entry.member_index
+        } else if added.contains(&identifier) {
+            input.creation_member_index
+        } else {
+            return Err(NativePopUpError::InvalidSource);
+        };
+        candidate_index.push(NativeObjectIndexEntry {
+            identifier,
+            member_index,
+            object_index: usize::MAX,
+        });
     }
-    for &(identifier, member_index) in ownership {
+    let sort_work = sorted_index_work(candidate_index.len())?;
+    budget
+        .charge_transaction_work(sort_work, input.path)
+        .map_err(|_| NativePopUpError::Limit)?;
+    candidate_index.sort_and_reject_duplicates()?;
+    let candidate_lookup_work = candidate_index
+        .len()
+        .checked_mul(2)
+        .and_then(|count| count.checked_add(ownership.len()))
+        .ok_or(NativePopUpError::InvalidSource)?;
+    budget
+        .charge_transaction_work(
+            binary_search_work(candidate_index.len(), candidate_lookup_work)?,
+            input.path,
+        )
+        .map_err(|_| NativePopUpError::Limit)?;
+    for object in &candidate.objects {
+        let identifier = object
+            .archive_info
+            .identifier
+            .ok_or(NativePopUpError::InvalidSource)?;
+        let entry = candidate_index
+            .get(identifier)
+            .ok_or(NativePopUpError::InvalidSource)?;
+        let destination = per_member
+            .get_mut(entry.member_index)
+            .ok_or(NativePopUpError::InvalidSource)?;
+        let destination_index = destination.objects.len();
+        destination.objects.push(object.clone());
+        candidate_index.set_object_index(identifier, destination_index)?;
+    }
+    let source_object_count = input
+        .members
+        .iter()
+        .try_fold(0usize, |total, member| {
+            total.checked_add(member.archive.objects.len())
+        })
+        .ok_or(NativePopUpError::InvalidSource)?;
+    budget
+        .charge_transaction_work(
+            binary_search_work(
+                candidate_index.len(),
+                ownership
+                    .len()
+                    .checked_add(source_object_count)
+                    .ok_or(NativePopUpError::InvalidSource)?,
+            )?,
+            input.path,
+        )
+        .map_err(|_| NativePopUpError::Limit)?;
+    for entry in ownership.iter() {
+        let identifier = entry.identifier;
+        let member_index = entry.member_index;
         let source_member = input
             .members
             .get(member_index)
@@ -959,21 +1122,18 @@ fn split_popup_candidate(
         let source_object = source_member
             .archive
             .objects
-            .iter()
-            .find(|object| object.archive_info.identifier == Some(identifier))
+            .get(entry.object_index)
             .ok_or(NativePopUpError::InvalidSource)?;
-        let present = per_member[member_index]
-            .objects
-            .iter()
-            .any(|object| object.archive_info.identifier == Some(identifier));
+        let candidate_route = candidate_index.get(identifier);
+        let present = candidate_route.is_some_and(|route| route.member_index == member_index);
         if !present && !removed.contains(&identifier) {
             return Err(NativePopUpError::InvalidSource);
         }
         if present {
-            let candidate_object = per_member[member_index]
-                .objects
-                .iter()
-                .find(|object| object.archive_info.identifier == Some(identifier))
+            let candidate_route = candidate_route.ok_or(NativePopUpError::InvalidSource)?;
+            let candidate_object = per_member
+                .get(member_index)
+                .and_then(|archive| archive.objects.get(candidate_route.object_index))
                 .ok_or(NativePopUpError::InvalidSource)?;
             if !source_object.same_content_ignoring_offsets(candidate_object)
                 && removed.contains(&identifier)
@@ -987,25 +1147,23 @@ fn split_popup_candidate(
     // source order must instead equal source IDs with removals filtered,
     // followed by any newly-created object assigned to this member.
     for (member_index, member) in input.members.iter().enumerate() {
-        let mut expected = member
+        let expected = member
             .archive
             .objects
             .iter()
             .filter_map(|object| object.archive_info.identifier)
             .filter(|identifier| !removed.contains(identifier))
-            .collect::<Vec<_>>();
-        expected.extend(
-            added
-                .iter()
-                .copied()
-                .filter(|_identifier| input.creation_member_index == member_index),
-        );
+            .chain(
+                added
+                    .iter()
+                    .copied()
+                    .filter(|_identifier| input.creation_member_index == member_index),
+            );
         let actual = per_member[member_index]
             .objects
             .iter()
-            .filter_map(|object| object.archive_info.identifier)
-            .collect::<Vec<_>>();
-        if expected != actual {
+            .filter_map(|object| object.archive_info.identifier);
+        if !expected.eq(actual) {
             return Err(NativePopUpError::InvalidSource);
         }
     }
@@ -1057,13 +1215,12 @@ fn split_popup_candidate(
         let source_ids = source_objects
             .iter()
             .filter_map(|object| object.archive_info.identifier)
-            .filter(|identifier| !removed.contains(identifier))
-            .collect::<Vec<_>>();
+            .filter(|identifier| !removed.contains(identifier));
         let candidate_ids = candidate_objects
             .iter()
-            .filter_map(|object| object.archive_info.identifier)
-            .collect::<Vec<_>>();
-        let changed = source_ids != candidate_ids
+            .filter_map(|object| object.archive_info.identifier);
+        let ids_match = source_ids.eq(candidate_ids);
+        let changed = !ids_match
             || source_objects.iter().any(|source_object| {
                 let Some(identifier) = source_object.archive_info.identifier else {
                     return true;
@@ -1071,9 +1228,13 @@ fn split_popup_candidate(
                 if removed.contains(&identifier) {
                     return true;
                 }
-                let Some(candidate_object) = candidate_objects
-                    .iter()
-                    .find(|object| object.archive_info.identifier == Some(identifier))
+                let Some(candidate_route) = candidate_index.get(identifier) else {
+                    return true;
+                };
+                if candidate_route.member_index != member_index {
+                    return true;
+                }
+                let Some(candidate_object) = candidate_objects.get(candidate_route.object_index)
                 else {
                     return true;
                 };
@@ -3118,4 +3279,71 @@ fn patch_row_buffer(
         replacement_offsets = Some(encoded_offsets);
     }
     Ok((output, replacement_offsets))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{NativeObjectIndex, NativeObjectIndexEntry, NativePopUpError, sorted_index_work};
+
+    #[test]
+    fn native_object_index_handles_adversarial_order_and_duplicate() {
+        const COUNT: usize = 16_384;
+        let mut index = NativeObjectIndex::with_capacity(COUNT + 1)
+            .expect("the bounded adversarial index should reserve");
+        for identifier in (1..=u64::try_from(COUNT).expect("count fits in u64")).rev() {
+            index.push(NativeObjectIndexEntry {
+                identifier,
+                member_index: usize::try_from(identifier % 7).expect("small route fits"),
+                object_index: usize::try_from(identifier).expect("count fits in usize"),
+            });
+        }
+        // A duplicate at the end used to make every earlier ownership check
+        // rescan the growing prefix.  Sorting once must reject it without
+        // changing the source-order metadata kept by each unique entry.
+        index.push(NativeObjectIndexEntry {
+            identifier: u64::try_from(COUNT / 2).expect("count fits in u64"),
+            member_index: 99,
+            object_index: usize::MAX,
+        });
+        assert_eq!(
+            index.sort_and_reject_duplicates(),
+            Err(NativePopUpError::UnsupportedDependency)
+        );
+        assert!(
+            sorted_index_work(COUNT).expect("the logarithmic sort bound should fit")
+                < COUNT.saturating_mul(COUNT)
+        );
+    }
+
+    #[test]
+    fn native_object_index_binary_lookup_preserves_routes() {
+        let mut index = NativeObjectIndex::with_capacity(3).expect("index reserve");
+        index.push(NativeObjectIndexEntry {
+            identifier: 30,
+            member_index: 3,
+            object_index: 0,
+        });
+        index.push(NativeObjectIndexEntry {
+            identifier: 10,
+            member_index: 1,
+            object_index: 2,
+        });
+        index.push(NativeObjectIndexEntry {
+            identifier: 20,
+            member_index: 2,
+            object_index: 1,
+        });
+        index
+            .sort_and_reject_duplicates()
+            .expect("unique index should sort");
+        assert_eq!(
+            index.get(10),
+            Some(NativeObjectIndexEntry {
+                identifier: 10,
+                member_index: 1,
+                object_index: 2,
+            })
+        );
+        assert_eq!(index.get(99), None);
+    }
 }

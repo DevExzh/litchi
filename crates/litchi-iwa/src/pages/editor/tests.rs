@@ -755,6 +755,72 @@ fn reachable_floating_drawable_comment_crud_is_guarded() {
 }
 
 #[test]
+fn reachable_zorder_rejects_wrong_message_type_without_mutating_source() {
+    let mut package = anchored_text_box_package();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            archive.object_mut(66).unwrap().messages[0].type_ = 10_014;
+            Ok(())
+        })
+        .unwrap();
+    let editor = PagesEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    let error = editor.drawables().expect_err("wrong z-order message type");
+    assert!(error.to_string().contains("type-10015"));
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn reachable_zorder_rejects_malformed_nested_reference_atomically() {
+    let mut package = anchored_text_box_package();
+    update_zorder_payload(&mut package, |payload| {
+        payload.clear();
+        append_length_delimited(payload, 1, &[0x08, 0x40, 0x08]);
+    });
+    let editor = PagesEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    assert!(editor.drawables().is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn reachable_zorder_accepts_unknown_balanced_groups_and_preserves_source() {
+    let mut package = anchored_text_box_package();
+    update_zorder_payload(&mut package, |payload| {
+        let nested_group = [0x9b, 0x03, 0x08, 0x01, 0x9c, 0x03];
+        payload.clear();
+        let mut first_reference = reference(42).encode_to_vec();
+        first_reference.extend_from_slice(&nested_group);
+        append_length_delimited(payload, 1, &first_reference);
+        append_length_delimited(payload, 1, &reference(64).encode_to_vec());
+        payload.extend_from_slice(&[0xa3, 0x03, 0x08, 0x01, 0xa4, 0x03]);
+    });
+    let editor = PagesEditor::from_package(package).unwrap();
+    let before = editor.to_bytes().unwrap();
+    let drawables = editor.drawables().unwrap();
+    assert!(drawables.iter().any(|drawable| drawable.id.get() == 64));
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+fn update_zorder_payload(package: &mut IWorkPackage, update: impl FnOnce(&mut Vec<u8>)) {
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(66).unwrap();
+            let mut payload = object.messages[0].data.clone();
+            update(&mut payload);
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: 10015,
+                    data: payload,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+}
+
+#[test]
 fn reachable_drawable_text_crud_covers_placeholders_and_text_boxes() {
     let mut editor = PagesEditor::from_package(floating_text_package()).unwrap();
     let text = editor.drawable_text_storages().unwrap();

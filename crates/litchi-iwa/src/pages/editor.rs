@@ -11,6 +11,11 @@ use litchi_iwa_common::comment::{
 use litchi_iwa_protos::pages_body_codec::{
     self as pages_body_codec, DecodeOptions as PagesBodyDecodeOptions, DocumentBodySnapshot,
 };
+use litchi_iwa_protos::pages_drawable_order_codec::{
+    self as pages_drawable_order_codec, DecodeError as PagesDrawableOrderDecodeError,
+    DecodeOptions as PagesDrawableOrderDecodeOptions,
+    WireResourceLimit as PagesDrawableOrderWireResourceLimit,
+};
 use litchi_iwa_protos::pages_movie_caption_codec::{
     self as pages_movie_caption_codec, CaptionInfoWrite,
     DecodeOptions as PagesMovieCaptionDecodeOptions,
@@ -27,6 +32,7 @@ use crate::archive::{ArchiveObject, RawMessage};
 #[allow(deprecated)]
 use crate::comments::IWorkDrawableCommentEditor;
 use crate::media::{MediaAssetId, reachable_embedded_assets};
+use crate::package::PackageLimits;
 use crate::package_metadata::{
     add_component_external_reference, add_component_object_uuids, component_identifier_for_entry,
     component_uuid_identifiers, next_object_identifier, release_package_identifier_suffix,
@@ -2782,17 +2788,7 @@ impl PagesEditor {
 
         if let Some(reference) = document.drawables_zorder {
             reachable.insert(reference.identifier);
-            let zorder: tp::DrawablesZOrderArchive = decode_package_object(
-                self.package(),
-                reference.identifier,
-                "TP.DrawablesZOrderArchive",
-            )?;
-            reachable.extend(
-                zorder
-                    .drawables
-                    .into_iter()
-                    .map(|drawable| drawable.identifier),
-            );
+            extend_reachable_drawable_order(self.package(), reference.identifier, &mut reachable)?;
         }
 
         for reference in document.page_templates {
@@ -3080,6 +3076,153 @@ fn decode_typed_package_object<T: Message + Default>(
             "object {identifier} has no decodable {type_name} payload"
         ))
     })
+}
+
+const PAGES_DRAWABLE_ORDER_MESSAGE_TYPE: u32 = 10_015;
+const PAGES_DRAWABLE_ORDER_RECURSION_LIMIT: u32 = 8;
+const PAGES_DRAWABLE_ORDER_FIELD_MULTIPLIER: usize = 8;
+const PAGES_DRAWABLE_ORDER_WORK_MULTIPLIER: usize = 64;
+
+/// Extend the document reachability set from the strict, borrowed z-order
+/// projection.  This read path deliberately does not materialize the
+/// generated `TP.DrawablesZOrderArchive`; the payload remains borrowed from
+/// the archive for the duration of the identifier scan.
+fn extend_reachable_drawable_order(
+    package: &IWorkPackage,
+    object_identifier: u64,
+    reachable: &mut HashSet<u64>,
+) -> Result<()> {
+    let mut found = false;
+    for name in package.iwa_entry_names() {
+        let archive = package.archive(name)?;
+        let Some(object) = archive.object(object_identifier) else {
+            continue;
+        };
+        if found {
+            return Err(Error::InvalidFormat(format!(
+                "object {object_identifier} occurs in more than one Pages component"
+            )));
+        }
+        found = true;
+        let mut payloads = object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == PAGES_DRAWABLE_ORDER_MESSAGE_TYPE);
+        let message = payloads.next().ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "object {object_identifier} has no type-{PAGES_DRAWABLE_ORDER_MESSAGE_TYPE} TP.DrawablesZOrderArchive payload"
+            ))
+        })?;
+        if payloads.next().is_some() {
+            return Err(Error::InvalidFormat(format!(
+                "object {object_identifier} has multiple type-{PAGES_DRAWABLE_ORDER_MESSAGE_TYPE} TP.DrawablesZOrderArchive payloads"
+            )));
+        }
+        let options = pages_drawable_order_decode_options(package.limits(), &message.data);
+        let snapshot = pages_drawable_order_codec::decode_drawable_order(&message.data, options)
+            .map_err(map_pages_drawable_order_error)?;
+        for identifier in snapshot.identifiers() {
+            find_object_archive(package, identifier)?;
+            reachable.insert(identifier);
+        }
+    }
+    if !found {
+        return Err(Error::InvalidFormat(format!(
+            "object {object_identifier} has no decodable TP.DrawablesZOrderArchive payload"
+        )));
+    }
+    Ok(())
+}
+
+fn pages_drawable_order_decode_options(
+    limits: PackageLimits,
+    source: &[u8],
+) -> PagesDrawableOrderDecodeOptions {
+    let stream_limit = limits
+        .max_iwa_stream_bytes()
+        .clamp(1, WireLimits::MAX_INPUT_BYTES);
+    let archive_limit = limits
+        .archive_limits()
+        .max_archive_bytes()
+        .min(stream_limit)
+        .clamp(1, WireLimits::MAX_INPUT_BYTES);
+    let max_input_bytes = source.len().max(1).min(archive_limit);
+    let max_fields = source
+        .len()
+        .saturating_mul(PAGES_DRAWABLE_ORDER_FIELD_MULTIPLIER)
+        .clamp(1, WireLimits::MAX_FIELDS);
+    let max_work_bytes = source
+        .len()
+        .saturating_mul(PAGES_DRAWABLE_ORDER_WORK_MULTIPLIER)
+        .clamp(1, WireLimits::MAX_REWRITE_WORK);
+    let max_references = source.len().clamp(1, WireLimits::MAX_FIELDS);
+    PagesDrawableOrderDecodeOptions::new(
+        max_input_bytes,
+        max_input_bytes,
+        max_fields,
+        max_work_bytes,
+        PAGES_DRAWABLE_ORDER_RECURSION_LIMIT,
+        max_references,
+    )
+}
+
+fn map_pages_drawable_order_error(error: PagesDrawableOrderDecodeError) -> Error {
+    if let Some(amount) = error.allocation_amount() {
+        return Error::IwaCommon(litchi_iwa_common::Error::Allocation {
+            resource: "Pages drawable-order reachability",
+            amount,
+        });
+    }
+    match error.resource_limit() {
+        Some(PagesDrawableOrderWireResourceLimit::InputBytes { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::InputBytes,
+                observed,
+                limit: maximum,
+            })
+        },
+        Some(PagesDrawableOrderWireResourceLimit::OutputBytes { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::OutputBytes,
+                observed,
+                limit: maximum,
+            })
+        },
+        Some(PagesDrawableOrderWireResourceLimit::Fields { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::Fields,
+                observed,
+                limit: maximum,
+            })
+        },
+        Some(PagesDrawableOrderWireResourceLimit::WorkBytes { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::RewriteWork,
+                observed,
+                limit: maximum,
+            })
+        },
+        Some(PagesDrawableOrderWireResourceLimit::Nesting { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::Nesting,
+                observed: usize::try_from(observed).unwrap_or(usize::MAX),
+                limit: usize::try_from(maximum).unwrap_or(usize::MAX),
+            })
+        },
+        Some(PagesDrawableOrderWireResourceLimit::References { observed, maximum }) => {
+            Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::Fields,
+                observed,
+                limit: maximum,
+            })
+        },
+        Some(_) => Error::InvalidFormat(format!(
+            "Pages drawable-order payload failed strict resource validation: {error}"
+        )),
+        None => Error::InvalidFormat(format!(
+            "Pages drawable-order payload failed strict validation: {error}"
+        )),
+    }
 }
 
 fn decode_optional_typed_package_object<T: Message + Default>(

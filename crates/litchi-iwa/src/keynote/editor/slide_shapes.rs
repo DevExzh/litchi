@@ -1246,6 +1246,7 @@ mod tests {
 
     use super::*;
     use crate::keynote::KeynoteDocumentBuilder;
+    use crate::media::MediaAssetId;
     use crate::shapes::{
         Appearance, BlurRadius, Curve, Curved, Endpoint, Offset, Pattern, RgbColorSpace, RgbaColor,
         Width,
@@ -1666,7 +1667,9 @@ mod tests {
         assert_eq!(image.tint(), Some(tint));
         assert_eq!(
             editor
-                .extract_media(image.data_identifier().unwrap().get())
+                .extract_media(
+                    MediaAssetId::try_from(image.data_identifier().unwrap().get()).unwrap(),
+                )
                 .unwrap(),
             bytes
         );

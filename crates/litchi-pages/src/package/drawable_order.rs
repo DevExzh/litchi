@@ -30,6 +30,7 @@ const ROOT_OBJECT_IDENTIFIER: u64 = 1;
 const ROOT_MESSAGE_TYPE: u32 = 10_000;
 const ROOT_DRAWABLES_Z_ORDER_FIELD: u32 = 20;
 const DRAWABLE_ORDER_MESSAGE_TYPE: u32 = 10_015;
+const ROOT_PREVIEW_NAMES: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"];
 
 const DRAWABLE_ORDER_RECURSION_LIMIT: u32 = 8;
 const DRAWABLE_ORDER_FIELD_MULTIPLIER: usize = 8;
@@ -153,6 +154,8 @@ struct OrderLocation {
     object_index: usize,
     message_index: usize,
     object_identifier: NonZeroU64,
+    body_storage_identifier: Option<NonZeroU64>,
+    body_storage_position: Option<usize>,
 }
 
 /// A mutable semantic body drawable-order edit staged against one immutable
@@ -334,6 +337,7 @@ pub struct BodyDrawableOrderDiagnostics {
     changed: bool,
     touched_components: usize,
     full_reparse_performed: bool,
+    deleted_previews: usize,
 }
 
 impl BodyDrawableOrderDiagnostics {
@@ -342,14 +346,16 @@ impl BodyDrawableOrderDiagnostics {
             changed: false,
             touched_components: 0,
             full_reparse_performed: false,
+            deleted_previews: 0,
         }
     }
 
-    const fn published() -> Self {
+    const fn published(deleted_previews: usize) -> Self {
         Self {
             changed: true,
             touched_components: 1,
             full_reparse_performed: true,
+            deleted_previews,
         }
     }
 
@@ -369,6 +375,12 @@ impl BodyDrawableOrderDiagnostics {
     #[must_use]
     pub const fn full_reparse_performed(self) -> bool {
         self.full_reparse_performed
+    }
+
+    /// Return the number of stale root previews removed in this direction.
+    #[must_use]
+    pub const fn deleted_previews(self) -> usize {
+        self.deleted_previews
     }
 }
 
@@ -489,10 +501,11 @@ impl Package {
             return Err(BodyDrawableOrderError::Verification);
         }
         verify_locality(self, &candidate, patch.proof)?;
+        let deleted_previews = preview_count(self).saturating_sub(preview_count(&candidate));
         Ok(BodyDrawableOrderCommit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: BodyDrawableOrderDiagnostics::published(),
+            diagnostics: BodyDrawableOrderDiagnostics::published(deleted_previews),
         })
     }
 }
@@ -534,6 +547,7 @@ fn commit_edit(
         return Err(BodyDrawableOrderError::Verification);
     }
     verify_locality(edit.source, &candidate, location)?;
+    let deleted_previews = preview_count(edit.source).saturating_sub(preview_count(&candidate));
     let target = candidate.state.source.shared_source();
     let target_handles = handles_for_order(&candidate, &candidate_order)?;
     Ok(BodyDrawableOrderCommit {
@@ -547,7 +561,7 @@ fn commit_edit(
             before: edit.before,
             after: target_handles,
         },
-        diagnostics: BodyDrawableOrderDiagnostics::published(),
+        diagnostics: BodyDrawableOrderDiagnostics::published(deleted_previews),
     })
 }
 
@@ -633,22 +647,33 @@ fn read_order(
         drawable_order_codec::decode_drawable_order_with_report(&message.data, options)
             .map_err(map_codec_error)?;
     reject_external_references(snapshot)?;
+    if let Some(body_storage_identifier) = body_storage_identifier
+        && (body_storage_identifier.get() == ROOT_OBJECT_IDENTIFIER
+            || body_storage_identifier == zorder_identifier
+            || !locations.contains_key(&body_storage_identifier.get()))
+    {
+        return Err(BodyDrawableOrderError::InvalidSource);
+    }
     let mut identifiers = allocate_vec(snapshot.len())?;
     let mut seen = HashSet::new();
     seen.try_reserve(snapshot.len())
         .map_err(|_| BodyDrawableOrderError::Allocation {
             amount: snapshot.len(),
         })?;
-    for identifier in snapshot.identifiers() {
+    let mut body_storage_position = None;
+    for (position, identifier) in snapshot.identifiers().enumerate() {
         let identifier =
             NonZeroU64::new(identifier).ok_or(BodyDrawableOrderError::InvalidSource)?;
         if !locations.contains_key(&identifier.get()) {
             return Err(BodyDrawableOrderError::InvalidSource);
         }
-        if identifier.get() == ROOT_OBJECT_IDENTIFIER
-            || identifier == zorder_identifier
-            || body_storage_identifier == Some(identifier)
-        {
+        if body_storage_identifier == Some(identifier) {
+            if body_storage_position.replace(position).is_some() {
+                return Err(BodyDrawableOrderError::InvalidSource);
+            }
+            continue;
+        }
+        if identifier.get() == ROOT_OBJECT_IDENTIFIER || identifier == zorder_identifier {
             return Err(BodyDrawableOrderError::InvalidSource);
         }
         if !seen.insert(identifier) {
@@ -661,6 +686,8 @@ fn read_order(
         object_index: zorder_object_index,
         message_index,
         object_identifier: zorder_identifier,
+        body_storage_identifier,
+        body_storage_position,
     };
     Ok((location, identifiers))
 }
@@ -854,15 +881,22 @@ fn rewrite_order(
             .map_err(map_codec_error)?;
     reject_external_references(decoded)?;
     let mut decoded_identifiers = allocate_vec(decoded.len())?;
-    for identifier in decoded.identifiers() {
-        decoded_identifiers
-            .push(NonZeroU64::new(identifier).ok_or(BodyDrawableOrderError::InvalidSource)?);
+    let mut body_storage_position = None;
+    for (position, identifier) in decoded.identifiers().enumerate() {
+        let identifier =
+            NonZeroU64::new(identifier).ok_or(BodyDrawableOrderError::InvalidSource)?;
+        if location.body_storage_identifier == Some(identifier) {
+            if body_storage_position.replace(position).is_some() {
+                return Err(BodyDrawableOrderError::InvalidSource);
+            }
+            continue;
+        }
+        decoded_identifiers.push(identifier);
     }
-    if decoded_identifiers != current {
+    if decoded_identifiers != current || body_storage_position != location.body_storage_position {
         return Err(BodyDrawableOrderError::InvalidSource);
     }
-    let mut raw_requested = allocate_vec(requested.len())?;
-    raw_requested.extend(requested.iter().map(|identifier| identifier.get()));
+    let raw_requested = complete_native_order(requested, location)?;
     let (rewritten, _report) = drawable_order_codec::rewrite_drawable_order_with_report(
         &message.data,
         DrawableOrderWrite::new(&raw_requested),
@@ -895,13 +929,25 @@ fn rewrite_order(
         .to_bytes_with_limits(archive_limits)
         .map_err(map_core_error)?;
     let compressed = SnappyStream::compress(&archive_bytes).map_err(map_core_error)?;
+    let mut deleted_previews = Vec::new();
+    deleted_previews
+        .try_reserve_exact(ROOT_PREVIEW_NAMES.len())
+        .map_err(|_| BodyDrawableOrderError::Allocation {
+            amount: ROOT_PREVIEW_NAMES.len(),
+        })?;
+    for name in ROOT_PREVIEW_NAMES {
+        if catalog.package().iter().any(|entry| entry.name() == name) {
+            deleted_previews.push(name);
+        }
+    }
     let output = catalog
         .package()
-        .reassemble_to_bytes(
+        .reassemble_with_deletions_to_bytes(
             &[EntryEdit::new(
                 component_name.as_str(),
                 compressed.as_slice(),
             )],
+            &deleted_previews,
             catalog.limits(),
         )
         .map_err(map_archive_error)?;
@@ -911,6 +957,42 @@ fn rewrite_order(
     Package::from_source_catalog(candidate_source).map_err(map_package_error)
 }
 
+fn complete_native_order(
+    requested: &[NonZeroU64],
+    location: OrderLocation,
+) -> Result<Vec<u64>, BodyDrawableOrderError> {
+    let extra = usize::from(location.body_storage_position.is_some());
+    let amount = requested
+        .len()
+        .checked_add(extra)
+        .ok_or(BodyDrawableOrderError::Allocation { amount: usize::MAX })?;
+    let mut complete = allocate_vec(amount)?;
+    let mut requested = requested.iter();
+    for position in 0..amount {
+        if location.body_storage_position == Some(position) {
+            complete.push(
+                location
+                    .body_storage_identifier
+                    .ok_or(BodyDrawableOrderError::InvalidSource)?
+                    .get(),
+            );
+        } else {
+            complete.push(
+                requested
+                    .next()
+                    .ok_or(BodyDrawableOrderError::InvalidSource)?
+                    .get(),
+            );
+        }
+    }
+    if requested.next().is_some()
+        || (location.body_storage_identifier.is_none() && location.body_storage_position.is_some())
+    {
+        return Err(BodyDrawableOrderError::InvalidSource);
+    }
+    Ok(complete)
+}
+
 fn verify_locality(
     source: &Package,
     candidate: &Package,
@@ -918,16 +1000,47 @@ fn verify_locality(
 ) -> Result<(), BodyDrawableOrderError> {
     let left = source.state.source.package();
     let right = candidate.state.source.package();
-    if left.len() != right.len()
-        || source.state.source.components().len() != candidate.state.source.components().len()
-    {
+    if source.state.source.components().len() != candidate.state.source.components().len() {
         return Err(BodyDrawableOrderError::Verification);
     }
-    for (index, (before, after)) in left.iter().zip(right.iter()).enumerate() {
-        if before.name() != after.name() || before.raw_name() != after.raw_name() {
+    let changed_component_name = source
+        .state
+        .source
+        .components()
+        .get_index(location.component_index)
+        .map(|component| component.name())
+        .ok_or(BodyDrawableOrderError::Verification)?;
+    let mut right_by_name = HashMap::new();
+    right_by_name
+        .try_reserve(right.len())
+        .map_err(|_| BodyDrawableOrderError::Allocation {
+            amount: right.len(),
+        })?;
+    for entry in right.iter() {
+        if right_by_name.insert(entry.name(), entry).is_some() {
             return Err(BodyDrawableOrderError::Verification);
         }
-        if index != location.component_index {
+    }
+    for before in left.iter() {
+        let after = right_by_name.remove(before.name());
+        if ROOT_PREVIEW_NAMES.contains(&before.name()) {
+            if let Some(after) = after {
+                if before.raw_name() != after.raw_name()
+                    || before.data() != after.data()
+                    || before.raw_record().local_record() != after.raw_record().local_record()
+                    || before.raw_record().central_directory_record()
+                        != after.raw_record().central_directory_record()
+                {
+                    return Err(BodyDrawableOrderError::Verification);
+                }
+            }
+            continue;
+        }
+        let after = after.ok_or(BodyDrawableOrderError::Verification)?;
+        if before.raw_name() != after.raw_name() {
+            return Err(BodyDrawableOrderError::Verification);
+        }
+        if before.name() != changed_component_name {
             if before.data() != after.data()
                 || before.raw_record().local_record() != after.raw_record().local_record()
                 || before.raw_record().central_directory_record()
@@ -936,6 +1049,12 @@ fn verify_locality(
                 return Err(BodyDrawableOrderError::Verification);
             }
         }
+    }
+    if right_by_name
+        .keys()
+        .any(|name| !ROOT_PREVIEW_NAMES.contains(name))
+    {
+        return Err(BodyDrawableOrderError::Verification);
     }
     let before_component = source
         .state
@@ -986,6 +1105,20 @@ fn verify_locality(
         }
     }
     Ok(())
+}
+
+fn preview_count(package: &Package) -> usize {
+    ROOT_PREVIEW_NAMES
+        .iter()
+        .filter(|name| {
+            package
+                .state
+                .source
+                .package()
+                .iter()
+                .any(|entry| entry.name() == **name)
+        })
+        .count()
 }
 
 fn object_locations(

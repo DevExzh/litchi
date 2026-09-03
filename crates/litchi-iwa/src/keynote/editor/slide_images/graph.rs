@@ -7,6 +7,7 @@ use crate::image_caption::{
     caption_objects, patch_drawable_caption_reference, replace_object_reference,
     standin_caption_object,
 };
+use crate::media::MediaAssetId;
 use crate::shapes::{
     drawable_properties, geometry_from_drawable, patch_drawable_geometry,
     patch_wrapped_drawable_properties,
@@ -541,6 +542,21 @@ fn image_info(
             ))
         })?
         .identifier;
+    let image_data_identifier = MediaAssetId::try_from(image_data_identifier).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Keynote image {identifier} has an invalid primary data identifier: {error}"
+        ))
+    })?;
+    let thumbnail_data_identifier = image
+        .thumbnail_data
+        .as_ref()
+        .map(|reference| MediaAssetId::try_from(reference.identifier))
+        .transpose()
+        .map_err(|error| {
+            Error::InvalidFormat(format!(
+                "Keynote image {identifier} has an invalid thumbnail data identifier: {error}"
+            ))
+        })?;
     let image_adjustments: ImageAdjustments = image_adjustments_from_archive(&image)?;
     Ok(KeynoteSlideImageInfo {
         slide_index,
@@ -554,7 +570,7 @@ fn image_info(
             KeynoteSlideImageKind::File
         },
         image_data_identifier,
-        thumbnail_data_identifier: image.thumbnail_data.map(|reference| reference.identifier),
+        thumbnail_data_identifier,
         geometry: geometry_from_drawable(&image.super_)?,
         properties: drawable_properties(&image.super_),
         image_adjustments,

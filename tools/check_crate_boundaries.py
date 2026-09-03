@@ -103,6 +103,15 @@ IWA_RAW_MODULE_DECLARATION = re.compile(
 )
 IWA_CORE_SOURCE_ROOT = Path("crates/litchi-iwa/src")
 IWA_CORE_EXAMPLE_SOURCE_ROOT = Path("crates/litchi-iwa/examples")
+IWA_CHARTS_FACADE_SOURCE = IWA_CORE_SOURCE_ROOT / "charts" / "mod.rs"
+RETIRED_IWA_CHARTS_INSPECTION_EXAMPLE = (
+    IWA_CORE_EXAMPLE_SOURCE_ROOT / "inspect_iwa_archive.rs"
+)
+RETIRED_IWA_CHARTS_COMPATIBILITY_MODULE = re.compile(
+    r"^[ \t]*pub(?:\([^()]*\))?[ \t\r\n]+mod[ \t\r\n]+"
+    r"(?:r#)?(?P<module>raw|error_bar)\b",
+    re.MULTILINE,
+)
 # ``Bundle`` now has one canonical byte ingress.  Keep the two historical
 # archive-named aliases retired across the whole compatibility host so a
 # private helper, import alias, or re-export cannot quietly bring either
@@ -14142,6 +14151,34 @@ def audit_iwa_raw_facade_source_topology(root: Path = ROOT) -> list[str]:
         violations.append(
             "litchi-iwa raw facade must remain deprecated: "
             f"{IWA_FACADE_SOURCE}:{line_number}"
+        )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_charts_compatibility_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep retired chart compatibility exports and their example deleted."""
+
+    violations: list[str] = []
+    facade = root / IWA_CHARTS_FACADE_SOURCE
+    if facade.is_file():
+        production_source = _mask_rust_cfg_test_items(
+            facade.read_text(encoding="utf-8")
+        )
+        source = _mask_rust_non_code(production_source)
+        for match in RETIRED_IWA_CHARTS_COMPATIBILITY_MODULE.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa charts compatibility module "
+                f"{match.group('module')}: {IWA_CHARTS_FACADE_SOURCE}:{line_number}"
+            )
+
+    if (root / RETIRED_IWA_CHARTS_INSPECTION_EXAMPLE).exists():
+        violations.append(
+            "retired litchi-iwa chart inspection example returned: "
+            f"{RETIRED_IWA_CHARTS_INSPECTION_EXAMPLE}"
         )
 
     return sorted(set(violations))
@@ -49363,6 +49400,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_snapshot(snapshot, policy)
         + audit_litchi_facade_source_topology()
         + audit_iwa_raw_facade_source_topology()
+        + audit_iwa_charts_compatibility_source_topology()
         + audit_litchi_semantic_facade_source_topology()
         + audit_iwork_example_source_topology()
         + audit_iwa_keynote_source_topology()

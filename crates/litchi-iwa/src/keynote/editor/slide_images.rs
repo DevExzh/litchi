@@ -37,8 +37,10 @@ pub struct KeynoteSlideImageInfo {
     pub slide_index: usize,
     pub drawable_object_id: u64,
     pub kind: KeynoteSlideImageKind,
-    pub image_data_identifier: u64,
-    pub thumbnail_data_identifier: Option<u64>,
+    /// Embedded image data referenced by this drawable.
+    pub image_data_identifier: MediaAssetId,
+    /// Embedded thumbnail data, when the native archive provides one.
+    pub thumbnail_data_identifier: Option<MediaAssetId>,
     pub geometry: DrawableGeometry,
     /// Shared drawable metadata, including accessibility description and lock state.
     pub properties: DrawableProperties,
@@ -53,7 +55,7 @@ pub struct KeynoteSlideImageInfo {
 pub struct RemovedKeynoteSlideImage {
     pub image: KeynoteSlideImageInfo,
     /// Assets culled because the removed image held their final package reference.
-    pub removed_data_identifiers: Vec<u64>,
+    pub removed_data_identifiers: Vec<MediaAssetId>,
 }
 
 impl KeynoteEditor {
@@ -133,12 +135,12 @@ impl KeynoteEditor {
             })?;
         let created_graph = image_graph(&verified, slide_index, ids.drawable)?;
         if created.kind != KeynoteSlideImageKind::File
-            || created.image_data_identifier != asset.data_identifier.get()
+            || created.image_data_identifier != asset.data_identifier
             || created.geometry != geometry
             || created.original_size != Some(options.natural_size())
             || created.natural_size != Some(options.natural_size())
             || created_graph.object_ids != ids.all()
-            || verified.extract_media(asset.data_identifier.get())? != data
+            || verified.extract_media(asset.data_identifier)? != data
         {
             return Err(Error::InvalidFormat(
                 "Keynote image creation produced an inconsistent graph".to_owned(),
@@ -588,7 +590,7 @@ impl KeynoteEditor {
                 .is_some_and(|asset| !asset.is_referenced())
             {
                 media.remove_unreferenced(identifier)?;
-                removed_data_identifiers.push(identifier.get());
+                removed_data_identifiers.push(identifier);
             }
         }
         removed_data_identifiers.sort_unstable();
@@ -602,7 +604,7 @@ impl KeynoteEditor {
             || removed_data_identifiers.iter().any(|identifier| {
                 remaining_assets
                     .iter()
-                    .any(|asset| asset.data_identifier.get() == *identifier)
+                    .any(|asset| asset.data_identifier == *identifier)
             })
         {
             return Err(Error::InvalidFormat(

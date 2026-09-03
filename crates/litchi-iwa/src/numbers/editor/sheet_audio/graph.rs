@@ -270,7 +270,7 @@ pub(super) fn audio_graph(
     data_references.sort_unstable();
     data_references.dedup();
     let info = audio_info(editor.package(), sheet_id, drawable_object_id)?;
-    if data_references != [(info.audio_data_identifier, drawable_object_id)] {
+    if data_references != [(info.audio_data_identifier.get(), drawable_object_id)] {
         return Err(Error::InvalidFormat(format!(
             "Numbers audio {drawable_object_id} has inconsistent data-reference metadata {data_references:?}"
         )));
@@ -327,6 +327,7 @@ fn audio_info(
             Error::InvalidFormat(format!("Numbers audio {identifier} has no data reference"))
         })?
         .identifier;
+    let audio_data_identifier = MediaAssetId::try_from(audio_data_identifier)?;
     if audio.poster_image_data.is_some() {
         return Err(Error::InvalidFormat(format!(
             "Numbers audio {identifier} unexpectedly references a poster image"

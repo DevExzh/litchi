@@ -7535,3 +7535,56 @@ No package, dependency edge, ordered migration debt, migration host, or whole
 monolith-exit deletion gate closes. The current topology remains 64 workspace
 packages, 238 internal dependency declarations, 227 canonical edges, 11
 development-only edges, 11 ordered migration debts, and one migration host.
+
+## 2026-09-03 amendment: typed media boundaries and bounded archive verification
+
+This wave removes another obsolete compatibility edge while retaining the
+remaining migration host. The public `litchi_iwa::charts::{raw,error_bar}`
+reexports and the obsolete `inspect_iwa_archive` example are deleted; active
+chart internals continue to use their private archive projection. The crate
+boundary checker now rejects reintroducing either public chart module or the
+retired example. Numbers and Keynote host media discovery, extraction,
+replacement, and removal results now carry the existing nonzero
+`MediaAssetId` type across their public boundaries instead of accepting or
+returning unchecked `u64` asset identifiers. Native identifiers are validated
+once when their archive graphs enter those adapters.
+
+Pages host reachability now reads its rooted drawable-order archive with the
+strict borrowed Buffa codec, including canonical framing, exact message type
+and multiplicity, bounded package work, and referenced-object validation.
+Pages movie and audio classification likewise reads only the two required
+flags through the borrowed `pages_media_codec` projection. Neither path
+materializes the corresponding generated Prost message. The focused Pages
+drawable-order owner was hardened against the native structural topology:
+Pages includes its body text-storage container in the native order stream, so
+the transaction now validates and preserves that fixed slot while exposing
+only source-bound user drawables. Changed publication deletes all three stale
+root previews, verifies unrelated members by name rather than confusing ZIP
+position with the name-sorted component catalog, and reports the number of
+deleted previews. Exact inverse application continues to restore the original
+source artifact.
+
+Large verification paths are bounded more tightly. Keynote physical table
+sorting and Numbers pop-up-menu graph verification replace repeated linear
+lookups with fallibly reserved direct or sorted indexes and charge their work
+and retained memory to the existing transaction budgets. Pages section-text
+locality verification now compares package entries in lockstep without two
+attacker-sized temporary vectors, and the pre-BNC Numbers extractor replaces
+its final unchecked byte index with a typed truncation error.
+
+Current-producer Pages evidence was exercised in the native application. Pages
+authored a document containing the marker `Litchi native verification — Pages
+drawable order and strict media projection`, a square, and a circle; Arrange >
+Send to Back was saved without repair or conversion. The focused reader then
+resolved exactly two opaque drawable handles at semantic positions 0 and 1.
+The focused transaction moved the first handle to the front, preserved the
+native body-storage slot, removed `preview.jpg`, `preview-micro.jpg`, and
+`preview-web.jpg`, reopened its candidate, and wrote a valid package. Pages
+opened that library-produced artifact with the marker and both shapes intact
+and presented no repair or conversion UI. This remains operation-specific
+evidence for body drawable ordering, not package-wide native certification.
+
+No package, dependency edge, ordered migration debt, migration host, or whole
+monolith-exit deletion gate closes. The topology remains 64 workspace packages,
+238 internal dependency declarations, 227 canonical edges, 11 development-only
+edges, 11 ordered migration debts, and one migration host.

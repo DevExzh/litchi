@@ -4377,7 +4377,10 @@ impl<'a> TableDataExtractor<'a> {
         row_count: usize,
         column_count: usize,
     ) -> Result<ParsedCell> {
-        let version = data[0];
+        let version = data
+            .first()
+            .copied()
+            .ok_or_else(|| Error::ParseError("Empty Numbers pre-BNC cell payload".to_owned()))?;
         let header_length = if version <= 1 { 8 } else { 12 };
         if data.len() < header_length {
             return Err(Error::ParseError(
