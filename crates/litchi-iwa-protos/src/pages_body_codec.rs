@@ -20,6 +20,13 @@ use crate::buffa_pages_body_generated::LitchiIwaProjection as projection;
 const DOCUMENT_BODY_STORAGE_FIELD: u32 = 4;
 const DOCUMENT_INITIAL_SECTION_FIELD: u32 = 5;
 const DOCUMENT_SUPER_FIELD: u32 = 15;
+const DOCUMENT_FLOATING_DRAWABLES_FIELD: u32 = 3;
+const DOCUMENT_THEME_FIELD: u32 = 6;
+const DOCUMENT_DRAWABLES_ZORDER_FIELD: u32 = 20;
+const DOCUMENT_LEFT_MARGIN_FIELD: u32 = 32;
+const DOCUMENT_PAGE_TEMPLATES_FIELD: u32 = 48;
+const DOCUMENT_SUPER_SUPER_FIELD: u32 = 1;
+const DOCUMENT_LANGUAGE_FIELD: u32 = 3;
 const BOUNDARY_CHARACTER_INDEX_FIELD: u32 = 1;
 const BOUNDARY_SECTION_FIELD: u32 = 2;
 const REFERENCE_IDENTIFIER_FIELD: u32 = 1;
@@ -126,6 +133,151 @@ impl DocumentBodySnapshot {
         self.initial_section
     }
 }
+
+/// Borrowed focused projection of the Pages document-root facts used by the
+/// migration host.
+//
+// The root payload itself is retained as a borrow so callers can keep the
+// native bytes authoritative. Singular references and the page-layout scalar
+// are copied value facts; repeated page-template references are streamed with
+// [`Self::page_templates`] and are never collected into an input-sized
+// generated Buffa view.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DocumentRootSnapshot<'source> {
+    source: &'source [u8],
+    options: DecodeOptions,
+    floating_drawables: Option<ReferenceSnapshot>,
+    theme: Option<ReferenceSnapshot>,
+    drawables_zorder: Option<ReferenceSnapshot>,
+    page_template_count: usize,
+    left_margin: Option<f32>,
+    document_language: Option<&'source str>,
+}
+
+impl<'source> DocumentRootSnapshot<'source> {
+    /// Return the exact caller-owned root payload.
+    #[must_use]
+    pub const fn raw(self) -> &'source [u8] {
+        self.source
+    }
+
+    /// Optional `TP.DocumentArchive.floating_drawables` reference.
+    #[must_use]
+    pub const fn floating_drawables(self) -> Option<ReferenceSnapshot> {
+        self.floating_drawables
+    }
+
+    /// Optional `TP.DocumentArchive.theme` reference.
+    #[must_use]
+    pub const fn theme(self) -> Option<ReferenceSnapshot> {
+        self.theme
+    }
+
+    /// Optional `TP.DocumentArchive.drawables_zorder` reference.
+    #[must_use]
+    pub const fn drawables_zorder(self) -> Option<ReferenceSnapshot> {
+        self.drawables_zorder
+    }
+
+    /// Number of repeated `TP.DocumentArchive.page_templates` references.
+    #[must_use]
+    pub const fn page_template_count(self) -> usize {
+        self.page_template_count
+    }
+
+    /// Optional `TP.DocumentArchive.left_margin` value.
+    #[must_use]
+    pub const fn left_margin(self) -> Option<f32> {
+        self.left_margin
+    }
+
+    /// Optional `TSA.DocumentArchive.document_language` value.
+    #[must_use]
+    pub const fn document_language(self) -> Option<&'source str> {
+        self.document_language
+    }
+
+    /// Stream page-template references in native source order.
+    //
+    // Each item is independently checked against the private lazy Buffa
+    // `TSP.Reference` view. The strict root pass performed by
+    // [`decode_document_root`] has already validated every item, so this
+    // iterator does not retain a collection or defer an unchecked payload.
+    #[must_use]
+    pub fn page_templates(self) -> PageTemplateIter<'source> {
+        PageTemplateIter {
+            remaining: self.source,
+            yielded: 0,
+            maximum: self.page_template_count,
+            options: self.options,
+        }
+    }
+}
+
+/// Allocation-free iterator over repeated Pages page-template references.
+#[derive(Debug, Clone, Copy)]
+pub struct PageTemplateIter<'source> {
+    remaining: &'source [u8],
+    yielded: usize,
+    maximum: usize,
+    options: DecodeOptions,
+}
+
+impl<'source> Iterator for PageTemplateIter<'source> {
+    type Item = Result<ReferenceSnapshot, DecodeError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.yielded >= self.maximum {
+            return None;
+        }
+        let mut budget = Budget::new(self.options);
+        loop {
+            let field = match next_strict_field(&mut self.remaining, self.options, &mut budget) {
+                Ok(Some(field)) => field,
+                Ok(None) => {
+                    self.yielded = self.maximum;
+                    return Some(Err(DecodeError::projection()));
+                },
+                Err(error) => {
+                    self.remaining = &[];
+                    self.yielded = self.maximum;
+                    return Some(Err(error));
+                },
+            };
+            if field.number != DOCUMENT_PAGE_TEMPLATES_FIELD {
+                continue;
+            }
+            let payload = match field.length_delimited() {
+                Ok(payload) => payload,
+                Err(error) => {
+                    self.remaining = &[];
+                    self.yielded = self.maximum;
+                    return Some(Err(error));
+                },
+            };
+            let nested_options = match self.options.descend() {
+                Ok(options) => options,
+                Err(error) => {
+                    self.remaining = &[];
+                    self.yielded = self.maximum;
+                    return Some(Err(error));
+                },
+            };
+            let strict = match preflight_reference(payload, nested_options, &mut budget) {
+                Ok(strict) => strict,
+                Err(error) => {
+                    self.remaining = &[];
+                    self.yielded = self.maximum;
+                    return Some(Err(error));
+                },
+            };
+            self.yielded = self.yielded.saturating_add(1);
+            return Some(cross_check_reference(payload, strict, self.options));
+        }
+    }
+}
+
+impl std::iter::FusedIterator for PageTemplateIter<'_> {}
 
 /// Borrow-free focused projection of one Pages section-boundary entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -377,6 +529,51 @@ pub fn decode_document_body(
     Ok(strict)
 }
 
+/// Decode the focused Pages document-root facts needed by the migration host.
+//
+// A complete strict source pass runs before the private Buffa lazy view is
+// constructed. The view is used only for the already-selected scalar
+// `left_margin`; each singular root reference is forced through the shared
+// borrowed `TSP.Reference` view. The TSA super envelope is checked for its
+// required nested TSK archive and its language is borrowed directly from the
+// source. Repeated page templates remain deferred to
+// [`DocumentRootSnapshot::page_templates`].
+pub fn decode_document_root<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+) -> Result<DocumentRootSnapshot<'source>, DecodeError> {
+    validate_decode_input(source, options)?;
+    let mut budget = Budget::new(options);
+    let strict = preflight_root(source, options, &mut budget)?;
+    let view: projection::PagesDocumentBodyArchiveLazyView<'_> =
+        options.buffa().decode_lazy_view(source)?;
+    if view.left_margin != strict.left_margin {
+        return Err(DecodeError::projection());
+    }
+    for reference in [
+        strict.floating_drawables,
+        strict.theme,
+        strict.drawables_zorder,
+    ]
+    .into_iter()
+    .flatten()
+    {
+        cross_check_reference(reference.raw, reference.snapshot, options)?;
+    }
+    Ok(DocumentRootSnapshot {
+        source,
+        options,
+        floating_drawables: strict
+            .floating_drawables
+            .map(|reference| reference.snapshot),
+        theme: strict.theme.map(|reference| reference.snapshot),
+        drawables_zorder: strict.drawables_zorder.map(|reference| reference.snapshot),
+        page_template_count: strict.page_template_count,
+        left_margin: strict.left_margin,
+        document_language: strict.document_language,
+    })
+}
+
 /// Decode one streamed `TSWP.ObjectAttributeTable.ObjectAttribute` entry.
 ///
 /// The entry is decoded independently so an enclosing repeated section table
@@ -456,6 +653,145 @@ impl Budget {
         self.work_bytes = observed;
         Ok(())
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RootReference<'source> {
+    raw: &'source [u8],
+    snapshot: ReferenceSnapshot,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct StrictRoot<'source> {
+    floating_drawables: Option<RootReference<'source>>,
+    theme: Option<RootReference<'source>>,
+    drawables_zorder: Option<RootReference<'source>>,
+    page_template_count: usize,
+    left_margin: Option<f32>,
+    document_language: Option<&'source str>,
+}
+
+fn preflight_root<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+) -> Result<StrictRoot<'source>, DecodeError> {
+    budget.charge_message(source.len())?;
+    let nested_options = options.descend()?;
+    let mut floating_drawables = None;
+    let mut theme = None;
+    let mut drawables_zorder = None;
+    let mut page_template_count = 0usize;
+    let mut left_margin = None;
+    let mut document_language = None;
+    let mut saw_super = false;
+    let mut remaining = source;
+    while let Some(field) = next_strict_field(&mut remaining, options, budget)? {
+        match field.number {
+            DOCUMENT_FLOATING_DRAWABLES_FIELD => {
+                if floating_drawables.is_some() {
+                    return Err(DecodeError::duplicate_singular(
+                        "TP.DocumentArchive.floating_drawables",
+                    ));
+                }
+                let raw = field.length_delimited()?;
+                let snapshot = preflight_reference(raw, nested_options, budget)?;
+                floating_drawables = Some(RootReference { raw, snapshot });
+            },
+            DOCUMENT_THEME_FIELD => {
+                if theme.is_some() {
+                    return Err(DecodeError::duplicate_singular("TP.DocumentArchive.theme"));
+                }
+                let raw = field.length_delimited()?;
+                let snapshot = preflight_reference(raw, nested_options, budget)?;
+                theme = Some(RootReference { raw, snapshot });
+            },
+            DOCUMENT_DRAWABLES_ZORDER_FIELD => {
+                if drawables_zorder.is_some() {
+                    return Err(DecodeError::duplicate_singular(
+                        "TP.DocumentArchive.drawables_zorder",
+                    ));
+                }
+                let raw = field.length_delimited()?;
+                let snapshot = preflight_reference(raw, nested_options, budget)?;
+                drawables_zorder = Some(RootReference { raw, snapshot });
+            },
+            DOCUMENT_LEFT_MARGIN_FIELD => {
+                if left_margin.is_some() {
+                    return Err(DecodeError::duplicate_singular(
+                        "TP.DocumentArchive.left_margin",
+                    ));
+                }
+                left_margin = Some(field.fixed32()?);
+            },
+            DOCUMENT_PAGE_TEMPLATES_FIELD => {
+                page_template_count = page_template_count
+                    .checked_add(1)
+                    .ok_or_else(|| DecodeError::field_limit(usize::MAX, options.max_fields))?;
+                let raw = field.length_delimited()?;
+                let _snapshot = preflight_reference(raw, nested_options, budget)?;
+            },
+            DOCUMENT_SUPER_FIELD => {
+                if saw_super {
+                    return Err(DecodeError::duplicate_singular("TP.DocumentArchive.super"));
+                }
+                saw_super = true;
+                document_language =
+                    preflight_tsa_document(field.length_delimited()?, nested_options, budget)?;
+            },
+            _ => {},
+        }
+    }
+    if !saw_super {
+        return Err(DecodeError::missing_required("TP.DocumentArchive.super"));
+    }
+    Ok(StrictRoot {
+        floating_drawables,
+        theme,
+        drawables_zorder,
+        page_template_count,
+        left_margin,
+        document_language,
+    })
+}
+
+fn preflight_tsa_document<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+) -> Result<Option<&'source str>, DecodeError> {
+    budget.charge_message(source.len())?;
+    let mut saw_super = false;
+    let mut language = None;
+    let mut remaining = source;
+    while let Some(field) = next_strict_field(&mut remaining, options, budget)? {
+        match field.number {
+            DOCUMENT_SUPER_SUPER_FIELD => {
+                if saw_super {
+                    return Err(DecodeError::duplicate_singular("TSA.DocumentArchive.super"));
+                }
+                saw_super = true;
+                // TSK.DocumentArchive contains only optional fields. Its
+                // payload is deliberately opaque at this boundary.
+                let _opaque_tsk_document = field.length_delimited()?;
+            },
+            DOCUMENT_LANGUAGE_FIELD => {
+                if language.is_some() {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSA.DocumentArchive.document_language",
+                    ));
+                }
+                let bytes = field.length_delimited()?;
+                language =
+                    Some(std::str::from_utf8(bytes).map_err(|_| buffa::DecodeError::InvalidUtf8)?);
+            },
+            _ => {},
+        }
+    }
+    if !saw_super {
+        return Err(DecodeError::missing_required("TSA.DocumentArchive.super"));
+    }
+    Ok(language)
 }
 
 fn preflight_document(
@@ -610,6 +946,19 @@ fn preflight_reference(
     })
 }
 
+fn cross_check_reference(
+    source: &[u8],
+    strict: ReferenceSnapshot,
+    options: DecodeOptions,
+) -> Result<ReferenceSnapshot, DecodeError> {
+    let view: projection::ReferenceLazyView<'_> = options.buffa().decode_lazy_view(source)?;
+    let projected = project_reference(&view)?;
+    if projected != strict {
+        return Err(DecodeError::projection());
+    }
+    Ok(projected)
+}
+
 fn project_reference(
     view: &projection::ReferenceLazyView<'_>,
 ) -> Result<ReferenceSnapshot, DecodeError> {
@@ -656,7 +1005,7 @@ enum StrictValue<'source> {
     Fixed64,
     LengthDelimited(&'source [u8]),
     Group,
-    Fixed32,
+    Fixed32([u8; 4]),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -686,7 +1035,7 @@ impl<'source> StrictField<'source> {
             StrictValue::Fixed64
             | StrictValue::LengthDelimited(_)
             | StrictValue::Group
-            | StrictValue::Fixed32 => Err(DecodeError::projection()),
+            | StrictValue::Fixed32(_) => Err(DecodeError::projection()),
         }
     }
 
@@ -697,7 +1046,18 @@ impl<'source> StrictField<'source> {
             StrictValue::Varint(_)
             | StrictValue::Fixed64
             | StrictValue::Group
-            | StrictValue::Fixed32 => Err(DecodeError::projection()),
+            | StrictValue::Fixed32(_) => Err(DecodeError::projection()),
+        }
+    }
+
+    fn fixed32(self) -> Result<f32, DecodeError> {
+        self.require_wire_type(buffa::encoding::WireType::Fixed32)?;
+        match self.value {
+            StrictValue::Fixed32(bytes) => Ok(f32::from_le_bytes(bytes)),
+            StrictValue::Varint(_)
+            | StrictValue::Fixed64
+            | StrictValue::LengthDelimited(_)
+            | StrictValue::Group => Err(DecodeError::projection()),
         }
     }
 }
@@ -775,8 +1135,12 @@ fn parse_strict_field<'source>(
             return Ok(Some(ParseItem::EndGroup(field_number)));
         },
         buffa::encoding::WireType::Fixed32 => {
-            let _bytes = take_exact(source, 4)?;
-            StrictValue::Fixed32
+            let bytes = take_exact(source, 4)?;
+            StrictValue::Fixed32(
+                bytes
+                    .try_into()
+                    .map_err(|_| buffa::DecodeError::UnexpectedEof)?,
+            )
         },
         _ => return Err(buffa::DecodeError::InvalidWireType(raw_wire_type).into()),
     };
@@ -877,8 +1241,19 @@ mod tests {
     }
 
     fn length_delimited(field: u32, payload: &[u8]) -> Vec<u8> {
-        let mut output = vec![u8::try_from((field << 3) | 2).expect("small test field")];
-        output.push(u8::try_from(payload.len()).expect("small test payload"));
+        let mut output = Vec::new();
+        let mut tag = u64::from(field) << 3 | 2;
+        while tag >= 0x80 {
+            output.push((tag as u8 & 0x7f) | 0x80);
+            tag >>= 7;
+        }
+        output.push(tag as u8);
+        let mut length = u64::try_from(payload.len()).expect("test payload length");
+        while length >= 0x80 {
+            output.push((length as u8 & 0x7f) | 0x80);
+            length >>= 7;
+        }
+        output.push(length as u8);
         output.extend_from_slice(payload);
         output
     }
@@ -892,6 +1267,31 @@ mod tests {
             output.extend(length_delimited(DOCUMENT_INITIAL_SECTION_FIELD, reference));
         }
         output.extend([0x7a, 0x00]);
+        output
+    }
+
+    fn root_super(language: Option<&[u8]>) -> Vec<u8> {
+        let mut tsa = length_delimited(DOCUMENT_SUPER_SUPER_FIELD, &[]);
+        if let Some(language) = language {
+            tsa.extend(length_delimited(DOCUMENT_LANGUAGE_FIELD, language));
+        }
+        length_delimited(DOCUMENT_SUPER_FIELD, &tsa)
+    }
+
+    fn root_reference(field: u32, identifier: u8) -> Vec<u8> {
+        length_delimited(field, &[0x08, identifier])
+    }
+
+    fn fixed32(field: u32, value: f32) -> Vec<u8> {
+        let tag = field << 3 | 5;
+        let mut output = Vec::new();
+        let mut tag = u64::from(tag);
+        while tag >= 0x80 {
+            output.push((tag as u8 & 0x7f) | 0x80);
+            tag >>= 7;
+        }
+        output.push(tag as u8);
+        output.extend(value.to_le_bytes());
         output
     }
 
@@ -915,6 +1315,139 @@ mod tests {
         assert_eq!(initial.deprecated_type(), Some(-7));
         assert_eq!(initial.deprecated_is_external(), Some(false));
         Ok(())
+    }
+
+    #[test]
+    fn canonical_root_projection_borrows_and_streams_host_facts()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut source = root_super(Some(b"en-US"));
+        source.extend(root_reference(DOCUMENT_FLOATING_DRAWABLES_FIELD, 42));
+        source.extend(root_reference(DOCUMENT_THEME_FIELD, 43));
+        source.extend(root_reference(DOCUMENT_DRAWABLES_ZORDER_FIELD, 44));
+        source.extend(fixed32(DOCUMENT_LEFT_MARGIN_FIELD, 12.5));
+        source.extend(root_reference(DOCUMENT_PAGE_TEMPLATES_FIELD, 45));
+        source.extend(root_reference(DOCUMENT_PAGE_TEMPLATES_FIELD, 46));
+
+        let root = decode_document_root(&source, options(&source))?;
+        assert_eq!(root.raw(), source.as_slice());
+        assert_eq!(
+            root.floating_drawables().map(ReferenceSnapshot::identifier),
+            NonZeroU64::new(42)
+        );
+        assert_eq!(
+            root.theme().map(ReferenceSnapshot::identifier),
+            NonZeroU64::new(43)
+        );
+        assert_eq!(
+            root.drawables_zorder().map(ReferenceSnapshot::identifier),
+            NonZeroU64::new(44)
+        );
+        assert_eq!(root.left_margin(), Some(12.5));
+        assert_eq!(root.document_language(), Some("en-US"));
+        assert_eq!(root.page_template_count(), 2);
+        let templates = root.page_templates().collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(
+            templates
+                .iter()
+                .map(|reference| reference.identifier().get())
+                .collect::<Vec<_>>(),
+            [45, 46]
+        );
+        let language = root.document_language().expect("language");
+        assert!(language.as_ptr() >= source.as_ptr());
+        assert!(language.as_ptr() < source.as_ptr().wrapping_add(source.len()));
+        Ok(())
+    }
+
+    #[test]
+    fn root_projection_rejects_missing_nested_super_and_singular_duplicates() {
+        let source: [u8; 0] = [];
+        assert_eq!(
+            decode_document_root(&source, options(&source))
+                .expect_err("missing root super")
+                .missing_required_field(),
+            Some("TP.DocumentArchive.super")
+        );
+
+        let source = [root_super(None), root_super(None)].concat();
+        assert_eq!(
+            decode_document_root(&source, options(&source))
+                .expect_err("duplicate root super")
+                .duplicate_singular_field(),
+            Some("TP.DocumentArchive.super")
+        );
+
+        let source = [0x7a, 0x00];
+        let error =
+            decode_document_root(&source, options(&source)).expect_err("missing nested TSA super");
+        assert_eq!(
+            error.missing_required_field(),
+            Some("TSA.DocumentArchive.super")
+        );
+
+        let mut source = length_delimited(DOCUMENT_SUPER_FIELD, &[]);
+        source.extend(root_reference(DOCUMENT_THEME_FIELD, 1));
+        let error = decode_document_root(&source, options(&source)).expect_err("missing TSA super");
+        assert_eq!(
+            error.missing_required_field(),
+            Some("TSA.DocumentArchive.super")
+        );
+
+        let mut source = root_super(None);
+        source.extend(root_reference(DOCUMENT_THEME_FIELD, 1));
+        source.extend(root_reference(DOCUMENT_THEME_FIELD, 2));
+        let error = decode_document_root(&source, options(&source)).expect_err("duplicate theme");
+        assert_eq!(
+            error.duplicate_singular_field(),
+            Some("TP.DocumentArchive.theme")
+        );
+
+        let mut source = root_super(None);
+        source.extend(fixed32(DOCUMENT_LEFT_MARGIN_FIELD, 1.0));
+        source.extend(fixed32(DOCUMENT_LEFT_MARGIN_FIELD, 2.0));
+        let error = decode_document_root(&source, options(&source)).expect_err("duplicate margin");
+        assert_eq!(
+            error.duplicate_singular_field(),
+            Some("TP.DocumentArchive.left_margin")
+        );
+    }
+
+    #[test]
+    fn root_projection_rejects_bad_reference_wire_values_and_language() {
+        let mut source = root_super(None);
+        source.extend(length_delimited(DOCUMENT_THEME_FIELD, &[0x08, 0x00]));
+        let error = decode_document_root(&source, options(&source)).expect_err("zero theme");
+        assert_eq!(
+            error.zero_identifier_field(),
+            Some("TSP.Reference.identifier")
+        );
+
+        let mut source = root_super(None);
+        source.extend(length_delimited(DOCUMENT_THEME_FIELD, &[0x0a, 0x01, 0x01]));
+        assert!(decode_document_root(&source, options(&source)).is_err());
+
+        let source = root_super(Some(&[0xff]));
+        let error = decode_document_root(&source, options(&source)).expect_err("invalid language");
+        assert!(matches!(error.kind, DecodeErrorKind::Wire(_)));
+
+        let mut source = root_super(None);
+        source.extend([0x80, 0x02, 0x00]);
+        assert!(decode_document_root(&source, options(&source)).is_err());
+    }
+
+    #[test]
+    fn root_projection_applies_finite_field_and_work_limits() {
+        let mut source = root_super(None);
+        source.extend(root_reference(DOCUMENT_THEME_FIELD, 1));
+        assert!(
+            decode_document_root(&source, DecodeOptions::new(source.len(), 0, usize::MAX, 8))
+                .is_err()
+        );
+        assert!(decode_document_root(&source, DecodeOptions::new(source.len(), 64, 1, 8)).is_err());
+        assert!(
+            decode_document_root(&source, DecodeOptions::new(source.len(), 64, usize::MAX, 0))
+                .is_err()
+        );
     }
 
     #[test]

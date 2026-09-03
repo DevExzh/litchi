@@ -12,6 +12,7 @@ pub(crate) mod body_table_name;
 pub(crate) mod body_table_sort;
 pub(crate) mod body_table_title;
 pub(crate) mod document_settings;
+mod drawable_order;
 mod footnote_text;
 mod header_footer_text;
 mod page_layout;
@@ -83,6 +84,10 @@ pub use body_table_sort::{
 pub use body_table_title::{
     BodyTableTitleCommit, BodyTableTitleDiagnostics, BodyTableTitleEdit, BodyTableTitleError,
     BodyTableTitleLimitKind, BodyTableTitlePatch,
+};
+pub use drawable_order::{
+    BodyDrawableOrderCommit, BodyDrawableOrderDiagnostics, BodyDrawableOrderEdit,
+    BodyDrawableOrderError, BodyDrawableOrderLimitKind, BodyDrawableOrderPatch,
 };
 pub use footnote_text::{
     FootnoteTextCommit, FootnoteTextDiagnostics, FootnoteTextEdit, FootnoteTextError,

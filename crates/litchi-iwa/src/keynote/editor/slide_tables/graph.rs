@@ -25,6 +25,7 @@ pub(super) struct SlideTableGraph {
 pub(super) struct CatalogSlideContext {
     pub(super) slide_id: u64,
     pub(super) slide: kn::SlideArchive,
+    pub(super) focused_table_appearance_package: Option<litchi_keynote::Package>,
 }
 
 #[derive(Debug, Clone)]
@@ -118,6 +119,8 @@ pub(super) fn slide_table_graph_from_graph(
     }
     let model_id = table_info.table_model.identifier;
     let model = decode_table_model(graph, model_id)?;
+    let table_position =
+        graph_table_position(graph, &context.slide.drawables_z_order, drawable_object_id)?;
     let table_archive = graph.archive_name(drawable_object_id)?.to_owned();
     let slide_archive = graph.archive_name(context.slide_id)?.to_owned();
     let slide_component_id = component_identifier_for_entry(editor.package(), &slide_archive)?
@@ -132,6 +135,10 @@ pub(super) fn slide_table_graph_from_graph(
     // lock bit here.  Public persisted lock reads/writes and Sort Now's
     // safety gate use the focused package APIs below.
     let lock_state = TableLockState::from_locked(table_info.super_.locked.unwrap_or(false));
+    let appearance = match focused_table_appearance_package(editor.package())? {
+        Some(focused) => focused_table_appearance(&focused, slide_index, table_position)?,
+        None => crate::table_appearance::table_appearance(editor.package(), model_id)?,
+    };
     Ok(SlideTableGraph {
         info: KeynoteSlideTableInfo {
             slide_index,
@@ -142,13 +149,146 @@ pub(super) fn slide_table_graph_from_graph(
             rows: model.number_of_rows as usize,
             columns: model.number_of_columns as usize,
             geometry: crate::shapes::geometry_from_drawable(&table_info.super_)?,
-            appearance: crate::table_appearance::table_appearance(editor.package(), model_id)?,
+            appearance,
             lock_state,
         },
         table_archive,
         slide_archive,
         slide_component_id,
     })
+}
+
+/// Return the table's zero-based position in the slide's native z-order.
+///
+/// The focused package owner addresses tables by this semantic position.  The
+/// compatibility graph still receives a drawable identifier, so resolve that
+/// identifier only at this private migration seam and verify that it appears
+/// exactly once among the table entries.
+fn graph_table_position(
+    graph: &ObjectGraph,
+    references: &[tsp::Reference],
+    drawable_object_id: u64,
+) -> Result<usize> {
+    let mut table_position = None;
+    let mut table_count = 0usize;
+    for reference in references {
+        let is_table = graph
+            .objects
+            .get(&reference.identifier)
+            .is_some_and(|messages| {
+                messages
+                    .iter()
+                    .any(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
+            });
+        if !is_table {
+            continue;
+        }
+        if reference.identifier == drawable_object_id
+            && table_position.replace(table_count).is_some()
+        {
+            return Err(Error::ParseError(format!(
+                "Keynote slide table {drawable_object_id} has ambiguous z-order position"
+            )));
+        }
+        table_count = table_count.checked_add(1).ok_or_else(|| {
+            Error::InvalidFormat("Keynote slide table count exceeds usize".to_owned())
+        })?;
+    }
+    table_position.ok_or_else(|| {
+        Error::ParseError(format!(
+            "Keynote slide table {drawable_object_id} has no z-order position"
+        ))
+    })
+}
+
+/// Return the table's zero-based position in a catalog-backed slide listing.
+///
+/// The catalog stores only message descriptors, so this remains a bounded
+/// metadata lookup and does not decode another table payload merely to map a
+/// legacy drawable identity to the focused selector.
+fn catalog_table_position(
+    catalog: &KeynoteObjectCatalog,
+    references: &[tsp::Reference],
+    drawable_object_id: u64,
+) -> Result<usize> {
+    let mut table_position = None;
+    let mut table_count = 0usize;
+    for reference in references {
+        let is_table = catalog
+            .message_type_count(reference.identifier, TABLE_INFO_MESSAGE_TYPE)
+            .map_err(map_catalog_error)?
+            > 0;
+        if !is_table {
+            continue;
+        }
+        if reference.identifier == drawable_object_id
+            && table_position.replace(table_count).is_some()
+        {
+            return Err(Error::ParseError(format!(
+                "Keynote slide table {drawable_object_id} has ambiguous z-order position"
+            )));
+        }
+        table_count = table_count.checked_add(1).ok_or_else(|| {
+            Error::InvalidFormat("Keynote slide table count exceeds usize".to_owned())
+        })?;
+    }
+    table_position.ok_or_else(|| {
+        Error::ParseError(format!(
+            "Keynote slide table {drawable_object_id} has no z-order position"
+        ))
+    })
+}
+
+/// Build the focused package view once for a catalog-backed slide listing.
+///
+/// The focused package is immutable and internally shares its physical source
+/// through an `Arc`, so retaining this per-slide view avoids reparsing the ZIP
+/// and rebuilding its object index for every table in the same listing.
+fn focused_table_appearance_package(
+    package: &IWorkPackage,
+) -> Result<Option<litchi_keynote::Package>> {
+    if !package.source_is_exact() {
+        return Ok(None);
+    }
+    let source = package.exact_source_bytes().ok_or_else(|| {
+        Error::InvalidFormat("focused Keynote table appearance source is not exact".to_owned())
+    })?;
+    let focused = litchi_keynote::Package::from_bytes(source).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "focused Keynote table appearance source failed: {error}"
+        ))
+    })?;
+    if focused
+        .__is_litchi_source_built_compatibility()
+        .map_err(|error| {
+            Error::InvalidFormat(format!(
+                "focused Keynote compatibility classification failed: {error}"
+            ))
+        })?
+    {
+        return Ok(None);
+    }
+    Ok(Some(focused))
+}
+
+/// Read appearance through the focused Keynote package owner for an admitted
+/// exact physical source. The source provenance check above keeps synthetic
+/// and compatibility snapshots on their existing catalog path.
+fn focused_table_appearance(
+    package: &litchi_keynote::Package,
+    slide_index: usize,
+    table_position: usize,
+) -> Result<CommonTableAppearance> {
+    package
+        .slide_table_appearance(
+            litchi_keynote::SlideSelector::index(slide_index),
+            litchi_keynote::TableSelector::index(table_position),
+        )
+        .map_err(|error| {
+            Error::InvalidFormat(format!(
+                "focused Keynote table appearance read failed: {error}"
+            ))
+        })
 }
 
 /// Resolve the root slide objects through the bounded catalog.
@@ -193,7 +333,12 @@ pub(super) fn catalog_slide_context(
     let slide: kn::SlideArchive = catalog
         .decode_type(package, slide_id, 5, "KN.SlideArchive")
         .map_err(map_catalog_error)?;
-    Ok(CatalogSlideContext { slide_id, slide })
+    let focused_package = focused_table_appearance_package(package)?;
+    Ok(CatalogSlideContext {
+        slide_id,
+        slide,
+        focused_table_appearance_package: focused_package,
+    })
 }
 
 /// Resolve one table using an already-decoded catalog slide context.
@@ -249,6 +394,11 @@ pub(super) fn slide_table_graph_from_catalog_context(
     }
     let model_id = table_info_projection.table_model().identifier().get();
     let model = catalog_table_model_facts(package, catalog, model_id)?;
+    let table_position = catalog_table_position(
+        catalog,
+        &context.slide.drawables_z_order,
+        drawable_object_id,
+    )?;
     let table_archive = catalog
         .archive_name(drawable_object_id)
         .map_err(map_catalog_error)?
@@ -264,12 +414,16 @@ pub(super) fn slide_table_graph_from_catalog_context(
             ))
         })?;
     let lock_state = TableLockState::from_locked(table_info_projection.locked().unwrap_or(false));
-    let appearance = catalog_table_appearance(
-        package,
-        catalog,
-        model.style_identifier,
-        model.style_preset_identifier,
-    )?;
+    let appearance = if let Some(focused) = context.focused_table_appearance_package.as_ref() {
+        focused_table_appearance(focused, slide_index, table_position)?
+    } else {
+        catalog_table_appearance(
+            package,
+            catalog,
+            model.style_identifier,
+            model.style_preset_identifier,
+        )?
+    };
     Ok(SlideTableGraph {
         info: KeynoteSlideTableInfo {
             slide_index,
@@ -850,6 +1004,7 @@ pub(super) fn table_template_from_graph(graph: &ObjectGraph) -> Result<(u64, u64
 mod tests {
     use super::*;
     use crate::archive::{Archive, ArchiveObject, RawMessage};
+    use crate::keynote::KeynoteDocumentBuilder;
     use crate::protobuf::{tsp, tss, tst};
     use prost::Message;
 
@@ -1154,6 +1309,107 @@ mod tests {
             .is_err()
         );
         assert_eq!(package.to_bytes().expect("source bytes"), before);
+    }
+
+    fn unmark_source_built_document(editor: KeynoteEditor) -> KeynoteEditor {
+        let mut package = editor.into_package();
+        package
+            .update_archive("Index/Document.iwa", |archive| {
+                let object = archive
+                    .object_mut(1)
+                    .ok_or_else(|| Error::InvalidFormat("document root is missing".to_owned()))?;
+                let message_index = object
+                    .messages
+                    .iter()
+                    .position(|message| message.type_ == DOCUMENT_MESSAGE_TYPE)
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("document payload is missing".to_owned())
+                    })?;
+                let mut document =
+                    kn::DocumentArchive::decode(object.messages[message_index].data.as_slice())?;
+                document.super_.template_identifier = Some("Application/Keynote/Native".to_owned());
+                object.replace_message(
+                    message_index,
+                    RawMessage {
+                        type_: DOCUMENT_MESSAGE_TYPE,
+                        data: document.encode_to_vec(),
+                    },
+                )?;
+                Ok(())
+            })
+            .expect("unmark source-built document");
+        KeynoteEditor::from_bytes(&package.to_bytes().expect("unmarked package bytes"))
+            .expect("reopen unmarked package")
+    }
+
+    #[test]
+    fn source_built_reopen_keeps_compatibility_appearance_route() {
+        let editor = KeynoteDocumentBuilder::new().build().expect("builder");
+        assert!(
+            focused_table_appearance_package(editor.package())
+                .expect("source-built route")
+                .is_none()
+        );
+
+        let reopened = KeynoteEditor::from_bytes(&editor.to_bytes().expect("builder bytes"))
+            .expect("reopen builder");
+        assert!(
+            focused_table_appearance_package(reopened.package())
+                .expect("reopened source-built route")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn exact_unmarked_package_is_not_allowed_to_fallback_after_focused_refusal() {
+        let mut editor = KeynoteDocumentBuilder::new().build().expect("builder");
+        let geometry = DrawableGeometry {
+            position: Some(DrawablePoint { x: 40.0, y: 40.0 }),
+            size: Some(DrawableSize {
+                width: 320.0,
+                height: 180.0,
+            }),
+            flags: Some(3),
+            angle: Some(0.0),
+        };
+        editor
+            .add_slide_table(
+                0,
+                "Focused route",
+                2,
+                2,
+                geometry.position.unwrap(),
+                geometry.size.unwrap(),
+            )
+            .expect("table");
+        let editor = unmark_source_built_document(editor);
+        assert!(
+            focused_table_appearance_package(editor.package())
+                .expect("exact route")
+                .is_some()
+        );
+
+        let focused =
+            litchi_keynote::Package::from_bytes(&editor.to_bytes().expect("exact package bytes"))
+                .expect("focused package ingress");
+        let focused_result = focused.slide_table_appearance(
+            litchi_keynote::SlideSelector::index(0),
+            litchi_keynote::TableSelector::index(0),
+        );
+        let host_result = editor.slide_tables(0);
+        match (focused_result, host_result) {
+            (Ok(expected), Ok(tables)) => {
+                assert_eq!(tables[0].appearance, expected);
+            },
+            (Err(focused_error), Err(host_error)) => {
+                let host_error = host_error.to_string();
+                assert!(host_error.contains("focused Keynote table appearance"));
+                assert!(host_error.contains(&focused_error.to_string()));
+            },
+            (focused, host) => panic!(
+                "focused and compatibility routes diverged: focused={focused:?}, host={host:?}"
+            ),
+        }
     }
 
     fn append_varint(value: u64, output: &mut Vec<u8>) {

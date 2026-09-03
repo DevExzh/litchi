@@ -26,7 +26,6 @@ mod conditional_highlight;
 mod formula;
 mod graph;
 mod hidden_axes;
-mod sort;
 mod storage;
 mod topology;
 

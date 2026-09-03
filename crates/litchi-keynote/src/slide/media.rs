@@ -466,6 +466,28 @@ pub mod playback {
         }
     }
 
+    impl TryFrom<litchi_iwa_common::media::playback::MediaPlaybackSettings> for MediaPlaybackSettings {
+        type Error = Error;
+
+        fn try_from(
+            value: litchi_iwa_common::media::playback::MediaPlaybackSettings,
+        ) -> Result<Self> {
+            Self {
+                start_time: value.start_time,
+                end_time: value.end_time,
+                poster_time: value.poster_time,
+                loop_mode: value
+                    .loop_mode
+                    .map(|mode| MediaLoopMode::from_raw(mode.as_raw())),
+                volume: value
+                    .volume
+                    .map(|volume| MediaVolume::new(volume.as_f32()))
+                    .transpose()?,
+            }
+            .canonicalize()
+        }
+    }
+
     #[allow(
         clippy::cast_possible_truncation,
         reason = "Keynote stores media times as f32 seconds"
@@ -686,5 +708,26 @@ mod tests {
         assert_eq!(settings.canonicalize().unwrap(), settings);
         assert_eq!(MediaLoopMode::from_raw(17).as_raw(), 17);
         assert_eq!(MediaVolume::FULL.as_f32(), 1.0);
+    }
+
+    #[test]
+    fn common_playback_values_convert_without_exposing_native_records() {
+        use litchi_iwa_common::media::playback::{
+            MediaLoopMode as CommonLoopMode, MediaPlaybackSettings as CommonPlaybackSettings,
+            MediaVolume as CommonVolume,
+        };
+
+        let common = CommonPlaybackSettings::new(Duration::from_secs(8))
+            .with_start_time(Some(Duration::from_secs(2)))
+            .with_poster_time(Some(Duration::from_secs(3)))
+            .with_loop_mode(Some(CommonLoopMode::Unknown(17)))
+            .with_volume(Some(CommonVolume::new(0.5).unwrap()));
+        let focused = MediaPlaybackSettings::try_from(common).unwrap();
+
+        assert_eq!(focused.start_time, common.start_time);
+        assert_eq!(focused.end_time, common.end_time);
+        assert_eq!(focused.poster_time, common.poster_time);
+        assert_eq!(focused.loop_mode, Some(MediaLoopMode::Unknown(17)));
+        assert_eq!(focused.volume.map(MediaVolume::as_f32), Some(0.5));
     }
 }

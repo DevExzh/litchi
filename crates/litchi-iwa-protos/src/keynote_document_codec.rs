@@ -18,6 +18,9 @@ use buffa::DecodeOptions as BuffaDecodeOptions;
 use crate::buffa_keynote_document_generated::LitchiIwaProjection as projection;
 
 const DOCUMENT_SHOW_FIELD: u32 = 2;
+const DOCUMENT_SUPER_FIELD: u32 = 3;
+const TSA_DOCUMENT_SUPER_FIELD: u32 = 1;
+const TSA_DOCUMENT_TEMPLATE_IDENTIFIER_FIELD: u32 = 9;
 const REFERENCE_IDENTIFIER_FIELD: u32 = 1;
 const REFERENCE_DEPRECATED_TYPE_FIELD: u32 = 2;
 const REFERENCE_DEPRECATED_EXTERNAL_FIELD: u32 = 3;
@@ -143,6 +146,7 @@ enum DecodeErrorKind {
     MissingRequired(&'static str),
     DuplicateSingular(&'static str),
     NonCanonical(&'static str),
+    InvalidUtf8(&'static str),
     FieldLimit { observed: usize, maximum: usize },
     WorkLimit { observed: usize, maximum: usize },
     Projection,
@@ -168,6 +172,9 @@ impl fmt::Display for DecodeError {
             },
             DecodeErrorKind::NonCanonical(reason) => {
                 write!(formatter, "non-canonical protobuf representation: {reason}")
+            },
+            DecodeErrorKind::InvalidUtf8(field) => {
+                write!(formatter, "field {field} is not valid UTF-8")
             },
             DecodeErrorKind::FieldLimit { observed, maximum } => write!(
                 formatter,
@@ -212,6 +219,7 @@ impl DecodeError {
             | DecodeErrorKind::Resource(_)
             | DecodeErrorKind::DuplicateSingular(_)
             | DecodeErrorKind::NonCanonical(_)
+            | DecodeErrorKind::InvalidUtf8(_)
             | DecodeErrorKind::FieldLimit { .. }
             | DecodeErrorKind::WorkLimit { .. }
             | DecodeErrorKind::Projection => None,
@@ -281,6 +289,12 @@ impl DecodeError {
         }
     }
 
+    const fn invalid_utf8(field: &'static str) -> Self {
+        Self {
+            kind: DecodeErrorKind::InvalidUtf8(field),
+        }
+    }
+
     const fn projection() -> Self {
         Self {
             kind: DecodeErrorKind::Projection,
@@ -296,6 +310,76 @@ impl DecodeError {
 /// private and borrowed.
 pub fn decode_show_identifier(source: &[u8], options: DecodeOptions) -> Result<u64, DecodeError> {
     Ok(decode_show_reference(source, options)?.identifier())
+}
+
+/// Borrow the optional template identifier from the Keynote root envelope.
+///
+/// This generated-free path validates the unique required
+/// `KN.DocumentArchive.super` and `TSA.DocumentArchive.super` envelopes while
+/// keeping both the returned string and every unknown field borrowed from the
+/// caller-owned source. It is intentionally separate from the show projection:
+/// forcing this private compatibility marker must not make Buffa decode the
+/// otherwise opaque document base during ordinary semantic reads.
+pub fn decode_template_identifier(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<Option<&str>, DecodeError> {
+    validate_decode_input(source, options)?;
+    let mut budget = Budget::new(options);
+    budget.charge_work(source.len())?;
+    let nested = options.descend(&budget)?;
+    let mut document_super = None;
+    let mut remaining = source;
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, &mut budget)?
+    {
+        field.require_canonical_framing()?;
+        if field.number != DOCUMENT_SUPER_FIELD {
+            continue;
+        }
+        if document_super.is_some() {
+            return Err(DecodeError::duplicate_singular("KN.DocumentArchive.super"));
+        }
+        document_super = Some(field.length_delimited()?);
+    }
+    let document_super = document_super
+        .ok_or_else(|| DecodeError::missing_required_field("KN.DocumentArchive.super"))?;
+    preflight_template_identifier(document_super, nested, &mut budget)
+}
+
+fn preflight_template_identifier<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+    budget: &mut Budget,
+) -> Result<Option<&'source str>, DecodeError> {
+    budget.charge_work(source.len())?;
+    let mut tsa_super = None;
+    let mut template_identifier = None;
+    let mut remaining = source;
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+        field.require_canonical_framing()?;
+        match field.number {
+            TSA_DOCUMENT_SUPER_FIELD => {
+                if tsa_super.is_some() {
+                    return Err(DecodeError::duplicate_singular("TSA.DocumentArchive.super"));
+                }
+                tsa_super = Some(field.length_delimited()?);
+            },
+            TSA_DOCUMENT_TEMPLATE_IDENTIFIER_FIELD => {
+                if template_identifier.is_some() {
+                    return Err(DecodeError::duplicate_singular(
+                        "TSA.DocumentArchive.template_identifier",
+                    ));
+                }
+                let bytes = field.length_delimited()?;
+                template_identifier = Some(str::from_utf8(bytes).map_err(|_error| {
+                    DecodeError::invalid_utf8("TSA.DocumentArchive.template_identifier")
+                })?);
+            },
+            _ => {},
+        }
+    }
+    tsa_super.ok_or_else(|| DecodeError::missing_required_field("TSA.DocumentArchive.super"))?;
+    Ok(template_identifier)
 }
 
 /// Decode the complete generated-free root show reference.
@@ -545,6 +629,20 @@ struct StrictField<'source> {
 }
 
 impl<'source> StrictField<'source> {
+    fn require_canonical_framing(self) -> Result<(), DecodeError> {
+        if !self.canonical_key {
+            return Err(DecodeError::noncanonical("protobuf field key"));
+        }
+        if matches!(
+            self.value,
+            StrictValue::Varint(_) | StrictValue::LengthDelimited(_)
+        ) && !self.canonical_value
+        {
+            return Err(DecodeError::noncanonical("protobuf field value framing"));
+        }
+        Ok(())
+    }
+
     fn require_wire_type(self, expected: buffa::encoding::WireType) -> Result<(), DecodeError> {
         if !self.canonical_key {
             return Err(DecodeError::noncanonical("protobuf field key"));
@@ -670,7 +768,7 @@ fn skip_strict_group(
 ) -> Result<(), DecodeError> {
     loop {
         match parse_strict_field(source, recursion_limit, budget)? {
-            Some(ParseItem::Field(_)) => {},
+            Some(ParseItem::Field(field)) => field.require_canonical_framing()?,
             Some(ParseItem::EndGroup(number)) if number == expected_field_number => return Ok(()),
             Some(ParseItem::EndGroup(number)) => {
                 return Err(buffa::DecodeError::InvalidEndGroup(number).into());
@@ -729,10 +827,59 @@ fn take_exact<'source>(
 mod tests {
     use prost::Message as _;
 
-    use super::{DecodeOptions, WireResourceLimit, decode_show_identifier, decode_show_reference};
+    use super::{
+        DecodeOptions, WireResourceLimit, decode_show_identifier, decode_show_reference,
+        decode_template_identifier,
+    };
 
     fn decode(source: &[u8]) -> Result<u64, super::DecodeError> {
         decode_show_identifier(source, DecodeOptions::new(source.len(), 2))
+    }
+
+    fn decode_template(source: &[u8]) -> Result<Option<&str>, super::DecodeError> {
+        decode_template_identifier(source, DecodeOptions::new(source.len(), 2))
+    }
+
+    #[test]
+    fn template_identifier_is_borrowed_from_required_envelopes()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let source = [
+            0x1a, 0x0a, 0x0a, 0x00, 0x4a, 0x06, b'L', b'i', b't', b'c', b'h', b'i',
+        ];
+        assert_eq!(decode_template(&source)?, Some("Litchi"));
+        assert_eq!(decode_template(&[0x1a, 0x02, 0x0a, 0x00])?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn template_identifier_rejects_ambiguous_or_malformed_envelopes() {
+        let duplicate_root = [0x1a, 0x02, 0x0a, 0x00, 0x1a, 0x02, 0x0a, 0x00];
+        assert_eq!(
+            decode_template(&duplicate_root)
+                .expect_err("duplicate root super")
+                .duplicate_singular_field(),
+            Some("KN.DocumentArchive.super")
+        );
+
+        let duplicate_template = [0x1a, 0x08, 0x0a, 0x00, 0x4a, 0x01, b'a', 0x4a, 0x01, b'b'];
+        assert_eq!(
+            decode_template(&duplicate_template)
+                .expect_err("duplicate template")
+                .duplicate_singular_field(),
+            Some("TSA.DocumentArchive.template_identifier")
+        );
+
+        let missing_tsa_super = [0x1a, 0x03, 0x4a, 0x01, b'a'];
+        assert_eq!(
+            decode_template(&missing_tsa_super)
+                .expect_err("missing TSA super")
+                .missing_required(),
+            Some("TSA.DocumentArchive.super")
+        );
+
+        let invalid_utf8 = [0x1a, 0x05, 0x0a, 0x00, 0x4a, 0x01, 0xff];
+        assert!(decode_template(&invalid_utf8).is_err());
+        assert!(decode_template(&[0x1a, 0x80, 0x00]).is_err());
     }
 
     #[test]

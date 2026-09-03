@@ -52,6 +52,7 @@ mod document;
 pub mod document_options;
 /// Combined document and footnote formatter settings.
 pub mod document_settings;
+mod drawable_order;
 pub mod footnote;
 pub mod header_footer;
 pub mod image;
@@ -68,6 +69,7 @@ pub use document::{
     MAX_BODY_STORAGES, MAX_SECTIONS, ReadError, ReadLimitKind, Result, Root, SemanticLimitKind,
     SemanticLimits, SemanticLimitsError,
 };
+pub use drawable_order::{BodyDrawableHandle, BodyDrawableSelector, DrawableLayerMove};
 pub use header_footer::{HeaderFooter, HeaderFooterSelector, Kind, Template};
 pub use litchi_core::Position;
 /// Maximum bytes retained for each canonical Pages metadata sidecar.
@@ -76,6 +78,10 @@ pub use litchi_iwa_text::{TextPosition, TextSpan};
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use package::{__is_valid_pages_text_storage, __semantic_document_from_prepared_source};
+pub use package::{
+    BodyDrawableOrderCommit, BodyDrawableOrderDiagnostics, BodyDrawableOrderEdit,
+    BodyDrawableOrderError, BodyDrawableOrderLimitKind, BodyDrawableOrderPatch,
+};
 pub use package::{
     BodyFootnoteCommit, BodyFootnoteDiagnostics, BodyFootnoteEdit, BodyFootnoteError,
     BodyFootnoteLimitKind, BodyFootnotePatch, BodyFootnoteSnapshot,

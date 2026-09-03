@@ -1,11 +1,12 @@
-//! Exact-source, selector-first Keynote movie-playback transactions.
+//! Exact-source, selector-first Keynote movie/audio-playback transactions.
 //!
-//! This owner deliberately handles the scalar playback edge only.  It resolves
-//! a rooted, file-backed movie, delegates the MovieArchive wire projection to
-//! the neutral strict codec, and rewrites the selected movie component in a
-//! private candidate before reopening it through the normal Keynote ingress.
-//! Movie graph creation/removal, media replacement, geometry, and metadata
-//! allocation are outside this module.
+//! This owner deliberately handles the scalar playback edge only. It resolves
+//! a rooted file-backed movie or independently positioned audio control,
+//! delegates the MovieArchive wire projection to the neutral strict codec, and
+//! rewrites the selected media component in a private candidate before
+//! reopening it through the normal Keynote ingress. Movie/audio graph
+//! creation/removal, media replacement, geometry, and metadata allocation are
+//! outside this module.
 
 #![allow(
     clippy::map_err_ignore,
@@ -658,7 +659,8 @@ impl fmt::Debug for PlaybackSelection {
 }
 
 impl Package {
-    /// Read playback settings for one existing file-backed movie.
+    /// Read playback settings for one existing file-backed movie or audio
+    /// control.
     pub fn slide_movie_playback_settings<'slide>(
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
@@ -675,7 +677,8 @@ impl Package {
         .before)
     }
 
-    /// Begin an exact immutable edit of an existing file-backed movie's playback.
+    /// Begin an exact immutable edit of an existing file-backed movie or audio
+    /// control's playback.
     pub fn edit_slide_movie_playback_settings<'slide>(
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
@@ -914,7 +917,7 @@ fn select_movie_with_budget(
         .ok_or(SlideMoviePlaybackError::MoviePositionNotFound {
             position: movie_position,
         })?;
-    if movie_kind != MovieKind::File {
+    if !matches!(movie_kind, MovieKind::File | MovieKind::Audio) {
         return Err(SlideMoviePlaybackError::InvalidSource);
     }
     let movie = package
