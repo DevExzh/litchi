@@ -1,5 +1,44 @@
 # Performance hotspot inventory
 
+## Change 0380 update
+
+Change 0380 is a PPTX correctness, CRUD-completeness, and bounded-resource
+batch, not a measured hotspot. Source-backed cross-slide copy now accepts
+exactly one direct embedded picture whose target is an internal,
+relationship-free `/ppt/media/` image leaf. Planning preflights the declared
+image size before reading its payload, reserves the complete staged candidate
+with checked arithmetic, verifies the actual size after reading, and binds the
+bytes, content type, source/destination identities, topology, and freshness in
+the copy plan. Publication deterministically allocates a collision-free media
+URI while preserving unrelated members and the existing signature,
+cancellation, stale/foreign-source, and failure-atomicity fences.
+
+Relationship-ID collisions are refused rather than remapped. Missing,
+mistyped, non-leaf, multiple, unreferenced, shared, or external image
+topologies; duplicate shape trees; misplaced or ambiguous blips; MCE; and
+broader dependency graphs also fail closed. The operation does not decode,
+convert, or render images and adds no durable or inverse patch surface.
+
+The focused suite passed `22/22`; the filtered default library passed `531`
+tests; the filtered all-features library passed `533/533` and all integration
+binaries passed; and doctests passed `6` with `2` ignored. The exact three
+audited unrelated test exclusions and three pre-existing Clippy allowances
+are recorded in the [Change 0380
+record](changes/0380-pptx-source-backed-cross-slide-image-copy.md). Strict
+Clippy, the 64-package/240-declaration boundary gate with 14 existing debt
+entries, and three independent source-only reviews passed.
+
+The validation procedure used one Cargo process and one test run at a time,
+`CARGO_BUILD_JOBS=1`, a 6 GiB per-process virtual-memory cap, a dedicated
+target, serial test threads, and a `>=10 GiB` available-memory launch
+threshold. These are OOM-mitigating, resource-capped controls, not evidence
+that OOM is prevented.
+
+`performance_claim: none`; `claim_authorized: false`. This change establishes
+no hotspot rank, latency, allocation-volume, RSS, I/O, throughput,
+fixed-memory, image-processing, broad media-rich, real-producer, or
+system-level OOM result.
+
 ## Change 0379 update
 
 Change 0379 is a DOCX correctness, CRUD-completeness, and bounded-resource
