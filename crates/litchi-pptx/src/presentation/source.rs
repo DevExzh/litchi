@@ -85,33 +85,68 @@ pub(super) struct SourcePart {
 }
 
 impl SourcePart {
-    pub(super) fn from_view(view: &PartView<'_>, data: PartData) -> Self {
-        Self {
+    pub(super) fn from_view(view: &PartView<'_>, data: PartData) -> Result<Self> {
+        let expected_len = view.rels().iter().count();
+        let mut rels = Relationships::new(clone_relationship_text(
+            view.partname().base_uri(),
+            "source-backed relationship base URI",
+        )?);
+        for relationship in view.rels().iter() {
+            let kind =
+                clone_relationship_text(relationship.reltype(), "source-backed relationship type")?;
+            let target = clone_relationship_text(
+                relationship.target_ref(),
+                "source-backed relationship target",
+            )?;
+            let id = clone_relationship_text(relationship.r_id(), "source-backed relationship ID")?;
+            rels.try_add_relationship(kind, target, id, relationship.target_mode())?;
+        }
+        if rels.iter().count() != expected_len {
+            return Err(Error::Invalid(
+                "source-backed part relationship count changed during iteration".into(),
+            ));
+        }
+        Ok(Self {
             partname: view.partname().clone(),
-            content_type: view.content_type().to_string(),
-            data,
-            replacement: None,
-            rels: view.rels().clone(),
-        }
-    }
-
-    fn from_binding(binding: &PartBinding, data: PartData) -> Self {
-        let mut rels = Relationships::new(binding.uri.base_uri().to_string());
-        for relationship in binding.relationships.iter() {
-            rels.add_relationship(
-                relationship.kind.clone(),
-                relationship.target.clone(),
-                relationship.id.clone(),
-                relationship.mode == TargetMode::External,
-            );
-        }
-        Self {
-            partname: binding.uri.clone(),
-            content_type: binding.content_type.clone(),
+            content_type: clone_relationship_text(
+                view.content_type(),
+                "source-backed part content type",
+            )?,
             data,
             replacement: None,
             rels,
+        })
+    }
+
+    fn from_binding(binding: &PartBinding, data: PartData) -> Result<Self> {
+        let expected_len = binding.relationships.len();
+        let mut rels = Relationships::new(clone_relationship_text(
+            binding.uri.base_uri(),
+            "source-backed relationship base URI",
+        )?);
+        for relationship in binding.relationships.iter() {
+            rels.try_add_relationship(
+                clone_relationship_text(&relationship.kind, "source-backed relationship type")?,
+                clone_relationship_text(&relationship.target, "source-backed relationship target")?,
+                clone_relationship_text(&relationship.id, "source-backed relationship ID")?,
+                relationship.mode,
+            )?;
         }
+        if rels.iter().count() != expected_len {
+            return Err(Error::Invalid(
+                "source-backed part relationship count changed during iteration".into(),
+            ));
+        }
+        Ok(Self {
+            partname: binding.uri.clone(),
+            content_type: clone_relationship_text(
+                &binding.content_type,
+                "source-backed part content type",
+            )?,
+            data,
+            replacement: None,
+            rels,
+        })
     }
 
     pub(super) fn source_data(&self) -> &PartData {
@@ -1493,7 +1528,7 @@ impl SourceBackedPresentationEditor {
                 reason: "publication raw snapshot must retain original source bytes",
             });
         };
-        let part = SourcePart::from_binding(&closure.slide.slide, raw);
+        let part = SourcePart::from_binding(&closure.slide.slide, raw)?;
         #[cfg(test)]
         record_test_semantic_slide_part_read();
         SlidePart::from_part(&part)?;
@@ -1531,13 +1566,15 @@ impl SourceBackedPresentationEditor {
         let source_version = match self.package.source_version() {
             Ok(source_version) => source_version,
             Err(error) => {
-                let part = SourcePart::from_view(&view, raw.clone());
+                #[cfg(test)]
+                record_test_semantic_scene_read();
+                {
+                    let _scene = crate::shape::Scene::read(raw.as_bytes())?;
+                }
+                let part = SourcePart::from_view(&view, raw)?;
                 #[cfg(test)]
                 record_test_semantic_slide_part_read();
                 SlidePart::from_part(&part)?;
-                #[cfg(test)]
-                record_test_semantic_scene_read();
-                let _scene = crate::shape::Scene::read(raw.as_bytes())?;
                 self.package.check_execution()?;
                 return Err(error.into());
             },
@@ -1588,16 +1625,20 @@ impl SourceBackedPresentationEditor {
         self.package.check_execution()?;
         let lineage = self.package.source_lineage();
         let context = self.package.execution_context();
-        let part = SourcePart::from_view(&view, raw.clone());
+        #[cfg(test)]
+        record_test_semantic_scene_read();
+        let scene_is_rewritten = {
+            let scene = crate::shape::Scene::read(raw.as_bytes())?;
+            scene.is_rewritten()
+        };
+        let part = SourcePart::from_view(&view, raw)?;
         #[cfg(test)]
         record_test_semantic_slide_part_read();
         SlidePart::from_part(&part)?;
-        #[cfg(test)]
-        record_test_semantic_scene_read();
-        let scene = crate::shape::Scene::read(raw.as_bytes())?;
+        let SourcePart { data: raw, .. } = part;
         self.package.check_execution()?;
         let source_version = self.package.source_version()?;
-        if scene.is_rewritten() {
+        if scene_is_rewritten {
             return Err(Error::UnsafeEdit {
                 operation,
                 reason: "source-backed slide edits do not support markup-compatibility branch selection",
@@ -2216,6 +2257,7 @@ impl SourceSlide {
         let part = self.load_part(&view)?;
         validate_source_slide_root(&part)?;
         reject_picture_markup_compatibility(part.blob())?;
+        validate_full_slide_picture_relationships(&self.owner.package, part.blob())?;
         // Keep the normal borrowed part validation on the safe path as well;
         // the raw-root check above prevents MCE preprocessing from masking a
         // malformed selected slide before our refusal scan runs.
@@ -2311,7 +2353,7 @@ impl SourceSlide {
 
     fn load_part(&self, view: &PartView<'_>) -> Result<SourcePart> {
         self.owner.package.check_execution()?;
-        let part = SourcePart::from_view(view, view.data()?);
+        let part = SourcePart::from_view(view, view.data()?)?;
         self.owner.package.check_execution()?;
         Ok(part)
     }
@@ -2337,6 +2379,7 @@ enum PictureNode {
 }
 
 const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
+const STRICT_MCE_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/markup-compatibility/2006";
 const DRAWINGML_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 const STRICT_DRAWINGML_NAMESPACE: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 
@@ -2629,26 +2672,76 @@ fn validate_blip_attributes(
     decoder: quick_xml::encoding::Decoder,
     resolver: &quick_xml::name::NamespaceResolver,
 ) -> Result<()> {
+    let mut cstate_seen = false;
     for attribute in element.attributes().with_checks(true) {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.as_namespace_binding().is_some() {
             continue;
         }
         let (namespace, local) = resolver.resolve_attribute(attribute.key);
+        if is_mce_namespace(&namespace) {
+            return Err(Error::UnsafeEdit {
+                operation: "picture relationship parsing",
+                reason: "markup-compatibility attributes are refused",
+            });
+        }
+        // Extracted p:pic fragments omit ancestor namespace declarations; the
+        // full-package caller validates the inherited relationship binding.
         let is_relationship = matches!(
             namespace,
             ResolveResult::Bound(Namespace(value))
                 if value == litchi_ooxml_common::relationships::TRANSITIONAL_NAMESPACE
                     || value == litchi_ooxml_common::relationships::STRICT_NAMESPACE
-        ) || matches!(namespace, ResolveResult::Unknown(prefix) if prefix.as_slice() == b"r");
-        if !is_relationship || !matches!(local.as_ref(), b"embed" | b"link") {
+        ) || matches!(namespace, ResolveResult::Unknown(ref prefix) if prefix.as_slice() == b"r");
+        if is_relationship {
+            if !matches!(local.as_ref(), b"embed" | b"link") {
+                return Err(Error::Invalid(
+                    "picture a:blip contains an unsupported attribute".into(),
+                ));
+            }
+            let _ = attribute
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            continue;
+        }
+        if matches!(namespace, ResolveResult::Unbound) {
+            if local.as_ref() != b"cstate" {
+                return Err(Error::Invalid(
+                    "picture a:blip contains an unsupported attribute".into(),
+                ));
+            }
+            if cstate_seen {
+                return Err(Error::Invalid(
+                    "picture a:blip contains duplicate cstate attributes".into(),
+                ));
+            }
+            let value = attribute
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            let token = litchi_ooxml_common::xml::xsd_token_atom(value.as_ref());
+            if !matches!(
+                token,
+                Some("email" | "screen" | "print" | "hqprint" | "none")
+            ) {
+                return Err(Error::Invalid(
+                    "picture a:blip contains an invalid cstate value".into(),
+                ));
+            }
+            cstate_seen = true;
+            continue;
+        }
+        let is_drawingml = matches!(
+            namespace,
+            ResolveResult::Bound(Namespace(value))
+                if value == DRAWINGML_NAMESPACE || value == STRICT_DRAWINGML_NAMESPACE
+        ) || matches!(namespace, ResolveResult::Unknown(ref prefix) if prefix.as_slice() == b"a");
+        if is_drawingml || matches!(namespace, ResolveResult::Unknown(_)) {
             return Err(Error::Invalid(
                 "picture a:blip contains an unsupported attribute".into(),
             ));
         }
-        let _ = attribute
-            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
-            .map_err(|error| Error::Xml(error.to_string()))?;
+        // Attributes in a bound foreign namespace are preserved as opaque XML
+        // and do not belong to the DrawingML blip semantic owner.
     }
     Ok(())
 }
@@ -2726,6 +2819,244 @@ fn validate_source_slide_root(part: &dyn Part) -> Result<()> {
     }
 }
 
+fn validate_full_slide_picture_relationships(
+    package: &SourceBackedPackage,
+    xml: &[u8],
+) -> Result<()> {
+    let mut reader = NsReader::from_reader(xml);
+    let mut stack = Vec::<Vec<u8>>::new();
+    let mut picture_depth = None;
+    let mut picture_blip_fill_depth = None;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut expected_relationship_namespace = None;
+
+    loop {
+        package.check_execution()?;
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let is_start = matches!(&event, Event::Start(_));
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if root_closed {
+                    return Err(Error::Invalid(
+                        "source slide picture scan contains more than one root".into(),
+                    ));
+                }
+                let depth = stack.len();
+                let name = element.name();
+                if !root_seen {
+                    if !is_presentation_name(&namespace, name, b"sld") {
+                        return Err(Error::Invalid(
+                            "source slide picture scan does not have a p:sld root".into(),
+                        ));
+                    }
+                    expected_relationship_namespace = match &namespace {
+                        ResolveResult::Bound(Namespace(value))
+                            if *value == crate::namespace::PRESENTATIONML_NAMESPACE =>
+                        {
+                            Some(litchi_ooxml_common::relationships::TRANSITIONAL_NAMESPACE)
+                        },
+                        ResolveResult::Bound(Namespace(value))
+                            if *value == crate::namespace::STRICT_PRESENTATIONML_NAMESPACE =>
+                        {
+                            Some(litchi_ooxml_common::relationships::STRICT_NAMESPACE)
+                        },
+                        _ => {
+                            return Err(Error::Invalid(
+                                "source slide picture scan requires a bound p:sld namespace".into(),
+                            ));
+                        },
+                    };
+                    root_seen = true;
+                }
+
+                if is_presentation_name(&namespace, name, b"pic") {
+                    if picture_depth.is_some() {
+                        return Err(Error::Invalid(
+                            "source slide picture scan contains a nested p:pic".into(),
+                        ));
+                    }
+                    if is_start {
+                        picture_depth = Some(depth.checked_add(1).ok_or_else(|| {
+                            Error::Invalid("source slide XML depth overflow".into())
+                        })?);
+                    }
+                } else if is_presentation_name(&namespace, name, b"blipFill")
+                    && picture_depth == Some(depth)
+                {
+                    if picture_blip_fill_depth.is_some() {
+                        return Err(Error::Invalid(
+                            "source slide picture scan contains multiple direct blipFill elements"
+                                .into(),
+                        ));
+                    }
+                    if is_start {
+                        picture_blip_fill_depth = Some(depth.checked_add(1).ok_or_else(|| {
+                            Error::Invalid("source slide XML depth overflow".into())
+                        })?);
+                    }
+                } else if is_drawing_name(&namespace, name, b"blip")
+                    && picture_blip_fill_depth == Some(depth)
+                {
+                    validate_full_slide_blip_attributes(
+                        package,
+                        &element,
+                        reader.resolver(),
+                        reader.decoder(),
+                        expected_relationship_namespace.ok_or_else(|| {
+                            Error::Invalid("source slide relationship namespace is missing".into())
+                        })?,
+                    )?;
+                }
+
+                if is_start {
+                    stack.try_reserve(1).map_err(|source| Error::Allocation {
+                        resource: "source-backed picture XML element stack",
+                        source,
+                    })?;
+                    let mut start_name = Vec::new();
+                    start_name
+                        .try_reserve_exact(name.as_ref().len())
+                        .map_err(|source| Error::Allocation {
+                            resource: "source-backed picture XML element name",
+                            source,
+                        })?;
+                    start_name.extend_from_slice(name.as_ref());
+                    stack.push(start_name);
+                } else if stack.is_empty() {
+                    root_closed = true;
+                }
+            },
+            Event::End(element) => {
+                let start_name = stack.pop().ok_or_else(|| {
+                    Error::Invalid("source slide picture scan has an unmatched end element".into())
+                })?;
+                if start_name.as_slice() != element.name().as_ref() {
+                    return Err(Error::Invalid(
+                        "source slide picture scan has a mismatched end element".into(),
+                    ));
+                }
+                let closing_depth = stack.len() + 1;
+                if picture_blip_fill_depth == Some(closing_depth) {
+                    picture_blip_fill_depth = None;
+                }
+                if picture_depth == Some(closing_depth) {
+                    picture_depth = None;
+                }
+                if stack.is_empty() {
+                    root_closed = true;
+                }
+            },
+            Event::Text(text)
+                if stack.is_empty() && !text.as_ref().iter().all(u8::is_ascii_whitespace) =>
+            {
+                return Err(Error::Invalid(
+                    "source slide picture scan contains text outside its root".into(),
+                ));
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(Error::UnsafeEdit {
+                    operation: "source-backed picture inventory",
+                    reason: "markup-compatibility or processing-instruction content is refused",
+                });
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if !root_seen || !root_closed || !stack.is_empty() {
+        return Err(Error::Invalid(
+            "source slide picture scan is not one closed root".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_full_slide_blip_attributes(
+    package: &SourceBackedPackage,
+    element: &quick_xml::events::BytesStart<'_>,
+    resolver: &quick_xml::name::NamespaceResolver,
+    decoder: quick_xml::encoding::Decoder,
+    expected_relationship_namespace: &'static [u8],
+) -> Result<()> {
+    let mut embed_seen = false;
+    let mut link_seen = false;
+    for attribute in element.attributes().with_checks(true) {
+        package.check_execution()?;
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.as_namespace_binding().is_some() {
+            continue;
+        }
+        let key = attribute.key.as_ref();
+        let (namespace, local) = resolver.resolve_attribute(attribute.key);
+        if is_mce_namespace(&namespace) {
+            return Err(Error::UnsafeEdit {
+                operation: "source-backed picture inventory",
+                reason: "markup-compatibility attributes are refused",
+            });
+        }
+        let relationship_namespace = match &namespace {
+            ResolveResult::Bound(Namespace(value))
+                if *value == litchi_ooxml_common::relationships::TRANSITIONAL_NAMESPACE =>
+            {
+                Some(litchi_ooxml_common::relationships::TRANSITIONAL_NAMESPACE)
+            },
+            ResolveResult::Bound(Namespace(value))
+                if *value == litchi_ooxml_common::relationships::STRICT_NAMESPACE =>
+            {
+                Some(litchi_ooxml_common::relationships::STRICT_NAMESPACE)
+            },
+            _ => None,
+        };
+        if key.starts_with(b"r:") && relationship_namespace != Some(expected_relationship_namespace)
+        {
+            return Err(Error::Invalid(
+                "picture a:blip r prefix is not bound to the slide relationship namespace".into(),
+            ));
+        }
+        if let Some(namespace) = relationship_namespace {
+            if namespace != expected_relationship_namespace {
+                return Err(Error::Invalid(
+                    "picture a:blip relationship namespace differs from the slide dialect".into(),
+                ));
+            }
+            match local.as_ref() {
+                b"embed" => {
+                    if embed_seen || link_seen {
+                        return Err(Error::Relationship(
+                            "picture a:blip contains duplicate or mixed image relationships".into(),
+                        ));
+                    }
+                    embed_seen = true;
+                },
+                b"link" => {
+                    if embed_seen || link_seen {
+                        return Err(Error::Relationship(
+                            "picture a:blip contains duplicate or mixed image relationships".into(),
+                        ));
+                    }
+                    link_seen = true;
+                },
+                _ => {
+                    return Err(Error::Invalid(
+                        "picture a:blip contains an unsupported relationship attribute".into(),
+                    ));
+                },
+            }
+            let _ = attribute
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+                .map_err(|error| Error::Xml(error.to_string()))?;
+        } else if matches!(namespace, ResolveResult::Unknown(_)) {
+            return Err(Error::Invalid(
+                "picture a:blip contains an unresolved attribute prefix".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn resolve_picture_target(
     package: &SourceBackedPackage,
     view: &PartView<'_>,
@@ -2791,7 +3122,7 @@ fn is_image_content_type(content_type: &str) -> bool {
 }
 
 fn is_mce_namespace(namespace: &ResolveResult<'_>) -> bool {
-    matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == MCE_NAMESPACE)
+    matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == MCE_NAMESPACE || *value == STRICT_MCE_NAMESPACE)
 }
 
 fn is_presentation_name(
@@ -2841,9 +3172,12 @@ fn validate_slide_graph(
             slide_id: reference.id(),
             part_uri: part_uri.clone(),
             binding: Arc::new(SlideBinding {
-                slide_reference_id: reference.relationship_id().to_string(),
-                presentation_relationship: relationship_binding(relationship),
-                slide: part_binding(&slide),
+                slide_reference_id: clone_relationship_text(
+                    reference.relationship_id(),
+                    "source-backed slide reference ID",
+                )?,
+                presentation_relationship: relationship_binding(relationship)?,
+                slide: part_binding(package, &slide)?,
             }),
         }));
     }
@@ -2867,45 +3201,76 @@ fn source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalog> {
     SOURCE_CATALOG_BUILDS.set(SOURCE_CATALOG_BUILDS.get() + 1);
     package.check_execution()?;
     let view = package.main_document_part()?;
-    let presentation = SourcePart::from_view(&view, view.data()?);
+    let presentation = SourcePart::from_view(&view, view.data()?)?;
     package.check_execution()?;
-    let presentation_binding = part_binding(&view);
+    let presentation_binding = part_binding(package, &view)?;
     let references = PresentationPart::from_part(&presentation)?.slide_references()?;
     package.check_execution()?;
     let slides = validate_slide_graph(package, &view, &references)?;
     package.check_execution()?;
     Ok(SourceCatalog {
         presentation,
-        package_relationships: relationship_bindings(package.rels()),
+        package_relationships: relationship_bindings(package, package.rels())?,
         presentation_binding,
         slides,
     })
 }
 
-fn part_binding(view: &PartView<'_>) -> PartBinding {
-    PartBinding {
+fn part_binding(package: &SourceBackedPackage, view: &PartView<'_>) -> Result<PartBinding> {
+    Ok(PartBinding {
         uri: view.partname().clone(),
-        content_type: view.content_type().to_string(),
-        relationships: relationship_bindings(view.rels()),
-    }
+        content_type: clone_relationship_text(
+            view.content_type(),
+            "source-backed part content type",
+        )?,
+        relationships: relationship_bindings(package, view.rels())?,
+    })
 }
 
-fn relationship_bindings(relationships: &Relationships) -> Box<[RelationshipBinding]> {
-    let mut bindings = relationships
-        .iter()
-        .map(relationship_binding)
-        .collect::<Vec<_>>();
+fn relationship_bindings(
+    package: &SourceBackedPackage,
+    relationships: &Relationships,
+) -> Result<Box<[RelationshipBinding]>> {
+    package.check_execution()?;
+    let expected_len = relationships.len();
+    let mut bindings = Vec::new();
+    bindings
+        .try_reserve_exact(expected_len)
+        .map_err(|source| Error::Allocation {
+            resource: "source-backed relationship bindings",
+            source,
+        })?;
+    for relationship in relationships.iter() {
+        package.check_execution()?;
+        bindings.push(relationship_binding(relationship)?);
+    }
+    if bindings.len() != expected_len {
+        return Err(Error::Invalid(
+            "source-backed relationship catalog length changed during iteration".into(),
+        ));
+    }
     bindings.sort_unstable_by(|left, right| left.id.cmp(&right.id));
-    bindings.into_boxed_slice()
+    Ok(bindings.into_boxed_slice())
 }
 
-fn relationship_binding(relationship: &litchi_opc::Relationship) -> RelationshipBinding {
-    RelationshipBinding {
-        id: relationship.r_id().to_string(),
-        kind: relationship.reltype().to_string(),
-        target: relationship.target_ref().to_string(),
+fn relationship_binding(relationship: &litchi_opc::Relationship) -> Result<RelationshipBinding> {
+    Ok(RelationshipBinding {
+        id: clone_relationship_text(relationship.r_id(), "source-backed relationship ID")?,
+        kind: clone_relationship_text(relationship.reltype(), "source-backed relationship type")?,
+        target: clone_relationship_text(
+            relationship.target_ref(),
+            "source-backed relationship target",
+        )?,
         mode: relationship.target_mode(),
-    }
+    })
+}
+
+fn clone_relationship_text(value: &str, resource: &'static str) -> Result<String> {
+    let mut text = String::new();
+    text.try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    text.push_str(value);
+    Ok(text)
 }
 
 #[cfg(test)]
