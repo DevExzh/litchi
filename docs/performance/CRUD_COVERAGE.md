@@ -2134,3 +2134,35 @@ cleared by rerun. See
 Each new case should use deterministic object positions and digests, separate
 semantic work from publication, reopen outputs, verify untouched content, and
 record source/sink, allocation and peak-memory behavior in addition to time.
+## Change 0383 update
+
+The source-backed PPTX cross-slide CRUD surface now covers a caller-bounded
+set of direct picture leaves plus zero or more direct ordinary chart graphic
+frames. Chart copying is deliberately leaf-only: an internal canonical
+`/ppt/charts/` target must be relationship-free, use the destination dialect's
+chart content type, and have the valid chart root. Distinct chart parts are
+physically deduplicated, but separate slide bindings are retained; canonical
+part and relationship identifiers are deterministic and only exact
+namespace-resolved relationship attributes are rewritten.
+
+ChartEx, embedded workbooks, `externalData`, style/color, chart drawing or
+user-shape content, chart outbound relationships, external/linked/wrong/missing
+bindings, unreferenced parts, malformed/ambiguous/nested hosts, stray chart
+namespace content, MCE/DTD/PI, unresolved namespace bindings, stale or foreign
+snapshots, signed packages, limit violations, cancellation, partial-sink
+failures outside the existing contract, and unsupported relationship-ID
+collisions remain explicit refusals. Destination anchors, source and
+destination freshness, signatures, raw members, and unrelated package members
+retain their existing preservation semantics. There is no durable inverse and
+no decode, conversion, or rendering path.
+
+Evidence for this bounded CRUD slice is focused `52/52` plus isolated typed
+cancellation `1/1`; default-feature library `531` passed with one named
+filtered test; all-features primary library `533` passed with one named
+filtered test and integrations green with three exact exclusions; doctests
+were `6` passed and `2` ignored. Clippy required only inherited
+`nonminimal_bool`, `clone_on_copy`, and `needless_lifetimes` allowances. The
+boundary audit reported `64` packages, `240` internal dependencies, and `14`
+debt edges. No performance measurements were taken.
+
+`performance_claim: none`; `claim_authorized: false`.
