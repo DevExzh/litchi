@@ -1,5 +1,34 @@
 # Performance program phase report
 
+## Change 0393: PPTX selected-image query
+
+PPTX source-backed `image` and `read_image` no longer build and retain the
+complete picture descriptor inventory merely to return one position. The
+private selected-query path still validates the entire ordered picture set
+and all targets before its final freshness fence, so malformed later pictures
+and stale sources retain precedence over a requested result or out-of-bounds
+error. The public API and full `images` inventory path are unchanged.
+
+Independent validation passed 534 library tests with the one exact historical
+failure excluded and reproduced at baseline, plus all focused picture,
+freshness, cancellation, MCE, outbound, and filesystem tests. Review found no
+material ownership or correctness issue.
+
+The stable 1.98.1 matched release run records a 12.404%–12.434% p50 reduction
+for the selected `image` selector and exact reductions of eight allocation and
+deallocation calls plus 1,831 allocated/deallocated bytes for both selected
+selectors. Reallocations and logical source reads are invariant. The [raw and
+machine-readable evidence](results/change-0393/) binds the exact control,
+patch, binaries, corpus, four reports, allocation vectors, and parent
+adjudication.
+
+`performance_claim: scoped`; `claim_authorized: true`. Only selected `image`
+p50 and the exact selected-path allocator vectors are accepted for the named
+corpus/protocol. Full-inventory and `read_image` latency, all tail/mean
+latencies, RSS, physical I/O, decompression, cold cache, throughput, scaling,
+and broad PPTX behavior are withheld. See [Change
+0393](changes/0393-pptx-selected-image-query.md).
+
 ## Change 0390: OPC materialization decoder session
 
 One opaque indexed-read session now owns a lazily initialized Deflate decoder

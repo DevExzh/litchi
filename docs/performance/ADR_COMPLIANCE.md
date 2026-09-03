@@ -1,5 +1,31 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0393 compliance update
+
+The selected-query state remains private to `litchi-pptx`, the semantic owner
+of PPTX picture descriptors. It adds no raw OPC/ZIP type or identifier to the
+public API, dependency edge, executor/runtime handle, cache, lock, unsafe code,
+or parallel path. `images` retains its public return and allocation behavior.
+
+Correctness remains ahead of selection: every picture is parsed and every
+target resolved in scene order, including pictures after the selected one.
+MCE and external-target policy, cancellation, limits, source-version fences,
+payload deferral, out-of-bounds length, and malformed/missing-target error
+precedence remain fail closed. Focused counters and adversarial tests establish
+the mechanism independently of timing. Independent review and stable 1.98.1
+validation accepted the implementation; the one full-suite exclusion was
+reproduced unchanged at exact baseline.
+
+The matched release package binds the source patch, binaries, deterministic
+corpus, four raw reports, allocator vectors, and adjudication. The accepted
+claim is limited to selected `image` p50 and exact selected-path allocator
+reductions on that protocol. Broad latency, tails, means, RSS, physical I/O,
+decompression, cold cache, throughput, scaling, and all-PPTX behavior remain
+withheld. Evidence is recorded in [Change
+0393](changes/0393-pptx-selected-image-query.md).
+
+`performance_claim: scoped`; `claim_authorized: true`.
+
 ## Change 0390 compliance update
 
 The indexed decoder session is opaque operation-scoped state: unmanaged OPC

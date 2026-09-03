@@ -34,6 +34,11 @@ use crate::{Error, Result};
 #[cfg(test)]
 thread_local! {
     static SOURCE_CATALOG_BUILDS: Cell<usize> = const { Cell::new(0) };
+    static SOURCE_PICTURE_QUERY_ALL: Cell<usize> = const { Cell::new(0) };
+    static SOURCE_PICTURE_QUERY_SELECTED: Cell<usize> = const { Cell::new(0) };
+    static SOURCE_PICTURE_DESCRIPTOR_RESERVE_CALLS: Cell<usize> = const { Cell::new(0) };
+    static SOURCE_PICTURE_DESCRIPTOR_RESERVE_ITEMS: Cell<usize> = const { Cell::new(0) };
+    static SOURCE_PICTURE_TARGET_RESOLUTIONS: Cell<usize> = const { Cell::new(0) };
 }
 
 #[cfg(test)]
@@ -44,6 +49,40 @@ fn reset_source_catalog_builds() {
 #[cfg(test)]
 fn source_catalog_builds() -> usize {
     SOURCE_CATALOG_BUILDS.get()
+}
+
+#[cfg(test)]
+fn reset_source_picture_query_counters() {
+    SOURCE_PICTURE_QUERY_ALL.set(0);
+    SOURCE_PICTURE_QUERY_SELECTED.set(0);
+    SOURCE_PICTURE_DESCRIPTOR_RESERVE_CALLS.set(0);
+    SOURCE_PICTURE_DESCRIPTOR_RESERVE_ITEMS.set(0);
+    SOURCE_PICTURE_TARGET_RESOLUTIONS.set(0);
+}
+
+#[cfg(test)]
+fn source_picture_query_all() -> usize {
+    SOURCE_PICTURE_QUERY_ALL.get()
+}
+
+#[cfg(test)]
+fn source_picture_query_selected() -> usize {
+    SOURCE_PICTURE_QUERY_SELECTED.get()
+}
+
+#[cfg(test)]
+fn source_picture_descriptor_reserve_calls() -> usize {
+    SOURCE_PICTURE_DESCRIPTOR_RESERVE_CALLS.get()
+}
+
+#[cfg(test)]
+fn source_picture_descriptor_reserve_items() -> usize {
+    SOURCE_PICTURE_DESCRIPTOR_RESERVE_ITEMS.get()
+}
+
+#[cfg(test)]
+fn source_picture_target_resolutions() -> usize {
+    SOURCE_PICTURE_TARGET_RESOLUTIONS.get()
 }
 
 /// Maximum number of existing slides in one source-backed batch edit.
@@ -515,6 +554,20 @@ impl SourceImage {
     pub const fn data(&self) -> &PartData {
         &self.data
     }
+}
+
+#[derive(Clone, Copy)]
+enum PictureQueryMode {
+    All,
+    Selected(usize),
+}
+
+enum PictureQueryResult {
+    All(Vec<SourceImageDescriptor>),
+    Selected {
+        descriptor: Option<SourceImageDescriptor>,
+        len: usize,
+    },
 }
 
 /// An owning, source-backed editor for one existing slide.
@@ -2252,6 +2305,23 @@ impl SourceSlide {
     /// Markup-compatibility branches and ambiguous or malformed picture
     /// grammar are refused rather than projected into a lossy descriptor.
     pub fn images(&self) -> Result<Vec<SourceImageDescriptor>> {
+        match self.query_images(PictureQueryMode::All)? {
+            PictureQueryResult::All(descriptors) => Ok(descriptors),
+            PictureQueryResult::Selected { .. } => unreachable!("all picture query result"),
+        }
+    }
+
+    fn query_images(&self, mode: PictureQueryMode) -> Result<PictureQueryResult> {
+        #[cfg(test)]
+        match mode {
+            PictureQueryMode::All => {
+                SOURCE_PICTURE_QUERY_ALL.set(SOURCE_PICTURE_QUERY_ALL.get() + 1)
+            },
+            PictureQueryMode::Selected(_) => {
+                SOURCE_PICTURE_QUERY_SELECTED.set(SOURCE_PICTURE_QUERY_SELECTED.get() + 1)
+            },
+        }
+
         self.owner.package.check_execution()?;
         let view = self.owner.package.part(&self.data.part_uri)?;
         let part = self.load_part(&view)?;
@@ -2270,33 +2340,85 @@ impl SourceSlide {
             });
         }
 
-        let mut descriptors = Vec::new();
-        descriptors
-            .try_reserve_exact(scene.len())
-            .map_err(|source| Error::Allocation {
-                resource: "source-backed picture descriptors",
-                source,
-            })?;
+        let mut descriptors = match mode {
+            PictureQueryMode::All => {
+                let mut descriptors = Vec::new();
+                #[cfg(test)]
+                {
+                    SOURCE_PICTURE_DESCRIPTOR_RESERVE_CALLS
+                        .set(SOURCE_PICTURE_DESCRIPTOR_RESERVE_CALLS.get() + 1);
+                    SOURCE_PICTURE_DESCRIPTOR_RESERVE_ITEMS
+                        .set(SOURCE_PICTURE_DESCRIPTOR_RESERVE_ITEMS.get() + scene.len());
+                }
+                descriptors
+                    .try_reserve_exact(scene.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "source-backed picture descriptors",
+                        source,
+                    })?;
+                Some(descriptors)
+            },
+            PictureQueryMode::Selected(_) => None,
+        };
+        let mut selected_descriptor = None;
+        let mut picture_count = 0usize;
         for (shape_position, shape) in scene.iter().enumerate() {
             let Shape::Picture(picture) = shape else {
                 continue;
             };
+            let position = picture_count;
+            picture_count = picture_count
+                .checked_add(1)
+                .ok_or_else(|| Error::Invalid("source-backed picture count overflow".into()))?;
             let common = picture.common();
             let relationship = parse_picture_relationship(common.xml()?)?;
             let target = resolve_picture_target(&self.owner.package, &view, &relationship)?;
-            descriptors.push(SourceImageDescriptor {
-                position: descriptors.len(),
-                shape_position,
-                id: common.id(),
-                name: common.name().map(str::to_owned),
-                bounds: common.bounds(),
-                relationship_id: relationship.id,
-                target,
-            });
+            let descriptor = match mode {
+                PictureQueryMode::All => Some(SourceImageDescriptor {
+                    position,
+                    shape_position,
+                    id: common.id(),
+                    name: common.name().map(str::to_owned),
+                    bounds: common.bounds(),
+                    relationship_id: relationship.id,
+                    target,
+                }),
+                PictureQueryMode::Selected(selected) if selected == position => {
+                    Some(SourceImageDescriptor {
+                        position,
+                        shape_position,
+                        id: common.id(),
+                        name: common.name().map(str::to_owned),
+                        bounds: common.bounds(),
+                        relationship_id: relationship.id,
+                        target,
+                    })
+                },
+                PictureQueryMode::Selected(_) => None,
+            };
+            if let Some(descriptor) = descriptor {
+                match mode {
+                    PictureQueryMode::All => descriptors
+                        .as_mut()
+                        .expect("all picture query retains descriptors")
+                        .push(descriptor),
+                    PictureQueryMode::Selected(_) => selected_descriptor = Some(descriptor),
+                }
+            }
         }
         self.owner.package.check_execution()?;
         self.owner.package.source_version()?;
-        Ok(descriptors)
+        match mode {
+            PictureQueryMode::All => Ok(PictureQueryResult::All(
+                descriptors
+                    .take()
+                    .expect("all picture query retains descriptors"),
+            )),
+            PictureQueryMode::Selected(_) => Ok(PictureQueryResult::Selected {
+                descriptor: selected_descriptor,
+                len: picture_count,
+            }),
+        }
     }
 
     /// Select one direct image descriptor by exact zero-based image position.
@@ -2304,15 +2426,15 @@ impl SourceSlide {
     /// The selected embedded payload is still deferred; use
     /// [`Self::read_image`] when payload bytes are required.
     pub fn image(&self, position: usize) -> Result<SourceImageDescriptor> {
-        let images = self.images()?;
-        let len = images.len();
-        images
-            .into_iter()
-            .nth(position)
-            .ok_or(Error::IndexOutOfBounds {
-                index: position,
-                len,
-            })
+        let PictureQueryResult::Selected { descriptor, len } =
+            self.query_images(PictureQueryMode::Selected(position))?
+        else {
+            unreachable!("selected picture query result")
+        };
+        descriptor.ok_or(Error::IndexOutOfBounds {
+            index: position,
+            len,
+        })
     }
 
     /// Read one embedded image payload by exact zero-based image position.
@@ -2324,7 +2446,15 @@ impl SourceSlide {
     /// access.
     pub fn read_image(&self, position: usize) -> Result<SourceImage> {
         self.owner.package.check_execution()?;
-        let descriptor = self.image(position)?;
+        let PictureQueryResult::Selected { descriptor, len } =
+            self.query_images(PictureQueryMode::Selected(position))?
+        else {
+            unreachable!("selected picture query result")
+        };
+        let descriptor = descriptor.ok_or(Error::IndexOutOfBounds {
+            index: position,
+            len,
+        })?;
         let SourceImageTarget::Internal { part_uri, .. } = &descriptor.target else {
             return Err(Error::Relationship(format!(
                 "source-backed image {position} has an external target and is inert"
@@ -3062,6 +3192,10 @@ fn resolve_picture_target(
     view: &PartView<'_>,
     picture: &PictureRelationship,
 ) -> Result<SourceImageTarget> {
+    #[cfg(test)]
+    {
+        SOURCE_PICTURE_TARGET_RESOLUTIONS.set(SOURCE_PICTURE_TARGET_RESOLUTIONS.get() + 1);
+    }
     let relationship = view.rels().get(&picture.id).ok_or_else(|| {
         Error::Relationship(format!(
             "picture image relationship '{}' is missing",
@@ -3295,7 +3429,10 @@ mod tests {
         SourceBackedPresentation, SourceBackedPresentationEditor, SourceBackedSlideBatchCommit,
         SourceBackedSlideBatchPatch, SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit,
         SourceBackedSlidePatch, SourceBackedSlideSnapshot, SourceImageTarget, SourcePayload,
-        reset_source_catalog_builds, reset_test_semantic_scene_reads, source_catalog_builds,
+        reset_source_catalog_builds, reset_source_picture_query_counters,
+        reset_test_semantic_scene_reads, source_catalog_builds,
+        source_picture_descriptor_reserve_calls, source_picture_descriptor_reserve_items,
+        source_picture_query_all, source_picture_query_selected, source_picture_target_resolutions,
         test_semantic_scene_reads, test_semantic_slide_part_reads,
     };
     use crate::Error;
@@ -3645,6 +3782,43 @@ mod tests {
     fn picture_slide_with_pic_children(children: &str) -> Vec<u8> {
         format!(
             r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:pic>{children}</p:pic></p:spTree></p:cSld></p:sld>"#
+        )
+        .into_bytes()
+    }
+
+    fn multiple_picture_slide(blips: &[&str]) -> Vec<u8> {
+        let pictures = blips
+            .iter()
+            .enumerate()
+            .map(|(index, blip)| {
+                format!(
+                    r#"<p:pic><p:nvPicPr><p:cNvPr id="{}" name="Photo {}"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill>{blip}<a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="{}" y="{}"/><a:ext cx="{}" cy="{}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>"#,
+                    42 + index,
+                    index,
+                    index + 1,
+                    index + 2,
+                    index + 3,
+                    index + 4,
+                )
+            })
+            .collect::<String>();
+        format!(
+            r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/>{pictures}</p:spTree></p:cSld></p:sld>"#
+        )
+        .into_bytes()
+    }
+
+    fn picture_relationships(ids: &[&str]) -> Vec<u8> {
+        let relationships = ids
+            .iter()
+            .map(|id| {
+                format!(
+                    r#"<Relationship Id="{id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.png"/>"#
+                )
+            })
+            .collect::<String>();
+        format!(
+            r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">{relationships}</Relationships>"#
         )
         .into_bytes()
     }
@@ -4189,6 +4363,139 @@ mod tests {
     }
 
     #[test]
+    fn selected_picture_query_matches_all_without_descriptor_reservation() {
+        let slide_xml = multiple_picture_slide(&[
+            r#"<a:blip r:embed="rIdImage1"/>"#,
+            r#"<a:blip r:embed="rIdImage2"/>"#,
+            r#"<a:blip r:embed="rIdImage3"/>"#,
+        ]);
+        let relationships = picture_relationships(&["rIdImage1", "rIdImage2", "rIdImage3"]);
+        let source = Arc::new(PictureCountingSource::new(picture_pptx(
+            &slide_xml,
+            &relationships,
+            Some("image/png"),
+            None,
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+        let slide = presentation.slide(0).unwrap();
+
+        reset_source_picture_query_counters();
+        let images = slide.images().unwrap();
+        assert_eq!(images.len(), 3);
+        assert_eq!(source_picture_query_all(), 1);
+        assert_eq!(source_picture_query_selected(), 0);
+        assert_eq!(source_picture_descriptor_reserve_calls(), 1);
+        assert!(source_picture_descriptor_reserve_items() >= images.len());
+        assert_eq!(source_picture_target_resolutions(), 3);
+        assert_eq!(images[0].shape_position(), 0);
+        assert_eq!(images[1].shape_position(), 1);
+        assert_eq!(images[2].shape_position(), 2);
+
+        reset_source_picture_query_counters();
+        let selected = slide.image(1).unwrap();
+        assert_eq!(selected, images[1]);
+        assert_eq!(source_picture_query_all(), 0);
+        assert_eq!(source_picture_query_selected(), 1);
+        assert_eq!(source_picture_descriptor_reserve_calls(), 0);
+        assert_eq!(source_picture_descriptor_reserve_items(), 0);
+        assert_eq!(source_picture_target_resolutions(), 3);
+
+        reset_source_picture_query_counters();
+        let media_reads_before = source.media_payload_reads.load(Ordering::SeqCst);
+        let image = slide.read_image(1).unwrap();
+        assert_eq!(image.descriptor(), &images[1]);
+        assert_eq!(source_picture_query_all(), 0);
+        assert_eq!(source_picture_query_selected(), 1);
+        assert_eq!(source_picture_descriptor_reserve_calls(), 0);
+        assert_eq!(source_picture_descriptor_reserve_items(), 0);
+        assert_eq!(source_picture_target_resolutions(), 3);
+        assert!(
+            source.media_payload_reads.load(Ordering::SeqCst) > media_reads_before,
+            "read_image must load the selected media payload after metadata validation"
+        );
+    }
+
+    #[test]
+    fn selected_picture_query_validates_later_grammar_and_targets() {
+        let malformed_slide = multiple_picture_slide(&[
+            r#"<a:blip r:embed="rIdImage1"/>"#,
+            r#"<a:blip r:embed="rIdImage2"/><a:blip r:embed="rIdImage2"/>"#,
+            r#"<a:blip r:embed="rIdImage3"/>"#,
+        ]);
+        let relationships = picture_relationships(&["rIdImage1", "rIdImage2", "rIdImage3"]);
+        let source = Arc::new(PictureCountingSource::new(picture_pptx(
+            &malformed_slide,
+            &relationships,
+            Some("image/png"),
+            None,
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
+        let result = presentation.slide(0).unwrap().image(0);
+        assert!(matches!(
+            result,
+            Err(Error::Invalid(message)) if message.contains("blipFill direct children")
+        ));
+
+        let missing_target_slide = multiple_picture_slide(&[
+            r#"<a:blip r:embed="rIdImage1"/>"#,
+            r#"<a:blip r:embed="rIdMissing"/>"#,
+            r#"<a:blip r:embed="rIdImage3"/>"#,
+        ]);
+        let relationships = picture_relationships(&["rIdImage1", "rIdImage3"]);
+        let source = Arc::new(PictureCountingSource::new(picture_pptx(
+            &missing_target_slide,
+            &relationships,
+            Some("image/png"),
+            None,
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
+        let result = presentation.slide(0).unwrap().image(0);
+        assert!(matches!(
+            result,
+            Err(Error::Relationship(message)) if message.contains("'rIdMissing' is missing")
+        ));
+    }
+
+    #[test]
+    fn selected_picture_query_reports_final_length_and_malformed_before_oob() {
+        let valid_slide = multiple_picture_slide(&[
+            r#"<a:blip r:embed="rIdImage1"/>"#,
+            r#"<a:blip r:embed="rIdImage2"/>"#,
+            r#"<a:blip r:embed="rIdImage3"/>"#,
+        ]);
+        let relationships = picture_relationships(&["rIdImage1", "rIdImage2", "rIdImage3"]);
+        let source = Arc::new(PictureCountingSource::new(picture_pptx(
+            &valid_slide,
+            &relationships,
+            Some("image/png"),
+            None,
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
+        assert!(matches!(
+            presentation.slide(0).unwrap().image(99),
+            Err(Error::IndexOutOfBounds { index: 99, len: 3 })
+        ));
+
+        let malformed_slide = multiple_picture_slide(&[
+            r#"<a:blip r:embed="rIdImage1"/>"#,
+            r#"<a:blip r:embed="rIdImage2"/><a:blip r:embed="rIdImage2"/>"#,
+            r#"<a:blip r:embed="rIdImage3"/>"#,
+        ]);
+        let source = Arc::new(PictureCountingSource::new(picture_pptx(
+            &malformed_slide,
+            &relationships,
+            Some("image/png"),
+            None,
+        )));
+        let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
+        let result = presentation.slide(0).unwrap().image(99);
+        assert!(matches!(
+            result,
+            Err(Error::Invalid(message)) if message.contains("blipFill direct children")
+        ));
+    }
+
+    #[test]
     fn strict_picture_graph_is_supported_without_payload_reads() {
         let slide = String::from_utf8(picture_slide(r#"<a:blip r:embed="rIdImage"/>"#))
             .unwrap()
@@ -4412,6 +4719,8 @@ mod tests {
         let presentation = SourceBackedPresentation::from_read_at(source).unwrap();
         let result = presentation.slide(0).unwrap().images();
         assert!(matches!(result, Err(Error::UnsafeEdit { .. })));
+        let result = presentation.slide(0).unwrap().image(0);
+        assert!(matches!(result, Err(Error::UnsafeEdit { .. })));
 
         let source = Arc::new(PictureCountingSource::new(picture_pptx(
             &picture_slide(r#"<a:blip r:embed="rIdImage"/>"#),
@@ -4430,6 +4739,10 @@ mod tests {
         let slide = presentation.slide(0).unwrap();
         assert!(slide.images().is_ok());
         source.changed();
+        assert!(matches!(
+            slide.image(99),
+            Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
+        ));
         assert!(matches!(
             slide.read_image(0),
             Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))

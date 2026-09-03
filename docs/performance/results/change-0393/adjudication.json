@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "change": "0393",
+  "performance_claim": "scoped",
+  "claim_authorized": true,
+  "capture_summary_sha256": "7b9fbe3d335c395cecdf8c80309fc4c0a6d78d2f03e0ef1b2278b5cfc4644d76",
+  "accepted": [
+    {
+      "case": "pptx_source_backed_image_query",
+      "metrics": [
+        "p50_ns"
+      ],
+      "a1_to_b1_delta_pct": -12.433713574436885,
+      "a2_to_b2_delta_pct": -12.404141540562065
+    },
+    {
+      "case": "pptx_source_backed_image_query",
+      "metrics": [
+        "allocation_calls",
+        "deallocation_calls",
+        "reallocation_calls",
+        "allocated_bytes",
+        "deallocated_bytes"
+      ],
+      "exact_delta": {
+        "allocation_calls": -8,
+        "deallocation_calls": -8,
+        "reallocation_calls": 0,
+        "allocated_bytes": -1831,
+        "deallocated_bytes": -1831
+      }
+    },
+    {
+      "case": "pptx_source_backed_read_image_query",
+      "metrics": [
+        "allocation_calls",
+        "deallocation_calls",
+        "reallocation_calls",
+        "allocated_bytes",
+        "deallocated_bytes"
+      ],
+      "exact_delta": {
+        "allocation_calls": -8,
+        "deallocation_calls": -8,
+        "reallocation_calls": 0,
+        "allocated_bytes": -1831,
+        "deallocated_bytes": -1831
+      }
+    }
+  ],
+  "withheld": [
+    "pptx_source_backed_images_query latency",
+    "pptx_source_backed_read_image_query latency",
+    "all p95, p99, and mean latency metrics",
+    "RSS and peak memory",
+    "physical I/O",
+    "decompression and copied-byte attribution",
+    "cold-cache behavior",
+    "throughput and parallel scaling",
+    "fixed memory and general OOM prevention",
+    "all-PPTX and unmeasured-corpus behavior"
+  ],
+  "reason": "The selected image query improves p50 by 12.404% to 12.434% in both matched directions and removes the exact descriptor-retention allocation mechanism. Read-image control p99 drift was 5.053%, so latency tails and read-image latency remain observational.",
+  "scope": "the named selectors, exact deterministic corpus, binaries, source patch, release configuration, and A1/B1/B2/A2 protocol only"
+}

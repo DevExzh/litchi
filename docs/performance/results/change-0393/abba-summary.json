@@ -1,0 +1,398 @@
+{
+  "schema_version": 1,
+  "protocol": "0393 matched A1/B1/B2/A2 prospective PPTX source-image query evidence",
+  "toolchain": {
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "cargo": "1.98.1",
+    "profile": "release",
+    "allocator_metrics": true,
+    "workers": 1,
+    "warmups": 5,
+    "samples": 30
+  },
+  "revisions": {
+    "control": "4ba030c2a6cd68b88e502a117d5730c5a6202fee",
+    "candidate_base": "4ba030c2a6cd68b88e502a117d5730c5a6202fee",
+    "candidate_patch_sha256": "4da5ce10d8f7475279ac4bdef639c3269d0baff30959b67c79b5f8869daf0559"
+  },
+  "binaries": {
+    "control": {
+      "path": "/tmp/litchi-0393-pptx-baseline.bTsuw2/target/release/litchi-perf-baseline-alloc",
+      "sha256": "c3262985314cfb9e78a9593f80bbffb53043c33f6d40a4aa7c62f95a29cf4ad0",
+      "bytes": 54603968,
+      "mode_bits": 509
+    },
+    "candidate": {
+      "path": "/tmp/litchi-0393-pptx-baseline.bTsuw2/candidate-target/release/litchi-perf-baseline-alloc",
+      "sha256": "85252c17b48d5ed98d2383da42fc7c97183fdf18977f2f423c225c9c4da10e1f",
+      "bytes": 54607424,
+      "mode_bits": 509
+    }
+  },
+  "reports": {
+    "a1": {
+      "path": "a1.json",
+      "sha256": "cd8c7dafe0c8848abd778a2cb76b6259544c10e11622ce4f754dcbe0405c5920"
+    },
+    "b1": {
+      "path": "b1.json",
+      "sha256": "0bed70b1fb47dcedfe677052aed487ded769ff2f53cef8207ff3bc5bb44c1dd0"
+    },
+    "b2": {
+      "path": "b2.json",
+      "sha256": "6a4e2e2b78b8fb25fe19bdfb0927c3edb587bc81d81a250f863cf4b1e2f9ee95"
+    },
+    "a2": {
+      "path": "a2.json",
+      "sha256": "02ad63be98aae1b623af398dab18ccea545892ecf7badef8cc3ba84f22cfca8b"
+    }
+  },
+  "corpus": {
+    "name": "pptx-source-backed-image-query",
+    "generator": "litchi-pptx-cross-slide-copy-evidence-v1",
+    "package_format": "PPTX/OPC/ZIP",
+    "shape": "picture-heavy-selected-slide",
+    "payload_kind": "deterministic-incompressible-media-and-slide-text",
+    "compression": "deflate",
+    "entry_count": 32,
+    "archive_member_count": 51,
+    "entry_bytes": 2097152,
+    "uncompressed_payload_bytes": 16867499,
+    "archive_bytes": 16815621,
+    "archive_sha256": "830928aafdc3ec8a5995a0d84a82ea9e2acb7f190f45008ddc017e2edfbf684b",
+    "target_entry": "slide:2/picture:3",
+    "target_payload_bytes": 2097152,
+    "target_payload_sha256": "5d6b7fd3f2ed6306e4470510c77d83b051a737e9fbd3776d71340308d4e89063",
+    "xlsx": null
+  },
+  "cases": [
+    {
+      "case": "pptx_source_backed_images_query",
+      "a1_to_b1": {
+        "p50": {
+          "from": 178285,
+          "to": 161261,
+          "delta_pct": -9.548756204952744
+        },
+        "p95": {
+          "from": 195921,
+          "to": 178311,
+          "delta_pct": -8.988316719494081
+        },
+        "p99": {
+          "from": 196201,
+          "to": 180121,
+          "delta_pct": -8.195676882380823
+        }
+      },
+      "a2_to_b2": {
+        "p50": {
+          "from": 174735,
+          "to": 156986,
+          "delta_pct": -10.157667324806136
+        },
+        "p95": {
+          "from": 191191,
+          "to": 174111,
+          "delta_pct": -8.93347490206129
+        },
+        "p99": {
+          "from": 192481,
+          "to": 176811,
+          "delta_pct": -8.141063273777672
+        }
+      },
+      "control_a1_to_a2_drift_pct": {
+        "p50_pct": -1.9911938749754607,
+        "p95_pct": -2.4142383920049406,
+        "p99_pct": -1.8960148011478024,
+        "mean_pct": -2.1838682026486134
+      },
+      "candidate_b1_to_b2_drift_pct": {
+        "p50_pct": -2.6509819485182406,
+        "p95_pct": -2.355435166647038,
+        "p99_pct": -1.83765357731747,
+        "mean_pct": -1.8886742825849743
+      },
+      "allocation": {
+        "a1": {
+          "allocation_calls": 1435,
+          "deallocation_calls": 1279,
+          "reallocation_calls": 121,
+          "allocated_bytes": 290732,
+          "deallocated_bytes": 282798
+        },
+        "a2": {
+          "allocation_calls": 1435,
+          "deallocation_calls": 1279,
+          "reallocation_calls": 121,
+          "allocated_bytes": 290732,
+          "deallocated_bytes": 282798
+        },
+        "b1": {
+          "allocation_calls": 1435,
+          "deallocation_calls": 1279,
+          "reallocation_calls": 121,
+          "allocated_bytes": 290732,
+          "deallocated_bytes": 282798
+        },
+        "b2": {
+          "allocation_calls": 1435,
+          "deallocation_calls": 1279,
+          "reallocation_calls": 121,
+          "allocated_bytes": 290732,
+          "deallocated_bytes": 282798
+        },
+        "control_legs_exact": true,
+        "candidate_legs_exact": true
+      },
+      "source_replay": {
+        "a1": {
+          "source_read_calls": 5,
+          "source_read_bytes": 706,
+          "selected_media_read_calls": 0,
+          "selected_media_read_bytes": 0
+        },
+        "a2": {
+          "source_read_calls": 5,
+          "source_read_bytes": 706,
+          "selected_media_read_calls": 0,
+          "selected_media_read_bytes": 0
+        },
+        "b1": {
+          "source_read_calls": 5,
+          "source_read_bytes": 706,
+          "selected_media_read_calls": 0,
+          "selected_media_read_bytes": 0
+        },
+        "b2": {
+          "source_read_calls": 5,
+          "source_read_bytes": 706,
+          "selected_media_read_calls": 0,
+          "selected_media_read_bytes": 0
+        }
+      }
+    },
+    {
+      "case": "pptx_source_backed_image_query",
+      "a1_to_b1": {
+        "p50": {
+          "from": 175941,
+          "to": 154065,
+          "delta_pct": -12.433713574436885
+        },
+        "p95": {
+          "from": 188011,
+          "to": 172151,
+          "delta_pct": -8.435676635941514
+        },
+        "p99": {
+          "from": 191081,
+          "to": 172741,
+          "delta_pct": -9.598023874691885
+        }
+      },
+      "a2_to_b2": {
+        "p50": {
+          "from": 175780,
+          "to": 153976,
+          "delta_pct": -12.404141540562065
+        },
+        "p95": {
+          "from": 191721,
+          "to": 163550,
+          "delta_pct": -14.693747685438737
+        },
+        "p99": {
+          "from": 191840,
+          "to": 165061,
+          "delta_pct": -13.959028356964136
+        }
+      },
+      "control_a1_to_a2_drift_pct": {
+        "p50_pct": -0.09150794868734405,
+        "p95_pct": 1.9732887969320945,
+        "p99_pct": 0.3972137470496805,
+        "mean_pct": 0.6842615704623606
+      },
+      "candidate_b1_to_b2_drift_pct": {
+        "p50_pct": -0.05776782526855548,
+        "p95_pct": -4.996195200724945,
+        "p99_pct": -4.445962452457726,
+        "mean_pct": -0.8520157440465652
+      },
+      "allocation": {
+        "a1": {
+          "allocation_calls": 1435,
+          "deallocation_calls": 1308,
+          "reallocation_calls": 121,
+          "allocated_bytes": 290732,
+          "deallocated_bytes": 285042
+        },
+        "a2": {
+          "allocation_calls": 1435,
+          "deallocation_calls": 1308,
+          "reallocation_calls": 121,
+          "allocated_bytes": 290732,
+          "deallocated_bytes": 285042
+        },
+        "b1": {
+          "allocation_calls": 1427,
+          "deallocation_calls": 1300,
+          "reallocation_calls": 121,
+          "allocated_bytes": 288901,
+          "deallocated_bytes": 283211
+        },
+        "b2": {
+          "allocation_calls": 1427,
+          "deallocation_calls": 1300,
+          "reallocation_calls": 121,
+          "allocated_bytes": 288901,
+          "deallocated_bytes": 283211
+        },
+        "control_legs_exact": true,
+        "candidate_legs_exact": true
+      },
+      "source_replay": {
+        "a1": {
+          "source_read_calls": 5,
+          "source_read_bytes": 706,
+          "selected_media_read_calls": 0,
+          "selected_media_read_bytes": 0
+        },
+        "a2": {
+          "source_read_calls": 5,
+          "source_read_bytes": 706,
+          "selected_media_read_calls": 0,
+          "selected_media_read_bytes": 0
+        },
+        "b1": {
+          "source_read_calls": 5,
+          "source_read_bytes": 706,
+          "selected_media_read_calls": 0,
+          "selected_media_read_bytes": 0
+        },
+        "b2": {
+          "source_read_calls": 5,
+          "source_read_bytes": 706,
+          "selected_media_read_calls": 0,
+          "selected_media_read_bytes": 0
+        }
+      }
+    },
+    {
+      "case": "pptx_source_backed_read_image_query",
+      "a1_to_b1": {
+        "p50": {
+          "from": 412787,
+          "to": 393517,
+          "delta_pct": -4.668267169266474
+        },
+        "p95": {
+          "from": 425922,
+          "to": 415112,
+          "delta_pct": -2.5380233939547616
+        },
+        "p99": {
+          "from": 426072,
+          "to": 420462,
+          "delta_pct": -1.3166788711767026
+        }
+      },
+      "a2_to_b2": {
+        "p50": {
+          "from": 418251,
+          "to": 397692,
+          "delta_pct": -4.915469419080887
+        },
+        "p95": {
+          "from": 434252,
+          "to": 412702,
+          "delta_pct": -4.962556303713051
+        },
+        "p99": {
+          "from": 447602,
+          "to": 415742,
+          "delta_pct": -7.117930661614559
+        }
+      },
+      "control_a1_to_a2_drift_pct": {
+        "p50_pct": 1.3236850966721336,
+        "p95_pct": 1.9557571574137989,
+        "p99_pct": 5.053136559079217,
+        "mean_pct": 1.6017034186476984
+      },
+      "candidate_b1_to_b2_drift_pct": {
+        "p50_pct": 1.0609452704711613,
+        "p95_pct": -0.5805662086376688,
+        "p99_pct": -1.1225746916487103,
+        "mean_pct": 1.322695829693471
+      },
+      "allocation": {
+        "a1": {
+          "allocation_calls": 1440,
+          "deallocation_calls": 1311,
+          "reallocation_calls": 121,
+          "allocated_bytes": 2468333,
+          "deallocated_bytes": 365450
+        },
+        "a2": {
+          "allocation_calls": 1440,
+          "deallocation_calls": 1311,
+          "reallocation_calls": 121,
+          "allocated_bytes": 2468333,
+          "deallocated_bytes": 365450
+        },
+        "b1": {
+          "allocation_calls": 1432,
+          "deallocation_calls": 1303,
+          "reallocation_calls": 121,
+          "allocated_bytes": 2466502,
+          "deallocated_bytes": 363619
+        },
+        "b2": {
+          "allocation_calls": 1432,
+          "deallocation_calls": 1303,
+          "reallocation_calls": 121,
+          "allocated_bytes": 2466502,
+          "deallocated_bytes": 363619
+        },
+        "control_legs_exact": true,
+        "candidate_legs_exact": true
+      },
+      "source_replay": {
+        "a1": {
+          "source_read_calls": 74,
+          "source_read_bytes": 2098549,
+          "selected_media_read_calls": 65,
+          "selected_media_read_bytes": 2097797
+        },
+        "a2": {
+          "source_read_calls": 74,
+          "source_read_bytes": 2098549,
+          "selected_media_read_calls": 65,
+          "selected_media_read_bytes": 2097797
+        },
+        "b1": {
+          "source_read_calls": 74,
+          "source_read_bytes": 2098549,
+          "selected_media_read_calls": 65,
+          "selected_media_read_bytes": 2097797
+        },
+        "b2": {
+          "source_read_calls": 74,
+          "source_read_bytes": 2098549,
+          "selected_media_read_calls": 65,
+          "selected_media_read_bytes": 2097797
+        }
+      }
+    }
+  ],
+  "stability_thresholds_pct": {
+    "p50": 5,
+    "mean": 5,
+    "p95": 10,
+    "p99": 15
+  },
+  "recommendation": "All A1->B1 and A2->B2 percentile deltas are improvements; control/candidate leg drift passes the documented percentile-specific stability ceilings. Candidate is suitable for final review, while retaining performance_claim=none until the parent records/accepts this matched evidence. A blanket 5% ceiling for every percentile would flag only control read_image p99 drift (+5.053%)."
+}

@@ -1,5 +1,28 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0393: selected PPTX image metadata avoids full descriptor retention
+
+`SourceSlide::image` and `read_image` now retain only the selected picture
+descriptor while still parsing every picture, resolving every target, and
+preserving final cancellation/freshness and error-precedence fences. The
+full-inventory `images` behavior is unchanged.
+
+Matched stable 1.98.1 release `A1/B1/B2/A2` evidence used one worker, five
+warmups, and 30 samples on an eight-picture deterministic PPTX. The selected
+`image` p50 improved by 12.434% and 12.404% in the two matched directions.
+Both `image` and `read_image` remove exactly eight allocation calls, eight
+deallocation calls, and 1,831 allocated/deallocated bytes, with reallocation
+counts and logical source vectors invariant. The [0393 evidence
+bundle](results/change-0393/) binds exact revision, patch, binaries, corpus,
+raw reports, and adjudication.
+
+`performance_claim: scoped`; `claim_authorized: true`. The accepted latency
+claim is only selected `image` p50 on the named corpus and protocol. Full-
+inventory and `read_image` latency, all tails and means, RSS, physical I/O,
+decompression, cold-cache behavior, throughput, scaling, and broad PPTX
+behavior are withheld. See [Change
+0393](changes/0393-pptx-selected-image-query.md).
+
 ## Change 0390: OPC materialization decoder session
 
 Unmanaged full materialization now reuses one operation-scoped Deflate decoder

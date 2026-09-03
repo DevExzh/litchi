@@ -1,5 +1,24 @@
 # Performance hotspot inventory
 
+## Change 0393 update
+
+The selected-picture metadata hotspot was one full descriptor vector per
+`SourceSlide::image` or `read_image` call. The selected mode now retains one
+descriptor and the final count without weakening the complete-scene grammar,
+relationship, target, cancellation, freshness, or error-ordering validation.
+Test counters independently prove zero descriptor-vector reservation and all-
+target resolution for selected queries.
+
+Matched release evidence accepts the exact eight-call/1,831-byte allocation
+reduction for both selected paths and the `image` p50 improvement of
+12.404%–12.434% on the fixed eight-picture corpus. `images` allocation is
+unchanged. Its favorable timing is not attributed to this mechanism, and
+`read_image` timing plus all means and tails remain observations; one
+`read_image` control p99 drifted 5.053%. The complete evidence and claim
+boundary are in [Change 0393](changes/0393-pptx-selected-image-query.md).
+
+`performance_claim: scoped`; `claim_authorized: true`.
+
 ## Change 0390 update
 
 The source-backed OPC full-materialization decoder-construction hotspot now
