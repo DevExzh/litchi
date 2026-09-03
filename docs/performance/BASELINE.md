@@ -1,5 +1,67 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0382: PPTX source-backed cross-slide image batch
+
+Change 0382 extends the bounded source-backed PPTX cross-slide copy closure
+from one direct embedded picture to a nonempty caller-bounded set of direct
+`p:pic` leaves under exactly one direct `p:spTree`. Each selected picture has
+exactly one direct `p:blipFill/a:blip r:embed` reference to an internal,
+relationship-free `/ppt/media/` `image/*` leaf. Distinct media targets are
+copied once, with deterministic destination media URIs and selected image
+relationship-ID allocation/rewrite without XML normalization.
+
+Semantic picture parsing preserves bounded foreign, non-MCE,
+non-relationship `a:blip` attributes opaquely and accepts one valid
+unqualified `cstate` token. Namespace-safe copy rewrites only the full-slide
+resolved relationship-namespace `r:embed`. A full-slide unbound lexical
+`r:embed` returns `UnsupportedRelationship`; `r:link`, unknown relationship
+attributes, MCE, and duplicate or ambiguous resolved embeds refuse. Wrong-type
+non-selected and non-anchor slide bindings are rejected at open, while
+planning revalidates every binding defense-in-depth; no malformed-object
+planner test is claimed.
+
+The destination anchor may preserve other valid existing relationships while
+anchoring exactly one dialect-correct internal `slideLayout`. The full-slide
+namespace-aware `SourceSlide::images` inventory is an inventory fence; source
+catalog relationship reconstruction is fallible, and physical ZIP media
+deduplication is asserted. Strict XML end-name and unresolved-prefix fences
+remain active for the bounded copy.
+
+Unselected XML and package members remain preserved, as do the existing
+freshness, signature, cancellation, partial-sink, and resource fences. Layout,
+non-selected, and unsupported relationship-ID collisions still refuse.
+Broader dependency graphs, MCE, malformed/ambiguous/misplaced blips,
+external/linked/missing/mistyped media, outbound media relationships,
+unreferenced image relationships, and unsupported topology fail closed. Image
+decoding, conversion, rendering, durable inverse, and broad media-rich copy
+remain outside the closure.
+
+The focused cross-copy suite passed `41/41`. The default-feature library
+passed `531` with the exact pre-existing
+`stale_and_unsupported_raw_xml_fail_before_publication` exclusion. The
+all-features library passed `533/533`, and all integration binaries passed
+with the exact exclusions
+`stale_and_unsupported_raw_xml_fail_before_publication`,
+`malformed_presentation_children_are_reported_by_their_owner`, and
+`noncanonical_style_target_survives_transactional_raw_save`. PPTX doctests
+passed `6` with `2` ignored. Strict Clippy passed with warnings denied and
+only the existing `clippy::nonminimal_bool`, `clippy::clone_on_copy`, and
+`clippy::needless_lifetimes` allowances. The crate-boundary gate passed for
+64 workspace packages and 240 internal dependency declarations with 14
+existing debt entries.
+
+Validation used one Cargo invocation at a time with `CARGO_BUILD_JOBS=1`,
+incremental and debug build state disabled, one dedicated target, serial test
+threads, a 6 GiB per-process virtual-memory cap, and a `>=10 GiB`
+available-memory launch threshold. These are OOM-mitigating,
+resource-capped controls, not evidence of OOM prevention. No benchmark or
+memory measurement changes the baseline.
+
+`performance_claim: none`; `claim_authorized: false`. No latency, hotspot,
+allocation, RSS, physical-I/O, cold-cache, throughput, fixed-memory,
+image-processing, broad media-rich, real-producer, or system-level
+OOM-prevention claim follows.
+
 ## Change 0381: DOCX source-backed glossary entry batch
 
 Change 0381 extends the bounded source-backed glossary text owner from one

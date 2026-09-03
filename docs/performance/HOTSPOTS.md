@@ -1,5 +1,62 @@
 # Performance hotspot inventory
 
+## Change 0382 update
+
+Change 0382 is a PPTX correctness, CRUD-completeness, and bounded-resource
+batch, not a measured hotspot. The source-backed cross-slide copy now accepts
+a nonempty caller-bounded set of direct `p:pic` leaves under exactly one
+direct `p:spTree`; each selected blip targets one internal,
+relationship-free `/ppt/media/` `image/*` leaf. Distinct media are copied
+once, destination media URIs are deterministic, and selected image
+relationship IDs are allocated and rewritten without XML normalization.
+
+Semantic picture parsing preserves bounded foreign, non-MCE,
+non-relationship `a:blip` attributes opaquely and accepts one valid
+unqualified `cstate` token. Namespace-safe copy rewrites only the full-slide
+resolved relationship-namespace `r:embed`; a full-slide unbound lexical
+`r:embed` returns `UnsupportedRelationship`. `r:link`, unknown relationship
+attributes, MCE, and duplicate or ambiguous resolved embeds refuse. Wrong-type
+non-selected and non-anchor slide bindings fail at open, and planning still
+revalidates every binding defense-in-depth. No malformed-object planner test
+is claimed.
+
+The destination anchor preserves other valid existing relationships while
+anchoring exactly one dialect-correct internal `slideLayout`. A full-slide,
+namespace-aware `SourceSlide::images` inventory fences the selected image set;
+source catalog relationship reconstruction is fallible and physical ZIP media
+deduplication is asserted. Strict XML end-name and unresolved-prefix fences
+remain part of the refusal boundary.
+
+Unselected XML and members remain exact, with freshness, signature,
+cancellation, partial-sink, and resource fences retained. Layout,
+non-selected, and unsupported relationship-ID collisions, broader dependency
+graphs, MCE, malformed or ambiguous blips, external/linked/missing/mistyped
+media, outbound media, unreferenced image relationships, and unsupported
+topology refuse before output. No image decode, conversion, rendering,
+durable inverse, or broad media-rich copy is added.
+
+The focused suite passed `41/41`; the default-feature library passed `531`
+with the exact pre-existing
+`stale_and_unsupported_raw_xml_fail_before_publication` exclusion; the
+all-features library passed `533/533` and all integration binaries passed
+with the exact three exclusions recorded in the [0382 change
+record](changes/0382-pptx-source-backed-cross-slide-image-batch.md). Doctests
+passed `6` with `2` ignored. Strict Clippy passed with warnings denied and
+the existing `clippy::nonminimal_bool`, `clippy::clone_on_copy`, and
+`clippy::needless_lifetimes` allowances; the 64-package/240-declaration
+crate-boundary gate passed with 14 existing debt entries.
+
+The validation procedure used one Cargo invocation at a time,
+`CARGO_BUILD_JOBS=1`, a 6 GiB per-process virtual-memory cap, a dedicated
+target, serial test threads, and a `>=10 GiB` available-memory launch
+threshold. These are OOM-mitigating, resource-capped operating constraints,
+not evidence that OOM is prevented.
+
+`performance_claim: none`; `claim_authorized: false`. This change establishes
+no measured hotspot, latency, allocation-volume, RSS, I/O, throughput,
+fixed-memory, image-processing, broad media-rich, real-producer, or
+system-level OOM-prevention result.
+
 ## Change 0381 update
 
 Change 0381 is a DOCX correctness, CRUD-completeness, and bounded-resource
