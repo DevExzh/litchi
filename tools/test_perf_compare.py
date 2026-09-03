@@ -300,6 +300,76 @@ def filesystem_xlsx_operation_metrics_report_fields(sample_indices=None):
     return operation_metrics
 
 
+def opc_source_materialize_operation_metrics_report_fields():
+    operation_metrics = operation_metrics_report_fields()
+    operation_metrics[
+        "latency_claim"
+    ] = perf_compare.OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM
+    source = operation_metrics["source"]
+    source_scope = perf_compare.OPC_SOURCE_MATERIALIZATION_SOURCE_SCOPE
+    source["counter_scope"] = source_scope
+    for field in (
+        "logical_read_calls",
+        "logical_read_returned_bytes",
+        "max_concurrent_reads",
+    ):
+        source[field] = metric_vector([10] * 5, scope=source_scope)
+    for field in (
+        "logical_read_requested_bytes",
+        "logical_read_largest_requested_bytes",
+        "logical_read_largest_returned_bytes",
+    ):
+        scope = (
+            perf_compare.OPC_SOURCE_MATERIALIZATION_REQUEST_SCOPE
+            if field == "logical_read_requested_bytes"
+            else perf_compare.OPC_SOURCE_MATERIALIZATION_LARGEST_SCOPE
+        )
+        source[field] = metric_vector(
+            None,
+            status="unavailable",
+            scope=scope,
+        )
+    source["logical_read_pattern"] = pattern_vector(
+        None,
+        status="unavailable",
+        scope="operation_logical_read_at_range_order_not_physical_io",
+    )
+
+    sink = operation_metrics["sink"]
+    sink["status"] = "not_applicable"
+    sink["output_bytes"] = metric_vector(
+        None,
+        status="not_applicable",
+        scope="post_operation_output_length_not_sink_write_volume",
+    )
+    sink["write_status"] = "not_applicable"
+    for field, scope in (
+        ("accepted_bytes", "logical_sink_accepted_write_bytes"),
+        ("write_calls", "logical_sink_accepted_write_calls"),
+        ("largest_write", "logical_sink_largest_accepted_write"),
+    ):
+        sink[field] = metric_vector(None, status="not_applicable", scope=scope)
+    sink["write_size_buckets"] = {
+        "status": "not_applicable",
+        **{
+            field: metric_vector(None, status="not_applicable", scope="logical_sink_accepted_write_size_bucket_counts")
+            for field in (
+                "bytes_0",
+                "bytes_1_to_512",
+                "bytes_513_to_4096",
+                "bytes_4097_to_16384",
+                "bytes_16385_to_65536",
+                "bytes_over_65536",
+            )
+        },
+    }
+    operation_metrics["materialization"] = {
+        "status": "measured",
+        "opc_parts": metric_vector([3] * 5, scope="logical_materialization_counter"),
+    }
+    return operation_metrics
+
+
 def opc_zip_operation_metrics_report_fields(status="measured", values=None):
     operation_metrics = operation_metrics_report_fields()
     operation_metrics["latency_claim"] = (
@@ -1974,6 +2044,77 @@ class PerfCompareTests(unittest.TestCase):
                     perf_compare.compare_reports(
                         baseline, current, self.operation_metrics_policy()
                     )
+
+    def test_opc_source_materialization_scope_and_claim_are_evidence_only(self):
+        baseline = report()
+        current = report(revision="current")
+        for item in (baseline["results"][0], current["results"][0]):
+            item["operation_metrics"] = (
+                opc_source_materialize_operation_metrics_report_fields()
+            )
+
+        result = perf_compare.compare_reports(
+            baseline, current, self.operation_metrics_policy()
+        )
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["summary"]["latency_compared_results"], 0)
+        self.assertEqual(result["summary"]["latency_excluded_results"], 1)
+        self.assertNotIn(
+            "elapsed_ns.p50", {item["metric"] for item in result["comparisons"]}
+        )
+
+    def test_opc_source_materialization_scope_requires_dedicated_claim(self):
+        baseline = report()
+        current = report(revision="current")
+        for item in (baseline["results"][0], current["results"][0]):
+            item["operation_metrics"] = (
+                opc_source_materialize_operation_metrics_report_fields()
+            )
+        current["results"][0]["operation_metrics"][
+            "latency_claim"
+        ] = perf_compare.EVIDENCE_ONLY_LATENCY_CLAIM
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "source.counter_scope=.*requires latency_claim",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+        baseline = report()
+        current = report(revision="current")
+        for item in (baseline["results"][0], current["results"][0]):
+            item["operation_metrics"] = (
+                opc_source_materialize_operation_metrics_report_fields()
+            )
+        current["results"][0]["operation_metrics"]["source"][
+            "counter_scope"
+        ] = "timed_read_at"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "latency_claim=.*requires source.counter_scope",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
+
+    def test_opc_source_materialization_scope_rejects_comparable_claim(self):
+        baseline = report()
+        current = report(revision="current")
+        for item in (baseline["results"][0], current["results"][0]):
+            item["operation_metrics"] = (
+                opc_source_materialize_operation_metrics_report_fields()
+            )
+        current["results"][0]["operation_metrics"][
+            "latency_claim"
+        ] = perf_compare.COMPARABLE_LATENCY_CLAIM
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "source.counter_scope=.*requires latency_claim",
+        ):
+            perf_compare.compare_reports(
+                baseline, current, self.operation_metrics_policy()
+            )
 
     def test_source_counter_scope_status_compatibility_fails_closed(self):
         baseline = report()

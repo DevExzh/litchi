@@ -329,10 +329,27 @@ pub(crate) struct InProcessObservation {
     pub allocation_metrics: Option<crate::allocation_metrics::Sample>,
 }
 
+/// Exact source counters available from the harness' in-process
+/// `InstrumentedSource`.  Requested lengths and range classifications are not
+/// included because that source snapshot does not expose them.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct InProcessSourceObservation {
+    pub read_calls: u64,
+    pub read_bytes: u64,
+    pub max_concurrent_reads: u64,
+}
+
 const ALIGNMENT: &str = "elapsed_ns.samples_by_elapsed_then_sample_index";
 const LATENCY_CLAIM: &str = "evidence_only_filesystem_selector";
 const COMPARABLE_LATENCY_CLAIM: &str = "comparable_timed_operation";
+const OPC_SOURCE_MATERIALIZATION_LATENCY_CLAIM: &str =
+    "evidence_only_opc_source_materialization";
 const SOURCE_SCOPE: &str = "operation_logical_read_at";
+const IN_PROCESS_SOURCE_SCOPE: &str = "in_process_instrumented_source_read_at";
+const IN_PROCESS_SOURCE_REQUEST_SCOPE: &str =
+    "unavailable_in_process_source_does_not_record_requested_lengths";
+const IN_PROCESS_SOURCE_LARGEST_SCOPE: &str =
+    "unavailable_in_process_source_does_not_record_largest_ranges";
 const SOURCE_PATTERN_SCOPE: &str = "operation_logical_read_at_range_order_not_physical_io";
 const SOURCE_COMPRESSED_SCOPE: &str = "unavailable_read_at_has_no_compressed_member_boundary";
 const SOURCE_DECOMPRESSED_SCOPE: &str = "unavailable_read_at_has_no_decompressed_byte_boundary";
@@ -750,6 +767,14 @@ pub(crate) fn from_in_process_observations(
     observations: &[InProcessObservation],
     sink: SinkObservation,
 ) -> Result<OperationMetrics, Box<dyn Error>> {
+    let mut metrics = aggregate_in_process_observations(observations)?;
+    metrics.set_sink_observation(observations.len(), sink)?;
+    Ok(metrics)
+}
+
+fn aggregate_in_process_observations(
+    observations: &[InProcessObservation],
+) -> Result<OperationMetrics, Box<dyn Error>> {
     if observations.is_empty() {
         return Err("in-process operation metrics cannot have zero observations".into());
     }
@@ -797,8 +822,100 @@ pub(crate) fn from_in_process_observations(
     let mut metrics = aggregate(&samples, "warm", &elapsed)?;
     metrics.latency_claim = COMPARABLE_LATENCY_CLAIM;
     relabel_in_process_scopes(&mut metrics.process);
-    metrics.set_sink_observation(observations.len(), sink)?;
     Ok(metrics)
+}
+
+/// Builds an in-process operation envelope and adds an exact logical OPC
+/// materialization count for each retained sample.  The values are supplied
+/// in the same unsorted order as `observations`; this helper applies the
+/// elapsed/sample-index order used by `Statistics` before publishing them.
+pub(crate) fn from_in_process_materialization_observations(
+    observations: &[InProcessObservation],
+    materialized_parts: &[u64],
+    source_observations: &[InProcessSourceObservation],
+) -> Result<OperationMetrics, Box<dyn Error>> {
+    if observations.len() != materialized_parts.len()
+        || observations.len() != source_observations.len()
+    {
+        return Err(format!(
+            "in-process materialization/source counts {}/{} do not match observations {}",
+            materialized_parts.len(),
+            source_observations.len(),
+            observations.len()
+        )
+        .into());
+    }
+    let mut metrics = from_in_process_observations_without_sink(observations)?;
+    metrics.latency_claim = OPC_SOURCE_MATERIALIZATION_LATENCY_CLAIM;
+    let mut order = (0..observations.len()).collect::<Vec<_>>();
+    order.sort_unstable_by_key(|&index| (observations[index].elapsed_ns, index));
+    let ordered_parts = order
+        .iter()
+        .map(|&index| materialized_parts[index])
+        .collect::<Vec<_>>();
+    metrics.materialization = MaterializationMetrics {
+        status: MetricStatus::Measured,
+        opc_parts: MetricVector::measured(ordered_parts, MATERIALIZATION_SCOPE),
+    };
+    let ordered_sources = order
+        .iter()
+        .map(|&index| source_observations[index])
+        .collect::<Vec<_>>();
+    let measured_source = |value: fn(&InProcessSourceObservation) -> u64| {
+        MetricVector::measured(
+            ordered_sources.iter().map(value).collect(),
+            IN_PROCESS_SOURCE_SCOPE,
+        )
+    };
+    let unavailable_source = |scope| MetricVector::absent(MetricStatus::Unavailable, scope);
+    metrics.source = SourceMetrics {
+        status: MetricStatus::Measured,
+        counter_scope: IN_PROCESS_SOURCE_SCOPE.to_owned(),
+        logical_read_calls: measured_source(|observation| observation.read_calls),
+        logical_read_requested_bytes: unavailable_source(IN_PROCESS_SOURCE_REQUEST_SCOPE),
+        logical_read_returned_bytes: measured_source(|observation| observation.read_bytes),
+        logical_read_largest_requested_bytes: unavailable_source(IN_PROCESS_SOURCE_LARGEST_SCOPE),
+        logical_read_largest_returned_bytes: unavailable_source(IN_PROCESS_SOURCE_LARGEST_SCOPE),
+        logical_read_pattern: PatternVector::absent(
+            MetricStatus::Unavailable,
+            SOURCE_PATTERN_SCOPE,
+        ),
+        compressed_bytes: unavailable_source(SOURCE_COMPRESSED_SCOPE),
+        decompressed_bytes: unavailable_source(SOURCE_DECOMPRESSED_SCOPE),
+        recompressed_bytes: unavailable_source(SOURCE_RECOMPRESSED_SCOPE),
+        max_concurrent_reads: measured_source(|observation| observation.max_concurrent_reads),
+    };
+    Ok(metrics)
+}
+
+/// Builds an in-process operation envelope for a read/materialization
+/// operation that has no logical sink.  The public operation schema keeps all
+/// sink vectors explicitly `not_applicable`; no synthetic zero write counts
+/// are published.
+pub(crate) fn from_in_process_observations_without_sink(
+    observations: &[InProcessObservation],
+) -> Result<OperationMetrics, Box<dyn Error>> {
+    let mut metrics = aggregate_in_process_observations(observations)?;
+    metrics.sink = absent_sink_metrics();
+    Ok(metrics)
+}
+
+fn absent_sink_metrics() -> SinkMetrics {
+    SinkMetrics {
+        status: MetricStatus::NotApplicable,
+        output_bytes: MetricVector::absent(MetricStatus::NotApplicable, OUTPUT_SCOPE),
+        write_status: MetricStatus::NotApplicable,
+        accepted_bytes: MetricVector::absent(
+            MetricStatus::NotApplicable,
+            SINK_ACCEPTED_BYTES_SCOPE,
+        ),
+        write_calls: MetricVector::absent(MetricStatus::NotApplicable, SINK_WRITE_CALLS_SCOPE),
+        largest_write: MetricVector::absent(MetricStatus::NotApplicable, SINK_LARGEST_WRITE_SCOPE),
+        write_size_buckets: WriteSizeBucketMetrics::absent(
+            MetricStatus::NotApplicable,
+            SINK_BUCKET_SCOPE,
+        ),
+    }
 }
 
 fn relabel_in_process_scopes(metrics: &mut ProcessMetrics) {
@@ -1231,7 +1348,8 @@ mod tests {
     use serde_json::Value;
 
     use super::{
-        InProcessObservation, MetricStatus, MetricVector, SinkObservation, aggregate,
+        InProcessObservation, InProcessSourceObservation, MetricStatus, MetricVector,
+        SinkObservation, aggregate, from_in_process_materialization_observations,
         from_in_process_observations, from_sink_observation,
     };
     use crate::filesystem::{
@@ -1618,6 +1736,94 @@ mod tests {
             serde_json::json!([5, 7])
         );
         assert_eq!(json["sink"]["write_status"], "measured");
+    }
+
+    #[test]
+    fn in_process_materialization_observations_align_ties_and_publish_evidence_scope() {
+        let observations = vec![
+            InProcessObservation {
+                elapsed_ns: 20,
+                process_metrics: None,
+                allocation_metrics: None,
+            },
+            InProcessObservation {
+                elapsed_ns: 10,
+                process_metrics: None,
+                allocation_metrics: None,
+            },
+            InProcessObservation {
+                elapsed_ns: 10,
+                process_metrics: None,
+                allocation_metrics: None,
+            },
+        ];
+        let source_observations = vec![
+            InProcessSourceObservation {
+                read_calls: 20,
+                read_bytes: 200,
+                max_concurrent_reads: 2,
+            },
+            InProcessSourceObservation {
+                read_calls: 10,
+                read_bytes: 100,
+                max_concurrent_reads: 1,
+            },
+            InProcessSourceObservation {
+                read_calls: 11,
+                read_bytes: 110,
+                max_concurrent_reads: 3,
+            },
+        ];
+        let envelope = from_in_process_materialization_observations(
+            &observations,
+            &[200, 100, 110],
+            &source_observations,
+        )
+        .unwrap();
+
+        assert_eq!(envelope.sample_indices, vec![1, 2, 0]);
+        assert_eq!(
+            envelope.latency_claim,
+            "evidence_only_opc_source_materialization"
+        );
+        assert_eq!(
+            envelope.source.counter_scope,
+            "in_process_instrumented_source_read_at"
+        );
+        assert_eq!(envelope.source.status, MetricStatus::Measured);
+        assert_eq!(envelope.source.logical_read_calls.values, Some(vec![10, 11, 20]));
+        assert_eq!(
+            envelope.source.logical_read_returned_bytes.values,
+            Some(vec![100, 110, 200])
+        );
+        assert_eq!(
+            envelope.source.max_concurrent_reads.values,
+            Some(vec![1, 3, 2])
+        );
+        assert_eq!(
+            envelope.materialization.opc_parts.values,
+            Some(vec![100, 110, 200])
+        );
+        assert_eq!(envelope.materialization.status, MetricStatus::Measured);
+        assert_eq!(
+            envelope.source.logical_read_requested_bytes.status,
+            MetricStatus::Unavailable
+        );
+        assert!(
+            envelope
+                .source
+                .logical_read_requested_bytes
+                .values
+                .is_none()
+        );
+        assert_eq!(
+            envelope.source.logical_read_pattern.status,
+            MetricStatus::Unavailable
+        );
+        assert!(envelope.source.logical_read_pattern.values.is_none());
+        assert_eq!(envelope.sink.status, MetricStatus::NotApplicable);
+        assert_eq!(envelope.sink.write_status, MetricStatus::NotApplicable);
+        assert!(envelope.sink.accepted_bytes.values.is_none());
     }
 
     #[test]

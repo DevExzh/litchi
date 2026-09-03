@@ -945,6 +945,7 @@ enum Case {
     OpcMutatedSave,
     OpcSourceOpen,
     OpcSourceOpenMainRead,
+    OpcSourceMaterialize,
     OpcSourceCachedMainRead,
     OpcSourceConcurrentSamePart,
     OpcSourceCacheBudgetBoundary,
@@ -1396,6 +1397,7 @@ impl Case {
             Self::OpcMutatedSave => "opc_mutated_save",
             Self::OpcSourceOpen => "opc_source_open",
             Self::OpcSourceOpenMainRead => "opc_source_open_main_read",
+            Self::OpcSourceMaterialize => "opc_source_materialize",
             Self::OpcSourceCachedMainRead => "opc_source_cached_main_read",
             Self::OpcSourceConcurrentSamePart => "opc_source_concurrent_same_part",
             Self::OpcSourceCacheBudgetBoundary => "opc_source_cache_budget_boundary",
@@ -1959,6 +1961,7 @@ impl Case {
                 | Self::OpcMutatedSave
                 | Self::OpcSourceOpen
                 | Self::OpcSourceOpenMainRead
+                | Self::OpcSourceMaterialize
                 | Self::OpcSourceCachedMainRead
                 | Self::OpcSourceConcurrentSamePart
                 | Self::OpcRangeSourceOpen
@@ -10151,6 +10154,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "opc_mutated_save" => Some(Case::OpcMutatedSave),
         "opc_source_open" => Some(Case::OpcSourceOpen),
         "opc_source_open_main_read" => Some(Case::OpcSourceOpenMainRead),
+        "opc_source_materialize" => Some(Case::OpcSourceMaterialize),
         "opc_source_cached_main_read" => Some(Case::OpcSourceCachedMainRead),
         "opc_source_concurrent_same_part" => Some(Case::OpcSourceConcurrentSamePart),
         "opc_source_cache_budget_boundary" => Some(Case::OpcSourceCacheBudgetBoundary),
@@ -10779,6 +10783,7 @@ fn usage_text() -> String {
                                        opc_relationship_open,\n\
                                        opc_noop_save,opc_mutated_save,opc_source_open,\n\
                                        opc_source_open_main_read,opc_source_cached_main_read,\n\
+                                       opc_source_materialize,\n\
                                        opc_source_concurrent_same_part,\n\
                                        opc_source_cache_budget_boundary,\n\
                                        opc_source_cache_control_contention,\n\
@@ -19352,6 +19357,9 @@ fn run_case_with_config(
         Case::OpcSourceOpen => run_opc_source_open(corpus, warmup_iterations, samples, false),
         Case::OpcSourceOpenMainRead => {
             run_opc_source_open(corpus, warmup_iterations, samples, true)
+        },
+        Case::OpcSourceMaterialize => {
+            run_opc_source_materialize(corpus, warmup_iterations, samples)
         },
         Case::OpcSourceCachedMainRead => {
             run_opc_source_cached_main_read(corpus, warmup_iterations, samples)
@@ -41286,6 +41294,166 @@ fn run_opc_source_open(
     Ok(result_with_source(case, corpus, elapsed, source_summary))
 }
 
+/// Verify the complete logical graph produced by source-backed OPC
+/// materialization.  This is intentionally outside the timed interval: it
+/// regenerates each deterministic payload, checks its digest and metadata,
+/// and verifies the package-level main-document relationship.
+fn verify_opc_materialized_package(
+    corpus: &Corpus,
+    package: &OpcPackage,
+) -> Result<(), Box<dyn Error>> {
+    if package.part_count() != corpus.manifest.entry_count {
+        return Err("OPC source materialization part count differs from corpus manifest".into());
+    }
+    let payload_kind = corpus_payload_kind(corpus)?;
+    let expected_relationships = vec![(
+        "rIdBenchmarkMain".to_owned(),
+        relationship_type::OFFICE_DOCUMENT.to_owned(),
+        corpus.target_name.clone(),
+        false,
+    )];
+    if relationship_signatures(package.rels()) != expected_relationships {
+        return Err("OPC source materialization package relationships differ from corpus".into());
+    }
+    for index in 0..corpus.manifest.entry_count {
+        let name = entry_name(index);
+        let uri = PackURI::new(format!("/{name}"))?;
+        let part = package.get_part(&uri)?;
+        let expected = payload_bytes(payload_kind, index, corpus.manifest.entry_bytes);
+        if part.content_type() != CONTENT_TYPE
+            || part.blob().len() != expected.len()
+            || sha256_hex(part.blob()) != sha256_hex(&expected)
+        {
+            return Err(format!(
+                "OPC source materialization Part {name} differs from deterministic payload"
+            )
+            .into());
+        }
+        if !part.rels().iter().next().is_none() {
+            return Err(format!(
+                "OPC source materialization Part {name} unexpectedly has relationships"
+            )
+            .into());
+        }
+    }
+    let main = package.main_document_part()?;
+    if main.partname().membername() != corpus.target_name
+        || sha256_hex(main.blob())
+            != sha256_hex(&payload_bytes(
+                payload_kind,
+                corpus.manifest.entry_count / 2,
+                corpus.manifest.entry_bytes,
+            ))
+    {
+        return Err("OPC source materialization main-document payload differs from corpus".into());
+    }
+    Ok(())
+}
+
+/// Measure only unmanaged `SourceBackedPackage::into_opc_package` after
+/// deterministic source-backed open has completed.  The complete graph and
+/// payload hashes are verified after each timed interval.  Process and
+/// allocator samples are operation-scoped; the allocator sample is explicit
+/// `unavailable` in the normal binary, whose global allocator is untouched.
+fn run_opc_source_materialize(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let cache_limits = opc_source_cache_limits(corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut source_summary = SourceSummary::default();
+    let mut observations = Vec::with_capacity(samples);
+    let mut materialized_parts = Vec::with_capacity(samples);
+    let mut source_observations = Vec::with_capacity(samples);
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let (source, _target_range) = opc_instrumented_source(corpus)?;
+        let package =
+            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        if package.iter_parts().count() != corpus.manifest.entry_count {
+            return Err("OPC source materialization opened an unexpected part count".into());
+        }
+        if source.snapshot().ordinary_payload_read_calls != 0 {
+            return Err("OPC source materialization opened an ordinary payload eagerly".into());
+        }
+        source.reset();
+
+        let process_before = process_metrics::Snapshot::read().ok();
+        let allocation_region = allocation_metrics::begin();
+        let started = Instant::now();
+        let owned = package.into_opc_package()?;
+        let duration = started.elapsed();
+        let allocation_metrics = match allocation_region.finish() {
+            Some(sample) => Some(sample),
+            None => Some(allocation_metrics::unavailable_sample()),
+        };
+        let process_after = process_metrics::Snapshot::read().ok();
+        let process_metrics = process_before
+            .zip(process_after)
+            .map(|(before, after)| after.delta(before));
+
+        let part_count = u64::try_from(owned.part_count())?;
+        verify_opc_materialized_package(corpus, &owned)?;
+        let source_metrics = source.snapshot();
+        if source_metrics.ordinary_payload_read_calls == 0
+            || source_metrics.ordinary_payload_read_bytes == 0
+        {
+            return Err("OPC source materialization performed no ordinary payload reads".into());
+        }
+        if iteration >= warmup_iterations {
+            let elapsed_value = elapsed_ns(duration)?;
+            observations.push(operation_metrics::InProcessObservation {
+                elapsed_ns: elapsed_value,
+                process_metrics,
+                allocation_metrics,
+            });
+            materialized_parts.push(part_count);
+            source_observations.push(operation_metrics::InProcessSourceObservation {
+                read_calls: source_metrics.read_calls,
+                read_bytes: source_metrics.read_bytes,
+                max_concurrent_reads: source_metrics.max_in_flight_reads,
+            });
+            source_summary.record_opc(source_metrics, part_count);
+            elapsed.push(elapsed_value);
+        }
+        std::hint::black_box(&owned);
+    }
+
+    let elapsed_statistics = statistics(elapsed);
+    let sample_order = elapsed_statistics.sample_order.clone();
+    reorder_sample_vector(&mut source_summary.read_calls, &sample_order)?;
+    reorder_sample_vector(&mut source_summary.read_bytes, &sample_order)?;
+    reorder_sample_vector(
+        &mut source_summary.ordinary_payload_read_calls,
+        &sample_order,
+    )?;
+    reorder_sample_vector(
+        &mut source_summary.ordinary_payload_read_bytes,
+        &sample_order,
+    )?;
+    reorder_sample_vector(&mut source_summary.max_in_flight_reads, &sample_order)?;
+    if let Some(materializations) = source_summary.ordinary_payload_materializations.as_mut() {
+        reorder_sample_vector(materializations, &sample_order)?;
+    }
+    let operation_metrics = operation_metrics::from_in_process_materialization_observations(
+        &observations,
+        &materialized_parts,
+        &source_observations,
+    )?;
+    Ok(CaseResult {
+        case: Case::OpcSourceMaterialize.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: elapsed_statistics,
+        sink: None,
+        source: Some(source_summary),
+        execution: None,
+        output_sha256: None,
+        operation_metrics: Some(operation_metrics),
+    })
+}
+
 fn run_opc_source_cached_main_read(
     corpus: &Corpus,
     warmup_iterations: usize,
@@ -51989,7 +52157,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 407);
+        assert_eq!(selectable_count, 408);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -53510,6 +53678,65 @@ mod tests {
         assert!(source.read_calls.windows(2).all(|pair| pair[0] == pair[1]));
         assert!(source.read_bytes.windows(2).all(|pair| pair[0] == pair[1]));
         assert_eq!(source.ordinary_payload_materializations, Some(vec![1, 1]));
+    }
+
+    #[test]
+    fn opc_source_materialize_selector_is_opt_in_and_operation_scoped() {
+        let case = parse_case("opc_source_materialize").expect("materialization selector parses");
+        assert_eq!(case, Case::OpcSourceMaterialize);
+        assert!(!Case::DEFAULT.contains(&case));
+
+        for (shape, payload) in [
+            (CorpusShape::Tiny, PayloadKind::Compressible),
+            (CorpusShape::FewLarge, PayloadKind::Incompressible),
+        ] {
+            let corpus = build_opc_corpus(shape, payload).unwrap();
+            let measured = run_case(case, &corpus, 0, 1).unwrap();
+            assert_eq!(measured.case, "opc_source_materialize");
+            assert_eq!(measured.elapsed_ns.samples.len(), 1);
+
+            let source = measured.source.as_ref().expect("source evidence");
+            assert!(source.read_calls[0] > 0);
+            assert!(source.read_bytes[0] > 0);
+            assert!(source.ordinary_payload_read_calls[0] > 0);
+            assert!(source.ordinary_payload_read_bytes[0] > 0);
+            assert_eq!(
+                source.ordinary_payload_materializations,
+                Some(vec![corpus.manifest.entry_count as u64])
+            );
+
+            let operation = measured
+                .operation_metrics
+                .as_ref()
+                .expect("operation metrics");
+            assert_eq!(operation.sample_count, 1);
+            assert_eq!(
+                operation.materialization.status,
+                super::operation_metrics::MetricStatus::Measured
+            );
+            assert_eq!(
+                operation.materialization.opc_parts.values,
+                Some(vec![corpus.manifest.entry_count as u64])
+            );
+            assert_eq!(
+                operation.sink.status,
+                super::operation_metrics::MetricStatus::NotApplicable
+            );
+            assert_eq!(
+                operation.sink.write_status,
+                super::operation_metrics::MetricStatus::NotApplicable
+            );
+            assert_eq!(operation.sink.accepted_bytes.values, None);
+            let allocation = operation
+                .allocation
+                .as_ref()
+                .expect("normal binary reports allocator unavailability");
+            assert_eq!(
+                allocation.status,
+                super::operation_metrics::MetricStatus::Unavailable
+            );
+            assert!(allocation.allocated_bytes.values.is_none());
+        }
     }
 
     #[test]
