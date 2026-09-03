@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use litchi_core::{OwnedSource, Position};
 use litchi_docx::glossary::{Id, Name};
-use litchi_docx::source_backed::{self, GlossarySelector, StorySelector};
+use litchi_docx::source_backed::{self, GlossaryBatchSelector, GlossarySelector, StorySelector};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
 
@@ -18,6 +18,7 @@ const STRICT_GLOSSARY_REL: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/glossaryDocument";
 const ALPHA_ID: &str = "{12345678-1234-4ABC-8DEF-1234567890AB}";
 const BETA_ID: &str = "{12345678-1234-4ABC-8DEF-1234567890AC}";
+const GAMMA_ID: &str = "{12345678-1234-4ABC-8DEF-1234567890AD}";
 const MAX_GLOSSARY_SELECTOR_NAME_BYTES: usize = 1024 * 1024;
 
 #[derive(Clone, Copy)]
@@ -76,6 +77,8 @@ enum Mutation {
     Signed,
     LegalReferences,
     TwoParagraphs,
+    BatchThreeEntries,
+    UnselectedManyParagraphs,
     UnknownEntity,
     LargeNamespace,
     DocPartPrAfterBody,
@@ -151,6 +154,21 @@ fn fixture(dialect: Dialect, mutation: Mutation) -> Vec<u8> {
     } else {
         format!(r#"{vml}<w:p{paragraph_attribute}><w:r><w:t>{visible}</w:t></w:r></w:p>"#)
     };
+    let beta_paragraphs = if matches!(mutation, Mutation::UnselectedManyParagraphs) {
+        r#"<w:p><w:r><w:t>sibling</w:t></w:r></w:p><w:p><w:r><w:t>unselected-second</w:t></w:r></w:p><w:p><w:r><w:t>unselected-third</w:t></w:r></w:p>"#
+    } else {
+        r#"<w:p><w:r><w:t>sibling</w:t></w:r></w:p>"#
+    };
+    let gamma_entry = if matches!(
+        mutation,
+        Mutation::BatchThreeEntries | Mutation::Signed | Mutation::UnselectedManyParagraphs
+    ) {
+        format!(
+            r#"<w:docPart><w:docPartPr><w:name w:val="Gamma"/><w:guid w:val="{GAMMA_ID}"/></w:docPartPr><w:docPartBody><w:p><w:r><w:t>third</w:t></w:r></w:p></w:docPartBody></w:docPart>"#
+        )
+    } else {
+        String::new()
+    };
     let alpha_body = if matches!(mutation, Mutation::MissingBody) {
         String::new()
     } else {
@@ -177,7 +195,7 @@ fn fixture(dialect: Dialect, mutation: Mutation) -> Vec<u8> {
         format!(r#"<w:docPart>{alpha_extra}{alpha_pr}{alpha_body}{duplicate_body}</w:docPart>"#)
     };
     let glossary_xml = format!(
-        r#"<w:glossaryDocument xmlns:w="{root_word}" xmlns:x="urn:root-opaque"><!--root-before--><x:rootOpaque x:value="preserve"/><w:docParts>{alpha_entry}<w:docPart><w:docPartPr><w:name w:val="{beta_name}"/><w:guid w:val="{beta_id}"/></w:docPartPr><w:docPartBody><w:p><w:r><w:t>sibling</w:t></w:r></w:p></w:docPartBody></w:docPart></w:docParts><!--root-after--></w:glossaryDocument>"#
+        r#"<w:glossaryDocument xmlns:w="{root_word}" xmlns:x="urn:root-opaque"><!--root-before--><x:rootOpaque x:value="preserve"/><w:docParts>{alpha_entry}<w:docPart><w:docPartPr><w:name w:val="{beta_name}"/><w:guid w:val="{beta_id}"/></w:docPartPr><w:docPartBody>{beta_paragraphs}</w:docPartBody></w:docPart>{gamma_entry}</w:docParts><!--root-after--></w:glossaryDocument>"#
     );
     let mut package = OpcPackage::new();
     let mut main = BlobPart::new(
@@ -1016,6 +1034,498 @@ fn glossary_managed_entry_edit_and_cancellation_are_refused() {
     assert!(snapshot.edit().is_err());
     cancel_source.cancel();
     assert!(package.story_text_snapshot(alpha_by_name()).is_err());
+}
+
+fn glossary_triplet() -> GlossaryBatchSelector {
+    GlossaryBatchSelector::try_new(vec![
+        GlossarySelector::ById(Id::new(BETA_ID).unwrap()),
+        GlossarySelector::ByName("Gamma".to_owned()),
+        GlossarySelector::ByName("Alpha".to_owned()),
+    ])
+    .unwrap()
+}
+
+fn batch_source() -> Vec<u8> {
+    fixture(Dialect::Transitional, Mutation::BatchThreeEntries)
+}
+
+#[test]
+fn glossary_batch_does_not_charge_unselected_entry_paragraphs() {
+    let source = fixture(Dialect::Transitional, Mutation::UnselectedManyParagraphs);
+    let limits = source_backed::StoryTextLimits::new(16 * 1024, 2, 10_000, 64, 32 * 1024, 8, 4096)
+        .unwrap()
+        .with_secondary_entry_limits(3, 16 * 1024, 256)
+        .unwrap();
+    let selected = GlossaryBatchSelector::try_new(vec![
+        GlossarySelector::ByName("Gamma".to_owned()),
+        GlossarySelector::ByName("Alpha".to_owned()),
+    ])
+    .unwrap();
+    let snapshot = open(&source)
+        .glossary_text_batch_snapshot_with_limits(selected, limits)
+        .unwrap();
+    assert_eq!(snapshot.entry_count().unwrap(), 2);
+    assert_eq!(snapshot.extract_text(0).unwrap().as_deref(), Some("target"));
+    assert_eq!(snapshot.extract_text(1).unwrap().as_deref(), Some("third"));
+}
+
+#[test]
+fn glossary_batch_is_general_n_canonical_and_preserves_siblings() {
+    let source = batch_source();
+    let package = open(&source);
+    let snapshot = package
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    assert_eq!(snapshot.entry_count().unwrap(), 3);
+    assert!(matches!(
+        snapshot.entry_selector(0),
+        Some(GlossarySelector::ByName(name)) if name == "Alpha"
+    ));
+    assert!(matches!(
+        snapshot.entry_selector(1),
+        Some(GlossarySelector::ById(id)) if *id == Id::new(BETA_ID).unwrap()
+    ));
+    assert!(matches!(
+        snapshot.entry_selector(2),
+        Some(GlossarySelector::ByName(name)) if name == "Gamma"
+    ));
+    let forward = GlossaryBatchSelector::try_new(vec![
+        GlossarySelector::ByName("Alpha".to_owned()),
+        GlossarySelector::ById(Id::new(BETA_ID).unwrap()),
+        GlossarySelector::ByName("Gamma".to_owned()),
+    ])
+    .unwrap();
+    let forward_snapshot = package.glossary_text_batch_snapshot(forward).unwrap();
+    assert_eq!(
+        snapshot.selector().selectors(),
+        forward_snapshot.selector().selectors()
+    );
+    assert_eq!(snapshot.extract_text(0).unwrap().as_deref(), Some("target"));
+    assert_eq!(
+        snapshot.extract_text(1).unwrap().as_deref(),
+        Some("sibling")
+    );
+    assert_eq!(snapshot.extract_text(2).unwrap().as_deref(), Some("third"));
+
+    let mut edit = snapshot.edit().unwrap();
+    edit.replace_paragraph_text(0, Position::new(0), "alpha changed")
+        .unwrap();
+    edit.replace_paragraph_text(2, Position::new(0), "gamma changed")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let mut output = Vec::new();
+    let publication = package
+        .publish_glossary_text_batch_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    let raw = String::from_utf8(part(&output, "/word/glossary/document.xml")).unwrap();
+    assert!(raw.contains("alpha changed") && raw.contains("gamma changed"));
+    assert!(raw.contains("root-before") && raw.contains("root-after"));
+    assert!(raw.contains("rootOpaque") && raw.contains("u:value=\"keep\""));
+    assert!(
+        raw.contains("sibling") && raw.contains("<!--before-->") && raw.contains("<!--after-->")
+    );
+    assert_eq!(
+        part(&source, "/word/document.xml"),
+        part(&output, "/word/document.xml")
+    );
+    assert_eq!(
+        open(&output)
+            .glossary_text_batch_snapshot(glossary_triplet())
+            .unwrap()
+            .extract_text(0)
+            .unwrap()
+            .as_deref(),
+        Some("alpha changed")
+    );
+    assert_eq!(
+        open(&output)
+            .glossary_text_batch_snapshot(glossary_triplet())
+            .unwrap()
+            .extract_text(2)
+            .unwrap()
+            .as_deref(),
+        Some("gamma changed")
+    );
+
+    let deterministic_package = open(&source);
+    let deterministic_snapshot = deterministic_package
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let mut deterministic_edit = deterministic_snapshot.edit().unwrap();
+    deterministic_edit
+        .replace_paragraph_text(0, Position::new(0), "alpha changed")
+        .unwrap();
+    deterministic_edit
+        .replace_paragraph_text(2, Position::new(0), "gamma changed")
+        .unwrap();
+    let deterministic_commit = deterministic_edit.commit().unwrap();
+    let mut deterministic = Vec::new();
+    deterministic_package
+        .publish_glossary_text_batch_commit_to_stream(&mut deterministic, &deterministic_commit)
+        .unwrap();
+    assert_eq!(output, deterministic);
+
+    let recaptured = open(&output)
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    assert_eq!(
+        publication.snapshot().part_fingerprint(),
+        recaptured.part_fingerprint()
+    );
+    let inverse_target = publication
+        .inverse_patch()
+        .apply(publication.snapshot())
+        .unwrap();
+    assert_eq!(
+        inverse_target.extract_text(0).unwrap().as_deref(),
+        Some("target")
+    );
+    assert_eq!(
+        inverse_target.extract_text(2).unwrap().as_deref(),
+        Some("third")
+    );
+}
+
+#[test]
+fn glossary_batch_rejects_empty_alias_missing_and_ambiguous_selectors() {
+    assert!(GlossaryBatchSelector::try_new(Vec::new()).is_err());
+    assert!(GlossaryBatchSelector::try_new(vec![GlossarySelector::ByIndex(0)]).is_ok());
+    assert!(
+        GlossaryBatchSelector::try_new(vec![
+            GlossarySelector::ByIndex(0),
+            GlossarySelector::ByName("Alpha".to_owned()),
+        ])
+        .is_ok()
+    );
+    assert!(
+        open(&batch_source())
+            .glossary_text_batch_snapshot(
+                GlossaryBatchSelector::try_new(vec![
+                    GlossarySelector::ByIndex(0),
+                    GlossarySelector::ByName("Alpha".to_owned()),
+                ])
+                .unwrap()
+            )
+            .is_err()
+    );
+    assert!(
+        open(&batch_source())
+            .glossary_text_batch_snapshot(
+                GlossaryBatchSelector::try_new(vec![
+                    GlossarySelector::ByName("Alpha".to_owned()),
+                    GlossarySelector::ByNameAndId {
+                        name: "Alpha".to_owned(),
+                        id: Id::new(ALPHA_ID).unwrap(),
+                    },
+                ])
+                .unwrap()
+            )
+            .is_err()
+    );
+    assert!(
+        open(&batch_source())
+            .glossary_text_batch_snapshot(
+                GlossaryBatchSelector::try_new(vec![
+                    GlossarySelector::ByName("Missing".to_owned()),
+                    GlossarySelector::ById(Id::new(BETA_ID).unwrap()),
+                ])
+                .unwrap()
+            )
+            .is_err()
+    );
+    assert!(
+        open(&fixture(Dialect::Transitional, Mutation::DuplicateName))
+            .glossary_text_batch_snapshot(
+                GlossaryBatchSelector::try_new(vec![
+                    GlossarySelector::ByName("Alpha".to_owned()),
+                    GlossarySelector::ById(Id::new(BETA_ID).unwrap()),
+                ])
+                .unwrap()
+            )
+            .is_err()
+    );
+    assert!(
+        open(&fixture(Dialect::Transitional, Mutation::DuplicateId))
+            .glossary_text_batch_snapshot(
+                GlossaryBatchSelector::try_new(vec![
+                    GlossarySelector::ById(Id::new(ALPHA_ID).unwrap()),
+                    GlossarySelector::ByName("Gamma".to_owned()),
+                ])
+                .unwrap()
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn glossary_batch_noop_inverse_and_limits_are_atomic() {
+    let source = batch_source();
+    let package = open(&source);
+    let snapshot = package
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let commit = snapshot.edit().unwrap().commit().unwrap();
+    assert!(commit.patch().is_noop());
+    let mut exact = Vec::new();
+    package
+        .publish_glossary_text_batch_commit_to_stream(&mut exact, &commit)
+        .unwrap();
+    assert_eq!(exact, source);
+
+    let package = open(&source);
+    let snapshot = package
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let mut edit = snapshot.edit().unwrap();
+    edit.replace_paragraph_text(0, Position::new(0), "changed")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let mut output = Vec::new();
+    let publication = package
+        .publish_glossary_text_batch_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    let mut restored = Vec::new();
+    open(&output)
+        .publish_glossary_text_batch_inverse_to_stream(&mut restored, &publication)
+        .unwrap();
+    assert_eq!(restored, source);
+
+    let count_limited = source_backed::StoryTextLimits::default()
+        .with_secondary_entry_limits(1, 16 * 1024, 256)
+        .unwrap();
+    assert!(
+        open(&source)
+            .glossary_text_batch_snapshot_with_limits(glossary_triplet(), count_limited)
+            .is_err()
+    );
+    let replacement_limited =
+        source_backed::StoryTextLimits::new(16 * 1024, 8, 10_000, 64, 32 * 1024, 1, 4096).unwrap();
+    let snapshot = open(&source)
+        .glossary_text_batch_snapshot_with_limits(glossary_triplet(), replacement_limited)
+        .unwrap();
+    let mut edit = snapshot.edit().unwrap();
+    edit.replace_paragraph_text(0, Position::new(0), "one")
+        .unwrap();
+    assert!(
+        edit.replace_paragraph_text(1, Position::new(0), "two")
+            .is_err()
+    );
+    assert!(edit.projected().is_ok());
+    let output_limited =
+        source_backed::StoryTextLimits::new(16 * 1024, 8, 10_000, 64, 1, 4096, 4096).unwrap();
+    assert!(matches!(
+        open(&source).glossary_text_batch_snapshot_with_limits(glossary_triplet(), output_limited),
+        Err(source_backed::StoryTextError::Limit {
+            resource: "glossary batch entry bytes",
+            maximum: 1,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn glossary_batch_rejects_repeated_targets_and_aggregate_limits() {
+    let source = batch_source();
+    let package = open(&source);
+    let snapshot = package
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let mut edit = snapshot.edit().unwrap();
+    edit.replace_paragraph_text(0, Position::new(0), "one")
+        .unwrap();
+    assert!(
+        edit.replace_paragraph_text(0, Position::new(0), "again")
+            .is_err()
+    );
+    assert_eq!(
+        edit.projected()
+            .unwrap()
+            .extract_text(0)
+            .unwrap()
+            .as_deref(),
+        Some("one")
+    );
+
+    let replacement_limited =
+        source_backed::StoryTextLimits::new(16 * 1024, 8, 10_000, 64, 32 * 1024, 8, 5).unwrap();
+    let snapshot = open(&source)
+        .glossary_text_batch_snapshot_with_limits(glossary_triplet(), replacement_limited)
+        .unwrap();
+    let mut edit = snapshot.edit().unwrap();
+    edit.replace_paragraph_text(0, Position::new(0), "one")
+        .unwrap();
+    assert!(
+        edit.replace_paragraph_text(1, Position::new(0), "four")
+            .is_err()
+    );
+
+    let entry_limited = source_backed::StoryTextLimits::default()
+        .with_secondary_entry_limits(3, 1, 256)
+        .unwrap();
+    assert!(matches!(
+        open(&source).glossary_text_batch_snapshot_with_limits(glossary_triplet(), entry_limited),
+        Err(source_backed::StoryTextError::Limit { .. })
+    ));
+
+    let glossary_bytes = part(&source, "/word/glossary/document.xml").len();
+    let output_limited =
+        source_backed::StoryTextLimits::new(16 * 1024, 8, 10_000, 64, glossary_bytes - 1, 8, 4096)
+            .unwrap();
+    let snapshot = open(&source)
+        .glossary_text_batch_snapshot_with_limits(glossary_triplet(), output_limited)
+        .unwrap();
+    let mut edit = snapshot.edit().unwrap();
+    edit.replace_paragraph_text(0, Position::new(0), "x".repeat(512))
+        .unwrap();
+    assert!(edit.commit().is_err());
+}
+
+#[test]
+fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths() {
+    let source = batch_source();
+    let versioned = Arc::new(VersionedSource {
+        bytes: source.clone(),
+        revision: std::sync::atomic::AtomicU64::new(0),
+    });
+    let package = source_backed::Package::from_read_at(versioned.clone()).unwrap();
+    let snapshot = package
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let mut edit = snapshot.edit().unwrap();
+    edit.replace_paragraph_text(0, Position::new(0), "changed")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    versioned
+        .revision
+        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let mut refused = Vec::new();
+    assert!(
+        package
+            .publish_glossary_text_batch_commit_to_stream(&mut refused, &commit)
+            .is_err()
+    );
+    assert!(refused.is_empty());
+    let foreign = open(&source)
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    assert!(commit.patch().apply(&foreign).is_err());
+
+    let managed = source_backed::Package::from_read_at_with_execution_context(
+        Arc::new(OwnedSource::new(source.clone())),
+        litchi_docx::ReadLimits::default(),
+        litchi_core::ExecutionContext::new(
+            litchi_core::Budget::root(
+                "source-backed-glossary-batch-test",
+                litchi_core::Limits::new(
+                    2 * source.len() as u64,
+                    u64::MAX,
+                    u64::MAX,
+                    u64::MAX,
+                    u64::MAX,
+                    u64::MAX,
+                ),
+            ),
+            litchi_core::CancellationSource::pair().1,
+            litchi_core::ExecutionLimits::new(
+                std::num::NonZeroUsize::MIN,
+                std::num::NonZeroUsize::MIN,
+                std::num::NonZeroU64::new(2 * source.len() as u64).unwrap(),
+                0,
+            )
+            .unwrap(),
+        ),
+    )
+    .unwrap();
+    assert!(
+        managed
+            .glossary_text_batch_snapshot(glossary_triplet())
+            .unwrap()
+            .edit()
+            .is_err()
+    );
+
+    let (cancel_source, token) = litchi_core::CancellationSource::pair();
+    let cancelled = source_backed::Package::from_read_at_with_execution_context(
+        Arc::new(OwnedSource::new(source.clone())),
+        litchi_docx::ReadLimits::default(),
+        litchi_core::ExecutionContext::new(
+            litchi_core::Budget::root(
+                "source-backed-glossary-batch-cancel-test",
+                litchi_core::Limits::new(
+                    2 * source.len() as u64,
+                    u64::MAX,
+                    u64::MAX,
+                    u64::MAX,
+                    u64::MAX,
+                    u64::MAX,
+                ),
+            ),
+            token,
+            litchi_core::ExecutionLimits::new(
+                std::num::NonZeroUsize::MIN,
+                std::num::NonZeroUsize::MIN,
+                std::num::NonZeroU64::new(2 * source.len() as u64).unwrap(),
+                0,
+            )
+            .unwrap(),
+        ),
+    )
+    .unwrap();
+    let captured = cancelled
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    cancel_source.cancel();
+    assert!(captured.entry_count().is_err());
+    assert!(
+        cancelled
+            .glossary_text_batch_snapshot(glossary_triplet())
+            .is_err()
+    );
+
+    let signed = open(&fixture(Dialect::Transitional, Mutation::Signed));
+    let noop = signed
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap()
+        .edit()
+        .unwrap()
+        .commit()
+        .unwrap();
+    let mut exact = Vec::new();
+    signed
+        .publish_glossary_text_batch_commit_to_stream(&mut exact, &noop)
+        .unwrap();
+    assert_eq!(exact, fixture(Dialect::Transitional, Mutation::Signed));
+
+    let signed = open(&fixture(Dialect::Transitional, Mutation::Signed));
+    let mut edit = signed
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap()
+        .edit()
+        .unwrap();
+    edit.replace_paragraph_text(0, Position::new(0), "changed")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let mut refused = Vec::new();
+    assert!(
+        signed
+            .publish_glossary_text_batch_commit_to_stream(&mut refused, &commit)
+            .is_err()
+    );
+    assert!(refused.is_empty());
+
+    let package = open(&source);
+    let snapshot = package
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let mut edit = snapshot.edit().unwrap();
+    edit.replace_paragraph_text(0, Position::new(0), "changed")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(
+        package
+            .publish_glossary_text_batch_commit_to_stream(PartialWriter { writes: 0 }, &commit)
+            .is_err()
+    );
 }
 
 #[allow(dead_code)]

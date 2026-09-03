@@ -1,4 +1,5 @@
-//! Source-backed text snapshots for one selected Word story.
+//! Source-backed text snapshots for one selected Word story or one bounded
+//! glossary-entry batch.
 //!
 //! This module deliberately keeps the selection closure to one main, header,
 //! footer, footnote, endnote, comment, or glossary-entry story. Relationship metadata is
@@ -119,6 +120,49 @@ impl GlossarySelector {
     #[must_use]
     pub const fn by_index(index: usize) -> Self {
         Self::ByIndex(index)
+    }
+}
+
+/// An owned, non-empty selection of existing glossary entries.
+///
+/// The selectors are resolved against one glossary Part. During capture they
+/// are canonicalized to the source order of the selected entries; duplicate,
+/// missing, and ambiguous semantic matches are refused before editing. The
+/// selector count is checked against [`Limits::max_entries`] when captured.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct GlossaryBatchSelector {
+    selectors: Vec<GlossarySelector>,
+}
+
+impl GlossaryBatchSelector {
+    /// Construct an exactly-two glossary-entry convenience selector.
+    #[must_use]
+    pub fn new(first: GlossarySelector, second: GlossarySelector) -> Self {
+        Self {
+            selectors: vec![first, second],
+        }
+    }
+
+    /// Construct a checked non-empty glossary-entry selector set.
+    pub fn try_new(selectors: Vec<GlossarySelector>) -> Result<Self> {
+        if selectors.is_empty() {
+            return Err(Error::Limit {
+                resource: "glossary batch selectors",
+                actual: 0,
+                maximum: 1,
+            });
+        }
+        Ok(Self { selectors })
+    }
+
+    /// Borrow the non-empty semantic selectors in their requested order.
+    ///
+    /// A captured [`GlossaryBatchSnapshot`] exposes its canonical source
+    /// order through [`GlossaryBatchSnapshot::selector`] and
+    /// [`GlossaryBatchSnapshot::entry_selector`].
+    #[must_use]
+    pub fn selectors(&self) -> &[GlossarySelector] {
+        &self.selectors
     }
 }
 
@@ -277,6 +321,16 @@ pub enum Error {
     AmbiguousGlossaryEntry {
         /// Compact selector kind that matched multiple source entries.
         selector: GlossarySelectorKind,
+    },
+    /// A batch edit attempted to replace one direct paragraph more than once.
+    #[error(
+        "source-backed glossary batch paragraph {paragraph_index} in entry {entry_index} is repeated"
+    )]
+    RepeatedParagraphEdit {
+        /// Canonical source-order entry index.
+        entry_index: usize,
+        /// Direct paragraph index within that entry.
+        paragraph_index: usize,
     },
     /// A publication inverse was applied to a foreign complete artifact.
     #[error("source-backed story text publication conflicts with the complete source artifact")]
@@ -2851,6 +2905,27 @@ fn scan_glossary(
     limits: Limits,
     execution: Option<&ExecutionContext>,
 ) -> Result<Layout> {
+    let mut layouts = scan_glossary_many(
+        xml,
+        std::slice::from_ref(selector),
+        expected_word_namespace,
+        limits,
+        execution,
+    )?;
+    layouts.pop().ok_or_else(|| {
+        Error::Document(crate::Error::InvalidFormat(
+            "glossary selector inventory returned no layout".into(),
+        ))
+    })
+}
+
+fn scan_glossary_many(
+    xml: &[u8],
+    selectors: &[GlossarySelector],
+    expected_word_namespace: Option<&[u8]>,
+    limits: Limits,
+    execution: Option<&ExecutionContext>,
+) -> Result<Vec<Layout>> {
     if xml.len() > limits.max_xml_bytes {
         return Err(Error::Limit {
             resource: "XML bytes",
@@ -2858,13 +2933,30 @@ fn scan_glossary(
             maximum: limits.max_xml_bytes,
         });
     }
-    validate_glossary_selector(selector)?;
-    let requested_name_key = match selector {
-        GlossarySelector::ByName(name) | GlossarySelector::ByNameAndId { name, .. } => {
-            Some(glossary_name_key(name)?)
-        },
-        GlossarySelector::ById(_) | GlossarySelector::ByIndex(_) => None,
-    };
+    validate_glossary_batch_selector_limits(selectors, limits)?;
+    let mut requested_name_keys = Vec::new();
+    requested_name_keys
+        .try_reserve_exact(selectors.len())
+        .map_err(|source| Error::Allocation {
+            resource: "glossary selector keys",
+            source,
+        })?;
+    for selector in selectors {
+        requested_name_keys.push(match selector {
+            GlossarySelector::ByName(name) | GlossarySelector::ByNameAndId { name, .. } => {
+                Some(glossary_name_key(name)?)
+            },
+            GlossarySelector::ById(_) | GlossarySelector::ByIndex(_) => None,
+        });
+    }
+    let mut matched = Vec::new();
+    matched
+        .try_reserve_exact(selectors.len())
+        .map_err(|source| Error::Allocation {
+            resource: "glossary selector matches",
+            source,
+        })?;
+    matched.resize_with(selectors.len(), || false);
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
@@ -2873,6 +2965,7 @@ fn scan_glossary(
     let mut root_seen = false;
     let mut root_closed = false;
     let mut word_namespace = Vec::new();
+    let mut word_namespace_shared: Option<Arc<[u8]>> = None;
     let mut namespace_stack = Vec::new();
     let empty_namespace_context = NamespaceContext::default();
     let mut root_has_background = false;
@@ -2895,12 +2988,13 @@ fn scan_glossary(
     let mut current_body_has_w_namespace = false;
     let mut paragraph_stack = Vec::new();
     let mut current_paragraphs = Vec::new();
-    let mut paragraphs = Vec::new();
-    let mut selected_count = 0usize;
-    let mut selected_inner_start = None;
-    let mut selected_inner_end = None;
-    let mut selected_namespace_attributes = None;
-    let mut selected_has_w_namespace = false;
+    let mut selected_layouts = Vec::new();
+    selected_layouts
+        .try_reserve_exact(selectors.len())
+        .map_err(|source| Error::Allocation {
+            resource: "glossary selected layouts",
+            source,
+        })?;
 
     loop {
         let before = reader_position(&reader)?;
@@ -2967,6 +3061,7 @@ fn scan_glossary(
                         ));
                     }
                     word_namespace = info.word_namespace;
+                    word_namespace_shared = Some(word_namespace.clone().into());
                     root_seen = true;
                 } else if !root_seen || root_closed {
                     return Err(unsupported_xml("glossary content occurs outside its root"));
@@ -3019,13 +3114,7 @@ fn scan_glossary(
                     }
                     current_entry_index = entry_count - 1;
                     current_entry_start = Some(event_start);
-                    current_entry_selected = matches!(
-                        selector,
-                        GlossarySelector::ByIndex(requested) if *requested == current_entry_index
-                    );
-                    if current_entry_selected {
-                        selected_count = 1;
-                    }
+                    current_entry_selected = false;
                     current_entry_pr_seen = false;
                     current_entry_name_key = None;
                     current_entry_id = None;
@@ -3065,6 +3154,19 @@ fn scan_glossary(
                         if body_depth.is_some() {
                             return Err(unsupported_xml("glossary docPartBody nesting is invalid"));
                         }
+                        current_entry_selected =
+                            selectors
+                                .iter()
+                                .enumerate()
+                                .any(|(selector_index, requested)| {
+                                    glossary_selector_matches(
+                                        requested,
+                                        requested_name_keys[selector_index].as_deref(),
+                                        current_entry_index,
+                                        current_entry_name_key.as_deref(),
+                                        current_entry_id.as_ref().map(crate::glossary::Id::as_str),
+                                    )
+                                });
                         body_depth = Some(logical_depth);
                         if current_entry_selected {
                             current_body_inner_start = Some(after);
@@ -3152,6 +3254,7 @@ fn scan_glossary(
                         ));
                     }
                     word_namespace = info.word_namespace;
+                    word_namespace_shared = Some(word_namespace.clone().into());
                     root_seen = true;
                     root_closed = true;
                 } else if !root_seen || root_closed {
@@ -3235,6 +3338,21 @@ fn scan_glossary(
                                     actual: usize::MAX,
                                     maximum: 1,
                                 })?;
+                            current_entry_selected =
+                                selectors
+                                    .iter()
+                                    .enumerate()
+                                    .any(|(selector_index, requested)| {
+                                        glossary_selector_matches(
+                                            requested,
+                                            requested_name_keys[selector_index].as_deref(),
+                                            current_entry_index,
+                                            current_entry_name_key.as_deref(),
+                                            current_entry_id
+                                                .as_ref()
+                                                .map(crate::glossary::Id::as_str),
+                                        )
+                                    });
                             if current_entry_selected {
                                 current_body_inner_start = Some(after);
                                 current_body_inner_end = Some(after);
@@ -3312,28 +3430,6 @@ fn scan_glossary(
                 }
                 if doc_part_pr_depth == Some(depth) {
                     doc_part_pr_depth = None;
-                    if !current_entry_selected
-                        && glossary_selector_matches(
-                            selector,
-                            requested_name_key.as_deref(),
-                            current_entry_index,
-                            current_entry_name_key.as_deref(),
-                            current_entry_id.as_ref().map(crate::glossary::Id::as_str),
-                        )
-                    {
-                        if selected_count != 0 {
-                            return Err(Error::AmbiguousGlossaryEntry {
-                                selector: selector.kind(),
-                            });
-                        }
-                        if current_body_count != 0 {
-                            return Err(unsupported_xml(
-                                "selected glossary entry body precedes its properties",
-                            ));
-                        }
-                        selected_count = 1;
-                        current_entry_selected = true;
-                    }
                 }
                 if doc_part_depth == Some(depth) {
                     if current_body_count != 1 {
@@ -3347,18 +3443,67 @@ fn scan_glossary(
                         let entry_bytes = after
                             .checked_sub(entry_start)
                             .ok_or(unsupported_xml("selected glossary entry range is inverted"))?;
-                        if entry_bytes > limits.max_entry_bytes {
-                            return Err(Error::Limit {
-                                resource: "selected entry bytes",
-                                actual: entry_bytes,
-                                maximum: limits.max_entry_bytes,
-                            });
+                        let mut matching_selectors = Vec::new();
+                        for (selector_index, requested) in selectors.iter().enumerate() {
+                            if glossary_selector_matches(
+                                requested,
+                                requested_name_keys[selector_index].as_deref(),
+                                current_entry_index,
+                                current_entry_name_key.as_deref(),
+                                current_entry_id.as_ref().map(crate::glossary::Id::as_str),
+                            ) {
+                                reserve_one(&mut matching_selectors, "glossary selector matches")?;
+                                matching_selectors.push(selector_index);
+                            }
                         }
-                        selected_inner_start = current_body_inner_start;
-                        selected_inner_end = current_body_inner_end;
-                        selected_namespace_attributes = current_body_namespace_attributes.take();
-                        selected_has_w_namespace = current_body_has_w_namespace;
-                        paragraphs = std::mem::take(&mut current_paragraphs);
+                        if !matching_selectors.is_empty() {
+                            if entry_bytes > limits.max_entry_bytes {
+                                return Err(Error::Limit {
+                                    resource: "selected entry bytes",
+                                    actual: entry_bytes,
+                                    maximum: limits.max_entry_bytes,
+                                });
+                            }
+                            let inner_start = current_body_inner_start.ok_or(unsupported_xml(
+                                "selected glossary entry body start is missing",
+                            ))?;
+                            let inner_end = current_body_inner_end.ok_or(unsupported_xml(
+                                "selected glossary entry body end is missing",
+                            ))?;
+                            let namespace_attributes = current_body_namespace_attributes
+                                .take()
+                                .ok_or(unsupported_xml(
+                                    "selected glossary namespace context is missing",
+                                ))?;
+                            let paragraphs: Arc<[Range]> =
+                                std::mem::take(&mut current_paragraphs).into();
+                            let namespace_attributes: Arc<Vec<u8>> = namespace_attributes.into();
+                            let word_namespace = word_namespace_shared
+                                .as_ref()
+                                .ok_or(unsupported_xml("glossary word namespace is missing"))?;
+                            for selector_index in matching_selectors {
+                                if matched[selector_index] {
+                                    return Err(Error::AmbiguousGlossaryEntry {
+                                        selector: selectors[selector_index].kind(),
+                                    });
+                                }
+                                matched[selector_index] = true;
+                                selected_layouts.push((
+                                    selector_index,
+                                    Layout {
+                                        paragraphs: paragraphs.clone(),
+                                        root_start_end: inner_start,
+                                        root_end_start: inner_end,
+                                        root_kind: RootKind::Glossary,
+                                        namespace_attributes: namespace_attributes.clone(),
+                                        word_namespace: word_namespace.clone(),
+                                        has_w_namespace: current_body_has_w_namespace,
+                                    },
+                                ));
+                            }
+                        } else {
+                            current_paragraphs.clear();
+                        }
                     } else {
                         current_paragraphs.clear();
                     }
@@ -3420,31 +3565,102 @@ fn scan_glossary(
     if !root_has_doc_parts {
         return Err(unsupported_xml("glossary root must contain docParts"));
     }
-    if selected_count == 0 {
-        return Err(Error::MissingGlossaryEntry {
-            selector: selector.kind(),
+    for (selector_index, selector) in selectors.iter().enumerate() {
+        if !matched[selector_index] {
+            return Err(Error::MissingGlossaryEntry {
+                selector: selector.kind(),
+            });
+        }
+    }
+    selected_layouts.sort_unstable_by_key(|(selector_index, _)| *selector_index);
+    if selected_layouts.len() != selectors.len() {
+        return Err(Error::TopologyConflict);
+    }
+    let mut layouts = Vec::new();
+    layouts
+        .try_reserve_exact(selected_layouts.len())
+        .map_err(|source| Error::Allocation {
+            resource: "glossary selected layouts",
+            source,
+        })?;
+    for (selector_index, layout) in selected_layouts {
+        if selector_index >= selectors.len() {
+            return Err(Error::TopologyConflict);
+        }
+        layouts.push(layout);
+    }
+    check_execution_context(execution)?;
+    Ok(layouts)
+}
+
+fn validate_glossary_batch_selector_limits(
+    selectors: &[GlossarySelector],
+    limits: Limits,
+) -> Result<()> {
+    if selectors.is_empty() {
+        return Err(Error::Limit {
+            resource: "glossary batch selectors",
+            actual: 0,
+            maximum: 1,
         });
     }
-    let root_start_end = selected_inner_start.ok_or(unsupported_xml(
-        "selected glossary entry body start is missing",
-    ))?;
-    let root_end_start = selected_inner_end.ok_or(unsupported_xml(
-        "selected glossary entry body end is missing",
-    ))?;
-    let namespace_attributes = selected_namespace_attributes.ok_or(unsupported_xml(
-        "selected glossary namespace context is missing",
-    ))?;
-    check_execution_context(execution)?;
-    paragraphs.sort_by_key(|range| range.start);
-    Ok(Layout {
-        paragraphs: paragraphs.into(),
-        root_start_end,
-        root_end_start,
-        root_kind: RootKind::Glossary,
-        namespace_attributes: namespace_attributes.into(),
-        word_namespace: word_namespace.into(),
-        has_w_namespace: selected_has_w_namespace,
-    })
+    if selectors.len() > limits.max_entries {
+        return Err(Error::Limit {
+            resource: "glossary batch selectors",
+            actual: selectors.len(),
+            maximum: limits.max_entries,
+        });
+    }
+    let mut total = 0usize;
+    for selector in selectors {
+        let bytes = match selector {
+            GlossarySelector::ByName(name) => {
+                if name.len() > MAX_GLOSSARY_SELECTOR_NAME_BYTES {
+                    return Err(Error::Limit {
+                        resource: "glossary selector name bytes",
+                        actual: name.len(),
+                        maximum: MAX_GLOSSARY_SELECTOR_NAME_BYTES,
+                    });
+                }
+                name.len()
+            },
+            GlossarySelector::ById(id) => {
+                validate_glossary_selector_id(id)?;
+                id.as_str().len()
+            },
+            GlossarySelector::ByNameAndId { name, id } => {
+                if name.len() > MAX_GLOSSARY_SELECTOR_NAME_BYTES {
+                    return Err(Error::Limit {
+                        resource: "glossary selector name bytes",
+                        actual: name.len(),
+                        maximum: MAX_GLOSSARY_SELECTOR_NAME_BYTES,
+                    });
+                }
+                validate_glossary_selector_id(id)?;
+                name.len()
+                    .checked_add(id.as_str().len())
+                    .ok_or(Error::Limit {
+                        resource: "glossary selector bytes",
+                        actual: usize::MAX,
+                        maximum: limits.max_xml_bytes,
+                    })?
+            },
+            GlossarySelector::ByIndex(_) => 0,
+        };
+        total = total.checked_add(bytes).ok_or(Error::Limit {
+            resource: "glossary selector bytes",
+            actual: usize::MAX,
+            maximum: limits.max_xml_bytes,
+        })?;
+        if total > limits.max_xml_bytes {
+            return Err(Error::Limit {
+                resource: "glossary selector bytes",
+                actual: total,
+                maximum: limits.max_xml_bytes,
+            });
+        }
+    }
+    Ok(())
 }
 
 fn scan_story(
@@ -4408,3 +4624,1058 @@ const TRANSITIONAL_GLOSSARY: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/glossaryDocument";
 const STRICT_GLOSSARY: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/glossaryDocument";
+
+#[derive(Clone)]
+struct GlossaryBatchEntry {
+    selector_index: usize,
+    layout: Layout,
+}
+
+/// An immutable source-backed batch of existing glossary-entry text stories.
+///
+/// Entries are resolved atomically in one glossary Part and retained in
+/// canonical source order. The payload is shared once by the whole batch;
+/// entry records contain only bounded ranges, selectors, and namespace
+/// metadata rather than duplicate XML buffers.
+#[derive(Clone)]
+pub struct GlossaryBatchSnapshot {
+    selector: GlossaryBatchSelector,
+    entries: Vec<GlossaryBatchEntry>,
+    payload: Payload,
+    partname: PackURI,
+    source_version: SourceVersion,
+    source_lineage: SourceLineage,
+    part_fingerprint: [u8; 32],
+    artifact_fingerprint: Option<SourceArtifactFingerprint>,
+    limits: Limits,
+    execution: Option<ExecutionContext>,
+}
+
+impl GlossaryBatchSnapshot {
+    /// Borrow the canonical source-order selector set.
+    #[must_use]
+    pub const fn selector(&self) -> &GlossaryBatchSelector {
+        &self.selector
+    }
+
+    /// Return the number of selected glossary entries.
+    pub fn entry_count(&self) -> Result<usize> {
+        self.check_execution()?;
+        Ok(self.entries.len())
+    }
+
+    /// Borrow one canonical source-order selector.
+    pub fn entry_selector(&self, index: usize) -> Option<&GlossarySelector> {
+        let entry = self.entries.get(index)?;
+        self.selector.selectors.get(entry.selector_index)
+    }
+
+    /// Return the source revision captured by this batch.
+    #[must_use]
+    pub const fn source_version(&self) -> SourceVersion {
+        self.source_version
+    }
+
+    /// Return the SHA-256 digest of the complete selected glossary Part.
+    #[must_use]
+    pub const fn part_fingerprint(&self) -> [u8; 32] {
+        self.part_fingerprint
+    }
+
+    /// Return the direct paragraph count for one selected entry.
+    pub fn paragraph_count(&self, entry_index: usize) -> Result<Option<usize>> {
+        self.check_execution()?;
+        let Some(entry) = self.entries.get(entry_index) else {
+            return Ok(None);
+        };
+        Ok(Some(entry.layout.paragraphs.len()))
+    }
+
+    /// Return one direct paragraph from one selected entry.
+    pub fn paragraph_text(
+        &self,
+        entry_index: usize,
+        paragraph_index: usize,
+    ) -> Result<Option<String>> {
+        self.check_execution()?;
+        let Some(entry) = self.entries.get(entry_index) else {
+            return Ok(None);
+        };
+        let Some(range) = entry.layout.paragraphs.get(paragraph_index).copied() else {
+            return Ok(None);
+        };
+        let bytes = self
+            .raw_bytes()
+            .get(range.start..range.end)
+            .ok_or_else(|| {
+                Error::Document(crate::Error::InvalidFormat(
+                    "glossary batch paragraph range is outside the selected XML".into(),
+                ))
+            })?;
+        let mut text = String::new();
+        extract_story_paragraph_text(
+            bytes,
+            &mut text,
+            self.limits.max_output_bytes,
+            "glossary batch paragraph text",
+        )?;
+        self.check_execution()?;
+        Ok(Some(text))
+    }
+
+    /// Extract direct paragraph text from one selected entry.
+    pub fn extract_text(&self, entry_index: usize) -> Result<Option<String>> {
+        self.check_execution()?;
+        let Some(entry) = self.entries.get(entry_index) else {
+            return Ok(None);
+        };
+        let mut output = String::new();
+        for (index, range) in entry.layout.paragraphs.iter().copied().enumerate() {
+            let bytes = self
+                .raw_bytes()
+                .get(range.start..range.end)
+                .ok_or_else(|| {
+                    Error::Document(crate::Error::InvalidFormat(
+                        "glossary batch paragraph range is outside the selected XML".into(),
+                    ))
+                })?;
+            extract_story_paragraph_text(
+                bytes,
+                &mut output,
+                self.limits.max_output_bytes,
+                "glossary batch text output",
+            )?;
+            if index % 64 == 0 {
+                self.check_execution()?;
+            }
+        }
+        self.check_execution()?;
+        Ok(Some(output))
+    }
+
+    /// Start one atomic direct-paragraph edit spanning the selected entries.
+    pub fn edit(&self) -> Result<GlossaryBatchEdit> {
+        self.check_execution()?;
+        if self.payload.is_managed() {
+            return Err(Error::Document(crate::Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "source-backed glossary batch text edit",
+                reason: "managed source-backed story edits require an owned edit snapshot; use an unmanaged compatibility constructor",
+            }));
+        }
+        Ok(GlossaryBatchEdit {
+            base: self.clone(),
+            intents: Vec::new(),
+            replacements: 0,
+            replacement_text_bytes: 0,
+        })
+    }
+
+    fn check_execution(&self) -> Result<()> {
+        check_execution_context(self.execution.as_ref())
+    }
+
+    fn raw_bytes(&self) -> &[u8] {
+        self.payload.as_bytes()
+    }
+
+    fn with_artifact_fingerprint(&self, fingerprint: SourceArtifactFingerprint) -> Self {
+        let mut snapshot = self.clone();
+        snapshot.artifact_fingerprint = Some(fingerprint);
+        snapshot
+    }
+}
+
+#[derive(Clone)]
+struct GlossaryBatchEditIntent {
+    entry_index: usize,
+    position: Position,
+    text: String,
+}
+
+/// A staged atomic edit of a bounded glossary-entry batch.
+///
+/// Only compact replacement intents are retained. During projection one
+/// selected entry is wrapped and edited at a time, so the batch does not hold
+/// one full document wrapper or XML payload per selected entry.
+pub struct GlossaryBatchEdit {
+    base: GlossaryBatchSnapshot,
+    intents: Vec<GlossaryBatchEditIntent>,
+    replacements: usize,
+    replacement_text_bytes: usize,
+}
+
+impl GlossaryBatchEdit {
+    /// Borrow the immutable batch source snapshot.
+    #[must_use]
+    pub const fn source(&self) -> &GlossaryBatchSnapshot {
+        &self.base
+    }
+
+    /// Return the current projected batch after atomically validating intents.
+    pub fn projected(&self) -> Result<GlossaryBatchSnapshot> {
+        self.base.check_execution()?;
+        let target = assemble_batch_snapshot(&self.base, &self.intents)?;
+        self.base.check_execution()?;
+        Ok(target)
+    }
+
+    /// Replace all text in one direct paragraph of one selected entry.
+    ///
+    /// A paragraph may be addressed only once in one staged batch. This
+    /// removes overlapping intent ambiguity and leaves every failed operation
+    /// free to return without changing counters or stored intents.
+    pub fn replace_paragraph_text(
+        &mut self,
+        entry_index: usize,
+        position: Position,
+        authored_text: impl AsRef<str>,
+    ) -> Result<&mut Self> {
+        self.base.check_execution()?;
+        let Some(entry) = self.base.entries.get(entry_index) else {
+            return Err(batch_entry_index_error(
+                entry_index,
+                self.base.entries.len(),
+            ));
+        };
+        let paragraph_index = position.get();
+        if paragraph_index >= entry.layout.paragraphs.len() {
+            return Err(batch_paragraph_index_error(
+                entry_index,
+                paragraph_index,
+                entry.layout.paragraphs.len(),
+            ));
+        }
+        let insert_at = match self.intents.binary_search_by(|intent| {
+            intent
+                .entry_index
+                .cmp(&entry_index)
+                .then_with(|| intent.position.cmp(&position))
+        }) {
+            Ok(_) => {
+                return Err(Error::RepeatedParagraphEdit {
+                    entry_index,
+                    paragraph_index,
+                });
+            },
+            Err(index) => index,
+        };
+        let next_replacements = self.replacements.checked_add(1).ok_or(Error::Limit {
+            resource: "replacements",
+            actual: usize::MAX,
+            maximum: self.base.limits.max_replacements,
+        })?;
+        if next_replacements > self.base.limits.max_replacements {
+            return Err(Error::Limit {
+                resource: "replacements",
+                actual: next_replacements,
+                maximum: self.base.limits.max_replacements,
+            });
+        }
+        let authored_text = authored_text.as_ref();
+        let next_bytes = self
+            .replacement_text_bytes
+            .checked_add(authored_text.len())
+            .ok_or(Error::Limit {
+                resource: "replacement text bytes",
+                actual: usize::MAX,
+                maximum: self.base.limits.max_replacement_text_bytes,
+            })?;
+        if next_bytes > self.base.limits.max_replacement_text_bytes {
+            return Err(Error::Limit {
+                resource: "replacement text bytes",
+                actual: next_bytes,
+                maximum: self.base.limits.max_replacement_text_bytes,
+            });
+        }
+        validate_paragraph_text(position, authored_text).map_err(Error::Transaction)?;
+        self.intents
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "glossary batch edit intents",
+                source,
+            })?;
+        let text = checked_string_clone(authored_text, "glossary batch replacement text")?;
+        self.intents.insert(
+            insert_at,
+            GlossaryBatchEditIntent {
+                entry_index,
+                position,
+                text,
+            },
+        );
+        if let Err(error) = self.base.check_execution() {
+            self.intents.remove(insert_at);
+            return Err(error);
+        }
+        self.replacements = next_replacements;
+        self.replacement_text_bytes = next_bytes;
+        Ok(self)
+    }
+
+    /// Finish the staged intents as one source-bound reversible patch.
+    pub fn commit(self) -> Result<GlossaryBatchCommit> {
+        self.base.check_execution()?;
+        let target = self.projected()?;
+        self.base.check_execution()?;
+        let patch = GlossaryBatchPatch {
+            before: self.base,
+            after: target.clone(),
+        };
+        Ok(GlossaryBatchCommit {
+            snapshot: target,
+            patch,
+        })
+    }
+}
+
+/// A completed atomic glossary batch edit.
+pub struct GlossaryBatchCommit {
+    snapshot: GlossaryBatchSnapshot,
+    patch: GlossaryBatchPatch,
+}
+
+impl GlossaryBatchCommit {
+    /// Borrow the projected batch snapshot.
+    #[must_use]
+    pub const fn snapshot(&self) -> &GlossaryBatchSnapshot {
+        &self.snapshot
+    }
+
+    /// Borrow the source-bound reversible batch patch.
+    #[must_use]
+    pub const fn patch(&self) -> &GlossaryBatchPatch {
+        &self.patch
+    }
+}
+
+/// A reversible source-bound patch for a glossary Part containing a bounded
+/// set of selected entries.
+#[derive(Clone)]
+pub struct GlossaryBatchPatch {
+    before: GlossaryBatchSnapshot,
+    after: GlossaryBatchSnapshot,
+}
+
+impl GlossaryBatchPatch {
+    /// Borrow the exact batch source required by this patch.
+    #[must_use]
+    pub const fn source(&self) -> &GlossaryBatchSnapshot {
+        &self.before
+    }
+
+    /// Borrow the projected target represented by this patch.
+    #[must_use]
+    pub const fn target(&self) -> &GlossaryBatchSnapshot {
+        &self.after
+    }
+
+    /// Return whether the complete glossary Part is unchanged.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.before.raw_bytes() == self.after.raw_bytes()
+    }
+
+    /// Return the exact inverse batch patch.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            before: self.after.clone(),
+            after: self.before.clone(),
+        }
+    }
+
+    /// Apply only to an equivalent source-backed batch snapshot.
+    pub fn apply(&self, source: &GlossaryBatchSnapshot) -> Result<GlossaryBatchSnapshot> {
+        if self.before.selector != source.selector
+            || !same_part_name(&self.before.partname, &source.partname)
+        {
+            return Err(Error::TopologyConflict);
+        }
+        if source.source_lineage != self.before.source_lineage {
+            return Err(Error::ForeignSource);
+        }
+        if source.source_version != self.before.source_version {
+            return Err(Error::StaleSource);
+        }
+        if source.part_fingerprint != self.before.part_fingerprint
+            || source.raw_bytes() != self.before.raw_bytes()
+        {
+            return Err(Error::StaleSource);
+        }
+        Ok(if self.is_noop() {
+            source.clone()
+        } else {
+            self.after.clone()
+        })
+    }
+}
+
+/// Exact publication evidence for one atomic glossary batch overlay.
+pub struct GlossaryBatchPublication {
+    snapshot: GlossaryBatchSnapshot,
+    original_snapshot: GlossaryBatchSnapshot,
+    original_artifact: SourceArtifact,
+    published_fingerprint: SourceArtifactFingerprint,
+    inverse_patch: GlossaryBatchPatch,
+}
+
+impl GlossaryBatchPublication {
+    /// Borrow the batch snapshot represented by the emitted package.
+    #[must_use]
+    pub const fn snapshot(&self) -> &GlossaryBatchSnapshot {
+        &self.snapshot
+    }
+
+    /// Borrow the inverse patch authorized for the emitted package.
+    #[must_use]
+    pub const fn inverse_patch(&self) -> &GlossaryBatchPatch {
+        &self.inverse_patch
+    }
+
+    /// Return the complete emitted-artifact fingerprint.
+    #[must_use]
+    pub const fn published_fingerprint(&self) -> SourceArtifactFingerprint {
+        self.published_fingerprint
+    }
+}
+
+impl Package {
+    /// Capture a bounded batch of existing glossary-entry text stories.
+    pub fn glossary_text_batch_snapshot(
+        &self,
+        selector: GlossaryBatchSelector,
+    ) -> Result<GlossaryBatchSnapshot> {
+        self.glossary_text_batch_snapshot_with_limits(selector, Limits::default())
+    }
+
+    /// Capture a glossary-entry batch under explicit finite bounds.
+    pub fn glossary_text_batch_snapshot_with_limits(
+        &self,
+        selector: GlossaryBatchSelector,
+        limits: Limits,
+    ) -> Result<GlossaryBatchSnapshot> {
+        capture_glossary_batch(self, selector, limits)
+    }
+
+    /// Start one staged atomic edit spanning selected glossary entries.
+    pub fn edit_glossary_text_batch(
+        &self,
+        selector: GlossaryBatchSelector,
+    ) -> Result<GlossaryBatchEdit> {
+        self.glossary_text_batch_snapshot(selector)?.edit()
+    }
+
+    /// Start one bounded atomic edit spanning selected glossary entries.
+    pub fn edit_glossary_text_batch_with_limits(
+        &self,
+        selector: GlossaryBatchSelector,
+        limits: Limits,
+    ) -> Result<GlossaryBatchEdit> {
+        self.glossary_text_batch_snapshot_with_limits(selector, limits)?
+            .edit()
+    }
+
+    /// Publish one glossary batch commit through a one-Part shared overlay.
+    pub fn publish_glossary_text_batch_commit_to_stream<W: Write>(
+        self,
+        writer: W,
+        commit: &GlossaryBatchCommit,
+    ) -> Result<GlossaryBatchPublication> {
+        self.publish_glossary_text_batch_patch_to_stream(writer, commit.patch())
+    }
+
+    /// Publish one source-bound glossary batch patch.
+    pub fn publish_glossary_text_batch_patch_to_stream<W: Write>(
+        self,
+        writer: W,
+        patch: &GlossaryBatchPatch,
+    ) -> Result<GlossaryBatchPublication> {
+        self.package.check_execution()?;
+        let execution = self.package.execution_context();
+        let current =
+            capture_glossary_batch(&self, patch.before.selector.clone(), patch.before.limits)?;
+        let target = patch.apply(&current)?;
+        let original_artifact = self.package.source_artifact();
+        let mut output = FingerprintingWriter::new(writer);
+        if patch.is_noop() {
+            let mut cancellation_writer = CancellationWriter {
+                writer: &mut output,
+                execution: execution.as_ref(),
+            };
+            original_artifact.write_to_stream(&mut cancellation_writer)?;
+            check_execution_context(execution.as_ref())?;
+        } else {
+            self.package.validate_topology_source_boundary()?;
+            if target.raw_bytes().len() > patch.before.limits.max_output_bytes {
+                return Err(Error::Limit {
+                    resource: "glossary batch output bytes",
+                    actual: target.raw_bytes().len(),
+                    maximum: patch.before.limits.max_output_bytes,
+                });
+            }
+            let replacement = Arc::new(checked_vec_clone(
+                target.raw_bytes(),
+                "glossary batch publication replacement",
+            )?);
+            self.package.write_part_overlay_shared_to_stream(
+                &mut output,
+                &current.partname,
+                replacement,
+            )?;
+        }
+        let published_fingerprint = output.finish();
+        let published_snapshot = target.with_artifact_fingerprint(published_fingerprint);
+        let inverse_patch = GlossaryBatchPatch {
+            before: published_snapshot.clone(),
+            after: current.clone(),
+        };
+        Ok(GlossaryBatchPublication {
+            snapshot: published_snapshot,
+            original_snapshot: current,
+            original_artifact,
+            published_fingerprint,
+            inverse_patch,
+        })
+    }
+
+    /// Restore the exact source artifact from a glossary batch publication.
+    pub fn publish_glossary_text_batch_inverse_to_stream<W: Write>(
+        self,
+        writer: W,
+        publication: &GlossaryBatchPublication,
+    ) -> Result<GlossaryBatchSnapshot> {
+        self.package.check_execution()?;
+        let execution = self.package.execution_context();
+        let current = self.package.source_artifact().fingerprint()?;
+        if current != publication.published_fingerprint {
+            return Err(Error::ArtifactConflict);
+        }
+        let mut writer = writer;
+        let mut cancellation_writer = CancellationWriter {
+            writer: &mut writer,
+            execution: execution.as_ref(),
+        };
+        publication
+            .original_artifact
+            .write_to_stream(&mut cancellation_writer)?;
+        check_execution_context(execution.as_ref())?;
+        Ok(publication.original_snapshot.clone())
+    }
+}
+
+fn capture_glossary_batch(
+    package: &Package,
+    selector: GlossaryBatchSelector,
+    limits: Limits,
+) -> Result<GlossaryBatchSnapshot> {
+    package.package.check_execution()?;
+    validate_glossary_batch_selector_limits(&selector.selectors, limits)?;
+
+    let source_version = package.package.source_version()?;
+    let source_lineage = package.package.source_lineage();
+    let execution = package.package.execution_context();
+    let first_selector = Selector::Glossary(
+        selector
+            .selectors
+            .first()
+            .ok_or(Error::TopologyConflict)?
+            .clone(),
+    );
+    // Resolve the package topology and materialize the glossary Part once.
+    // One semantic inventory scan resolves every selector against those bytes.
+    let (partname, part, relationship_word_namespace) =
+        resolve_part(&package.package, &first_selector)?;
+    let declared = part.declared_uncompressed_size()?;
+    if declared > limits.max_xml_bytes as u64 {
+        return Err(Error::Limit {
+            resource: "XML bytes",
+            actual: usize::try_from(declared).unwrap_or(usize::MAX),
+            maximum: limits.max_xml_bytes,
+        });
+    }
+    let data = part.data()?;
+    if data.as_bytes().len() > limits.max_xml_bytes {
+        return Err(Error::Limit {
+            resource: "XML bytes",
+            actual: data.as_bytes().len(),
+            maximum: limits.max_xml_bytes,
+        });
+    }
+    let managed = package.package.cache_diagnostics().budget_managed;
+    let payload = if managed {
+        Payload::Managed(data)
+    } else {
+        Payload::Owned(data.into_arc()?)
+    };
+    let part_fingerprint = digest(payload.as_bytes());
+    let layouts = scan_glossary_many(
+        payload.as_bytes(),
+        &selector.selectors,
+        relationship_word_namespace,
+        limits,
+        execution.as_ref(),
+    )?;
+    if layouts.len() != selector.selectors.len() {
+        return Err(Error::TopologyConflict);
+    }
+    let mut entries = Vec::new();
+    entries
+        .try_reserve_exact(selector.selectors.len())
+        .map_err(|source| Error::Allocation {
+            resource: "glossary batch entries",
+            source,
+        })?;
+    let mut selected_bytes = 0usize;
+    for (selector_index, layout) in layouts.into_iter().enumerate() {
+        let entry_bytes = layout
+            .root_end_start
+            .checked_sub(layout.root_start_end)
+            .ok_or(Error::TopologyConflict)?;
+        selected_bytes = selected_bytes
+            .checked_add(entry_bytes)
+            .ok_or(Error::Limit {
+                resource: "glossary batch entry bytes",
+                actual: usize::MAX,
+                maximum: limits.max_output_bytes,
+            })?;
+        if selected_bytes > limits.max_output_bytes {
+            return Err(Error::Limit {
+                resource: "glossary batch entry bytes",
+                actual: selected_bytes,
+                maximum: limits.max_output_bytes,
+            });
+        }
+        entries.push(GlossaryBatchEntry {
+            selector_index,
+            layout,
+        });
+    }
+    let observed = package.package.source_version()?;
+    if observed != source_version {
+        return Err(Error::Document(crate::Error::Opc(
+            litchi_opc::OpcError::SourceChanged {
+                expected: source_version,
+                actual: observed,
+            },
+        )));
+    }
+    package.package.check_execution()?;
+
+    entries.sort_unstable_by_key(|entry| entry.layout.root_start_end);
+    validate_batch_ranges(&entries, payload.as_bytes().len())?;
+    let mut canonical = Vec::new();
+    canonical
+        .try_reserve_exact(entries.len())
+        .map_err(|source| Error::Allocation {
+            resource: "glossary batch selectors",
+            source,
+        })?;
+    for (canonical_index, entry) in entries.iter_mut().enumerate() {
+        let requested = selector
+            .selectors
+            .get(entry.selector_index)
+            .ok_or(Error::TopologyConflict)?;
+        canonical.push(requested.clone());
+        entry.selector_index = canonical_index;
+    }
+    Ok(GlossaryBatchSnapshot {
+        selector: GlossaryBatchSelector {
+            selectors: canonical,
+        },
+        entries,
+        payload,
+        partname,
+        source_version,
+        source_lineage,
+        part_fingerprint,
+        artifact_fingerprint: None,
+        limits,
+        execution,
+    })
+}
+
+struct GlossaryBatchMeasurement {
+    entry_index: usize,
+    intent_start: usize,
+    intent_end: usize,
+    range: Range,
+    length: usize,
+}
+
+struct GlossaryBatchProjection {
+    range: Range,
+    length: usize,
+    bytes: Option<Vec<u8>>,
+}
+
+struct GlossaryBatchReplacement {
+    range: Range,
+    bytes: Vec<u8>,
+}
+
+fn assemble_batch_snapshot(
+    base: &GlossaryBatchSnapshot,
+    intents: &[GlossaryBatchEditIntent],
+) -> Result<GlossaryBatchSnapshot> {
+    base.check_execution()?;
+    if intents.len() > base.limits.max_replacements {
+        return Err(Error::Limit {
+            resource: "replacements",
+            actual: intents.len(),
+            maximum: base.limits.max_replacements,
+        });
+    }
+    if base.raw_bytes().len() > base.limits.max_output_bytes {
+        return Err(Error::Limit {
+            resource: "glossary batch output bytes",
+            actual: base.raw_bytes().len(),
+            maximum: base.limits.max_output_bytes,
+        });
+    }
+    let mut authored_bytes = 0usize;
+    for intent in intents {
+        authored_bytes = authored_bytes
+            .checked_add(intent.text.len())
+            .ok_or(Error::Limit {
+                resource: "glossary batch transient bytes",
+                actual: usize::MAX,
+                maximum: base.limits.max_output_bytes,
+            })?;
+    }
+    let transient_bound = authored_bytes
+        .checked_mul(6)
+        .and_then(|value| base.raw_bytes().len().checked_add(value))
+        .ok_or(Error::Limit {
+            resource: "glossary batch transient bytes",
+            actual: usize::MAX,
+            maximum: base.limits.max_output_bytes,
+        })?;
+    if transient_bound > base.limits.max_output_bytes {
+        return Err(Error::Limit {
+            resource: "glossary batch transient bytes",
+            actual: transient_bound,
+            maximum: base.limits.max_output_bytes,
+        });
+    }
+    let mut measurements = Vec::new();
+    measurements
+        .try_reserve_exact(intents.len())
+        .map_err(|source| Error::Allocation {
+            resource: "glossary batch replacement measurements",
+            source,
+        })?;
+    let mut aggregate_replacement_bytes = 0usize;
+    let mut intent_start = 0usize;
+    for entry_index in 0..base.entries.len() {
+        let group_start = intent_start;
+        while intents
+            .get(intent_start)
+            .is_some_and(|intent| intent.entry_index == entry_index)
+        {
+            intent_start += 1;
+        }
+        if group_start == intent_start {
+            continue;
+        }
+        base.check_execution()?;
+        let projection = project_batch_entry(
+            base,
+            entry_index,
+            intents
+                .get(group_start..intent_start)
+                .ok_or(Error::TopologyConflict)?,
+            false,
+        )?;
+        aggregate_replacement_bytes = aggregate_replacement_bytes
+            .checked_add(projection.length)
+            .ok_or(Error::Limit {
+                resource: "glossary batch replacement bytes",
+                actual: usize::MAX,
+                maximum: base.limits.max_output_bytes,
+            })?;
+        if aggregate_replacement_bytes > base.limits.max_output_bytes {
+            return Err(Error::Limit {
+                resource: "glossary batch replacement bytes",
+                actual: aggregate_replacement_bytes,
+                maximum: base.limits.max_output_bytes,
+            });
+        }
+        if projection.bytes.is_some() {
+            return Err(Error::TopologyConflict);
+        }
+        measurements.push(GlossaryBatchMeasurement {
+            entry_index,
+            intent_start: group_start,
+            intent_end: intent_start,
+            range: projection.range,
+            length: projection.length,
+        });
+    }
+    if intent_start != intents.len() {
+        return Err(Error::TopologyConflict);
+    }
+
+    let mut final_len = base.raw_bytes().len();
+    for measurement in &measurements {
+        if measurement.range.start > measurement.range.end
+            || measurement.range.end > base.raw_bytes().len()
+        {
+            return Err(Error::TopologyConflict);
+        }
+        let old_len = measurement.range.end - measurement.range.start;
+        final_len = final_len
+            .checked_sub(old_len)
+            .and_then(|value| value.checked_add(measurement.length))
+            .ok_or(Error::Limit {
+                resource: "glossary batch output bytes",
+                actual: usize::MAX,
+                maximum: base.limits.max_output_bytes,
+            })?;
+    }
+    if final_len > base.limits.max_output_bytes {
+        return Err(Error::Limit {
+            resource: "glossary batch output bytes",
+            actual: final_len,
+            maximum: base.limits.max_output_bytes,
+        });
+    }
+
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve_exact(measurements.len())
+        .map_err(|source| Error::Allocation {
+            resource: "glossary batch replacements",
+            source,
+        })?;
+    for measurement in measurements {
+        base.check_execution()?;
+        let intent_group = intents
+            .get(measurement.intent_start..measurement.intent_end)
+            .ok_or(Error::TopologyConflict)?;
+        let projection = project_batch_entry(base, measurement.entry_index, intent_group, true)?;
+        let Some(bytes) = projection.bytes else {
+            return Err(Error::TopologyConflict);
+        };
+        if bytes.len() != measurement.length || projection.range != measurement.range {
+            return Err(Error::TopologyConflict);
+        }
+        replacements.push(GlossaryBatchReplacement {
+            range: projection.range,
+            bytes,
+        });
+    }
+
+    let payload = if replacements.is_empty() {
+        base.payload.clone()
+    } else {
+        let mut raw = Vec::new();
+        raw.try_reserve_exact(final_len)
+            .map_err(|source| Error::Allocation {
+                resource: "glossary batch output bytes",
+                source,
+            })?;
+        let mut cursor = 0usize;
+        for replacement in &replacements {
+            if replacement.range.start < cursor
+                || replacement.range.start > replacement.range.end
+                || replacement.range.end > base.raw_bytes().len()
+            {
+                return Err(Error::TopologyConflict);
+            }
+            let untouched = base
+                .raw_bytes()
+                .get(cursor..replacement.range.start)
+                .ok_or(Error::TopologyConflict)?;
+            raw.extend_from_slice(untouched);
+            raw.extend_from_slice(&replacement.bytes);
+            cursor = replacement.range.end;
+        }
+        let suffix = base
+            .raw_bytes()
+            .get(cursor..)
+            .ok_or(Error::TopologyConflict)?;
+        raw.extend_from_slice(suffix);
+        if raw.len() != final_len {
+            return Err(Error::TopologyConflict);
+        }
+        Payload::Owned(Arc::new(raw))
+    };
+
+    let first_entry = base.entries.first().ok_or(Error::TopologyConflict)?;
+    let expected_word_namespace = first_entry.layout.word_namespace.as_ref();
+    let final_layouts = scan_glossary_many(
+        payload.as_bytes(),
+        &base.selector.selectors,
+        Some(expected_word_namespace),
+        base.limits,
+        base.execution.as_ref(),
+    )?;
+    if final_layouts.len() != base.entries.len() {
+        return Err(Error::TopologyConflict);
+    }
+    let mut target_entries = Vec::new();
+    target_entries
+        .try_reserve_exact(base.entries.len())
+        .map_err(|source| Error::Allocation {
+            resource: "glossary batch target entries",
+            source,
+        })?;
+    for entry in &base.entries {
+        base.check_execution()?;
+        let layout = final_layouts
+            .get(entry.selector_index)
+            .ok_or(Error::TopologyConflict)?
+            .clone();
+        target_entries.push(GlossaryBatchEntry {
+            selector_index: entry.selector_index,
+            layout,
+        });
+    }
+    target_entries.sort_unstable_by_key(|entry| entry.layout.root_start_end);
+    validate_batch_ranges(&target_entries, payload.as_bytes().len())?;
+    let part_fingerprint = digest(payload.as_bytes());
+    base.check_execution()?;
+    Ok(GlossaryBatchSnapshot {
+        selector: base.selector.clone(),
+        entries: target_entries,
+        payload,
+        partname: base.partname.clone(),
+        source_version: base.source_version,
+        source_lineage: base.source_lineage.clone(),
+        part_fingerprint,
+        artifact_fingerprint: base.artifact_fingerprint,
+        limits: base.limits,
+        execution: base.execution.clone(),
+    })
+}
+
+fn project_batch_entry(
+    base: &GlossaryBatchSnapshot,
+    entry_index: usize,
+    intents: &[GlossaryBatchEditIntent],
+    materialize: bool,
+) -> Result<GlossaryBatchProjection> {
+    let entry = base
+        .entries
+        .get(entry_index)
+        .ok_or_else(|| batch_entry_index_error(entry_index, base.entries.len()))?;
+    let range = Range {
+        start: entry.layout.root_start_end,
+        end: entry.layout.root_end_start,
+    };
+    let source_len = range
+        .end
+        .checked_sub(range.start)
+        .ok_or(Error::TopologyConflict)?;
+    let mut authored_bytes = 0usize;
+    for intent in intents {
+        if intent.entry_index != entry_index {
+            return Err(Error::TopologyConflict);
+        }
+        authored_bytes = authored_bytes
+            .checked_add(intent.text.len())
+            .ok_or(Error::Limit {
+                resource: "glossary batch transient bytes",
+                actual: usize::MAX,
+                maximum: base.limits.max_output_bytes,
+            })?;
+    }
+    let transient_estimate = source_len.checked_add(authored_bytes).ok_or(Error::Limit {
+        resource: "glossary batch transient bytes",
+        actual: usize::MAX,
+        maximum: base.limits.max_output_bytes,
+    })?;
+    if transient_estimate > base.limits.max_output_bytes {
+        return Err(Error::Limit {
+            resource: "glossary batch transient bytes",
+            actual: transient_estimate,
+            maximum: base.limits.max_output_bytes,
+        });
+    }
+    let effective_output_limit = base.limits.max_output_bytes.min(MAX_DOCUMENT_XML_BYTES);
+    let (document_xml, envelope) =
+        make_wrapped_document(base.raw_bytes(), &entry.layout, effective_output_limit)?;
+    let document = DocumentSnapshot::from_xml(document_xml)?;
+    let mut projected = document.edit();
+    for intent in intents {
+        if intent.entry_index != entry_index {
+            return Err(Error::TopologyConflict);
+        }
+        base.check_execution()?;
+        validate_paragraph_text(intent.position, &intent.text).map_err(Error::Transaction)?;
+        let text = checked_string_clone(&intent.text, "glossary batch replacement text")?;
+        projected
+            .replace_paragraph_text(intent.position, text)
+            .map_err(Error::Transaction)?;
+    }
+    base.check_execution()?;
+    let wrapped = projected.projected().shared_xml();
+    let wrapped_end = wrapped
+        .len()
+        .checked_sub(envelope.wrapped_suffix_len)
+        .ok_or_else(|| {
+            Error::Document(crate::Error::InvalidFormat(
+                "glossary batch wrapper suffix exceeds projected XML".into(),
+            ))
+        })?;
+    let inner = wrapped
+        .get(envelope.wrapped_prefix_len..wrapped_end)
+        .ok_or_else(|| {
+            Error::Document(crate::Error::InvalidFormat(
+                "glossary batch wrapper body is outside projected XML".into(),
+            ))
+        })?;
+    if inner.len() > base.limits.max_entry_bytes {
+        return Err(Error::Limit {
+            resource: "selected entry bytes",
+            actual: inner.len(),
+            maximum: base.limits.max_entry_bytes,
+        });
+    }
+    let bytes = if materialize {
+        Some(checked_vec_clone(inner, "glossary batch replacement")?)
+    } else {
+        None
+    };
+    Ok(GlossaryBatchProjection {
+        range,
+        length: inner.len(),
+        bytes,
+    })
+}
+
+fn validate_batch_ranges(entries: &[GlossaryBatchEntry], xml_len: usize) -> Result<()> {
+    for entry in entries {
+        if entry.layout.root_start_end > entry.layout.root_end_start
+            || entry.layout.root_end_start > xml_len
+        {
+            return Err(Error::TopologyConflict);
+        }
+    }
+    for pair in entries.windows(2) {
+        if pair[0].layout.root_start_end == pair[1].layout.root_start_end
+            || pair[0].layout.root_end_start == pair[1].layout.root_end_start
+            || pair[0].layout.root_end_start > pair[1].layout.root_start_end
+        {
+            return Err(Error::TopologyConflict);
+        }
+    }
+    Ok(())
+}
+
+fn batch_entry_index_error(index: usize, len: usize) -> Error {
+    Error::Limit {
+        resource: "glossary batch entry index",
+        actual: index.saturating_add(1),
+        maximum: len,
+    }
+}
+
+fn batch_paragraph_index_error(_entry_index: usize, index: usize, len: usize) -> Error {
+    Error::Limit {
+        resource: "glossary batch paragraph index",
+        actual: index.saturating_add(1),
+        maximum: len,
+    }
+}

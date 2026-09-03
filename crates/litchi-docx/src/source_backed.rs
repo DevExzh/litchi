@@ -13,9 +13,11 @@ pub mod paragraph_remove;
 pub mod story_text;
 
 pub use story_text::{
-    Commit as StoryTextCommit, Edit as StoryTextEdit, Error as StoryTextError, GlossarySelector,
-    GlossarySelectorKind, Limits as StoryTextLimits, Patch as StoryTextPatch,
-    Publication as StoryTextPublication, Selector as StorySelector, Snapshot as StoryTextSnapshot,
+    Commit as StoryTextCommit, Edit as StoryTextEdit, Error as StoryTextError, GlossaryBatchCommit,
+    GlossaryBatchEdit, GlossaryBatchPatch, GlossaryBatchPublication, GlossaryBatchSelector,
+    GlossaryBatchSnapshot, GlossarySelector, GlossarySelectorKind, Limits as StoryTextLimits,
+    Patch as StoryTextPatch, Publication as StoryTextPublication, Selector as StorySelector,
+    Snapshot as StoryTextSnapshot,
 };
 
 use crate::alt::Data;
