@@ -36,9 +36,9 @@ pub mod editor;
 pub use creation::KeynoteDocumentBuilder;
 pub use editor::Effect;
 pub use editor::{
-    Angle, Background, BuildAcceleration, BuildStart, Gradient, KeynoteBuildChunkInfo,
-    KeynoteBuildCustomParameters, KeynoteBuildInfo, KeynoteBuildSettings, KeynoteBuildTimingCurve,
-    KeynoteEditor, KeynoteEmphasisAction, KeynoteFlipDirection, KeynoteHorizontalBuildDirection,
+    BuildAcceleration, BuildStart, KeynoteBuildChunkInfo, KeynoteBuildCustomParameters,
+    KeynoteBuildInfo, KeynoteBuildSettings, KeynoteBuildTimingCurve, KeynoteEditor,
+    KeynoteEmphasisAction, KeynoteFlipDirection, KeynoteHorizontalBuildDirection,
     KeynoteJiggleIntensity, KeynoteKeyboardBuild, KeynoteKeyboardDirection, KeynoteMotionPath,
     KeynoteMotionPathNode, KeynoteMotionPathNodeType, KeynoteMotionPathPoint, KeynoteMotionSubpath,
     KeynoteMoveAction, KeynoteObjectBuildEffect, KeynoteOpacityAction, KeynoteRotationAction,
@@ -58,10 +58,10 @@ pub use editor::{
     KeynoteTableCellTextDecorations, KeynoteTableCellTextFont, KeynoteTableCellTextLigatures,
     KeynoteTableCellTextOutline, KeynoteTableCellTextScript, KeynoteTableCellTextShadow,
     KeynoteTableCellTextStyle, KeynoteTableCellUpdate, KeynoteTableCellValue,
-    KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTablePoints, Kind, MovieKind, Opaque,
+    KeynoteTableDimension, KeynoteTableDimensionSize, KeynoteTablePoints, MovieKind,
     RemovedKeynoteSlideAudio, RemovedKeynoteSlideChart, RemovedKeynoteSlideImage,
     RemovedKeynoteSlideMovie, RemovedKeynoteSlideShape, RemovedKeynoteSlideTable,
-    RemovedKeynoteTextBox, RgbColorSpace, Rgba, Stop,
+    RemovedKeynoteTextBox,
 };
 pub use litchi_keynote::build::{AnimationType, Build};
 pub use litchi_keynote::show::{Mode, Settings, Show, Size};

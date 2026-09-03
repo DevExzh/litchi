@@ -743,7 +743,8 @@ impl Package {
     /// semantic state, preservation of unselected content, and directional
     /// rendering-cache and package-root-preview state.
     pub fn apply_slide_placeholder_visibility(&self, patch: &Patch) -> Result<Commit, Error> {
-        let source = physical_catalog(self)?.shared_source();
+        let catalog = physical_catalog(self)?;
+        let source = catalog.shared_source();
         if !patch.artifacts.authorizes_source(&source) {
             return Err(Error::PatchConflict);
         }
@@ -753,6 +754,9 @@ impl Package {
                 patch: patch.clone(),
                 diagnostics: Diagnostics::unchanged(),
             });
+        }
+        if !catalog.source_is_exact() {
+            return Err(Error::UnsupportedSource);
         }
         let mut budget = TransactionBudget::new(self)?;
         let selection = select_with_budget(
@@ -2201,6 +2205,86 @@ mod tests {
             ),
             Err(Error::InvalidSource)
         ));
+        Ok(())
+    }
+
+    fn package_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let mut bytes = Vec::new();
+        package.write_to(&mut bytes)?;
+        Ok(bytes)
+    }
+
+    fn legacy_package_bytes(flat: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let catalog = litchi_iwa_archive::package::Catalog::from_bytes(flat)?;
+        let inner_entries = catalog
+            .iter()
+            .filter(|entry| {
+                std::path::Path::new(entry.name())
+                    .extension()
+                    .is_some_and(|extension| extension.eq_ignore_ascii_case("iwa"))
+            })
+            .map(|entry| (entry.name(), entry.data()))
+            .collect::<Vec<_>>();
+        let inner = litchi_iwa_archive::package::to_bytes(
+            inner_entries.iter().copied(),
+            litchi_iwa_archive::Limits::default(),
+        )?;
+        Ok(litchi_iwa_archive::package::to_bytes(
+            [
+                ("legacy.key/Index.zip", inner.as_slice()),
+                (
+                    "legacy.key/Data/sentinel.bin",
+                    b"legacy outer sentinel".as_slice(),
+                ),
+            ],
+            litchi_iwa_archive::Limits::default(),
+        )?)
+    }
+
+    #[test]
+    fn changed_apply_rejects_legacy_provenance_but_legacy_noop_replays_exactly()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/keynote/basic.key");
+        let native = Package::open(fixture)?;
+        let source = package_bytes(&native)?;
+        let package = Package::from_bytes(&source)?;
+        let changed = package
+            .edit_slide_placeholder_visibility(0usize, Kind::Title)?
+            .hide()
+            .commit()?;
+        assert!(!changed.patch().is_noop());
+
+        let legacy_source = legacy_package_bytes(&source)?;
+        let target = package_bytes(changed.package())?;
+        let legacy_target = legacy_package_bytes(&target)?;
+        let legacy = Package::from_bytes(&legacy_source)?;
+        assert!(!physical_catalog(&legacy)?.source_is_exact());
+
+        let mut forged = changed.patch().clone();
+        forged.artifacts = ExactArtifacts::new(
+            Arc::<[u8]>::from(legacy_source.clone()),
+            Arc::<[u8]>::from(legacy_target),
+        );
+        assert!(!forged.is_noop());
+
+        let before = legacy.source_bytes().to_vec();
+        assert!(matches!(
+            legacy.apply_slide_placeholder_visibility(&forged),
+            Err(Error::UnsupportedSource)
+        ));
+        assert_eq!(legacy.source_bytes(), before.as_slice());
+
+        let state = legacy
+            .slide_placeholder_visibility(0usize, Kind::Title)?
+            .ok_or(Error::InvalidSource)?;
+        let noop = legacy
+            .edit_slide_placeholder_visibility(0usize, Kind::Title)?
+            .set(state)
+            .commit()?;
+        assert!(noop.patch().is_noop());
+        let applied = legacy.apply_slide_placeholder_visibility(noop.patch())?;
+        assert_eq!(applied.package().source_bytes(), before.as_slice());
         Ok(())
     }
 }

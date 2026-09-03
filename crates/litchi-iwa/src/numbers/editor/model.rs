@@ -99,6 +99,83 @@ fn validate_comment_storage_payload(storage_id: u64, source: &[u8]) -> Result<()
     .map_err(|error| strict_comment_storage_error(storage_id, error))
 }
 
+fn numbers_text_storage_wire_limits(source: &[u8]) -> Result<litchi_iwa_text_wire::RewriteLimits> {
+    let source_bytes = source
+        .len()
+        .clamp(1, litchi_iwa_text_wire::RewriteLimits::MAX_MESSAGE_BYTES);
+    let fields = source_bytes.clamp(1, litchi_iwa_text_wire::RewriteLimits::MAX_FIELDS);
+    let fragments = source_bytes.clamp(1, litchi_iwa_text_wire::RewriteLimits::MAX_FRAGMENTS);
+    let text_bytes = source_bytes.clamp(1, litchi_iwa_text_wire::RewriteLimits::MAX_TEXT_BYTES);
+    let table_entries =
+        source_bytes.clamp(1, litchi_iwa_text_wire::RewriteLimits::MAX_TABLE_ENTRIES);
+    let object_references = source_bytes.clamp(
+        1,
+        litchi_iwa_text_wire::RewriteLimits::MAX_OBJECT_REFERENCES,
+    );
+    let output_bytes = source_bytes.clamp(1, litchi_iwa_text_wire::RewriteLimits::MAX_OUTPUT_BYTES);
+    let rewrite_work = source_bytes
+        .checked_mul(16)
+        .ok_or_else(|| {
+            Error::InvalidFormat(
+                "Numbers text storage rewrite work budget overflows usize".to_owned(),
+            )
+        })?
+        .clamp(1, litchi_iwa_text_wire::RewriteLimits::MAX_REWRITE_WORK);
+    litchi_iwa_text_wire::RewriteLimits::new(
+        source_bytes,
+        fields,
+        4,
+        fragments,
+        text_bytes,
+        table_entries,
+        object_references,
+        output_bytes,
+        rewrite_work,
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!("Numbers text storage limits are invalid: {error}"))
+    })
+}
+
+fn numbers_text_storage_limit_kind(resource: &str) -> litchi_iwa_common::LimitKind {
+    match resource {
+        "message bytes" | "text bytes" | "aggregate nested scan bytes" => {
+            litchi_iwa_common::LimitKind::InputBytes
+        },
+        "fields" | "text fragments" | "table entries" | "object references" => {
+            litchi_iwa_common::LimitKind::Fields
+        },
+        "nesting" => litchi_iwa_common::LimitKind::Nesting,
+        "output bytes" => litchi_iwa_common::LimitKind::OutputBytes,
+        _ => litchi_iwa_common::LimitKind::RewriteWork,
+    }
+}
+
+fn map_numbers_text_storage_decode_error(
+    storage_id: u64,
+    archive_name: &str,
+    message_index: usize,
+    error: litchi_iwa_text_wire::RewriteError,
+) -> Error {
+    match error {
+        litchi_iwa_text_wire::RewriteError::Allocation { resource, amount } => {
+            Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
+        },
+        litchi_iwa_text_wire::RewriteError::LimitExceeded {
+            resource,
+            observed,
+            limit,
+        } => Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+            kind: numbers_text_storage_limit_kind(resource),
+            observed,
+            limit,
+        }),
+        error => Error::InvalidFormat(format!(
+            "iWork text storage {storage_id} has a malformed writable payload in {archive_name} message {message_index}: {error}"
+        )),
+    }
+}
+
 fn decode_comment_storage_payload<'source>(
     storage_id: u64,
     source: &'source [u8],
@@ -815,8 +892,11 @@ impl NumbersObjectCatalog {
                 catalog.record_semantic_decode(format!(
                     "storage object {storage_id} message {message_index}"
                 ))?;
-                let storage = match tswp::StorageArchive::decode(message.data.as_slice()) {
-                    Ok(storage) => storage,
+                let decoded = match litchi_iwa_text_wire::decode_storage_with_limits(
+                    message.data.as_slice(),
+                    numbers_text_storage_wire_limits(message.data.as_slice())?,
+                ) {
+                    Ok(decoded) => decoded,
                     Err(_error)
                         if message.type_ == 2_022
                             && tswp::ParagraphStyleArchive::decode(message.data.as_slice())
@@ -825,19 +905,29 @@ impl NumbersObjectCatalog {
                         continue;
                     },
                     Err(error) => {
-                        return Err(Error::InvalidFormat(format!(
-                            "iWork text storage {storage_id} has a malformed writable payload in {archive_name} message {message_index}: {error}"
-                        )));
+                        return Err(map_numbers_text_storage_decode_error(
+                            native_storage_id,
+                            &archive_name,
+                            message_index,
+                            error,
+                        ));
                     },
                 };
+                let kind = i32::try_from(decoded.validation().storage_kind()).map(Some).map_err(
+                    |_| {
+                        Error::InvalidFormat(format!(
+                            "iWork text storage {storage_id} has an unsupported storage kind in {archive_name} message {message_index}"
+                        ))
+                    },
+                )?;
                 if found.is_some() {
                     return Err(Error::InvalidFormat(format!(
                         "iWork text storage {storage_id} must have exactly one writable payload"
                     )));
                 }
-                found = Some((message.type_, storage));
+                found = Some((message.type_, kind, decoded.into_storage()));
             }
-            let (message_type, storage) = found.ok_or_else(|| {
+            let (message_type, kind, storage) = found.ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Numbers text storage {storage_id} has no writable payload"
                 ))
@@ -845,8 +935,8 @@ impl NumbersObjectCatalog {
             Ok(TextStorageInfo {
                 id: storage_id,
                 message_type,
-                kind: storage.kind,
-                storage: litchi_iwa_text::storage::Storage::from_text(storage.text.concat()),
+                kind,
+                storage,
             })
         })
     }

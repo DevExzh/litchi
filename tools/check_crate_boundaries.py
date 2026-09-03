@@ -103,6 +103,24 @@ IWA_RAW_MODULE_DECLARATION = re.compile(
 )
 IWA_CORE_SOURCE_ROOT = Path("crates/litchi-iwa/src")
 IWA_CORE_EXAMPLE_SOURCE_ROOT = Path("crates/litchi-iwa/examples")
+# ``Bundle`` now has one canonical byte ingress.  Keep the two historical
+# archive-named aliases retired across the whole compatibility host so a
+# private helper, import alias, or re-export cannot quietly bring either
+# spelling back.  The checker masks comments, literals, and individual
+# ``cfg(test)`` items before applying this token ratchet.
+IWA_BUNDLE_SOURCE = IWA_CORE_SOURCE_ROOT / "bundle.rs"
+RETIRED_IWA_BUNDLE_ARCHIVE_CONSTRUCTORS = (
+    "from_archive_bytes",
+    "from_archive_bytes_with_limits",
+)
+RETIRED_IWA_BUNDLE_ARCHIVE_CONSTRUCTOR_SET = frozenset(
+    RETIRED_IWA_BUNDLE_ARCHIVE_CONSTRUCTORS
+)
+RETIRED_IWA_BUNDLE_ARCHIVE_CONSTRUCTOR = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<constructor>"
+    r"from_archive_bytes_with_limits|from_archive_bytes"
+    r")(?![A-Za-z0-9_])"
+)
 # The legacy host no longer owns a normal Cargo edge to ``litchi-iwa-core``.
 # Keep its Rust source from bypassing that boundary with a direct crate path;
 # archive-owned re-exports remain the only supported compatibility route.
@@ -490,6 +508,21 @@ KEYNOTE_CHART_ARRANGEMENT_RAW_ID_PARAMETER = re.compile(
 )
 KEYNOTE_CHART_ARRANGEMENT_LEGACY_METHODS = frozenset(
     {"slide_chart_arrangement", "set_slide_chart_arrangement"}
+)
+# These raw-ID host methods and their selector-construction helper were
+# retired once the focused Package owner became the only chart-arrangement
+# ingress.  Keep this separate from the focused Package method inventory:
+# Package calls with the same semantic names remain valid.
+RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_METHODS = (
+    "slide_chart_arrangement",
+    "set_slide_chart_arrangement",
+)
+RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_METHOD_SET = frozenset(
+    RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_METHODS
+)
+RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_HELPERS = ("chart_selector_for_drawable",)
+RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_HELPER_SET = frozenset(
+    RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_HELPERS
 )
 KEYNOTE_CHART_ARRANGEMENT_LEGACY_CALL = re.compile(
     r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>slide_chart_arrangement|"
@@ -4735,10 +4768,9 @@ KEYNOTE_SLIDE_TRANSITION_SEMANTIC_OPAQUE_PAYLOAD_MEMBERS = frozenset(
 )
 
 # Keynote slide-background ownership moved into the focused package in Wave53.
-# The compatibility host keeps one deliberately thin adapter so callers that
-# still use ``KeynoteEditor`` can be migrated incrementally. The two small
-# color/gradient files are retained only as cfg(test) differential oracles;
-# every style-graph, metadata, registry, and wire owner is retired.
+# The host bridge, its old cfg(test) color/gradient oracles, and the former
+# style-graph files are all retired now. Keep the focused Package inventory
+# below separate: those semantic methods remain valid in ``litchi-keynote``.
 IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_SOURCE = (
     IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_background.rs"
 )
@@ -4747,6 +4779,11 @@ IWA_KEYNOTE_SLIDE_BACKGROUND_ORACLE_SOURCES = frozenset(
         IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_background_color.rs",
         IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_background_gradient_wire.rs",
     }
+)
+RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_BRIDGE_SOURCES = (
+    IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_SOURCE,
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_background_color.rs",
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_background_gradient_wire.rs",
 )
 RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_SOURCES = (
     IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_background_wire.rs",
@@ -4761,15 +4798,62 @@ IWA_KEYNOTE_SLIDE_BACKGROUND_TEST_ORACLE_SOURCES = (
     IWA_KEYNOTE_SLIDE_BACKGROUND_ORACLE_SOURCES
 )
 IWA_KEYNOTE_SLIDE_BACKGROUND_LEGACY_SOURCES = (
-    *IWA_KEYNOTE_SLIDE_BACKGROUND_ORACLE_SOURCES,
+    *RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_BRIDGE_SOURCES,
     *RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_SOURCES,
+)
+RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_METHODS = (
+    "slide_background",
+    "slide_background_override",
+    "set_slide_background",
+    "reset_slide_background",
+)
+RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_METHOD_SET = frozenset(
+    RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_METHODS
+)
+RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_MODULES = (
+    "slide_background",
+    "slide_background_color",
+    "slide_background_gradient_wire",
+)
+RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_MODULE_SET = frozenset(
+    RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_MODULES
+)
+RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_REEXPORTS = frozenset(
+    {
+        "RgbColorSpace",
+        "Rgba",
+        "Angle",
+        "Background",
+        "Gradient",
+        "Kind",
+        "Opaque",
+        "Stop",
+    }
+)
+RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_REEXPORT_SET = (
+    RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_REEXPORTS
+)
+RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_TESTS = (
+    "slide_background_crud_inherits_and_culls_native_variations",
+    "slide_background_gradient_crud_round_trips_native_semantics",
+    "slide_background_gradient_validation_and_unknown_wire_are_lossless",
+    "slide_background_reset_preserves_combined_and_unknown_style_properties",
+    "slide_background_reset_preserves_shared_background_variations",
+    "slide_background_reset_copy_on_writes_shared_combined_variations",
+    "slide_background_reset_and_update_reject_or_preserve_future_style_wire",
+    "slide_background_preserves_opaque_fills_and_unknown_solid_fields",
+    "slide_background_rejects_invalid_inputs_transactionally",
+)
+RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_TEST_SET = frozenset(
+    RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_TESTS
 )
 RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_EXAMPLE = Path(
     "crates/litchi-iwa/examples/set_keynote_slide_background.rs"
 )
 IWA_KEYNOTE_SLIDE_BACKGROUND_MODULE = re.compile(
     r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
-    r"mod[ \t\r\n]+(?:r#)?(?P<module>slide_background_color|"
+    r"mod[ \t\r\n]+(?:r#)?(?P<module>slide_background|"
+    r"slide_background_color|"
     r"slide_background_gradient_wire|slide_background_wire|slide_background_reset|"
     r"slide_style_graph|slide_style_metadata|slide_style_registry)\b"
     r"[ \t\r\n]*(?:;|\{)",
@@ -4784,6 +4868,7 @@ IWA_KEYNOTE_SLIDE_BACKGROUND_ORACLE_MODULE = re.compile(
 )
 IWA_KEYNOTE_SLIDE_BACKGROUND_MODULE_NAMES = frozenset(
     {
+        "slide_background",
         "slide_background_color",
         "slide_background_gradient_wire",
         "slide_background_wire",
@@ -7193,6 +7278,32 @@ RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_TESTS = (
 RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_TEST_SET = frozenset(
     RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_TESTS
 )
+# These are the migration-host-only bridge/fallback names removed together
+# with the raw-ID methods.  The generic ``cell_*_format`` helpers above are
+# intentionally not included: source-built and cross-format DataFormat
+# compatibility still uses those helpers in the host and attached-table
+# callers.
+RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_FOCUSED_HELPERS = frozenset(
+    {
+        "FocusedPercentageFormatError",
+        "FocusedPercentageFormatLocation",
+        "focused_percentage_format_error",
+        "focused_percentage_format_location",
+        "focused_percentage_format_read_can_fallback",
+        "focused_percentage_format_edit_can_fallback",
+        "focused_percentage_format",
+        "commit_legacy_percentage_format",
+        "commit_focused_percentage_format",
+    }
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_FOCUSED_TESTS = frozenset(
+    {
+        "percentage_format_fallback_policy_tests",
+        "focused_percentage_format_round_trips_through_legacy_host_bridge",
+        "source_built_percentage_format_keeps_legacy_host_compatibility",
+        "exact_sources_never_fallback_after_structural_admission_failure",
+    }
+)
 RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_EXAMPLE = Path(
     "crates/litchi-iwa/examples/create_iwork_table_number_formats.rs"
 )
@@ -7497,6 +7608,27 @@ RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_HELPERS = (
     "set_cell_currency_format",
     "reset_cell_currency_format",
 )
+RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_FOCUSED_HELPERS = frozenset(
+    {
+        "FocusedCurrencyFormatError",
+        "FocusedCurrencyFormatLocation",
+        "focused_currency_format_error",
+        "focused_currency_format_location",
+        "focused_currency_format_read_can_fallback",
+        "focused_currency_format_edit_can_fallback",
+        "focused_currency_format",
+        "commit_legacy_currency_format",
+        "commit_focused_currency_format",
+    }
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_FOCUSED_TESTS = frozenset(
+    {
+        "currency_format_fallback_policy_tests",
+        "focused_currency_format_round_trips_through_legacy_host_bridge",
+        "source_built_currency_format_keeps_legacy_host_compatibility",
+        "exact_sources_never_fallback_after_structural_admission_failure",
+    }
+)
 RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_SOURCE = (
     IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "table.rs",
 )
@@ -7797,6 +7929,27 @@ RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_HELPERS = (
     "cell_scientific_format",
     "set_cell_scientific_format",
     "reset_cell_scientific_format",
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_FOCUSED_HELPERS = frozenset(
+    {
+        "FocusedScientificFormatError",
+        "FocusedScientificFormatLocation",
+        "focused_scientific_format_error",
+        "focused_scientific_format_location",
+        "focused_scientific_format_read_can_fallback",
+        "focused_scientific_format_edit_can_fallback",
+        "focused_scientific_format",
+        "commit_legacy_scientific_format",
+        "commit_focused_scientific_format",
+    }
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_FOCUSED_TESTS = frozenset(
+    {
+        "scientific_format_fallback_policy_tests",
+        "focused_scientific_format_round_trips_through_legacy_host_bridge",
+        "source_built_scientific_format_keeps_legacy_host_compatibility",
+        "exact_sources_never_fallback_after_structural_admission_failure",
+    }
 )
 RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_SOURCE = (
     IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "table.rs",
@@ -10816,13 +10969,11 @@ IWA_PAGES_FOOTNOTE_TEXT_CALL = re.compile(
 PAGES_SOURCE_ROOT = Path("crates/litchi-pages/src")
 PAGES_FOOTNOTE_TEXT_OWNER_SOURCE = PAGES_SOURCE_ROOT / "package" / "footnote_text.rs"
 PAGES_FOOTNOTE_TEXT_PACKAGE_METHOD = "edit_body_footnote_text"
-# Body-footnote graph lifecycle remains in the compatibility host until a
-# complete selector-first package owner exists.  Keep this ratchet dormant in
-# that migration window: the existing host still owns graph creation/removal,
-# while ``footnote_text.rs`` owns only existing-storage text replacement.
-# Once the private lifecycle owner is introduced, the host methods and all
-# production callsites become retired together.  Test fixtures are masked
-# item-by-item so a cfg(test) oracle cannot hide a later production route.
+# The focused Pages package now owns the complete body-footnote lifecycle.
+# Keep the existing lifecycle ratchet active for the two retired host
+# mutators, and separately reject the retired public reader and its private
+# package-ingress/publication bridge. Test fixtures are masked item-by-item so
+# a cfg(test) oracle cannot hide a later production route.
 RETIRED_IWA_PAGES_FOOTNOTE_LIFECYCLE_SOURCE = (
     IWA_PAGES_SOURCE_ROOT / "editor" / "footnotes.rs"
 )
@@ -10833,11 +10984,32 @@ RETIRED_IWA_PAGES_FOOTNOTE_LIFECYCLE_METHODS = (
 RETIRED_IWA_PAGES_FOOTNOTE_LIFECYCLE_METHOD_SET = frozenset(
     RETIRED_IWA_PAGES_FOOTNOTE_LIFECYCLE_METHODS
 )
+RETIRED_IWA_PAGES_FOOTNOTE_READ_METHODS = ("body_footnotes",)
+RETIRED_IWA_PAGES_FOOTNOTE_READ_METHOD_SET = frozenset(
+    RETIRED_IWA_PAGES_FOOTNOTE_READ_METHODS
+)
+RETIRED_IWA_PAGES_FOOTNOTE_FACADE_HELPERS = (
+    "focused_body_footnote_package",
+    "focused_body_footnote_limits",
+    "publish_focused_body_footnote_commit",
+)
+RETIRED_IWA_PAGES_FOOTNOTE_FACADE_HELPER_SET = frozenset(
+    RETIRED_IWA_PAGES_FOOTNOTE_FACADE_HELPERS
+)
 IWA_PAGES_FOOTNOTE_LIFECYCLE_CALL = re.compile(
     r"(?<![A-Za-z0-9_#])(?P<receiver>(?:r#)?[A-Za-z_][A-Za-z0-9_]*)"
     r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
     r"(?P<method>insert_body_footnote|remove_body_footnote)\b"
     r"[ \t\r\n]*\("
+)
+IWA_PAGES_FOOTNOTE_READ_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?P<receiver>(?:r#)?(?:self|editor|pages|PagesEditor))"
+    r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?body_footnotes\b"
+    r"[ \t\r\n]*\("
+)
+IWA_PAGES_FOOTNOTE_FACADE_HELPER = re.compile(
+    r"(?<![A-Za-z0-9_#])(?P<helper>(?:r#)?(?:focused_body_footnote_package|"
+    r"focused_body_footnote_limits|publish_focused_body_footnote_commit))\b"
 )
 IWA_PAGES_FOOTNOTE_LIFECYCLE_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
 IWA_PAGES_README_FOOTNOTE_LIFECYCLE_CALLS = (
@@ -10846,6 +11018,13 @@ IWA_PAGES_README_FOOTNOTE_LIFECYCLE_CALLS = (
         r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
         r"(?P<method>insert_body_footnote|remove_body_footnote)\b"
         r"[ \t\r\n]*\(",
+    ),
+)
+IWA_PAGES_README_FOOTNOTE_READ_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|editor|PagesEditor)"
+        r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
+        r"(?P<method>body_footnotes)\b[ \t\r\n]*\(",
     ),
 )
 PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_SOURCE = (
@@ -13993,6 +14172,35 @@ def audit_iwa_direct_core_path_source_topology(root: Path = ROOT) -> list[str]:
                     "litchi-iwa production source directly references "
                     f"litchi_iwa_core: {path.relative_to(root)}:{line_number}"
                 )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_bundle_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep ``Bundle`` on the canonical ``from_bytes`` ingress names.
+
+    The archive-named constructors were compatibility aliases, not a second
+    ownership boundary.  Scan the complete ``litchi-iwa`` source tree so an
+    alias cannot return in another module, while masking comments, literals,
+    and individual ``cfg(test)`` items so documentation and test fixtures do
+    not weaken the retirement ratchet.
+    """
+
+    source_root = root / IWA_CORE_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+
+    violations: list[str] = []
+    for path in sorted(source_root.rglob("*.rs")):
+        raw_source = path.read_text(encoding="utf-8")
+        production_source = _mask_rust_cfg_test_items(raw_source)
+        source = _mask_rust_non_code(production_source)
+        for match in RETIRED_IWA_BUNDLE_ARCHIVE_CONSTRUCTOR.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Bundle archive constructor "
+                f"{match.group('constructor')}: {path.relative_to(root)}:{line_number}"
+            )
 
     return sorted(set(violations))
 
@@ -17608,22 +17816,21 @@ def audit_keynote_slide_transition_facade_source_topology(
 def audit_iwa_keynote_slide_background_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Keep slide-background wire/style ownership out of the compatibility host.
+    """Keep the retired slide-background host surface out of ``litchi-iwa``.
 
-    ``slide_background_color.rs`` and ``slide_background_gradient_wire.rs`` are
-    intentionally retained as cfg(test) differential oracles for old host
-    fixtures.  They are not allowed to become production modules or callers;
-    all other files from the former background implementation are retired.
+    The focused Package crate is the sole owner of slide-background behavior.
+    The old host adapter, its two test-only oracle modules, the former
+    implementation files, public type re-exports, host methods, and removed
+    tests are all deletion ratchets.  Comments and literals are masked, while
+    production scans mask individual ``cfg(test)`` items where a test-only
+    fixture is not part of the retired host surface itself.
     """
 
     violations: list[str] = []
-    oracle_sources = IWA_KEYNOTE_SLIDE_BACKGROUND_ORACLE_SOURCES
 
     for retired in IWA_KEYNOTE_SLIDE_BACKGROUND_LEGACY_SOURCES:
         path = root / retired
         if not path.exists():
-            continue
-        if retired in oracle_sources:
             continue
         violations.append(
             "retired litchi-iwa Keynote slide-background source returned: "
@@ -17638,69 +17845,44 @@ def audit_iwa_keynote_slide_background_source_topology(
         )
 
     editor_path = root / IWA_KEYNOTE_EDITOR_SOURCE
-    module_names: dict[str, list[tuple[int, int]]] = {}
     if editor_path.is_file():
+        # These names are deleted module declarations, including the two
+        # modules that used to be cfg(test) oracles.  A cfg(test) attribute
+        # therefore does not make their return legitimate; only comments and
+        # literals are ignored here.
         source = _mask_rust_non_code(editor_path.read_text(encoding="utf-8"))
-
-        def is_cfg_test_module(module_start: int) -> bool:
-            line_start = source.rfind("\n", 0, module_start) + 1
-            prefix = source[:line_start].rstrip()
-            while prefix:
-                previous_line_start = prefix.rfind("\n") + 1
-                previous_line = prefix[previous_line_start:].strip()
-                if not previous_line:
-                    prefix = prefix[:previous_line_start].rstrip()
-                    continue
-                if RUST_CFG_TEST_ATTRIBUTE.fullmatch(previous_line):
-                    return True
-                if previous_line.startswith("#["):
-                    prefix = prefix[:previous_line_start].rstrip()
-                    continue
-                return False
-            return False
-
         for match in IWA_KEYNOTE_SLIDE_BACKGROUND_MODULE.finditer(source):
             module = match.group("module")
             line_number = source.count("\n", 0, match.start()) + 1
-            module_names.setdefault(module, []).append((match.start(), line_number))
-            if module in {
-                "slide_background_color",
-                "slide_background_gradient_wire",
-            }:
-                if is_cfg_test_module(match.start()):
-                    continue
-                violations.append(
-                    "retained litchi-iwa Keynote slide-background oracle module "
-                    f"must be cfg(test) {module}: "
-                    f"{IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
-                )
-            else:
-                violations.append(
-                    "retired litchi-iwa Keynote slide-background module "
-                    f"{module}: {IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
-                )
+            violations.append(
+                "retired litchi-iwa Keynote slide-background module "
+                f"{module}: {IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
+            )
 
-    for oracle in oracle_sources:
-        if not (root / oracle).is_file():
-            continue
-        module = oracle.stem
-        if module_names.get(module):
-            continue
-        violations.append(
-            "retained litchi-iwa Keynote slide-background oracle source must be "
-            f"cfg(test)-owned: {oracle}"
+        editor_production = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(editor_path.read_text(encoding="utf-8"))
         )
+        for declaration, declaration_line in _rust_public_declarations(
+            editor_production
+        ):
+            if not re.search(r"\bpub[ \t\r\n]+use\b", declaration):
+                continue
+            for identifier in RUST_IDENTIFIER.finditer(declaration):
+                name = identifier.group(1)
+                if name not in RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_REEXPORT_SET:
+                    continue
+                line_number = declaration_line + declaration.count(
+                    "\n", 0, identifier.start(1)
+                )
+                violations.append(
+                    "retired litchi-iwa Keynote slide-background re-export "
+                    f"{name}: {IWA_KEYNOTE_EDITOR_SOURCE}:{line_number}"
+                )
 
-    # A cfg(test) item scanner is required here: the adapter may contain a
-    # generated-Prost differential helper after its production functions.
-    # Truncating at the first cfg(test) attribute would hide production code
-    # placed above a test-only import or helper.
     source_root = root / IWA_KEYNOTE_SOURCE_ROOT
     if source_root.is_dir():
         for path in sorted(source_root.rglob("*.rs")):
             if path == root / IWA_KEYNOTE_EDITOR_TEST_SOURCE:
-                continue
-            if path in {root / oracle for oracle in oracle_sources}:
                 continue
             raw_source = path.read_text(encoding="utf-8")
             production_code = _mask_rust_non_code(
@@ -17721,23 +17903,39 @@ def audit_iwa_keynote_slide_background_source_topology(
                     f"reference {match.group(0)}: {path.relative_to(root)}:{line_number}"
                 )
 
-    adapter_path = root / IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_SOURCE
-    if adapter_path.is_file():
-        raw_source = adapter_path.read_text(encoding="utf-8")
-        production_code = _mask_rust_non_code(
-            _mask_rust_cfg_test_items(raw_source)
-        )
-        for label, markers in IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_MARKER_GROUPS:
-            for match in RUST_IDENTIFIER.finditer(production_code):
-                marker = match.group(1)
-                if marker not in markers:
+        # Method names are retired on the host only.  Calls to the same names
+        # on ``litchi-keynote::Package`` live in another crate and remain
+        # valid; scanning declarations avoids mistaking those focused calls
+        # for the deleted host API.
+        for path in sorted(source_root.rglob("*.rs")):
+            if path == root / IWA_KEYNOTE_EDITOR_TEST_SOURCE:
+                continue
+            production = _mask_rust_cfg_test_items(
+                path.read_text(encoding="utf-8")
+            )
+            for name, line_number in _rust_function_declarations(production):
+                if name not in RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_METHOD_SET:
                     continue
-                line_number = production_code.count("\n", 0, match.start(1)) + 1
                 violations.append(
-                    "litchi-iwa Keynote slide-background compatibility adapter "
-                    f"retains {label} {marker}: "
-                    f"{IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_SOURCE}:{line_number}"
+                    "retired litchi-iwa Keynote slide-background host method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
                 )
+
+    # The old integration tests were part of the host surface too.  Keep an
+    # exact-name inventory so a renamed or copied test cannot silently revive
+    # those assumptions.  Test-only cfg attributes do not exempt a removed
+    # test, but comments and strings are ignored by the declaration scanner.
+    test_path = root / IWA_KEYNOTE_EDITOR_TEST_SOURCE
+    if test_path.is_file():
+        for name, line_number in _rust_function_declarations(
+            test_path.read_text(encoding="utf-8")
+        ):
+            if name not in RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_TEST_SET:
+                continue
+            violations.append(
+                "retired litchi-iwa Keynote slide-background test "
+                f"{name}: {IWA_KEYNOTE_EDITOR_TEST_SOURCE}:{line_number}"
+            )
 
     return sorted(set(violations))
 
@@ -26588,6 +26786,206 @@ def audit_iwa_numbers_table_cell_currency_format_source_topology(
     return sorted(set(violations))
 
 
+def _audit_iwa_numbers_table_cell_format_retirement(
+    root: Path,
+    *,
+    label: str,
+    methods: tuple[str, ...],
+    focused_helpers: frozenset[str],
+    focused_tests: frozenset[str],
+) -> list[str]:
+    """Reject a retired raw-ID format route from the Numbers migration host.
+
+    The focused ``litchi-numbers::Package`` owns these transactions now.  Keep
+    the host ratchet deliberately narrower than the generic DataFormat audits:
+    only the format-specific raw-ID methods and their migration-only bridge,
+    fallback, and focused test names are forbidden.  Generic source-built and
+    cross-format ``cell_*_format`` helpers therefore remain valid.
+    """
+
+    source_root = root / IWA_NUMBERS_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+
+    method_pattern = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:r#)?(?P<name>(?:"
+        + "|".join(re.escape(name) for name in methods)
+        + r"))(?![A-Za-z0-9_])"
+    )
+    helper_pattern = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:r#)?(?P<name>(?:"
+        + "|".join(re.escape(name) for name in sorted(focused_helpers, key=len, reverse=True))
+        + r"))(?![A-Za-z0-9_])"
+    )
+    test_pattern = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:r#)?(?P<name>(?:"
+        + "|".join(re.escape(name) for name in sorted(focused_tests, key=len, reverse=True))
+        + r"))(?![A-Za-z0-9_])"
+    )
+    focused_call_pattern = {
+        "Percentage": IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_FOCUSED_CALL,
+        "Currency": IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_FOCUSED_CALL,
+        "Scientific": IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_FOCUSED_CALL,
+    }[label]
+
+    violations: set[str] = set()
+    for path in sorted(source_root.rglob("*.rs")):
+        relative = path.relative_to(root)
+        source = path.read_text(encoding="utf-8")
+        relative_to_source = path.relative_to(source_root)
+        if path.name == "tests.rs" or "tests" in relative_to_source.parts:
+            production = ""
+        else:
+            production = _mask_rust_cfg_test_items(source)
+        code = _mask_rust_non_code(production)
+        all_code = _mask_rust_non_code(source)
+        focused_receiver_names = {
+            match.group("receiver")
+            for match in re.finditer(
+                r"\b(?:let[ \t]+(?:mut[ \t]+)?)?"
+                r"(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)[ \t]*"
+                r"(?::[^;=\n]*)?[=][^;\n]*"
+                r"\b(?:FocusedNumbersPackage|litchi_numbers[ \t]*::[ \t]*Package)\b",
+                code,
+            )
+        }
+        focused_receiver_names.update(
+            match.group("receiver")
+            for match in re.finditer(
+                r"\b(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)[ \t]*:[ \t]*"
+                r"(?:&[ \t]*)?(?:FocusedNumbersPackage|"
+                r"litchi_numbers[ \t]*::[ \t]*Package)\b",
+                code,
+            )
+        )
+
+        declaration_spans = {
+            (match.start(1), match.end(1))
+            for match in RUST_FUNCTION_DECLARATION.finditer(code)
+        }
+        for match in method_pattern.finditer(code):
+            name = match.group("name")
+            line_start = code.rfind("\n", 0, match.start("name")) + 1
+            receiver_match = re.search(
+                r"(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)[ \t]*\.[ \t]*$",
+                code[line_start : match.start("name")],
+            )
+            # Calls through the focused Package are canonical and may remain
+            # in a migration-host adapter.  The retired surface is the
+            # NumbersEditor raw-ID method, not the focused owner call with the
+            # same semantic method name.
+            if any(
+                candidate.start() <= match.start("name") < candidate.end()
+                for candidate in focused_call_pattern.finditer(code)
+            ) or (
+                receiver_match is not None
+                and receiver_match.group("receiver") in focused_receiver_names
+            ):
+                continue
+            line_number = code.count("\n", 0, match.start("name")) + 1
+            if any(
+                start <= match.start("name") < end
+                for start, end in declaration_spans
+            ):
+                message = (
+                    f"retired litchi-iwa Numbers {label}-format raw-ID method "
+                    f"returned {name}: {relative}:{line_number}"
+                )
+            else:
+                message = (
+                    f"retired litchi-iwa Numbers {label}-format raw-ID production "
+                    f"call {name}: {relative}:{line_number}"
+                )
+            violations.add(message)
+
+        # A test-only item cannot hide a reintroduced public method: the
+        # method declaration itself is part of the retired host surface.
+        all_declaration_spans = {
+            (match.start(1), match.end(1))
+            for match in RUST_FUNCTION_DECLARATION.finditer(all_code)
+        }
+        for match in method_pattern.finditer(all_code):
+            if not any(
+                start <= match.start("name") < end
+                for start, end in all_declaration_spans
+            ):
+                continue
+            name = match.group("name")
+            line_number = all_code.count("\n", 0, match.start("name")) + 1
+            violations.add(
+                f"retired litchi-iwa Numbers {label}-format raw-ID method "
+                f"returned {name}: {relative}:{line_number}"
+            )
+
+        # Focused helpers and tests are forbidden even when they occur in a
+        # cfg(test) module.  Comments and literals are masked, so prose and
+        # decoys cannot accidentally activate the retirement gate.
+        for match in helper_pattern.finditer(all_code):
+            name = match.group("name")
+            line_number = all_code.count("\n", 0, match.start("name")) + 1
+            violations.add(
+                f"retired litchi-iwa Numbers {label}-format focused "
+                f"bridge/fallback helper {name}: {relative}:{line_number}"
+            )
+        for match in test_pattern.finditer(all_code):
+            name = match.group("name")
+            line_number = all_code.count("\n", 0, match.start("name")) + 1
+            violations.add(
+                f"retired litchi-iwa Numbers {label}-format focused "
+                f"bridge/fallback test {name}: {relative}:{line_number}"
+            )
+
+    return sorted(violations)
+
+
+def audit_iwa_numbers_table_cell_percentage_format_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire Percentage raw-ID methods and migration-host bridge helpers."""
+
+    if not _numbers_table_cell_percentage_format_owner_present(root):
+        return []
+    return _audit_iwa_numbers_table_cell_format_retirement(
+        root,
+        label="Percentage",
+        methods=RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_METHODS,
+        focused_helpers=RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_FOCUSED_HELPERS,
+        focused_tests=RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_FOCUSED_TESTS,
+    )
+
+
+def audit_iwa_numbers_table_cell_currency_format_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire Currency raw-ID methods and migration-host bridge helpers."""
+
+    if not _numbers_table_cell_currency_format_owner_present(root):
+        return []
+    return _audit_iwa_numbers_table_cell_format_retirement(
+        root,
+        label="Currency",
+        methods=RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_METHODS,
+        focused_helpers=RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_FOCUSED_HELPERS,
+        focused_tests=RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_FOCUSED_TESTS,
+    )
+
+
+def audit_iwa_numbers_table_cell_scientific_format_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire Scientific raw-ID methods and migration-host bridge helpers."""
+
+    if not _numbers_table_cell_scientific_format_owner_present(root):
+        return []
+    return _audit_iwa_numbers_table_cell_format_retirement(
+        root,
+        label="Scientific",
+        methods=RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_METHODS,
+        focused_helpers=RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_FOCUSED_HELPERS,
+        focused_tests=RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_FOCUSED_TESTS,
+    )
+
+
 def _numbers_table_cell_control_public_leak(identifier: str) -> str | None:
     """Classify native vocabulary forbidden in the generic control facade."""
 
@@ -31123,11 +31521,10 @@ def audit_iwa_pages_footnote_lifecycle_source_topology(
 ) -> list[str]:
     """Retire raw Pages body-footnote lifecycle paths after owner activation.
 
-    The current compatibility host deliberately owns insertion and removal.
-    This audit therefore remains completely dormant until the focused package
-    publishes its private ``body_footnote`` owner.  Activation retires only
-    the two public lifecycle methods and production callsites; body-footnote
-    readers and private graph helpers remain outside this narrow ratchet.
+    The focused package owns the complete lifecycle. Activation retires the
+    two host mutators, the public host reader, and the private package
+    ingress/publication bridge; graph readers and ordinary-body cleanup remain
+    outside this narrow ratchet.
     """
 
     if not _pages_footnote_lifecycle_owner_present(root):
@@ -31153,6 +31550,16 @@ def audit_iwa_pages_footnote_lifecycle_source_topology(
                         "retired litchi-iwa Pages body-footnote lifecycle public "
                         f"method {method}: {path.relative_to(root)}:{line_number}"
                     )
+                for method in sorted(RETIRED_IWA_PAGES_FOOTNOTE_READ_METHOD_SET):
+                    if re.search(
+                        rf"\bfn[ \t\r\n]+(?:r#)?{re.escape(method)}\b",
+                        declaration,
+                    ) is None:
+                        continue
+                    violations.append(
+                        "retired litchi-iwa Pages body-footnote public read method "
+                        f"{method}: {path.relative_to(root)}:{line_number}"
+                    )
 
             code = _mask_rust_non_code(production_source)
             for match in IWA_PAGES_FOOTNOTE_LIFECYCLE_CALL.finditer(code):
@@ -31177,6 +31584,18 @@ def audit_iwa_pages_footnote_lifecycle_source_topology(
                     "retired litchi-iwa Pages body-footnote lifecycle call "
                     f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
                 )
+            for match in IWA_PAGES_FOOTNOTE_READ_CALL.finditer(code):
+                line_number = code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Pages body-footnote public read call "
+                    f"body_footnotes: {path.relative_to(root)}:{line_number}"
+                )
+            for match in IWA_PAGES_FOOTNOTE_FACADE_HELPER.finditer(code):
+                line_number = code.count("\n", 0, match.start("helper")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages body-footnote facade helper "
+                    f"{match.group('helper')}: {path.relative_to(root)}:{line_number}"
+                )
 
     example_root = root / IWA_PAGES_FOOTNOTE_LIFECYCLE_EXAMPLE_ROOT
     if example_root.is_dir():
@@ -31193,6 +31612,12 @@ def audit_iwa_pages_footnote_lifecycle_source_topology(
                     f"call {match.group('method')}: "
                     f"{example_path.relative_to(root)}:{line_number}"
                 )
+            for match in IWA_PAGES_FOOTNOTE_READ_CALL.finditer(source):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Pages body-footnote public read example "
+                    f"call body_footnotes: {example_path.relative_to(root)}:{line_number}"
+                )
 
     readme_path = root / IWA_PAGES_README
     if readme_path.is_file():
@@ -31202,6 +31627,13 @@ def audit_iwa_pages_footnote_lifecycle_source_topology(
                 line_number = source.count("\n", 0, match.start("method")) + 1
                 violations.append(
                     "retired litchi-iwa Pages body-footnote lifecycle README "
+                    f"call {match.group('method')}: {IWA_PAGES_README}:{line_number}"
+                )
+        for pattern in IWA_PAGES_README_FOOTNOTE_READ_CALLS:
+            for match in pattern.finditer(source):
+                line_number = source.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "retired litchi-iwa Pages body-footnote public read README "
                     f"call {match.group('method')}: {IWA_PAGES_README}:{line_number}"
                 )
 
@@ -37575,7 +38007,14 @@ def _keynote_chart_arrangement_deprecated_legacy_methods(
 def audit_iwa_keynote_chart_arrangement_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
-    """Keep Keynote chart Arrange compatibility code as a focused delegation."""
+    """Keep Keynote chart Arrange ownership in the focused Package crate.
+
+    The focused Package methods intentionally retain the semantic names
+    ``slide_chart_arrangement`` and ``edit_slide_chart_arrangement``.  This
+    host-side ratchet therefore rejects only declarations of the retired
+    raw-ID methods (and the old selector-construction helper), rather than
+    banning valid focused Package calls.
+    """
 
     if not _keynote_chart_arrangement_owner_present(root):
         return []
@@ -37591,9 +38030,24 @@ def audit_iwa_keynote_chart_arrangement_source_topology(
     violations: list[str] = []
     relative = path.relative_to(root)
     function_bodies = _keynote_chart_arrangement_function_bodies(production)
-    deprecated_legacy_methods = _keynote_chart_arrangement_deprecated_legacy_methods(
-        production
-    )
+
+    for name, line_number in _rust_function_declarations(production):
+        if name not in RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_METHOD_SET:
+            continue
+        violations.append(
+            "retired litchi-iwa Keynote chart-arrangement raw-ID method "
+            f"{name}: {relative}:{line_number}"
+        )
+    for match in re.finditer(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?P<helper>chart_selector_for_drawable)"
+        r"(?![A-Za-z0-9_])",
+        code,
+    ):
+        line_number = code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "retired litchi-iwa Keynote chart-arrangement selector helper "
+            f"{match.group('helper')}: {relative}:{line_number}"
+        )
 
     listing_path = root / IWA_KEYNOTE_CHART_ARRANGEMENT_LISTING_SOURCE
     if not listing_path.is_file():
@@ -37665,57 +38119,12 @@ def audit_iwa_keynote_chart_arrangement_source_topology(
             f"ownership {match.group(0)}: {relative}:{line_number}"
         )
 
-    focused_wrapper_names = {
-        name
-        for name in KEYNOTE_CHART_ARRANGEMENT_HOST_TYPED_METHODS
-        if any(
-            _keynote_chart_arrangement_focused_call_in_body(body)
-            for body, _offset in function_bodies.get(name, [])
-        )
-    }
-
-    def delegates_to_focused_package(body: str) -> bool:
-        if _keynote_chart_arrangement_focused_call_in_body(body):
-            return True
-        return any(
-            re.search(
-                rf"(?:\bself\s*\.\s*)?{re.escape(name)}\s*\(", body
-            )
-            for name in focused_wrapper_names
-        )
-
-    legacy_bodies = [
-        (name, body, offset)
-        for name in KEYNOTE_CHART_ARRANGEMENT_LEGACY_METHODS
-        for body, offset in function_bodies.get(name, [])
-    ]
-    if not legacy_bodies:
-        violations.append(
-            "litchi-iwa Keynote chart-arrangement host has no compatibility method "
-            f"to delegate: {relative}"
-        )
-    else:
-        for name, body, offset in legacy_bodies:
-            if name not in deprecated_legacy_methods:
-                line_number = production.count("\n", 0, offset) + 1
-                violations.append(
-                    "litchi-iwa Keynote chart-arrangement raw-ID compatibility "
-                    f"method must be deprecated {name}: {relative}:{line_number}"
-                )
-            if delegates_to_focused_package(body):
-                continue
-            line_number = production.count("\n", 0, offset) + 1
-            violations.append(
-                "litchi-iwa Keynote chart-arrangement compatibility method must "
-                f"delegate to focused Package: {relative}:{line_number}"
-            )
-
-    # Existing raw-ID methods are documented compatibility aliases.  Any new
-    # host method or public helper that introduces an archive identifier must
-    # fail closed instead of expanding the monolith surface.
+    # Any host method or public helper that introduces an archive identifier
+    # must fail closed instead of expanding the monolith surface.  Focused
+    # Package calls are not declarations and are intentionally allowed.
     for declaration, line_number in _rust_public_declarations(production):
         function = RUST_FUNCTION_DECLARATION.search(declaration)
-        if function is None or function.group(1) in KEYNOTE_CHART_ARRANGEMENT_LEGACY_METHODS:
+        if function is None or function.group(1) in RETIRED_IWA_KEYNOTE_CHART_ARRANGEMENT_METHOD_SET:
             continue
         raw_identifier = KEYNOTE_CHART_ARRANGEMENT_PUBLIC_RAW_PARAMETER.search(
             declaration
@@ -48948,6 +49357,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwork_example_source_topology()
         + audit_iwa_keynote_source_topology()
         + audit_iwa_direct_core_path_source_topology()
+        + audit_iwa_bundle_source_topology()
         + audit_iwa_legacy_method_deprecation_source_topology()
         + audit_iwa_keynote_slide_info_source_topology()
         + audit_iwa_keynote_slide_text_info_source_topology()

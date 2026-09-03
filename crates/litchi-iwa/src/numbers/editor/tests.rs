@@ -3437,291 +3437,6 @@ fn focused_cell_edit_round_trips_through_legacy_host_reader() {
 }
 
 #[test]
-fn focused_percentage_format_round_trips_through_legacy_host_bridge() {
-    let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../test-data/iwork/numbers/basic.numbers");
-    let mut setup = NumbersEditor::open(fixture).unwrap();
-    let table_id = setup.tables().unwrap()[0].object_id;
-    let initial = litchi_numbers::cell::data_format::number::Percentage::new(
-        litchi_numbers::cell::data_format::number::DecimalPlaces::fixed(1).unwrap(),
-        litchi_numbers::cell::data_format::number::NegativeStyle::MinusSign,
-        litchi_numbers::cell::data_format::number::ThousandsSeparator::Hidden,
-    );
-    setup
-        .set_table_cell_data_format(table_id, 2, 1, DataFormat::Percentage(initial))
-        .unwrap();
-
-    // Reopening the legacy-written bytes restores exact-source provenance, so
-    // the dedicated host methods below must take the focused owner route.
-    let mut editor = NumbersEditor::from_bytes(&setup.to_bytes().unwrap()).unwrap();
-    let before = editor.table_cell_percentage_format(table_id, 2, 1).unwrap();
-    assert_eq!(before, Some(initial));
-    let format = litchi_numbers::cell::data_format::number::Percentage::new(
-        litchi_numbers::cell::data_format::number::DecimalPlaces::fixed(3).unwrap(),
-        litchi_numbers::cell::data_format::number::NegativeStyle::RedParentheses,
-        litchi_numbers::cell::data_format::number::ThousandsSeparator::Shown,
-    );
-
-    editor
-        .set_table_cell_percentage_format(table_id, 2, 1, format)
-        .unwrap();
-    assert_eq!(
-        editor.table_cell_percentage_format(table_id, 2, 1).unwrap(),
-        Some(format)
-    );
-
-    assert!(
-        editor
-            .reset_table_cell_percentage_format(table_id, 2, 1)
-            .unwrap()
-    );
-    assert_eq!(
-        editor.table_cell_percentage_format(table_id, 2, 1).unwrap(),
-        None
-    );
-}
-
-#[test]
-fn source_built_percentage_format_keeps_legacy_host_compatibility() {
-    let mut editor = NumbersDocumentBuilder::new()
-        .table_name("Percentages")
-        .table_dimensions(3, 3)
-        .build()
-        .unwrap();
-    let table_id = editor.tables().unwrap()[0].object_id;
-    let number = litchi_numbers::cell::data_format::number::Number::new(
-        litchi_numbers::cell::data_format::number::DecimalPlaces::fixed(1).unwrap(),
-        litchi_numbers::cell::data_format::number::NegativeStyle::MinusSign,
-        litchi_numbers::cell::data_format::number::ThousandsSeparator::Hidden,
-    );
-    let format = litchi_numbers::cell::data_format::number::Percentage::new(
-        litchi_numbers::cell::data_format::number::DecimalPlaces::fixed(2).unwrap(),
-        litchi_numbers::cell::data_format::number::NegativeStyle::Parentheses,
-        litchi_numbers::cell::data_format::number::ThousandsSeparator::Shown,
-    );
-
-    editor
-        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Number(number))
-        .unwrap();
-    editor
-        .set_table_cell_percentage_format(table_id, 1, 1, format)
-        .unwrap();
-    assert_eq!(
-        editor.table_cell_percentage_format(table_id, 1, 1).unwrap(),
-        Some(format)
-    );
-
-    let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(
-        reopened
-            .table_cell_percentage_format(table_id, 1, 1)
-            .unwrap(),
-        Some(format)
-    );
-    assert!(
-        reopened
-            .reset_table_cell_percentage_format(table_id, 1, 1)
-            .unwrap()
-    );
-    assert_eq!(
-        reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
-        DataFormat::Automatic
-    );
-}
-
-#[test]
-#[allow(deprecated)]
-fn focused_currency_format_round_trips_through_legacy_host_bridge() {
-    let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../test-data/iwork/numbers/basic.numbers");
-    let mut setup = NumbersEditor::open(fixture).unwrap();
-    let table_id = setup.tables().unwrap()[0].object_id;
-    let initial = litchi_numbers::cell::data_format::currency::Currency::new(
-        litchi_numbers::cell::data_format::currency::CurrencyCode::USD,
-        litchi_numbers::cell::data_format::currency::DecimalPlaces::fixed(2).unwrap(),
-        litchi_numbers::cell::data_format::currency::NegativeStyle::MinusSign,
-        litchi_numbers::cell::data_format::currency::ThousandsSeparator::Shown,
-        litchi_numbers::cell::data_format::currency::CurrencyStyle::Standard,
-    );
-    setup
-        .set_table_cell_data_format(table_id, 2, 1, DataFormat::Currency(initial))
-        .unwrap();
-
-    // Reopening the legacy-written bytes restores exact-source provenance, so
-    // the dedicated host methods below must take the focused owner route.
-    let mut editor = NumbersEditor::from_bytes(&setup.to_bytes().unwrap()).unwrap();
-    assert_eq!(
-        editor.table_cell_currency_format(table_id, 2, 1).unwrap(),
-        Some(initial)
-    );
-    let format = litchi_numbers::cell::data_format::currency::Currency::new(
-        litchi_numbers::cell::data_format::currency::CurrencyCode::EUR,
-        litchi_numbers::cell::data_format::currency::DecimalPlaces::fixed(3).unwrap(),
-        litchi_numbers::cell::data_format::currency::NegativeStyle::RedParentheses,
-        litchi_numbers::cell::data_format::currency::ThousandsSeparator::Hidden,
-        litchi_numbers::cell::data_format::currency::CurrencyStyle::Accounting,
-    );
-
-    editor
-        .set_table_cell_currency_format(table_id, 2, 1, format)
-        .unwrap();
-    assert_eq!(
-        editor.table_cell_currency_format(table_id, 2, 1).unwrap(),
-        Some(format)
-    );
-
-    assert!(
-        editor
-            .reset_table_cell_currency_format(table_id, 2, 1)
-            .unwrap()
-    );
-    assert_eq!(
-        editor.table_cell_currency_format(table_id, 2, 1).unwrap(),
-        None
-    );
-}
-
-#[test]
-#[allow(deprecated)]
-fn source_built_currency_format_keeps_legacy_host_compatibility() {
-    let mut editor = NumbersDocumentBuilder::new()
-        .table_name("Currencies")
-        .table_dimensions(3, 3)
-        .build()
-        .unwrap();
-    let table_id = editor.tables().unwrap()[0].object_id;
-    let number = litchi_numbers::cell::data_format::number::Number::new(
-        litchi_numbers::cell::data_format::number::DecimalPlaces::fixed(1).unwrap(),
-        litchi_numbers::cell::data_format::number::NegativeStyle::MinusSign,
-        litchi_numbers::cell::data_format::number::ThousandsSeparator::Hidden,
-    );
-    let format = litchi_numbers::cell::data_format::currency::Currency::new(
-        litchi_numbers::cell::data_format::currency::CurrencyCode::USD,
-        litchi_numbers::cell::data_format::currency::DecimalPlaces::fixed(2).unwrap(),
-        litchi_numbers::cell::data_format::currency::NegativeStyle::Parentheses,
-        litchi_numbers::cell::data_format::currency::ThousandsSeparator::Shown,
-        litchi_numbers::cell::data_format::currency::CurrencyStyle::Accounting,
-    );
-
-    editor
-        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Number(number))
-        .unwrap();
-    editor
-        .set_table_cell_currency_format(table_id, 1, 1, format)
-        .unwrap();
-    assert_eq!(
-        editor.table_cell_currency_format(table_id, 1, 1).unwrap(),
-        Some(format)
-    );
-
-    let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(
-        reopened.table_cell_currency_format(table_id, 1, 1).unwrap(),
-        Some(format)
-    );
-    assert!(
-        reopened
-            .reset_table_cell_currency_format(table_id, 1, 1)
-            .unwrap()
-    );
-    assert_eq!(
-        reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
-        DataFormat::Automatic
-    );
-}
-
-#[test]
-#[allow(deprecated)]
-fn focused_scientific_format_round_trips_through_legacy_host_bridge() {
-    let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../test-data/iwork/numbers/basic.numbers");
-    let mut setup = NumbersEditor::open(fixture).unwrap();
-    let table_id = setup.tables().unwrap()[0].object_id;
-    let initial = litchi_numbers::cell::data_format::scientific::Scientific::new(
-        litchi_numbers::cell::data_format::scientific::FixedDecimalPlaces::new(2).unwrap(),
-    );
-    setup
-        .set_table_cell_data_format(table_id, 2, 1, DataFormat::Scientific(initial))
-        .unwrap();
-
-    // Reopening the legacy-written bytes restores exact-source provenance, so
-    // the dedicated host methods below must take the focused owner route.
-    let mut editor = NumbersEditor::from_bytes(&setup.to_bytes().unwrap()).unwrap();
-    assert_eq!(
-        editor.table_cell_scientific_format(table_id, 2, 1).unwrap(),
-        Some(initial)
-    );
-    let format = litchi_numbers::cell::data_format::scientific::Scientific::new(
-        litchi_numbers::cell::data_format::scientific::FixedDecimalPlaces::new(5).unwrap(),
-    );
-
-    editor
-        .set_table_cell_scientific_format(table_id, 2, 1, format)
-        .unwrap();
-    assert_eq!(
-        editor.table_cell_scientific_format(table_id, 2, 1).unwrap(),
-        Some(format)
-    );
-
-    assert!(
-        editor
-            .reset_table_cell_scientific_format(table_id, 2, 1)
-            .unwrap()
-    );
-    assert_eq!(
-        editor.table_cell_scientific_format(table_id, 2, 1).unwrap(),
-        None
-    );
-}
-
-#[test]
-#[allow(deprecated)]
-fn source_built_scientific_format_keeps_legacy_host_compatibility() {
-    let mut editor = NumbersDocumentBuilder::new()
-        .table_name("Scientific")
-        .table_dimensions(3, 3)
-        .build()
-        .unwrap();
-    let table_id = editor.tables().unwrap()[0].object_id;
-    let number = litchi_numbers::cell::data_format::number::Number::new(
-        litchi_numbers::cell::data_format::number::DecimalPlaces::fixed(1).unwrap(),
-        litchi_numbers::cell::data_format::number::NegativeStyle::MinusSign,
-        litchi_numbers::cell::data_format::number::ThousandsSeparator::Hidden,
-    );
-    let format = litchi_numbers::cell::data_format::scientific::Scientific::new(
-        litchi_numbers::cell::data_format::scientific::FixedDecimalPlaces::new(4).unwrap(),
-    );
-
-    editor
-        .set_table_cell_data_format(table_id, 1, 1, DataFormat::Number(number))
-        .unwrap();
-    editor
-        .set_table_cell_scientific_format(table_id, 1, 1, format)
-        .unwrap();
-    assert_eq!(
-        editor.table_cell_scientific_format(table_id, 1, 1).unwrap(),
-        Some(format)
-    );
-
-    let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-    assert_eq!(
-        reopened
-            .table_cell_scientific_format(table_id, 1, 1)
-            .unwrap(),
-        Some(format)
-    );
-    assert!(
-        reopened
-            .reset_table_cell_scientific_format(table_id, 1, 1)
-            .unwrap()
-    );
-    assert_eq!(
-        reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
-        DataFormat::Automatic
-    );
-}
-
-#[test]
 fn builder_empty_table_accepts_focused_commit_apply_and_inverse() {
     fn bytes(package: &FocusedNumbersPackage) -> Vec<u8> {
         let mut output = Vec::new();
@@ -9273,6 +8988,18 @@ fn test_package_with_text_box() -> IWorkPackage {
     package
 }
 
+fn replace_test_text_storage_messages(package: &mut IWorkPackage, messages: Vec<RawMessage>) {
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(53).ok_or_else(|| {
+                Error::InvalidFormat("test text storage object is missing".to_owned())
+            })?;
+            *object = ArchiveObject::new(53, messages)?;
+            Ok(())
+        })
+        .unwrap();
+}
+
 #[test]
 fn numbers_object_catalog_is_bounded_and_measured() {
     let package = test_package_with_text_box();
@@ -9296,6 +9023,151 @@ fn numbers_object_catalog_is_bounded_and_measured() {
     let graph = catalog.text_box_graph(&package, 2, 50).unwrap();
     assert_eq!(graph.storage_id, TextStorageId::new(53).unwrap());
     assert_eq!(catalog.stats(), stats);
+}
+
+#[test]
+fn numbers_text_storage_projection_preserves_empty_fragments_and_kind() {
+    let mut package = test_package_with_text_box();
+    let storage = tswp::StorageArchive {
+        kind: Some(5),
+        text: vec![
+            String::new(),
+            "A".to_owned(),
+            String::new(),
+            "🚀B".to_owned(),
+        ],
+        ..Default::default()
+    };
+    replace_test_text_storage_messages(
+        &mut package,
+        vec![RawMessage {
+            type_: 2_001,
+            data: storage.encode_to_vec(),
+        }],
+    );
+
+    let mut catalog = NumbersObjectCatalog::build(&package).unwrap();
+    let info = catalog
+        .text_storage_info(&package, TextStorageId::new(53).unwrap())
+        .unwrap();
+    assert_eq!(info.kind, Some(5));
+    assert_eq!(info.storage.text(), "A🚀B");
+    assert_eq!(
+        info.storage.runs(),
+        [
+            litchi_iwa_text::storage::Run::new(0, 0),
+            litchi_iwa_text::storage::Run::new(0, 1),
+            litchi_iwa_text::storage::Run::new(1, 0),
+            litchi_iwa_text::storage::Run::new(1, 5),
+        ]
+    );
+}
+
+#[test]
+fn numbers_text_storage_projection_rejects_malformed_field_and_utf8() {
+    for source in [vec![0x80], vec![0x1a, 0x01, 0xff]] {
+        let mut package = test_package_with_text_box();
+        replace_test_text_storage_messages(
+            &mut package,
+            vec![RawMessage {
+                type_: 2_001,
+                data: source,
+            }],
+        );
+
+        let mut catalog = NumbersObjectCatalog::build(&package).unwrap();
+        let error = catalog
+            .text_storage_info(&package, TextStorageId::new(53).unwrap())
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::InvalidFormat(message)
+                if message.contains("iWork text storage 53 has a malformed writable payload")
+                    && message.contains("Index/Document.iwa message 0")
+        ));
+    }
+}
+
+#[test]
+fn numbers_text_storage_projection_rejects_duplicate_writable_candidates() {
+    let mut package = test_package_with_text_box();
+    package
+        .update_archive("Index/Document.iwa", |archive| {
+            archive
+                .object_mut(53)
+                .ok_or_else(|| Error::InvalidFormat("test text storage is missing".to_owned()))?
+                .push_message(RawMessage {
+                    type_: 2_022,
+                    data: tswp::StorageArchive {
+                        text: vec!["Second".to_owned()],
+                        ..Default::default()
+                    }
+                    .encode_to_vec(),
+                })?;
+            Ok(())
+        })
+        .unwrap();
+
+    let mut catalog = NumbersObjectCatalog::build(&package).unwrap();
+    let before = catalog.stats().semantic_decodes;
+    let error = catalog
+        .text_storage_info(&package, TextStorageId::new(53).unwrap())
+        .unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("must have exactly one writable payload")
+    );
+    assert_eq!(catalog.stats().semantic_decodes, before + 2);
+}
+
+#[test]
+fn numbers_text_storage_projection_skips_2022_paragraph_style_collision() {
+    let mut package = test_package_with_text_box();
+    let style = tswp::ParagraphStyleArchive {
+        super_: tss::StyleArchive::default(),
+        ..Default::default()
+    };
+    replace_test_text_storage_messages(
+        &mut package,
+        vec![RawMessage {
+            type_: 2_022,
+            data: style.encode_to_vec(),
+        }],
+    );
+
+    let mut catalog = NumbersObjectCatalog::build(&package).unwrap();
+    let error = catalog
+        .text_storage_info(&package, TextStorageId::new(53).unwrap())
+        .unwrap_err();
+    assert!(error.to_string().contains("has no writable payload"));
+}
+
+#[test]
+fn numbers_sheet_text_boxes_read_back_wire_projection_after_mutation() {
+    let mut editor = NumbersEditor::from_package(test_package_with_text_box()).unwrap();
+    editor
+        .replace_sheet_text_box_text(2, 50, 0..6, "Edited 🚀")
+        .unwrap();
+    let text_box = editor.sheet_text_boxes(2).unwrap().pop().unwrap();
+    assert_eq!(text_box.storage.storage.text(), "Edited 🚀");
+    assert_eq!(
+        text_box.storage.storage.runs(),
+        [litchi_iwa_text::storage::Run::new(0, "Edited 🚀".len())]
+    );
+}
+
+#[test]
+fn numbers_text_storage_info_uses_bounded_text_wire_projection() {
+    let source = include_str!("model.rs");
+    let body = source
+        .split_once("pub(super) fn text_storage_info")
+        .and_then(|(_, rest)| rest.split_once("    fn text_box_graph_current"))
+        .map(|(body, _)| body)
+        .expect("text storage info source boundary is present");
+    assert!(body.contains("decode_storage_with_limits"));
+    assert!(!body.contains("StorageArchive::decode"));
+    assert!(!body.contains("storage.text.concat"));
 }
 
 #[test]

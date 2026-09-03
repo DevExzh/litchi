@@ -184,6 +184,69 @@ impl ReferenceGraph {
         }
     }
 
+    /// Build a graph from an iterator of edges.
+    ///
+    /// Repeated `(source, target)` pairs are ignored, and the first occurrence
+    /// of every edge determines its position in both adjacency directions.
+    /// The duplicate catalog makes this bulk path linear in the number of input
+    /// edges while retaining the graph's deduplication invariant. Endpoint
+    /// registration is intentionally outside this graph primitive: every
+    /// non-null [`ObjectId`] is admitted as a graph vertex, while callers such
+    /// as an object index may validate their own object catalog before calling.
+    ///
+    /// # Errors
+    ///
+    /// Returns the allocator's error when the duplicate catalog, graph map, or
+    /// adjacency list cannot reserve its next item.
+    pub fn try_from_edges<I>(edges: I) -> Result<Self, std::collections::TryReserveError>
+    where
+        I: IntoIterator<Item = (ObjectId, ObjectId)>,
+    {
+        let mut seen_edges = HashSet::new();
+        let mut state = GraphState::default();
+        for (source, target) in edges {
+            if seen_edges.contains(&(source, target)) {
+                continue;
+            }
+            seen_edges.try_reserve(1)?;
+            seen_edges.insert((source, target));
+
+            // Reserve before `entry`/`push` so this bulk path remains
+            // fallible at the same allocation boundaries as the index
+            // builders. The one-item reservation is a no-op while capacity
+            // remains and grows each vector geometrically when needed.
+            state.outgoing_refs.try_reserve(1)?;
+            let outgoing = state.outgoing_refs.entry(source).or_default();
+            outgoing.try_reserve(1)?;
+            outgoing.push(target);
+
+            state.incoming_refs.try_reserve(1)?;
+            let incoming = state.incoming_refs.entry(target).or_default();
+            incoming.try_reserve(1)?;
+            incoming.push(source);
+        }
+
+        Ok(Self {
+            state: Arc::new(state),
+        })
+    }
+
+    /// Freeze the current graph into a cheap immutable snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns the allocator's error when the ordered object-ID cache cannot
+    /// reserve its storage.
+    pub fn try_snapshot(
+        &self,
+    ) -> Result<ReferenceGraphSnapshot, std::collections::TryReserveError> {
+        let ordered_ids = Arc::from(try_object_ids_in_order(&self.state)?.into_boxed_slice());
+        Ok(ReferenceGraphSnapshot {
+            state: Arc::clone(&self.state),
+            ordered_ids,
+        })
+    }
+
     /// Freeze the current graph into a cheap immutable snapshot.
     #[must_use]
     pub fn snapshot(&self) -> ReferenceGraphSnapshot {
@@ -712,6 +775,23 @@ fn object_ids_in_order(state: &GraphState) -> Vec<ObjectId> {
     object_ids
 }
 
+fn try_object_ids_in_order(
+    state: &GraphState,
+) -> Result<Vec<ObjectId>, std::collections::TryReserveError> {
+    let mut object_ids = Vec::new();
+    object_ids.try_reserve_exact(
+        state
+            .incoming_refs
+            .len()
+            .saturating_add(state.outgoing_refs.len()),
+    )?;
+    object_ids.extend(state.incoming_refs.keys().copied());
+    object_ids.extend(state.outgoing_refs.keys().copied());
+    object_ids.sort_unstable();
+    object_ids.dedup();
+    Ok(object_ids)
+}
+
 fn graph_statistics(state: &GraphState) -> ReferenceGraphStats {
     ReferenceGraphStats {
         total_objects: object_count(state),
@@ -767,6 +847,75 @@ mod tests {
         // Should only appear once
         assert_eq!(graph.get_outgoing_refs(1), Some(vec![2]));
         assert_eq!(graph.get_incoming_refs(2), Some(vec![1]));
+    }
+
+    #[test]
+    fn bulk_edges_deduplicate_and_preserve_first_edge_order() {
+        let source = ObjectId::try_from(1).unwrap();
+        let first_target = ObjectId::try_from(2).unwrap();
+        let second_target = ObjectId::try_from(3).unwrap();
+        let third_target = ObjectId::try_from(4).unwrap();
+        let graph = ReferenceGraph::try_from_edges([
+            (source, first_target),
+            (source, second_target),
+            (source, first_target),
+            (source, third_target),
+            (source, second_target),
+        ])
+        .expect("bulk graph");
+
+        assert_eq!(
+            graph.outgoing(source).unwrap().collect::<Vec<_>>(),
+            vec![first_target, second_target, third_target]
+        );
+        assert_eq!(
+            graph.incoming(first_target).unwrap().collect::<Vec<_>>(),
+            vec![source]
+        );
+        assert_eq!(graph.edge_count(), 3);
+        assert_eq!(
+            graph.try_snapshot().unwrap().object_ids(),
+            vec![source, first_target, second_target, third_target]
+        );
+    }
+
+    #[test]
+    fn bulk_edges_preserve_adversarial_star_order() {
+        const DEGREE: u64 = 1_024;
+        let source = ObjectId::try_from(1).unwrap();
+        let sink = ObjectId::try_from(DEGREE.saturating_mul(2).saturating_add(2)).unwrap();
+        let outgoing_targets = (2..=DEGREE.saturating_add(1))
+            .map(|id| ObjectId::try_from(id).unwrap())
+            .collect::<Vec<_>>();
+        let incoming_sources = (DEGREE.saturating_add(2)
+            ..=DEGREE.saturating_mul(2).saturating_add(1))
+            .map(|id| ObjectId::try_from(id).unwrap())
+            .collect::<Vec<_>>();
+        let edges = outgoing_targets
+            .iter()
+            .copied()
+            .map(|target| (source, target))
+            .chain(
+                incoming_sources
+                    .iter()
+                    .copied()
+                    .map(|source| (source, sink)),
+            );
+
+        let graph = ReferenceGraph::try_from_edges(edges).expect("bulk graph");
+
+        assert_eq!(
+            graph.outgoing(source).unwrap().collect::<Vec<_>>(),
+            outgoing_targets
+        );
+        assert_eq!(
+            graph.incoming(sink).unwrap().collect::<Vec<_>>(),
+            incoming_sources
+        );
+        assert_eq!(graph.edge_count(), usize::try_from(DEGREE * 2).unwrap());
+        let stats = graph.statistics();
+        assert_eq!(stats.max_out_degree, usize::try_from(DEGREE).unwrap());
+        assert_eq!(stats.max_in_degree, usize::try_from(DEGREE).unwrap());
     }
 
     #[test]

@@ -1,9 +1,8 @@
 //! Selector-first chart Arrange compatibility for Keynote slide charts.
 //!
 //! The focused `litchi_keynote::Package` owns chart Arrange reads and writes.
-//! The raw drawable-ID methods remain only as compatibility shells for the
-//! legacy `KeynoteEditor` API; they resolve the ID to chart order before
-//! entering the focused selector transaction.
+//! The selector-based `KeynoteEditor` methods below are compatibility bridges
+//! for the legacy editor while all physical reads and writes stay focused.
 
 use super::*;
 use litchi_keynote::{ChartSelector, Package as FocusedKeynotePackage, SlideSelector};
@@ -40,39 +39,6 @@ impl KeynoteEditor {
             return Ok(());
         }
         replace_from_focused_chart_arrangement_commit(self, commit)
-    }
-
-    /// Read one slide chart's Arrange-panel state.
-    ///
-    /// This legacy drawable-ID entry point resolves the ID to the checked
-    /// chart position and then delegates to the focused selector-first
-    /// package owner.
-    #[deprecated(note = "use slide_chart_arrangement_by_selector with a semantic ChartSelector")]
-    pub fn slide_chart_arrangement(
-        &self,
-        slide_index: usize,
-        drawable_object_id: u64,
-    ) -> Result<ChartArrangement> {
-        let selector = chart_selector_for_drawable(self, slide_index, drawable_object_id)?;
-        self.slide_chart_arrangement_by_selector(slide_index, selector)
-    }
-
-    /// Set one slide chart's Arrange-panel state.
-    ///
-    /// This legacy drawable-ID entry point is retained as a compatibility
-    /// shell; all physical reads and writes are performed by the focused
-    /// selector-first package transaction.
-    #[deprecated(
-        note = "use set_slide_chart_arrangement_by_selector with a semantic ChartSelector"
-    )]
-    pub fn set_slide_chart_arrangement(
-        &mut self,
-        slide_index: usize,
-        drawable_object_id: u64,
-        arrangement: ChartArrangement,
-    ) -> Result<()> {
-        let selector = chart_selector_for_drawable(self, slide_index, drawable_object_id)?;
-        self.set_slide_chart_arrangement_by_selector(slide_index, selector, arrangement)
     }
 }
 
@@ -137,15 +103,6 @@ fn focused_chart_arrangements(
     focused_chart_arrangement_package(editor)?
         .slide_chart_arrangements(SlideSelector::index(slide_index))
         .map_err(map_focused_chart_arrangement_error)
-}
-
-fn chart_selector_for_drawable(
-    editor: &KeynoteEditor,
-    slide_index: usize,
-    drawable_object_id: u64,
-) -> Result<ChartSelector<'static>> {
-    let graph = chart_graph(editor, slide_index, drawable_object_id)?;
-    Ok(ChartSelector::index(graph.chart_position))
 }
 
 fn focused_chart_arrangement_package(editor: &KeynoteEditor) -> Result<FocusedKeynotePackage> {
@@ -227,9 +184,8 @@ mod tests {
     use crate::keynote::KeynoteDocumentBuilder;
     use crate::shapes::{DrawablePoint, DrawableSize};
 
-    #[allow(deprecated)]
     #[test]
-    fn scratch_presentation_supports_chart_arrangement_crud() {
+    fn scratch_presentation_supports_chart_arrangement_selector_crud() {
         let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
         let chart = editor
             .add_slide_chart(
@@ -246,7 +202,7 @@ mod tests {
         let baseline = editor.to_bytes().unwrap();
         assert_eq!(
             editor
-                .slide_chart_arrangement(0, chart.drawable_object_id)
+                .slide_chart_arrangement_by_selector(0, ChartSelector::index(0))
                 .unwrap(),
             ChartArrangement::default()
         );
@@ -282,24 +238,24 @@ mod tests {
             .unwrap();
         assert_eq!(
             editor
-                .slide_chart_arrangement(0, duplicate.drawable_object_id)
+                .slide_chart_arrangement_by_selector(0, chart_selector(&editor, &duplicate))
                 .unwrap(),
             constrained
         );
 
         let locked = ChartArrangement::default().with_locked(true);
         editor
-            .set_slide_chart_arrangement(0, duplicate.drawable_object_id, locked)
+            .set_slide_chart_arrangement_by_selector(0, chart_selector(&editor, &duplicate), locked)
             .unwrap();
         assert_eq!(
             editor
-                .slide_chart_arrangement(0, chart.drawable_object_id)
+                .slide_chart_arrangement_by_selector(0, chart_selector(&editor, &chart))
                 .unwrap(),
             constrained
         );
         assert_eq!(
             editor
-                .slide_chart_arrangement(0, duplicate.drawable_object_id)
+                .slide_chart_arrangement_by_selector(0, chart_selector(&editor, &duplicate))
                 .unwrap(),
             locked
         );
@@ -308,7 +264,11 @@ mod tests {
             .remove_slide_chart(0, chart_selector(&editor, &duplicate))
             .unwrap();
         editor
-            .set_slide_chart_arrangement(0, chart.drawable_object_id, ChartArrangement::default())
+            .set_slide_chart_arrangement_by_selector(
+                0,
+                chart_selector(&editor, &chart),
+                ChartArrangement::default(),
+            )
             .unwrap();
         assert_eq!(editor.to_bytes().unwrap(), baseline);
     }

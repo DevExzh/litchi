@@ -1,0 +1,64 @@
+// Wire-only Buffa projection for the bounded IWA archive-header seam.
+//
+// This is the complete message closure consumed by `archive_codec.rs`.  The
+// canonical TSP archive schema contains many additional package and component
+// messages; keeping those messages out of this sidecar prevents an archive
+// header decode from compiling or materializing the unrelated closure.
+syntax = "proto2";
+
+package LitchiIwaArchiveHeaderProjection;
+
+message ArchiveInfo {
+  optional uint64 identifier = 1;
+  repeated MessageInfo message_infos = 2;
+  optional bool should_merge = 3;
+}
+
+message MessageInfo {
+  required uint32 type = 1;
+  repeated uint32 version = 2 [packed = true];
+  required uint32 length = 3;
+  repeated FieldInfo field_infos = 4;
+  repeated uint64 object_references = 5 [packed = true];
+  repeated uint64 data_references = 6 [packed = true];
+  optional uint32 base_message_index = 7;
+  repeated uint32 diff_merge_version = 8 [packed = true];
+  optional FieldPath diff_field_path = 9;
+  repeated FieldPath fields_to_remove = 10;
+  repeated uint32 diff_read_version = 11 [packed = true];
+}
+
+message FieldInfo {
+  enum Type {
+    Value = 0;
+    ObjectReference = 1;
+    DataReference = 2;
+    Message = 3;
+  }
+
+  enum UnknownFieldRule {
+    IgnoreAndPreserveUntilModified = 0;
+    IgnoreAndPreserve = 1;
+    MustUnderstand = 2;
+    NotSupported = -1;
+  }
+
+  enum KnownFieldRule {
+    None = 0;
+    PreserveNewerValueUntilModified = 1;
+    PreserveNewerValue = 2;
+  }
+
+  required FieldPath path = 1;
+  optional Type type = 2 [default = Value];
+  optional UnknownFieldRule unknown_field_rule = 3 [default = IgnoreAndPreserveUntilModified];
+  repeated uint64 object_references = 4 [packed = true];
+  repeated uint64 data_references = 5 [packed = true];
+  optional KnownFieldRule known_field_rule = 6 [default = None];
+  repeated uint32 known_field_version = 7 [packed = true];
+  optional string known_field_feature_identifier = 8;
+}
+
+message FieldPath {
+  repeated uint32 path = 1 [packed = true];
+}

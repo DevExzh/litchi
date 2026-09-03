@@ -196,6 +196,10 @@ impl BodyTableAppearanceEdit<'_> {
     }
 
     /// Validate and atomically publish the staged appearance.
+    ///
+    /// Exact semantic no-ops reuse the immutable source allocation. Changed
+    /// edits revalidate the selected rooted target, enforce ownership and
+    /// lock safety, then rewrite and fully reopen the candidate.
     pub fn commit(self) -> Result<BodyTableAppearanceCommit, BodyTableAppearanceError> {
         commit_edit(self)
     }
@@ -384,8 +388,9 @@ impl Package {
     ) -> Result<BodyTableAppearanceEdit<'_>, BodyTableAppearanceError> {
         let mut budget = TransactionBudget::new(self)?;
         // Stage only after the same strict graph/metadata admission used by
-        // a read.  Commit repeats this proof because an edit is an
-        // immutable snapshot boundary, not an authority token.
+        // a read. Changed commits repeat this proof because an edit is an
+        // immutable snapshot boundary, not an authority token; exact no-ops
+        // retain this staged immutable proof and skip changed-only work.
         let target = resolve_target_with_budget(self, selector, &mut budget, true)?;
         Ok(BodyTableAppearanceEdit {
             source: self,
@@ -418,6 +423,9 @@ impl Package {
                 patch: patch.clone(),
                 diagnostics: BodyTableAppearanceDiagnostics::unchanged(),
             });
+        }
+        if !source_catalog.source_is_exact() {
+            return Err(BodyTableAppearanceError::PatchConflict);
         }
         let target_owner = patch.artifacts.target_owner();
         budget.charge_output_bytes(target_owner.len(), BodyTableAppearancePath::Package)?;
@@ -477,6 +485,21 @@ fn commit_edit(
     let edit_path = edit.path();
     let catalog = physical_source(edit.source)?;
     let source_owner = SharedBytes::from_shared_slice(catalog.shared_source());
+    if edit.before == edit.appearance {
+        return Ok(BodyTableAppearanceCommit {
+            package: edit.source.snapshot(),
+            patch: BodyTableAppearancePatch {
+                artifacts: OwnedExactArtifacts::new(source_owner.clone(), source_owner),
+                target: edit.target.clone(),
+                before: edit.before,
+                after: edit.appearance,
+                source_previews: 0,
+                target_previews: 0,
+                touched_components: 0,
+            },
+            diagnostics: BodyTableAppearanceDiagnostics::unchanged(),
+        });
+    }
     if !catalog.source_is_exact() {
         return Err(BodyTableAppearanceError::UnsupportedSource);
     }
@@ -492,21 +515,6 @@ fn commit_edit(
         || revalidated.style_identifier != edit.target.style_identifier
     {
         return Err(BodyTableAppearanceError::PatchConflict);
-    }
-    if edit.before == edit.appearance {
-        return Ok(BodyTableAppearanceCommit {
-            package: edit.source.snapshot(),
-            patch: BodyTableAppearancePatch {
-                artifacts: OwnedExactArtifacts::new(source_owner.clone(), source_owner),
-                target: edit.target.clone(),
-                before: edit.before,
-                after: edit.appearance,
-                source_previews: 0,
-                target_previews: 0,
-                touched_components: 0,
-            },
-            diagnostics: BodyTableAppearanceDiagnostics::unchanged(),
-        });
     }
     if revalidated.native.explicit_locked == Some(true) {
         return Err(BodyTableAppearanceError::TableLocked { path: edit_path });

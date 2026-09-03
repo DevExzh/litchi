@@ -1,9 +1,8 @@
-//! Native body-footnote CRUD for Pages documents.
+//! Native Pages body-footnote graph projection and cleanup.
 
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::str;
-use std::sync::Arc;
 
 use litchi_iwa_common::{
     LimitKind, WireLimits,
@@ -14,9 +13,10 @@ use litchi_iwa_protos::pages_body_codec;
 use litchi_iwa_protos::pages_footnote_codec;
 use litchi_iwa_protos::pages_footnote_marker_codec;
 
+#[cfg(test)]
+use super::PagesEditor;
 use super::{
-    DOCUMENT_OBJECT_ID, PagesEditor, STORAGE_MESSAGE_TYPES, find_object_archive,
-    package_references_object,
+    DOCUMENT_OBJECT_ID, STORAGE_MESSAGE_TYPES, find_object_archive, package_references_object,
 };
 use crate::archive::ArchiveObject;
 #[cfg(test)]
@@ -31,8 +31,7 @@ use crate::wire::repeated_length_delimited_payloads;
 #[cfg(test)]
 use crate::wire::{patch_length_delimited_field, rewrite_repeated_length_delimited_fields};
 use crate::{Error, IWorkPackage, Result};
-use litchi_pages::Package as PagesPackage;
-use litchi_pages::footnote::body::{Footnote, Position, Selector};
+use litchi_pages::footnote::body::{Footnote, Position};
 
 const FOOTNOTE_REFERENCE_MESSAGE_TYPE: u32 = 2_008;
 const TEXTUAL_ATTACHMENT_MESSAGE_TYPE: u32 = 2_004;
@@ -58,146 +57,6 @@ pub(super) struct BodyFootnoteGraph {
 struct FootnoteTableEntry {
     index: u32,
     reference_id: u64,
-}
-
-impl PagesEditor {
-    /// Read every native footnote attached to the main Pages body.
-    pub fn body_footnotes(&self) -> Result<Vec<Footnote>> {
-        focused_body_footnote_package(self)?
-            .body_footnotes()
-            .map_err(|error| {
-                Error::InvalidFormat(format!("Pages body footnote read failed: {error}"))
-            })
-    }
-
-    /// Insert a native Pages footnote through the focused package owner.
-    ///
-    /// The inserted body character is Pages' private U+000E footnote anchor;
-    /// use [`Self::body_footnotes`] instead of treating that character as text.
-    fn insert_body_footnote(
-        &mut self,
-        position: Position,
-        text: impl AsRef<str>,
-    ) -> Result<Footnote> {
-        let text = text.as_ref();
-        let package = focused_body_footnote_package(self)?;
-        let commit = PagesPackage::insert_body_footnote(&package, position, text, None).map_err(
-            |error| Error::InvalidFormat(format!("Pages body footnote insertion failed: {error}")),
-        )?;
-        let notes = commit.package().body_footnotes().map_err(|error| {
-            Error::InvalidFormat(format!(
-                "Pages body footnote insertion readback failed: {error}"
-            ))
-        })?;
-        let created = notes
-            .iter()
-            .find(|footnote| footnote.position == position)
-            .cloned()
-            .ok_or_else(|| {
-                Error::InvalidFormat(
-                    "Pages body footnote insertion did not produce its requested position"
-                        .to_owned(),
-                )
-            })?;
-        publish_focused_body_footnote_commit(self, &commit, &notes)?;
-        Ok(created)
-    }
-
-    /// Delete one native body footnote through the focused package owner.
-    fn remove_body_footnote(&mut self, selector: Selector) -> Result<Footnote> {
-        let package = focused_body_footnote_package(self)?;
-        let mut edit = package.edit_body_footnote(selector).map_err(|error| {
-            Error::InvalidFormat(format!("Pages body footnote selection failed: {error}"))
-        })?;
-        let removed = edit.before().clone();
-        edit.clear();
-        let commit = edit.commit().map_err(|error| {
-            Error::InvalidFormat(format!("Pages body footnote removal failed: {error}"))
-        })?;
-        let notes = commit.package().body_footnotes().map_err(|error| {
-            Error::InvalidFormat(format!(
-                "Pages body footnote removal readback failed: {error}"
-            ))
-        })?;
-        publish_focused_body_footnote_commit(self, &commit, &notes)?;
-        Ok(removed)
-    }
-}
-
-fn focused_body_footnote_package(editor: &PagesEditor) -> Result<PagesPackage> {
-    let source = match editor.package().exact_source_bytes() {
-        Some(source) => source.to_vec(),
-        None => editor.to_bytes()?,
-    };
-    let limits = focused_body_footnote_limits(editor.package().limits())?;
-    PagesPackage::from_bytes_with_limits(&source, limits).map_err(|error| {
-        Error::InvalidFormat(format!(
-            "Pages focused body footnote ingress failed: {error}"
-        ))
-    })
-}
-
-fn focused_body_footnote_limits(
-    source: crate::package::PackageLimits,
-) -> Result<litchi_pages::Limits> {
-    let limits = litchi_pages::Limits::new(
-        source.max_input_bytes(),
-        source.max_entries(),
-        source.max_entry_bytes(),
-        source.max_total_bytes(),
-        source.max_iwa_stream_bytes(),
-    )
-    .map_err(|error| Error::InvalidFormat(format!("Pages focused limits are invalid: {error}")))?;
-    limits
-        .with_archive_limits(source.archive_limits())
-        .map_err(|error| Error::InvalidFormat(format!("Pages focused limits are invalid: {error}")))
-}
-
-fn publish_focused_body_footnote_commit(
-    editor: &mut PagesEditor,
-    commit: &litchi_pages::BodyFootnoteCommit,
-    expected: &[Footnote],
-) -> Result<()> {
-    let focused_limits = focused_body_footnote_limits(editor.package().limits())?;
-    let source_limits = editor.package().limits();
-    let mut bytes = Vec::new();
-    commit
-        .package()
-        .write_to(&mut bytes)
-        .map_err(|error| Error::Io(error.into_io_error()))?;
-    let candidate =
-        PagesPackage::from_bytes_with_limits(&bytes, focused_limits).map_err(|error| {
-            Error::InvalidFormat(format!(
-                "Pages focused body footnote candidate failed: {error}"
-            ))
-        })?;
-    let actual = candidate.body_footnotes().map_err(|error| {
-        Error::InvalidFormat(format!(
-            "Pages focused body footnote candidate readback failed: {error}"
-        ))
-    })?;
-    if actual != expected {
-        return Err(Error::InvalidFormat(
-            "Pages focused body footnote candidate semantic readback disagreed".to_owned(),
-        ));
-    }
-    let target: Arc<[u8]> = bytes.into();
-    let package = IWorkPackage::from_shared_bytes_with_limits(Arc::clone(&target), source_limits)?;
-    let reopened = PagesEditor::from_package(package)?;
-    let reopened_notes = focused_body_footnote_package(&reopened)?
-        .body_footnotes()
-        .map_err(|error| {
-            Error::InvalidFormat(format!(
-                "Pages focused body footnote reopen readback failed: {error}"
-            ))
-        })?;
-    if reopened_notes != expected {
-        return Err(Error::InvalidFormat(
-            "Pages focused body footnote reopen semantic readback disagreed".to_owned(),
-        ));
-    }
-    *editor = reopened;
-    Ok(())
 }
 
 pub(super) fn body_footnote_graphs(
@@ -1439,7 +1298,44 @@ fn utf16_unit_at<F: AsRef<str>>(text: &[F], requested: u32) -> Option<u16> {
 mod tests {
     use super::*;
     use litchi_pages::Package as PagesPackage;
-    use litchi_pages::footnote::body::Footnote;
+    use litchi_pages::footnote::body::{Footnote, Selector};
+
+    fn focused_body_footnotes(editor: &PagesEditor) -> Result<Vec<Footnote>> {
+        let package = PagesPackage::from_bytes(&editor.to_bytes()?)
+            .map_err(|error| Error::InvalidFormat(format!("Pages footnote package: {error}")))?;
+        package
+            .body_footnotes()
+            .map_err(|error| Error::InvalidFormat(format!("Pages footnote readback: {error}")))
+    }
+
+    fn insert_body_footnote_via_pages(
+        editor: &mut PagesEditor,
+        position: Position,
+        text: &str,
+    ) -> Result<Footnote> {
+        let package = PagesPackage::from_bytes(&editor.to_bytes()?)
+            .map_err(|error| Error::InvalidFormat(format!("Pages footnote package: {error}")))?;
+        let commit = package
+            .insert_body_footnote(position, text, None)
+            .map_err(|error| Error::InvalidFormat(format!("Pages footnote insertion: {error}")))?;
+        let inserted = commit
+            .package()
+            .body_footnotes()
+            .map_err(|error| Error::InvalidFormat(format!("Pages footnote readback: {error}")))?
+            .into_iter()
+            .find(|footnote| footnote.position == position)
+            .ok_or_else(|| {
+                Error::InvalidFormat(
+                    "Pages footnote insertion readback missing requested position".to_owned(),
+                )
+            })?;
+        let mut bytes = Vec::new();
+        commit.package().write_to(&mut bytes).map_err(|error| {
+            Error::InvalidFormat(format!("Pages footnote package write failed: {error}"))
+        })?;
+        *editor = PagesEditor::from_bytes(&bytes)?;
+        Ok(inserted)
+    }
 
     fn rewrite_body_footnote_text_via_pages(
         editor: &mut PagesEditor,
@@ -1505,75 +1401,20 @@ mod tests {
     }
 
     #[test]
-    fn body_footnote_crud_round_trips_and_retains_the_native_high_watermark() {
-        let mut editor = PagesEditor::create_with_text("A😀B").unwrap();
-        let baseline = editor.to_bytes().unwrap();
-        let note = editor
-            .insert_body_footnote(Position::from_utf16_index(3).unwrap(), "Initial note")
-            .unwrap();
-        assert_eq!(editor.body_text().unwrap(), "A😀\u{e}B");
-        assert_eq!(note.position, Position::from_utf16_index(3).unwrap());
-        assert_eq!(note.text.as_ref(), "Initial note");
-        assert_eq!(note.custom_mark, None);
-        assert_eq!(editor.body_footnotes().unwrap(), vec![note.clone()]);
-
-        let reopened = PagesEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
-        assert_eq!(reopened.body_footnotes().unwrap(), vec![note.clone()]);
-
-        let updated =
-            rewrite_body_footnote_text_via_pages(&mut editor, Selector::Index(0), "Updated note")
-                .unwrap();
-        assert_eq!(updated.text.as_ref(), "Updated note");
-        assert_eq!(updated.position, note.position);
-
-        let removed = editor
-            .remove_body_footnote(Selector::At(note.position))
-            .unwrap();
-        assert_eq!(removed, updated);
-        assert_eq!(editor.body_text().unwrap(), "A😀B");
-        assert!(editor.body_footnotes().unwrap().is_empty());
-        let target = editor.to_bytes().unwrap();
-        assert_ne!(target, baseline);
-        let reopened = PagesEditor::from_bytes(&target).unwrap();
-        assert_eq!(reopened.body_text().unwrap(), "A😀B");
-        assert!(reopened.body_footnotes().unwrap().is_empty());
-    }
-
-    #[test]
-    fn removing_adjacent_body_footnote_is_atomic_and_tracks_identity() {
-        let mut editor = PagesEditor::create_with_text("AB").unwrap();
-        let first = editor
-            .insert_body_footnote(Position::from_utf16_index(1).unwrap(), "First")
-            .unwrap();
-        let second = editor
-            .insert_body_footnote(Position::from_utf16_index(2).unwrap(), "Second")
-            .unwrap();
-
-        let removed = editor
-            .remove_body_footnote(Selector::At(first.position))
-            .unwrap();
-
-        assert_eq!(removed, first);
-        assert_eq!(editor.body_text().unwrap(), "A\u{e}B");
-        assert_eq!(
-            editor.body_footnotes().unwrap(),
-            vec![Footnote {
-                position: Position::from_utf16_index(1).unwrap(),
-                text: second.text,
-                custom_mark: second.custom_mark,
-            }]
-        );
-    }
-
-    #[test]
     fn ordinary_body_replacement_refuses_unattributed_footnote_graph_cleanup() {
         let mut editor = PagesEditor::create_with_text("AB").unwrap();
-        editor
-            .insert_body_footnote(Position::from_utf16_index(1).unwrap(), "First")
-            .unwrap();
-        editor
-            .insert_body_footnote(Position::from_utf16_index(3).unwrap(), "Second")
-            .unwrap();
+        insert_body_footnote_via_pages(
+            &mut editor,
+            Position::from_utf16_index(1).unwrap(),
+            "First",
+        )
+        .unwrap();
+        insert_body_footnote_via_pages(
+            &mut editor,
+            Position::from_utf16_index(3).unwrap(),
+            "Second",
+        )
+        .unwrap();
         assert_eq!(editor.body_text().unwrap(), "A\u{e}B\u{e}");
 
         let baseline = editor.to_bytes().unwrap();
@@ -1587,28 +1428,14 @@ mod tests {
     }
 
     #[test]
-    fn footnote_text_rejects_native_structural_markers_transactionally() {
-        let mut editor = PagesEditor::create_with_text("Body").unwrap();
-        let baseline = editor.to_bytes().unwrap();
-        assert!(
-            editor
-                .insert_body_footnote(Position::ZERO, "Invalid\u{e}")
-                .is_err()
-        );
-        assert!(
-            editor
-                .insert_body_footnote(Position::ZERO, "Invalid\u{fffc}")
-                .is_err()
-        );
-        assert_eq!(editor.to_bytes().unwrap(), baseline);
-    }
-
-    #[test]
     fn required_footnote_reference_payload_cannot_be_removed_by_host_mutation() {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
-        editor
-            .insert_body_footnote(Position::from_utf16_index(4).unwrap(), "Native")
-            .unwrap();
+        insert_body_footnote_via_pages(
+            &mut editor,
+            Position::from_utf16_index(4).unwrap(),
+            "Native",
+        )
+        .unwrap();
         let reference_id = body_footnote_graphs(editor.package(), editor.body_storage_id.get())
             .unwrap()[0]
             .reference_id;
@@ -1646,9 +1473,12 @@ mod tests {
     #[test]
     fn footnote_marker_unknown_fields_survive_an_atomic_text_rewrite() {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
-        editor
-            .insert_body_footnote(Position::from_utf16_index(4).unwrap(), "Native")
-            .unwrap();
+        insert_body_footnote_via_pages(
+            &mut editor,
+            Position::from_utf16_index(4).unwrap(),
+            "Native",
+        )
+        .unwrap();
         let graph = body_footnote_graphs(editor.package(), editor.body_storage_id.get())
             .unwrap()
             .pop()
@@ -1674,7 +1504,10 @@ mod tests {
             .unwrap();
 
         let mut edited = PagesEditor::from_package(package).unwrap();
-        assert_eq!(edited.body_footnotes().unwrap()[0].text.as_ref(), "Native");
+        assert_eq!(
+            focused_body_footnotes(&edited).unwrap()[0].text.as_ref(),
+            "Native"
+        );
         rewrite_body_footnote_text_via_pages(&mut edited, Selector::Index(0), "Updated").unwrap();
         let marker_archive = find_object_archive(edited.package(), graph.marker_id).unwrap();
         let marker_archive_data = edited.package().archive(&marker_archive).unwrap();
@@ -1685,9 +1518,12 @@ mod tests {
     #[test]
     fn malformed_footnote_marker_rewrite_is_failure_atomic() {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
-        editor
-            .insert_body_footnote(Position::from_utf16_index(4).unwrap(), "Native")
-            .unwrap();
+        insert_body_footnote_via_pages(
+            &mut editor,
+            Position::from_utf16_index(4).unwrap(),
+            "Native",
+        )
+        .unwrap();
         let marker_id = body_footnote_graphs(editor.package(), editor.body_storage_id.get())
             .unwrap()[0]
             .marker_id;
@@ -1721,9 +1557,12 @@ mod tests {
     #[test]
     fn footnote_reference_unknown_fields_survive_an_atomic_text_rewrite() {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
-        editor
-            .insert_body_footnote(Position::from_utf16_index(4).unwrap(), "Native")
-            .unwrap();
+        insert_body_footnote_via_pages(
+            &mut editor,
+            Position::from_utf16_index(4).unwrap(),
+            "Native",
+        )
+        .unwrap();
         let reference_id = body_footnote_graphs(editor.package(), editor.body_storage_id.get())
             .unwrap()[0]
             .reference_id;
@@ -1748,7 +1587,10 @@ mod tests {
             .unwrap();
 
         let mut edited = PagesEditor::from_package(package).unwrap();
-        assert_eq!(edited.body_footnotes().unwrap()[0].text.as_ref(), "Native");
+        assert_eq!(
+            focused_body_footnotes(&edited).unwrap()[0].text.as_ref(),
+            "Native"
+        );
         rewrite_body_footnote_text_via_pages(&mut edited, Selector::Index(0), "Updated").unwrap();
         let reference_archive = find_object_archive(edited.package(), reference_id).unwrap();
         let reference_archive_data = edited.package().archive(&reference_archive).unwrap();
@@ -1759,9 +1601,12 @@ mod tests {
     #[test]
     fn malformed_footnote_reference_rewrite_is_failure_atomic() {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
-        editor
-            .insert_body_footnote(Position::from_utf16_index(4).unwrap(), "Native")
-            .unwrap();
+        insert_body_footnote_via_pages(
+            &mut editor,
+            Position::from_utf16_index(4).unwrap(),
+            "Native",
+        )
+        .unwrap();
         let reference_id = body_footnote_graphs(editor.package(), editor.body_storage_id.get())
             .unwrap()[0]
             .reference_id;
@@ -1796,9 +1641,12 @@ mod tests {
     #[test]
     fn footnote_body_attachment_unknown_fields_survive_an_atomic_text_rewrite() {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
-        editor
-            .insert_body_footnote(Position::from_utf16_index(4).unwrap(), "Native")
-            .unwrap();
+        insert_body_footnote_via_pages(
+            &mut editor,
+            Position::from_utf16_index(4).unwrap(),
+            "Native",
+        )
+        .unwrap();
         let body_storage_id = editor.body_storage_id.get();
         let unknown = [0xa0, 0x06, 0x01, 0xaa, 0x06, 0x03, b'o', b'p', b'a'];
         let mut package = editor.package().clone();
@@ -1848,7 +1696,10 @@ mod tests {
             .unwrap();
 
         let mut edited = PagesEditor::from_package(package).unwrap();
-        assert_eq!(edited.body_footnotes().unwrap()[0].text.as_ref(), "Native");
+        assert_eq!(
+            focused_body_footnotes(&edited).unwrap()[0].text.as_ref(),
+            "Native"
+        );
         rewrite_body_footnote_text_via_pages(&mut edited, Selector::Index(0), "Updated").unwrap();
         let body_archive = find_object_archive(edited.package(), body_storage_id).unwrap();
         let body_archive_data = edited.package().archive(&body_archive).unwrap();
@@ -1872,9 +1723,12 @@ mod tests {
     #[test]
     fn malformed_footnote_body_attachment_rewrite_is_failure_atomic() {
         let mut editor = PagesEditor::create_with_text("Body").unwrap();
-        editor
-            .insert_body_footnote(Position::from_utf16_index(4).unwrap(), "Native")
-            .unwrap();
+        insert_body_footnote_via_pages(
+            &mut editor,
+            Position::from_utf16_index(4).unwrap(),
+            "Native",
+        )
+        .unwrap();
         let body_storage_id = editor.body_storage_id.get();
         let mut package = editor.package().clone();
         let archive_name = find_object_archive(&package, body_storage_id).unwrap();

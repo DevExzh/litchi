@@ -838,41 +838,6 @@ impl Bundle {
         ))
     }
 
-    /// Create a Bundle from raw bytes (ZIP archive).
-    ///
-    /// This method parses the archive and its IWA members from the supplied
-    /// bytes; it does not accept or reuse a previously parsed archive owner.
-    pub fn from_archive_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_archive_bytes_with_limits(bytes, BundleLimits::default())
-    }
-
-    /// Parse a ZIP archive from bytes under caller-selected ingress ceilings.
-    pub fn from_archive_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
-        let input_size = u64::try_from(bytes.len()).map_err(|_| {
-            Error::InvalidFormat("iWork bundle input length does not fit u64".to_owned())
-        })?;
-        limits.check_input_size(input_size, "iWork bundle input")?;
-
-        let archives = Self::parse_zip_bytes(bytes, limits)?;
-
-        // For single-file bundles, metadata is typically embedded
-        let metadata = BundleMetadata {
-            has_properties: true, // Assume it has properties
-            has_build_version_history: true,
-            has_document_identifier: true,
-            detected_application: None,
-            properties: PropertyMap::default(),
-            build_versions: Vec::new().into_boxed_slice(),
-            document_id: None,
-        };
-
-        Ok(Self::from_parts(
-            std::path::PathBuf::from("<zip_archive>"), // Placeholder path
-            archives,
-            metadata,
-        ))
-    }
-
     /// Open a traditional directory-based bundle
     fn open_directory_bundle(bundle_path: &Path, limits: BundleLimits) -> Result<Self> {
         // Check for required bundle structure
@@ -1786,12 +1751,12 @@ mod tests {
 
         let archive_limits = IwaArchiveLimits::default().with_objects(1)?;
         let limits = BundleLimits::default().with_archive_limits(archive_limits)?;
-        let error = Bundle::from_archive_bytes_with_limits(&bytes, limits).unwrap_err();
+        let error = Bundle::from_bytes_with_limits(&bytes, limits).unwrap_err();
         assert!(error.to_string().contains("IWA object limit exceeded"));
 
         let byte_limits = IwaArchiveLimits::default().with_archive_bytes(1)?;
         let limits = BundleLimits::default().with_archive_limits(byte_limits)?;
-        let error = Bundle::from_archive_bytes_with_limits(&bytes, limits).unwrap_err();
+        let error = Bundle::from_bytes_with_limits(&bytes, limits).unwrap_err();
         assert!(matches!(
             error,
             Error::IwaCore(core)

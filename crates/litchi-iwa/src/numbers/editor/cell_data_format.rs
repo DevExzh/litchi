@@ -2468,10 +2468,10 @@ mod tests {
         )
         .unwrap();
         editor
-            .set_table_cell_scientific_format(table_id, 1, 1, scientific)
+            .set_table_cell_data_format(table_id, 1, 1, DataFormat::Scientific(scientific))
             .unwrap();
         editor
-            .set_table_cell_scientific_format(table_id, 1, 2, scientific)
+            .set_table_cell_data_format(table_id, 1, 2, DataFormat::Scientific(scientific))
             .unwrap();
 
         let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
@@ -2481,27 +2481,19 @@ mod tests {
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            reopened
-                .table_cell_scientific_format(table_id, 1, 1)
-                .unwrap(),
-            Some(scientific)
+            reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
+            DataFormat::Scientific(scientific)
         );
-        assert!(
-            reopened
-                .reset_table_cell_scientific_format(table_id, 1, 1)
-                .unwrap()
-        );
+        reopened
+            .set_table_cell_data_format(table_id, 1, 1, DataFormat::Automatic)
+            .unwrap();
         assert_eq!(
-            reopened
-                .table_cell_scientific_format(table_id, 1, 2)
-                .unwrap(),
-            Some(scientific)
+            reopened.table_cell_data_format(table_id, 1, 2).unwrap(),
+            DataFormat::Scientific(scientific)
         );
-        assert!(
-            reopened
-                .reset_table_cell_scientific_format(table_id, 1, 2)
-                .unwrap()
-        );
+        reopened
+            .set_table_cell_data_format(table_id, 1, 2, DataFormat::Automatic)
+            .unwrap();
         let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
         assert!(
             resolve_format_table(reopened.package(), &location)
@@ -2535,10 +2527,10 @@ mod tests {
         )
         .unwrap();
         editor
-            .set_table_cell_currency_format(table_id, 1, 1, currency)
+            .set_table_cell_data_format(table_id, 1, 1, DataFormat::Currency(currency))
             .unwrap();
         editor
-            .set_table_cell_currency_format(table_id, 1, 2, currency)
+            .set_table_cell_data_format(table_id, 1, 2, DataFormat::Currency(currency))
             .unwrap();
 
         let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
@@ -2548,23 +2540,19 @@ mod tests {
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            reopened.table_cell_currency_format(table_id, 1, 1).unwrap(),
-            Some(currency)
+            reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
+            DataFormat::Currency(currency)
         );
-        assert!(
-            reopened
-                .reset_table_cell_currency_format(table_id, 1, 1)
-                .unwrap()
-        );
+        reopened
+            .set_table_cell_data_format(table_id, 1, 1, DataFormat::Automatic)
+            .unwrap();
         assert_eq!(
-            reopened.table_cell_currency_format(table_id, 1, 2).unwrap(),
-            Some(currency)
+            reopened.table_cell_data_format(table_id, 1, 2).unwrap(),
+            DataFormat::Currency(currency)
         );
-        assert!(
-            reopened
-                .reset_table_cell_currency_format(table_id, 1, 2)
-                .unwrap()
-        );
+        reopened
+            .set_table_cell_data_format(table_id, 1, 2, DataFormat::Automatic)
+            .unwrap();
         let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
         assert!(
             resolve_format_table(reopened.package(), &location)
@@ -2699,10 +2687,10 @@ mod tests {
             DataFormat::Automatic
         );
         editor
-            .set_table_cell_percentage_format(table_id, 1, 1, percentage)
+            .set_table_cell_data_format(table_id, 1, 1, DataFormat::Percentage(percentage))
             .unwrap();
         editor
-            .set_table_cell_percentage_format(table_id, 1, 2, percentage)
+            .set_table_cell_data_format(table_id, 1, 2, DataFormat::Percentage(percentage))
             .unwrap();
 
         assert_eq!(
@@ -2728,10 +2716,8 @@ mod tests {
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            reopened
-                .table_cell_percentage_format(table_id, 1, 1)
-                .unwrap(),
-            Some(percentage)
+            reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
+            DataFormat::Percentage(percentage)
         );
         reopened
             .set_table_cell_data_format(table_id, 1, 1, DataFormat::Automatic)
@@ -2741,10 +2727,8 @@ mod tests {
             DataFormat::Automatic
         );
         assert_eq!(
-            reopened
-                .table_cell_percentage_format(table_id, 1, 2)
-                .unwrap(),
-            Some(percentage)
+            reopened.table_cell_data_format(table_id, 1, 2).unwrap(),
+            DataFormat::Percentage(percentage)
         );
     }
 }

@@ -4,7 +4,7 @@ use std::fmt;
 
 use buffa::{DecodeOptions as BuffaDecodeOptions, Enumeration as _, Message as _};
 
-use crate::buffa_generated::TSP as buffa_tsp;
+use crate::buffa_archive_header_generated::LitchiIwaArchiveHeaderProjection as buffa_tsp;
 
 /// Owned, schema-neutral representation of one `TSP.FieldPath`.
 ///

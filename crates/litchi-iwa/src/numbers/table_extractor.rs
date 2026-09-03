@@ -43,10 +43,12 @@ use crate::{Error, Result};
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::comment::{AuthorId, Comment, StorageId, Uuid};
 use litchi_iwa_common::formula::FiniteF64 as CommonFiniteF64;
+use litchi_iwa_common::wire::parse_wire_view;
 use litchi_iwa_protos::comment_storage_codec;
 use litchi_iwa_protos::numbers_formula_codec;
 use litchi_iwa_protos::numbers_names_codec;
 use litchi_iwa_protos::numbers_table_cell_storage_codec;
+use litchi_iwa_protos::table_info_codec;
 use litchi_numbers::cell::FiniteF64;
 use litchi_numbers::table::Dimensions;
 use prost::Message;
@@ -62,6 +64,10 @@ type FormulaCategoryKey = [u64; 2];
 
 const TILE_MESSAGE_TYPE: u32 = 6_002;
 const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
+const TABLE_INFO_MESSAGE_TYPES: &[u32] = &[6_000, 6_003];
+const TABLE_INFO_PROJECTION_RECURSION_LIMIT: u32 = 2;
+const TABLE_INFO_PROJECTION_WORK_MULTIPLIER: usize = 4;
+const LEGACY_TABLE_INFO_SUPER_PREFIX: [u8; 2] = [0x0a, 0x00];
 const MAX_TABLE_ROWS: usize = 1 << 20;
 const MAX_TABLE_COLUMNS: usize = 1 << 14;
 const MAX_ADDRESSABLE_CELLS: usize = 1 << 24;
@@ -3021,6 +3027,95 @@ fn first_rich_text_payload_text(
     Ok(None)
 }
 
+fn table_info_projection_work(source_len: usize) -> Result<usize> {
+    source_len
+        .checked_mul(TABLE_INFO_PROJECTION_WORK_MULTIPLIER)
+        .ok_or_else(|| {
+            Error::InvalidFormat(
+                "Numbers formula table-info projection work size overflowed".to_owned(),
+            )
+        })
+}
+
+fn charge_table_info_projection(budget: &mut ProjectionBudget, source_len: usize) -> Result<()> {
+    let work = table_info_projection_work(source_len)?;
+    let mut next = *budget;
+    next.charge_payload_fields(source_len)?;
+    next.charge_payload_work(work)?;
+    *budget = next;
+    Ok(())
+}
+
+fn table_info_projection_options(source: &[u8]) -> Result<table_info_codec::DecodeOptions> {
+    Ok(table_info_codec::DecodeOptions::new(
+        source.len().max(1),
+        source.len().max(1),
+        table_info_projection_work(source.len())?.max(1),
+        TABLE_INFO_PROJECTION_RECURSION_LIMIT,
+    ))
+}
+
+/// Decode the model edge used by formula-reference names without materializing
+/// the drawable or the unselected TableInfo metadata.
+///
+/// This remains a best-effort candidate probe: malformed or incompatible
+/// typed payloads return `Ok(None)`, while aggregate resource failures remain
+/// errors. Historical type-6003 payloads that omit the required Drawable
+/// envelope receive only a temporary canonical empty envelope; the original
+/// source remains untouched and authoritative.
+fn decode_table_info_model_reference(
+    message_type: u32,
+    source: &[u8],
+    compatibility: &mut Vec<u8>,
+    budget: &mut ProjectionBudget,
+) -> Result<Option<u64>> {
+    if !TABLE_INFO_MESSAGE_TYPES.contains(&message_type) {
+        return Ok(None);
+    }
+
+    // Admit the source-sized four-pass allowance before scanning or allocating
+    // the compatibility envelope.  A legacy prefix, when needed, is charged
+    // separately below so the aggregate budget matches the actual projected
+    // source width.
+    charge_table_info_projection(budget, source.len())?;
+
+    let mut projected_source = source;
+    if message_type == 6_003 {
+        let Ok(view) = parse_wire_view(source) else {
+            return Ok(None);
+        };
+        if !view.fields().any(|field| field.number() == 1) {
+            let prefixed_len = source
+                .len()
+                .checked_add(LEGACY_TABLE_INFO_SUPER_PREFIX.len())
+                .ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "Numbers legacy table-info compatibility source size overflowed".to_owned(),
+                    )
+                })?;
+            charge_table_info_projection(budget, LEGACY_TABLE_INFO_SUPER_PREFIX.len())?;
+            compatibility.clear();
+            compatibility.try_reserve_exact(prefixed_len).map_err(|_| {
+                allocation_error(
+                    "Numbers formula table-info compatibility source",
+                    prefixed_len,
+                )
+            })?;
+            compatibility.extend_from_slice(&LEGACY_TABLE_INFO_SUPER_PREFIX);
+            compatibility.extend_from_slice(source);
+            projected_source = compatibility.as_slice();
+        }
+    }
+
+    let Ok(reference) = table_info_codec::decode_table_model_reference(
+        projected_source,
+        table_info_projection_options(projected_source)?,
+    ) else {
+        return Ok(None);
+    };
+    Ok(Some(reference.identifier().get()))
+}
+
 fn build_formula_reference_maps(
     bundle: &Bundle,
     budget: &mut ProjectionBudget,
@@ -3099,16 +3194,18 @@ fn build_formula_reference_maps(
                     continue;
                 };
                 let mut table_name = None;
+                let mut table_info_compatibility = Vec::new();
                 for message in &drawable_object.messages {
-                    budget.charge_payload_fields(message.data.len())?;
-                    budget.charge_payload_work(message.data.len())?;
-                    let Ok(table_info) = tst::TableInfoArchive::decode(message.data.as_slice())
+                    let Some(model_identifier) = decode_table_info_model_reference(
+                        message.type_,
+                        message.data.as_slice(),
+                        &mut table_info_compatibility,
+                        budget,
+                    )?
                     else {
                         continue;
                     };
-                    let Some(model_object) =
-                        objects.get(&table_info.table_model.identifier).copied()
-                    else {
+                    let Some(model_object) = objects.get(&model_identifier).copied() else {
                         continue;
                     };
                     for model_message in &model_object.messages {
@@ -3583,6 +3680,21 @@ fn finite_zero() -> Result<FiniteF64> {
 mod tests {
     use super::*;
 
+    fn table_info_reference_wire(identifier: u64, include_super: bool) -> Vec<u8> {
+        let reference = crate::protobuf::tsp::Reference {
+            identifier,
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let mut source = Vec::new();
+        if include_super {
+            source.extend_from_slice(&[0x0a, 0x00]);
+        }
+        source.extend_from_slice(&[0x12, u8::try_from(reference.len()).unwrap()]);
+        source.extend_from_slice(&reference);
+        source
+    }
+
     #[test]
     fn tracked_native_numbers_fixture_streams_model_store_and_tiles() {
         let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -3596,6 +3708,122 @@ mod tests {
         assert_eq!(tables[0].name(), "Table 1");
         assert_eq!(tables[0].dimensions(), (22, 7));
         assert!(tables[0].cell_count() > 0);
+    }
+
+    #[test]
+    fn formula_reference_table_info_ingress_uses_bounded_projection() {
+        let source = include_str!("table_extractor.rs");
+        let production = source
+            .split_once("#[cfg(test)]\nmod tests")
+            .map(|(production, _tests)| production)
+            .expect("table extractor test module marker is present");
+        assert_eq!(
+            production
+                .matches("table_info_codec::decode_table_model_reference(")
+                .count(),
+            1
+        );
+        assert!(!production.contains("tst::TableInfoArchive::decode"));
+        assert!(production.contains("TABLE_INFO_MESSAGE_TYPES.contains"));
+    }
+
+    #[test]
+    fn formula_reference_table_info_aliases_preserve_sparse_legacy_envelope() -> Result<()> {
+        let canonical = table_info_reference_wire(42, true);
+        let sparse = table_info_reference_wire(43, false);
+        let sparse_before = sparse.clone();
+        let mut compatibility = Vec::new();
+        let mut budget = ProjectionBudget::new();
+
+        assert_eq!(
+            decode_table_info_model_reference(6_000, &canonical, &mut compatibility, &mut budget,)?,
+            Some(42)
+        );
+        assert_eq!(
+            decode_table_info_model_reference(6_003, &sparse, &mut compatibility, &mut budget)?,
+            Some(43)
+        );
+        assert_eq!(sparse, sparse_before);
+        assert_eq!(
+            budget.payload_work,
+            table_info_projection_work(canonical.len())?
+                + table_info_projection_work(sparse.len())?
+                + table_info_projection_work(LEGACY_TABLE_INFO_SUPER_PREFIX.len())?
+        );
+
+        let budget_before_untyped = budget;
+        assert_eq!(
+            decode_table_info_model_reference(999, &canonical, &mut compatibility, &mut budget,)?,
+            None
+        );
+        assert_eq!(budget, budget_before_untyped);
+        Ok(())
+    }
+
+    #[test]
+    fn formula_reference_table_info_malformed_candidates_are_skipped() -> Result<()> {
+        let malformed = vec![0x0a, 0x00, 0x12, 0x02, 0x08, 0x81, 0x00];
+        let malformed_before = malformed.clone();
+        let mut compatibility = Vec::new();
+        let mut budget = ProjectionBudget::new();
+        assert_eq!(
+            decode_table_info_model_reference(6_000, &malformed, &mut compatibility, &mut budget,)?,
+            None
+        );
+        assert_eq!(malformed, malformed_before);
+
+        let malformed_legacy = [0xff];
+        assert_eq!(
+            decode_table_info_model_reference(
+                6_003,
+                &malformed_legacy,
+                &mut compatibility,
+                &mut budget,
+            )?,
+            None
+        );
+        assert!(budget.payload_fields > 0);
+        assert!(budget.payload_work > 0);
+        Ok(())
+    }
+
+    #[test]
+    fn formula_reference_table_info_budget_uses_checked_four_pass_charge() -> Result<()> {
+        let source = table_info_reference_wire(7, true);
+        let fields = source.len();
+        let work = table_info_projection_work(source.len())?;
+        let mut compatibility = Vec::new();
+
+        let mut exact = ProjectionBudget::new();
+        exact.payload_fields = MAX_TABLE_LIST_PAYLOAD_FIELDS - fields;
+        exact.payload_work = MAX_TABLE_LIST_PAYLOAD_WORK - work;
+        assert_eq!(
+            decode_table_info_model_reference(6_000, &source, &mut compatibility, &mut exact,)?,
+            Some(7)
+        );
+        assert_eq!(exact.payload_fields, MAX_TABLE_LIST_PAYLOAD_FIELDS);
+        assert_eq!(exact.payload_work, MAX_TABLE_LIST_PAYLOAD_WORK);
+
+        let mut one_short = ProjectionBudget::new();
+        one_short.payload_fields = MAX_TABLE_LIST_PAYLOAD_FIELDS - fields;
+        one_short.payload_work = MAX_TABLE_LIST_PAYLOAD_WORK - work + 1;
+        let fields_before_refusal = one_short.payload_fields;
+        let work_before_refusal = one_short.payload_work;
+        assert!(matches!(
+            decode_table_info_model_reference(6_000, &source, &mut compatibility, &mut one_short,),
+            Err(Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
+                kind: litchi_iwa_common::LimitKind::RewriteWork,
+                ..
+            }))
+        ));
+        assert_eq!(one_short.payload_fields, fields_before_refusal);
+        assert_eq!(one_short.payload_work, work_before_refusal);
+        assert!(matches!(
+            table_info_projection_work(usize::MAX),
+            Err(Error::InvalidFormat(message))
+                if message.contains("work size overflowed")
+        ));
+        Ok(())
     }
 
     #[test]

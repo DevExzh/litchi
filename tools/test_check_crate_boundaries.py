@@ -1375,90 +1375,6 @@ def add_numbers_table_cell_percentage_format_canonical_scaffold(
         "fn main() { package.edit_table_cell_percentage_format(); }\n",
         encoding="utf-8",
     )
-    host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_SOURCE[0]
-    host.parent.mkdir(parents=True, exist_ok=True)
-    host.write_text(
-        host.read_text(encoding="utf-8")
-        + "\n"
-        + "use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelector, CellPosition};\n"
-        + "impl NumbersEditor {\n"
-        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        + "pub fn table_cell_percentage_format(&self, table_id: u64, row: usize, column: usize) -> Result<Option<Percentage>> {\n"
-        + "    let source_built = !self.package.source_is_exact(); if source_built { cell_percentage_format(); }\n"
-        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
-        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
-        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
-        + "    package.table_cell_percentage_format(sheet, table, position)\n"
-        + "}\n"
-        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        + "pub fn set_table_cell_percentage_format(&mut self, table_id: u64, row: usize, column: usize, format: Percentage) -> Result<()> {\n"
-        + "    let source_built = !self.package.source_is_exact(); let allow_family_replacement = true; if source_built || allow_family_replacement && matches!(error, WrongFormatFamily) { set_cell_percentage_format(); }\n"
-        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
-        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
-        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
-        + "    package.edit_table_cell_percentage_format(sheet, table, position).set(format).commit()\n"
-        + "}\n"
-        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        + "pub fn reset_table_cell_percentage_format(&mut self, table_id: u64, row: usize, column: usize) -> Result<bool> {\n"
-        + "    let source_built = !self.package.source_is_exact(); let allow_family_replacement = true; if source_built || allow_family_replacement && matches!(error, WrongFormatFamily) { reset_cell_percentage_format(); }\n"
-        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
-        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
-        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
-        + "    package.edit_table_cell_percentage_format(sheet, table, position).clear().commit()\n"
-        + "}\n"
-        + "}\n",
-        encoding="utf-8",
-    )
-
-
-def add_percentage_format_selector_context_host(
-    root: Path,
-    *,
-    typed_location: bool,
-) -> None:
-    """Replace the Percentage host with a helper-only selector route fixture."""
-
-    host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_SOURCE[0]
-    selector_fields = (
-        "sheet: litchi_numbers::SheetSelector<'static>, "
-        "table: litchi_numbers::TableSelector<'static>, "
-        "position: litchi_numbers::table::CellPosition,"
-        if typed_location
-        else "sheet: usize, table: usize, position: usize,"
-    )
-    host.write_text(
-        "use litchi_numbers::Package as FocusedNumbersPackage;\n"
-        "enum FocusedPercentageFormatLocation {\n"
-        "    Owner { "
-        + selector_fields
-        + " source: FocusedNumbersPackage },\n"
-        "}\n"
-        "fn focused_percentage_format_location() -> Result<FocusedPercentageFormatLocation> {\n"
-        "    let source = FocusedNumbersPackage::from_bytes(bytes)?;\n"
-        "    Ok(FocusedPercentageFormatLocation::Owner { source, sheet, table, position })\n"
-        "}\n"
-        "fn focused_percentage_format() -> Result<Option<Percentage>> {\n"
-        "    let location = focused_percentage_format_location()?;\n"
-        "    let FocusedPercentageFormatLocation::Owner { source, sheet, table, position } = location else { return Err(Unsupported); };\n"
-        "    source.table_cell_percentage_format(sheet, table, position)\n"
-        "}\n"
-        "fn commit_focused_percentage_format() -> Result<()> {\n"
-        "    let location = focused_percentage_format_location()?;\n"
-        "    let FocusedPercentageFormatLocation::Owner { source, sheet, table, position } = location else { return Err(Unsupported); };\n"
-        "    source.edit_table_cell_percentage_format(sheet, table, position).set(format).commit()\n"
-        "}\n"
-        "impl NumbersEditor {\n"
-        "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        "pub fn table_cell_percentage_format(&self, table_id: u64, row: usize, column: usize) -> Result<Option<Percentage>> { focused_percentage_format() }\n"
-        "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        "pub fn set_table_cell_percentage_format(&mut self, table_id: u64, row: usize, column: usize, format: Percentage) -> Result<()> { commit_focused_percentage_format() }\n"
-        "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        "pub fn reset_table_cell_percentage_format(&mut self, table_id: u64, row: usize, column: usize) -> Result<bool> { commit_focused_percentage_format() }\n"
-        "}\n",
-        encoding="utf-8",
-    )
-
-
 def add_numbers_table_cell_currency_format_canonical_scaffold(
     root: Path,
     *,
@@ -1604,37 +1520,6 @@ def add_numbers_table_cell_currency_format_canonical_scaffold(
         "fn main() { package.edit_table_cell_currency_format(); }\n",
         encoding="utf-8",
     )
-    host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_SOURCE[0]
-    host.write_text(
-        host.read_text(encoding="utf-8")
-        + "\n"
-        + "impl NumbersEditor {\n"
-        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        + "pub fn table_cell_currency_format(&self, table_id: u64, row: usize, column: usize) -> Result<Option<Currency>> {\n"
-        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
-        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
-        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
-        + "    package.table_cell_currency_format(sheet, table, position)\n"
-        + "}\n"
-        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        + "pub fn set_table_cell_currency_format(&mut self, table_id: u64, row: usize, column: usize, format: Currency) -> Result<()> {\n"
-        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
-        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
-        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
-        + "    package.edit_table_cell_currency_format(sheet, table, position).set(format).commit()\n"
-        + "}\n"
-        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        + "pub fn reset_table_cell_currency_format(&mut self, table_id: u64, row: usize, column: usize) -> Result<bool> {\n"
-        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
-        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
-        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
-        + "    package.edit_table_cell_currency_format(sheet, table, position).clear().commit()\n"
-        + "}\n"
-        + "}\n",
-        encoding="utf-8",
-    )
-
-
 def add_numbers_table_cell_scientific_format_canonical_scaffold(
     root: Path,
     *,
@@ -1778,38 +1663,6 @@ def add_numbers_table_cell_scientific_format_canonical_scaffold(
         "fn main() { package.edit_table_cell_scientific_format(); }\n",
         encoding="utf-8",
     )
-    host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_SOURCE[0]
-    host.write_text(
-        host.read_text(encoding="utf-8")
-        + "\n"
-        + "impl NumbersEditor {\n"
-        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        + "pub fn table_cell_scientific_format(&self, table_id: u64, row: usize, column: usize) -> Result<Option<Scientific>> {\n"
-        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
-        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
-        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
-        + "    package.table_cell_scientific_format(sheet, table, position)\n"
-        + "}\n"
-        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        + "pub fn set_table_cell_scientific_format(&mut self, table_id: u64, row: usize, column: usize, format: Scientific) -> Result<()> {\n"
-        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
-        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
-        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
-        + "    package.edit_table_cell_scientific_format(sheet, table, position).set(format).commit()\n"
-        + "}\n"
-        + "#[deprecated(note = \"legacy compatibility shell\")]\n"
-        + "pub fn reset_table_cell_scientific_format(&mut self, table_id: u64, row: usize, column: usize) -> Result<bool> {\n"
-        + "    let package = FocusedNumbersPackage::from_bytes(bytes)?;\n"
-        + "    let sheet = SheetSelector::index(0); let table = TableSelector::index(0);\n"
-        + "    let position = CellPosition::try_from_usize(row, column)?;\n"
-        + "    package.edit_table_cell_scientific_format(sheet, table, position).clear().commit()\n"
-        + "}\n"
-        + "}\n",
-        encoding="utf-8",
-    )
-
-
-
 def add_numbers_table_cell_fraction_format_canonical_scaffold(
     root: Path,
     *,
@@ -2570,19 +2423,17 @@ def add_keynote_chart_arrangement_canonical_scaffold(root: Path) -> None:
     host = root / boundaries.IWA_KEYNOTE_CHART_ARRANGEMENT_SOURCE
     host.parent.mkdir(parents=True, exist_ok=True)
     host.write_text(
-        "use litchi_keynote::{ChartArrangement, Package as FocusedKeynotePackage, SlideSelector};\n"
+        "use litchi_keynote::{ChartArrangement, ChartSelector, Package as FocusedKeynotePackage, SlideSelector};\n"
         "impl KeynoteEditor {\n"
-        "    #[deprecated]\n"
-        "    pub fn slide_chart_arrangement(&self, slide_index: usize, drawable_object_id: u64) -> Result<ChartArrangement> {\n"
-        "        let package = FocusedKeynotePackage::from_bytes(bytes)?;\n"
-        "        package.slide_chart_arrangement(slide_selector, chart_selector)\n"
+        "    pub fn slide_chart_arrangement_by_selector(&self, slide_index: usize, selector: ChartSelector) -> Result<ChartArrangement> {\n"
+        "        focused_chart_arrangement_package(self)?.slide_chart_arrangement(SlideSelector::index(slide_index), selector)\n"
         "    }\n"
-        "    #[deprecated]\n"
-        "    pub fn set_slide_chart_arrangement(&mut self, slide_index: usize, drawable_object_id: u64, arrangement: ChartArrangement) -> Result<()> {\n"
-        "        let package = FocusedKeynotePackage::from_bytes(bytes)?;\n"
-        "        package.edit_slide_chart_arrangement(slide_selector, chart_selector).set(arrangement).commit()\n"
+        "    pub fn set_slide_chart_arrangement_by_selector(&mut self, slide_index: usize, selector: ChartSelector, arrangement: ChartArrangement) -> Result<()> {\n"
+        "        let package = focused_chart_arrangement_package(self)?;\n"
+        "        package.edit_slide_chart_arrangement(SlideSelector::index(slide_index), selector).set(arrangement).commit()\n"
         "    }\n"
         "}\n"
+        "fn focused_chart_arrangement_package(editor: &KeynoteEditor) -> Result<FocusedKeynotePackage> { let _ = editor; todo!() }\n"
         "fn focused_chart_arrangements(editor: &KeynoteEditor, slide_index: usize) -> Result<Box<[ChartArrangement]>> {\n"
         "    let package = FocusedKeynotePackage::from_bytes(bytes)?;\n"
         "    package.slide_chart_arrangements(SlideSelector::index(slide_index))\n"
@@ -5348,6 +5199,45 @@ class BoundaryPolicyTests(unittest.TestCase):
             )
 
             self.assertEqual(boundaries.audit_iwa_direct_core_path_source_topology(root), [])
+
+    def test_iwa_bundle_retires_archive_constructor_aliases_and_allows_canonical_ingress(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_BUNDLE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "impl Bundle {\n"
+                "    pub fn from_archive_bytes(bytes: &[u8]) -> Result<Self> { let _ = bytes; todo!() }\n"
+                "    pub fn from_archive_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> { let _ = (bytes, limits); todo!() }\n"
+                "    pub fn from_bytes(bytes: &[u8]) -> Result<Self> { let _ = bytes; todo!() }\n"
+                "    pub fn from_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> { let _ = (bytes, limits); todo!() }\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "fn archive_alias_test_only() { Bundle::from_archive_bytes(&[]); }\n"
+                "// Bundle::from_archive_bytes(&[]);\n"
+                'const NOTE: &str = "from_archive_bytes_with_limits";\n',
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwa_bundle_source_topology(root)
+
+            self.assertTrue(
+                any("from_archive_bytes:" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("from_archive_bytes_with_limits:" in item for item in violations),
+                violations,
+            )
+            self.assertFalse(any("from_bytes" in item for item in violations), violations)
+
+    def test_iwa_bundle_archive_constructor_audit_is_in_main_dispatch(self) -> None:
+        self.assertIn(
+            "+ audit_iwa_bundle_source_topology()",
+            inspect.getsource(boundaries.main),
+        )
 
     def test_iwa_direct_core_path_audit_is_in_main_dispatch(self) -> None:
         self.assertIn(
@@ -8802,6 +8692,62 @@ class BoundaryPolicyTests(unittest.TestCase):
             Path("crates/litchi-iwa/src/keynote/editor/slide_background.rs"),
         )
         self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_BRIDGE_SOURCES,
+            (
+                Path("crates/litchi-iwa/src/keynote/editor/slide_background.rs"),
+                Path("crates/litchi-iwa/src/keynote/editor/slide_background_color.rs"),
+                Path(
+                    "crates/litchi-iwa/src/keynote/editor/slide_background_gradient_wire.rs"
+                ),
+            ),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_METHODS,
+            (
+                "slide_background",
+                "slide_background_override",
+                "set_slide_background",
+                "reset_slide_background",
+            ),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_MODULES,
+            (
+                "slide_background",
+                "slide_background_color",
+                "slide_background_gradient_wire",
+            ),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_REEXPORTS,
+            frozenset(
+                {
+                    "RgbColorSpace",
+                    "Rgba",
+                    "Angle",
+                    "Background",
+                    "Gradient",
+                    "Kind",
+                    "Opaque",
+                    "Stop",
+                }
+            ),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_TESTS,
+            (
+                "slide_background_crud_inherits_and_culls_native_variations",
+                "slide_background_gradient_crud_round_trips_native_semantics",
+                "slide_background_gradient_validation_and_unknown_wire_are_lossless",
+                "slide_background_reset_preserves_combined_and_unknown_style_properties",
+                "slide_background_reset_preserves_shared_background_variations",
+                "slide_background_reset_copy_on_writes_shared_combined_variations",
+                "slide_background_reset_and_update_reject_or_preserve_future_style_wire",
+                "slide_background_preserves_opaque_fills_and_unknown_solid_fields",
+                "slide_background_rejects_invalid_inputs_transactionally",
+            ),
+        )
+        self.assertEqual(
             boundaries.RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_SOURCES,
             (
                 Path("crates/litchi-iwa/src/keynote/editor/slide_background_wire.rs"),
@@ -8844,7 +8790,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             ("set", "clear"),
         )
 
-    def test_retired_iwa_keynote_slide_background_surface_and_adapter_markers(
+    def test_retired_iwa_keynote_slide_background_surface_and_removed_tests(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -8852,14 +8798,23 @@ class BoundaryPolicyTests(unittest.TestCase):
             editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
             editor.parent.mkdir(parents=True)
             editor.write_text(
+                "mod slide_background;\n"
                 "#[cfg(test)]\n"
                 "mod slide_background_color;\n"
                 "#[cfg(test)]\n"
                 "pub(crate) mod r#slide_background_gradient_wire;\n"
-                "mod slide_background_wire;\n",
+                "mod slide_background_wire;\n"
+                "pub use litchi_iwa_common::color::{RgbColorSpace, Rgba};\n"
+                "pub use litchi_keynote::background::{Angle, Background, Gradient, Kind, Opaque, Stop};\n"
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_background(&self) {}\n"
+                "    pub fn slide_background_override(&self) {}\n"
+                "    pub fn set_slide_background(&mut self) {}\n"
+                "    pub fn reset_slide_background(&mut self) {}\n"
+                "}\n",
                 encoding="utf-8",
             )
-            for retired in boundaries.RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_SOURCES:
+            for retired in boundaries.IWA_KEYNOTE_SLIDE_BACKGROUND_LEGACY_SOURCES:
                 path = root / retired
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("// returned source\n", encoding="utf-8")
@@ -8869,13 +8824,17 @@ class BoundaryPolicyTests(unittest.TestCase):
             adapter = root / boundaries.IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_SOURCE
             adapter.parent.mkdir(parents=True, exist_ok=True)
             adapter.write_text(
-                "fn production() { let _ = tsd::FillArchive::default(); }\n"
-                "#[cfg(test)]\n"
-                "fn differential() {\n"
-                "    let _ = prost::Message::decode(&[]);\n"
-                "    let _ = WireView::parse(&[]);\n"
-                "    patch_stylesheet();\n"
-                "}\n",
+                "fn production() {}\n",
+                encoding="utf-8",
+            )
+            test_source = root / boundaries.IWA_KEYNOTE_EDITOR_TEST_SOURCE
+            test_source.parent.mkdir(parents=True, exist_ok=True)
+            test_source.write_text(
+                "\n".join(
+                    f"fn {name}() {{}}"
+                    for name in boundaries.RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_TESTS
+                )
+                + "\n",
                 encoding="utf-8",
             )
 
@@ -8887,13 +8846,10 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "crates/litchi-iwa/examples/set_keynote_slide_background.rs",
                 violations,
             )
-            self.assertIn(
-                "retired litchi-iwa Keynote slide-background module "
-                "slide_background_wire: "
-                "crates/litchi-iwa/src/keynote/editor.rs:5",
-                violations,
-            )
             for filename in (
+                "slide_background.rs",
+                "slide_background_color.rs",
+                "slide_background_gradient_wire.rs",
                 "slide_background_wire.rs",
                 "slide_background_reset.rs",
                 "slide_style_graph.rs",
@@ -8905,19 +8861,44 @@ class BoundaryPolicyTests(unittest.TestCase):
                     f"crates/litchi-iwa/src/keynote/editor/{filename}",
                     violations,
                 )
-            self.assertIn(
-                "litchi-iwa Keynote slide-background compatibility adapter retains "
-                "generated protobuf ownership marker tsd: "
-                "crates/litchi-iwa/src/keynote/editor/slide_background.rs:1",
-                violations,
-            )
-            self.assertFalse(
-                any("prost::Message" in violation for violation in violations)
-            )
-            self.assertFalse(any("WireView" in violation for violation in violations))
-            self.assertFalse(any("patch_stylesheet" in violation for violation in violations))
+            for module in boundaries.RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_MODULES:
+                self.assertTrue(
+                    any(
+                        "retired litchi-iwa Keynote slide-background module "
+                        f"{module}:" in violation
+                        for violation in violations
+                    ),
+                    violations,
+                )
+            for method in boundaries.RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_METHODS:
+                self.assertTrue(
+                    any(
+                        "retired litchi-iwa Keynote slide-background host method "
+                        f"{method}:" in violation
+                        for violation in violations
+                    ),
+                    violations,
+                )
+            for reexport in boundaries.RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_REEXPORTS:
+                self.assertTrue(
+                    any(
+                        "retired litchi-iwa Keynote slide-background re-export "
+                        f"{reexport}:" in violation
+                        for violation in violations
+                    ),
+                    violations,
+                )
+            for test_name in boundaries.RETIRED_IWA_KEYNOTE_SLIDE_BACKGROUND_TESTS:
+                self.assertTrue(
+                    any(
+                        "retired litchi-iwa Keynote slide-background test "
+                        f"{test_name}:" in violation
+                        for violation in violations
+                    ),
+                    violations,
+                )
 
-    def test_iwa_keynote_slide_background_oracles_require_cfg_test_and_no_prod_refs(
+    def test_iwa_keynote_slide_background_retirement_masks_non_code_and_cfg_decoys(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -8925,43 +8906,38 @@ class BoundaryPolicyTests(unittest.TestCase):
             editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
             editor.parent.mkdir(parents=True)
             editor.write_text(
-                "mod slide_background_color;\n"
+                "// mod slide_background;\n"
+                'const NOTE: &str = "slide_background_color slide_background_gradient_wire";\n'
                 "#[cfg(test)]\n"
-                "mod slide_background_gradient_wire;\n",
+                "fn slide_background() { slide_background_color::color_from_native(); }\n"
+                "#[cfg(test)]\n"
+                "pub use litchi_keynote::background::Background;\n",
                 encoding="utf-8",
             )
-            for oracle in boundaries.IWA_KEYNOTE_SLIDE_BACKGROUND_TEST_ORACLE_SOURCES:
-                path = root / oracle
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text("fn oracle() {}\n", encoding="utf-8")
             legacy = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "legacy.rs"
+            legacy.parent.mkdir(parents=True, exist_ok=True)
             legacy.write_text(
                 "#[cfg(test)]\n"
-                "fn differential() { slide_background_color::color_from_native(); }\n"
-                "fn production() { slide_background_gradient_wire::gradient_to_fill(); }\n",
+                "fn differential() { slide_background_gradient_wire::gradient_to_fill(); }\n"
+                "// slide_background::background_from_fill()\n"
+                'const RAW_NOTE: &str = "set_slide_background";\n',
                 encoding="utf-8",
             )
-            adapter = root / boundaries.IWA_KEYNOTE_SLIDE_BACKGROUND_ADAPTER_SOURCE
-            adapter.parent.mkdir(parents=True, exist_ok=True)
-            adapter.write_text(
-                "#[cfg(test)]\n"
-                "fn differential() { slide_background_color::color_from_native(); }\n",
-                encoding="utf-8",
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_background_source_topology(root), []
             )
 
-            self.assertEqual(
-                boundaries.audit_iwa_keynote_slide_background_source_topology(root),
-                [
-                    "retained litchi-iwa Keynote slide-background oracle module "
-                    "must be cfg(test) slide_background_color: "
-                    "crates/litchi-iwa/src/keynote/editor.rs:1",
-                    "retired litchi-iwa Keynote slide-background production reference "
-                    "slide_background_color: "
-                    "crates/litchi-iwa/src/keynote/editor.rs:1",
-                    "retired litchi-iwa Keynote slide-background production reference "
-                    "slide_background_gradient_wire: "
-                    "crates/litchi-iwa/src/keynote/legacy.rs:3",
-                ],
+            editor.write_text(
+                editor.read_text(encoding="utf-8")
+                + "fn slide_background(&self) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_background_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("host method slide_background" in item for item in violations),
+                violations,
             )
 
     def test_focused_keynote_slide_background_requires_package_owner_and_is_prost_free(
@@ -21929,6 +21905,18 @@ fn rewrite_movie_title_operation(
             ("insert_body_footnote", "remove_body_footnote"),
         )
         self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_FOOTNOTE_READ_METHODS,
+            ("body_footnotes",),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_IWA_PAGES_FOOTNOTE_FACADE_HELPERS,
+            (
+                "focused_body_footnote_package",
+                "focused_body_footnote_limits",
+                "publish_focused_body_footnote_commit",
+            ),
+        )
+        self.assertEqual(
             boundaries.PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_SOURCE,
             Path("crates/litchi-pages/src/footnote/body.rs"),
         )
@@ -21986,11 +21974,16 @@ fn rewrite_movie_title_operation(
             host = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor/legacy.rs"
             host.parent.mkdir(parents=True, exist_ok=True)
             host.write_text(
+                "pub fn body_footnotes() {}\n"
                 "pub fn insert_body_footnote() {}\n"
                 "pub fn remove_body_footnote() {}\n"
                 "fn bridge(editor: &mut PagesEditor) {\n"
+                "    editor.body_footnotes();\n"
                 "    editor.insert_body_footnote();\n"
                 "    PagesEditor::remove_body_footnote();\n"
+                "    focused_body_footnote_package();\n"
+                "    focused_body_footnote_limits();\n"
+                "    publish_focused_body_footnote_commit();\n"
                 "}\n",
                 encoding="utf-8",
             )
@@ -22007,7 +22000,8 @@ fn rewrite_movie_title_operation(
             readme.parent.mkdir(parents=True, exist_ok=True)
             readme.write_text(
                 "pages.insert_body_footnote();\n"
-                "PagesEditor::remove_body_footnote();\n",
+                "PagesEditor::remove_body_footnote();\n"
+                "PagesEditor::body_footnotes();\n",
                 encoding="utf-8",
             )
 
@@ -22024,6 +22018,19 @@ fn rewrite_movie_title_operation(
                 violations,
             )
             self.assertTrue(
+                any("public read method body_footnotes" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("public read call body_footnotes" in item for item in violations),
+                violations,
+            )
+            for helper in boundaries.RETIRED_IWA_PAGES_FOOTNOTE_FACADE_HELPERS:
+                self.assertTrue(
+                    any(f"facade helper {helper}" in item for item in violations),
+                    msg=f"missing retired facade helper {helper}: {violations!r}",
+                )
+            self.assertTrue(
                 any("lifecycle call insert_body_footnote" in item for item in violations),
                 violations,
             )
@@ -22033,6 +22040,10 @@ fn rewrite_movie_title_operation(
             )
             self.assertTrue(
                 any("lifecycle README call remove_body_footnote" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("public read README call body_footnotes" in item for item in violations),
                 violations,
             )
 
@@ -22047,9 +22058,17 @@ fn rewrite_movie_title_operation(
             host.write_text(
                 "#[cfg(test)]\n"
                 "mod fixtures {\n"
+                "    pub fn body_footnotes() {}\n"
                 "    pub fn insert_body_footnote() {}\n"
+                "    fn focused_body_footnote_package() {}\n"
+                "    fn focused_body_footnote_limits() {}\n"
+                "    fn publish_focused_body_footnote_commit() {}\n"
                 "    fn test_only(editor: &mut PagesEditor) {\n"
+                "        editor.body_footnotes();\n"
                 "        editor.remove_body_footnote();\n"
+                "        focused_body_footnote_package();\n"
+                "        focused_body_footnote_limits();\n"
+                "        publish_focused_body_footnote_commit();\n"
                 "    }\n"
                 "}\n"
                 "// editor.insert_body_footnote();\n"
@@ -32640,14 +32659,26 @@ fn rewrite_movie_title_operation(
                 "    pub fn set_slide_chart_arrangement(&mut self, slide_index: usize, drawable_object_id: u64, arrangement: ChartArrangement) -> Result<()> {\n"
                 "        parse_wire_fields(bytes); set_native_arrangement(self.package(), drawable_object_id, arrangement)\n"
                 "    }\n"
-                "}\n",
+                "}\n"
+                "fn chart_selector_for_drawable(editor: &KeynoteEditor, slide_index: usize, drawable_object_id: u64) -> Result<ChartSelector> { let _ = (editor, slide_index, drawable_object_id); todo!() }\n"
+                "#[cfg(test)]\n"
+                "fn set_slide_chart_arrangement(&mut self) {}\n"
+                "// fn slide_chart_arrangement(&self, drawable_object_id: u64) {}\n"
+                "const NOTE: &str = \"chart_selector_for_drawable\";\n",
                 encoding="utf-8",
             )
             violations = boundaries.audit_iwa_keynote_chart_arrangement_source_topology(root)
             self.assertTrue(any("native wire helper" in item for item in violations), violations)
-            self.assertTrue(any("must delegate to focused Package" in item for item in violations), violations)
             self.assertTrue(
-                any("raw-ID compatibility method must be deprecated" in item for item in violations),
+                any("raw-ID method slide_chart_arrangement" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("raw-ID method set_slide_chart_arrangement" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("selector helper chart_selector_for_drawable" in item for item in violations),
                 violations,
             )
             self.assertTrue(
@@ -32656,19 +32687,17 @@ fn rewrite_movie_title_operation(
             )
 
             host.write_text(
-                "use litchi_keynote::{ChartArrangement, Package as FocusedKeynotePackage, SlideSelector};\n"
+                "use litchi_keynote::{ChartArrangement, ChartSelector, Package as FocusedKeynotePackage, SlideSelector};\n"
                 "impl KeynoteEditor {\n"
-                "    #[deprecated]\n"
-                "    pub fn slide_chart_arrangement(&self, slide_index: usize, drawable_object_id: u64) -> Result<ChartArrangement> {\n"
-                "        let package = FocusedKeynotePackage::from_bytes(bytes)?;\n"
-                "        package.slide_chart_arrangement(slide_selector, chart_selector)\n"
+                "    pub fn slide_chart_arrangement_by_selector(&self, slide_index: usize, selector: ChartSelector) -> Result<ChartArrangement> {\n"
+                "        focused_chart_arrangement_package(self)?.slide_chart_arrangement(SlideSelector::index(slide_index), selector)\n"
                 "    }\n"
-                "    #[deprecated]\n"
-                "    pub fn set_slide_chart_arrangement(&mut self, slide_index: usize, drawable_object_id: u64, arrangement: ChartArrangement) -> Result<()> {\n"
-                "        let package = FocusedKeynotePackage::from_bytes(bytes)?;\n"
-                "        package.edit_slide_chart_arrangement(slide_selector, chart_selector).set(arrangement).commit()\n"
+                "    pub fn set_slide_chart_arrangement_by_selector(&mut self, slide_index: usize, selector: ChartSelector, arrangement: ChartArrangement) -> Result<()> {\n"
+                "        let package = focused_chart_arrangement_package(self)?;\n"
+                "        package.edit_slide_chart_arrangement(SlideSelector::index(slide_index), selector).set(arrangement).commit()\n"
                 "    }\n"
-                "}\n",
+                "}\n"
+                "fn focused_chart_arrangement_package(editor: &KeynoteEditor) -> Result<FocusedKeynotePackage> { let _ = editor; todo!() }\n",
                 encoding="utf-8",
             )
             host.write_text(
@@ -32725,18 +32754,7 @@ fn rewrite_movie_title_operation(
                 "        let package = focused_chart_arrangement_package(self)?;\n"
                 "        package.edit_slide_chart_arrangement(SlideSelector::index(slide_index), selector).set(arrangement).commit()\n"
                 "    }\n"
-                "    #[deprecated]\n"
-                "    pub fn slide_chart_arrangement(&self, slide_index: usize, drawable_object_id: u64) -> Result<ChartArrangement> {\n"
-                "        let selector = chart_selector_for_drawable(self, slide_index, drawable_object_id)?;\n"
-                "        self.slide_chart_arrangement_by_selector(slide_index, selector)\n"
-                "    }\n"
-                "    #[deprecated]\n"
-                "    pub fn set_slide_chart_arrangement(&mut self, slide_index: usize, drawable_object_id: u64, arrangement: ChartArrangement) -> Result<()> {\n"
-                "        let selector = chart_selector_for_drawable(self, slide_index, drawable_object_id)?;\n"
-                "        self.set_slide_chart_arrangement_by_selector(slide_index, selector, arrangement)\n"
-                "    }\n"
                 "}\n"
-                "fn chart_selector_for_drawable(editor: &KeynoteEditor, slide_index: usize, drawable_object_id: u64) -> Result<ChartSelector<'static>> { let _ = (editor, slide_index, drawable_object_id); todo!() }\n"
                 "fn focused_chart_arrangement_package(editor: &KeynoteEditor) -> Result<FocusedKeynotePackage> { let _ = editor; todo!() }\n",
                 encoding="utf-8",
             )
@@ -33473,13 +33491,19 @@ fn rewrite_movie_title_operation(
             )
             self.assertTrue(any("corpus must be nonempty" in item for item in violations), violations)
 
-    def test_iwa_numbers_table_cell_currency_format_requires_deprecated_selector_route(
+    def test_iwa_numbers_table_cell_currency_format_retires_raw_id_methods_helpers_and_tests(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             add_numbers_table_cell_currency_format_canonical_scaffold(root)
-            add_currency_format_selector_context_host(root, typed_location=True)
+            host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_SOURCE[0]
+            host.write_text(
+                "fn generic_currency_format_route() {\n"
+                "    cell_currency_format(); set_cell_currency_format(); reset_cell_currency_format();\n"
+                "}\n",
+                encoding="utf-8",
+            )
             self.assertEqual(
                 boundaries.audit_iwa_numbers_table_cell_currency_format_source_topology(
                     root
@@ -33487,45 +33511,65 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
-            add_currency_format_selector_context_host(root, typed_location=False)
+            host.write_text(
+                "impl NumbersEditor {\n"
+                + "".join(f"pub fn {method}(&self) {{}}\n" for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_METHODS)
+                + "}\n"
+                + "".join(f"fn {helper}() {{}}\n" for helper in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_FOCUSED_HELPERS),
+                encoding="utf-8",
+            )
+            test_source = root / boundaries.IWA_NUMBERS_EDITOR_TEST_SOURCE
+            test_source.parent.mkdir(parents=True, exist_ok=True)
+            test_source.write_text(
+                "#[cfg(test)]\n"
+                "mod currency_format_fallback_policy_tests {\n"
+                "    #[test] fn exact_sources_never_fallback_after_structural_admission_failure() {}\n"
+                "}\n"
+                "fn focused_currency_format_round_trips_through_legacy_host_bridge() {}\n"
+                "fn source_built_currency_format_keeps_legacy_host_compatibility() {}\n",
+                encoding="utf-8",
+            )
             violations = boundaries.audit_iwa_numbers_table_cell_currency_format_source_topology(
                 root
             )
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_METHODS:
                 self.assertTrue(
-                    any(
-                        "missing selector-first" in item and selector in item
-                        for item in violations
-                    ),
-                    (selector, violations),
+                    any(f"raw-ID method returned {method}" in item for item in violations),
+                    (method, violations),
+                )
+            for helper in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_FOCUSED_HELPERS:
+                self.assertTrue(
+                    any(f"focused bridge/fallback helper {helper}" in item for item in violations),
+                    (helper, violations),
+                )
+            for test_name in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_FOCUSED_TESTS:
+                self.assertTrue(
+                    any(f"focused bridge/fallback test {test_name}" in item for item in violations),
+                    (test_name, violations),
                 )
 
-            host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_SOURCE[0]
-            complete = host.read_text(encoding="utf-8")
             host.write_text(
-                complete.replace(
-                    "#[deprecated(note = \"legacy compatibility shell\")]\n",
-                    "",
-                    1,
-                ),
+                "// table_cell_currency_format(); focused_currency_format();\n"
+                'const NOTE: &str = "set_table_cell_currency_format focused_currency_format_fallback_policy_tests";\n'
+                "fn table_cell_currency_format_summary() {}\n"
+                "fn focused_currency_formatting() {}\n"
+                "#[cfg(test)]\n"
+                "fn test_decoy() { editor.reset_table_cell_currency_format(); }\n",
                 encoding="utf-8",
             )
-            violations = boundaries.audit_iwa_numbers_table_cell_currency_format_source_topology(
-                root
-            )
-            self.assertTrue(any("must remain deprecated" in item for item in violations), violations)
-
-            host.write_text(
-                complete.replace(
-                    "source.table_cell_currency_format(sheet, table, position)",
-                    "self.table_cell_currency_format(table_id, row, column)",
-                ),
+            test_source.write_text(
+                "// focused_currency_format_round_trips_through_legacy_host_bridge\n"
+                'const NOTE: &str = "source_built_currency_format_keeps_legacy_host_compatibility";\n'
+                "fn currency_format_fallback_policy_tests_extra() {}\n"
+                "fn exact_sources_never_fallback_after_structural_admission_failure_extra() {}\n",
                 encoding="utf-8",
             )
-            violations = boundaries.audit_iwa_numbers_table_cell_currency_format_source_topology(
-                root
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_currency_format_source_topology(
+                    root
+                ),
+                [],
             )
-            self.assertTrue(any("must delegate to focused Package" in item for item in violations), violations)
 
     def test_numbers_table_cell_currency_format_shared_core_rejects_duplicate_writer(
         self,
@@ -33746,13 +33790,19 @@ fn rewrite_movie_title_operation(
             )
             self.assertTrue(any("corpus must be nonempty" in item for item in violations), violations)
 
-    def test_iwa_numbers_table_cell_scientific_format_requires_deprecated_selector_route(
+    def test_iwa_numbers_table_cell_scientific_format_retires_raw_id_methods_helpers_and_tests(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             add_numbers_table_cell_scientific_format_canonical_scaffold(root)
-            add_scientific_format_selector_context_host(root, typed_location=True)
+            host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_SOURCE[0]
+            host.write_text(
+                "fn generic_scientific_format_route() {\n"
+                "    cell_scientific_format(); set_cell_scientific_format(); reset_cell_scientific_format();\n"
+                "}\n",
+                encoding="utf-8",
+            )
             self.assertEqual(
                 boundaries.audit_iwa_numbers_table_cell_scientific_format_source_topology(
                     root
@@ -33760,45 +33810,65 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
-            add_scientific_format_selector_context_host(root, typed_location=False)
+            host.write_text(
+                "impl NumbersEditor {\n"
+                + "".join(f"pub fn {method}(&self) {{}}\n" for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_METHODS)
+                + "}\n"
+                + "".join(f"fn {helper}() {{}}\n" for helper in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_FOCUSED_HELPERS),
+                encoding="utf-8",
+            )
+            test_source = root / boundaries.IWA_NUMBERS_EDITOR_TEST_SOURCE
+            test_source.parent.mkdir(parents=True, exist_ok=True)
+            test_source.write_text(
+                "#[cfg(test)]\n"
+                "mod scientific_format_fallback_policy_tests {\n"
+                "    #[test] fn exact_sources_never_fallback_after_structural_admission_failure() {}\n"
+                "}\n"
+                "fn focused_scientific_format_round_trips_through_legacy_host_bridge() {}\n"
+                "fn source_built_scientific_format_keeps_legacy_host_compatibility() {}\n",
+                encoding="utf-8",
+            )
             violations = boundaries.audit_iwa_numbers_table_cell_scientific_format_source_topology(
                 root
             )
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_METHODS:
                 self.assertTrue(
-                    any(
-                        "missing selector-first" in item and selector in item
-                        for item in violations
-                    ),
-                    (selector, violations),
+                    any(f"raw-ID method returned {method}" in item for item in violations),
+                    (method, violations),
+                )
+            for helper in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_FOCUSED_HELPERS:
+                self.assertTrue(
+                    any(f"focused bridge/fallback helper {helper}" in item for item in violations),
+                    (helper, violations),
+                )
+            for test_name in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_FOCUSED_TESTS:
+                self.assertTrue(
+                    any(f"focused bridge/fallback test {test_name}" in item for item in violations),
+                    (test_name, violations),
                 )
 
-            host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_SOURCE[0]
-            complete = host.read_text(encoding="utf-8")
             host.write_text(
-                complete.replace(
-                    "#[deprecated(note = \"legacy compatibility shell\")]\n",
-                    "",
-                    1,
-                ),
+                "// table_cell_scientific_format(); focused_scientific_format();\n"
+                'const NOTE: &str = "set_table_cell_scientific_format focused_scientific_format_fallback_policy_tests";\n'
+                "fn table_cell_scientific_format_summary() {}\n"
+                "fn focused_scientific_formatting() {}\n"
+                "#[cfg(test)]\n"
+                "fn test_decoy() { editor.reset_table_cell_scientific_format(); }\n",
                 encoding="utf-8",
             )
-            violations = boundaries.audit_iwa_numbers_table_cell_scientific_format_source_topology(
-                root
-            )
-            self.assertTrue(any("must remain deprecated" in item for item in violations), violations)
-
-            host.write_text(
-                complete.replace(
-                    "source.table_cell_scientific_format(sheet, table, position)",
-                    "self.table_cell_scientific_format(table_id, row, column)",
-                ),
+            test_source.write_text(
+                "// focused_scientific_format_round_trips_through_legacy_host_bridge\n"
+                'const NOTE: &str = "source_built_scientific_format_keeps_legacy_host_compatibility";\n'
+                "fn scientific_format_fallback_policy_tests_extra() {}\n"
+                "fn exact_sources_never_fallback_after_structural_admission_failure_extra() {}\n",
                 encoding="utf-8",
             )
-            violations = boundaries.audit_iwa_numbers_table_cell_scientific_format_source_topology(
-                root
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_scientific_format_source_topology(
+                    root
+                ),
+                [],
             )
-            self.assertTrue(any("must delegate to focused Package" in item for item in violations), violations)
 
     def test_numbers_table_cell_scientific_format_shared_core_rejects_duplicate_writer(
         self,
@@ -34312,63 +34382,19 @@ fn rewrite_movie_title_operation(
             )
             self.assertTrue(any("duplicate implementations rewrite_display_format" in item for item in violations), violations)
 
-    def test_iwa_numbers_table_cell_percentage_format_host_is_deprecated_focused_and_gated(
+    def test_iwa_numbers_table_cell_percentage_format_retires_raw_id_methods_helpers_and_tests(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             add_numbers_table_cell_percentage_format_canonical_scaffold(root)
-            self.assertEqual(
-                boundaries.audit_iwa_numbers_table_cell_percentage_format_source_topology(
-                    root
-                ),
-                [],
-            )
             host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_SOURCE[0]
-            complete = host.read_text(encoding="utf-8")
-            legacy_attribute = "#[deprecated(note = \"legacy compatibility shell\")]\n"
             host.write_text(
-                complete[: complete.rfind(legacy_attribute)]
-                + complete[complete.rfind(legacy_attribute) + len(legacy_attribute) :],
+                "fn generic_percentage_format_route() {\n"
+                "    cell_percentage_format(); set_cell_percentage_format(); reset_cell_percentage_format();\n"
+                "}\n",
                 encoding="utf-8",
             )
-            violations = boundaries.audit_iwa_numbers_table_cell_percentage_format_source_topology(
-                root
-            )
-            self.assertTrue(any("must remain deprecated" in item and "percentage_format" in item for item in violations), violations)
-
-            host.write_text(
-                complete.replace("source_is_exact", "source_was_exact"), encoding="utf-8"
-            )
-            violations = boundaries.audit_iwa_numbers_table_cell_percentage_format_source_topology(
-                root
-            )
-            self.assertTrue(any("missing exact-source provenance gate" in item for item in violations), violations)
-
-            host.write_text(
-                complete.replace("allow_family_replacement", "allow_any_family"), encoding="utf-8"
-            )
-            violations = boundaries.audit_iwa_numbers_table_cell_percentage_format_source_topology(
-                root
-            )
-            self.assertTrue(any("narrow family-replacement exception" in item for item in violations), violations)
-
-            host.write_text(
-                complete + "fn old_percentage_caller(editor: &NumbersEditor) { editor.set_table_cell_percentage_format(); }\n",
-                encoding="utf-8",
-            )
-            violations = boundaries.audit_iwa_numbers_table_cell_percentage_format_source_topology(
-                root
-            )
-            self.assertTrue(any("raw-ID production call set_table_cell_percentage_format" in item for item in violations), violations)
-
-    def test_iwa_numbers_table_cell_percentage_format_requires_typed_selector_context(
-        self,
-    ) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            add_numbers_table_cell_percentage_format_canonical_scaffold(root)
-            add_percentage_format_selector_context_host(root, typed_location=True)
             self.assertEqual(
                 boundaries.audit_iwa_numbers_table_cell_percentage_format_source_topology(
                     root
@@ -34376,18 +34402,65 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
-            add_percentage_format_selector_context_host(root, typed_location=False)
+            host.write_text(
+                "impl NumbersEditor {\n"
+                + "".join(f"pub fn {method}(&self) {{}}\n" for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_METHODS)
+                + "}\n"
+                + "".join(f"fn {helper}() {{}}\n" for helper in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_FOCUSED_HELPERS),
+                encoding="utf-8",
+            )
+            test_source = root / boundaries.IWA_NUMBERS_EDITOR_TEST_SOURCE
+            test_source.parent.mkdir(parents=True, exist_ok=True)
+            test_source.write_text(
+                "#[cfg(test)]\n"
+                "mod percentage_format_fallback_policy_tests {\n"
+                "    #[test] fn exact_sources_never_fallback_after_structural_admission_failure() {}\n"
+                "}\n"
+                "fn focused_percentage_format_round_trips_through_legacy_host_bridge() {}\n"
+                "fn source_built_percentage_format_keeps_legacy_host_compatibility() {}\n",
+                encoding="utf-8",
+            )
             violations = boundaries.audit_iwa_numbers_table_cell_percentage_format_source_topology(
                 root
             )
-            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+            for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_METHODS:
                 self.assertTrue(
-                    any(
-                        "missing selector-first" in item and selector in item
-                        for item in violations
-                    ),
-                    (selector, violations),
+                    any(f"raw-ID method returned {method}" in item for item in violations),
+                    (method, violations),
                 )
+            for helper in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_FOCUSED_HELPERS:
+                self.assertTrue(
+                    any(f"focused bridge/fallback helper {helper}" in item for item in violations),
+                    (helper, violations),
+                )
+            for test_name in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_FOCUSED_TESTS:
+                self.assertTrue(
+                    any(f"focused bridge/fallback test {test_name}" in item for item in violations),
+                    (test_name, violations),
+                )
+
+            host.write_text(
+                "// table_cell_percentage_format(); focused_percentage_format();\n"
+                'const NOTE: &str = "set_table_cell_percentage_format focused_percentage_format_fallback_policy_tests";\n'
+                "fn table_cell_percentage_format_summary() {}\n"
+                "fn focused_percentage_formatting() {}\n"
+                "#[cfg(test)]\n"
+                "fn test_decoy() { editor.reset_table_cell_percentage_format(); }\n",
+                encoding="utf-8",
+            )
+            test_source.write_text(
+                "// focused_percentage_format_round_trips_through_legacy_host_bridge\n"
+                'const NOTE: &str = "source_built_percentage_format_keeps_legacy_host_compatibility";\n'
+                "fn percentage_format_fallback_policy_tests_extra() {}\n"
+                "fn exact_sources_never_fallback_after_structural_admission_failure_extra() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_percentage_format_source_topology(
+                    root
+                ),
+                [],
+            )
 
     def test_numbers_table_cell_number_format_facade_rejects_raw_aliases_and_leaks(
         self,

@@ -758,7 +758,8 @@ impl<'a> ChartCaptionEdit<'a> {
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
     ) -> Result<Self, ChartCaptionError> {
-        let selection = select_caption(source, slide_selector.into(), chart_selector.into(), true)?;
+        let selection =
+            select_caption(source, slide_selector.into(), chart_selector.into(), false)?;
         let after = selection.text.as_deref().map(copy_caption).transpose()?;
         Ok(Self {
             source,
@@ -816,7 +817,7 @@ impl<'a> ChartCaptionEdit<'a> {
             self.source,
             SlideSelector::position(self.selection.slide_position),
             ChartSelector::index(self.selection.chart_position.get()),
-            true,
+            false,
         )?;
         if !current.same_identity(&self.selection) || current.text != self.selection.text {
             return Err(ChartCaptionError::InvalidSource);
@@ -841,6 +842,15 @@ impl<'a> ChartCaptionEdit<'a> {
             return Err(ChartCaptionError::UnsupportedSource);
         }
         self.source.validate().map_err(map_read_error)?;
+        let guarded = select_caption(
+            self.source,
+            SlideSelector::position(self.selection.slide_position),
+            ChartSelector::index(self.selection.chart_position.get()),
+            true,
+        )?;
+        if !guarded.same_identity(&self.selection) || guarded.text != self.selection.text {
+            return Err(ChartCaptionError::InvalidSource);
+        }
         let mut budget = CaptionBudget::for_package(self.source)?;
         budget.charge_catalog_scan(self.source)?;
         budget.charge_selection_scan(self.source, 1)?;
@@ -1095,7 +1105,7 @@ impl Package {
             self,
             SlideSelector::position(patch.selection.slide_position),
             ChartSelector::index(patch.selection.chart_position.get()),
-            true,
+            false,
         )?;
         if !current.same_identity(&patch.selection) || current.text != patch.selection.text {
             return Err(ChartCaptionError::PatchConflict);
@@ -1109,6 +1119,15 @@ impl Package {
             });
         }
         if !catalog.source_is_exact() {
+            return Err(ChartCaptionError::PatchConflict);
+        }
+        let guarded = select_caption(
+            self,
+            SlideSelector::position(patch.selection.slide_position),
+            ChartSelector::index(patch.selection.chart_position.get()),
+            true,
+        )?;
+        if !guarded.same_identity(&patch.selection) || guarded.text != patch.selection.text {
             return Err(ChartCaptionError::PatchConflict);
         }
         let mut budget = CaptionBudget::for_package(self)?;

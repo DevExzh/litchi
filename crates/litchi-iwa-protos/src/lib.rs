@@ -27,17 +27,17 @@ mod generated {
     include!(concat!(env!("OUT_DIR"), "/iwa_protos.rs"));
 }
 
-/// Private Buffa eager/lazy view sidecar for archive adapters.
+/// Private Buffa eager/lazy view projection for the archive-header adapter.
 ///
-/// The sidecar is deliberately not an untrusted-ingress API. In Buffa 0.9.1,
-/// deferred lazy message access rebuilds its decode context with recursion and
-/// unknown-field limits only; it does not retain the original
+/// The projection is deliberately not an untrusted-ingress API. In Buffa
+/// 0.9.1, deferred lazy message access rebuilds its decode context with
+/// recursion and unknown-field limits only; it does not retain the original
 /// `DecodeOptions::with_element_memory_limit` budget. Nested deferred
 /// allocations can therefore escape that initial element-memory accounting.
 /// Archive adapters must establish their own complete resource policy before
 /// accepting untrusted payloads through this path.
 #[doc(hidden)]
-mod buffa_generated {
+mod buffa_archive_header_generated {
     #![allow(
         elided_lifetimes_in_paths,
         reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
@@ -62,10 +62,49 @@ mod buffa_generated {
         clippy::arbitrary_source_item_ordering,
         clippy::module_name_repetitions,
         clippy::pedantic,
-        reason = "buffa-build output is generated from the native IWA schemas."
+        reason = "buffa-build output is generated from the archive-header projection."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-archive-header/iwa_archive_header_buffa_protos.rs"
+    ));
+}
+
+/// Private Buffa lazy-view projection for the nested Keynote movie
+/// `TSP.DataReference` envelope.
+#[doc(hidden)]
+mod buffa_data_reference_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The Buffa sidecar is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "buffa-build output is generated from the DataReference projection."
     )]
 
-    include!(concat!(env!("OUT_DIR"), "/buffa/iwa_buffa_protos.rs"));
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-data-reference/iwa_data_reference_buffa_protos.rs"
+    ));
 }
 
 /// Private Buffa lazy-view projection for `TSWP.StorageArchive.text` only.
@@ -1869,7 +1908,7 @@ mod tests {
         let prost_encoded = input.encode_to_vec();
 
         let buffa_decoded =
-            super::buffa_generated::TSP::ArchiveInfo::decode_from_slice(&prost_encoded)?;
+            super::buffa_archive_header_generated::LitchiIwaArchiveHeaderProjection::ArchiveInfo::decode_from_slice(&prost_encoded)?;
         assert_eq!(buffa_decoded.identifier, input.identifier);
         assert!(buffa_decoded.message_infos.is_empty());
         assert_eq!(buffa_decoded.should_merge, input.should_merge);
@@ -1882,9 +1921,9 @@ mod tests {
 
     #[test]
     fn buffa_archive_info_lazy_view_round_trips() -> Result<(), Box<dyn std::error::Error>> {
-        let input = super::buffa_generated::TSP::ArchiveInfo {
+        let input = super::buffa_archive_header_generated::LitchiIwaArchiveHeaderProjection::ArchiveInfo {
             identifier: Some(42),
-            message_infos: vec![super::buffa_generated::TSP::MessageInfo {
+            message_infos: vec![super::buffa_archive_header_generated::LitchiIwaArchiveHeaderProjection::MessageInfo {
                 r#type: 7,
                 length: 11,
                 ..Default::default()
@@ -1893,7 +1932,7 @@ mod tests {
             ..Default::default()
         };
         let encoded = input.try_encode_to_vec()?;
-        let lazy: super::buffa_generated::TSP::ArchiveInfoLazyView<'_> =
+        let lazy: super::buffa_archive_header_generated::LitchiIwaArchiveHeaderProjection::ArchiveInfoLazyView<'_> =
             buffa::DecodeOptions::new().decode_lazy_view(&encoded)?;
 
         assert_eq!(lazy.message_infos.len(), 1);
