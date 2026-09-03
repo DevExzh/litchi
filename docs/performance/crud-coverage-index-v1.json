@@ -1,0 +1,623 @@
+{
+  "schema_version": 1,
+  "index_kind": "crud-coverage-index",
+  "scope": {
+    "included_formats": "all supported non-iWork formats",
+    "excluded_formats": ["iWork"]
+  },
+  "taxonomy": {
+    "source": "docs/CRUD_Scenario_Checklist.md",
+    "category_count": 15,
+    "category_ids": [
+      "content-reading-extraction",
+      "structural-queries-analysis",
+      "conversion-export",
+      "creation-from-scratch",
+      "template-filling-targeted-replacement",
+      "append-incremental-generation",
+      "structural-editing",
+      "content-deletion-sanitization",
+      "cross-document-copying-assembly",
+      "merging-splitting",
+      "comparison-patching-three-way-merge",
+      "validation-repair-normalization",
+      "dynamic-content-calculation-refresh",
+      "security-protection-encryption-signing",
+      "low-level-package-part-relationship-stream-extension"
+    ]
+  },
+  "selector_registry": {
+    "source": "tools/perf-baseline/src/lib.rs",
+    "minimum_selectable_cases": 408
+  },
+  "checked_catalog": {
+    "path": "docs/performance/results/perf-corpus-manifest-v2.json",
+    "catalog_id": "litchi-perf-corpus-v2",
+    "catalog_sha256": "2add6164efd5d4324315d46327a53f1567c74d95f4cd719f898af1cb9c700297",
+    "content_set_sha256": "f0fad22aa4deed6ccf2f8ecc202222ee2c901aec3fe908e69edee0dbd46b1d71"
+  },
+  "status_values": ["measured", "correctness-only", "unsupported", "not-applicable"],
+  "status_semantics": {
+    "measured": "default-baseline timing contract: static identity binding is not timing evidence; scheduled/manual full runs must validate actual report rows",
+    "correctness-only": "selector or API evidence is retained without a baseline timing claim; emitted timing is not claimed here",
+    "unsupported": "no selector-backed evidence is claimed and an explicit reason is required",
+    "not-applicable": "the capability is deliberately outside this non-iWork coverage scope and an explicit reason is required"
+  },
+  "coverage_claim": "representative checklist mappings; this index is not an exhaustive certification of every checklist row",
+  "categories": [
+    {
+      "id": "content-reading-extraction",
+      "name": "Content reading and extraction",
+      "checklist_refs": ["Open valid input", "Malformed input is covered"],
+      "status": "measured",
+      "measurement": {
+        "kind": "full-run-timing-contract",
+        "identity_artifact": "docs/performance/results/perf-regression-default-manifest-v1.json",
+        "run_report": "target/perf/container-baseline.json",
+        "minimum_samples": 15
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xlsx_full_cell_scan",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "xlsx_full_cell_scan",
+            "ids": [
+              "xlsx-opc-zip:sha256:5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+              "xlsx-opc-zip:sha256:69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+              "xlsx-opc-zip:sha256:9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+            ],
+            "shapes": ["dense-wide", "medium", "tiny"]
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        }
+      ]
+    },
+    {
+      "id": "structural-queries-analysis",
+      "name": "Structural queries and document analysis",
+      "checklist_refs": ["Selection is checked", "Snapshot is immutable", "Unknown data is bounded"],
+      "status": "measured",
+      "measurement": {
+        "kind": "full-run-timing-contract",
+        "identity_artifact": "docs/performance/results/perf-regression-default-manifest-v1.json",
+        "run_report": "target/perf/container-baseline.json",
+        "minimum_samples": 15
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xlsx_list_sheets",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "xlsx_list_sheets",
+            "ids": [
+              "xlsx-opc-zip:sha256:5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+              "xlsx-opc-zip:sha256:69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+              "xlsx-opc-zip:sha256:9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+            ],
+            "shapes": ["dense-wide", "medium", "tiny"]
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        }
+      ]
+    },
+    {
+      "id": "conversion-export",
+      "name": "Conversion and export",
+      "checklist_refs": ["Compact XML output", "Referenced XML is compact"],
+      "status": "correctness-only",
+      "measurement": {
+        "kind": "correctness-only",
+        "reason": "This selector is retained as API/correctness evidence only; no retained baseline timing claim is made."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "rtf_semantic_text_to_sink",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["large", "medium", "tiny"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
+          "selector": "odt_semantic_text_to_sink",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["large", "medium", "tiny"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
+          "selector": "ods_semantic_text_to_sink",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["large", "medium", "tiny"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
+          "selector": "odp_semantic_text_to_sink",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["large", "medium", "tiny"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        }
+      ]
+    },
+    {
+      "id": "creation-from-scratch",
+      "name": "Creation from scratch",
+      "checklist_refs": ["Minimal valid artifact", "Deterministic output", "Package topology is valid"],
+      "status": "measured",
+      "measurement": {
+        "kind": "full-run-timing-contract",
+        "identity_artifact": "docs/performance/results/perf-regression-default-manifest-v1.json",
+        "run_report": "target/perf/container-baseline.json",
+        "minimum_samples": 15
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "doc_fresh_write_to",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "doc_fresh_write_to",
+            "ids": [
+              "doc-cfb:sha256:3d96764fe48e213b972ff5921df183dab9e8bfc8c8e751bcf3bf20190de4fec6",
+              "doc-cfb:sha256:707137ee82e4aebf7f68ac1d40ad94bc547d06270cece0bdac719a875a0cc388",
+              "doc-cfb:sha256:ec7824ca46413dbdb6c96ee01abf2d49ffa702046d675c04518eebf0ab3e4e3b"
+            ],
+            "shapes": ["large", "payload-heavy", "tiny"]
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
+          "selector": "xls_fresh_write_to",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "xls_fresh_write_to",
+            "ids": [
+              "xls-cfb:sha256:228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb",
+              "xls-cfb:sha256:cdc133bd87aaa60a91ea5e94df6ff8da0eb6bb0f2432afa4bfdb13cf70c0298b",
+              "xls-cfb:sha256:f0bec5d6a82d5d739a0993704751fb4da906183a4105b159d10e9b73969491fc"
+            ],
+            "shapes": ["large", "payload-heavy", "tiny"]
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
+          "selector": "ppt_fresh_write_to",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "ppt_fresh_write_to",
+            "ids": [
+              "ppt-cfb:sha256:229052cd918c0e5b7ef44070bafe20833531eee119b5943b18499503e225ff52",
+              "ppt-cfb:sha256:51686d86b2ca22c444c382565d065be7d92aecd9b6f7fdfb8597a2593d155ffb",
+              "ppt-cfb:sha256:e233c6b63928578c2429178c3ac8589b32d73d44df9953ac18c9d27f6968d8b4"
+            ],
+            "shapes": ["large", "payload-heavy", "tiny"]
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        }
+      ]
+    },
+    {
+      "id": "template-filling-targeted-replacement",
+      "name": "Template filling and targeted replacement",
+      "checklist_refs": ["Update each field family", "Read after create"],
+      "status": "measured",
+      "measurement": {
+        "kind": "full-run-timing-contract",
+        "identity_artifact": "docs/performance/results/perf-regression-default-manifest-v1.json",
+        "run_report": "target/perf/container-baseline.json",
+        "minimum_samples": 15
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xlsx_one_cell_commit",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "xlsx_one_cell_commit",
+            "ids": [
+              "xlsx-opc-zip:sha256:5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+              "xlsx-opc-zip:sha256:69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+              "xlsx-opc-zip:sha256:9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+            ],
+            "shapes": ["dense-wide", "medium", "tiny"]
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
+          "selector": "xlsx_one_percent_commit",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "xlsx_one_percent_commit",
+            "ids": [
+              "xlsx-opc-zip:sha256:5dd3ad701eb686f6d2d14e9f177a4e9433445728b57b484d53f663b2f87a7714",
+              "xlsx-opc-zip:sha256:69ef199769a316eaa465a41ebf08f7a1b501f708775fabd7a084a90dc6a9b428",
+              "xlsx-opc-zip:sha256:9574867b4f1ab4d30ce150de32d2a0b01267d15399ec9edd2c0d57b4bc60fab6"
+            ],
+            "shapes": ["dense-wide", "medium", "tiny"]
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        }
+      ]
+    },
+    {
+      "id": "append-incremental-generation",
+      "name": "Append-only and incremental generation",
+      "checklist_refs": ["Authoring is bounded", "Minimal valid artifact"],
+      "status": "correctness-only",
+      "measurement": {
+        "kind": "correctness-only",
+        "reason": "This selector is retained as API/correctness evidence only; no retained baseline timing claim is made."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xlsx_streaming_create",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["large", "medium", "tiny"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
+          "selector": "rtf_streaming_create",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["large", "medium", "tiny"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        }
+      ]
+    },
+    {
+      "id": "structural-editing",
+      "name": "Structural editing",
+      "checklist_refs": ["Create semantic owner", "Reorder or move", "Atomic failure"],
+      "status": "correctness-only",
+      "measurement": {
+        "kind": "correctness-only",
+        "reason": "This selector is retained as API/correctness evidence only; no retained baseline timing claim is made."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xlsx_eager_defined_names_edit_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["media-rich"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
+          "selector": "xlsx_eager_row_visibility_edit_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["large", "medium"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        }
+      ]
+    },
+    {
+      "id": "content-deletion-sanitization",
+      "name": "Content deletion and document sanitization",
+      "checklist_refs": ["Delete first/middle/last/only", "Unknown content survives", "Lossless-or-refuse is enforced"],
+      "status": "correctness-only",
+      "measurement": {
+        "kind": "correctness-only",
+        "reason": "This selector is retained as API/correctness evidence only; no retained baseline timing claim is made."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xlsx_eager_cell_remove_edit_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["dense-sparse", "medium"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
+          "selector": "docx_story_hyperlink_redaction_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["media-rich"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        }
+      ]
+    },
+    {
+      "id": "cross-document-copying-assembly",
+      "name": "Cross-document copying and assembly",
+      "checklist_refs": ["Package topology is valid", "Unknown content survives"],
+      "status": "correctness-only",
+      "measurement": {
+        "kind": "correctness-only",
+        "reason": "This selector is retained as API/correctness evidence only; no retained baseline timing claim is made."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "pptx_source_backed_cross_copy_plain",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["plain"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
+          "selector": "pptx_cross_copy_media_rich",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["media-rich"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        }
+      ]
+    },
+    {
+      "id": "merging-splitting",
+      "name": "Merging and splitting",
+      "checklist_refs": ["Reorder or move", "Reversible patch"],
+      "status": "correctness-only",
+      "measurement": {
+        "kind": "correctness-only",
+        "reason": "This selector is retained as API/correctness evidence only; no retained baseline timing claim is made."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xlsx_eager_merge_commit_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["sparse-a1-b2"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
+          "selector": "rtf_semantic_split_paragraph_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["large", "medium", "tiny"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        }
+      ]
+    },
+    {
+      "id": "comparison-patching-three-way-merge",
+      "name": "Comparison, patching, and three-way merge",
+      "checklist_refs": ["Reversible patch", "Concurrent composition"],
+      "status": "correctness-only",
+      "measurement": {
+        "kind": "correctness-only",
+        "reason": "This selector is retained as API/correctness evidence only; no retained baseline timing claim is made."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xlsx_join_disjoint_commit_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["medium"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
+          "selector": "xlsx_three_way_disjoint_commit_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["medium"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        }
+      ]
+    },
+    {
+      "id": "validation-repair-normalization",
+      "name": "Validation, repair, and normalization",
+      "checklist_refs": ["Malformed input is covered", "Unsupported states are explicit", "Diff and generated XML are audited"],
+      "status": "correctness-only",
+      "measurement": {
+        "kind": "correctness-only",
+        "reason": "This selector is retained as API/correctness evidence only; no retained baseline timing claim is made."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "odf_validation_report",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["large", "medium", "tiny"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
+          "selector": "odf_mimetype_repair_plan",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["large", "medium", "tiny"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        }
+      ]
+    },
+    {
+      "id": "dynamic-content-calculation-refresh",
+      "name": "Dynamic content calculation and refresh",
+      "checklist_refs": ["Formula behavior is capability-bound", "External targets remain inert"],
+      "status": "unsupported",
+      "measurement": {
+        "kind": "unsupported",
+        "reason": "No selector-backed evidence is claimed; explicit capability is required."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "status": "unsupported",
+          "reason": "No selector evaluates formulas or refreshes external content; those operations require an explicit caller capability and remain outside the inert performance harness."
+        }
+      ]
+    },
+    {
+      "id": "security-protection-encryption-signing",
+      "name": "Security, protection, encryption, and signing",
+      "checklist_refs": ["Signature policy is explicit", "Encryption policy is explicit", "Macros and VBA remain inert"],
+      "status": "correctness-only",
+      "measurement": {
+        "kind": "correctness-only",
+        "reason": "This selector is retained as API/correctness evidence only; no retained baseline timing claim is made."
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "xls_validation_report",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["large", "medium", "tiny"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
+          "selector": "xlsx_eager_sheet_protection_edit_save",
+          "status": "correctness-only",
+          "corpus": {
+            "kind": "generated-per-run",
+            "shapes": ["media-rich"],
+            "identity": "harness-generated schema-2 corpus IDs use format:sha256:<archive_sha256>"
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        }
+      ]
+    },
+    {
+      "id": "low-level-package-part-relationship-stream-extension",
+      "name": "Low-level package, Part, Relationship, stream, and extension operations",
+      "checklist_refs": ["Package topology is valid", "Unknown content survives"],
+      "status": "measured",
+      "measurement": {
+        "kind": "full-run-timing-contract",
+        "identity_artifact": "docs/performance/results/perf-regression-default-manifest-v1.json",
+        "run_report": "target/perf/container-baseline.json",
+        "minimum_samples": 15
+      },
+      "coverage_scope": "representative",
+      "scenarios": [
+        {
+          "selector": "cfb_list_streams",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "cfb_list_streams",
+            "ids": [
+              "cfb-ole2:sha256:186750b66895472e6c4b61bdd6e89d7cfd066baec1000cc0e9aab5d86457c0e8",
+              "cfb-ole2:sha256:2d26fb024fc844112843ca76e615e9402d722efd72aec35737c17085c80e5115",
+              "cfb-ole2:sha256:4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+              "cfb-ole2:sha256:50af945fdf091648da751193b28621eda6c5f80f9980fbceae4baf9014d8d6d8",
+              "cfb-ole2:sha256:6475ba52d3a442956caa0ca08f0e3dfad4ae93729baa179eee13b1ba0176515f",
+              "cfb-ole2:sha256:84f1dcb6b2f35b87a9abb4aa783cc9988172b368cb72956d72b11c0a0ec5f282",
+              "cfb-ole2:sha256:b9b1216d01da16665f0e2412c07cabc6fcc23905e9582f2cdb0f6121257227fe",
+              "cfb-ole2:sha256:dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c"
+            ],
+            "shapes": ["few-large", "many-small", "tiny", "wide-root"]
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
+          "selector": "cfb_read_one",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "cfb_read_one",
+            "ids": [
+              "cfb-ole2:sha256:186750b66895472e6c4b61bdd6e89d7cfd066baec1000cc0e9aab5d86457c0e8",
+              "cfb-ole2:sha256:2d26fb024fc844112843ca76e615e9402d722efd72aec35737c17085c80e5115",
+              "cfb-ole2:sha256:4b732058fb9f06fa9166208b207dff2339e2c9caf6e6091a06648a27b3ac4cfa",
+              "cfb-ole2:sha256:50af945fdf091648da751193b28621eda6c5f80f9980fbceae4baf9014d8d6d8",
+              "cfb-ole2:sha256:6475ba52d3a442956caa0ca08f0e3dfad4ae93729baa179eee13b1ba0176515f",
+              "cfb-ole2:sha256:84f1dcb6b2f35b87a9abb4aa783cc9988172b368cb72956d72b11c0a0ec5f282",
+              "cfb-ole2:sha256:b9b1216d01da16665f0e2412c07cabc6fcc23905e9582f2cdb0f6121257227fe",
+              "cfb-ole2:sha256:dca7a96c4548b37a7fd971835afffd0529433b34e07a192e3b9964e4803c634c"
+            ],
+            "shapes": ["few-large", "many-small", "tiny", "wide-root"]
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        },
+        {
+          "selector": "opc_open",
+          "status": "measured",
+          "corpus": {
+            "kind": "checked-catalog",
+            "case": "opc_open",
+            "ids": [
+              "opc-zip:sha256:08dc9000ef567838ec5c6d9121cdb35bccb68110c38d1c68eb308e3f060dee40",
+              "opc-zip:sha256:183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+              "opc-zip:sha256:1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a",
+              "opc-zip:sha256:879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+              "opc-zip:sha256:a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+              "opc-zip:sha256:b8ed826dc5627314aa1f2442b6313158ef48bab7622dce0994b94afe8cc2cfd7",
+              "opc-zip:sha256:c34438f16692121822ee71e6cd2103777f9d3c552eaf1c201db37a5c516ba4fb",
+              "opc-zip:sha256:c89c13841d987233e00cbf0fd9f40f35a56c463c5eb3aadd551fce1e008a9d35"
+            ],
+            "shapes": ["few-large", "many-small", "tiny", "wide-root"]
+          },
+          "evidence": ["tools/perf-baseline/README.md", "docs/performance/CRUD_COVERAGE.md"]
+        }
+      ]
+    }
+  ]
+}

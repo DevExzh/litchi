@@ -453,6 +453,104 @@ class PerformanceWorkflowPolicyTests(unittest.TestCase):
             r"(?m)^\s*target/perf/container-baseline\.corpus-manifest-v2\.json\s*$",
         )
 
+    def test_crud_coverage_index_is_validated_and_uploaded_with_full_baseline(self) -> None:
+        expected_arguments = (
+            r"python3\s+tools/validate_crud_coverage_index\.py\b",
+            r"--index\s+docs/performance/crud-coverage-index-v1\.json",
+            r"--catalog\s+docs/performance/results/perf-corpus-manifest-v2\.json",
+            r"--selector-source\s+tools/perf-baseline/src/lib\.rs",
+            r"--checklist\s+docs/CRUD_Scenario_Checklist\.md",
+            r"--repo-root\s+\.",
+        )
+        for job_name in ("smoke", "full"):
+            steps = [
+                step
+                for step in _steps(self.jobs[job_name])
+                if "Validate non-iWork CRUD coverage index" in step
+            ]
+            self.assertEqual(len(steps), 1, job_name)
+            run = _run_body(steps[0])
+            for expression in expected_arguments:
+                self.assertRegex(run, expression, msg=f"{job_name}: {expression}")
+
+        uploads = [
+            step
+            for step in _steps(self.jobs["full"])
+            if re.search(r"uses:\s*actions/upload-artifact@", step)
+            and "container-performance-baseline" in step
+        ]
+        self.assertEqual(len(uploads), 1)
+        self.assertRegex(
+            uploads[0],
+            r"(?m)^\s*target/perf/crud-coverage-index-v1\.json\s*$",
+        )
+
+        full_steps = _steps(self.jobs["full"])
+        baseline_index = next(
+            index
+            for index, step in enumerate(full_steps)
+            if "Run full release baseline matrix" in step
+        )
+        catalog_binding_index = next(
+            index
+            for index, step in enumerate(full_steps)
+            if "Validate full corpus catalog binding" in step
+        )
+        timing_contract_steps = [
+            (index, step)
+            for index, step in enumerate(full_steps)
+            if "Validate full CRUD coverage timing contract" in step
+        ]
+        self.assertEqual(len(timing_contract_steps), 1)
+        timing_contract_index, timing_contract = timing_contract_steps[0]
+        self.assertGreater(timing_contract_index, baseline_index)
+        self.assertGreater(timing_contract_index, catalog_binding_index)
+        timing_run = _run_body(timing_contract)
+        for expression in (
+            r"python3\s+tools/validate_crud_coverage_index\.py\b",
+            r"--index\s+docs/performance/crud-coverage-index-v1\.json",
+            r"--catalog\s+target/perf/container-baseline\.corpus-manifest-v2\.json",
+            r"--selector-source\s+tools/perf-baseline/src/lib\.rs",
+            r"--checklist\s+docs/CRUD_Scenario_Checklist\.md",
+            r"--repo-root\s+\.",
+            r"--report\s+target/perf/container-baseline\.json",
+        ):
+            self.assertRegex(timing_run, expression)
+        self.assertIn(
+            "cp docs/performance/crud-coverage-index-v1.json \\",
+            timing_run,
+        )
+        self.assertIn("target/perf/crud-coverage-index-v1.json", timing_run)
+        upload_index = next(
+            index
+            for index, step in enumerate(full_steps)
+            if re.search(r"uses:\s*actions/upload-artifact@", step)
+            and "container-performance-baseline" in step
+        )
+        self.assertGreater(upload_index, timing_contract_index)
+        self.assertRegex(
+            self.jobs["full"],
+            r"(?m)^    if: github\.event_name == 'schedule' \|\| github\.event_name == 'workflow_dispatch'",
+            msg="full timing contract must remain scheduled/manual only",
+        )
+
+    def test_crud_coverage_index_files_are_in_push_and_pull_request_path_triggers(self) -> None:
+        required_paths = (
+            "docs/CRUD_Scenario_Checklist.md",
+            "docs/performance/crud-coverage-index-v1.json",
+            "docs/performance/CRUD_COVERAGE.md",
+            "tools/validate_crud_coverage_index.py",
+            "tools/test_crud_coverage_index.py",
+        )
+        for event in ("push", "pull_request"):
+            section = _top_level_section(self.workflow, event)
+            for path in required_paths:
+                self.assertRegex(
+                    section,
+                    rf"(?m)^\s*-\s*['\"]?{re.escape(path)}['\"]?\s*(?:#.*)?$",
+                    msg=f"{event} path filter must include {path}",
+                )
+
     def test_full_resource_profile_uses_bounded_prebuilt_release_harness(self) -> None:
         profile_steps = [
             step

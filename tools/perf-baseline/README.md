@@ -50,6 +50,19 @@ fails report generation rather than publishing unverifiable provenance.
 The tool is intentionally outside the root workspace and has no effect on
 production dependency graphs.
 
+The non-iWork Phase-1 CRUD taxonomy is recorded in the machine-readable
+[`docs/performance/crud-coverage-index-v1.json`](../../docs/performance/crud-coverage-index-v1.json).
+It is a representative (not exhaustive) mapping: `measured` is reserved for
+the full-run timing contract; the checked identity artifact is not timing
+evidence. Scheduled/manual full runs validate `target/perf/container-baseline.json`
+with at least 15 samples for each measured selector/corpus. `correctness-only`
+rows explicitly make no retained baseline timing claim. Each category binds to
+exact selectors and either checked schema-2 corpus IDs or an explicit
+generated-per-run shape. Validate it with
+`python3 tools/validate_crud_coverage_index.py`; the checker reads the current
+selector registry directly, treats documentation paths as navigation only, and
+keeps unsupported work explicit.
+
 ## Real-producer security correctness corpus
 
 The ignored `security_corpus` test is a correctness-only gate over checked-in
