@@ -37,6 +37,39 @@ use crate::{
 
 const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
 
+#[cfg(test)]
+mod phase_observer {
+    use std::{cell::Cell, thread_local};
+
+    thread_local! {
+        static PREFLIGHT: Cell<usize> = const { Cell::new(0) };
+    }
+
+    pub(super) fn hit_preflight() {
+        PREFLIGHT.with(|counter| counter.set(counter.get().saturating_add(1)));
+    }
+
+    pub(super) fn reset() {
+        PREFLIGHT.with(|counter| counter.set(0));
+    }
+
+    pub(super) fn preflight_count() -> usize {
+        PREFLIGHT.with(Cell::get)
+    }
+}
+
+#[cfg(test)]
+macro_rules! preflight {
+    () => {
+        phase_observer::hit_preflight()
+    };
+}
+
+#[cfg(not(test))]
+macro_rules! preflight {
+    () => {};
+}
+
 /// A content-free location associated with a sort transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -735,6 +768,7 @@ impl TransactionBudget {
     }
 
     fn preflight_source(&mut self, source: &Package, path: Path) -> Result<(), Error> {
+        preflight!();
         let bytes = source.source_bytes().len();
         self.charge_input_bytes(bytes, path)?;
         self.charge_transaction_work(bytes.saturating_mul(2), path)?;
@@ -1030,8 +1064,6 @@ impl Package {
 
     /// Apply a reversible exact-source persisted-sort patch.
     pub fn apply_table_sort_order(&self, patch: &Patch) -> Result<Commit, Error> {
-        let mut budget = TransactionBudget::new(self);
-        budget.preflight_source(self, Path::Package)?;
         let catalog = physical_source(self)?;
         let source = catalog.__source_owner();
         if !patch.artifacts.authorizes_owner(&source) {
@@ -1044,6 +1076,8 @@ impl Package {
                 diagnostics: Diagnostics::unchanged(),
             });
         }
+        let mut budget = TransactionBudget::new(self);
+        budget.preflight_source(self, Path::Package)?;
         let current = resolve_at(
             self,
             patch.target.native.sheet_position,
@@ -1164,8 +1198,6 @@ fn resolve_at(
 }
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
-    let mut budget = TransactionBudget::new(edit.source);
-    budget.preflight_source(edit.source, edit.path())?;
     if edit.target.before == edit.after {
         let source = physical_source(edit.source)?.__source_owner();
         return Ok(Commit {
@@ -1179,6 +1211,8 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             diagnostics: Diagnostics::unchanged(),
         });
     }
+    let mut budget = TransactionBudget::new(edit.source);
+    budget.preflight_source(edit.source, edit.path())?;
     if edit.target.native.locked == LockState::Locked {
         return Err(Error::TableLocked { path: edit.path() });
     }
@@ -1735,4 +1769,71 @@ fn charge_budget(
     }
     *remaining = (*remaining).saturating_sub(amount);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fixture() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/numbers/basic.numbers")
+    }
+
+    #[test]
+    fn exact_noops_skip_preflight_and_malformed_changed_paths_still_fail()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let package = Package::open(fixture())?;
+        let source = package.source_bytes().to_vec();
+        let edit = package.edit_table_sort_order(0usize, 0usize)?;
+        let current = edit.order().cloned();
+
+        phase_observer::reset();
+        let commit = match current.clone() {
+            Some(order) => edit.set(order).commit()?,
+            None => edit.clear().commit()?,
+        };
+        assert_eq!(phase_observer::preflight_count(), 0);
+        assert!(commit.patch().is_noop());
+        assert!(commit.package().shares_snapshot(&package));
+        assert_eq!(commit.package().source_bytes(), source.as_slice());
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().touched_components(), 0);
+        assert!(!commit.diagnostics().full_reparse_performed());
+
+        let mut malformed_noop = commit.patch().clone();
+        malformed_noop.target.native.sheet_position = usize::MAX;
+        malformed_noop.target.native.table_position = usize::MAX;
+        phase_observer::reset();
+        let applied = package.apply_table_sort_order(&malformed_noop)?;
+        assert_eq!(phase_observer::preflight_count(), 0);
+        assert!(applied.package().shares_snapshot(&package));
+        assert_eq!(applied.package().source_bytes(), source.as_slice());
+        assert!(!applied.diagnostics().changed());
+        assert_eq!(applied.diagnostics().touched_components(), 0);
+        assert!(!applied.diagnostics().full_reparse_performed());
+
+        let changed = match current {
+            Some(_) => package
+                .edit_table_sort_order(0usize, 0usize)?
+                .clear()
+                .commit()?,
+            None => package
+                .edit_table_sort_order(0usize, 0usize)?
+                .set(Order::new([Rule::new(
+                    crate::table::sort::ColumnIndex::new(0)?,
+                    Direction::Ascending,
+                )])?)
+                .commit()?,
+        };
+        assert!(!changed.patch().is_noop());
+        let mut malformed_changed = changed.patch().clone();
+        malformed_changed.target.native.sheet_position = usize::MAX;
+        malformed_changed.target.native.table_position = usize::MAX;
+        phase_observer::reset();
+        assert!(package.apply_table_sort_order(&malformed_changed).is_err());
+        assert!(phase_observer::preflight_count() > 0);
+        assert_eq!(package.source_bytes(), source.as_slice());
+        Ok(())
+    }
 }

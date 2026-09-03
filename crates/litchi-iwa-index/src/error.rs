@@ -95,6 +95,8 @@ pub enum AllocationKind {
     FragmentObjectIds,
     /// The immutable fragment lookup entries assembled at build time.
     FragmentEntries,
+    /// The immutable incoming/outgoing reference graph assembled at build time.
+    ReferenceGraph,
 }
 
 impl fmt::Display for AllocationKind {
@@ -111,6 +113,7 @@ impl fmt::Display for AllocationKind {
             Self::FragmentObjectPairs => "fragment/object ordering pairs",
             Self::FragmentObjectIds => "fragment object identity storage",
             Self::FragmentEntries => "fragment lookup entries",
+            Self::ReferenceGraph => "reference graph storage",
         };
         formatter.write_str(name)
     }

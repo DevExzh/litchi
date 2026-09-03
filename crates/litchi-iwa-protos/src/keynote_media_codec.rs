@@ -15,7 +15,7 @@ use core::fmt;
 
 use buffa::DecodeOptions as BuffaDecodeOptions;
 
-use crate::buffa_generated::TSP::DataReferenceLazyView;
+use crate::buffa_data_reference_generated::LitchiIwaDataReferenceProjection::DataReferenceLazyView;
 
 const MAX_RECURSION_LIMIT: u32 = 64;
 const MAX_FIELD_NUMBER: u32 = 0x1fff_ffff;
@@ -517,9 +517,8 @@ mod tests {
 
     #[test]
     fn generated_data_reference_fixture_matches_lazy_message_shape() {
-        let source = crate::buffa_generated::TSP::DataReference {
+        let source = crate::buffa_data_reference_generated::LitchiIwaDataReferenceProjection::DataReference {
             identifier: 9,
-            ..Default::default()
         }
         .try_encode_to_vec()
         .unwrap();

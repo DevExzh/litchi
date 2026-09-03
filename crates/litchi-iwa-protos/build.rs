@@ -108,6 +108,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/pages_section_codec.rs");
     println!("cargo:rerun-if-changed=src/production_codec_guard.rs");
     println!("cargo:rerun-if-changed=src/table_info_codec.rs");
+    println!("cargo:rerun-if-changed=src/table_appearance_codec.rs");
     println!("cargo:rerun-if-changed=src/text_storage_codec.rs");
     println!("cargo:rerun-if-changed=src/lib.rs");
 
@@ -230,17 +231,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         .compile_protos(&proto_files, &[proto_directory])?;
 
     // Keep the archive-header sidecar isolated from format projections. Prost
-    // remains the full-corpus compatibility generator during migration.
-    let buffa_proto_files = [
-        proto_directory.join("TSPMessages.proto"),
-        proto_directory.join("TSPArchiveMessages.proto"),
-    ];
-    let buffa_out_directory = PathBuf::from(env::var("OUT_DIR")?).join("buffa");
+    // remains the full-corpus compatibility generator for the public schema
+    // API; Buffa receives only the bounded private header closure here.
+    let buffa_archive_header_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-archive-header");
     buffa_build::Config::new()
-        .files(&buffa_proto_files)
-        .includes(&[proto_directory])
-        .out_dir(&buffa_out_directory)
-        .include_file("iwa_buffa_protos.rs")
+        .files(&[buffa_projection_directory.join("TSPArchiveHeaderProjection.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_archive_header_out_directory)
+        .include_file("iwa_archive_header_buffa_protos.rs")
         .generate_views(true)
         .lazy_views(true)
         .preserve_unknown_fields(true)
@@ -249,7 +248,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         .reflect_mode(buffa_build::ReflectMode::Off)
         .idiomatic_field_names(true)
         .compile()?;
-    enforce_full_buffa_projection_budget(&buffa_out_directory)?;
+    enforce_archive_header_projection_budget(&buffa_archive_header_out_directory)?;
+
+    // Keynote movie media needs only the scalar TSP.DataReference envelope.
+    // Keep this sidecar independent from both the full TSP schema and the
+    // archive-header projection so neither route can widen the other.
+    let buffa_data_reference_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-data-reference");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSPDataReferenceProjection.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_data_reference_out_directory)
+        .include_file("iwa_data_reference_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_data_reference_projection_budget(&buffa_data_reference_out_directory)?;
 
     // The text decoder never encodes or preserves from its view: caller-owned
     // source bytes remain authoritative. Generate the tiny derived projection
@@ -1146,6 +1165,16 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
     // lazy ingress boundary while remaining under a per-generator budget.
     const EXPECTED_PROJECTIONS: &[(&str, usize, &str)] = &[
         (
+            "TSPArchiveHeaderProjection.proto",
+            2005,
+            "73d1dd85fe7e2e29e5fe0bcbaded613ef6ff3c30e4cd908f054a220ea02aabd0",
+        ),
+        (
+            "TSPDataReferenceProjection.proto",
+            275,
+            "a19e934a76924af3268fad0ac87e07ad9c3abd5e17c3bc4d0bfec56d2ec8c90a",
+        ),
+        (
             "KNDocumentArchive.proto",
             844,
             "d4dba9f6a73a35531e9c8bb9731504891000d415bb981b74f783710998630236",
@@ -1436,8 +1465,8 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
     const CODECS: &[(&str, &str, &str)] = &[
         (
             "src/archive_codec.rs",
-            "buffa_generated::TSP",
-            "mod buffa_generated {",
+            "buffa_archive_header_generated::LitchiIwaArchiveHeaderProjection",
+            "mod buffa_archive_header_generated {",
         ),
         (
             "src/text_storage_codec.rs",
@@ -1526,8 +1555,8 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
         ),
         (
             "src/keynote_media_codec.rs",
-            "crate::buffa_generated::TSP::",
-            "mod buffa_generated {",
+            "crate::buffa_data_reference_generated::LitchiIwaDataReferenceProjection::",
+            "mod buffa_data_reference_generated {",
         ),
         (
             "src/keynote_slide_transition_codec.rs",
@@ -6936,28 +6965,55 @@ fn enforce_text_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>
     Ok(())
 }
 
-fn enforce_full_buffa_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
-    // The archive/keynote sidecar intentionally covers the native TSP closure,
-    // including its repeated lazy views. Pin the generated surface so a schema
-    // or generator change cannot widen production's full-sidecar ingress
-    // without an explicit review.
+fn enforce_archive_header_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
     const EXPECTED_FILES: &[&str] = &[
-        "TSP.mod.rs",
-        "TSPArchiveMessages.__lazy_view.rs",
-        "TSPArchiveMessages.__view.rs",
-        "TSPArchiveMessages.rs",
-        "TSPMessages.__ext.rs",
-        "TSPMessages.__lazy_view.rs",
-        "TSPMessages.__view.rs",
-        "TSPMessages.rs",
-        "iwa_buffa_protos.rs",
+        "LitchiIwaArchiveHeaderProjection.mod.rs",
+        "TSPArchiveHeaderProjection.__lazy_view.rs",
+        "TSPArchiveHeaderProjection.__view.rs",
+        "TSPArchiveHeaderProjection.rs",
+        "iwa_archive_header_buffa_protos.rs",
     ];
-    const EXPECTED_GENERATED_BYTES: u64 = 2_761_538;
-    const EXPECTED_REPEATED_VIEWS: usize = 228;
-    const EXPECTED_LAZY_REPEATED_VIEWS: usize = 49;
-    const EXPECTED_DIGEST: &str =
-        "06db03da3614be74f6802feba5a0e1b647b320aae80ad023e326052e9e912e06";
 
+    enforce_exact_buffa_projection_budget(
+        directory,
+        "archive-header Buffa projection",
+        EXPECTED_FILES,
+        214394,
+        36,
+        3,
+        "a08cdb89cdcbe05fac17b3e8f89555d142b249162b3d951e6c255f9dcec23fec",
+    )
+}
+
+fn enforce_data_reference_projection_budget(directory: &Path) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: &[&str] = &[
+        "LitchiIwaDataReferenceProjection.mod.rs",
+        "TSPDataReferenceProjection.__lazy_view.rs",
+        "TSPDataReferenceProjection.__view.rs",
+        "TSPDataReferenceProjection.rs",
+        "iwa_data_reference_buffa_protos.rs",
+    ];
+
+    enforce_exact_buffa_projection_budget(
+        directory,
+        "DataReference Buffa projection",
+        EXPECTED_FILES,
+        25985,
+        0,
+        0,
+        "fd45b5589fe353985488d575b1dbe5f2e0267bcd9781966a21915feea37bd60f",
+    )
+}
+
+fn enforce_exact_buffa_projection_budget(
+    directory: &Path,
+    label: &str,
+    expected_files: &[&str],
+    expected_bytes: u64,
+    expected_repeated_views: usize,
+    expected_lazy_repeated_views: usize,
+    expected_digest: &str,
+) -> Result<(), Box<dyn Error>> {
     let mut entries = fs::read_dir(directory)?
         .map(|result| result.map(|entry| (entry.file_name(), entry.path(), entry.file_type())))
         .collect::<Result<Vec<_>, _>>()?;
@@ -6973,19 +7029,19 @@ fn enforce_full_buffa_projection_budget(directory: &Path) -> Result<(), Box<dyn 
         }
         names.push(
             name.into_string()
-                .map_err(|_name| "full Buffa sidecar generated a non-UTF-8 filename")?,
+                .map_err(|_name| format!("{label} generated a non-UTF-8 filename"))?,
         );
         let generated = fs::read(path)?;
         bytes = bytes
             .checked_add(u64::try_from(generated.len())?)
-            .ok_or("full Buffa sidecar generated-byte count overflow")?;
+            .ok_or_else(|| format!("{label} generated-byte count overflow"))?;
         let text = std::str::from_utf8(&generated)?;
         repeated_views = repeated_views
             .checked_add(text.matches("RepeatedView").count())
-            .ok_or("full Buffa sidecar repeated-view count overflow")?;
+            .ok_or_else(|| format!("{label} repeated-view count overflow"))?;
         lazy_repeated_views = lazy_repeated_views
             .checked_add(text.matches("LazyRepeatedView").count())
-            .ok_or("full Buffa sidecar lazy-repeated-view count overflow")?;
+            .ok_or_else(|| format!("{label} lazy-repeated-view count overflow"))?;
         digest.update(generated);
     }
     let aggregate_digest = digest
@@ -6993,14 +7049,19 @@ fn enforce_full_buffa_projection_budget(directory: &Path) -> Result<(), Box<dyn 
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect::<String>();
-    if names.iter().map(String::as_str).collect::<Vec<_>>() != EXPECTED_FILES
-        || bytes != EXPECTED_GENERATED_BYTES
-        || repeated_views != EXPECTED_REPEATED_VIEWS
-        || lazy_repeated_views != EXPECTED_LAZY_REPEATED_VIEWS
-        || aggregate_digest != EXPECTED_DIGEST
+    let mut expected_names = expected_files
+        .iter()
+        .map(|name| (*name).to_owned())
+        .collect::<Vec<_>>();
+    expected_names.sort_unstable();
+    if names != expected_names
+        || bytes != expected_bytes
+        || repeated_views != expected_repeated_views
+        || lazy_repeated_views != expected_lazy_repeated_views
+        || aggregate_digest != expected_digest
     {
         return Err(format!(
-            "full Buffa sidecar generated {names:?}/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions/digest {aggregate_digest}; expected exactly {EXPECTED_FILES:?}/{EXPECTED_GENERATED_BYTES} bytes/{EXPECTED_REPEATED_VIEWS} RepeatedView mentions/{EXPECTED_LAZY_REPEATED_VIEWS} LazyRepeatedView mentions/digest {EXPECTED_DIGEST}"
+            "{label} generated {names:?}/{bytes} bytes/{repeated_views} RepeatedView mentions/{lazy_repeated_views} LazyRepeatedView mentions/digest {aggregate_digest}; expected exactly {expected_names:?}/{expected_bytes} bytes/{expected_repeated_views} RepeatedView mentions/{expected_lazy_repeated_views} LazyRepeatedView mentions/digest {expected_digest}"
         )
         .into());
     }

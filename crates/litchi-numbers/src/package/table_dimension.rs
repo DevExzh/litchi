@@ -20,7 +20,11 @@ const HEADER_BUCKET_MESSAGE_TYPE: u32 = 6_006;
 
 #[cfg(test)]
 mod phase_observer {
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::{
+        cell::Cell,
+        sync::atomic::{AtomicUsize, Ordering},
+        thread_local,
+    };
 
     pub(super) static COMPONENT_ENCODE: AtomicUsize = AtomicUsize::new(0);
     pub(super) static REASSEMBLY: AtomicUsize = AtomicUsize::new(0);
@@ -28,6 +32,9 @@ mod phase_observer {
     pub(super) static REOPEN: AtomicUsize = AtomicUsize::new(0);
     pub(super) static LOCALITY: AtomicUsize = AtomicUsize::new(0);
     pub(super) static FINGERPRINT: AtomicUsize = AtomicUsize::new(0);
+    thread_local! {
+        static PREFLIGHT: Cell<usize> = const { Cell::new(0) };
+    }
 
     pub(super) fn hit(counter: &AtomicUsize) {
         counter.fetch_add(1, Ordering::Relaxed);
@@ -44,6 +51,7 @@ mod phase_observer {
         ] {
             counter.store(0, Ordering::Relaxed);
         }
+        PREFLIGHT.with(|counter| counter.set(0));
     }
 
     pub(super) fn snapshot() -> [usize; 6] {
@@ -56,6 +64,14 @@ mod phase_observer {
             FINGERPRINT.load(Ordering::Relaxed),
         ]
     }
+
+    pub(super) fn preflight_count() -> usize {
+        PREFLIGHT.with(Cell::get)
+    }
+
+    pub(super) fn hit_preflight() {
+        PREFLIGHT.with(|counter| counter.set(counter.get().saturating_add(1)));
+    }
 }
 
 #[cfg(test)]
@@ -63,6 +79,18 @@ macro_rules! phase {
     ($counter:ident) => {
         phase_observer::hit(&phase_observer::$counter)
     };
+}
+
+#[cfg(test)]
+macro_rules! preflight {
+    () => {
+        phase_observer::hit_preflight()
+    };
+}
+
+#[cfg(not(test))]
+macro_rules! preflight {
+    () => {};
 }
 
 #[cfg(not(test))]
@@ -285,8 +313,6 @@ impl Package {
     ///
     /// Returns a conflict unless this package is the patch's exact source.
     pub fn apply_table_dimension_size(&self, patch: &Patch) -> Result<Commit, TransactionError> {
-        let target_bytes = patch.artifacts.target_owner();
-        preflight_transaction_work(self, Some(target_bytes.as_ref()))?;
         let catalog = physical_source(self)?;
         let source = catalog.__source_owner();
         phase!(FINGERPRINT);
@@ -300,6 +326,8 @@ impl Package {
                 diagnostics: unchanged(),
             });
         }
+        let target_bytes = patch.artifacts.target_owner();
+        preflight_transaction_work(self, Some(target_bytes.as_ref()))?;
         let selected = resolve_at(
             self,
             patch.sheet_position,
@@ -340,7 +368,6 @@ impl Package {
 pub(crate) fn commit(edit: Edit<'_>) -> Result<Commit, TransactionError> {
     let catalog = physical_source(edit.source)?;
     if edit.before == edit.size {
-        preflight_transaction_work(edit.source, None)?;
         let source = catalog.__source_owner();
         phase!(FINGERPRINT);
         return Ok(Commit {
@@ -990,6 +1017,7 @@ fn preflight_transaction_work(
     source: &Package,
     target: Option<&[u8]>,
 ) -> Result<usize, TransactionError> {
+    preflight!();
     table_headers::rewrite::preflight_transaction_work(source, target).map_err(map_header_error)
 }
 
@@ -1423,6 +1451,55 @@ mod tests {
             } if observed > maximum && maximum == u64::try_from(exact - 1)?
         ));
         assert_eq!(phase_observer::snapshot(), [0; 6]);
+        Ok(())
+    }
+
+    #[test]
+    fn exact_noops_skip_preflight_and_malformed_changed_paths_still_fail()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let package = Package::open(fixture())?;
+        let source = package.source_bytes().to_vec();
+        let edit = package.edit_table_dimension_size(0usize, 0usize, Dimension::Column(2))?;
+        let size = edit.size();
+
+        phase_observer::reset();
+        let commit = edit.set(size).commit()?;
+        assert_eq!(phase_observer::preflight_count(), 0);
+        assert!(commit.patch().is_noop());
+        assert!(commit.package().shares_snapshot(&package));
+        assert_eq!(commit.package().source_bytes(), source.as_slice());
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().touched_components(), 0);
+        assert!(!commit.diagnostics().full_reparse_performed());
+
+        let mut malformed_noop = commit.patch().clone();
+        malformed_noop.sheet_position = usize::MAX;
+        malformed_noop.table_position = usize::MAX;
+        phase_observer::reset();
+        let applied = package.apply_table_dimension_size(&malformed_noop)?;
+        assert_eq!(phase_observer::preflight_count(), 0);
+        assert!(applied.package().shares_snapshot(&package));
+        assert_eq!(applied.package().source_bytes(), source.as_slice());
+        assert!(!applied.diagnostics().changed());
+        assert_eq!(applied.diagnostics().touched_components(), 0);
+        assert!(!applied.diagnostics().full_reparse_performed());
+
+        let changed = package
+            .edit_table_dimension_size(0usize, 0usize, Dimension::Column(2))?
+            .set(Size::points(124.0)?)
+            .commit()?;
+        assert!(!changed.patch().is_noop());
+        let mut malformed_changed = changed.patch().clone();
+        malformed_changed.sheet_position = usize::MAX;
+        malformed_changed.table_position = usize::MAX;
+        phase_observer::reset();
+        assert!(
+            package
+                .apply_table_dimension_size(&malformed_changed)
+                .is_err()
+        );
+        assert!(phase_observer::preflight_count() > 0);
+        assert_eq!(package.source_bytes(), source.as_slice());
         Ok(())
     }
 }

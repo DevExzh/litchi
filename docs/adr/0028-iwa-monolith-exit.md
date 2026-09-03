@@ -7451,3 +7451,87 @@ unpublished (`publish = false`); no package, dependency edge, ordered migration
 debt, or monolith-exit gate closes through this shell retirement. The focused
 owner's existing strict graph, source-preserving, and reopen evidence is not
 broadened by the host cleanup.
+
+## 2026-09-03 amendment: Numbers Percentage, Currency, and Scientific raw-ID convenience cutover
+
+The focused `litchi-numbers::Package` remains the canonical owner for
+existing-cell Percentage, Currency, and Scientific read/edit/apply transactions
+through semantic sheet and table selectors plus checked cell positions. The
+nine dedicated migration-host `NumbersEditor` convenience methods
+(`table_cell_percentage_format`, `set_table_cell_percentage_format`,
+`reset_table_cell_percentage_format`, `table_cell_currency_format`,
+`set_table_cell_currency_format`, `reset_table_cell_currency_format`,
+`table_cell_scientific_format`, `set_table_cell_scientific_format`, and
+`reset_table_cell_scientific_format`) and their format-specific
+focused-location, bridge, and fallback helpers and tests are removed. The
+boundary ratchet rejects their reintroduction.
+
+This remains a narrow host cutover. Generic source-built and cross-format
+`DataFormat::{Percentage,Currency,Scientific}` helpers remain valid in
+`litchi-iwa`, as do the attached-table helpers used by Pages and Keynote.
+The focused owners retain strict type-258, type-257, and type-259 wire
+preflight before lazy Buffa views, source-bound exact transactions, unknown
+and reference preservation, bounded candidate reopen/readback, and typed
+failure behavior. Existing package, wire, fuzz, and operation-specific native
+evidence remains scoped to those focused owners and is not broadened by this
+host cleanup.
+
+No package, dependency edge, ordered migration debt, migration host, or whole
+monolith-exit deletion gate closes. The current topology remains 64 workspace
+packages, 238 internal dependency declarations, 227 canonical edges, 11
+development-only edges, 11 ordered migration debts, and one migration host.
+
+## 2026-09-03 amendment: focused wire, transaction, and host-boundary hardening
+
+This wave narrows several remaining migration-host surfaces without changing
+the crate topology. The obsolete `Bundle::{from_archive_bytes,
+from_archive_bytes_with_limits}` aliases are removed in favor of the canonical
+constructors. Pages no longer exposes the body-footnote convenience facade;
+its retained host internals are limited to cleanup, graph maintenance, and
+focused test support. Keynote removes the raw-ID chart-arrangement host methods
+and the entire slide-background host shell and its eager wire oracles. The
+selector-first focused `litchi-keynote::Package` owners remain canonical, and
+the boundary ratchet rejects reintroduction of the retired aliases, methods,
+modules, reexports, and tests.
+
+Two production Buffa sidecars are reduced from the full TSP import closure to
+private, exact projections: the archive-header projection carries only the
+canonical header fields, enums, and defaults used by the archive codec, while
+the data-reference projection carries only its required identifier. Build-time
+file-count, byte-count, and digest ratchets bind both projection closures.
+Their Prost-facing compatibility surface and raw-byte preservation behavior do
+not change. Within the host, Numbers table-info formula discovery, text storage
+inspection, and data-store reference extraction now use strict bounded lazy
+projections instead of eager generated-message materialization. Raw records
+remain authoritative for preservation and mutation.
+
+Focused transaction contracts are tightened in place. Numbers table dimension
+and physical sort, Pages body-table appearance, and Keynote chart captions now
+recognize exact semantic no-ops before changed-only ownership and provenance
+work. Pages appearance apply and Keynote placeholder visibility reject changed
+patches whose exact source provenance is not proven, and Keynote slide
+background no-op identity includes the target style. Corresponding shared,
+prepared-source, mismatch, deterministic, and exact-no-op regressions preserve
+failure atomicity. Reference-graph/index construction also gains fallible bulk
+paths and expected-linear edge deduplication so large graph planning no longer
+depends on repeated linear membership scans or infallible large buffers.
+
+Representative current-producer evidence was rerun for the focused Numbers
+Scientific owner. Numbers authored a package containing the marker `Litchi
+focused package verification` and scalar `42`; after the native cell was set to
+Scientific with two decimals, the selector-first transaction changed checked
+cell `B3` to seven decimals. The focused candidate opened in Numbers as
+`4.2000000E+01`, retained the marker and scalar, exposed Scientific/seven in the
+cell formatter, and survived native Save As, close, and reopen without repair
+or conversion. The inverse restored the exact source bytes (source/inverse
+SHA-256 `b9a3599786d2394fd0a0aa894a639737d5faf183c1168be0081bfa83b16121c0`),
+and restaging seven decimals after the native resave was byte-identical with
+zero touched components and no full reparse (SHA-256
+`7f1cbabfb02979b0229b82f4959b9d8402b0b0bc3c00463c59ed41a6931a98e4`).
+This is operation-specific evidence, not arbitrary-producer or package-wide
+native certification.
+
+No package, dependency edge, ordered migration debt, migration host, or whole
+monolith-exit deletion gate closes. The current topology remains 64 workspace
+packages, 238 internal dependency declarations, 227 canonical edges, 11
+development-only edges, 11 ordered migration debts, and one migration host.

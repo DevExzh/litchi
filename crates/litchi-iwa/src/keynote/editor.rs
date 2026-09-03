@@ -51,8 +51,6 @@ use crate::text::{
     TextLanguage, TextLanguageRun, TextLigatures, TextRange, TextScript, TextStorageId,
     TextStorageInfo, TextStyle,
 };
-#[cfg(test)]
-use crate::wire::parse_wire_fields;
 use crate::wire::{
     append_repeated_length_delimited_field, patch_fixed32_field, patch_fixed64_field,
     patch_length_delimited_field, patch_nested_fixed32_field, patch_nested_length_delimited_field,
@@ -5365,11 +5363,6 @@ mod keynote_object_catalog;
 mod named_paragraph_styles;
 mod placeholder_ownership;
 mod slide_audio;
-mod slide_background;
-#[cfg(test)]
-mod slide_background_color;
-#[cfg(test)]
-mod slide_background_gradient_wire;
 mod slide_charts;
 mod slide_create;
 mod slide_graph;
@@ -5384,9 +5377,7 @@ mod text_box_create;
 mod transition;
 
 use builds::*;
-pub use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 pub use litchi_keynote::Seconds;
-pub use litchi_keynote::background::{Angle, Background, Gradient, Kind, Opaque, Stop};
 pub use litchi_keynote::show::{Mode, Settings, Size};
 pub use litchi_keynote::slide::media::MovieKind;
 pub use litchi_keynote::transition::Effect;

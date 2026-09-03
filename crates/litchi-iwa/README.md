@@ -1224,6 +1224,12 @@ transactions, not `NumbersEditor` raw-ID calls. They stage a complete batch
 before publication, so any rejected coordinate, dependency, or cache update
 leaves the package unchanged:
 
+Existing-cell Percentage, Currency, and Scientific format transactions follow
+the same focused-package rule. Their former `NumbersEditor` raw-ID convenience
+methods and format-specific bridge/fallback helpers are retired; generic
+source-built or cross-format `DataFormat` compatibility helpers and attached
+table callers remain migration-host-only compatibility surfaces.
+
 ```rust,no_run
 use litchi_numbers::{Package, SheetSelector, TableSelector};
 use litchi_numbers::table::cells::Input;

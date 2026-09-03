@@ -307,16 +307,28 @@ impl IndexBuilder {
             objects
         };
 
-        let mut graph = ReferenceGraph::new();
-        for reference in self.references {
-            graph.add_object_reference(reference.source(), reference.target());
-        }
+        let reference_count = self.references.len();
+        let graph = ReferenceGraph::try_from_edges(
+            self.references
+                .into_iter()
+                .map(|reference| (reference.source(), reference.target())),
+        )
+        .map_err(|_error| IndexError::Allocation {
+            kind: AllocationKind::ReferenceGraph,
+            requested: reference_count,
+        })?;
+        let graph = graph
+            .try_snapshot()
+            .map_err(|_error| IndexError::Allocation {
+                kind: AllocationKind::ReferenceGraph,
+                requested: reference_count,
+            })?;
 
         Ok(ObjectIndex {
             objects: snapshot_objects.into_boxed_slice(),
             fragments: fragment_entries.into_boxed_slice(),
             fragment_object_ids: fragment_object_ids.into_boxed_slice(),
-            graph: graph.snapshot(),
+            graph,
         })
     }
 }
@@ -817,6 +829,72 @@ mod tests {
         assert_eq!(
             index.outgoing(source).map(Iterator::collect::<Vec<_>>),
             Some(vec![target])
+        );
+    }
+
+    #[test]
+    fn bulk_graph_build_preserves_high_degree_order_and_deduplication() {
+        const DEGREE: u64 = 1_024;
+        let fragment_id = fragment(1);
+        let star_source = object(1);
+        let sink = object(DEGREE.saturating_mul(2).saturating_add(2));
+        let star_targets = (2..=DEGREE.saturating_add(1))
+            .map(object)
+            .collect::<Vec<_>>();
+        let incoming_sources = (DEGREE.saturating_add(2)
+            ..=DEGREE.saturating_mul(2).saturating_add(1))
+            .map(object)
+            .collect::<Vec<_>>();
+
+        let mut builder = IndexBuilder::new();
+        builder.add_fragment(fragment_id).expect("fragment");
+        builder
+            .add_object(ObjectRecord::new(star_source, fragment_id, span(0, 1)))
+            .expect("star source");
+        for (position, source) in incoming_sources.iter().copied().enumerate() {
+            builder
+                .add_object(ObjectRecord::new(
+                    source,
+                    fragment_id,
+                    span(u64::try_from(position + 1).unwrap(), 1),
+                ))
+                .expect("incoming source");
+        }
+        for target in star_targets.iter().copied() {
+            assert!(
+                builder
+                    .add_reference_if_absent(star_source, target)
+                    .expect("star edge")
+            );
+        }
+        for source in incoming_sources.iter().copied() {
+            assert!(
+                builder
+                    .add_reference_if_absent(source, sink)
+                    .expect("incoming edge")
+            );
+        }
+        assert!(
+            !builder
+                .add_reference_if_absent(star_source, star_targets[0])
+                .expect("duplicate edge")
+        );
+
+        let index = builder
+            .build_allow_missing_targets()
+            .expect("high-degree index");
+
+        assert_eq!(
+            index.outgoing(star_source).map(Iterator::collect::<Vec<_>>),
+            Some(star_targets)
+        );
+        assert_eq!(
+            index.incoming(sink).map(Iterator::collect::<Vec<_>>),
+            Some(incoming_sources)
+        );
+        assert_eq!(
+            index.reference_count(),
+            usize::try_from(DEGREE * 2).unwrap()
         );
     }
 

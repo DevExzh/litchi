@@ -1440,6 +1440,38 @@ fn no_op_is_exact_and_changed_graph_without_metadata_fails_closed() -> TestResul
 }
 
 #[test]
+fn semantic_noop_skips_changed_only_caption_ownership_guards() -> TestResult<()> {
+    let source = shared_metadata_graph_source()?;
+    let package = Package::from_bytes(&source)?;
+    let no_op = package
+        .edit_slide_chart_caption(0usize, 0usize)?
+        .set("North")?
+        .commit()?;
+    assert!(no_op.patch().is_noop());
+    assert!(!no_op.diagnostics().changed());
+    assert_eq!(no_op.diagnostics().touched_components(), 0);
+    assert_eq!(no_op.diagnostics().deleted_previews(), 0);
+    assert!(!no_op.diagnostics().full_reparse_performed());
+    assert_eq!(exact_bytes(no_op.package())?, source);
+
+    let applied = package.apply_slide_chart_caption(no_op.patch())?;
+    assert!(applied.patch().is_noop());
+    assert!(!applied.diagnostics().changed());
+    assert_eq!(exact_bytes(applied.package())?, source);
+
+    let changed = package
+        .edit_slide_chart_caption(0usize, 0usize)?
+        .set("fresh caption")?
+        .commit();
+    assert!(matches!(
+        changed,
+        Err(ChartCaptionError::InvalidSource | ChartCaptionError::UnsupportedDependency)
+    ));
+    assert_eq!(exact_bytes(&package)?, source);
+    Ok(())
+}
+
+#[test]
 fn semantic_selectors_report_missing_and_ambiguous_charts() -> TestResult<()> {
     let package = Package::from_bytes(&synthetic_package()?)?;
     assert!(matches!(

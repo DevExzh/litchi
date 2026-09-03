@@ -57,8 +57,8 @@ use litchi_iwa_common::comment::{
 use litchi_iwa_common::table::appearance::Appearance;
 use litchi_iwa_common::table::cell::conditional_highlight::Rule;
 use litchi_numbers::cell::data_format::{
-    Checkbox, Currency, Custom, DataFormat, DateTime, Duration, Fraction, Number, NumeralSystem,
-    Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper, Text,
+    Checkbox, Custom, DataFormat, DateTime, Duration, Fraction, Number, NumeralSystem, PopUpMenu,
+    Slider, StarRating, Stepper, Text,
 };
 
 #[path = "semantic/drawables.rs"]

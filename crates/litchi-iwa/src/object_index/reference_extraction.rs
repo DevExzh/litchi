@@ -643,21 +643,20 @@ fn extract_tst_table_model_references(
     source: &[u8],
 ) -> Result<()> {
     let options = tst_storage_decode_options(source);
-    let Ok((table, _report)) =
-        numbers_table_cell_storage_codec::decode_table_model_with_report(source, options)
+    let Ok((projection, _report)) =
+        numbers_table_cell_storage_codec::decode_table_model_with_data_store_and_visitor(
+            source,
+            options,
+            &mut (),
+        )
     else {
         // Compatibility reference extraction has always ignored malformed
         // payloads. No edge is published until both the model and its
         // selected data-store projection have completed.
         return Ok(());
     };
-    let data_store_source = table.base_data_store();
-    let Ok((data_store, _report)) = numbers_table_cell_storage_codec::decode_data_store_with_report(
-        data_store_source,
-        tst_storage_decode_options(data_store_source),
-    ) else {
-        return Ok(());
-    };
+    let table = projection.model();
+    let data_store = projection.data_store();
 
     let mut staged = TstReferences::default();
     for reference in [
@@ -1382,6 +1381,30 @@ mod tests {
                 .matches("keynote_show_codec::decode_references(")
                 .count(),
             1
+        );
+    }
+
+    #[test]
+    fn tst_table_model_ingress_uses_combined_model_store_projection() {
+        let source = include_str!("reference_extraction.rs");
+        let production = source
+            .split_once("#[cfg(test)]")
+            .map_or(source, |(production, _tests)| production);
+        assert_eq!(
+            production
+                .matches(
+                    "numbers_table_cell_storage_codec::decode_table_model_with_data_store_and_visitor("
+                )
+                .count(),
+            1
+        );
+        assert!(
+            !production
+                .contains("numbers_table_cell_storage_codec::decode_table_model_with_report(")
+        );
+        assert!(
+            !production
+                .contains("numbers_table_cell_storage_codec::decode_data_store_with_report(")
         );
     }
 

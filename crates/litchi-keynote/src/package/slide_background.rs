@@ -346,6 +346,7 @@ impl SlideBackgroundPatch {
         self.artifacts.is_byte_noop()
             && self.before == self.target_effective
             && self.before_override == self.target_override
+            && self.style_identifier == self.target_style_identifier
     }
 
     /// Return compact source provenance.
@@ -3868,6 +3869,35 @@ mod tests {
         };
 
         assert!(patch.artifacts.is_byte_noop());
+        assert!(!patch.is_noop());
+    }
+
+    #[test]
+    fn target_style_mismatch_is_not_a_noop() {
+        let source = Arc::<[u8]>::from(&b"same source bytes"[..]);
+        let background = Background::Solid(
+            Rgba::new(0.25, 0.5, 0.75, 1.0, RgbColorSpace::Srgb).expect("test color is valid"),
+        );
+        let patch = SlideBackgroundPatch {
+            artifacts: ExactArtifacts::new(Arc::clone(&source), source),
+            slide_position: Position::new(0),
+            slide_identifier: 1,
+            style_identifier: 2,
+            target_style_identifier: 3,
+            before: background.clone(),
+            before_override: Some(background.clone()),
+            after: Some(background.clone()),
+            target_effective: background.clone(),
+            target_override: Some(background),
+            reset: false,
+            touched_components: 0,
+            deleted_previews: 0,
+        };
+
+        assert!(patch.artifacts.is_byte_noop());
+        assert_eq!(patch.before, patch.target_effective);
+        assert_eq!(patch.before_override, patch.target_override);
+        assert_ne!(patch.style_identifier, patch.target_style_identifier);
         assert!(!patch.is_noop());
     }
 }
