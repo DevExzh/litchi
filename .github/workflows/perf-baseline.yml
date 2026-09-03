@@ -50,6 +50,8 @@ on:
       - 'tools/perf_resource_profile.py'
       - 'tools/validate_perf_corpus_binding.py'
       - 'tools/test_perf_corpus_binding.py'
+      - 'tools/validate_crud_coverage_index.py'
+      - 'tools/test_crud_coverage_index.py'
       - 'tools/test_perf_resource_profile.py'
       - 'tools/test_perf_baseline_source_policy.py'
       - 'tools/test_perf_workflow_policy.py'
@@ -65,6 +67,9 @@ on:
       - 'docs/performance/perf-regression-policy-allocator-v1.json'
       - 'docs/performance/perf-regression-policy-xlsx-allocator-v1.json'
       - 'docs/performance/results/perf-regression-allocator-manifest-v1.json'
+      - 'docs/performance/crud-coverage-index-v1.json'
+      - 'docs/performance/CRUD_COVERAGE.md'
+      - 'docs/CRUD_Scenario_Checklist.md'
       - 'docs/performance/results/**'
       - 'docs/performance/changes/**'
       - 'docs/performance/REGRESSION_COMPARATOR.md'
@@ -118,6 +123,8 @@ on:
       - 'tools/perf_resource_profile.py'
       - 'tools/validate_perf_corpus_binding.py'
       - 'tools/test_perf_corpus_binding.py'
+      - 'tools/validate_crud_coverage_index.py'
+      - 'tools/test_crud_coverage_index.py'
       - 'tools/test_perf_resource_profile.py'
       - 'tools/test_perf_baseline_source_policy.py'
       - 'tools/test_perf_workflow_policy.py'
@@ -133,6 +140,9 @@ on:
       - 'docs/performance/perf-regression-policy-allocator-v1.json'
       - 'docs/performance/perf-regression-policy-xlsx-allocator-v1.json'
       - 'docs/performance/results/perf-regression-allocator-manifest-v1.json'
+      - 'docs/performance/crud-coverage-index-v1.json'
+      - 'docs/performance/CRUD_COVERAGE.md'
+      - 'docs/CRUD_Scenario_Checklist.md'
       - 'docs/performance/results/**'
       - 'docs/performance/changes/**'
       - 'docs/performance/REGRESSION_COMPARATOR.md'
@@ -290,6 +300,7 @@ jobs:
             tools.test_perf_abba_package \
             tools.test_perf_resource_profile \
             tools.test_perf_corpus_binding \
+            tools.test_crud_coverage_index \
             tools.test_perf_workflow_policy
 
       - name: Test benchmark source policy
@@ -303,6 +314,15 @@ jobs:
             --evidence-root . \
             --mode strict
           python3 -m unittest tools.test_perf_claims
+
+      - name: Validate non-iWork CRUD coverage index
+        run: |
+          python3 tools/validate_crud_coverage_index.py \
+            --index docs/performance/crud-coverage-index-v1.json \
+            --catalog docs/performance/results/perf-corpus-manifest-v2.json \
+            --selector-source tools/perf-baseline/src/lib.rs \
+            --checklist docs/CRUD_Scenario_Checklist.md \
+            --repo-root .
 
       - name: Check historical REPORT claim classification
         run: |
@@ -1377,6 +1397,16 @@ jobs:
             --mode strict
           python3 -m unittest tools.test_perf_claims
 
+      - name: Validate non-iWork CRUD coverage index
+        run: |
+          mkdir -p target/perf
+          python3 tools/validate_crud_coverage_index.py \
+            --index docs/performance/crud-coverage-index-v1.json \
+            --catalog docs/performance/results/perf-corpus-manifest-v2.json \
+            --selector-source tools/perf-baseline/src/lib.rs \
+            --checklist docs/CRUD_Scenario_Checklist.md \
+            --repo-root .
+
       - name: Build release harness
         run: cargo build --release --locked --manifest-path "$PERF_MANIFEST"
 
@@ -1496,6 +1526,18 @@ jobs:
           python3 tools/validate_perf_corpus_binding.py \
             --report target/perf/container-baseline.json \
             --catalog target/perf/container-baseline.corpus-manifest-v2.json
+
+      - name: Validate full CRUD coverage timing contract
+        run: |
+          python3 tools/validate_crud_coverage_index.py \
+            --index docs/performance/crud-coverage-index-v1.json \
+            --catalog target/perf/container-baseline.corpus-manifest-v2.json \
+            --selector-source tools/perf-baseline/src/lib.rs \
+            --checklist docs/CRUD_Scenario_Checklist.md \
+            --repo-root . \
+            --report target/perf/container-baseline.json
+          cp docs/performance/crud-coverage-index-v1.json \
+            target/perf/crud-coverage-index-v1.json
 
       - name: Validate full baseline report shape
         run: |
@@ -2442,6 +2484,7 @@ jobs:
           path: |
             target/perf/container-baseline.json
             target/perf/container-baseline.corpus-manifest-v2.json
+            target/perf/crud-coverage-index-v1.json
             target/perf/resource-profile.json
             target/perf/xlsx-commit-read-baseline.json
             target/perf/opc-source-overlay-baseline.json

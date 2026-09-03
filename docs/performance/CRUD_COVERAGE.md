@@ -1,5 +1,23 @@
 # Performance CRUD coverage
 
+## 2026-09-03: change 0389 adds the non-iWork CRUD coverage index
+
+The machine-readable [`crud-coverage-index-v1.json`](crud-coverage-index-v1.json)
+maps the fifteen Phase-1 CRUD categories to exact harness selectors, checked
+schema-2 corpus identities or generated-per-run shapes, and explicit
+`measured`, `correctness-only`, `unsupported`, or `not-applicable` statuses.
+The index is representative rather than exhaustive: its category status is
+derived from the retained scenario rows, with `measured` reserved for rows
+bound to a full-run timing contract. The checked identity artifact is not
+timing evidence: scheduled/manual runs must supply the report at
+`target/perf/container-baseline.json` with at least 15 validated samples per
+measured selector/corpus. `correctness-only` explicitly makes no retained
+baseline timing claim. The index's documentation paths are navigation only;
+their existence does not substantiate behavior. `tools/validate_crud_coverage_index.py`
+binds those references to the current 408-plus selector registry and rejects
+stale selectors or corpus identities, invalid status/timing-contract bindings,
+and any iWork selector or corpus named by this non-iWork index.
+
 ## 2026-09-03: change 0382 adds PPTX source-backed cross-slide image batches
 
 - The source-backed PPTX cross-slide copy owner now accepts a nonempty caller-bounded set of direct `p:pic` leaves under exactly one direct `p:spTree`. Each selected picture has one direct `p:blipFill/a:blip r:embed` target to an internal, relationship-free `/ppt/media/` `image/*` leaf; distinct media are copied once, deterministic destination media URIs are allocated, and selected image relationship IDs are allocated/rewritten without XML normalization.
