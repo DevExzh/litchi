@@ -535,6 +535,94 @@ def allocator_report(value=100, revision="baseline"):
     return result
 
 
+def operation_allocator_policy_fixture():
+    comparison_policy = policy()
+    comparison_policy["allocator_evidence_scope"] = "operation"
+    comparison_policy["tool_identity"] = {
+        **copy.deepcopy(TOOL),
+        "binary": "litchi-perf-baseline-alloc",
+        "instrumentation": "system_allocator_operation_scoped",
+    }
+    comparison_policy["expected_build_identity"] = {
+        "allocator": "CountingSystemAllocator(std::alloc::System)"
+    }
+    comparison_policy["required_cases"] = ["opc_source_materialize"]
+    comparison_policy["expected_result_keys_sha256"] = perf_compare.result_key_manifest_sha256(
+        [
+            (
+                "opc_source_materialize",
+                json.dumps(
+                    report()["results"][0]["corpus"],
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                ),
+            )
+        ]
+    )
+    comparison_policy["expected_configuration"] = {"samples_per_case": 5}
+    comparison_policy["metric_classes"] = [
+        {
+            "name": "allocation",
+            "max_regression_percent": 0.0,
+            "path_globs": [
+                "operation_metrics/allocation/allocation_calls/values",
+                "operation_metrics/allocation/allocated_bytes/values",
+            ],
+            "presence": "required",
+        },
+        {
+            "name": "invariant_work",
+            "max_regression_percent": 0.0,
+            "path_globs": [
+                "operation_metrics/source/logical_read_calls/values",
+                "operation_metrics/source/logical_read_returned_bytes/values",
+                "operation_metrics/materialization/opc_parts/values",
+            ],
+            "presence": "required",
+        },
+    ]
+    return comparison_policy
+
+
+def operation_allocator_metrics(value=100):
+    operation_metrics = opc_source_materialize_operation_metrics_report_fields()
+    allocation = {
+        "status": "measured",
+        "scope": "operation_global_system_allocator",
+    }
+    for field in ALLOCATOR_VECTOR_FIELDS:
+        allocation[field] = {
+            "values": [value] * 5,
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+        }
+    operation_metrics["allocation"] = allocation
+    return operation_metrics
+
+
+def operation_allocator_report(value=100, revision="baseline"):
+    result = report(value=value, revision=revision)
+    result["tool"]["binary"] = "litchi-perf-baseline-alloc"
+    result["tool"]["instrumentation"] = "system_allocator_operation_scoped"
+    result["binary_identity"]["path"] = (
+        "/tmp/litchi-perf-operation-alloc-candidate"
+        if revision != "baseline"
+        else "/tmp/litchi-perf-operation-alloc-baseline"
+    )
+    result["binary_identity"]["binary_sha256"] = (
+        "d" * 64 if revision != "baseline" else "c" * 64
+    )
+    result["binary_identity"]["binary_bytes"] = 220 if revision != "baseline" else 210
+    result["environment"]["allocator"] = "CountingSystemAllocator(std::alloc::System)"
+    result["configuration"]["cases"] = ["opc_source_materialize"]
+    first = result["results"][0]
+    first["case"] = "opc_source_materialize"
+    first["elapsed_ns"]["sample_order"] = list(range(5))
+    first["operation_metrics"] = operation_allocator_metrics(value)
+    return result
+
+
 def xlsx_allocator_corpus_fixture():
     corpus = copy.deepcopy(report()["results"][0]["corpus"])
     corpus.update(
@@ -902,6 +990,272 @@ class PerfCompareTests(unittest.TestCase):
         allocator_report["tool"]["instrumentation"] = "system_allocator_operation_scoped"
         with self.assertRaisesRegex(perf_compare.ComparisonInputError, "tool does not match"):
             perf_compare.compare_reports(allocator_report, report(revision="current"), policy())
+
+    def test_operation_allocator_policy_compares_only_allocation_and_invariant_work(self):
+        comparison_policy = operation_allocator_policy_fixture()
+        baseline = operation_allocator_report()
+        current = operation_allocator_report(revision="current")
+        result = perf_compare.compare_reports(baseline, current, comparison_policy)
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["summary"]["matched_results"], 1)
+        self.assertEqual(result["summary"]["compared_metrics"], 5)
+        self.assertEqual(result["summary"]["latency_claims"], "withheld_instrumentation")
+        self.assertEqual(result["summary"]["latency_compared_results"], 0)
+        self.assertEqual(result["summary"]["latency_excluded_results"], 1)
+        self.assertEqual(
+            {item["metric"] for item in result["comparisons"]},
+            {
+                "operation_metrics.allocation.allocation_calls.values",
+                "operation_metrics.allocation.allocated_bytes.values",
+                "operation_metrics.materialization.opc_parts.values",
+                "operation_metrics.source.logical_read_calls.values",
+                "operation_metrics.source.logical_read_returned_bytes.values",
+            },
+        )
+        self.assertTrue(all("cache_state" not in item for item in result["comparisons"]))
+
+    def test_checked_0387_operation_allocator_policy_and_comparison_are_scoped(self):
+        repository = Path(__file__).resolve().parents[1]
+        raw_artifacts = repository / "docs/performance/results/change-0387"
+        checked_policy = json.loads(
+            (
+                repository
+                / "docs/performance/perf-regression-policy-opc-source-materialize-allocator-v1.json"
+            ).read_text(encoding="utf-8")
+        )
+        checked_comparison = json.loads(
+            (
+                repository
+                / "docs/performance/results/opc-source-materialization-shared-0388-comparison.json"
+            ).read_text(encoding="utf-8")
+        )
+        perf_compare.validate_policy(checked_policy)
+        self.assertEqual(checked_policy["allocator_evidence_scope"], "operation")
+        self.assertEqual(checked_policy["result_key_fields"], ["case", "corpus"])
+        self.assertEqual(checked_comparison["status"], "pass")
+        self.assertEqual(
+            checked_comparison["policy"]["policy_id"], checked_policy["policy_id"]
+        )
+        self.assertEqual(checked_comparison["summary"]["matched_results"], 3)
+        self.assertEqual(checked_comparison["summary"]["compared_metrics"], 15)
+        self.assertEqual(
+            checked_comparison["summary"]["latency_claims"],
+            "withheld_instrumentation",
+        )
+        self.assertEqual(checked_comparison["summary"]["latency_compared_results"], 0)
+        self.assertEqual(checked_comparison["summary"]["latency_excluded_results"], 3)
+        self.assertTrue(
+            all("cache_state" not in item for item in checked_comparison["comparisons"])
+        )
+        self.assertEqual(
+            {item["metric"] for item in checked_comparison["comparisons"]},
+            {
+                "operation_metrics.allocation.allocation_calls.values",
+                "operation_metrics.allocation.allocated_bytes.values",
+                "operation_metrics.materialization.opc_parts.values",
+                "operation_metrics.source.logical_read_calls.values",
+                "operation_metrics.source.logical_read_returned_bytes.values",
+            },
+        )
+
+        def read_zstd_json(path):
+            try:
+                payload = subprocess.check_output(
+                    ["zstd", "-q", "-d", "-c", str(path)]
+                )
+            except FileNotFoundError:
+                self.skipTest("zstd is unavailable; cannot rederive checked artifacts")
+            return json.loads(payload)
+
+        artifact_pairs = (
+            ("tiny", "tiny-compressible", "compressible"),
+            ("many-small", "many-small-incompressible", "incompressible"),
+            ("few-large", "few-large-incompressible", "incompressible"),
+        )
+
+        def aggregate(role):
+            report_names = [
+                f"{role}-{filename}.json.zst"
+                for _, filename, _ in artifact_pairs
+            ]
+            reports = [read_zstd_json(raw_artifacts / name) for name in report_names]
+            aggregate_report = copy.deepcopy(reports[0])
+            aggregate_report["results"] = [
+                report_value["results"][0] for report_value in reports
+            ]
+            aggregate_report.pop("parallel_metrics", None)
+            aggregate_report.pop("corpus_catalog", None)
+            aggregate_report["configuration"]["corpus_shapes"] = [
+                shape for shape, _, _ in artifact_pairs
+            ]
+            aggregate_report["configuration"]["payload_kinds"] = [
+                payload_kind
+                for payload_kind in dict.fromkeys(
+                    payload_kind for _, _, payload_kind in artifact_pairs
+                )
+            ]
+            return aggregate_report
+
+        self.assertEqual(
+            perf_compare.compare_reports(
+                aggregate("control"), aggregate("candidate"), checked_policy
+            ),
+            checked_comparison,
+        )
+
+    def test_operation_allocator_policy_rejects_malformed_envelope(self):
+        comparison_policy = operation_allocator_policy_fixture()
+        baseline = operation_allocator_report()
+        mutations = (
+            (
+                lambda report: report["results"][0]["operation_metrics"]["allocation"].__setitem__(
+                    "status", "unavailable"
+                ),
+                "allocation.status must be 'measured'",
+            ),
+            (
+                lambda report: report["results"][0]["operation_metrics"]["allocation"].__setitem__(
+                    "scope", "wrong_scope"
+                ),
+                "allocation.scope must be",
+            ),
+            (
+                lambda report: report["results"][0]["operation_metrics"]["allocation"][
+                    "allocated_bytes"
+                ]["values"].pop(),
+                "allocated_bytes.values cardinality",
+            ),
+            (
+                lambda report: report["results"][0]["operation_metrics"][
+                    "sample_indices"
+                ].__setitem__(0, 1),
+                "sample_indices must be a permutation",
+            ),
+            (
+                lambda report: report["results"][0]["elapsed_ns"].__setitem__(
+                    "sample_order", list(reversed(range(5)))
+                ),
+                "sample_indices must match elapsed_ns.sample_order",
+            ),
+        )
+        for mutate, message in mutations:
+            with self.subTest(message=message):
+                current = operation_allocator_report(revision="current")
+                mutate(current)
+                with self.assertRaisesRegex(
+                    perf_compare.ComparisonInputError, message
+                ):
+                    perf_compare.compare_reports(baseline, current, comparison_policy)
+
+    def test_operation_allocator_policy_rejects_filesystem_assumptions_and_cross_mode_reports(self):
+        operation_policy = operation_allocator_policy_fixture()
+        filesystem_policy = allocator_policy_fixture()
+
+        invalid_operation_policy = copy.deepcopy(operation_policy)
+        invalid_operation_policy["result_key_fields"] = [
+            "case",
+            "corpus",
+            "cache_state",
+        ]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "case/corpus result keys"
+        ):
+            perf_compare.validate_policy(invalid_operation_policy)
+
+        invalid_operation_policy = copy.deepcopy(operation_policy)
+        invalid_operation_policy["expected_configuration"]["filesystem_cache_states"] = [
+            "warm"
+        ]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "filesystem configuration fields"
+        ):
+            perf_compare.validate_policy(invalid_operation_policy)
+
+        operation_baseline = operation_allocator_report()
+        operation_current = operation_allocator_report(revision="current")
+        operation_current["filesystem_evidence"] = []
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "filesystem_evidence.*forbidden"
+        ):
+            perf_compare.compare_reports(
+                operation_baseline, operation_current, operation_policy
+            )
+
+        operation_current = operation_allocator_report(revision="current")
+        operation_current["results"][0]["cache_state"] = "warm"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "cache_state.*forbidden"
+        ):
+            perf_compare.compare_reports(
+                operation_baseline, operation_current, operation_policy
+            )
+
+        filesystem_baseline = allocator_report()
+        filesystem_current = allocator_report(revision="current")
+        for report_value in (filesystem_baseline, filesystem_current):
+            report_value["configuration"]["cases"] = ["opc_source_materialize"]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "filesystem_evidence.*forbidden"
+        ):
+            perf_compare.compare_reports(
+                filesystem_baseline, filesystem_current, operation_policy
+            )
+        strict_filesystem_baseline = allocator_report()
+        filesystem_missing_cache = allocator_report(revision="current")
+        filesystem_missing_cache["results"][0].pop("cache_state")
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "cache_state must be a non-empty string"
+        ):
+            perf_compare.compare_reports(
+                strict_filesystem_baseline,
+                filesystem_missing_cache,
+                filesystem_policy,
+            )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "filesystem_evidence is required"
+        ):
+            for report_value in (operation_baseline, operation_current):
+                report_value["configuration"]["cases"] = ["opc_file_eager_open"]
+                report_value["configuration"].update(
+                    filesystem_cache_states=["warm", "cold-requested"],
+                    filesystem_fresh_child_per_sample=True,
+                    filesystem_process_isolated=True,
+                    filesystem_root_selected=False,
+                )
+            perf_compare.compare_reports(
+                operation_baseline, operation_current, filesystem_policy
+            )
+
+    def test_allocator_policies_require_paired_instrumented_binary_identity(self):
+        operation_policy = operation_allocator_policy_fixture()
+        missing_identity_requirement = copy.deepcopy(operation_policy)
+        missing_identity_requirement.pop("require_binary_identity")
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "must require binary identity"
+        ):
+            perf_compare.validate_policy(missing_identity_requirement)
+
+        null_scope = copy.deepcopy(operation_policy)
+        null_scope["allocator_evidence_scope"] = None
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "allocator_evidence_scope must be 'filesystem' or 'operation'",
+        ):
+            perf_compare.validate_policy(null_scope)
+
+        baseline = operation_allocator_report()
+        current = operation_allocator_report(revision="current")
+        current.pop("binary_identity")
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "binary_identity"
+        ):
+            perf_compare.compare_reports(baseline, current, operation_policy)
+
+        ordinary = report(revision="current")
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "tool does not match"
+        ):
+            perf_compare.compare_reports(baseline, ordinary, operation_policy)
 
     def test_xlsx_allocator_policy_pins_0269_warm_corpus_keys(self):
         repository = Path(__file__).resolve().parents[1]
@@ -1633,7 +1987,10 @@ class PerfCompareTests(unittest.TestCase):
                         / f"{baseline_role}-{current_role}-comparison.json"
                     ).read_text(encoding="utf-8")
                 )
-                self.assertEqual(tracked_comparison, result)
+                self.assertEqual(tracked_comparison["tool"]["version"], "1.3.2")
+                historical_result = copy.deepcopy(result)
+                historical_result["tool"]["version"] = "1.3.2"
+                self.assertEqual(tracked_comparison, historical_result)
                 self.assertEqual(
                     len(tracked_comparison["comparisons"]),
                     package_manifest["comparison_policy"][

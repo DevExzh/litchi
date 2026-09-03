@@ -1,0 +1,314 @@
+{
+  "baseline_binary_sha256": "1aa6ef28d6bba3df8b7a045370cba661aa262711dcf01013d9ab1d58742bd5ef",
+  "baseline_revision": "7edfad113e62f45025848273ef04d6a94c433b27",
+  "comparisons": [
+    {
+      "baseline": 246756.0,
+      "case": "opc_source_materialize",
+      "corpus": {
+        "archive_sha256": "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a",
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-compressible",
+        "payload_kind": "compressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin"
+      },
+      "current": 245100.0,
+      "delta_is_infinite": false,
+      "delta_percent": -0.671108301317902,
+      "max_regression_percent": 0.0,
+      "metric": "operation_metrics.allocation.allocated_bytes.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 53.0,
+      "case": "opc_source_materialize",
+      "corpus": {
+        "archive_sha256": "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a",
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-compressible",
+        "payload_kind": "compressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin"
+      },
+      "current": 47.0,
+      "delta_is_infinite": false,
+      "delta_percent": -11.32075471698113,
+      "max_regression_percent": 0.0,
+      "metric": "operation_metrics.allocation.allocation_calls.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 3.0,
+      "case": "opc_source_materialize",
+      "corpus": {
+        "archive_sha256": "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a",
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-compressible",
+        "payload_kind": "compressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin"
+      },
+      "current": 3.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 0.0,
+      "metric": "operation_metrics.materialization.opc_parts.values",
+      "metric_class": "invariant_source_materialization_work",
+      "regression": false
+    },
+    {
+      "baseline": 15.0,
+      "case": "opc_source_materialize",
+      "corpus": {
+        "archive_sha256": "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a",
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-compressible",
+        "payload_kind": "compressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin"
+      },
+      "current": 15.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 0.0,
+      "metric": "operation_metrics.source.logical_read_calls.values",
+      "metric_class": "invariant_source_materialization_work",
+      "regression": false
+    },
+    {
+      "baseline": 318.0,
+      "case": "opc_source_materialize",
+      "corpus": {
+        "archive_sha256": "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a",
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "tiny-compressible",
+        "payload_kind": "compressible",
+        "shape": "tiny",
+        "target_entry": "benchmark/parts/00001.bin"
+      },
+      "current": 318.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 0.0,
+      "metric": "operation_metrics.source.logical_read_returned_bytes.values",
+      "metric_class": "invariant_source_materialization_work",
+      "regression": false
+    },
+    {
+      "baseline": 33879589.0,
+      "case": "opc_source_materialize",
+      "corpus": {
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-incompressible",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin"
+      },
+      "current": 17102213.0,
+      "delta_is_infinite": false,
+      "delta_percent": -49.52060073692157,
+      "max_regression_percent": 0.0,
+      "metric": "operation_metrics.allocation.allocated_bytes.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 69.0,
+      "case": "opc_source_materialize",
+      "corpus": {
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-incompressible",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin"
+      },
+      "current": 61.0,
+      "delta_is_infinite": false,
+      "delta_percent": -11.594202898550721,
+      "max_regression_percent": 0.0,
+      "metric": "operation_metrics.allocation.allocation_calls.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 4.0,
+      "case": "opc_source_materialize",
+      "corpus": {
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-incompressible",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin"
+      },
+      "current": 4.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 0.0,
+      "metric": "operation_metrics.materialization.opc_parts.values",
+      "metric_class": "invariant_source_materialization_work",
+      "regression": false
+    },
+    {
+      "baseline": 532.0,
+      "case": "opc_source_materialize",
+      "corpus": {
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-incompressible",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin"
+      },
+      "current": 532.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 0.0,
+      "metric": "operation_metrics.source.logical_read_calls.values",
+      "metric_class": "invariant_source_materialization_work",
+      "regression": false
+    },
+    {
+      "baseline": 16782540.0,
+      "case": "opc_source_materialize",
+      "corpus": {
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "few-large-incompressible",
+        "payload_kind": "incompressible",
+        "shape": "few-large",
+        "target_entry": "benchmark/parts/00002.bin"
+      },
+      "current": 16782540.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 0.0,
+      "metric": "operation_metrics.source.logical_read_returned_bytes.values",
+      "metric_class": "invariant_source_materialization_work",
+      "regression": false
+    },
+    {
+      "baseline": 21290113.0,
+      "case": "opc_source_materialize",
+      "corpus": {
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "many-small-incompressible",
+        "payload_kind": "incompressible",
+        "shape": "many-small",
+        "target_entry": "benchmark/parts/00128.bin"
+      },
+      "current": 21017729.0,
+      "delta_is_infinite": false,
+      "delta_percent": -1.2793919881965876,
+      "max_regression_percent": 0.0,
+      "metric": "operation_metrics.allocation.allocated_bytes.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 3609.0,
+      "case": "opc_source_materialize",
+      "corpus": {
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "many-small-incompressible",
+        "payload_kind": "incompressible",
+        "shape": "many-small",
+        "target_entry": "benchmark/parts/00128.bin"
+      },
+      "current": 3097.0,
+      "delta_is_infinite": false,
+      "delta_percent": -14.186755333887502,
+      "max_regression_percent": 0.0,
+      "metric": "operation_metrics.allocation.allocation_calls.values",
+      "metric_class": "allocation",
+      "regression": false
+    },
+    {
+      "baseline": 256.0,
+      "case": "opc_source_materialize",
+      "corpus": {
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "many-small-incompressible",
+        "payload_kind": "incompressible",
+        "shape": "many-small",
+        "target_entry": "benchmark/parts/00128.bin"
+      },
+      "current": 256.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 0.0,
+      "metric": "operation_metrics.materialization.opc_parts.values",
+      "metric_class": "invariant_source_materialization_work",
+      "regression": false
+    },
+    {
+      "baseline": 1280.0,
+      "case": "opc_source_materialize",
+      "corpus": {
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "many-small-incompressible",
+        "payload_kind": "incompressible",
+        "shape": "many-small",
+        "target_entry": "benchmark/parts/00128.bin"
+      },
+      "current": 1280.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 0.0,
+      "metric": "operation_metrics.source.logical_read_calls.values",
+      "metric_class": "invariant_source_materialization_work",
+      "regression": false
+    },
+    {
+      "baseline": 276992.0,
+      "case": "opc_source_materialize",
+      "corpus": {
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "generator": "litchi-opc-synthetic-v2",
+        "name": "many-small-incompressible",
+        "payload_kind": "incompressible",
+        "shape": "many-small",
+        "target_entry": "benchmark/parts/00128.bin"
+      },
+      "current": 276992.0,
+      "delta_is_infinite": false,
+      "delta_percent": 0.0,
+      "max_regression_percent": 0.0,
+      "metric": "operation_metrics.source.logical_read_returned_bytes.values",
+      "metric_class": "invariant_source_materialization_work",
+      "regression": false
+    }
+  ],
+  "current_binary_sha256": "04e47a043f959fec19e403418b2007f979680caa27be00399693f82af7e6fe36",
+  "current_revision": "7edfad113e62f45025848273ef04d6a94c433b27",
+  "errors": [],
+  "policy": {
+    "minimum_samples": 15,
+    "policy_id": "litchi-allocator-opc-source-materialize-v1",
+    "schema_version": 2
+  },
+  "regressions": [],
+  "schema_version": 1,
+  "status": "pass",
+  "summary": {
+    "compared_metrics": 15,
+    "latency_claims": "withheld_instrumentation",
+    "latency_compared_results": 0,
+    "latency_excluded_results": 3,
+    "matched_results": 3,
+    "regressions": 0
+  },
+  "tool": {
+    "name": "litchi-perf-compare",
+    "version": "1.4.0"
+  }
+}

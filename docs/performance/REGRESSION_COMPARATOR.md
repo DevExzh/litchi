@@ -57,6 +57,22 @@ vectors while withholding all elapsed-latency comparisons; the normal
 policy's `binary` and `instrumentation` identity still rejects allocator
 reports.
 
+Non-filesystem operation reports use the explicit
+`allocator_evidence_scope: "operation"` mode in
+[`perf-regression-policy-opc-source-materialize-allocator-v1.json`](perf-regression-policy-opc-source-materialize-allocator-v1.json).
+This mode is intentionally distinct from the filesystem policy: result keys
+are exactly `(case, corpus)`, the allocator binary and paired
+`binary_identity` are required, and every operation allocation vector must be
+measured, aligned to the elapsed sample permutation, and have the same
+cardinality. `cache_state`, `filesystem_evidence`, raw child samples, and
+filesystem identity fields are rejected rather than silently ignored. The
+checked 0387 comparison
+[`opc-source-materialization-shared-0388-comparison.json`](results/opc-source-materialization-shared-0388-comparison.json)
+compares only `allocation_calls`, `allocated_bytes`, and invariant logical
+source/Part-work vectors. Allocator operation mode withholds all latency and
+throughput claims, even though elapsed samples remain validated for alignment
+and sample quality.
+
 The schema-2 metric-class `presence` field distinguishes required and optional
 counters and is mandatory for every class. Required classes must match at least
 one metric in every result, and every required path must be present and valid in
@@ -96,6 +112,9 @@ missing or asymmetric required metrics, and asymmetric optional metrics.
 In allocator mode, `status`, `scope`, alignment, and cardinality are evidence
 metadata rather than numeric metrics; they must agree with the final
 `operation_metrics` schema, and zero allocation vectors are invalid.
+Filesystem allocator mode additionally requires cache-state keyed rows and
+raw per-child allocator samples; operation allocator mode has neither of
+those filesystem-only evidence surfaces.
 
 The policy also requires a SHA-256 digest of all 198 exact `(case, canonical
 corpus JSON)` keys. Keys are sorted, then hashed as UTF-8 case name, a zero

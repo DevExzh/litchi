@@ -24,7 +24,7 @@ from typing import Any, Iterable
 
 
 COMPARATOR_NAME = "litchi-perf-compare"
-COMPARATOR_VERSION = "1.3.2"
+COMPARATOR_VERSION = "1.4.0"
 SUPPORTED_POLICY_SCHEMA = 2
 SUPPORTED_REPORT_SCHEMA = 1
 EVIDENCE_ONLY_LATENCY_CLAIM = "evidence_only_filesystem_selector"
@@ -62,6 +62,11 @@ _METADATA_FIELD_NAMES = frozenset(
 _ALLOCATOR_INSTRUMENTATION = "system_allocator_operation_scoped"
 _ALLOCATOR_BINARY = "litchi-perf-baseline-alloc"
 _ALLOCATOR_SCOPE = "operation_global_system_allocator"
+_ALLOCATOR_EVIDENCE_SCOPE_FILESYSTEM = "filesystem"
+_ALLOCATOR_EVIDENCE_SCOPE_OPERATION = "operation"
+_ALLOCATOR_EVIDENCE_SCOPES = frozenset(
+    {_ALLOCATOR_EVIDENCE_SCOPE_FILESYSTEM, _ALLOCATOR_EVIDENCE_SCOPE_OPERATION}
+)
 _ALLOCATOR_VECTOR_FIELDS = (
     "allocation_calls",
     "deallocation_calls",
@@ -85,6 +90,7 @@ _FILESYSTEM_CASE_PREFIXES = (
     "odp_file_",
 )
 _OPTIONAL_POLICY_KEYS = {
+    "allocator_evidence_scope",
     "filesystem_identity_fields",
     "result_key_fields",
     "expected_build_identity",
@@ -355,6 +361,16 @@ def validate_policy(raw: Any) -> dict[str, Any]:
             raise ComparisonInputError(
                 f"policy.tool_identity.{field} must be a non-empty string"
             )
+    allocator_evidence_scope = policy.get("allocator_evidence_scope")
+    if "allocator_evidence_scope" in policy and (
+        tool["instrumentation"] != _ALLOCATOR_INSTRUMENTATION
+        or not isinstance(allocator_evidence_scope, str)
+        or allocator_evidence_scope not in _ALLOCATOR_EVIDENCE_SCOPES
+    ):
+        raise ComparisonInputError(
+            "policy.allocator_evidence_scope must be 'filesystem' or 'operation' "
+            "and is reserved for allocator instrumentation"
+        )
     result_key_fields = policy.get("result_key_fields", list(_DEFAULT_RESULT_KEY_FIELDS))
     if result_key_fields not in (
         list(_DEFAULT_RESULT_KEY_FIELDS),
@@ -365,15 +381,36 @@ def validate_policy(raw: Any) -> dict[str, Any]:
             "['case', 'corpus', 'cache_state']"
         )
     if tool["instrumentation"] == _ALLOCATOR_INSTRUMENTATION:
-        if result_key_fields != list(_CACHE_RESULT_KEY_FIELDS):
-            raise ComparisonInputError(
-                "allocator policy must include cache_state in result_key_fields"
-            )
         if tool["binary"] != _ALLOCATOR_BINARY:
             raise ComparisonInputError(
                 "allocator policy must pin tool_identity.binary to "
                 f"{_ALLOCATOR_BINARY!r}"
             )
+        allocator_evidence_scope = allocator_evidence_scope or (
+            _ALLOCATOR_EVIDENCE_SCOPE_FILESYSTEM
+        )
+        if allocator_evidence_scope == _ALLOCATOR_EVIDENCE_SCOPE_FILESYSTEM:
+            if result_key_fields != list(_CACHE_RESULT_KEY_FIELDS):
+                raise ComparisonInputError(
+                    "allocator policy must include cache_state in result_key_fields"
+                )
+        else:
+            if policy.get("require_binary_identity") is not True:
+                raise ComparisonInputError(
+                    "operation allocator policy must require binary identity"
+                )
+            if result_key_fields != list(_DEFAULT_RESULT_KEY_FIELDS):
+                raise ComparisonInputError(
+                    "operation allocator policy must use case/corpus result keys"
+                )
+            if filesystem_identity_fields is not None:
+                raise ComparisonInputError(
+                    "operation allocator policy cannot declare filesystem identity fields"
+                )
+            if policy.get("require_sample_child_identity", False):
+                raise ComparisonInputError(
+                    "operation allocator policy cannot require filesystem child identity"
+                )
     elif result_key_fields != list(_DEFAULT_RESULT_KEY_FIELDS):
         raise ComparisonInputError(
             "cache_state result keys are reserved for allocator policy"
@@ -436,6 +473,25 @@ def validate_policy(raw: Any) -> dict[str, Any]:
     if not expected_configuration:
         raise ComparisonInputError("policy.expected_configuration must not be empty")
     _reject_nonfinite_tree(expected_configuration, "policy.expected_configuration")
+    if (
+        tool["instrumentation"] == _ALLOCATOR_INSTRUMENTATION
+        and (allocator_evidence_scope or _ALLOCATOR_EVIDENCE_SCOPE_FILESYSTEM)
+        == _ALLOCATOR_EVIDENCE_SCOPE_OPERATION
+    ):
+        filesystem_configuration_fields = {
+            "filesystem_cache_states",
+            "filesystem_fresh_child_per_sample",
+            "filesystem_process_isolated",
+            "filesystem_root_selected",
+        }
+        forbidden = sorted(
+            filesystem_configuration_fields & set(expected_configuration)
+        )
+        if forbidden:
+            raise ComparisonInputError(
+                "operation allocator policy cannot pin filesystem configuration "
+                f"fields: {forbidden}"
+            )
     for field in (
         "filesystem_fresh_child_per_sample",
         "filesystem_process_isolated",
@@ -2412,20 +2468,30 @@ def _collect_metrics(
     return selected, vector_metadata
 
 
+def _allocator_evidence_scope(policy: dict[str, Any]) -> str | None:
+    if policy["tool_identity"]["instrumentation"] != _ALLOCATOR_INSTRUMENTATION:
+        return None
+    # The omitted value is the historical filesystem mode.  Keeping this
+    # default is important for existing allocator policies and their cache/raw
+    # child evidence contract.
+    return policy.get(
+        "allocator_evidence_scope", _ALLOCATOR_EVIDENCE_SCOPE_FILESYSTEM
+    )
+
+
 def _allocator_policy(policy: dict[str, Any]) -> bool:
-    return policy["tool_identity"]["instrumentation"] == _ALLOCATOR_INSTRUMENTATION
+    return _allocator_evidence_scope(policy) is not None
 
 
-def _validate_allocator_evidence(
+def _validate_allocator_operation_envelope(
     result: dict[str, Any],
     location: str,
     minimum_samples: int,
-    raw_samples: dict[tuple[str, str, int], dict[str, int]],
-) -> None:
+) -> tuple[str, dict[str, Any], dict[str, Any], list[int]]:
     case = result.get("case")
-    if not isinstance(case, str) or not case.startswith(_FILESYSTEM_CASE_PREFIXES):
+    if not isinstance(case, str) or not case:
         raise ComparisonInputError(
-            f"{location}.case must select a filesystem allocator case"
+            f"{location}.case must be a non-empty string"
         )
     operation_metrics = _require_object(
         result.get("operation_metrics"), f"{location}.operation_metrics"
@@ -2513,8 +2579,25 @@ def _validate_allocator_evidence(
     ):
         raise ComparisonInputError(
             f"{location}.operation_metrics.sample_indices must be a permutation "
-            "of the raw allocator sample indices"
+            "of allocator sample indices"
         )
+    return case, operation_metrics, allocation, sample_indices
+
+
+def _validate_allocator_evidence(
+    result: dict[str, Any],
+    location: str,
+    minimum_samples: int,
+    raw_samples: dict[tuple[str, str, int], dict[str, int]],
+) -> None:
+    case = result.get("case")
+    if not isinstance(case, str) or not case.startswith(_FILESYSTEM_CASE_PREFIXES):
+        raise ComparisonInputError(
+            f"{location}.case must select a filesystem allocator case"
+        )
+    _, _, allocation, sample_indices = _validate_allocator_operation_envelope(
+        result, location, minimum_samples
+    )
     cache_state = result.get("cache_state")
     if not isinstance(cache_state, str) or not cache_state:
         raise ComparisonInputError(
@@ -2536,6 +2619,58 @@ def _validate_allocator_evidence(
                     f"sample_index {sample_index} does not match "
                     f"operation_metrics.allocation.{field}.values[{position}]"
                 )
+
+
+def _validate_allocator_operation_evidence(
+    result: dict[str, Any], location: str, minimum_samples: int
+) -> None:
+    """Validate allocator vectors captured by one in-process operation.
+
+    Operation-scoped allocator reports intentionally have no filesystem cache
+    state or raw child-process sample table.  The operation envelope itself is
+    the evidence boundary: every allocator vector must be measured, aligned
+    to the retained elapsed samples, and have identical cardinality.
+    """
+    case = result.get("case")
+    if not isinstance(case, str) or not case:
+        raise ComparisonInputError(f"{location}.case must be a non-empty string")
+    if case.startswith(_FILESYSTEM_CASE_PREFIXES):
+        raise ComparisonInputError(
+            f"{location}.case must select a non-filesystem allocator case"
+        )
+    if "cache_state" in result:
+        raise ComparisonInputError(
+            f"{location}.cache_state is forbidden for operation allocator evidence"
+        )
+    _, _, _, sample_indices = _validate_allocator_operation_envelope(
+        result, location, minimum_samples
+    )
+    elapsed = _require_object(result.get("elapsed_ns"), f"{location}.elapsed_ns")
+    elapsed_sample_order = elapsed.get("sample_order")
+    if elapsed_sample_order != sample_indices:
+        raise ComparisonInputError(
+            f"{location}.operation_metrics.sample_indices must match "
+            "elapsed_ns.sample_order"
+        )
+
+
+def _validate_allocator_operation_report(
+    report: dict[str, Any], policy: dict[str, Any], label: str
+) -> None:
+    """Reject filesystem-only evidence leaking into operation allocator mode."""
+    if "filesystem_evidence" in report:
+        raise ComparisonInputError(
+            f"{label}.filesystem_evidence is forbidden for operation allocator policy"
+        )
+    results = report.get("results")
+    if not isinstance(results, list):
+        raise ComparisonInputError(f"{label}.results must be a list")
+    for index, raw_result in enumerate(results):
+        _validate_allocator_operation_evidence(
+            _require_object(raw_result, f"{label}.results[{index}]"),
+            f"{label}.results[{index}]",
+            policy["minimum_samples"],
+        )
 
 
 def _validate_allocator_filesystem_evidence(
@@ -2970,31 +3105,41 @@ def compare_reports(
         else None
     )
     allocator_mode = _allocator_policy(policy)
+    allocator_evidence_scope = _allocator_evidence_scope(policy)
+    filesystem_allocator_mode = (
+        allocator_evidence_scope == _ALLOCATOR_EVIDENCE_SCOPE_FILESYSTEM
+    )
+    operation_allocator_mode = (
+        allocator_evidence_scope == _ALLOCATOR_EVIDENCE_SCOPE_OPERATION
+    )
     baseline_raw_samples: dict[tuple[str, str, int], dict[str, int]] = {}
     current_raw_samples: dict[tuple[str, str, int], dict[str, int]] = {}
-    if allocator_mode:
+    if filesystem_allocator_mode:
         baseline_raw_samples = _validate_allocator_filesystem_evidence(
             baseline, policy, "baseline"
         )
         current_raw_samples = _validate_allocator_filesystem_evidence(
             current, policy, "current"
         )
+    elif operation_allocator_mode:
+        _validate_allocator_operation_report(baseline, policy, "baseline")
+        _validate_allocator_operation_report(current, policy, "current")
     expected_count = policy["expected_result_count"]
     baseline_results = _index_results(
         baseline,
         "baseline",
         expected_count,
-        include_cache_state=allocator_mode,
+        include_cache_state=filesystem_allocator_mode,
     )
     current_results = _index_results(
         current,
         "current",
         expected_count,
-        include_cache_state=allocator_mode,
+        include_cache_state=filesystem_allocator_mode,
     )
     baseline_keys = set(baseline_results)
     current_keys = set(current_results)
-    if allocator_mode:
+    if filesystem_allocator_mode:
         _validate_allocator_result_key_cardinality(baseline_keys, policy, "baseline")
         _validate_allocator_result_key_cardinality(current_keys, policy, "current")
     if baseline_keys != current_keys:
@@ -3033,7 +3178,7 @@ def compare_reports(
         cache_state = key[2]
         before_result = baseline_results[key]
         after_result = current_results[key]
-        if allocator_mode:
+        if filesystem_allocator_mode:
             _validate_allocator_evidence(
                 before_result,
                 f"baseline.{case}[{cache_state}]",
@@ -3071,7 +3216,7 @@ def compare_reports(
                 f"baseline={before_latency_claim!r}, current={after_latency_claim!r}"
             )
         corpus = before_result["corpus"]
-        if before_latency_claim in _EVIDENCE_ONLY_LATENCY_CLAIMS:
+        if allocator_mode or before_latency_claim in _EVIDENCE_ONLY_LATENCY_CLAIMS:
             latency_excluded_results += 1
         else:
             latency_compared_results += 1
