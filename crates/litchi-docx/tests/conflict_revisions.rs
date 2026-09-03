@@ -97,7 +97,7 @@ fn package_with_conflicts() -> Package {
     Package::from_opc_package(opc).unwrap()
 }
 
-fn slice<'a>(source: &'a [u8], span: litchi_docx::revision::conflict::Span) -> &'a [u8] {
+fn slice(source: &[u8], span: litchi_docx::revision::conflict::Span) -> &[u8] {
     &source[span.start()..span.end()]
 }
 

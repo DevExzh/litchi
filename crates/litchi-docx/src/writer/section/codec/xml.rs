@@ -3,10 +3,6 @@
     reason = "items remain grouped by OOXML schema family and package lifecycle"
 )]
 #![expect(
-    clippy::expect_used,
-    reason = "the invariant is established immediately before extraction"
-)]
-#![expect(
     clippy::shadow_reuse,
     reason = "parser bindings are intentionally refined after validation"
 )]

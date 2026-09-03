@@ -48,8 +48,10 @@ fn inactive_branch_still_counts_toward_raw_mce_security_limits() {
     let xml = format!(
         r#"<w:document xmlns:w="{W}" xmlns:mc="{MC}" xmlns:u="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="u"><w:sdtPr xmlns:x="urn:future" mc:Ignorable="x"><w:id w:val="1"/></w:sdtPr></mc:Choice><mc:Fallback><w:sdtPr><w:id w:val="2"/></w:sdtPr></mc:Fallback></mc:AlternateContent></w:document>"#
     );
-    let mut limits = Limits::default();
-    limits.max_metadata_bytes = 0;
+    let limits = Limits {
+        max_metadata_bytes: 0,
+        ..Limits::default()
+    };
 
     assert!(Inventory::parse_with_limits(xml.as_bytes(), &limits).is_err());
 }

@@ -161,7 +161,7 @@ fn recipient_transaction_is_typed_bounded_and_reversible() {
         commit
             .patch()
             .inverse()
-            .apply(&commit.snapshot())
+            .apply(commit.snapshot())
             .unwrap()
             .recipients_xml(),
         Some(recipients.as_bytes())

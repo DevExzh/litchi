@@ -182,36 +182,6 @@ pub(crate) fn validate_limits(limits: Limits) -> Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn semantic_zero_quotas_are_valid() {
-        let limits = Limits {
-            max_conflicts: 0,
-            max_ranges: 0,
-            max_open_ranges: 0,
-            max_text_bytes: 0,
-            max_metadata_bytes: 0,
-            max_total_conflicts: 0,
-            max_total_ranges: 0,
-            max_total_metadata_bytes: 0,
-            ..Limits::default()
-        };
-        assert!(validate_limits(limits).is_ok());
-    }
-
-    #[test]
-    fn structural_zero_budgets_are_rejected() {
-        let limits = Limits {
-            max_events: 0,
-            ..Limits::default()
-        };
-        assert!(validate_limits(limits).is_err());
-    }
-}
-
 fn is_xsd_datetime(value: &str) -> bool {
     let bytes = value.as_bytes();
     let mut cursor = usize::from(bytes.first() == Some(&b'-'));
@@ -332,5 +302,35 @@ fn days_in_month(year_mod_400: u32, month: u32) -> u32 {
         },
         2 => 28,
         _ => 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn semantic_zero_quotas_are_valid() {
+        let limits = Limits {
+            max_conflicts: 0,
+            max_ranges: 0,
+            max_open_ranges: 0,
+            max_text_bytes: 0,
+            max_metadata_bytes: 0,
+            max_total_conflicts: 0,
+            max_total_ranges: 0,
+            max_total_metadata_bytes: 0,
+            ..Limits::default()
+        };
+        assert!(validate_limits(limits).is_ok());
+    }
+
+    #[test]
+    fn structural_zero_budgets_are_rejected() {
+        let limits = Limits {
+            max_events: 0,
+            ..Limits::default()
+        };
+        assert!(validate_limits(limits).is_err());
     }
 }

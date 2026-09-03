@@ -32,8 +32,33 @@ use super::xml::is_fragment_word_name;
 const MAX_TEXT_SCAN_DEPTH: usize = 128;
 /// Maximum number of elements scanned while extracting paragraph text.
 const MAX_TEXT_SCAN_NODES: usize = 1_000_000;
+/// Maximum raw text/reference bytes decoded in one borrowed chunk.
+const MAX_TEXT_DECODE_CHUNK_BYTES: usize = 4096;
+const MAX_TEXT_REFERENCE_BYTES: usize = 64 * 1024;
 
 pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
+    let mut result = String::new();
+    for_each_word_text_chunk(xml_bytes, |chunk| {
+        result
+            .try_reserve(chunk.len())
+            .map_err(|source| Error::Allocation {
+                resource: "Word paragraph text",
+                source,
+            })?;
+        result.push_str(chunk);
+        Ok::<(), Error>(())
+    })?;
+    Ok(result)
+}
+
+pub(crate) fn for_each_word_text_chunk<F, E>(
+    xml_bytes: &[u8],
+    mut append: F,
+) -> std::result::Result<(), E>
+where
+    F: FnMut(&str) -> std::result::Result<(), E>,
+    E: From<Error>,
+{
     // Plain reader + hand-rolled binding maintenance (change 0229, the
     // litchi-odt 0227 analog): the tracker replicates the push/pop
     // `NsReader` performs inside `read_resolved_event` (the
@@ -45,7 +70,6 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
     let mut reader = Reader::from_reader(xml_bytes);
     let mut tracker = BindingTracker::new();
     let mut pending_pop = false;
-    let mut result = String::with_capacity(xml_bytes.len() / 8);
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
     let mut depth = 0usize;
     let mut nodes = 0usize;
@@ -60,7 +84,7 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
         }
         let event = reader
             .read_event()
-            .map_err(|error| Error::Xml(error.to_string()))?;
+            .map_err(|error| E::from(Error::Xml(error.to_string())))?;
         // The push for a `Start`/`Empty` runs before the event is
         // classified, so a namespace error preempts the event exactly where
         // `read_resolved_event` returned `Err`. A push error is a real
@@ -78,13 +102,13 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
             Event::Start(element) => {
                 tracker
                     .push(element)
-                    .map_err(|error| Error::Xml(error.to_string()))?;
+                    .map_err(|error| E::from(Error::Xml(error.to_string())))?;
                 tracker.resolve_element(element.name()).0
             },
             Event::Empty(element) => {
                 tracker
                     .push(element)
-                    .map_err(|error| Error::Xml(error.to_string()))?;
+                    .map_err(|error| E::from(Error::Xml(error.to_string())))?;
                 // The scope an `Empty` element opens closes immediately:
                 // defer its pop to the top of the next iteration.
                 pending_pop = true;
@@ -101,31 +125,37 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
             && let Event::Start(element) = &event
             && !matches!(namespace, ResolveResult::Bound(_))
         {
-            fragment_prefix = Some(
-                element
-                    .name()
-                    .prefix()
-                    .map(|prefix| prefix.into_inner().to_vec()),
-            );
+            let prefix = element.name().prefix().map(|prefix| prefix.into_inner());
+            fragment_prefix = Some(match prefix {
+                Some(prefix) => Some(checked_text_vec_clone(
+                    prefix,
+                    "Word text namespace prefix",
+                )?),
+                None => None,
+            });
         }
 
         match event {
             Event::Start(element) => {
                 nodes = nodes.checked_add(1).ok_or_else(|| {
-                    Error::InvalidFormat("Word XML element counter overflow".to_string())
+                    E::from(Error::InvalidFormat(
+                        "Word XML element counter overflow".to_string(),
+                    ))
                 })?;
                 if nodes > MAX_TEXT_SCAN_NODES {
-                    return Err(Error::InvalidFormat(format!(
+                    return Err(E::from(Error::InvalidFormat(format!(
                         "Word XML exceeds {MAX_TEXT_SCAN_NODES} elements"
-                    )));
+                    ))));
                 }
                 depth = depth.checked_add(1).ok_or_else(|| {
-                    Error::InvalidFormat("Word XML nesting is too deep".to_string())
+                    E::from(Error::InvalidFormat(
+                        "Word XML nesting is too deep".to_string(),
+                    ))
                 })?;
                 if depth > MAX_TEXT_SCAN_DEPTH {
-                    return Err(Error::InvalidFormat(format!(
+                    return Err(E::from(Error::InvalidFormat(format!(
                         "Word XML nesting exceeds the {MAX_TEXT_SCAN_DEPTH} depth limit"
-                    )));
+                    ))));
                 }
                 if text_depth.is_none()
                     && is_fragment_word_name(&namespace, element.name(), b"t", &fragment_prefix)
@@ -134,40 +164,39 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
                 } else if let Some(character) =
                     word_special_character(&namespace, element.name(), &fragment_prefix)
                 {
-                    result.push(character);
+                    let mut encoded = [0_u8; 4];
+                    append(character.encode_utf8(&mut encoded))?;
                 }
             },
             Event::Empty(element) => {
                 nodes = nodes.checked_add(1).ok_or_else(|| {
-                    Error::InvalidFormat("Word XML element counter overflow".to_string())
+                    E::from(Error::InvalidFormat(
+                        "Word XML element counter overflow".to_string(),
+                    ))
                 })?;
                 if nodes > MAX_TEXT_SCAN_NODES {
-                    return Err(Error::InvalidFormat(format!(
+                    return Err(E::from(Error::InvalidFormat(format!(
                         "Word XML exceeds {MAX_TEXT_SCAN_NODES} elements"
-                    )));
+                    ))));
                 }
                 if let Some(character) =
                     word_special_character(&namespace, element.name(), &fragment_prefix)
                 {
-                    result.push(character);
+                    let mut encoded = [0_u8; 4];
+                    append(character.encode_utf8(&mut encoded))?;
                 }
             },
             Event::Text(text) if text_depth.is_some() => {
-                let decoded = text
-                    .xml_content(XmlVersion::Explicit1_0)
-                    .map_err(|error| Error::Xml(error.to_string()))?;
-                let unescaped = quick_xml::escape::unescape(&decoded)
-                    .map_err(|error| Error::Xml(error.to_string()))?;
-                result.push_str(&unescaped);
+                append_xml_text_chunks(text.as_ref(), &mut append)?;
             },
             Event::CData(text) if text_depth.is_some() => {
-                let decoded = text
-                    .xml_content(XmlVersion::Explicit1_0)
-                    .map_err(|error| Error::Xml(error.to_string()))?;
-                result.push_str(&decoded);
+                append_xml_text_chunks_without_entities(text.as_ref(), &mut append)?;
             },
-            Event::GeneralRef(reference) if text_depth.is_some() => {
-                result.push_str(&decode_xml_reference(&reference)?);
+            Event::GeneralRef(reference) => {
+                let decoded = decode_word_xml_reference(&reference).map_err(E::from)?;
+                if text_depth.is_some() {
+                    append_utf8_str_chunks(&decoded, &mut append)?;
+                }
             },
             Event::End(element) => {
                 if text_depth == Some(depth)
@@ -175,12 +204,14 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
                 {
                     text_depth = None;
                 }
-                depth = depth
-                    .checked_sub(1)
-                    .ok_or_else(|| Error::InvalidFormat("invalid Word XML nesting".to_string()))?;
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    E::from(Error::InvalidFormat("invalid Word XML nesting".to_string()))
+                })?;
             },
             Event::Eof if depth != 0 || text_depth.is_some() => {
-                return Err(Error::InvalidFormat("unterminated Word XML".to_string()));
+                return Err(E::from(Error::InvalidFormat(
+                    "unterminated Word XML".to_string(),
+                )));
             },
             Event::Eof => break,
             Event::Text(_)
@@ -188,12 +219,181 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
             | Event::Comment(_)
             | Event::Decl(_)
             | Event::PI(_)
-            | Event::DocType(_)
-            | Event::GeneralRef(_) => {},
+            | Event::DocType(_) => {},
         }
     }
-    result.shrink_to_fit();
-    Ok(result)
+    Ok(())
+}
+
+fn checked_text_vec_clone(bytes: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+    let mut copy = Vec::new();
+    copy.try_reserve_exact(bytes.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    copy.extend_from_slice(bytes);
+    Ok(copy)
+}
+
+fn is_supported_xml_reference(reference: &[u8]) -> bool {
+    if reference == b"lt"
+        || reference == b"gt"
+        || reference == b"amp"
+        || reference == b"apos"
+        || reference == b"quot"
+    {
+        return true;
+    }
+    let (digits, hexadecimal) = if reference.first() == Some(&b'#') {
+        if reference.get(1) == Some(&b'x') || reference.get(1) == Some(&b'X') {
+            (reference.get(2..).unwrap_or_default(), true)
+        } else {
+            (reference.get(1..).unwrap_or_default(), false)
+        }
+    } else {
+        return false;
+    };
+    !digits.is_empty()
+        && digits.iter().all(|digit| {
+            if hexadecimal {
+                digit.is_ascii_hexdigit()
+            } else {
+                digit.is_ascii_digit()
+            }
+        })
+}
+
+fn decode_word_xml_reference(reference: &quick_xml::events::BytesRef<'_>) -> Result<String> {
+    let reference_bytes = reference.as_ref();
+    if reference_bytes.len() > MAX_TEXT_REFERENCE_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "Word XML reference exceeds the {MAX_TEXT_REFERENCE_BYTES}-byte limit"
+        )));
+    }
+    if !is_supported_xml_reference(reference_bytes) {
+        return Err(Error::InvalidFormat(
+            "unsupported Word XML general entity reference".to_string(),
+        ));
+    }
+    decode_xml_reference(reference).map_err(Error::from)
+}
+
+fn append_xml_text_chunks<F, E>(raw: &[u8], append: &mut F) -> std::result::Result<(), E>
+where
+    F: FnMut(&str) -> std::result::Result<(), E>,
+    E: From<Error>,
+{
+    let mut cursor = 0usize;
+    let mut plain_start = 0usize;
+    while cursor < raw.len() {
+        if raw[cursor] != b'&' {
+            cursor += 1;
+            continue;
+        }
+        append_xml_text_chunks_without_entities(&raw[plain_start..cursor], append)?;
+        let entity_end = raw[cursor + 1..]
+            .iter()
+            .position(|byte| *byte == b';')
+            .map(|relative| cursor + 1 + relative)
+            .ok_or_else(|| {
+                E::from(Error::InvalidFormat(
+                    "unterminated Word XML text reference".to_string(),
+                ))
+            })?;
+        let entity = &raw[cursor..=entity_end];
+        if entity.len() > MAX_TEXT_REFERENCE_BYTES {
+            return Err(E::from(Error::InvalidFormat(format!(
+                "Word XML reference exceeds the {MAX_TEXT_REFERENCE_BYTES}-byte limit"
+            ))));
+        }
+        let entity = std::str::from_utf8(entity).map_err(|_| {
+            E::from(Error::InvalidFormat(
+                "Word XML text reference is not valid UTF-8".to_string(),
+            ))
+        })?;
+        let decoded = quick_xml::escape::unescape(entity)
+            .map_err(|error| E::from(Error::Xml(error.to_string())))?;
+        append_utf8_str_chunks(decoded.as_ref(), append)?;
+        cursor = entity_end + 1;
+        plain_start = cursor;
+    }
+    append_xml_text_chunks_without_entities(&raw[plain_start..], append)
+}
+
+fn append_xml_text_chunks_without_entities<F, E>(
+    raw: &[u8],
+    append: &mut F,
+) -> std::result::Result<(), E>
+where
+    F: FnMut(&str) -> std::result::Result<(), E>,
+    E: From<Error>,
+{
+    let mut cursor = 0usize;
+    let mut plain_start = 0usize;
+    while cursor < raw.len() {
+        match raw[cursor] {
+            b'\r' => {
+                append_utf8_chunks(&raw[plain_start..cursor], append)?;
+                append("\n")?;
+                cursor += if raw.get(cursor + 1) == Some(&b'\n') {
+                    2
+                } else {
+                    1
+                };
+                plain_start = cursor;
+            },
+            b'\n' => {
+                append_utf8_chunks(&raw[plain_start..cursor], append)?;
+                append("\n")?;
+                cursor += 1;
+                plain_start = cursor;
+            },
+            _ => cursor += 1,
+        }
+    }
+    append_utf8_chunks(&raw[plain_start..], append)
+}
+
+fn append_utf8_chunks<F, E>(value: &[u8], append: &mut F) -> std::result::Result<(), E>
+where
+    F: FnMut(&str) -> std::result::Result<(), E>,
+    E: From<Error>,
+{
+    let value = std::str::from_utf8(value).map_err(|_| {
+        E::from(Error::InvalidFormat(
+            "Word XML text is not valid UTF-8".to_string(),
+        ))
+    })?;
+    append_utf8_str_chunks(value, append)
+}
+
+fn append_utf8_str_chunks<F, E>(value: &str, append: &mut F) -> std::result::Result<(), E>
+where
+    F: FnMut(&str) -> std::result::Result<(), E>,
+    E: From<Error>,
+{
+    let mut cursor = 0usize;
+    while cursor < value.len() {
+        let mut end =
+            value.len().min(
+                cursor
+                    .checked_add(MAX_TEXT_DECODE_CHUNK_BYTES)
+                    .ok_or_else(|| {
+                        E::from(Error::InvalidFormat(
+                            "Word XML text chunk length overflow".to_string(),
+                        ))
+                    })?,
+            );
+        while end > cursor && !value.is_char_boundary(end) {
+            end -= 1;
+        }
+        if end == cursor {
+            return Err(E::from(Error::InvalidFormat(
+                "Word XML text chunk is not valid UTF-8".to_string(),
+            )));
+        }
+        append(&value[cursor..end])?;
+        cursor = end;
+    }
+    Ok(())
 }
 
 // The sink path deliberately has its own bounded parser. The established

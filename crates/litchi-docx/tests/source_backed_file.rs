@@ -255,7 +255,7 @@ fn exact_noop_and_changed_document_overlay_preserve_raw_unselected_members() {
 }
 
 #[test]
-fn replacing_the_path_reports_source_changed_without_retargeting() {
+fn replacing_the_path_keeps_the_open_source_pinned() {
     let directory = tempfile::tempdir().unwrap();
     let (path, original) = write_fixture(&directory, "original");
     let replacement_path = directory.path().join("replacement.docx");
@@ -267,15 +267,11 @@ fn replacing_the_path_reports_source_changed_without_retargeting() {
     fs::remove_file(&path).unwrap();
     fs::rename(&replacement_path, &path).unwrap();
 
-    assert!(matches!(
-        package.source_version(),
-        Err(Error::Opc(OpcError::SourceChanged { expected, actual }))
-            if expected == version && actual.revision() > expected.revision()
-    ));
-    assert!(matches!(
-        package.document(),
-        Err(Error::Opc(OpcError::SourceChanged { .. }))
-    ));
+    assert_eq!(package.source_version().unwrap(), version);
+    assert_eq!(
+        package.document().unwrap().extract_text().unwrap(),
+        "original"
+    );
     assert_ne!(fs::read(&path).unwrap(), original);
     assert_eq!(
         source_backed::Package::from_path(&path)

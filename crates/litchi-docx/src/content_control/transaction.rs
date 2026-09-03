@@ -855,9 +855,7 @@ mod tests {
 
     #[test]
     fn edits_only_the_mce_selected_binding() {
-        let source = format!(
-            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:u="urn:unsupported"><w:body><mc:AlternateContent><mc:Choice Requires="u"><w:sdt><w:sdtPr><w:dataBinding w:xpath="/inactive" w:storeItemID="{{00000000-0000-0000-0000-000000000001}}"/></w:sdtPr><w:sdtContent/></w:sdt></mc:Choice><mc:Fallback><w:sdt><w:sdtPr><w:dataBinding w:xpath="/active" w:storeItemID="{{00000000-0000-0000-0000-000000000001}}"/></w:sdtPr><w:sdtContent/></w:sdt></mc:Fallback></mc:AlternateContent></w:body></w:document>"#
-        );
+        let source = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:u="urn:unsupported"><w:body><mc:AlternateContent><mc:Choice Requires="u"><w:sdt><w:sdtPr><w:dataBinding w:xpath="/inactive" w:storeItemID="{00000000-0000-0000-0000-000000000001}"/></w:sdtPr><w:sdtContent/></w:sdt></mc:Choice><mc:Fallback><w:sdt><w:sdtPr><w:dataBinding w:xpath="/active" w:storeItemID="{00000000-0000-0000-0000-000000000001}"/></w:sdtPr><w:sdtContent/></w:sdt></mc:Fallback></mc:AlternateContent></w:body></w:document>"#.to_owned();
         let snapshot = Snapshot::from_xml(source.into_bytes()).unwrap();
         assert_eq!(snapshot.occurrences().len(), 1);
         assert_eq!(
@@ -893,8 +891,10 @@ mod tests {
     #[test]
     fn output_limit_failure_leaves_transaction_retryable() {
         let source = xml(BINDING);
-        let mut limits = super::super::Limits::default();
-        limits.max_output_bytes = source.len();
+        let limits = super::super::Limits {
+            max_output_bytes: source.len(),
+            ..Default::default()
+        };
         let snapshot = Snapshot::from_xml_with_limits(source, limits).unwrap();
         let mut transaction = snapshot.edit();
         transaction
@@ -1036,8 +1036,10 @@ mod tests {
         )
         .into_bytes();
 
-        let mut authored = super::super::Limits::default();
-        authored.max_output_bytes = source.len();
+        let authored = super::super::Limits {
+            max_output_bytes: source.len(),
+            ..Default::default()
+        };
         let snapshot = Snapshot::from_xml_with_limits(source.clone(), authored).unwrap();
         let mut transaction = snapshot.edit();
         transaction
@@ -1045,24 +1047,32 @@ mod tests {
             .unwrap();
         assert!(transaction.commit().is_err());
 
-        let mut marked = super::super::Limits::default();
-        marked.max_mce_marked_bytes = source.len();
+        let marked = super::super::Limits {
+            max_mce_marked_bytes: source.len(),
+            ..Default::default()
+        };
         assert!(Snapshot::from_xml_with_limits(source.clone(), marked).is_err());
 
-        let mut mce = super::super::Limits::default();
-        mce.max_mce_output_bytes = 1;
+        let mce = super::super::Limits {
+            max_mce_output_bytes: 1,
+            ..Default::default()
+        };
         assert!(Snapshot::from_xml_with_limits(source, mce).is_err());
     }
 
     #[test]
     fn detached_input_and_depth_stack_limits_are_admitted_before_ownership() {
         let source = xml(BINDING);
-        let mut bytes = super::super::Limits::default();
-        bytes.max_input_bytes = source.len() - 1;
+        let bytes = super::super::Limits {
+            max_input_bytes: source.len() - 1,
+            ..Default::default()
+        };
         assert!(Snapshot::from_xml_with_limits(source.clone(), bytes).is_err());
 
-        let mut depth = super::super::Limits::default();
-        depth.max_depth = usize::MAX;
+        let depth = super::super::Limits {
+            max_depth: usize::MAX,
+            ..Default::default()
+        };
         let snapshot = Snapshot::from_xml_with_limits(source, depth).unwrap();
         assert_eq!(snapshot.occurrences().len(), 1);
     }

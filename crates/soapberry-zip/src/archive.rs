@@ -846,7 +846,7 @@ fn local_header_sizes(
 
     let mut zip64_data = None;
     let mut fields = ExtraFields::new(extra);
-    while let Some((field_id, field_data)) = fields.next() {
+    for (field_id, field_data) in fields.by_ref() {
         if field_id != ExtraFieldId::ZIP64 {
             continue;
         }

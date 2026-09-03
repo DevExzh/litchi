@@ -1372,8 +1372,7 @@ fn is_signature_path(path: &str) -> bool {
 /// the package signature directory.
 fn is_signature_member_path(path: &str) -> bool {
     path.split(['/', '\\'])
-        .filter(|segment| !segment.is_empty() && *segment != ".")
-        .next()
+        .find(|segment| !segment.is_empty() && *segment != ".")
         .is_some_and(|segment| segment.eq_ignore_ascii_case("_xmlsignatures"))
 }
 

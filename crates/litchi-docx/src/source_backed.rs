@@ -1538,15 +1538,13 @@ impl Package {
         let data = main.data()?;
         let raw = data.into_arc()?;
         let artifact_fingerprint = self.package.source_artifact().fingerprint()?;
-        let snapshot = (|| {
-            layout::Snapshot::from_source_xml(
-                Arc::clone(&raw),
-                source_version,
-                lineage.clone(),
-                artifact_fingerprint,
-                limits,
-            )
-        })();
+        let snapshot = layout::Snapshot::from_source_xml(
+            Arc::clone(&raw),
+            source_version,
+            lineage.clone(),
+            artifact_fingerprint,
+            limits,
+        );
         let observed = self.package.source_version()?;
         if observed != source_version {
             return Err(litchi_opc::OpcError::SourceChanged {

@@ -11,6 +11,8 @@ mod package;
 mod tests;
 mod transaction;
 
+pub(crate) use transaction::MAX_DOCUMENT_XML_BYTES;
+pub(crate) use transaction::validate_paragraph_text;
 pub(crate) use transaction::{TransferPart, TransferRelationship, durable_transfer_operations};
 
 pub use model::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};

@@ -1,7 +1,7 @@
 use litchi_docx::glossary::{
     self, Catalog, Category, Conformance, Entry, Gallery, Id, Insert, Kind, Name, Props, raw,
 };
-use litchi_docx::{Error, Package};
+use litchi_docx::Package;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{PackURI, part::BlobPart};
 
@@ -242,12 +242,12 @@ fn invalid_graph_update_is_failure_atomic() {
 
     assert!(
         package
-            .edit_opc(|opc| Ok::<_, Error>(glossary::remove(opc)?))
+            .edit_opc(glossary::remove)
             .unwrap()
     );
     assert!(
         !package
-            .edit_opc(|opc| Ok::<_, Error>(glossary::remove(opc)?))
+            .edit_opc(glossary::remove)
             .unwrap()
     );
 }
