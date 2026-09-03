@@ -1741,6 +1741,7 @@ impl Package {
                 diagnostics: CommentReplyDiagnostics::unchanged(),
             });
         }
+        require_exact_apply_source(catalog.source_is_exact())?;
         let target_owner = patch.artifacts.target_owner();
         let candidate = Package::from_source_owner_with_options(target_owner, self.state.options)
             .map_err(|_| CommentReplyError::Verification)?;
@@ -1762,5 +1763,27 @@ impl Package {
                 patch.source_previews.saturating_sub(patch.target_previews),
             ),
         })
+    }
+}
+
+fn require_exact_apply_source(source_is_exact: bool) -> Result<(), CommentReplyError> {
+    if source_is_exact {
+        Ok(())
+    } else {
+        Err(CommentReplyError::UnsupportedSource)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CommentReplyError, require_exact_apply_source};
+
+    #[test]
+    fn changed_direct_apply_requires_exact_physical_provenance() {
+        assert_eq!(
+            require_exact_apply_source(false),
+            Err(CommentReplyError::UnsupportedSource)
+        );
+        assert_eq!(require_exact_apply_source(true), Ok(()));
     }
 }

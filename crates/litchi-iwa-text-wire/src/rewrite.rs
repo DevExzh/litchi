@@ -16,9 +16,11 @@ std::thread_local! {
     static STORAGE_EXECUTION_ENTRIES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
+use litchi_iwa_common::Error as CommonWireError;
 use litchi_iwa_common::varint::{
     decode_varint_from_bytes, encode_varint_into, encoded_len as varint_len,
 };
+use litchi_iwa_common::wire::{RawWireField, RawWireFields as CommonRawWireFields};
 use litchi_iwa_protos::text_storage_codec;
 use litchi_iwa_text::storage::{Error as StorageError, Run, Storage};
 
@@ -710,27 +712,24 @@ pub enum RewriteError {
 /// Result type for bounded storage rewrites.
 pub type RewriteResult<T> = Result<T, RewriteError>;
 
-#[derive(Debug, Clone, Copy)]
-struct RawField<'source> {
-    source: &'source [u8],
-    number: u32,
-    wire_type: u8,
-    start: usize,
-    key_end: usize,
-    payload_start: usize,
-    end: usize,
-    key_canonical: bool,
-    length_canonical: bool,
-    group_fields: usize,
-    group_depth: usize,
-}
+type RawField<'source> = RawWireField<'source>;
 
-impl<'source> RawField<'source> {
+trait RawFieldPolicy<'source>: Sized + Copy {
+    fn field_number(self) -> u32;
+
+    fn field_wire_type(self) -> u8;
+
+    fn field_payload(self) -> &'source [u8];
+
+    fn field_key_is_canonical(self) -> bool;
+
+    fn field_length_is_canonical(self) -> bool;
+
     fn require_canonical_framing(self, label: &'static str) -> RewriteResult<()> {
-        if !self.key_canonical || !self.length_canonical {
+        if !self.field_key_is_canonical() || !self.field_length_is_canonical() {
             return Err(invalid_owned(format!(
                 "{label} field {} has noncanonical protobuf framing",
-                self.number
+                self.field_number()
             )));
         }
         Ok(())
@@ -741,14 +740,15 @@ impl<'source> RawField<'source> {
         expected_wire: u8,
         label: &'static str,
     ) -> RewriteResult<&'source [u8]> {
-        if self.wire_type != expected_wire {
+        if self.field_wire_type() != expected_wire {
             return Err(RewriteError::InvalidFormat(format!(
                 "{label} field {} has wire type {}; expected {expected_wire}",
-                self.number, self.wire_type
+                self.field_number(),
+                self.field_wire_type()
             )));
         }
         self.require_canonical_framing(label)?;
-        Ok(self.payload())
+        Ok(self.field_payload())
     }
 
     fn canonical_varint(self, label: &'static str) -> RewriteResult<u64> {
@@ -756,232 +756,169 @@ impl<'source> RawField<'source> {
         let (value, length) = decode_varint_from_bytes(payload).map_err(|error| {
             RewriteError::InvalidFormat(format!(
                 "{label} field {} contains an invalid varint: {error}",
-                self.number
+                self.field_number()
             ))
         })?;
         if length != payload.len() {
             return Err(RewriteError::InvalidFormat(format!(
                 "{label} field {} contains trailing varint bytes",
-                self.number
+                self.field_number()
             )));
         }
         if length != varint_len(value) {
             return Err(RewriteError::InvalidFormat(format!(
                 "{label} field {} contains a noncanonical varint",
-                self.number
+                self.field_number()
             )));
         }
         Ok(value)
     }
+}
 
-    fn payload(self) -> &'source [u8] {
-        &self.source[self.payload_start..self.end]
+impl<'source> RawFieldPolicy<'source> for RawWireField<'source> {
+    fn field_number(self) -> u32 {
+        self.number()
     }
 
-    fn raw(self) -> &'source [u8] {
-        &self.source[self.start..self.end]
+    fn field_wire_type(self) -> u8 {
+        self.wire_type()
     }
 
-    fn key(self) -> &'source [u8] {
-        &self.source[self.start..self.key_end]
+    fn field_payload(self) -> &'source [u8] {
+        self.payload()
+    }
+
+    fn field_key_is_canonical(self) -> bool {
+        self.key_is_canonical()
+    }
+
+    fn field_length_is_canonical(self) -> bool {
+        self.length_is_canonical()
     }
 }
 
 struct RawFields<'source> {
-    source: &'source [u8],
-    offset: usize,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct GroupScan {
-    end: usize,
-    fields: usize,
-    depth: usize,
+    inner: CommonRawWireFields<'source>,
 }
 
 impl<'source> RawFields<'source> {
-    const fn new(source: &'source [u8]) -> Self {
-        Self { source, offset: 0 }
+    fn new(source: &'source [u8], limits: RewriteLimits) -> RewriteResult<Self> {
+        Self::with_remaining(source, limits, 1, 0, 0)
+    }
+
+    fn with_counters(
+        source: &'source [u8],
+        depth: usize,
+        counters: &Counters,
+        limits: RewriteLimits,
+    ) -> RewriteResult<Self> {
+        Self::with_remaining(source, limits, depth, counters.fields, counters.tree_bytes)
+    }
+
+    fn with_remaining(
+        source: &'source [u8],
+        limits: RewriteLimits,
+        depth: usize,
+        fields_used: usize,
+        work_used: usize,
+    ) -> RewriteResult<Self> {
+        let fields = remaining_raw_limit("fields", fields_used, limits.max_fields(), source)?;
+        let work =
+            remaining_raw_limit("rewrite work", work_used, limits.max_rewrite_work(), source)?;
+        let depth =
+            limits
+                .max_nesting()
+                .checked_sub(depth)
+                .ok_or_else(|| RewriteError::LimitExceeded {
+                    resource: "nesting",
+                    observed: depth,
+                    limit: limits.max_nesting(),
+                })?;
+        let raw_limits = litchi_iwa_common::wire::RawWireLimits::new(
+            limits.max_message_bytes(),
+            fields,
+            depth,
+            work,
+        )
+        .map_err(map_common_wire_error)?;
+        Ok(Self {
+            inner: CommonRawWireFields::with_limits(source, raw_limits),
+        })
     }
 
     fn next(&mut self) -> RewriteResult<Option<RawField<'source>>> {
-        if self.offset == self.source.len() {
-            return Ok(None);
-        }
-        let start = self.offset;
-        let (key_value, key_length) =
-            decode_varint_from_bytes(&self.source[start..]).map_err(|error| {
-                RewriteError::InvalidFormat(format!("invalid protobuf key: {error}"))
-            })?;
-        let key_end = checked_add(start, key_length, "protobuf key offset")?;
-        let key_canonical = key_length == varint_len(key_value);
-        let number = u32::try_from(key_value >> 3)
-            .map_err(|_error| invalid("protobuf field number exceeds u32"))?;
-        if number == 0 || number > 0x1fff_ffff {
-            return Err(invalid("protobuf field number is outside the valid range"));
-        }
-        let wire_type = u8::try_from(key_value & 7)
-            .map_err(|_error| invalid("protobuf wire type exceeds u8"))?;
-        let mut length_canonical = true;
-        let (payload_start, end, group_fields, group_depth) = match wire_type {
-            0 => {
-                let (_, length) =
-                    decode_varint_from_bytes(&self.source[key_end..]).map_err(|error| {
-                        invalid_owned(format!("invalid protobuf varint value: {error}"))
-                    })?;
-                (
-                    key_end,
-                    checked_add(key_end, length, "protobuf varint offset")?,
-                    0,
-                    0,
-                )
-            },
-            1 => (
-                key_end,
-                checked_add(key_end, 8, "protobuf fixed64 offset")?,
-                0,
-                0,
-            ),
-            2 => {
-                let (encoded_length, prefix_length) =
-                    decode_varint_from_bytes(&self.source[key_end..]).map_err(|error| {
-                        invalid_owned(format!("invalid protobuf length: {error}"))
-                    })?;
-                let payload_start = checked_add(key_end, prefix_length, "protobuf length prefix")?;
-                length_canonical = prefix_length == varint_len(encoded_length);
-                let payload_length = usize::try_from(encoded_length)
-                    .map_err(|_error| invalid("protobuf length exceeds usize"))?;
-                (
-                    payload_start,
-                    checked_add(payload_start, payload_length, "protobuf payload range")?,
-                    0,
-                    0,
-                )
-            },
-            3 => {
-                if is_known_root_field(number) {
-                    return Err(invalid_owned(format!(
-                        "known protobuf field {number} cannot use group wire type"
-                    )));
+        self.inner
+            .next_with(|field| {
+                if field.wire_type() != 4
+                    && (field.depth() != 0 || field.wire_type() == 3)
+                    && is_known_root_field(field.number())
+                {
+                    let message = if field.wire_type() == 3 {
+                        format!(
+                            "known protobuf field {} cannot use group wire type",
+                            field.number()
+                        )
+                    } else {
+                        format!(
+                            "known protobuf field {} cannot appear inside an unknown group",
+                            field.number()
+                        )
+                    };
+                    return Err(CommonWireError::InvalidFormat(message));
                 }
-                let group = scan_group(self.source, key_end, number, 1)?;
-                (key_end, group.end, group.fields, group.depth)
-            },
-            4 => return Err(invalid("unexpected protobuf end-group wire type")),
-            5 => (
-                key_end,
-                checked_add(key_end, 4, "protobuf fixed32 offset")?,
-                0,
-                0,
-            ),
-            _ => return Err(invalid("invalid protobuf wire type")),
-        };
-        if end > self.source.len() {
-            return Err(invalid("truncated protobuf field"));
-        }
-        self.offset = end;
-        Ok(Some(RawField {
-            source: self.source,
-            number,
-            wire_type,
-            start,
-            key_end,
-            payload_start,
-            end,
-            key_canonical,
-            length_canonical,
-            group_fields,
-            group_depth,
-        }))
+                Ok(())
+            })
+            .map_err(map_common_wire_error)
     }
 }
 
-fn scan_group(
+fn remaining_raw_limit(
+    resource: &'static str,
+    used: usize,
+    limit: usize,
     source: &[u8],
-    mut offset: usize,
-    expected_field_number: u32,
-    depth: usize,
-) -> RewriteResult<GroupScan> {
-    if depth > RewriteLimits::MAX_NESTING {
-        return Err(invalid("protobuf group nesting exceeds the hard limit"));
+) -> RewriteResult<usize> {
+    let remaining = limit.saturating_sub(used);
+    if remaining == 0 && !source.is_empty() {
+        return Err(RewriteError::LimitExceeded {
+            resource,
+            observed: used.saturating_add(1),
+            limit,
+        });
     }
-    let mut fields = 0usize;
-    let mut maximum_depth = depth;
-    loop {
-        if offset >= source.len() {
-            return Err(invalid("unbalanced protobuf group"));
-        }
-        let (key_value, key_length) = decode_varint_from_bytes(&source[offset..])
-            .map_err(|error| invalid_owned(format!("invalid protobuf group key: {error}")))?;
-        let key_end = checked_add(offset, key_length, "protobuf group key offset")?;
-        let number = u32::try_from(key_value >> 3)
-            .map_err(|_error| invalid("protobuf group field number exceeds u32"))?;
-        if number == 0 || number > 0x1fff_ffff {
-            return Err(invalid(
-                "protobuf group field number is outside the valid range",
-            ));
-        }
-        let wire_type = u8::try_from(key_value & 7)
-            .map_err(|_error| invalid("protobuf group wire type exceeds u8"))?;
-        if wire_type != 4 && is_known_root_field(number) {
-            return Err(invalid_owned(format!(
-                "known protobuf field {number} cannot appear inside an unknown group"
-            )));
-        }
-        fields = checked_add(fields, 1, "protobuf group field count")?;
-        match wire_type {
-            0 => {
-                let (_, length) =
-                    decode_varint_from_bytes(&source[key_end..]).map_err(|error| {
-                        invalid_owned(format!("invalid protobuf group varint value: {error}"))
-                    })?;
-                offset = checked_add(key_end, length, "protobuf group varint offset")?;
+    Ok(remaining.max(1))
+}
+
+fn map_common_wire_error(error: CommonWireError) -> RewriteError {
+    match error {
+        CommonWireError::InvalidFormat(message) => RewriteError::InvalidFormat(message),
+        CommonWireError::LimitExceeded {
+            kind,
+            observed,
+            limit,
+        } => RewriteError::LimitExceeded {
+            resource: match kind {
+                litchi_iwa_common::LimitKind::InputBytes => "message bytes",
+                litchi_iwa_common::LimitKind::Fields => "fields",
+                litchi_iwa_common::LimitKind::Nesting => "nesting",
+                litchi_iwa_common::LimitKind::RewriteWork => "raw wire work",
+                _ => "raw wire resource",
             },
-            1 => {
-                offset = checked_add(key_end, 8, "protobuf group fixed64 offset")?;
-            },
-            2 => {
-                let (encoded_length, prefix_length) = decode_varint_from_bytes(&source[key_end..])
-                    .map_err(|error| {
-                        invalid_owned(format!("invalid protobuf group length: {error}"))
-                    })?;
-                let payload_start =
-                    checked_add(key_end, prefix_length, "protobuf group length prefix")?;
-                let payload_length = usize::try_from(encoded_length)
-                    .map_err(|_error| invalid("protobuf group length exceeds usize"))?;
-                offset = checked_add(payload_start, payload_length, "protobuf group payload")?;
-            },
-            3 => {
-                if is_known_root_field(number) {
-                    return Err(invalid_owned(format!(
-                        "known protobuf field {number} cannot use group wire type"
-                    )));
-                }
-                let nested = scan_group(source, key_end, number, depth + 1)?;
-                fields = checked_add(fields, nested.fields, "nested protobuf group fields")?;
-                maximum_depth = maximum_depth.max(nested.depth);
-                offset = nested.end;
-            },
-            4 => {
-                if number != expected_field_number {
-                    return Err(invalid_owned(format!(
-                        "mismatched protobuf end-group field {number}; expected {expected_field_number}"
-                    )));
-                }
-                return Ok(GroupScan {
-                    end: key_end,
-                    fields,
-                    depth: maximum_depth,
-                });
-            },
-            5 => {
-                offset = checked_add(key_end, 4, "protobuf group fixed32 offset")?;
-            },
-            _ => return Err(invalid("invalid protobuf group wire type")),
-        }
-        if offset > source.len() {
-            return Err(invalid("truncated protobuf group field"));
-        }
+            observed,
+            limit,
+        },
+        CommonWireError::Allocation { resource, amount } => {
+            RewriteError::Allocation { resource, amount }
+        },
+        CommonWireError::InvalidLimit {
+            field,
+            value,
+            maximum,
+        } => RewriteError::InvalidLimit {
+            field,
+            value,
+            maximum,
+        },
     }
 }
 
@@ -1066,31 +1003,32 @@ fn preflight_root_text(source: &[u8], limits: RewriteLimits) -> RewriteResult<Te
     let mut field_count = 0usize;
     let mut storage_kind = None;
     let mut has_groups = false;
-    let mut fields = RawFields::new(source);
+    let mut fields = RawFields::new(source, limits)?;
     while let Some(field) = fields.next()? {
-        let field_increment = checked_add(field.group_fields, 1, "root field count")?;
+        let field_increment = checked_add(field.group_fields(), 1, "root field count")?;
         field_count = checked_add(field_count, field_increment, "root field count")?;
         enforce_limit("fields", field_count, limits.max_fields())?;
-        if field.group_depth != 0 {
+        if field.group_depth() != 0 {
             has_groups = true;
-            let depth = checked_add(1, field.group_depth, "protobuf group nesting")?;
+            let depth = checked_add(1, field.group_depth(), "protobuf group nesting")?;
             enforce_limit("nesting", depth, limits.max_nesting())?;
         }
         let number =
-            usize::try_from(field.number).map_err(|_error| arithmetic("root field number"))?;
-        if number <= MAX_KNOWN_ROOT_FIELD && is_known_root_field(field.number) {
+            usize::try_from(field.number()).map_err(|_error| arithmetic("root field number"))?;
+        if number <= MAX_KNOWN_ROOT_FIELD && is_known_root_field(field.number()) {
             occurrences[number] =
                 checked_add(occurrences[number], 1, "known root field occurrences")?;
             field.require_canonical_framing("TSWP storage")?;
             validate_root_field_shape(field)?;
-            if field.number != ROOT_TEXT_FIELD && occurrences[number] > 1 {
+            if field.number() != ROOT_TEXT_FIELD && occurrences[number] > 1 {
                 return Err(invalid_owned(format!(
                     "singular TSWP storage field {} occurs {} times",
-                    field.number, occurrences[number]
+                    field.number(),
+                    occurrences[number]
                 )));
             }
         }
-        if field.number == ROOT_TEXT_FIELD {
+        if field.number() == ROOT_TEXT_FIELD {
             let payload = field.canonical_payload(2, "TSWP storage text")?;
             let fragment_index = fragments;
             fragments = checked_add(fragments, 1, "text fragment count")?;
@@ -1106,7 +1044,7 @@ fn preflight_root_text(source: &[u8], limits: RewriteLimits) -> RewriteResult<Te
                     checked_add(utf16_len, character.len_utf16(), "preflight UTF-16 length")?;
             }
         }
-        if field.number == 1 {
+        if field.number() == 1 {
             storage_kind = Some(field.canonical_varint("TSWP storage kind")?);
         }
     }
@@ -1132,7 +1070,7 @@ fn is_table_field(number: u32) -> bool {
 }
 
 fn validate_root_field_shape(field: RawField<'_>) -> RewriteResult<()> {
-    match field.number {
+    match field.number() {
         1 => {
             let _kind = field.canonical_varint("TSWP storage kind")?;
         },
@@ -1147,7 +1085,7 @@ fn validate_root_field_shape(field: RawField<'_>) -> RewriteResult<()> {
             if value > 1 {
                 return Err(invalid_owned(format!(
                     "TSWP storage boolean field {} has value {value}",
-                    field.number
+                    field.number()
                 )));
             }
         },
@@ -1170,6 +1108,7 @@ fn validate_root_field_shape(field: RawField<'_>) -> RewriteResult<()> {
 fn text_projection_source<'source>(
     source: &'source [u8],
     has_groups: bool,
+    limits: RewriteLimits,
 ) -> RewriteResult<Cow<'source, [u8]>> {
     if !has_groups {
         return Ok(Cow::Borrowed(source));
@@ -1181,9 +1120,9 @@ fn text_projection_source<'source>(
             resource: "TSWP text projection source",
             amount: source.len(),
         })?;
-    let mut fields = RawFields::new(source);
+    let mut fields = RawFields::new(source, limits)?;
     while let Some(field) = fields.next()? {
-        if matches!(field.number, 1 | ROOT_TEXT_FIELD) {
+        if matches!(field.number(), 1 | ROOT_TEXT_FIELD) {
             projection.extend_from_slice(field.raw());
         }
     }
@@ -1215,7 +1154,7 @@ fn decode_text_plan(
     )?;
     let options =
         text_storage_codec::DecodeOptions::new(limits.max_message_bytes(), 0, element_memory, 1);
-    let projection_source = text_projection_source(source, preflight.has_groups)?;
+    let projection_source = text_projection_source(source, preflight.has_groups, limits)?;
     let view = text_storage_codec::decode_storage_text(projection_source.as_ref(), options)
         .map_err(|error| RewriteError::Projection(error.to_string()))?;
     if view.len() != preflight.fragments {
@@ -1482,11 +1421,11 @@ impl Counters {
         depth: usize,
         limits: RewriteLimits,
     ) -> RewriteResult<()> {
-        let amount = checked_add(field.group_fields, 1, "aggregate field count")?;
+        let amount = checked_add(field.group_fields(), 1, "aggregate field count")?;
         self.fields = checked_add(self.fields, amount, "aggregate field count")?;
         enforce_limit("fields", self.fields, limits.max_fields())?;
-        if field.group_depth != 0 {
-            let nested_depth = checked_add(depth, field.group_depth, "protobuf group nesting")?;
+        if field.group_depth() != 0 {
+            let nested_depth = checked_add(depth, field.group_depth(), "protobuf group nesting")?;
             enforce_limit("nesting", nested_depth, limits.max_nesting())?;
             self.max_depth = self.max_depth.max(nested_depth);
         }
@@ -1543,10 +1482,10 @@ fn validate_reference(
     let mut identifier = None;
     let mut deprecated_type = false;
     let mut external = false;
-    let mut fields = RawFields::new(data);
+    let mut fields = RawFields::with_counters(data, depth, counters, limits)?;
     while let Some(field) = fields.next()? {
         counters.field(field, depth, limits)?;
-        match field.number {
+        match field.number() {
             1 => {
                 require_absent(identifier.is_some(), "TSP.Reference identifier")?;
                 identifier = Some(field.canonical_varint("TSP.Reference identifier")?);
@@ -1566,7 +1505,7 @@ fn validate_reference(
             },
             _ => {},
         }
-        if !matches!(field.number, 1..=3) {
+        if !matches!(field.number(), 1..=3) {
             counters.unknown_field()?;
         }
     }
@@ -1579,11 +1518,11 @@ fn validate_reference(
     Ok(required_identifier)
 }
 
-fn inspect_reference(data: &[u8]) -> RewriteResult<u64> {
+fn inspect_reference(data: &[u8], limits: RewriteLimits) -> RewriteResult<u64> {
     let mut identifier = None;
-    let mut fields = RawFields::new(data);
+    let mut fields = RawFields::new(data, limits)?;
     while let Some(field) = fields.next()? {
-        if field.number == 1 {
+        if field.number() == 1 {
             require_absent(identifier.is_some(), "TSP.Reference identifier")?;
             identifier = Some(field.canonical_varint("TSP.Reference identifier")?);
         }
@@ -1601,10 +1540,10 @@ fn validate_range<'source>(
     let mut location = None;
     let mut length = None;
     let mut location_field = None;
-    let mut fields = RawFields::new(data);
+    let mut fields = RawFields::with_counters(data, depth, counters, limits)?;
     while let Some(field) = fields.next()? {
         counters.field(field, depth, limits)?;
-        match field.number {
+        match field.number() {
             1 => {
                 require_absent(location.is_some(), "TSP.Range location")?;
                 location = Some(to_u32(
@@ -1622,7 +1561,7 @@ fn validate_range<'source>(
             },
             _ => {},
         }
-        if !matches!(field.number, 1..=2) {
+        if !matches!(field.number(), 1..=2) {
             counters.unknown_field()?;
         }
     }
@@ -1633,13 +1572,13 @@ fn validate_range<'source>(
     ))
 }
 
-fn inspect_range(data: &[u8]) -> RewriteResult<(u32, u32, RawField<'_>)> {
+fn inspect_range(data: &[u8], limits: RewriteLimits) -> RewriteResult<(u32, u32, RawField<'_>)> {
     let mut location = None;
     let mut length = None;
     let mut location_field = None;
-    let mut fields = RawFields::new(data);
+    let mut fields = RawFields::new(data, limits)?;
     while let Some(field) = fields.next()? {
-        match field.number {
+        match field.number() {
             1 => {
                 require_absent(location.is_some(), "TSP.Range location")?;
                 location = Some(to_u32(
@@ -1678,10 +1617,10 @@ fn validate_index_entry<'source>(
     let mut object = None;
     let mut value_two = false;
     let mut value_three = false;
-    let mut fields = RawFields::new(data);
+    let mut fields = RawFields::with_counters(data, depth, counters, limits)?;
     while let Some(field) = fields.next()? {
         counters.field(field, depth, limits)?;
-        match field.number {
+        match field.number() {
             1 => {
                 require_absent(index.is_some(), "table entry character index")?;
                 index = Some(to_u32(
@@ -1724,8 +1663,8 @@ fn validate_index_entry<'source>(
             _ => {},
         }
         let known = match kind {
-            EntryKind::Object | EntryKind::String => matches!(field.number, 1..=2),
-            EntryKind::Para => matches!(field.number, 1..=3),
+            EntryKind::Object | EntryKind::String => matches!(field.number(), 1..=2),
+            EntryKind::Para => matches!(field.number(), 1..=3),
         };
         if !known {
             counters.unknown_field()?;
@@ -1742,13 +1681,17 @@ fn validate_index_entry<'source>(
     })
 }
 
-fn inspect_index_entry(data: &[u8], kind: EntryKind) -> RewriteResult<BorrowedIndexEntry<'_>> {
+fn inspect_index_entry(
+    data: &[u8],
+    kind: EntryKind,
+    limits: RewriteLimits,
+) -> RewriteResult<BorrowedIndexEntry<'_>> {
     let mut index = None;
     let mut index_field = None;
     let mut object = None;
-    let mut fields = RawFields::new(data);
+    let mut fields = RawFields::new(data, limits)?;
     while let Some(field) = fields.next()? {
-        match field.number {
+        match field.number() {
             1 => {
                 index = Some(to_u32(
                     field.canonical_varint("table entry character index")?,
@@ -1759,6 +1702,7 @@ fn inspect_index_entry(data: &[u8], kind: EntryKind) -> RewriteResult<BorrowedIn
             2 if kind == EntryKind::Object => {
                 object = Some(inspect_reference(
                     field.canonical_payload(2, "object table entry reference")?,
+                    limits,
                 )?);
             },
             _ => {},
@@ -1781,10 +1725,10 @@ fn validate_overlapping_entry<'source>(
     counters.enter_message(data.len(), depth, limits)?;
     let mut range = None;
     let mut reference = None;
-    let mut fields = RawFields::new(data);
+    let mut fields = RawFields::with_counters(data, depth, counters, limits)?;
     while let Some(field) = fields.next()? {
         counters.field(field, depth, limits)?;
-        match field.number {
+        match field.number() {
             1 => {
                 require_absent(range.is_some(), "overlapping table range")?;
                 let payload = field.canonical_payload(2, "overlapping table range")?;
@@ -1799,7 +1743,7 @@ fn validate_overlapping_entry<'source>(
             },
             _ => {},
         }
-        if !matches!(field.number, 1..=2) {
+        if !matches!(field.number(), 1..=2) {
             counters.unknown_field()?;
         }
     }
@@ -1814,20 +1758,24 @@ fn validate_overlapping_entry<'source>(
     })
 }
 
-fn inspect_overlapping_entry(data: &[u8]) -> RewriteResult<OverlappingEntry<'_>> {
+fn inspect_overlapping_entry(
+    data: &[u8],
+    limits: RewriteLimits,
+) -> RewriteResult<OverlappingEntry<'_>> {
     let mut range = None;
     let mut reference = None;
-    let mut fields = RawFields::new(data);
+    let mut fields = RawFields::new(data, limits)?;
     while let Some(field) = fields.next()? {
-        match field.number {
+        match field.number() {
             1 => {
                 let payload = field.canonical_payload(2, "overlapping table range")?;
-                let (start, length, location_field) = inspect_range(payload)?;
+                let (start, length, location_field) = inspect_range(payload, limits)?;
                 range = Some((start, length, field, location_field));
             },
             2 => {
                 reference = Some(inspect_reference(
                     field.canonical_payload(2, "overlapping table reference")?,
+                    limits,
                 )?);
             },
             _ => {},
@@ -1897,13 +1845,13 @@ fn validate_and_plan_root(
         RewriteBehavior::PreserveOnEqualText => text.no_op,
         RewriteBehavior::ReplaceSelection => range.start == range.end && replacement.is_empty(),
     };
-    let mut fields = RawFields::new(source);
+    let mut fields = RawFields::with_counters(source, 1, &counters, limits)?;
     while let Some(field) = fields.next()? {
         counters.field(field, 1, limits)?;
-        if !is_known_root_field(field.number) {
+        if !is_known_root_field(field.number()) {
             counters.unknown_field()?;
         }
-        let contribution = match field.number {
+        let contribution = match field.number() {
             2 => {
                 let payload = field.canonical_payload(2, "TSWP storage style sheet")?;
                 let _identifier = validate_reference(payload, 2, &mut counters, limits)?;
@@ -2146,12 +2094,12 @@ fn validate_and_plan_table(
         });
     }
     if policy == TablePolicy::NormalizeObject {
-        validate_normalized_source(table)?;
+        validate_normalized_source(table, limits)?;
     }
     if policy == TablePolicy::Overlapping {
-        plan_overlapping_table(table, range, replacement_units)
+        plan_overlapping_table(table, range, replacement_units, limits)
     } else {
-        plan_index_table(table, policy, range, replacement_units)
+        plan_index_table(table, policy, range, replacement_units, limits)
     }
     .map_err(|error| add_table_context(error, storage_field))
 }
@@ -2165,10 +2113,10 @@ fn validate_table_tree(
 ) -> RewriteResult<()> {
     counters.enter_message(table.len(), 2, limits)?;
     let mut previous_index = None;
-    let mut fields = RawFields::new(table);
+    let mut fields = RawFields::with_counters(table, 2, counters, limits)?;
     while let Some(field) = fields.next()? {
         counters.field(field, 2, limits)?;
-        if field.number != TABLE_ENTRY_FIELD {
+        if field.number() != TABLE_ENTRY_FIELD {
             counters.unknown_field()?;
             continue;
         }
@@ -2250,12 +2198,20 @@ fn plan_index_table(
     policy: TablePolicy,
     range: &Range<usize>,
     replacement_units: usize,
+    limits: RewriteLimits,
 ) -> RewriteResult<TablePlan> {
     let kind = policy
         .entry_kind()
         .ok_or_else(|| invalid("index table has no entry kind"))?;
     let normalization_option = if policy == TablePolicy::NormalizeObject {
-        find_normalization(table, kind, range, replacement_units, policy.retain_start())?
+        find_normalization(
+            table,
+            kind,
+            range,
+            replacement_units,
+            policy.retain_start(),
+            limits,
+        )?
     } else {
         Some(Normalization {
             keep_from_ordinal: 0,
@@ -2278,9 +2234,9 @@ fn plan_index_table(
     let mut changed = normalization.keep_from_ordinal != 0 || normalization.insert_sentinel;
     let mut previous_adjusted = None;
     let mut ordinal = 0usize;
-    let mut fields = RawFields::new(table);
+    let mut fields = RawFields::new(table, limits)?;
     while let Some(field) = fields.next()? {
-        if field.number != TABLE_ENTRY_FIELD {
+        if field.number() != TABLE_ENTRY_FIELD {
             output_len = checked_add(output_len, field.raw().len(), "table unknown fields")?;
             unknown_table_fields =
                 checked_add(unknown_table_fields, 1, "unknown table field count")?;
@@ -2288,7 +2244,7 @@ fn plan_index_table(
         }
         source_entries = checked_add(source_entries, 1, "source table entries")?;
         let entry = field.canonical_payload(2, "TSWP table entry")?;
-        let inspected = inspect_index_entry(entry, kind)?;
+        let inspected = inspect_index_entry(entry, kind, limits)?;
         let adjusted = adjust_index(
             inspected.index,
             range,
@@ -2354,16 +2310,21 @@ fn find_normalization(
     range: &Range<usize>,
     replacement_units: usize,
     retain_start: bool,
+    limits: RewriteLimits,
 ) -> RewriteResult<Option<Normalization>> {
     let mut previous_adjusted = None;
     let mut previous_retained_ordinal = None;
     let mut ordinal = 0usize;
-    let mut fields = RawFields::new(table);
+    let mut fields = RawFields::new(table, limits)?;
     while let Some(field) = fields.next()? {
-        if field.number != TABLE_ENTRY_FIELD {
+        if field.number() != TABLE_ENTRY_FIELD {
             continue;
         }
-        let entry = inspect_index_entry(field.canonical_payload(2, "TSWP table entry")?, kind)?;
+        let entry = inspect_index_entry(
+            field.canonical_payload(2, "TSWP table entry")?,
+            kind,
+            limits,
+        )?;
         let adjusted = adjust_index(entry.index, range, replacement_units, retain_start)?;
         let retained = adjusted.is_some_and(|value| previous_adjusted != Some(value));
         if retained {
@@ -2391,19 +2352,20 @@ fn find_normalization(
     Ok(None)
 }
 
-fn validate_normalized_source(table: &[u8]) -> RewriteResult<()> {
+fn validate_normalized_source(table: &[u8], limits: RewriteLimits) -> RewriteResult<()> {
     let mut ordinal = 0usize;
     let mut first_index = None;
     let mut first_has_object = false;
     let mut first_object_ordinal = None;
-    let mut fields = RawFields::new(table);
+    let mut fields = RawFields::new(table, limits)?;
     while let Some(field) = fields.next()? {
-        if field.number != TABLE_ENTRY_FIELD {
+        if field.number() != TABLE_ENTRY_FIELD {
             continue;
         }
         let entry = inspect_index_entry(
             field.canonical_payload(2, "ranged object table entry")?,
             EntryKind::Object,
+            limits,
         )?;
         if ordinal == 0 {
             first_index = Some(entry.index);
@@ -2436,18 +2398,19 @@ fn plan_overlapping_table(
     table: &[u8],
     range: &Range<usize>,
     replacement_units: usize,
+    limits: RewriteLimits,
 ) -> RewriteResult<TablePlan> {
     let mut output_len = 0usize;
     let mut retained_entries = 0usize;
     let mut changed = false;
-    let mut fields = RawFields::new(table);
+    let mut fields = RawFields::new(table, limits)?;
     while let Some(field) = fields.next()? {
-        if field.number != TABLE_ENTRY_FIELD {
+        if field.number() != TABLE_ENTRY_FIELD {
             output_len = checked_add(output_len, field.raw().len(), "overlapping table unknown")?;
             continue;
         }
         let entry = field.canonical_payload(2, "overlapping table entry")?;
-        let inspected = inspect_overlapping_entry(entry)?;
+        let inspected = inspect_overlapping_entry(entry, limits)?;
         match adjust_native_range(inspected.start, inspected.length, range, replacement_units)? {
             None => changed = true,
             Some(start) => {
@@ -2547,7 +2510,7 @@ fn rewritten_nested_location_len(
         .ok_or_else(|| arithmetic("overlapping entry without range"))?;
     checked_add(
         without_range,
-        encoded_length_delimited_len(inspected.range_field.number, range_len)?,
+        encoded_length_delimited_len(inspected.range_field.number(), range_len)?,
         "rewritten overlapping entry length",
     )
 }
@@ -2810,7 +2773,7 @@ pub fn decode_storage_with_limits(
     )?;
     let options =
         text_storage_codec::DecodeOptions::new(limits.max_message_bytes(), 0, element_memory, 1);
-    let projection_source = text_projection_source(source, text_preflight.has_groups)?;
+    let projection_source = text_projection_source(source, text_preflight.has_groups, limits)?;
     let view = text_storage_codec::decode_storage_text(projection_source.as_ref(), options)
         .map_err(|error| RewriteError::Projection(error.to_string()))?;
     if view.len() != text_preflight.fragments {
@@ -2927,13 +2890,13 @@ fn validate_full_storage_tree(
 ) -> RewriteResult<Counters> {
     let mut counters = Counters::default();
     counters.enter_message(source.len(), 1, limits)?;
-    let mut fields = RawFields::new(source);
+    let mut fields = RawFields::with_counters(source, 1, &counters, limits)?;
     while let Some(field) = fields.next()? {
         counters.field(field, 1, limits)?;
-        if !is_known_root_field(field.number) {
+        if !is_known_root_field(field.number()) {
             counters.unknown_field()?;
         }
-        match field.number {
+        match field.number() {
             2 => {
                 let payload = field.canonical_payload(2, "TSWP storage style sheet")?;
                 let _identifier = validate_reference(payload, 2, &mut counters, limits)?;
@@ -3201,9 +3164,9 @@ fn rewrite_root(
     require_exact_capacity(&output, output_len, "rewritten TSWP storage")?;
     let mut fragment_index = 0usize;
     let mut fragment_offset = 0usize;
-    let mut fields = RawFields::new(source);
+    let mut fields = RawFields::new(source, limits)?;
     while let Some(field) = fields.next()? {
-        match field.number {
+        match field.number() {
             ROOT_TEXT_FIELD => {
                 let payload = field.canonical_payload(2, "TSWP storage text")?;
                 let action = text_action(
@@ -3227,9 +3190,9 @@ fn rewrite_root(
                     continue;
                 }
                 let plan = if policy == TablePolicy::Overlapping {
-                    plan_overlapping_table(table, range, text.replacement_units)?
+                    plan_overlapping_table(table, range, text.replacement_units, limits)?
                 } else {
-                    plan_index_table(table, policy, range, text.replacement_units)?
+                    plan_index_table(table, policy, range, text.replacement_units, limits)?
                 };
                 if !plan.keep {
                     continue;
@@ -3240,9 +3203,22 @@ fn rewrite_root(
                 }
                 write_length_delimited_header(&mut output, number, plan.output_len)?;
                 if policy == TablePolicy::Overlapping {
-                    write_overlapping_table(&mut output, table, range, text.replacement_units)?;
+                    write_overlapping_table(
+                        &mut output,
+                        table,
+                        range,
+                        text.replacement_units,
+                        limits,
+                    )?;
                 } else {
-                    write_index_table(&mut output, table, policy, range, text.replacement_units)?;
+                    write_index_table(
+                        &mut output,
+                        table,
+                        policy,
+                        range,
+                        text.replacement_units,
+                        limits,
+                    )?;
                 }
             },
             _ => output.extend_from_slice(field.raw()),
@@ -3319,13 +3295,21 @@ fn write_index_table(
     policy: TablePolicy,
     range: &Range<usize>,
     replacement_units: usize,
+    limits: RewriteLimits,
 ) -> RewriteResult<()> {
     let kind = policy
         .entry_kind()
         .ok_or_else(|| invalid("index table has no entry kind"))?;
     let normalization = if policy == TablePolicy::NormalizeObject {
-        find_normalization(table, kind, range, replacement_units, policy.retain_start())?
-            .ok_or_else(|| invalid("removed normalized table reached writer"))?
+        find_normalization(
+            table,
+            kind,
+            range,
+            replacement_units,
+            policy.retain_start(),
+            limits,
+        )?
+        .ok_or_else(|| invalid("removed normalized table reached writer"))?
     } else {
         Normalization {
             keep_from_ordinal: 0,
@@ -3335,14 +3319,14 @@ fn write_index_table(
     };
     let mut previous_adjusted = None;
     let mut ordinal = 0usize;
-    let mut fields = RawFields::new(table);
+    let mut fields = RawFields::new(table, limits)?;
     while let Some(field) = fields.next()? {
-        if field.number != TABLE_ENTRY_FIELD {
+        if field.number() != TABLE_ENTRY_FIELD {
             output.extend_from_slice(field.raw());
             continue;
         }
         let entry = field.canonical_payload(2, "TSWP table entry")?;
-        let inspected = inspect_index_entry(entry, kind)?;
+        let inspected = inspect_index_entry(entry, kind, limits)?;
         let adjusted = adjust_index(
             inspected.index,
             range,
@@ -3388,15 +3372,16 @@ fn write_overlapping_table(
     table: &[u8],
     replacement: &Range<usize>,
     replacement_units: usize,
+    limits: RewriteLimits,
 ) -> RewriteResult<()> {
-    let mut fields = RawFields::new(table);
+    let mut fields = RawFields::new(table, limits)?;
     while let Some(field) = fields.next()? {
-        if field.number != TABLE_ENTRY_FIELD {
+        if field.number() != TABLE_ENTRY_FIELD {
             output.extend_from_slice(field.raw());
             continue;
         }
         let entry = field.canonical_payload(2, "overlapping table entry")?;
-        let inspected = inspect_overlapping_entry(entry)?;
+        let inspected = inspect_overlapping_entry(entry, limits)?;
         let Some(start) = adjust_native_range(
             inspected.start,
             inspected.length,
@@ -3424,10 +3409,10 @@ fn write_varint_message(
     replacement: u64,
 ) -> RewriteResult<()> {
     let prefix = message
-        .get(..target.start)
+        .get(..target.start())
         .ok_or_else(|| invalid("varint target prefix exceeds message"))?;
     let suffix = message
-        .get(target.end..)
+        .get(target.end()..)
         .ok_or_else(|| invalid("varint target suffix exceeds message"))?;
     output.extend_from_slice(prefix);
     output.extend_from_slice(target.key());
@@ -3444,7 +3429,7 @@ fn write_nested_location(
 ) -> RewriteResult<()> {
     output.extend_from_slice(
         entry
-            .get(..inspected.range_field.start)
+            .get(..inspected.range_field.start())
             .ok_or_else(|| invalid("range prefix exceeds overlapping entry"))?,
     );
     let range = inspected.range_field.payload();
@@ -3453,7 +3438,7 @@ fn write_nested_location(
         inspected.location_field,
         u64::from(replacement),
     )?;
-    write_length_delimited_header(output, inspected.range_field.number, range_len)?;
+    write_length_delimited_header(output, inspected.range_field.number(), range_len)?;
     write_varint_message(
         output,
         range,
@@ -3462,7 +3447,7 @@ fn write_nested_location(
     )?;
     output.extend_from_slice(
         entry
-            .get(inspected.range_field.end..)
+            .get(inspected.range_field.end()..)
             .ok_or_else(|| invalid("range suffix exceeds overlapping entry"))?,
     );
     Ok(())
@@ -3481,13 +3466,16 @@ fn collect_reference_occurrences(
             amount: capacity,
         })?;
     require_exact_capacity(&references, capacity, "TSWP reference occurrences")?;
-    let mut fields = RawFields::new(source);
+    let mut fields = RawFields::new(source, limits)?;
     while let Some(field) = fields.next()? {
-        match field.number {
+        match field.number() {
             2 => push_reference(
                 &mut references,
                 2,
-                inspect_reference(field.canonical_payload(2, "TSWP storage style sheet")?)?,
+                inspect_reference(
+                    field.canonical_payload(2, "TSWP storage style sheet")?,
+                    limits,
+                )?,
                 limits,
             )?,
             number if is_table_field(number) => {
@@ -3516,11 +3504,12 @@ fn collect_table_references(
     limits: RewriteLimits,
 ) -> RewriteResult<()> {
     let Some(kind) = policy.entry_kind() else {
-        let mut fields = RawFields::new(table);
+        let mut fields = RawFields::new(table, limits)?;
         while let Some(field) = fields.next()? {
-            if field.number == TABLE_ENTRY_FIELD {
+            if field.number() == TABLE_ENTRY_FIELD {
                 let entry = inspect_overlapping_entry(
                     field.canonical_payload(2, "overlapping table entry")?,
+                    limits,
                 )?;
                 push_reference(references, storage_field, entry.reference, limits)?;
             }
@@ -3530,12 +3519,13 @@ fn collect_table_references(
     if kind != EntryKind::Object {
         return Ok(());
     }
-    let mut fields = RawFields::new(table);
+    let mut fields = RawFields::new(table, limits)?;
     while let Some(field) = fields.next()? {
-        if field.number == TABLE_ENTRY_FIELD {
+        if field.number() == TABLE_ENTRY_FIELD {
             let entry = inspect_index_entry(
                 field.canonical_payload(2, "object table entry")?,
                 EntryKind::Object,
+                limits,
             )?;
             if let Some(identifier) = entry.object {
                 push_reference(references, storage_field, identifier, limits)?;
@@ -3810,12 +3800,13 @@ mod tests {
     }
 
     fn root_field(source: &[u8], number: u32) -> Vec<u8> {
-        let mut fields = RawFields::new(source);
+        let mut fields = RawFields::new(source, RewriteLimits::default())
+            .unwrap_or_else(|error| panic!("test root should construct scanner: {error}"));
         while let Some(field) = fields
             .next()
             .unwrap_or_else(|error| panic!("test root should parse: {error}"))
         {
-            if field.number == number {
+            if field.number() == number {
                 return field.raw().to_vec();
             }
         }
@@ -4355,8 +4346,28 @@ mod tests {
         assert!(matches!(
             rewrite_storage_text_with_limits(&nested_source, 0..0, "", work_limited),
             Err(RewriteError::LimitExceeded {
-                resource: "aggregate nested scan bytes",
+                resource: "raw wire work",
                 ..
+            })
+        ));
+    }
+
+    #[test]
+    fn raw_scans_use_remaining_aggregate_field_budget() {
+        let source = [
+            raw_length_delimited(3, b"x"),
+            raw_length_delimited(2, &reference(17).encode_to_vec()),
+        ]
+        .concat();
+        let limits = RewriteLimits::new(1_024, 2, 4, 16, 1_024, 16, 16, 1_024, 16_384)
+            .unwrap_or_else(|error| panic!("test limits should be valid: {error}"));
+
+        assert!(matches!(
+            rewrite_storage_text_with_limits(&source, 0..0, "", limits),
+            Err(RewriteError::LimitExceeded {
+                resource: "fields",
+                observed: 3,
+                limit: 2,
             })
         ));
     }

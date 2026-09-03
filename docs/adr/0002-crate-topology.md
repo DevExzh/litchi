@@ -70,14 +70,14 @@ iWork format crate, and concrete format owners retain their own object-model
 and package-topology semantics.
 
 The shared table vocabulary begins at
-`litchi-iwa-common::table::cell::BorderSide`. It is a compact, four-variant
-cell-edge selector with no stroke, appearance, archive, or protobuf knowledge.
-`litchi-iwa` retains `numbers::editor::table::cell::Borders` because that
-aggregate contains the facade-owned `ShapeStroke`; native stroke sidecars
-convert the neutral selector at the concrete boundary. The old Numbers-owned
-selector is removed rather than retained as a compatibility alias, and the
-Numbers, Pages, and Keynote border APIs now take this canonical selector
-directly.
+`litchi-iwa-common::table::cell::{BorderSide,Borders}`. `BorderSide` is a
+compact, four-variant cell-edge selector, while `Borders` carries an optional
+neutral `Stroke` for each edge; neither type has archive, appearance,
+protobuf, or concrete-format knowledge. `litchi-iwa` retains
+`numbers::editor::table::cell::Borders` only as a deprecated compatibility
+re-export while migration-host callers adopt the common owner. The Numbers,
+Pages, and Keynote border APIs now import the common value directly, and
+native stroke sidecars remain at each concrete format boundary.
 
 The physical IWA substrate is layered beneath the application crate:
 `litchi-iwa-protos` owns the generated raw schemas, and `litchi-iwa-core`

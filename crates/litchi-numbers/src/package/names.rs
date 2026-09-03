@@ -503,12 +503,14 @@ impl fmt::Debug for Patch {
 }
 
 impl Patch {
-    /// Return whether the patch changes no semantic name.
+    /// Return whether the patch is both semantically and byte-wise unchanged.
     #[must_use]
     pub fn is_noop(&self) -> bool {
         self.operations
             .iter()
             .all(|operation| operation.before == operation.after)
+            && self.source.as_ref() == self.target.as_ref()
+            && self.source_fingerprint == self.target_fingerprint
     }
 
     /// Return the number of semantic name operations retained by this patch.
@@ -3271,4 +3273,41 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
 
 fn usize_as_u64(value: usize) -> u64 {
     u64::try_from(value).unwrap_or(u64::MAX)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use litchi_iwa_archive::package::SharedBytes;
+
+    use super::{Direction, Location, Operation, Patch, fingerprint};
+
+    fn patch(source: SharedBytes, target: SharedBytes) -> Patch {
+        Patch {
+            source_fingerprint: fingerprint(source.as_ref()),
+            target_fingerprint: fingerprint(target.as_ref()),
+            source,
+            target,
+            operations: Arc::from([Operation {
+                location: Location::Sheet(0),
+                before: Arc::from("same"),
+                after: Arc::from("same"),
+            }]),
+            native: Arc::from([]),
+            direction: Direction::Forward,
+            touched_components: 0,
+            previews: 0,
+        }
+    }
+
+    #[test]
+    fn is_noop_requires_exact_source_and_target_artifacts() {
+        let source = SharedBytes::from_shared_slice(Arc::from([1_u8, 2]));
+        let different_target = SharedBytes::from_shared_slice(Arc::from([1_u8, 3]));
+        assert!(!patch(source.clone(), different_target).is_noop());
+
+        let equivalent_target = SharedBytes::from_shared_slice(Arc::from([1_u8, 2]));
+        assert!(patch(source, equivalent_target).is_noop());
+    }
 }

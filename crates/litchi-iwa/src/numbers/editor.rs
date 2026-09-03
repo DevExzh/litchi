@@ -107,40 +107,16 @@ const CONDITIONAL_STYLE_NO_APPLIED_RULE: u32 = 15;
 pub mod table {
     /// Cell-level table editing vocabulary.
     pub mod cell {
-        use litchi_iwa_common::shape::stroke::Stroke;
-        use litchi_iwa_common::table::cell::BorderSide;
-
-        /// Effective explicit borders stored for one native Numbers table cell.
+        /// Compatibility re-export for the former Numbers-owned border value.
         ///
-        /// `None` means the table style supplies the edge, or a later native
-        /// stroke run explicitly clears it.
-        #[derive(Clone, Copy, Debug, Default, PartialEq)]
-        pub struct Borders {
-            pub left: Option<Stroke>,
-            pub right: Option<Stroke>,
-            pub top: Option<Stroke>,
-            pub bottom: Option<Stroke>,
-        }
-
-        impl Borders {
-            pub const fn get(self, side: BorderSide) -> Option<Stroke> {
-                match side {
-                    BorderSide::Left => self.left,
-                    BorderSide::Right => self.right,
-                    BorderSide::Top => self.top,
-                    BorderSide::Bottom => self.bottom,
-                }
-            }
-
-            pub(crate) fn set(&mut self, side: BorderSide, stroke: Option<Stroke>) {
-                match side {
-                    BorderSide::Left => self.left = stroke,
-                    BorderSide::Right => self.right = stroke,
-                    BorderSide::Top => self.top = stroke,
-                    BorderSide::Bottom => self.bottom = stroke,
-                }
-            }
-        }
+        /// New code should import [`litchi_iwa_common::table::cell::Borders`]
+        /// directly. This path remains only so migration-host callers using
+        /// the historical `numbers::editor::table::cell` namespace continue
+        /// to compile while the common owner is adopted.
+        #[deprecated(
+            note = "use litchi_iwa_common::table::cell::Borders; this Numbers path is retained for migration-host compatibility"
+        )]
+        pub use litchi_iwa_common::table::cell::Borders;
     }
 }
 

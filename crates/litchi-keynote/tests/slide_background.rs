@@ -689,6 +689,26 @@ fn no_op_preserves_exact_source_and_reset_restores_inheritance() -> TestResult<(
     assert!(noop.patch().is_noop());
     assert_eq!(exact_bytes(noop.package())?, source);
 
+    let direct_noop = package
+        .edit_slide_background("Beta")?
+        .set(red())?
+        .commit()?;
+    assert!(direct_noop.patch().is_noop());
+    assert_eq!(exact_bytes(direct_noop.package())?, source);
+
+    let inherited_none_source = synthetic_package_with_inherited_none()?;
+    let inherited_none = Package::from_bytes(&inherited_none_source)?;
+    let reset_noop = inherited_none
+        .edit_slide_background(0usize)?
+        .reset()?
+        .commit()?;
+    assert!(reset_noop.patch().is_noop());
+    assert_eq!(exact_bytes(reset_noop.package())?, inherited_none_source);
+    assert_eq!(
+        reset_noop.package().slide_background_override(0usize)?,
+        None
+    );
+
     let cleared = package.edit_slide_background("Beta")?.reset()?.commit()?;
     assert_eq!(cleared.package().slide_background_override("Beta")?, None);
     assert_eq!(cleared.package().slide_background("Beta")?, white());

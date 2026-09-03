@@ -42,7 +42,6 @@ const INLINE_TABLE_DUPLICATE_OFFSET: f32 = 0.0;
 pub type PagesCellValue = litchi_numbers::cell::Value;
 /// One mutation in a transactional Pages table-cell batch.
 pub type PagesTableCellUpdate = litchi_numbers::cell::Update;
-pub use crate::numbers::editor::table::cell::Borders;
 pub use crate::shapes::RgbaColor as PagesTableCellTextColor;
 pub use crate::text::Background as PagesTableCellTextBackground;
 pub use crate::text::Outline as PagesTableCellTextOutline;
@@ -70,6 +69,7 @@ pub use crate::text::TextScript as PagesTableCellTextScript;
 pub use crate::text::TextStyle as PagesTableCellTextStyle;
 pub use litchi_iwa_common::shape::stroke::Stroke;
 pub use litchi_iwa_common::table::cell::BorderSide;
+pub use litchi_iwa_common::table::cell::Borders;
 pub use litchi_iwa_common::table::cell::layout::{
     Inset as PagesTableCellInset, Insets as PagesTableCellInsets, Layout as PagesTableCellLayout,
     TextWrap as PagesTableCellTextWrap, VerticalAlignment as PagesTableCellVerticalAlignment,

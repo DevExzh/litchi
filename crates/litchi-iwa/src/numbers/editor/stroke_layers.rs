@@ -5,9 +5,8 @@
 //! edited axis. This module keeps existing borders attached to their original
 //! cells when the editor inserts or removes a blank row or column.
 
-use litchi_iwa_common::table::cell::BorderSide;
+use litchi_iwa_common::table::cell::{BorderSide, Borders};
 
-use super::table::cell::Borders;
 use super::*;
 use crate::package_metadata::{next_object_identifier, set_package_last_object_identifier};
 use crate::shapes::{empty_stroke_archive, stroke_from_native, stroke_to_native};

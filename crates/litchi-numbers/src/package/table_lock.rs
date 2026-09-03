@@ -263,10 +263,12 @@ impl TableLockPatch {
         self.after
     }
 
-    /// Return whether applying this patch changes semantic state.
+    /// Return whether the patch is both semantically and byte-wise unchanged.
     #[must_use]
     pub fn is_noop(&self) -> bool {
         self.before == self.after
+            && self.source.as_ref() == self.target.as_ref()
+            && self.source_fingerprint == self.target_fingerprint
     }
 
     /// Return an exact-source inverse that restores the original artifact.
@@ -1106,5 +1108,37 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> TableLockError {
         },
         litchi_iwa_common::Error::InvalidFormat(_)
         | litchi_iwa_common::Error::InvalidLimit { .. } => TableLockError::InvalidSource,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use litchi_iwa_archive::package::SharedBytes;
+
+    use super::{State, TableLockPatch, fingerprint};
+
+    fn patch(source: SharedBytes, target: SharedBytes) -> TableLockPatch {
+        TableLockPatch {
+            source_fingerprint: fingerprint(source.as_ref()),
+            target_fingerprint: fingerprint(target.as_ref()),
+            source,
+            target,
+            sheet_position: 0,
+            table_position: 0,
+            before: State::Unlocked,
+            after: State::Unlocked,
+        }
+    }
+
+    #[test]
+    fn is_noop_requires_exact_source_and_target_artifacts() {
+        let source = SharedBytes::from_shared_slice(Arc::from([1_u8, 2]));
+        let different_target = SharedBytes::from_shared_slice(Arc::from([1_u8, 3]));
+        assert!(!patch(source.clone(), different_target).is_noop());
+
+        let equivalent_target = SharedBytes::from_shared_slice(Arc::from([1_u8, 2]));
+        assert!(patch(source, equivalent_target).is_noop());
     }
 }

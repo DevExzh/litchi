@@ -1472,9 +1472,10 @@ mod buffa_keynote_slide_background_generated {
 
 /// Internal archive-header codec implemented by the private Buffa sidecar.
 ///
-/// This module intentionally exchanges only the existing Prost compatibility
-/// structs. Buffa-generated types remain an implementation detail and cannot
-/// leak into the public format APIs.
+/// This module exchanges only owned, schema-neutral archive-header DTOs.
+/// Buffa-generated types and the full Prost schema remain implementation
+/// details of their respective boundaries and cannot leak through this
+/// focused format API.
 #[doc(hidden)]
 pub mod archive_codec;
 

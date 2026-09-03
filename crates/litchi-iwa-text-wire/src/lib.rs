@@ -4,6 +4,16 @@
 //! [`litchi_iwa_text`]. It owns no package traversal, archive state, object
 //! lookup, or application semantics. Callers retain context-specific error
 //! wording and transaction ownership at their format boundary.
+//!
+//! The compatibility conversion from a generated `StorageArchive` is kept
+//! only for this crate's differential tests; callers provide encoded bytes
+//! through [`from_bytes`].
+//!
+//! ```compile_fail
+//! use litchi_iwa_protos::tswp::StorageArchive;
+//!
+//! let _ = litchi_iwa_text_wire::from_archive(StorageArchive::default());
+//! ```
 
 #![forbid(unsafe_code)]
 
@@ -23,6 +33,7 @@ use std::{cell::Cell, mem::size_of};
 
 use litchi_iwa_common::{WireLimits, wire::WireDescent, wire::preflight_wire_tree_with_limits};
 use litchi_iwa_protos::text_storage_codec;
+#[cfg(test)]
 use litchi_iwa_protos::tswp::StorageArchive;
 use litchi_iwa_text::storage::{Error as StorageError, MAX_RUNS, Run, Storage};
 
@@ -284,15 +295,16 @@ pub fn from_bytes_with_limits(source: &[u8], limits: Limits) -> Result<Storage> 
 /// Convert one decoded native TSWP storage payload without retaining wire
 /// fragments or allocating a second concatenated text buffer.
 ///
-/// This Prost-shaped entry point remains temporarily for compatibility and as
-/// a differential oracle while format call sites migrate to [`from_bytes`].
+/// This Prost-shaped helper exists only as a differential oracle for the
+/// in-crate tests; supported callers use [`from_bytes`] instead.
 ///
 /// # Errors
 ///
 /// Returns a typed error when the fragment budget, aggregate text length, or
 /// allocation budget is exceeded, or when the semantic storage ranges cannot
 /// be validated.
-pub fn from_archive(archive: StorageArchive) -> Result<Storage> {
+#[cfg(test)]
+fn from_archive(archive: StorageArchive) -> Result<Storage> {
     if archive.text.len() > MAX_FRAGMENTS {
         return Err(Error::TooManyFragments {
             actual: archive.text.len(),

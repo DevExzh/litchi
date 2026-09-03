@@ -11,6 +11,9 @@
 
 use crate::{Error, Result};
 use litchi_iwa_common::{WireLimits, varint::encoded_len};
+use litchi_iwa_protos::archive_codec::{
+    ArchiveInfo as NeutralArchiveInfo, MessageInfo as NeutralMessageInfo,
+};
 use phf::phf_map;
 use prost::Message;
 
@@ -804,7 +807,7 @@ pub trait DecodedMessage: std::fmt::Debug + Send + Sync {
 
 /// Wrapper for ArchiveInfo message
 #[derive(Debug)]
-struct ArchiveInfoWrapper(tsp::ArchiveInfo);
+struct ArchiveInfoWrapper(NeutralArchiveInfo);
 
 impl DecodedMessage for ArchiveInfoWrapper {
     fn extract_text(&self) -> Vec<String> {
@@ -814,7 +817,7 @@ impl DecodedMessage for ArchiveInfoWrapper {
 
 /// Wrapper for MessageInfo message
 #[derive(Debug)]
-struct MessageInfoWrapper(tsp::MessageInfo);
+struct MessageInfoWrapper(NeutralMessageInfo);
 
 impl DecodedMessage for MessageInfoWrapper {
     fn extract_text(&self) -> Vec<String> {

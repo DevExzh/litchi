@@ -210,24 +210,36 @@ fn source_built_compatibility_package(editor: &KeynoteEditor) -> Result<bool> {
     const DOCUMENT_MESSAGE_TYPE: u32 = 1;
     const SOURCE_BUILT_TEMPLATE: &str = "Application/Litchi/Blank/Wide";
 
-    let archive = editor.package().archive(DOCUMENT_ENTRY)?;
-    let object = archive
-        .object(DOCUMENT_IDENTIFIER)
-        .ok_or_else(|| Error::InvalidFormat("Keynote document root is missing".to_owned()))?;
-    let mut messages = object
-        .messages
-        .iter()
-        .filter(|message| message.type_ == DOCUMENT_MESSAGE_TYPE);
-    let message = messages
-        .next()
-        .ok_or_else(|| Error::InvalidFormat("Keynote document payload is missing".to_owned()))?;
-    if messages.next().is_some() {
-        return Err(Error::InvalidFormat(
-            "Keynote document payload is ambiguous".to_owned(),
-        ));
+    let source_is_exact = editor.package().source_is_exact();
+    let marker = (|| {
+        let archive = editor.package().archive(DOCUMENT_ENTRY)?;
+        let object = archive
+            .object(DOCUMENT_IDENTIFIER)
+            .ok_or_else(|| Error::InvalidFormat("Keynote document root is missing".to_owned()))?;
+        let mut messages = object
+            .messages
+            .iter()
+            .filter(|message| message.type_ == DOCUMENT_MESSAGE_TYPE);
+        let message = messages.next().ok_or_else(|| {
+            Error::InvalidFormat("Keynote document payload is missing".to_owned())
+        })?;
+        if messages.next().is_some() {
+            return Err(Error::InvalidFormat(
+                "Keynote document payload is ambiguous".to_owned(),
+            ));
+        }
+        let document = kn::DocumentArchive::decode(message.data.as_slice())?;
+        Ok(document.super_.template_identifier.as_deref() == Some(SOURCE_BUILT_TEMPLATE))
+    })();
+
+    match marker {
+        Ok(marked) => Ok(marked),
+        // An exact/native package that does not expose the compatibility
+        // marker belongs to the focused owner. Never route it through the
+        // permissive Numbers writer merely because this narrow probe failed.
+        Err(_) if source_is_exact => Ok(false),
+        Err(error) => Err(error),
     }
-    let document = kn::DocumentArchive::decode(message.data.as_slice())?;
-    Ok(document.super_.template_identifier.as_deref() == Some(SOURCE_BUILT_TEMPLATE))
 }
 
 fn execute_source_built_table_sort(

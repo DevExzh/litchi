@@ -11,6 +11,8 @@ along with media assets and metadata. It is the legacy migration host, not the
 supported format facade. Its remaining public surface is for raw archive and
 package work, compatibility adapters, and editor capabilities that have not
 yet moved to a concrete format crate.
+This package is intentionally unpublished (`publish = false`); use it only as
+a workspace or source-checkout dependency while migrating existing callers.
 
 New semantic code belongs in `litchi-pages`, `litchi-numbers`, or
 `litchi-keynote`; use `litchi::iwork` for a supported cross-format snapshot.
@@ -72,9 +74,13 @@ assert_eq!(restored.package().show_settings()?, before);
 
 ## Usage
 
+`litchi-iwa` is intentionally unpublished and is not a crates.io dependency.
+For a local source checkout, depend on it by path while migrating existing
+callers:
+
 ```toml
 [dependencies]
-litchi-iwa = "0.0.1"
+litchi-iwa = { path = "../litchi-iwa" }
 ```
 
 The unified `Document` API below is retained for legacy compatibility
@@ -342,11 +348,17 @@ matching `remove_*` methods. Shape labels remain independent through duplicate,
 delete, and package round-trip operations; the `create_*_shape` examples build
 them from scratch.
 
-File-backed movies expose the same native title/caption controls through
-`*_movie_title_caption`, `set_*_movie_title`, `set_*_movie_caption`, and their
-matching `remove_*` methods. Movie labels remain independent through duplicate,
-delete, and package round-trip operations; the `create_*_movie` examples build
-them from scratch.
+File-backed movies in this migration host retain media, geometry, playback,
+and other format-specific compatibility controls. Body and sheet movie labels
+continue to use the corresponding `*_movie_title_caption`,
+`set_*_movie_title`, `set_*_movie_caption`, and `remove_*` methods. Keynote
+slide movie title/caption CRUD is owned by the focused
+`litchi_keynote::Package` methods
+`{slide_movie_title,edit_slide_movie_title,apply_slide_movie_title,slide_movie_caption,edit_slide_movie_caption,apply_slide_movie_caption}`
+with `SlideSelector` and `MovieSelector`; the migration host no longer exposes
+wrappers for those operations. See `create_keynote_movie.rs` for the focused
+package workflow. Movie labels remain independent through duplicate, delete,
+and package round-trip operations.
 
 They likewise expose `flip_body_movie`, `flip_sheet_movie`, and
 `flip_slide_movie`, preserving their video and poster assets, playback settings,
@@ -2500,8 +2512,9 @@ record and retain unknown protobuf fields. Body insertion keeps the mandatory
 initial section boundary at index zero. Selector-first section-scoped text
 read, UTF-16 span replacement, whole-value update, and clear now live in
 `litchi-pages::Package`; see `litchi-pages/examples/edit_section_text.rs`.
-The umbrella `edit_pages_section_text` example delegates to that same
-selector-first package transaction; it is not a raw-ID `PagesEditor` example.
+Use the focused `litchi-pages/examples/edit_section_text.rs` example and its
+selector-first `litchi_pages::Package` transaction; there is no umbrella
+`edit_pages_section_text` example in this migration host.
 For a rooted exact source with one unambiguous native body storage, the changed
 transaction excludes native U+0004 separators and dependent footnote or
 inline-object anchors, preserves unrelated raw records, and publishes only

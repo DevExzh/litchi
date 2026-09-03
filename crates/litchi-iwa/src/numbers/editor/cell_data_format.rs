@@ -2588,8 +2588,8 @@ mod tests {
             ThousandsSeparator::Shown,
         );
         assert_eq!(
-            editor.table_cell_number_format(table_id, 1, 1).unwrap(),
-            None
+            editor.table_cell_data_format(table_id, 1, 1).unwrap(),
+            DataFormat::Automatic
         );
         crate::numbers::editor::set_cell_fixture(
             &mut editor,
@@ -2600,13 +2600,13 @@ mod tests {
         )
         .unwrap();
         editor
-            .set_table_cell_number_format(table_id, 1, 1, format)
+            .set_table_cell_data_format(table_id, 1, 1, DataFormat::Number(format))
             .unwrap();
         editor
-            .set_table_cell_number_format(table_id, 1, 2, format)
+            .set_table_cell_data_format(table_id, 1, 2, DataFormat::Number(format))
             .unwrap();
         editor
-            .set_table_cell_number_format(table_id, 1, 2, format)
+            .set_table_cell_data_format(table_id, 1, 2, DataFormat::Number(format))
             .unwrap();
 
         let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
@@ -2616,32 +2616,30 @@ mod tests {
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            reopened.table_cell_number_format(table_id, 1, 1).unwrap(),
-            Some(format)
+            reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
+            DataFormat::Number(format)
         );
-        assert!(
-            reopened
-                .reset_table_cell_number_format(table_id, 1, 1)
-                .unwrap()
-        );
+        reopened
+            .set_table_cell_data_format(table_id, 1, 1, DataFormat::Automatic)
+            .unwrap();
         assert_eq!(
-            reopened.table_cell_number_format(table_id, 1, 2).unwrap(),
-            Some(format)
+            reopened.table_cell_data_format(table_id, 1, 2).unwrap(),
+            DataFormat::Number(format)
         );
         let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
         let formats = resolve_format_table(reopened.package(), &location).unwrap();
         assert_eq!(formats.entries[0].entry.refcount, 1);
 
-        assert!(
-            reopened
-                .reset_table_cell_number_format(table_id, 1, 2)
-                .unwrap()
+        reopened
+            .set_table_cell_data_format(table_id, 1, 2, DataFormat::Automatic)
+            .unwrap();
+        assert_eq!(
+            reopened.table_cell_data_format(table_id, 1, 2).unwrap(),
+            DataFormat::Automatic
         );
-        assert!(
-            !reopened
-                .reset_table_cell_number_format(table_id, 1, 2)
-                .unwrap()
-        );
+        reopened
+            .set_table_cell_data_format(table_id, 1, 2, DataFormat::Automatic)
+            .unwrap();
         let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
         assert!(
             resolve_format_table(reopened.package(), &location)
@@ -2661,7 +2659,7 @@ mod tests {
         let before = editor.to_bytes().unwrap();
         assert!(
             editor
-                .set_table_cell_number_format(table_id, 2, 0, Number::default())
+                .set_table_cell_data_format(table_id, 2, 0, DataFormat::Number(Number::default()),)
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);
@@ -2711,7 +2709,10 @@ mod tests {
             editor.table_cell_data_format(table_id, 1, 1).unwrap(),
             DataFormat::Percentage(percentage)
         );
-        assert!(editor.table_cell_number_format(table_id, 1, 1).is_err());
+        assert!(matches!(
+            editor.table_cell_data_format(table_id, 1, 1).unwrap(),
+            DataFormat::Percentage(_)
+        ));
         let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
         let formats = resolve_format_table(editor.package(), &location).unwrap();
         assert_eq!(formats.entries.len(), 1);

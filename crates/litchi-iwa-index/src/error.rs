@@ -24,6 +24,18 @@ pub enum FragmentTraversalError {
         /// The adapter-local fragment whose catalog is inconsistent.
         fragment: FragmentId,
     },
+    /// A fragment catalog entry contains a range outside the immutable
+    /// fragment/object identity storage or has reversed endpoints.
+    InvalidRange {
+        /// The adapter-local fragment whose catalog is inconsistent.
+        fragment: FragmentId,
+        /// The first catalog position addressed by the invalid range.
+        start: usize,
+        /// The exclusive catalog position addressed by the invalid range.
+        end: usize,
+        /// The number of entries available in the immutable catalog.
+        available: usize,
+    },
 }
 
 impl fmt::Display for FragmentTraversalError {
@@ -40,6 +52,15 @@ impl fmt::Display for FragmentTraversalError {
             Self::MissingObject { fragment } => write!(
                 formatter,
                 "fragment {fragment:?} refers to an object missing from the index"
+            ),
+            Self::InvalidRange {
+                fragment,
+                start,
+                end,
+                available,
+            } => write!(
+                formatter,
+                "fragment {fragment:?} has invalid object range {start}..{end} for {available} catalog entries"
             ),
         }
     }

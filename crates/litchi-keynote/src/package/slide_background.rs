@@ -339,10 +339,13 @@ impl SlideBackgroundPatch {
         self.before_override.as_ref()
     }
 
-    /// Return whether the patch preserves the exact source bytes.
+    /// Return whether the patch preserves the exact source bytes and selected
+    /// slide-background semantics.
     #[must_use]
     pub fn is_noop(&self) -> bool {
         self.artifacts.is_byte_noop()
+            && self.before == self.target_effective
+            && self.before_override == self.target_override
     }
 
     /// Return compact source provenance.
@@ -3836,4 +3839,35 @@ fn map_rendering_error(
 
 fn usize_to_u64(value: usize) -> u64 {
     u64::try_from(value).unwrap_or(u64::MAX)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn byte_equal_but_semantically_different_patch_is_not_a_noop() {
+        let source = Arc::<[u8]>::from(&b"same source bytes"[..]);
+        let target = Background::Solid(
+            Rgba::new(0.25, 0.5, 0.75, 1.0, RgbColorSpace::Srgb).expect("test color is valid"),
+        );
+        let patch = SlideBackgroundPatch {
+            artifacts: ExactArtifacts::new(Arc::clone(&source), source),
+            slide_position: Position::new(0),
+            slide_identifier: 1,
+            style_identifier: 2,
+            target_style_identifier: 2,
+            before: Background::None,
+            before_override: None,
+            after: Some(target.clone()),
+            target_effective: target.clone(),
+            target_override: Some(target),
+            reset: false,
+            touched_components: 1,
+            deleted_previews: 0,
+        };
+
+        assert!(patch.artifacts.is_byte_noop());
+        assert!(!patch.is_noop());
+    }
 }
