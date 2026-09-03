@@ -390,6 +390,56 @@ class PerformanceWorkflowPolicyTests(unittest.TestCase):
                 "every performance artifact upload must use if: always()",
             )
 
+    def test_full_baseline_emits_and_validates_schema_two_corpus_catalog(self) -> None:
+        full_steps = _steps(self.jobs["full"])
+        baseline_steps = [
+            step for step in full_steps if "Run full release baseline matrix" in step
+        ]
+        self.assertEqual(len(baseline_steps), 1)
+        baseline_run = _run_body(baseline_steps[0])
+        self.assertRegex(
+            baseline_run,
+            r"--json\s+target/perf/container-baseline\.json",
+        )
+        self.assertRegex(
+            baseline_run,
+            r"--corpus-manifest\s+target/perf/container-baseline\.corpus-manifest-v2\.json",
+        )
+
+        validation_steps = [
+            step for step in full_steps if "Validate full corpus catalog binding" in step
+        ]
+        self.assertEqual(len(validation_steps), 1)
+        validation_run = _run_body(validation_steps[0])
+        self.assertRegex(
+            validation_run,
+            r"python3\s+tools/validate_perf_corpus_binding\.py\b",
+        )
+        self.assertRegex(
+            validation_run,
+            r"--report\s+target/perf/container-baseline\.json",
+        )
+        self.assertRegex(
+            validation_run,
+            r"--catalog\s+target/perf/container-baseline\.corpus-manifest-v2\.json",
+        )
+
+        uploads = [
+            step
+            for step in full_steps
+            if re.search(r"uses:\s*actions/upload-artifact@", step)
+            and "container-performance-baseline" in step
+        ]
+        self.assertEqual(len(uploads), 1)
+        self.assertRegex(
+            uploads[0],
+            r"(?m)^\s*target/perf/container-baseline\.corpus-manifest-v2\.json\s*$",
+        )
+
+    def test_smoke_preserves_default_matrix_without_corpus_catalog_sidecar(self) -> None:
+        smoke_runs = "\n".join(_run_body(step) for step in _steps(self.jobs["smoke"]))
+        self.assertNotRegex(smoke_runs, r"--corpus-manifest\b")
+
     def test_stale_repository_target_cache_is_not_configured(self) -> None:
         self.assertNotRegex(
             self.workflow,

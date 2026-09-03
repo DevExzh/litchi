@@ -48,6 +48,8 @@ on:
       - 'tools/perf_abba_summary.py'
       - 'tools/test_perf_abba_summary.py'
       - 'tools/perf_resource_profile.py'
+      - 'tools/validate_perf_corpus_binding.py'
+      - 'tools/test_perf_corpus_binding.py'
       - 'tools/test_perf_resource_profile.py'
       - 'tools/test_perf_baseline_source_policy.py'
       - 'tools/test_perf_workflow_policy.py'
@@ -114,6 +116,8 @@ on:
       - 'tools/perf_abba_summary.py'
       - 'tools/test_perf_abba_summary.py'
       - 'tools/perf_resource_profile.py'
+      - 'tools/validate_perf_corpus_binding.py'
+      - 'tools/test_perf_corpus_binding.py'
       - 'tools/test_perf_resource_profile.py'
       - 'tools/test_perf_baseline_source_policy.py'
       - 'tools/test_perf_workflow_policy.py'
@@ -285,6 +289,7 @@ jobs:
             tools.test_perf_abba_summary \
             tools.test_perf_abba_package \
             tools.test_perf_resource_profile \
+            tools.test_perf_corpus_binding \
             tools.test_perf_workflow_policy
 
       - name: Test benchmark source policy
@@ -1380,7 +1385,17 @@ jobs:
           mkdir -p target/perf
           cargo run --release --locked --manifest-path "$PERF_MANIFEST" -- \
             --samples 15 \
-            --json target/perf/container-baseline.json
+            --json target/perf/container-baseline.json \
+            --corpus-manifest target/perf/container-baseline.corpus-manifest-v2.json
+
+      - name: Validate full corpus catalog binding
+        run: |
+          python3 tools/validate_perf_corpus_binding.py \
+            --report target/perf/container-baseline.json \
+            --catalog target/perf/container-baseline.corpus-manifest-v2.json
+
+      - name: Validate full baseline report shape
+        run: |
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -2323,6 +2338,7 @@ jobs:
           name: container-performance-baseline-${{ github.run_id }}
           path: |
             target/perf/container-baseline.json
+            target/perf/container-baseline.corpus-manifest-v2.json
             target/perf/xlsx-commit-read-baseline.json
             target/perf/opc-source-overlay-baseline.json
             target/perf/docx-source-edit-baseline.json
