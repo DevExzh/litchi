@@ -1189,6 +1189,53 @@ footnote codec corpora.
 cargo +nightly fuzz check pages_footnote_graph_codec
 ```
 
+## Pages drawable-order codec
+
+`pages_drawable_order_codec` exercises the strict borrowed
+`TP.DrawablesZOrderArchive` projection. Successful snapshots must retain the
+caller-owned payload, expose complete references and identifiers without
+allocating, and preserve optional reference fields plus unknown scalar/group
+spans through source-preserving no-op and permutation rewrites. The harness
+also keeps duplicate, zero, missing, wrong-wire, non-canonical, truncated,
+unterminated-group, and nesting-limit failures reachable. Every malformed or
+resource-limited call is bounded by the same finite input, field, work, depth,
+and repeated-reference ceilings used by the Pages host.
+
+The target accepts at most 64 KiB, permits 128 KiB of rewrite output, 16,384
+fields, 512 KiB of aggregate work, 4,096 references, and recursion depth 64.
+Corpus entries under `corpus/pages_drawable_order_codec/` are hand-authored
+`hex:` wire recipes; they are strict codec payloads rather than native package
+bytes.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check pages_drawable_order_codec
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build output
+outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-pages-drawable-order-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+cp corpus/pages_drawable_order_codec/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  pages_drawable_order_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
 ## Pages footnote reference and marker codecs
 
 `pages_footnote_codec` drives both strict, caller-owned Pages footnote

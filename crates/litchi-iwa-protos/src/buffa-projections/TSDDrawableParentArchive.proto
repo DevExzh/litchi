@@ -1,0 +1,15 @@
+// Wire-only Buffa projection for the parent edge of one TSD.DrawableArchive.
+// The complete native drawable payload remains caller-owned.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}
+
+message DrawableArchive {
+  optional .LitchiIwaProjection.Reference parent = 2;
+}

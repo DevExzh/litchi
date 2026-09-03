@@ -6,6 +6,8 @@
 
 use litchi_core::Position;
 
+pub use self::number_format::CellPosition;
+
 /// Effective appearance settings for a table's style graph.
 pub mod appearance;
 /// Checked row and column point-size values.
@@ -18,6 +20,8 @@ pub mod headers;
 pub mod lock;
 /// Validated display names for a table.
 pub mod name;
+/// Decimal number display formats for existing table cells.
+pub mod number_format;
 /// Physical row-sort transaction values for a Keynote slide table.
 pub mod physical_sort;
 /// Sort values shared through the neutral iWork semantic model.

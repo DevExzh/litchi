@@ -5146,6 +5146,169 @@ class BoundaryPolicyTests(unittest.TestCase):
                 ],
             )
 
+    def test_iwa_theme_facade_and_wrapper_visibility_stay_retired(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.IWA_FACADE_SOURCE
+            facade.parent.mkdir(parents=True)
+            facade.write_text(
+                "pub mod raw {\n"
+                "    pub mod package {}\n"
+                "    pub mod theme {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            theme = root / boundaries.IWA_THEME_SOURCE
+            theme.parent.mkdir(parents=True, exist_ok=True)
+            theme.write_text(
+                "pub struct IWorkThemeArchive {\n"
+                "    pub base: u64,\n"
+                "}\n"
+                "impl IWorkThemeArchive {\n"
+                "    pub fn decode() {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_theme_facade_source_topology(root),
+                [
+                    "litchi-iwa theme implementation exposes external visibility: "
+                    "crates/litchi-iwa/src/theme.rs:1",
+                    "litchi-iwa theme implementation exposes external visibility: "
+                    "crates/litchi-iwa/src/theme.rs:2",
+                    "litchi-iwa theme implementation exposes external visibility: "
+                    "crates/litchi-iwa/src/theme.rs:5",
+                    "retired litchi-iwa raw theme facade returned: "
+                    "crates/litchi-iwa/src/lib.rs:3",
+                ],
+            )
+
+    def test_iwa_theme_facade_audit_allows_private_theme_implementation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.IWA_FACADE_SOURCE
+            facade.parent.mkdir(parents=True)
+            facade.write_text(
+                "pub mod raw {\n"
+                "    pub mod package {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            theme = root / boundaries.IWA_THEME_SOURCE
+            theme.parent.mkdir(parents=True, exist_ok=True)
+            theme.write_text(
+                "pub(crate) struct IWorkThemeArchive {\n"
+                "    pub(crate) base: u64,\n"
+                "}\n"
+                "impl IWorkThemeArchive {\n"
+                "    pub(crate) fn decode() {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_theme_facade_source_topology(root), []
+            )
+
+    def test_iwa_theme_facade_audit_masks_trivia_and_cfg_test_items(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.IWA_FACADE_SOURCE
+            facade.parent.mkdir(parents=True)
+            facade.write_text(
+                "// pub mod raw { pub mod theme {} }\n"
+                'const NOTE: &str = "pub mod theme";\n'
+                "pub mod raw {\n"
+                "    #[cfg(test)]\n"
+                "    pub mod theme {}\n"
+                "    pub mod package {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            theme = root / boundaries.IWA_THEME_SOURCE
+            theme.parent.mkdir(parents=True, exist_ok=True)
+            theme.write_text(
+                "#[cfg(test)]\n"
+                "pub struct TestOnlyTheme {}\n"
+                "pub(crate) struct IWorkThemeArchive {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_theme_facade_source_topology(root), []
+            )
+
+    def test_iwa_theme_facade_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+
+        self.assertIn(
+            "audit_iwa_theme_facade_source_topology()", main_source
+        )
+
+    def test_iwa_protos_retired_root_aliases_stay_private(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.IWA_PROTOS_FACADE_SOURCE
+            facade.parent.mkdir(parents=True)
+            facade.write_text(
+                "pub use self::generated::{kn, knsos, tn, tsck, tswp};\n"
+                "pub(crate) use generated::{tstsos, tswpsos};\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_protos_root_alias_source_topology(root),
+                [
+                    "retired litchi-iwa-protos generated root aliases returned "
+                    "(knsos, tsck): crates/litchi-iwa-protos/src/lib.rs:1"
+                ],
+            )
+
+    def test_iwa_protos_retired_root_alias_audit_rejects_glob(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.IWA_PROTOS_FACADE_SOURCE
+            facade.parent.mkdir(parents=True)
+            facade.write_text("pub use generated::*;\n", encoding="utf-8")
+
+            violations = boundaries.audit_iwa_protos_root_alias_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            for alias in boundaries.RETIRED_IWA_PROTOS_ROOT_ALIASES:
+                self.assertIn(alias, violations[0])
+
+    def test_iwa_protos_retired_root_alias_audit_rejects_public_module(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.IWA_PROTOS_FACADE_SOURCE
+            facade.parent.mkdir(parents=True)
+            facade.write_text(
+                "pub mod tstsos {}\n"
+                "pub(crate) mod tswpsos {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_protos_root_alias_source_topology(root),
+                [
+                    "retired litchi-iwa-protos generated root alias returned as a "
+                    "public module (tstsos): crates/litchi-iwa-protos/src/lib.rs:1"
+                ],
+            )
+
+    def test_iwa_protos_retired_root_alias_audit_is_in_main_dispatch(
+        self,
+    ) -> None:
+        main_source = inspect.getsource(boundaries.main)
+
+        self.assertIn(
+            "audit_iwa_protos_root_alias_source_topology()", main_source
+        )
+
     def test_iwa_charts_compatibility_exports_and_example_stay_retired(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -11168,7 +11331,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             host.parent.mkdir(parents=True, exist_ok=True)
             host.write_text(
                 "use litchi_numbers::Package as FocusedNumbersPackage;\n"
-                "pub fn move_table(&mut self, table: TableSelector, target: SheetSelector) {\n"
+                "pub(crate) fn move_table(&mut self, table: TableSelector, target: SheetSelector) {\n"
                 "    let source = FocusedNumbersPackage::from_bytes(bytes).unwrap();\n"
                 "    source.move_table(source_sheet, table, target);\n"
                 "}\n"
@@ -11184,6 +11347,38 @@ class BoundaryPolicyTests(unittest.TestCase):
             )
             self.assertEqual(
                 boundaries.audit_numbers_table_move_facade_source_topology(root), []
+            )
+
+    def test_focused_numbers_table_move_rejects_public_host_and_example(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_move_canonical_scaffold(root)
+            host = root / boundaries.IWA_NUMBERS_TABLE_MOVE_SOURCE
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "use litchi_numbers::Package as FocusedNumbersPackage;\n"
+                "pub fn move_table(&mut self, table: TableSelector, target: SheetSelector) {\n"
+                "    let package = FocusedNumbersPackage::from_bytes(bytes).unwrap();\n"
+                "    package.move_table(source_sheet, table, target);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_MOVE_EXAMPLE
+            example.parent.mkdir(parents=True, exist_ok=True)
+            example.write_text("fn main() {}\n", encoding="utf-8")
+
+            violations = boundaries.audit_iwa_numbers_table_move_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("public litchi-iwa NumbersEditor::move_table" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("table-move example returned" in item for item in violations),
+                violations,
             )
 
     def test_focused_numbers_table_move_facade_rejects_raw_ids_and_public_module(

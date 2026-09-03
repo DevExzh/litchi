@@ -103,6 +103,42 @@ IWA_RAW_MODULE_DECLARATION = re.compile(
 )
 IWA_CORE_SOURCE_ROOT = Path("crates/litchi-iwa/src")
 IWA_CORE_EXAMPLE_SOURCE_ROOT = Path("crates/litchi-iwa/examples")
+IWA_PROTOS_FACADE_SOURCE = Path("crates/litchi-iwa-protos/src/lib.rs")
+RETIRED_IWA_PROTOS_ROOT_ALIASES = frozenset(
+    {
+        "knsos",
+        "tnsos",
+        "tpsos",
+        "tsasos",
+        "tschsos",
+        "tsck",
+        "tscksos",
+        "tsdsos",
+        "tsssos",
+        "tstsos",
+        "tswpsos",
+    }
+)
+IWA_PROTOS_PUBLIC_USE = re.compile(
+    r"^[ \t]*pub(?![ \t\r\n]*\()[ \t\r\n]+use[ \t\r\n]+"
+    r"(?P<tail>.*?);",
+    re.MULTILINE | re.DOTALL,
+)
+IWA_PROTOS_EXTERNAL_MODULE_DECLARATION = re.compile(
+    r"^[ \t]*pub(?![ \t\r\n]*\()[ \t\r\n]+mod[ \t\r\n]+"
+    r"(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b",
+    re.MULTILINE,
+)
+IWA_THEME_SOURCE = IWA_CORE_SOURCE_ROOT / "theme.rs"
+IWA_RAW_THEME_MODULE_DECLARATION = re.compile(
+    r"^[ \t]*pub(?![ \t\r\n]*\()[ \t\r\n]+mod[ \t\r\n]+"
+    r"(?:r#)?theme\b",
+    re.MULTILINE,
+)
+IWA_THEME_EXTERNAL_VISIBILITY = re.compile(
+    r"^[ \t]*pub(?![ \t\r\n]*\([ \t\r\n]*crate[ \t\r\n]*\))",
+    re.MULTILINE,
+)
 IWA_CHARTS_FACADE_SOURCE = IWA_CORE_SOURCE_ROOT / "charts" / "mod.rs"
 RETIRED_IWA_CHARTS_INSPECTION_EXAMPLE = (
     IWA_CORE_EXAMPLE_SOURCE_ROOT / "inspect_iwa_archive.rs"
@@ -10311,6 +10347,15 @@ NUMBERS_TABLE_SORT_RAW_PARAMETER = re.compile(
 IWA_NUMBERS_TABLE_MOVE_SOURCE = (
     IWA_NUMBERS_SOURCE_ROOT / "editor" / "table_move.rs"
 )
+RETIRED_IWA_NUMBERS_TABLE_MOVE_EXAMPLE = (
+    IWA_CORE_EXAMPLE_SOURCE_ROOT / "move_numbers_table.rs"
+)
+IWA_NUMBERS_TABLE_MOVE_EXTERNAL_METHOD = re.compile(
+    r"^[ \t]*pub(?![ \t\r\n]*\()[ \t\r\n]+"
+    r"(?:(?:async|const|unsafe)[ \t\r\n]+)*fn[ \t\r\n]+"
+    r"(?:r#)?move_table\b",
+    re.MULTILINE,
+)
 NUMBERS_TABLE_MOVE_OWNER_SOURCE = (
     NUMBERS_SOURCE_ROOT / "package" / "table_relocation.rs"
 )
@@ -14151,6 +14196,103 @@ def audit_iwa_raw_facade_source_topology(root: Path = ROOT) -> list[str]:
         violations.append(
             "litchi-iwa raw facade must remain deprecated: "
             f"{IWA_FACADE_SOURCE}:{line_number}"
+        )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_theme_facade_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep the retired raw theme facade and external wrapper visibility out.
+
+    Theme decoding is still an internal migration-host concern.  Once the
+    deprecated ``raw`` namespace stopped forwarding it, the wrapper and its
+    fields/methods must remain crate-private so a future edit cannot quietly
+    recreate a second low-level public entry point.
+    """
+
+    violations: list[str] = []
+    facade_path = root / IWA_FACADE_SOURCE
+    if facade_path.is_file():
+        production_source = _mask_rust_cfg_test_items(
+            facade_path.read_text(encoding="utf-8")
+        )
+        source = _mask_rust_non_code(production_source)
+        raw_module = IWA_RAW_MODULE_DECLARATION.search(source)
+        if raw_module is not None:
+            opening = source.find("{", raw_module.end())
+            if opening >= 0:
+                depth = 1
+                cursor = opening + 1
+                while cursor < len(source) and depth:
+                    if source[cursor] == "{":
+                        depth += 1
+                    elif source[cursor] == "}":
+                        depth -= 1
+                    cursor += 1
+                if depth == 0:
+                    raw_body = source[opening + 1 : cursor - 1]
+                    for match in IWA_RAW_THEME_MODULE_DECLARATION.finditer(
+                        raw_body
+                    ):
+                        offset = opening + 1 + match.start()
+                        line_number = source.count("\n", 0, offset) + 1
+                        violations.append(
+                            "retired litchi-iwa raw theme facade returned: "
+                            f"{IWA_FACADE_SOURCE}:{line_number}"
+                        )
+
+    theme_path = root / IWA_THEME_SOURCE
+    if theme_path.is_file():
+        production_source = _mask_rust_cfg_test_items(
+            theme_path.read_text(encoding="utf-8")
+        )
+        source = _mask_rust_non_code(production_source)
+        for match in IWA_THEME_EXTERNAL_VISIBILITY.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "litchi-iwa theme implementation exposes external visibility: "
+                f"{IWA_THEME_SOURCE}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_protos_root_alias_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep retired generated-schema aliases out of the public crate root."""
+
+    path = root / IWA_PROTOS_FACADE_SOURCE
+    if not path.is_file():
+        return []
+
+    production_source = _mask_rust_cfg_test_items(
+        path.read_text(encoding="utf-8")
+    )
+    source = _mask_rust_non_code(production_source)
+    violations: list[str] = []
+    for declaration in IWA_PROTOS_PUBLIC_USE.finditer(source):
+        tail = declaration.group("tail")
+        tokens = set(re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", tail))
+        aliases = RETIRED_IWA_PROTOS_ROOT_ALIASES.intersection(
+            tokens
+        )
+        if "*" in tail and "generated" in tokens:
+            aliases = RETIRED_IWA_PROTOS_ROOT_ALIASES
+        if not aliases:
+            continue
+        line_number = source.count("\n", 0, declaration.start()) + 1
+        violations.append(
+            "retired litchi-iwa-protos generated root aliases returned "
+            f"({', '.join(sorted(aliases))}): "
+            f"{IWA_PROTOS_FACADE_SOURCE}:{line_number}"
+        )
+    for declaration in IWA_PROTOS_EXTERNAL_MODULE_DECLARATION.finditer(source):
+        alias = declaration.group("name")
+        if alias not in RETIRED_IWA_PROTOS_ROOT_ALIASES:
+            continue
+        line_number = source.count("\n", 0, declaration.start()) + 1
+        violations.append(
+            "retired litchi-iwa-protos generated root alias returned as a "
+            f"public module ({alias}): {IWA_PROTOS_FACADE_SOURCE}:{line_number}"
         )
 
     return sorted(set(violations))
@@ -19695,6 +19837,19 @@ def audit_iwa_numbers_table_move_source_topology(
     production_source = _mask_rust_cfg_test_items(raw_source)
     code = _mask_rust_non_code(production_source)
     violations: list[str] = []
+
+    for match in IWA_NUMBERS_TABLE_MOVE_EXTERNAL_METHOD.finditer(code):
+        line_number = code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "retired public litchi-iwa NumbersEditor::move_table returned: "
+            f"{IWA_NUMBERS_TABLE_MOVE_SOURCE}:{line_number}"
+        )
+    retired_example = root / RETIRED_IWA_NUMBERS_TABLE_MOVE_EXAMPLE
+    if retired_example.is_file():
+        violations.append(
+            "retired litchi-iwa Numbers table-move example returned: "
+            f"{RETIRED_IWA_NUMBERS_TABLE_MOVE_EXAMPLE}"
+        )
 
     def function_records(source: str) -> dict[str, list[tuple[str, int]]]:
         """Return production function bodies for this dedicated host module."""
@@ -49400,6 +49555,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_snapshot(snapshot, policy)
         + audit_litchi_facade_source_topology()
         + audit_iwa_raw_facade_source_topology()
+        + audit_iwa_theme_facade_source_topology()
+        + audit_iwa_protos_root_alias_source_topology()
         + audit_iwa_charts_compatibility_source_topology()
         + audit_litchi_semantic_facade_source_topology()
         + audit_iwork_example_source_topology()
