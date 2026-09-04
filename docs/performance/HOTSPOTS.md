@@ -11,14 +11,15 @@ ASCII-case-alias, genuine-miss, and combined 144-query vectors are
 independently oracle-checked. The selectable registry rises from **415** to
 **418**, while the default remains **36 cases / 198 rows**.
 
-Every latency result and delta here is normal, non-allocator release-binary
-p50 evidence. Source-open measurements time normal unmanaged
+The latency deltas reported here are derived only from normal,
+non-allocator release-binary p50 evidence. Source-open measurements time normal unmanaged
 `SourceBackedPackage::from_read_at`; lookup measurements time fixed pre-open
 unmanaged packages. Values are in **2,048 / 16,384 Parts** order;
 allocator-enabled latency is observational only. Validation-constructor
 coverage is correctness-only. Mapless exact regressed approximately
-`+2,750% / +3,500%`; scalar exact
-`+20.22% / +12.42%` while saving `N` allocation events; `std` prehashed exact
+`+2,750% / +3,500%`. The preliminary scalar-`Vec` exact probe measured
+`+14.85% / +20.96%`; the full inlined linear-probe ABBA measured
+`+20.22% / +12.42%` while saving `N` allocation events. `std` prehashed exact
 `+13.42% / +15.88%`; and direct `HashTable` exact `+14.66% / +13.36%`, with
 a high-sample follow-up still around `+14.7%`–`+15.6%`. The final pooled
 `Arc<str>` experiment regressed exact `+6.09% / +6.96%`, source-open
