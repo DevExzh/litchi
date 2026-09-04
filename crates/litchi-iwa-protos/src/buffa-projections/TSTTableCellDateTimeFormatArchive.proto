@@ -1,0 +1,13 @@
+// Narrow scalar projection for one native Numbers date-and-time format.
+//
+// The complete TSK.FormatStructArchive remains source-authoritative. This
+// sidecar exists only to parity-check the selected discriminator and pattern
+// after the handwritten codec has performed its complete bounded wire
+// preflight.
+syntax = "proto2";
+package LitchiIwaNumbersTableCellDateTimeFormatProjection;
+
+message FormatStructArchive {
+  optional uint32 format_type = 1;
+  optional string date_time_format = 14;
+}

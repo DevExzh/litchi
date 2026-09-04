@@ -1494,7 +1494,11 @@ fn verify_locality(
     }
     for entry in candidate_catalog.package().iter() {
         if !source_entries.contains_key(entry.name()) {
-            return Err(SlideTableTitleError::Verification);
+            if target_previews_absent
+                || !super::rendering_invalidation::is_root_preview_name(entry.name())
+            {
+                return Err(SlideTableTitleError::Verification);
+            }
         }
     }
     let source_archive = component_archive(source, selection.component_name.as_ref())?;

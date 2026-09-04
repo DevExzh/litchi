@@ -251,11 +251,14 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 variant of the borrowed `FormatStructArchive` seam. It accepts only native
 format type 260 and keeps the selected value lazy and source-borrowed while
 unknown scalar, fixed-width, length-delimited, and balanced group records
-remain opaque and source-preserving. The fixed recipes cover canonical type
-260, unknown-record interleaving, duplicate/missing/wrong-wire/noncanonical
-known fields, and truncated or mismatched groups. Canonical writes also check
-the plain (`0x80`) and converted (`0x81`) BNC markers without exposing raw
-format IDs to callers.
+remain opaque and source-preserving. Unknown keys and length prefixes must be
+canonical; an overlong unknown scalar value is the one compatibility exception
+and is retained byte-for-byte. The fixed recipes cover canonical type 260,
+all protobuf wire kinds, interleaved unknown records, the maximum legal field
+number, duplicate/missing/wrong-wire/noncanonical known fields, every known
+sibling field 2 through 45, and truncated, mismatched, or reserved-wire
+groups. Canonical writes also check the plain (`0x80`) and converted (`0x81`)
+BNC markers without exposing raw format IDs to callers.
 
 Scalar and measured decode paths must agree, successful rewrites must retain
 the complete source byte-for-byte, and exact replay is checked against

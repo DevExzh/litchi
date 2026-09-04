@@ -11,8 +11,8 @@ use std::sync::Arc;
 
 use super::table_relocation::{
     Error, Operation, Path, SheetTarget, map_header_error, physical_source, resolve_sheet_target,
-    rewrite_bytes, root_preview_deletions, verify_locality, verify_source_state,
-    verify_target_state,
+    rewrite_bytes_for_compatibility, root_preview_deletions, verify_locality,
+    verify_physical_source_state, verify_physical_target_state,
 };
 use super::{
     Components, Document, DocumentLimits, Package, ReadOptions, SemanticLimits, State,
@@ -85,8 +85,8 @@ impl Package {
             return Err(Error::UnsupportedSource);
         }
         let deleted_previews = root_preview_deletions(catalog)?;
-        verify_source_state(&source, operation)?;
-        let output = rewrite_bytes(
+        let source_parent = verify_physical_source_state(&source, operation)?;
+        let output = rewrite_bytes_for_compatibility(
             &source,
             operation,
             table,
@@ -95,7 +95,7 @@ impl Package {
             &deleted_previews,
         )?;
         let candidate = physical_package(&output)?;
-        verify_target_state(&candidate, operation)?;
+        verify_physical_target_state(&candidate, operation, source_parent)?;
         verify_locality(&source, &candidate, operation)?;
         Ok(output)
     }

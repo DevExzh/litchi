@@ -184,9 +184,14 @@ fn parse_selector<T>(
         .into_string()
         .map_err(|_| invalid_input(format!("{kind} selector must be valid UTF-8")))?;
     if let Some(index) = value.strip_prefix("index:") {
+        if index.is_empty() || !index.bytes().all(|byte| byte.is_ascii_digit()) {
+            return Err(invalid_input(format!(
+                "{kind} index must be a non-negative decimal integer"
+            )));
+        }
         let index = index
-            .parse()
-            .map_err(|_| invalid_input(format!("{kind} index must be a non-negative integer")))?;
+            .parse::<usize>()
+            .map_err(|_| invalid_input(format!("{kind} index is too large for this platform")))?;
         return Ok(from_index(index));
     }
     if let Some(name) = value.strip_prefix("name:") {

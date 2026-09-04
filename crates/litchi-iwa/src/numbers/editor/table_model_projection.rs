@@ -518,7 +518,7 @@ fn classify_candidate(
 
     let mut present = 0_u8;
     let mut invalid_selected = false;
-    let mut dense_data_store = false;
+    let mut dense_style_reference = false;
     let mut seen_known = 0_u128;
     let mut scanner = ShapeScanner::new(*budget);
     let scan = (|| -> litchi_iwa_common::Result<()> {
@@ -572,10 +572,13 @@ fn classify_candidate(
                     let nested = parse_shape_field(field.payload, nested_offset, 1, &mut scanner)?;
                     nested_offset = nested.end;
                     // HeaderStorage and zero/default metadata references are
-                    // valid generated proto2 compatibility data. A DataStore
-                    // becomes dense only when a selected metadata route proves
-                    // a canonical nonzero identifier; mere field presence must
-                    // not silently upgrade sparse historical models.
+                    // valid generated proto2 compatibility data. The style
+                    // table reference is the native envelope's ownership
+                    // marker: old/editor-created models often materialise a
+                    // column-header reference while retaining a generated
+                    // zero style reference. Such a model must stay on the
+                    // compatibility projection; merely seeing field 2 must
+                    // not silently upgrade it to strict decoding.
                     let bit = match nested.number {
                         2 => 1,
                         5 => 2,
@@ -588,7 +591,10 @@ fn classify_candidate(
                     seen_metadata_references |= bit;
                     match classify_reference_identifier(nested.payload, 2, &mut scanner)? {
                         ReferenceIdentifierShape::Default => {},
-                        ReferenceIdentifierShape::Nonzero => dense_data_store = true,
+                        ReferenceIdentifierShape::Nonzero if nested.number == 5 => {
+                            dense_style_reference = true;
+                        },
+                        ReferenceIdentifierShape::Nonzero => {},
                         ReferenceIdentifierShape::Malformed => invalid_selected = true,
                     }
                 }
@@ -631,11 +637,13 @@ fn classify_candidate(
     if invalid_selected || present != REQUIRED {
         return Ok(CandidateClassification::Malformed);
     }
-    Ok(CandidateClassification::Projection(if dense_data_store {
-        ProjectionKind::Strict
-    } else {
-        ProjectionKind::SparseCompatibility
-    }))
+    Ok(CandidateClassification::Projection(
+        if dense_style_reference {
+            ProjectionKind::Strict
+        } else {
+            ProjectionKind::SparseCompatibility
+        },
+    ))
 }
 
 fn valid_known_root_wire_type(number: u32, wire_type: u8) -> Option<bool> {
@@ -867,6 +875,26 @@ mod tests {
             0x0a, 0x01, 0xff, // opaque HeaderStorage metadata
             0x12, 0x00, // empty column-header Reference
             0x2a, 0x02, 0x08, 0x00, // explicit zero style Reference
+        ];
+        let mut model = vec![0x22, u8::try_from(store.len()).unwrap()];
+        model.extend_from_slice(&store);
+        model.extend_from_slice(&[0x30, 0x00, 0x38, 0x00, 0x42, 0x00]);
+
+        let mut budget = ProbeBudget::new();
+        assert_eq!(
+            probe_candidate(6_001, model.as_slice(), &mut budget).unwrap(),
+            CandidateProbe::Valid
+        );
+    }
+
+    #[test]
+    fn nonzero_sparse_data_store_metadata_keeps_compatibility_projection() {
+        // A generated/editor-created model can materialise just the selected
+        // column-header route while omitting the remaining proto2-required
+        // DataStore metadata.  The non-zero route must not force a strict
+        // decode of those intentionally omitted defaults.
+        let store = [
+            0x12, 0x02, 0x08, 0x2b, // column-header Reference { identifier: 43 }
         ];
         let mut model = vec![0x22, u8::try_from(store.len()).unwrap()];
         model.extend_from_slice(&store);

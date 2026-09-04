@@ -60,6 +60,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/numbers_table_cell_scientific_format_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_fraction_format_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_text_format_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_table_cell_date_time_format_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec.rs");
     // Keep the native Numbers and Pages message-ID routes tied to their schema
     // projections when this crate is built from the workspace. Published
@@ -211,6 +212,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     )?;
     enforce_numbers_table_cell_control_codec_provenance(proto_directory)?;
     enforce_numbers_table_cell_text_format_codec_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
+    enforce_numbers_table_cell_date_time_format_codec_provenance(
         proto_directory,
         buffa_projection_directory,
     )?;
@@ -838,6 +843,29 @@ fn main() -> Result<(), Box<dyn Error>> {
         &buffa_numbers_table_cell_text_format_out_directory,
     )?;
 
+    // DateTime keeps only the native discriminator and date-and-time pattern
+    // in its lazy parity sidecar. The complete source payload remains
+    // authoritative so unknown extension records and groups are retained by
+    // the handwritten rewrite path.
+    let buffa_numbers_table_cell_date_time_format_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-numbers-table-cell-date-time-format");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSTTableCellDateTimeFormatArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_numbers_table_cell_date_time_format_out_directory)
+        .include_file("iwa_numbers_table_cell_date_time_format_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_numbers_table_cell_date_time_format_projection_budget(
+        &buffa_numbers_table_cell_date_time_format_out_directory,
+    )?;
+
     let buffa_table_cell_dependency_out_directory =
         PathBuf::from(env::var("OUT_DIR")?).join("buffa-numbers-table-cell-dependency");
     buffa_build::Config::new()
@@ -1414,6 +1442,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "ad88c732d8c7ba3ebc7303e6fb8af739cd19ab6a885bdc6f4f31af3d57ad28bb",
         ),
         (
+            "TSTTableCellDateTimeFormatArchive.proto",
+            501,
+            "108e057fc1db2d181c223aaa3b6e5d6b222d7acd69478cd77163e445be8e776a",
+        ),
+        (
             "TSTTableHeaderSettingsArchive.proto",
             930,
             "1236d9a9d0116885c7140683e5de2d33b6a083435bf3d3cfbebf91172c856d24",
@@ -1708,6 +1741,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "mod buffa_numbers_table_cell_text_format_generated {",
         ),
         (
+            "src/numbers_table_cell_pop_up_menu_codec.rs",
+            "crate::buffa_numbers_table_cell_date_time_format_generated::",
+            "mod buffa_numbers_table_cell_date_time_format_generated {",
+        ),
+        (
             "src/numbers_table_cell_dependency_codec.rs",
             "crate::buffa_numbers_table_cell_dependency_generated::",
             "mod buffa_numbers_table_cell_dependency_generated {",
@@ -1805,6 +1843,7 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
         "src/numbers_table_cell_scientific_format_codec.rs",
         "src/numbers_table_cell_fraction_format_codec.rs",
         "src/numbers_table_cell_text_format_codec.rs",
+        "src/numbers_table_cell_date_time_format_codec.rs",
     ];
 
     let mut expected_paths = CODECS
@@ -4520,6 +4559,54 @@ fn enforce_numbers_table_cell_text_format_projection_budget(
     Ok(())
 }
 
+fn enforce_numbers_table_cell_date_time_format_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 128 * 1024;
+
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    let mut lazy_message_fields = 0usize;
+    let mut files = 0usize;
+    for entry in fs::read_dir(directory)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("date-time generated file count overflow")?;
+        let generated = fs::read(entry.path())?;
+        bytes = bytes
+            .checked_add(u64::try_from(generated.len())?)
+            .ok_or("date-time generated byte count overflow")?;
+        let text = std::str::from_utf8(&generated)?;
+        repeated_views = repeated_views
+            .checked_add(text.matches("RepeatedView").count())
+            .ok_or("date-time repeated-view count overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(text.matches("LazyRepeatedView").count())
+            .ok_or("date-time lazy-repeated-view count overflow")?;
+        lazy_message_fields = lazy_message_fields
+            .checked_add(text.matches("LazyMessageFieldView").count())
+            .ok_or("date-time lazy-message-field count overflow")?;
+    }
+    if files != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || repeated_views != 0
+        || lazy_repeated_views != 0
+        || lazy_message_fields != 0
+    {
+        return Err(format!(
+            "Numbers table-cell date-time projection generated {files} files/{bytes} bytes/{repeated_views} repeated/{lazy_repeated_views} lazy repeated/{lazy_message_fields} lazy message fields; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated or deferred message views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
 fn enforce_numbers_table_cell_text_format_codec_provenance(
     proto_directory: &Path,
     projection_directory: &Path,
@@ -4587,6 +4674,84 @@ fn enforce_numbers_table_cell_text_format_codec_provenance(
     {
         return Err(
             "Numbers table-cell Text projection/codec drifted from TSK.FormatStructArchive, exposed generated storage, or introduced production encoding".into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_numbers_table_cell_date_time_format_codec_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const CODEC_MARKERS: [&str; 17] = [
+        "pub use core::NATIVE_DATE_TIME_FORMAT_TYPE;",
+        "pub use core::{",
+        "pub struct DateTimeFormatSnapshot<'source>",
+        "pub struct DateTimeFormatWrite<'source>",
+        "pub struct PreparedDateTimeFormatRewrite<'source>",
+        "pub struct PreparedDateTimeFormatWrite<'source>",
+        "pub fn decode_date_time_format(",
+        "pub fn decode_date_time_format_with_report(",
+        "pub fn prepare_date_time_format_rewrite<'source>(",
+        "pub fn rewrite_date_time_format(",
+        "pub fn prepare_date_time_format_write<'source>(",
+        "pub use prepare_date_time_format_write as prepare_date_time_format_append;",
+        "pub fn canonical_date_time_format(",
+        "pub use rewrite_date_time_format as rewrite_table_cell_date_time_format;",
+        "core::decode_date_time_format(source, options)",
+        "core::prepare_date_time_format_rewrite(source, write.0, options)",
+        "core::canonical_date_time_format(write.0, options)",
+    ];
+    const PROJECTION_MARKERS: [&str; 6] = [
+        "syntax = \"proto2\";",
+        "package LitchiIwaNumbersTableCellDateTimeFormatProjection;",
+        "message FormatStructArchive {",
+        "optional uint32 format_type = 1;",
+        "optional string date_time_format = 14;",
+        "}",
+    ];
+    let tsk = fs::read_to_string(proto_directory.join("TSKArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSTTableCellDateTimeFormatArchive.proto"))?;
+    let codec = fs::read_to_string("src/numbers_table_cell_date_time_format_codec.rs")?;
+    let core_codec = fs::read_to_string("src/numbers_table_cell_pop_up_menu_codec.rs")?;
+    let lib = fs::read_to_string("src/lib.rs")?;
+    let production_codec = production_codec_source(&codec);
+    let production_core_codec = production_codec_source(&core_codec);
+    if !CODEC_MARKERS
+        .iter()
+        .all(|marker| codec.matches(marker).count() == 1)
+        || !PROJECTION_MARKERS
+            .iter()
+            .all(|marker| projection.matches(marker).count() >= 1)
+        || tsk.matches("message FormatStructArchive {").count() != 1
+        || tsk.matches("optional uint32 format_type = 1;").count() != 1
+        || tsk
+            .matches("optional string date_time_format = 14;")
+            .count()
+            != 1
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || projection.contains("import ")
+        || lib
+            .matches("pub mod numbers_table_cell_date_time_format_codec;")
+            .count()
+            != 1
+        || lib
+            .matches("mod buffa_numbers_table_cell_date_time_format_generated {")
+            .count()
+            != 1
+        || !production_core_codec
+            .contains("crate::buffa_numbers_table_cell_date_time_format_generated::")
+        || !production_core_codec.contains("decode_lazy_view(")
+        || production_codec.contains("prost::")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "Numbers table-cell DateTime projection/codec drifted from TSK.FormatStructArchive, exposed generated storage, or introduced production encoding".into(),
         );
     }
     Ok(())

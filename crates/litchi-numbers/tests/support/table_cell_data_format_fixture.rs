@@ -68,6 +68,11 @@ pub(crate) const METADATA_TYPE: u32 = 11_006;
 pub(crate) const FIRST_FORMAT_KEY: u32 = 1;
 pub(crate) const SECOND_FORMAT_KEY: u32 = 2;
 
+const BNC_CELL_FORMAT_KIND_FLAG: u32 = 0x0000_1000;
+const BNC_CELL_FORMAT_IDENTIFIER_FLAG: u32 = 0x0000_2000;
+const BNC_TEXT_FORMAT_IDENTIFIER_FLAG: u32 = 0x0002_0000;
+const BNC_RESERVED_KNOWN_FIELD_FLAG: u32 = 0x0010_0000;
+
 /// Zero-based cell coordinates in the one-row fixture table.
 pub(crate) const FIRST_CELL: (usize, usize) = (0, 0);
 pub(crate) const SECOND_CELL: (usize, usize) = (0, 1);
@@ -89,6 +94,7 @@ pub(crate) enum FormatFamily {
     Percentage,
     Scientific,
     Fraction,
+    DateTime,
     Text,
 }
 
@@ -101,6 +107,7 @@ impl FormatFamily {
             Self::Percentage => NATIVE_PERCENTAGE_FORMAT_TYPE,
             Self::Scientific => NATIVE_SCIENTIFIC_FORMAT_TYPE,
             Self::Fraction => NATIVE_FRACTION_FORMAT_TYPE,
+            Self::DateTime => NATIVE_DATE_TIME_FORMAT_TYPE,
             Self::Text => NATIVE_TEXT_FORMAT_TYPE,
         }
     }
@@ -116,6 +123,8 @@ pub(crate) const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
 pub(crate) const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
 /// Native Fraction format-list discriminator.
 pub(crate) const NATIVE_FRACTION_FORMAT_TYPE: u32 = 262;
+/// Native Date & Time format-list discriminator.
+pub(crate) const NATIVE_DATE_TIME_FORMAT_TYPE: u32 = 261;
 /// Native Text format-list discriminator.
 pub(crate) const NATIVE_TEXT_FORMAT_TYPE: u32 = 260;
 
@@ -156,6 +165,31 @@ pub(crate) enum Corruption {
     UnterminatedUnknownGroup,
     /// Give an unrelated message a typed field-level owner edge to the tile.
     UnexpectedFieldReference,
+    /// Mark the selected Text cell as converted (`0x81`) without a generic
+    /// Number-format field.
+    ConvertedGenericMissing,
+    /// Point the converted Text cell's generic field at the primary Text
+    /// entry rather than a Number entry.
+    ConvertedGenericWrong,
+    /// Set the converted Text cell's generic Number-format field to zero.
+    ConvertedGenericZero,
+    /// Point the converted Text cell's generic field at an absent list key.
+    ConvertedGenericMissingEntry,
+    /// Keep the converted generic key but give its payload a non-Number type.
+    ConvertedGenericWrongType,
+    /// Keep the converted generic key but make its list refcount disagree with
+    /// the BNC secondary edge.
+    ConvertedGenericRefcountMismatch,
+    /// Leave a sibling Text identifier without the kind that gives it meaning.
+    SiblingOrphanTextIdentifier,
+    /// Leave a sibling Text identifier paired with a decimal kind.
+    SiblingMismatchedTextIdentifier,
+    /// Leave a reserved known BNC field on a nonselected sibling cell.
+    SiblingReservedKnownField,
+    /// Give a nonselected converted Text cell a generic non-Number target.
+    NonselectedConvertedGenericWrongType,
+    /// Add a zero-cell row whose storage buffers are nevertheless nonempty.
+    ZeroCellRowStorage,
 }
 
 /// Build the canonical two-cell package used by data-format tests.
@@ -447,6 +481,52 @@ pub(crate) fn corrupted_package_for(
                 Ok(())
             })
         },
+        Corruption::ConvertedGenericMissing => {
+            let source = text_converted_package()?;
+            rewrite_converted_generic_identifier(&source, None)
+        },
+        Corruption::ConvertedGenericWrong => {
+            let source = text_converted_package()?;
+            rewrite_converted_generic_identifier(&source, Some(FIRST_FORMAT_KEY))
+        },
+        Corruption::ConvertedGenericZero => {
+            let source = text_converted_package()?;
+            rewrite_converted_generic_identifier(&source, Some(0))
+        },
+        Corruption::ConvertedGenericMissingEntry => {
+            let source = text_converted_package()?;
+            rewrite_converted_generic_identifier(&source, Some(99))
+        },
+        Corruption::ConvertedGenericWrongType => {
+            let source = text_converted_package()?;
+            rewrite_format_varint_by_key(
+                &source,
+                SECOND_FORMAT_KEY,
+                1,
+                u64::from(NATIVE_TEXT_FORMAT_TYPE),
+            )
+        },
+        Corruption::ConvertedGenericRefcountMismatch => {
+            let source = text_converted_package()?;
+            rewrite_format_list_payload_for_test(&source, |list| {
+                let entry = list
+                    .entries
+                    .iter_mut()
+                    .find(|entry| entry.key == SECOND_FORMAT_KEY)
+                    .ok_or_else(|| io::Error::other("converted generic entry is missing"))?;
+                entry.refcount = 2;
+                Ok(())
+            })
+        },
+        Corruption::SiblingOrphanTextIdentifier => sibling_text_identifier_without_kind(&source),
+        Corruption::SiblingMismatchedTextIdentifier => {
+            sibling_text_identifier_with_wrong_kind(&source)
+        },
+        Corruption::SiblingReservedKnownField => sibling_reserved_known_field(&source),
+        Corruption::NonselectedConvertedGenericWrongType => {
+            nonselected_converted_generic_wrong_type()
+        },
+        Corruption::ZeroCellRowStorage => zero_cell_row_with_storage(&source),
     }
 }
 
@@ -564,10 +644,13 @@ fn tile_payload(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<t
         | FormatFamily::Percentage
         | FormatFamily::Scientific
         | FormatFamily::Fraction => CellDataFormatKind::NumberOrPercentage,
+        FormatFamily::DateTime => CellDataFormatKind::DateTime,
         FormatFamily::Text => CellDataFormatKind::Text,
     };
     let first = if matches!(family, FormatFamily::Text) {
         formatted_text_cell(FIRST_FORMAT_KEY, 1)?
+    } else if matches!(family, FormatFamily::DateTime) {
+        formatted_date_time_cell(FIRST_FORMAT_KEY, 45200.5)?
     } else {
         formatted_cell(FIRST_FORMAT_KEY, first_kind, 1234.5)?
     };
@@ -577,12 +660,15 @@ fn tile_payload(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<t
     };
     let second_kind = match (family, sharing) {
         (FormatFamily::Currency, FormatSharing::Shared) => CellDataFormatKind::Currency,
+        (FormatFamily::DateTime, _) => CellDataFormatKind::DateTime,
         (FormatFamily::Text, _) => CellDataFormatKind::Text,
         (_, FormatSharing::Shared) => CellDataFormatKind::NumberOrPercentage,
         (_, FormatSharing::Unshared) => CellDataFormatKind::NumberOrPercentage,
     };
     let second = if matches!(family, FormatFamily::Text) {
         formatted_text_cell(second_key, 2)?
+    } else if matches!(family, FormatFamily::DateTime) {
+        formatted_date_time_cell(second_key, 45201.25)?
     } else {
         formatted_cell(second_key, second_kind, 0.25)?
     };
@@ -622,6 +708,13 @@ fn formatted_text_cell(format_key: u32, string_key: u32) -> FixtureResult<Vec<u8
     Ok(cell.encode())
 }
 
+fn formatted_date_time_cell(format_key: u32, value: f64) -> FixtureResult<Vec<u8>> {
+    let mut cell = BncCell::minimal();
+    cell.set_date(value)?;
+    cell.set_data_format_identifier(format_key, CellDataFormatKind::DateTime, None)?;
+    Ok(cell.encode())
+}
+
 fn sidecar_object(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<ArchiveObject> {
     let format_entries = match (family, sharing) {
         (FormatFamily::Currency, FormatSharing::Shared) => vec![currency_format_entry(
@@ -639,6 +732,17 @@ fn sidecar_object(family: FormatFamily, sharing: FormatSharing) -> FixtureResult
         (FormatFamily::Fraction, FormatSharing::Shared) => {
             vec![fraction_format_entry(FIRST_FORMAT_KEY, 2, 8)]
         },
+        (FormatFamily::DateTime, FormatSharing::Shared) => {
+            vec![date_time_format_entry(
+                FIRST_FORMAT_KEY,
+                2,
+                "yyyy-MM-dd H:mm:ss",
+            )]
+        },
+        (FormatFamily::DateTime, FormatSharing::Unshared) => vec![
+            date_time_format_entry(FIRST_FORMAT_KEY, 1, "yyyy-MM-dd H:mm:ss"),
+            date_time_format_entry(SECOND_FORMAT_KEY, 1, "MM/dd/yyyy"),
+        ],
         (FormatFamily::Text, FormatSharing::Shared) => {
             vec![text_format_entry(FIRST_FORMAT_KEY, 2)]
         },
@@ -780,6 +884,23 @@ fn fraction_format_entry(
         format: Some(tsk::FormatStructArchive {
             format_type: Some(NATIVE_FRACTION_FORMAT_TYPE),
             fraction_accuracy: Some(accuracy),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+fn date_time_format_entry(
+    key: u32,
+    refcount: u32,
+    pattern: &str,
+) -> tst::table_data_list::ListEntry {
+    tst::table_data_list::ListEntry {
+        key,
+        refcount,
+        format: Some(tsk::FormatStructArchive {
+            format_type: Some(NATIVE_DATE_TIME_FORMAT_TYPE),
+            date_time_format: Some(pattern.to_owned()),
             ..Default::default()
         }),
         ..Default::default()
@@ -1068,6 +1189,282 @@ pub(crate) fn text_converted_package() -> FixtureResult<Vec<u8>> {
             2,
             true,
         ));
+        Ok(())
+    })
+}
+
+/// Build a converted-Text fixture where both cells retain the generic Number
+/// edge.  Keeping that edge live after clearing the selected cell lets a test
+/// prove source-preserving rewrites of the generic format payload itself;
+/// the ordinary one-converted-cell fixture intentionally culls that entry.
+pub(crate) fn text_converted_shared_generic_package() -> FixtureResult<Vec<u8>> {
+    let source = text_converted_package()?;
+    let source = rewrite_tile_cells(&source, |cells| {
+        let second = cells
+            .get_mut(1)
+            .ok_or_else(|| io::Error::other("format fixture second cell is missing"))?;
+        *second = converted_text_cell_with_generic(second, SECOND_FORMAT_KEY)?;
+        Ok(())
+    })?;
+    rewrite_format_list_payload_for_test(&source, |list| {
+        let entry = list
+            .entries
+            .iter_mut()
+            .find(|entry| entry.key == SECOND_FORMAT_KEY)
+            .ok_or_else(|| io::Error::other("converted generic entry is missing"))?;
+        entry.refcount = 2;
+        Ok(())
+    })
+}
+
+/// Return a converted-Text cell carrying exactly the requested generic key.
+fn converted_text_cell_with_generic(
+    source: &[u8],
+    generic_identifier: u32,
+) -> FixtureResult<Vec<u8>> {
+    let mut encoded = BncCell::parse(source)?.encode();
+    if encoded.len() < 24 {
+        return Err(io::Error::other("format fixture Text cell is truncated").into());
+    }
+    let flags = u32::from_le_bytes(
+        encoded[8..12]
+            .try_into()
+            .map_err(|_| io::Error::other("format fixture Text flags are truncated"))?,
+    );
+    if flags & 0x0002_0000 == 0 {
+        return Err(io::Error::other("format fixture Text identifier is missing").into());
+    }
+    encoded[8..12].copy_from_slice(&(flags | 0x0000_2000).to_le_bytes());
+    if encoded.len() >= 28 {
+        encoded[20..24].copy_from_slice(&generic_identifier.to_le_bytes());
+    } else {
+        encoded.splice(20..20, generic_identifier.to_le_bytes());
+    }
+    encoded[6..8]
+        .copy_from_slice(&litchi_numbers_wire::EXPLICIT_CONVERTED_TEXT_FORMAT.to_le_bytes());
+    Ok(encoded)
+}
+
+/// Rewrite the selected converted-Text cell's generic Number identifier.
+/// This keeps the package envelope and all unrelated records unchanged so
+/// owner-level validation, rather than package ingress, gets the decision.
+fn rewrite_converted_generic_identifier(
+    source: &[u8],
+    generic_identifier: Option<u32>,
+) -> FixtureResult<Vec<u8>> {
+    rewrite_tile_cells(source, |cells| {
+        let first = cells
+            .first_mut()
+            .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
+        let mut encoded = BncCell::parse(first)?.encode();
+        if encoded.len() < 24 {
+            return Err(io::Error::other("format fixture Text cell is truncated").into());
+        }
+        let flags = u32::from_le_bytes(
+            encoded[8..12]
+                .try_into()
+                .map_err(|_| io::Error::other("format fixture Text flags are truncated"))?,
+        );
+        match generic_identifier {
+            Some(identifier) => {
+                encoded[8..12].copy_from_slice(&(flags | 0x0000_2000).to_le_bytes());
+                if encoded.len() >= 28 {
+                    encoded[20..24].copy_from_slice(&identifier.to_le_bytes());
+                } else {
+                    encoded.splice(20..20, identifier.to_le_bytes());
+                }
+            },
+            None => {
+                if flags & 0x0000_2000 != 0 {
+                    if encoded.len() < 28 {
+                        return Err(
+                            io::Error::other("format fixture generic field is truncated").into(),
+                        );
+                    }
+                    encoded.drain(20..24);
+                    encoded[8..12].copy_from_slice(&(flags & !0x0000_2000).to_le_bytes());
+                }
+            },
+        }
+        encoded[6..8]
+            .copy_from_slice(&litchi_numbers_wire::EXPLICIT_CONVERTED_TEXT_FORMAT.to_le_bytes());
+        *first = encoded;
+        Ok(())
+    })
+}
+
+fn sibling_text_identifier_without_kind(source: &[u8]) -> FixtureResult<Vec<u8>> {
+    let source = rewrite_tile_cells(source, |cells| {
+        let second = cells
+            .get_mut(1)
+            .ok_or_else(|| io::Error::other("format fixture second cell is missing"))?;
+        let mut encoded = BncCell::parse(second)?.encode();
+        if encoded.len() < 24 {
+            return Err(io::Error::other("format fixture Text cell is truncated").into());
+        }
+        let flags = u32::from_le_bytes(
+            encoded[8..12]
+                .try_into()
+                .map_err(|_| io::Error::other("format fixture Text flags are truncated"))?,
+        );
+        if flags & BNC_TEXT_FORMAT_IDENTIFIER_FLAG == 0 || flags & BNC_CELL_FORMAT_KIND_FLAG == 0 {
+            return Err(io::Error::other("format fixture Text metadata is missing").into());
+        }
+        // The canonical Text layout is string, kind, then Text identifier.
+        // Remove only the kind bytes and clear the marker, leaving the known
+        // Text field physically present but semantically orphaned.
+        encoded.drain(16..20);
+        encoded[8..12].copy_from_slice(&(flags & !BNC_CELL_FORMAT_KIND_FLAG).to_le_bytes());
+        encoded[6..8].fill(0);
+        *second = encoded;
+        Ok(())
+    })?;
+    rewrite_format_list_payload_for_test(&source, |list| {
+        let entry = list
+            .entries
+            .iter_mut()
+            .find(|entry| entry.key == FIRST_FORMAT_KEY)
+            .ok_or_else(|| io::Error::other("format fixture Text entry is missing"))?;
+        // Only the selected first cell has a visible primary edge after the
+        // sibling's kind is removed.
+        entry.refcount = 1;
+        Ok(())
+    })
+}
+
+fn sibling_text_identifier_with_wrong_kind(source: &[u8]) -> FixtureResult<Vec<u8>> {
+    let source = rewrite_tile_cells(source, |cells| {
+        let second = cells
+            .get_mut(1)
+            .ok_or_else(|| io::Error::other("format fixture second cell is missing"))?;
+        let mut encoded = BncCell::parse(second)?.encode();
+        if encoded.len() < 24 {
+            return Err(io::Error::other("format fixture Text cell is truncated").into());
+        }
+        let flags = u32::from_le_bytes(
+            encoded[8..12]
+                .try_into()
+                .map_err(|_| io::Error::other("format fixture Text flags are truncated"))?,
+        );
+        if flags & BNC_TEXT_FORMAT_IDENTIFIER_FLAG == 0 || flags & BNC_CELL_FORMAT_KIND_FLAG == 0 {
+            return Err(io::Error::other("format fixture Text metadata is missing").into());
+        }
+        // Keep both fixed-width fields but make the kind decimal. The old
+        // kind-directed census ignores the Text field and sees no edge here.
+        encoded[16..20]
+            .copy_from_slice(&litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND.to_le_bytes());
+        encoded[6..8].fill(0);
+        *second = encoded;
+        Ok(())
+    })?;
+    rewrite_format_list_payload_for_test(&source, |list| {
+        let entry = list
+            .entries
+            .iter_mut()
+            .find(|entry| entry.key == FIRST_FORMAT_KEY)
+            .ok_or_else(|| io::Error::other("format fixture Text entry is missing"))?;
+        entry.refcount = 1;
+        Ok(())
+    })
+}
+
+fn sibling_reserved_known_field(source: &[u8]) -> FixtureResult<Vec<u8>> {
+    let source = rewrite_tile_cells(source, |cells| {
+        let second = cells
+            .get_mut(1)
+            .ok_or_else(|| io::Error::other("format fixture second cell is missing"))?;
+        let mut cell = BncCell::parse(second)?;
+        cell.clear_explicit_format();
+        let mut encoded = cell.encode();
+        if encoded.len() < 12 {
+            return Err(io::Error::other("format fixture cell is truncated").into());
+        }
+        let flags = u32::from_le_bytes(
+            encoded[8..12]
+                .try_into()
+                .map_err(|_| io::Error::other("format fixture flags are truncated"))?,
+        );
+        encoded[8..12].copy_from_slice(&(flags | BNC_RESERVED_KNOWN_FIELD_FLAG).to_le_bytes());
+        // The reserved field is the final fixed-width known slot.
+        encoded.extend_from_slice(&[0; 4]);
+        *second = encoded;
+        Ok(())
+    })?;
+    rewrite_format_list_payload_for_test(&source, |list| {
+        let entry = list
+            .entries
+            .iter_mut()
+            .find(|entry| entry.key == FIRST_FORMAT_KEY)
+            .ok_or_else(|| io::Error::other("format fixture Text entry is missing"))?;
+        entry.refcount = 1;
+        Ok(())
+    })
+}
+
+fn nonselected_converted_generic_wrong_type() -> FixtureResult<Vec<u8>> {
+    let source = synthetic_package_for(FormatFamily::Text, FormatSharing::Shared)?;
+    let source = rewrite_tile_cells(&source, |cells| {
+        let second = cells
+            .get_mut(1)
+            .ok_or_else(|| io::Error::other("format fixture second cell is missing"))?;
+        *second = converted_text_cell_with_generic(second, SECOND_FORMAT_KEY)?;
+        Ok(())
+    })?;
+    let source = rewrite_format_list_payload_for_test(&source, |list| {
+        list.entries.push(format_entry(
+            SECOND_FORMAT_KEY,
+            1,
+            NATIVE_NUMBER_FORMAT_TYPE,
+            2,
+            2,
+            true,
+        ));
+        Ok(())
+    })?;
+    rewrite_format_varint_by_key(
+        &source,
+        SECOND_FORMAT_KEY,
+        1,
+        u64::from(NATIVE_TEXT_FORMAT_TYPE),
+    )
+}
+
+fn zero_cell_row_with_storage(source: &[u8]) -> FixtureResult<Vec<u8>> {
+    // Keep the extra row inside the declared table height so package ingress
+    // admits the graph and the focused owner's full tile census gets to see
+    // the malformed row.
+    let source = rewrite_tables(source, |archive| {
+        let model = archive
+            .object_mut(TABLE_MODEL_ID)
+            .ok_or_else(|| io::Error::other("format fixture model is missing"))?;
+        let message = model
+            .messages
+            .first_mut()
+            .ok_or_else(|| io::Error::other("format fixture model payload is missing"))?;
+        let mut decoded = tst::TableModelArchive::decode(message.data.as_slice())?;
+        decoded.number_of_rows = 2;
+        message.data = decoded.encode_to_vec();
+        Ok(())
+    })?;
+    rewrite_tile(&source, |tile| {
+        let first = tile
+            .row_infos
+            .first()
+            .ok_or_else(|| io::Error::other("format fixture row is missing"))?;
+        let storage = first
+            .cell_storage_buffer
+            .clone()
+            .ok_or_else(|| io::Error::other("format fixture row storage is missing"))?;
+        tile.row_infos.push(tst::TileRowInfo {
+            tile_row_index: 1,
+            cell_count: 0,
+            cell_storage_buffer_pre_bnc: storage.clone(),
+            cell_offsets_pre_bnc: vec![u8::MAX, u8::MAX],
+            storage_version: Some(5),
+            cell_storage_buffer: Some(storage),
+            cell_offsets: Some(vec![u8::MAX, u8::MAX]),
+            ..Default::default()
+        });
         Ok(())
     })
 }

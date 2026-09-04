@@ -163,6 +163,43 @@
 //! # }
 //! ```
 //!
+//! # Existing-cell Date & Time-format transactions
+//!
+//! [`Package::table_cell_date_time_format`] reads the validated Date & Time
+//! pattern for one selected existing cell. [`Package::edit_table_cell_date_time_format`]
+//! stages a typed [`cell::data_format::DateTime`] value or the inherited
+//! state with `clear`/`reset`; unchanged requests are exact no-ops, while
+//! changed commits reopen and reread the candidate and return a reversible,
+//! source-bound patch. The focused owner changes display metadata only and
+//! preserves the cell value, unknown wire fields, and unrelated package
+//! members.
+//!
+//! ```no_run
+//! use litchi_numbers::{cell::data_format::DateTime, CellPosition, Package};
+//! use litchi_numbers::{SheetSelector, TableSelector};
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let package = Package::open("input.numbers")?;
+//! let sheet = SheetSelector::name("Summary");
+//! let table = TableSelector::name("Revenue");
+//! let position = CellPosition::from_a1("B3")?;
+//! let _before = package.table_cell_date_time_format(sheet, table, position)?;
+//! let commit = package
+//!     .edit_table_cell_date_time_format(sheet, table, position)?
+//!     .set(DateTime::iso_date_time_24_hour_with_seconds())
+//!     .commit()?;
+//! let restored = commit
+//!     .package()
+//!     .apply_table_cell_date_time_format(&commit.patch().inverse())?;
+//! let mut original = Vec::new();
+//! package.write_to(&mut original)?;
+//! let mut restored_bytes = Vec::new();
+//! restored.package().write_to(&mut restored_bytes)?;
+//! assert_eq!(restored_bytes, original);
+//! # Ok(())
+//! # }
+//! ```
+//!
 //! # Table-title transactions
 //!
 //! Use [`table::title`] to read and transactionally update a single table

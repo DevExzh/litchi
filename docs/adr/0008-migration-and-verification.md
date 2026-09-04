@@ -15738,3 +15738,77 @@ adds no evidence-level, performance, or topology claim. The current inventory
 is 64 workspace packages, 238 internal declarations, 227 canonical edges, 11
 development-only edges, 11 ordered debts `[1, 2, 4, 8, 10, 12, 13, 14, 15,
 16, 17]`, and one migration host.
+
+## 2026-09-04 amendment: Numbers existing-cell Date & Time native verification record
+
+The focused Numbers owner now assigns one existing rooted cell's Date & Time
+display metadata to a selector-first `litchi_numbers::Package` transaction.
+The archive-free `DateTime` value and package API keep native IDs, BNC/list
+records, IWA member names, and wire objects private. The owner is deliberately
+metadata-only: it changes the display pattern and never changes the cell's
+scalar value or formula. Patterns are bounded to 4096 bytes. Strict native
+type-261 preflight requires explicit marker `0x0008`, kind `3`, and strict
+fields 1/14; Empty/type-5 Date and the evidenced type-9 numeric/formula shape
+are admitted, while plain type-2, marker-zero, wrong/reserved, and ambiguous
+shapes fail closed. The setter uses a lazy Buffa view only after preflight and
+retains exact copy-on-write/refcount closure, unknown and unselected bytes,
+inverse behavior, and physical locality. Generic source-built
+`DataFormat::DateTime`, the broad `TextDateTimeField` smart-field lifecycle,
+and Pages/Keynote compatibility remain host-owned; the dedicated host raw-ID
+DateTime surface is not retired by this amendment.
+
+### Frozen source and operation
+
+Computer Use used real Numbers 14.4 build 7043.0.93 on macOS 26.5.2. The
+fixture was Sheet 1 / Table 1 / B2, with A1 containing the marker
+`Litchi DateTime producer — 東京😀`. B2 contained scalar
+`2026-09-04 12:34:56` with source pattern `yyyy-MM-dd H:mm:ss`. The focused
+transaction changed only the display pattern to `yyyy/MM/dd HH:mm:ss`. Before
+the native open, the source and candidate package topology was unchanged and
+only `Index/Tables/Tile.iwa` and
+`Index/Tables/DataList-904498-2.iwa` differed; the inverse was source-
+identical.
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| source package (138744) | 138,744 | `0e0a8b8c2a6bbf3676723a9926da3be37b2ff6e2c86221618df957da665a76c8` |
+| focused Date & Time candidate (138745) | 138,745 | `d114d4aba1b970b567e4ae6912140757585afaa5fe12a2a9ef0e8eed2c81415b` |
+| exact inverse | 138,744 | `0e0a8b8c2a6bbf3676723a9926da3be37b2ff6e2c86221618df957da665a76c8` |
+| native Numbers save/resave (138725) | 138,725 | `4e489da196bac7416c8c6d827afb2a6264892d4856a5a33dc0a18c6c2d2b1b0c` |
+
+Numbers opened the candidate copy cleanly, with no repair, recovery, or
+conversion prompt. It showed the A1 marker and B2
+`2026/09/04 12:34:56`; the displayed Actual value was
+`9/4/2026 12:34:56 PM`, and the inspector showed Date & Time with date
+`2026/01/05` and time `19:08:09`. Numbers saved a distinct copy, closed it,
+and reopened that exact path cleanly with the same values and settings. This
+is operation-specific native E3/E4 evidence for the admitted existing type-9
+cell/pattern.
+
+Native resave normalization changed document, calculation, stylesheet,
+metadata, view-state, and preview entries.
+The exact DateTime members in `Index/Tables/Tile.iwa` and
+`Index/Tables/DataList-904498-2.iwa` remained byte-identical to the focused
+candidate; this is member-level locality evidence, not package-wide native
+byte parity. The subsequent strict normalized reread used the same
+`yyyy/MM/dd HH:mm:ss` pattern and reported `before=after` explicit,
+`changed=false`, `touched_components=0`, `full_reparse=false`, and
+`scalar_value=untouched`. Its 138,725-byte `datetime-reread.numbers` output
+was `cmp=0` with the native-resaved artifact and had the same SHA-256 shown
+above. This closes the strict reread portion of this operation's E4 record,
+but does not generalize beyond this one existing type-9 cell/pattern or imply
+DateTime package-wide/native-byte-parity support.
+
+No workspace package or canonical dependency edge changed. The topology
+remains 64 workspace packages, 238 internal dependency declarations, 227
+canonical edges, 11 development-only edges, 11 ordered migration debts
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. No debt,
+host, or ADR 0028 deletion gate closes.
+
+## 2026-09-04 amendment: Date & Time pattern grammar scope
+
+The Date & Time record above refers to a bounded native date/time pattern
+string, capped at 4096 bytes. The focused owner validates the native envelope
+and admitted fields only; it does not validate pattern grammar or claim to
+implement Apple's locale formatter. This clarification changes no evidence
+grade, compatibility boundary, topology, debt, host, or deletion-gate status.

@@ -68,16 +68,33 @@ declarations, 227 canonical edges, 11 development-only edges, 11 ordered migrati
 not evidence that the concrete format owners or the monolith deletion gate are complete; the
 focused Keynote physical-sort slice closes no debt or gate.
 
-The Numbers matrix now records bounded existing-cell Number, Percentage, Currency, Scientific, and
-Fraction display-format owners. Currency, Scientific, and Fraction support are operation-specific
-and remain separate from generic display format or rich-style support; suite-wide/native
-general-format acceptance and the ADR 0028 deletion gate remain open. Scientific has focused build,
-test, fuzz, and native Numbers evidence recorded in ADR 0008. Fraction has source/build/test/fuzz
-evidence for native type 262 and all nine accuracy strategies, plus operation-specific native
-Numbers E3/E4 evidence for the representative Eighths-to-Hundredths edit. The source, candidate,
-and native-resaved hashes are recorded in ADR 0008; this does not claim native UI acceptance for all
-nine variants, arbitrary-producer parity, native byte parity, or package-wide performance. Neither
-operation-specific record broadens its scope.
+The Numbers matrix now records bounded existing-cell Number, Percentage, Currency, Scientific,
+Fraction, Text, and Date & Time display-format owners. Text support is limited to the focused E1
+owner and checked-in native-fixture E2 read/no-op evidence; no E3/E4 acceptance claim is made.
+Currency, Scientific, Fraction, and Date & Time support are operation-specific and remain separate
+from generic display format or rich-style support; suite-wide/native general-format acceptance and
+the ADR 0028 deletion gate remain open. Scientific has focused build, test, fuzz, and native Numbers
+evidence recorded in ADR 0008. Fraction has source/build/test/fuzz evidence for native type 262 and
+all nine accuracy strategies, plus operation-specific native Numbers E3/E4 evidence for the
+representative Eighths-to-Hundredths edit. Date & Time has operation-specific native E3/E4
+app-cycle evidence for one existing type-9 cell/pattern; strict normalized reread was an exact
+byte-identical no-op (`changed=false`, zero touched components, and no full reparse). The source,
+candidate, and native-resaved hashes are recorded in ADR 0008; these records do not claim native UI
+acceptance for untested variants, arbitrary-producer parity, native byte parity, or package-wide
+performance. No operation-specific record broadens its scope.
+
+The seven scalar owners do not retire every compatibility path: generic
+source-built or cross-format `DataFormat` mutation remains host-owned, there is
+no dedicated host Text route, and dedicated host raw-ID Date & Time retirement
+is not claimed. Numbers persisted-sort compatibility is narrower still: exact
+package snapshots use the semantic persisted-sort owner and any refusal is
+terminal; only historical source-built snapshots may use the private physical
+bridge for field 44. This bridge is not a public owner and has no ADR 0028 debt
+or deletion-gate impact.
+The same boundary applies to table relocation: exact snapshots use the focused
+semantic transaction with terminal refusals, while only source-built snapshots
+may use the private physical bridge for historical storage outside semantic
+projection.
 
 The Keynote matrix now records a bounded focused owner for physical table row sorting (“Sort Now”).
 The owner is selector-first and source-bound, uses a private strict Buffa lazy codec for admitted
@@ -95,7 +112,10 @@ conditional-style CalculationEngine dependency graph. That run is external explo
 not current-owner E3/E4 promotion; the checked-in native fixture
 has no table and the checked-in evidence test records hashes without launching Keynote. Native
 acceptance remains pending; see the [Keynote matrix](../crates/litchi-keynote/docs/FEATURE_MATRIX.md)
-and [ADR 0008](adr/0008-migration-and-verification.md#2026-09-02-amendment-keynote-physical-sort-focused-owner-verification-status).
+and [ADR 0008](adr/0008-migration-and-verification.md#2026-09-02-amendment-keynote-physical-sort-now-evidence-status).
+For exact packages, focused physical-sort refusals are terminal. The legacy host
+retains only the explicitly source-built compatibility route and broader
+table/cell graph work; it is not a general physical-sort fallback.
 
 For XLSB sparklines, the detailed XLSB matrix records the strict, bounded Worksheet-ABNF support
 for [MS-XLSB] §2.1.7.62 and records §2.4.228-230, §2.4.581-583, and §2.4.806. The common

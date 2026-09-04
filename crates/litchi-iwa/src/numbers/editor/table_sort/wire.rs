@@ -4,8 +4,6 @@ use super::*;
 
 use litchi_iwa_protos::table_sort_order_codec as codec;
 
-const SORT_ORDER_FIELD: u32 = 44;
-
 fn codec_options(source: &[u8], model: &TableModelArchive) -> codec::DecodeOptions {
     let columns = usize::try_from(model.number_of_columns).unwrap_or(usize::MAX);
     codec::DecodeOptions::for_source(source).with_max_columns(columns)
@@ -19,10 +17,11 @@ pub(super) fn read_native_table_sort_order_wire(
     original: &[u8],
     model: &TableModelArchive,
 ) -> Result<Option<codec::SortOrderSnapshot>> {
-    let snapshot = codec::decode_table_model_sort_order(original, codec_options(original, model))
-        .map_err(codec_error)?;
-    let has_sort_field =
-        !crate::wire::repeated_length_delimited_payloads(original, SORT_ORDER_FIELD)?.is_empty();
+    let (snapshot, has_sort_field) = codec::decode_table_model_sort_order_with_presence(
+        original,
+        codec_options(original, model),
+    )
+    .map_err(codec_error)?;
     if has_sort_field != model.sort_order.is_some() {
         return Err(Error::InvalidFormat(
             "Numbers table sort-order wire payload is missing or inconsistent".to_owned(),
@@ -99,6 +98,9 @@ mod tests {
     use crate::protobuf::tst::TableModelArchive;
     use prost::Message;
 
+    const ROOT_GROUP_BEFORE: [u8; 6] = [0xa3, 0x06, 0x08, 0x01, 0xa4, 0x06];
+    const ROOT_GROUP_AFTER: [u8; 6] = [0xab, 0x06, 0x10, 0x02, 0xac, 0x06];
+
     fn table_model_source() -> Vec<u8> {
         let editor = NumbersDocumentBuilder::new()
             .table_dimensions(2, 3)
@@ -111,8 +113,99 @@ mod tests {
             .expect("document archive");
         let object = archive.object(table_id).expect("table model object");
         let message_index = find_table_model_message(object).expect("table model message");
-        let source = object.messages[message_index].data.clone();
-        source
+        object.messages[message_index].data.clone()
+    }
+
+    fn table_model_source_with_root_groups(
+        order: &codec::SortOrderSnapshot,
+    ) -> (Vec<u8>, usize, Vec<u8>) {
+        let mut source = table_model_source();
+        let sort_payload = codec::canonical_table_sort_order(order).expect("sort payload");
+        let mut sort_field = Vec::new();
+        crate::wire::append_length_delimited_field(&mut sort_field, 44, &sort_payload)
+            .expect("sort field");
+        // Unknown balanced groups are valid protobuf wire fields.  Keep one
+        // on each side of field 44 so the regression covers both traversal
+        // order and exact retention through a rewrite.
+        let tail_start = source.len();
+        source.extend_from_slice(&ROOT_GROUP_BEFORE);
+        source.extend_from_slice(&sort_field);
+        source.extend_from_slice(&ROOT_GROUP_AFTER);
+        (source, tail_start, sort_field)
+    }
+
+    #[test]
+    fn strict_codec_reads_sort_with_unrelated_root_groups() {
+        let order = codec::SortOrderSnapshot::new(
+            codec::SortScope::EntireTable,
+            [codec::SortRule::new(1, codec::SortDirection::Ascending)],
+        )
+        .expect("sort order");
+        let (source, tail_start, sort_field) = table_model_source_with_root_groups(&order);
+        let model = TableModelArchive::decode(source.as_slice()).expect("model with sort");
+
+        assert_eq!(
+            read_native_table_sort_order_wire(&source, &model).expect("strict sort read"),
+            Some(order)
+        );
+        assert_eq!(
+            &source[tail_start..tail_start + ROOT_GROUP_BEFORE.len()],
+            ROOT_GROUP_BEFORE
+        );
+        let sort_start = tail_start + ROOT_GROUP_BEFORE.len();
+        assert_eq!(
+            &source[sort_start..sort_start + sort_field.len()],
+            sort_field
+        );
+        assert_eq!(&source[sort_start + sort_field.len()..], ROOT_GROUP_AFTER);
+    }
+
+    #[test]
+    fn column_delete_retains_root_groups_and_their_source_order() {
+        let order = codec::SortOrderSnapshot::new(
+            codec::SortScope::EntireTable,
+            [
+                codec::SortRule::new(1, codec::SortDirection::Ascending),
+                codec::SortRule::new(2, codec::SortDirection::Descending),
+            ],
+        )
+        .expect("sort order");
+        let (source, tail_start, _sort_field) = table_model_source_with_root_groups(&order);
+        let model = TableModelArchive::decode(source.as_slice()).expect("model with sort");
+
+        let changed =
+            delete_table_sort_column_wire(&source, &model, 2, 2).expect("column deletion rewrite");
+        let changed_model =
+            TableModelArchive::decode(changed.as_slice()).expect("rewritten model with groups");
+        let expected = codec::SortOrderSnapshot::new(
+            codec::SortScope::EntireTable,
+            [codec::SortRule::new(1, codec::SortDirection::Ascending)],
+        )
+        .expect("remaining sort order");
+        assert_eq!(
+            read_native_table_sort_order_wire(&changed, &changed_model)
+                .expect("strict rewritten sort read"),
+            Some(expected.clone())
+        );
+
+        let mut expected_sort_field = Vec::new();
+        let expected_payload = codec::canonical_table_sort_order(&expected).expect("sort payload");
+        crate::wire::append_length_delimited_field(&mut expected_sort_field, 44, &expected_payload)
+            .expect("sort field");
+        let changed_after_start = changed.len() - ROOT_GROUP_AFTER.len();
+        let changed_sort_start = changed_after_start - expected_sort_field.len();
+        let changed_group_start = changed_sort_start - ROOT_GROUP_BEFORE.len();
+        assert_eq!(changed_group_start, tail_start);
+        assert_eq!(&changed[..tail_start], &source[..tail_start]);
+        assert_eq!(
+            &changed[changed_group_start..changed_sort_start],
+            ROOT_GROUP_BEFORE
+        );
+        assert_eq!(
+            &changed[changed_sort_start..changed_after_start],
+            expected_sort_field
+        );
+        assert_eq!(&changed[changed_after_start..], ROOT_GROUP_AFTER);
     }
 
     #[test]

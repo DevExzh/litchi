@@ -55,6 +55,7 @@ fuzz_target!(|data: &[u8]| {
     }
     exercise_redacted_ingress();
     exercise_input_limit();
+    exercise_hex_input_limit();
     exercise_archive_limit();
     exercise_semantic_limit(&command);
 });
@@ -102,7 +103,12 @@ fn source_built_bytes() -> &'static [u8] {
     static BYTES: OnceLock<Box<[u8]>> = OnceLock::new();
     BYTES
         .get_or_init(|| {
-            decode_hex(SOURCE_BUILT_PACKAGE)
+            let encoded = SOURCE_BUILT_PACKAGE
+                .strip_prefix(b"hex:")
+                .unwrap_or_else(|| {
+                    panic!("source-built Keynote dimension corpus must start with hex:")
+                });
+            decode_hex(encoded)
                 .unwrap_or_else(|| panic!("source-built Keynote dimension package has invalid hex"))
                 .into_boxed_slice()
         })
@@ -113,7 +119,10 @@ fn locked_bytes() -> &'static [u8] {
     static BYTES: OnceLock<Box<[u8]>> = OnceLock::new();
     BYTES
         .get_or_init(|| {
-            decode_hex(LOCKED_PACKAGE)
+            let encoded = LOCKED_PACKAGE
+                .strip_prefix(b"hex:")
+                .unwrap_or_else(|| panic!("locked Keynote dimension corpus must start with hex:"));
+            decode_hex(encoded)
                 .unwrap_or_else(|| panic!("locked Keynote dimension package has invalid hex"))
                 .into_boxed_slice()
         })
@@ -130,6 +139,16 @@ fn command_input(data: &[u8]) -> Vec<u8> {
 }
 
 fn decode_hex(encoded: &[u8]) -> Option<Vec<u8>> {
+    // Reject an oversized encoded command before reserving from its source
+    // length.  The decoded command remains capped at 1 MiB below; the small
+    // allowance keeps a bounded amount of formatting whitespace admissible.
+    if encoded.len()
+        > (MAX_INPUT_BYTES as usize)
+            .saturating_mul(2)
+            .saturating_add(32)
+    {
+        return None;
+    }
     let mut output = Vec::with_capacity(encoded.len() / 2);
     let mut high = None;
     for byte in encoded.iter().copied() {
@@ -432,6 +451,19 @@ fn exercise_input_limit() {
         Ok(_) => panic!("oversized Keynote dimension input must be rejected"),
         Err(error) => observe_error(error),
     }
+}
+
+fn exercise_hex_input_limit() {
+    static CHECK: OnceLock<()> = OnceLock::new();
+    CHECK.get_or_init(|| {
+        let oversized = vec![b'0'; (MAX_INPUT_BYTES as usize) * 2 + 33];
+        assert!(decode_hex(&oversized).is_none());
+
+        let encoded = vec![b'0'; (MAX_INPUT_BYTES as usize) * 2];
+        let decoded = decode_hex(&encoded)
+            .unwrap_or_else(|| panic!("a one-MiB decoded command must remain valid"));
+        assert_eq!(decoded.len(), MAX_INPUT_BYTES as usize);
+    });
 }
 
 fn exercise_archive_limit() {

@@ -25,6 +25,11 @@ const SORT_RULE_COLUMN_FIELD: u32 = 1;
 const SORT_RULE_DIRECTION_FIELD: u32 = 2;
 const MAX_FIELD_NUMBER: u32 = 0x1fff_ffff;
 const MAX_RECURSION: u32 = 64;
+const MAX_CONSTRUCTED_RULES: usize = 1_024;
+// A source can contain a very large length-delimited unknown field but only
+// one span. Grow span vectors in small fallible batches so payload size does
+// not turn into an eager allocation of span metadata.
+const FIELD_SPAN_RESERVE_BATCH: usize = 32;
 
 /// A persisted table-sort scope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -112,12 +117,14 @@ pub struct SortOrderSnapshot {
 
 impl SortOrderSnapshot {
     /// Construct a semantic order, rejecting empty and duplicate-column rules.
+    /// Rule iterators are collected fallibly and are bounded to the codec's
+    /// finite semantic rule ceiling.
     pub fn new(
         scope: SortScope,
         rules: impl IntoIterator<Item = SortRule>,
     ) -> Result<Self, DecodeError> {
-        let rules = rules.into_iter().collect::<Vec<_>>();
-        validate_rules(scope, &rules, usize::MAX, usize::MAX)?;
+        let rules = collect_constructed_rules(rules)?;
+        validate_rules(scope, &rules, MAX_CONSTRUCTED_RULES, usize::MAX)?;
         Ok(Self { scope, rules })
     }
 
@@ -657,6 +664,27 @@ pub fn decode_table_sort_order_with_report(
     source: &[u8],
     options: DecodeOptions,
 ) -> Result<(Option<SortOrderSnapshot>, DecodeReport), DecodeError> {
+    let (semantic, _field_present, report) = decode_table_sort_order_internal(source, options)?;
+    Ok((semantic, report))
+}
+
+/// Decode field 44 and report whether its outer field was present.
+///
+/// The semantic snapshot uses `None` for both an absent field and an explicit
+/// empty sort marker, so callers that must compare raw/model presence should
+/// use this companion result rather than infer presence from the snapshot.
+pub fn decode_table_sort_order_with_presence(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(Option<SortOrderSnapshot>, bool), DecodeError> {
+    let (semantic, field_present, _report) = decode_table_sort_order_internal(source, options)?;
+    Ok((semantic, field_present))
+}
+
+fn decode_table_sort_order_internal(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(Option<SortOrderSnapshot>, bool, DecodeReport), DecodeError> {
     validate_input(source, options)?;
     let mut budget = Budget::new(options);
     let model = parse_model(source, options, &mut budget)?;
@@ -669,6 +697,7 @@ pub fn decode_table_sort_order_with_report(
     }
     Ok((
         semantic,
+        model.sort.is_some(),
         budget.report(source.len(), source.len(), budget.allocations, source.len()),
     ))
 }
@@ -836,6 +865,14 @@ pub fn decode_table_model_sort_order_with_report(
     options: DecodeOptions,
 ) -> Result<(Option<SortOrderSnapshot>, DecodeReport), DecodeError> {
     decode_table_sort_order_with_report(source, options)
+}
+
+/// Canonical model-field naming retained for package/boundary ratchets.
+pub fn decode_table_model_sort_order_with_presence(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(Option<SortOrderSnapshot>, bool), DecodeError> {
+    decode_table_sort_order_with_presence(source, options)
 }
 
 /// Canonical model-field naming retained for package/boundary ratchets.
@@ -1244,6 +1281,51 @@ fn copy_bytes(source: &[u8]) -> Result<Vec<u8>, DecodeError> {
     Ok(bytes)
 }
 
+fn collect_constructed_rules(
+    rules: impl IntoIterator<Item = SortRule>,
+) -> Result<Vec<SortRule>, DecodeError> {
+    let iterator = rules.into_iter();
+    let (lower, _) = iterator.size_hint();
+    if lower > MAX_CONSTRUCTED_RULES {
+        return Err(DecodeError::limit(DecodeLimit::Rules {
+            observed: lower,
+            maximum: MAX_CONSTRUCTED_RULES,
+        }));
+    }
+
+    let mut collected = Vec::new();
+    if lower != 0 {
+        reserve_constructed_rules(&mut collected, lower)?;
+    }
+    for rule in iterator {
+        if collected.len() >= MAX_CONSTRUCTED_RULES {
+            return Err(DecodeError::limit(DecodeLimit::Rules {
+                observed: collected.len().saturating_add(1),
+                maximum: MAX_CONSTRUCTED_RULES,
+            }));
+        }
+        if collected.len() == collected.capacity() {
+            let remaining = MAX_CONSTRUCTED_RULES - collected.len();
+            let additional = collected
+                .capacity()
+                .clamp(1, FIELD_SPAN_RESERVE_BATCH)
+                .min(remaining);
+            reserve_constructed_rules(&mut collected, additional)?;
+        }
+        collected.push(rule);
+    }
+    Ok(collected)
+}
+
+fn reserve_constructed_rules(rules: &mut Vec<SortRule>, count: usize) -> Result<(), DecodeError> {
+    let bytes = count
+        .checked_mul(size_of::<SortRule>())
+        .ok_or(DecodeError::projection())?;
+    rules
+        .try_reserve_exact(count)
+        .map_err(|_| DecodeError::allocation(bytes))
+}
+
 fn validate_parsed_rules(
     rules: &[ParsedRule],
     max_rules: usize,
@@ -1324,22 +1406,48 @@ fn scan_fields(
     depth: u32,
 ) -> Result<Vec<FieldSpan>, DecodeError> {
     budget.depth(depth)?;
-    budget.allocate()?;
-    let capacity = source.len().min(options.max_fields);
-    let scratch = capacity
-        .checked_mul(size_of::<FieldSpan>())
-        .ok_or(DecodeError::projection())?;
     let mut fields = Vec::new();
-    fields
-        .try_reserve_exact(capacity)
-        .map_err(|_| DecodeError::allocation(scratch))?;
-    budget.reserve_spans(capacity)?;
     let mut offset = 0usize;
     while offset < source.len() {
+        if fields.len() == fields.capacity() {
+            let remaining = options.max_fields.saturating_sub(fields.len());
+            if remaining != 0 {
+                let additional = fields
+                    .capacity()
+                    .clamp(1, FIELD_SPAN_RESERVE_BATCH)
+                    .min(remaining);
+                reserve_field_spans(&mut fields, additional, budget)?;
+            }
+        }
         let field = parse_field(source, &mut offset, budget, depth)?;
+        // `parse_field` accounts for the aggregate field ceiling before this
+        // point.  A successful parse therefore always has room in the vector;
+        // keep the invariant explicit rather than allowing `push` to perform
+        // an infallible growth if a future budget change violates it.
+        if fields.len() == fields.capacity() {
+            return Err(DecodeError::projection());
+        }
         fields.push(field);
     }
     Ok(fields)
+}
+
+fn reserve_field_spans(
+    fields: &mut Vec<FieldSpan>,
+    count: usize,
+    budget: &mut Budget,
+) -> Result<(), DecodeError> {
+    let scratch = count
+        .checked_mul(size_of::<FieldSpan>())
+        .ok_or(DecodeError::projection())?;
+    // Charge both limits before asking the allocator for memory.  The
+    // scratch charge is deliberately first so an arithmetic/budget failure
+    // cannot leave an allocation behind.
+    budget.reserve_spans(count)?;
+    budget.allocate()?;
+    fields
+        .try_reserve_exact(count)
+        .map_err(|_| DecodeError::allocation(scratch))
 }
 
 fn parse_field(
@@ -2272,5 +2380,181 @@ mod tests {
     fn malformed_known_duplicates_are_rejected() {
         let source = model(&[8, 0, 8, 1, 0x12, 0x04, 8, 0, 16, 0]);
         assert!(decode_table_sort_order(&source, options(&source)).is_err());
+    }
+
+    #[test]
+    fn field_span_reservation_tracks_fields_not_unknown_payload_size() {
+        let payload_len = 64 * 1024;
+        let mut source = Vec::new();
+        source.push(0x52); // unknown field 10, length-delimited
+        encode_varint(payload_len as u64, &mut source);
+        source.resize(source.len() + payload_len, 0);
+
+        let options = DecodeOptions::new(
+            source.len(),
+            source.len(),
+            usize::MAX,
+            source.len(),
+            1,
+            usize::MAX,
+            usize::MAX,
+        );
+        let mut budget = Budget::new(options);
+        let fields = scan_fields(&source, options, &mut budget, 1).unwrap();
+
+        assert_eq!(fields.len(), 1);
+        assert_eq!(budget.allocations, 1);
+        assert_eq!(budget.scratch_bytes, size_of::<FieldSpan>());
+    }
+
+    #[test]
+    fn field_span_growth_charges_each_allocation_before_reserving() {
+        let source = [8, 0, 8, 1];
+        let options = DecodeOptions::new(
+            source.len(),
+            source.len(),
+            usize::MAX,
+            source.len(),
+            1,
+            usize::MAX,
+            usize::MAX,
+        )
+        .with_max_allocations(1);
+        let mut budget = Budget::new(options);
+        let error = scan_fields(&source, options, &mut budget, 1).unwrap_err();
+
+        assert_eq!(
+            error.resource_limit(),
+            Some(DecodeLimit::Allocations {
+                observed: 2,
+                maximum: 1,
+            })
+        );
+        assert_eq!(budget.scratch_bytes, size_of::<FieldSpan>() * 2);
+    }
+
+    #[test]
+    fn zero_field_budget_reports_fields_before_span_growth() {
+        let source = [8, 0];
+        let options = DecodeOptions::new(source.len(), source.len(), 0, source.len(), 1, 1, 1);
+        let error = decode_table_sort_order(&source, options).unwrap_err();
+
+        assert_eq!(
+            error.resource_limit(),
+            Some(DecodeLimit::Fields {
+                observed: 1,
+                maximum: 0,
+            })
+        );
+    }
+
+    #[test]
+    fn field_span_growth_checks_scratch_before_allocation() {
+        let options = DecodeOptions::new(1, 1, 1, 1, 1, 1, 1);
+        let mut budget = Budget::new(options);
+        budget.scratch_bytes = usize::MAX;
+        let mut fields = Vec::new();
+        let error = reserve_field_spans(&mut fields, 1, &mut budget).unwrap_err();
+
+        assert!(matches!(error.kind, ErrorKind::Projection));
+        assert_eq!(budget.allocations, 0);
+        assert_eq!(fields.capacity(), 0);
+    }
+
+    #[test]
+    fn constructed_rule_iterators_are_bounded() {
+        let error = SortOrderSnapshot::new(
+            SortScope::EntireTable,
+            (0u32..).map(|column| SortRule::new(column, SortDirection::Ascending)),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error.resource_limit(),
+            Some(DecodeLimit::Rules {
+                observed: usize::MAX,
+                maximum: MAX_CONSTRUCTED_RULES,
+            })
+        );
+
+        struct UnknownInfinite {
+            next_column: u32,
+        }
+
+        impl Iterator for UnknownInfinite {
+            type Item = SortRule;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                let column = self.next_column;
+                self.next_column = self.next_column.saturating_add(1);
+                Some(SortRule::new(column, SortDirection::Ascending))
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                (0, None)
+            }
+        }
+
+        let error =
+            SortOrderSnapshot::new(SortScope::EntireTable, UnknownInfinite { next_column: 0 })
+                .unwrap_err();
+        assert_eq!(
+            error.resource_limit(),
+            Some(DecodeLimit::Rules {
+                observed: MAX_CONSTRUCTED_RULES + 1,
+                maximum: MAX_CONSTRUCTED_RULES,
+            })
+        );
+
+        struct OversizedHint;
+
+        impl Iterator for OversizedHint {
+            type Item = SortRule;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                None
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                (MAX_CONSTRUCTED_RULES + 1, Some(MAX_CONSTRUCTED_RULES + 1))
+            }
+        }
+
+        let error = SortOrderSnapshot::new(SortScope::EntireTable, OversizedHint).unwrap_err();
+        assert_eq!(
+            error.resource_limit(),
+            Some(DecodeLimit::Rules {
+                observed: MAX_CONSTRUCTED_RULES + 1,
+                maximum: MAX_CONSTRUCTED_RULES,
+            })
+        );
+
+        struct HugeUpperHint {
+            yielded: bool,
+        }
+
+        impl Iterator for HugeUpperHint {
+            type Item = SortRule;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                if self.yielded {
+                    None
+                } else {
+                    self.yielded = true;
+                    Some(SortRule::new(7, SortDirection::Ascending))
+                }
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                (0, Some(usize::MAX))
+            }
+        }
+
+        let snapshot =
+            SortOrderSnapshot::new(SortScope::EntireTable, HugeUpperHint { yielded: false })
+                .unwrap();
+        assert_eq!(
+            snapshot.rules(),
+            &[SortRule::new(7, SortDirection::Ascending)]
+        );
     }
 }

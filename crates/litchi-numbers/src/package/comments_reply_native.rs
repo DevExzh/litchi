@@ -2149,12 +2149,13 @@ fn archive_reference_presence(
     limits: Limits,
     budget: &mut TransactionBudget,
     path: BudgetPath,
-) -> Result<(bool, bool)> {
+) -> Result<(bool, bool, bool)> {
     struct Search {
         first_identifier: u64,
         second_identifier: Option<u64>,
         first_found: bool,
         second_found: bool,
+        second_found_outside_first: bool,
     }
     impl ArchiveReferenceVisitor for Search {
         fn visit_reference(
@@ -2172,6 +2173,9 @@ fn archive_reference_presence(
                 .is_some_and(|identifier| occurrence.referenced_identifier == identifier)
             {
                 self.second_found = true;
+                if occurrence.object_identifier != self.first_identifier {
+                    self.second_found_outside_first = true;
+                }
             }
             Ok(())
         }
@@ -2199,6 +2203,7 @@ fn archive_reference_presence(
         second_identifier,
         first_found: false,
         second_found: false,
+        second_found_outside_first: false,
     };
     for object in &archive.objects {
         object
@@ -2209,7 +2214,11 @@ fn archive_reference_presence(
             )
             .map_err(|_| NativeReplyError::Archive)?;
     }
-    Ok((search.first_found, search.second_found))
+    Ok((
+        search.first_found,
+        search.second_found,
+        search.second_found_outside_first,
+    ))
 }
 
 fn validate_known_archive_metadata(
@@ -2824,14 +2833,15 @@ pub(super) fn rewrite_native_comment_reply(
     // Culling is performed only after an unknown-metadata global inbound
     // census.  A shared root stays alive while another cell still owns the old
     // key; a shared reply likewise stays alive when another root references it.
-    let (root_referenced, old_reply_referenced) = archive_reference_presence(
-        &candidate,
-        root_identifier,
-        old_reply_identifier,
-        request.limits,
-        budget,
-        BUDGET_PATH,
-    )?;
+    let (root_referenced, old_reply_referenced, old_reply_referenced_outside_root) =
+        archive_reference_presence(
+            &candidate,
+            root_identifier,
+            old_reply_identifier,
+            request.limits,
+            budget,
+            BUDGET_PATH,
+        )?;
     let old_root_can_cull = old_entry.ref_count == 1 && !root_referenced;
     if old_root_can_cull {
         candidate
@@ -2839,7 +2849,12 @@ pub(super) fn rewrite_native_comment_reply(
             .map_err(|_| NativeReplyError::Archive)?;
     }
     if let Some(old_reply) = old_reply_identifier {
-        if !old_reply_referenced {
+        let old_reply_still_referenced = if old_root_can_cull {
+            old_reply_referenced_outside_root
+        } else {
+            old_reply_referenced
+        };
+        if !old_reply_still_referenced {
             candidate
                 .remove_object_checked_with_limits(old_reply, request.limits)
                 .map_err(|_| NativeReplyError::Archive)?;

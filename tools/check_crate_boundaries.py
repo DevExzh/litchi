@@ -7032,7 +7032,8 @@ NUMBERS_TABLE_CELL_NUMBER_FORMAT_OWNER_REQUIRED_MARKERS = {
         re.IGNORECASE,
     ),
     "format-table/refcount closure": re.compile(
-        r"(?<![A-Za-z0-9])(?:format[_-]?table|registry|refcount|ref_count|reference)(?![A-Za-z0-9])",
+        r"(?<![A-Za-z0-9])(?:format[_-]?table|registry|refcount|ref_count|reference|"
+        r"WireReferenceBytes|PayloadReferences)(?![A-Za-z0-9])",
         re.IGNORECASE,
     ),
     "exact-source transaction": re.compile(
@@ -7048,7 +7049,8 @@ NUMBERS_TABLE_CELL_NUMBER_FORMAT_OWNER_REQUIRED_MARKERS = {
         re.IGNORECASE,
     ),
     "fail-closed unsupported graph": re.compile(
-        r"(?<![A-Za-z0-9])(?:unsupported|ambiguous|cross[_-]?component|fail[_-]?closed)(?![A-Za-z0-9])",
+        r"(?<![A-Za-z0-9])(?:unsupported|UnsupportedDependency|UnsupportedSource|"
+        r"ambiguous|cross[_-]?component|fail[_-]?closed)(?![A-Za-z0-9])",
         re.IGNORECASE,
     ),
 }
@@ -7470,6 +7472,75 @@ IWA_NUMBERS_TABLE_CELL_TEXT_FORMAT_LEGACY_CALL = re.compile(
     r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>table_cell_text_format|"
     r"set_table_cell_text_format|reset_table_cell_text_format)"
     r"(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+
+# Date & Time is a focused Numbers display-format owner. Keep this ratchet
+# deliberately topology-oriented: DateTime's host compatibility methods are
+# not retired here, but its archive-free semantic value, private transaction
+# owner, strict Buffa/lazy codec seam, and generated-module visibility must not
+# regress as the shared display-format core evolves.
+NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_SEMANTIC_SOURCE = Path(
+    "crates/litchi-numbers/src/cell/data_format/date_time.rs"
+)
+NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_OWNER_SOURCE = Path(
+    "crates/litchi-numbers/src/package/table_cell_date_time_format.rs"
+)
+NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/numbers_table_cell_date_time_format_codec.rs"
+)
+NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_MODULE = (
+    "numbers_table_cell_date_time_format_codec"
+)
+NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_GENERATED_MODULE = (
+    "buffa_numbers_table_cell_date_time_format_generated"
+)
+NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_IMPLEMENTATION_SOURCES = (
+    NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_SOURCE,
+    NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_SOURCE,
+)
+NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_REQUIRED_APIS = (
+    "DateTimeFormatSnapshot",
+    "DateTimeFormatWrite",
+    "PreparedDateTimeFormatRewrite",
+    "RewriteExecutionRequirements",
+    "RewriteExecutionLimits",
+    "decode_date_time_format",
+    "decode_date_time_format_with_report",
+    "prepare_date_time_format_rewrite",
+    "prepare_date_time_format_write",
+    "canonical_date_time_format",
+    "rewrite_date_time_format",
+)
+NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_OWNER_METHODS = (
+    "table_cell_date_time_format",
+    "edit_table_cell_date_time_format",
+    "apply_table_cell_date_time_format",
+)
+NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_TRANSACTION_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+    "Path",
+)
+NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_RAW_MARKERS = frozenset(
+    {
+        "RawMessage",
+        "IWorkPackage",
+        "SourceCatalog",
+        "ObjectId",
+        "ObjectID",
+        "ModelId",
+        "ModelID",
+        "Identifier",
+        "UUID",
+        "Uuid",
+    }
 )
 
 # Percentage is deliberately audited as a separate focused owner.  It shares
@@ -14036,6 +14107,14 @@ def parse_policy(raw: Any) -> Policy:
     migration_raw = raw.get("migration_debt")
     if not isinstance(migration_raw, list):
         raise PolicyError("migration_debt must be a list")
+    if migration_raw:
+        # A workspace with no migration debt may retire its last migration
+        # host.  While debt remains, however, an empty host set would make the
+        # debt unowned and therefore silently unenforceable.
+        if not migration_hosts:
+            raise PolicyError(
+                "migration_hosts must be non-empty while migration_debt exists"
+            )
     migration: list[Debt] = []
     for index, item in enumerate(migration_raw):
         context = f"migration_debt[{index}]"
@@ -14086,6 +14165,14 @@ def parse_policy(raw: Any) -> Policy:
         raise PolicyError(
             "migration_hosts references unknown packages: "
             + ", ".join(sorted(migration_hosts - packages))
+        )
+    non_host_migration_debt = sorted(
+        item.edge for item in migration if item.edge.dependent not in migration_hosts
+    )
+    if non_host_migration_debt:
+        raise PolicyError(
+            "migration debt dependents must be migration hosts: "
+            + ", ".join(edge.display() for edge in non_host_migration_debt)
         )
     incoming_host_edges = sorted(
         edge
@@ -15158,11 +15245,131 @@ RUST_CFG_TEST_ATTRIBUTE = re.compile(
     r"^[ \t]*#[ \t]*\[[ \t]*cfg[ \t]*\([ \t]*test[ \t]*\)[ \t]*\]",
     re.MULTILINE,
 )
+# A source ratchet must distinguish an item that is test-only from one that
+# merely has a test configuration as one possible branch.  In particular,
+# ``cfg(any(test, feature = "oracle"))`` is production-reachable when the
+# feature is enabled and must stay visible to the production audit, while
+# ``cfg(all(test, feature = "oracle"))`` is safe to mask.  Keep the old exact
+# matcher above for callers that need its historical spelling; the item
+# masker below uses this balanced scanner so nested cfg expressions cannot
+# bypass it by adding whitespace or a second predicate.
+RUST_CFG_ATTRIBUTE_START = re.compile(
+    r"^[ \t]*#[ \t]*\[[ \t]*cfg\b",
+    re.MULTILINE,
+)
 RUST_CFG_TEST_ITEM = re.compile(
     r"(?:pub(?:[ \t\r\n]*\([^()]*\))?[ \t\r\n]+)?"
     r"(?:(?:unsafe|async|const)[ \t\r\n]+)*"
     r"(?P<kind>use|fn|mod|impl|struct|enum|trait|type|const|static)\b"
 )
+
+
+def _cfg_expression_requires_test(expression: str) -> bool:
+    """Return whether a cfg expression can only be true under ``test``.
+
+    The parser intentionally models only the boolean cfg meta-expression
+    operators.  Values such as ``feature = "oracle"`` are non-test atoms;
+    their string payload is irrelevant.  For a conjunction, one operand that
+    requires test is enough.  For a disjunction, every alternative must
+    require test.  Negation never proves a test-only item.  Unknown/malformed
+    forms are conservative and remain visible to the production scan.
+    """
+
+    tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]*|[(),=]", expression)
+    cursor = 0
+
+    def parse_term() -> bool:
+        nonlocal cursor
+        if cursor >= len(tokens):
+            return False
+        atom = tokens[cursor]
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", atom):
+            cursor += 1
+            return False
+        cursor += 1
+
+        if cursor < len(tokens) and tokens[cursor] == "(":
+            cursor += 1
+            values: list[bool] = []
+            malformed = False
+            while cursor < len(tokens) and tokens[cursor] != ")":
+                before = cursor
+                values.append(parse_term())
+                if cursor == before:
+                    malformed = True
+                    cursor += 1
+                if cursor < len(tokens) and tokens[cursor] == ",":
+                    cursor += 1
+                elif cursor < len(tokens) and tokens[cursor] != ")":
+                    malformed = True
+                    # Make forward progress without treating the remainder
+                    # as a nested production item.
+                    cursor += 1
+            if cursor >= len(tokens) or tokens[cursor] != ")":
+                return False
+            cursor += 1
+            if malformed or not values:
+                return False
+            if atom == "all":
+                return any(values)
+            if atom == "any":
+                return all(values)
+            # ``not(test)`` is production-reachable outside tests.  Unknown
+            # operators are likewise not safe to hide.
+            return False
+
+        if cursor < len(tokens) and tokens[cursor] == "=":
+            # Consume a cfg key/value atom (usually ``feature = \"...\"``).
+            # The value is intentionally opaque to this test-only classifier.
+            cursor += 1
+            while cursor < len(tokens) and tokens[cursor] not in {",", ")"}:
+                cursor += 1
+            return False
+        return atom == "test"
+
+    result = parse_term()
+    # An unconsumed token sequence means this is not a form we can prove
+    # test-only.  This also keeps invalid/composite syntax fail-closed.
+    return result and cursor == len(tokens)
+
+
+def _rust_cfg_test_only_attribute_spans(source: str) -> tuple[tuple[int, int], ...]:
+    """Return balanced ``cfg`` attributes whose condition requires ``test``."""
+
+    code = _mask_rust_non_code(source)
+    spans: list[tuple[int, int]] = []
+    for candidate in RUST_CFG_ATTRIBUTE_START.finditer(code):
+        opening = code.find("[", candidate.start(), candidate.end())
+        if opening < 0:
+            continue
+        bracket_depth = 1
+        cursor = opening + 1
+        while cursor < len(code) and bracket_depth:
+            if code[cursor] == "[":
+                bracket_depth += 1
+            elif code[cursor] == "]":
+                bracket_depth -= 1
+            cursor += 1
+        if bracket_depth:
+            continue
+        closing = cursor
+        paren_open = code.find("(", candidate.end(), closing)
+        if paren_open < 0:
+            continue
+        paren_depth = 1
+        paren_cursor = paren_open + 1
+        while paren_cursor < closing and paren_depth:
+            if code[paren_cursor] == "(":
+                paren_depth += 1
+            elif code[paren_cursor] == ")":
+                paren_depth -= 1
+            paren_cursor += 1
+        if paren_depth:
+            continue
+        expression = code[paren_open + 1 : paren_cursor - 1]
+        if _cfg_expression_requires_test(expression):
+            spans.append((candidate.start(), closing))
+    return tuple(spans)
 
 
 def _mask_rust_cfg_test_items(source: str) -> str:
@@ -15240,13 +15447,15 @@ def _mask_rust_cfg_test_items(source: str) -> str:
             cursor += 1
         return len(code)
 
-    for attribute in RUST_CFG_TEST_ATTRIBUTE.finditer(code):
+    for attribute_start, attribute_end in _rust_cfg_test_only_attribute_spans(
+        source
+    ):
         if all(
             character in {" ", "\n"}
-            for character in masked[attribute.start() : attribute.end()]
+            for character in masked[attribute_start:attribute_end]
         ):
             continue
-        cursor = skip_whitespace(attribute.end())
+        cursor = skip_whitespace(attribute_end)
         while True:
             next_cursor = skip_attribute(cursor)
             if next_cursor is None:
@@ -15257,9 +15466,9 @@ def _mask_rust_cfg_test_items(source: str) -> str:
             # Leave an unrecognized item visible so a future production marker
             # cannot be hidden by an item shape this small scanner does not yet
             # understand.
-            blank(attribute.start(), attribute.end())
+            blank(attribute_start, attribute_end)
             continue
-        blank(attribute.start(), item_end(item.end(), item.group("kind")))
+        blank(attribute_start, item_end(item.end(), item.group("kind")))
 
     return "".join(masked)
 
@@ -15524,6 +15733,846 @@ def _rust_public_declarations(source: str) -> list[tuple[str, int]]:
             (code[match.start() : end], code.count("\n", 0, match.start()) + 1)
         )
     return declarations
+
+
+def _rust_brace_depth_at(code: str, offset: int) -> int:
+    """Return the lexical Rust brace depth immediately before ``offset``."""
+
+    return code.count("{", 0, offset) - code.count("}", 0, offset)
+
+
+def _rust_balanced_delimited_end(
+    code: str, opening: int, opener: str = "{", closer: str = "}"
+) -> int | None:
+    """Return the exclusive end of one balanced delimiter pair."""
+
+    if opening < 0 or opening >= len(code) or code[opening] != opener:
+        return None
+    depth = 1
+    cursor = opening + 1
+    while cursor < len(code) and depth:
+        if code[cursor] == opener:
+            depth += 1
+        elif code[cursor] == closer:
+            depth -= 1
+        cursor += 1
+    return cursor if depth == 0 else None
+
+
+def _rust_root_level_matches(
+    source: str, pattern: re.Pattern[str]
+) -> tuple[re.Match[str], ...]:
+    """Find pattern matches at the crate/module root, ignoring Rust trivia."""
+
+    code = _mask_rust_non_code(source)
+    return tuple(
+        match
+        for match in pattern.finditer(code)
+        if _rust_brace_depth_at(code, match.start()) == 0
+    )
+
+
+def _rust_root_level_module_declarations(
+    source: str, names: frozenset[str]
+) -> tuple[tuple[str, str | None, str, str, int], ...]:
+    """Return root module declarations and their ``;``/inline-body shape.
+
+    The returned tuple is ``(name, visibility, shape, body, line)``.  ``shape``
+    is ``external`` for ``mod name;``, ``inline`` for a balanced module body,
+    and ``invalid`` when the declaration is truncated or has another token
+    after its name.  Nested decoy modules are deliberately excluded.
+    """
+
+    if not names:
+        return ()
+    code = _mask_rust_non_code(source)
+    pattern = re.compile(
+        r"(?m)^[ \t]*(?P<visibility>pub(?:[ \t]*\([^()\r\n]*\))?[ \t\r\n]+)?"
+        r"mod[ \t\r\n]+(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
+    )
+    declarations: list[tuple[str, str | None, str, str, int]] = []
+    for match in pattern.finditer(code):
+        name = match.group("name")
+        if name not in names or _rust_brace_depth_at(code, match.start()) != 0:
+            continue
+        cursor = match.end()
+        while cursor < len(code) and code[cursor].isspace():
+            cursor += 1
+        shape = "invalid"
+        body = ""
+        if cursor < len(code) and code[cursor] == ";":
+            shape = "external"
+        elif cursor < len(code) and code[cursor] == "{":
+            end = _rust_balanced_delimited_end(code, cursor)
+            if end is not None:
+                shape = "inline"
+                body = source[cursor + 1 : end - 1]
+        declarations.append(
+            (
+                name,
+                match.group("visibility"),
+                shape,
+                body,
+                code.count("\n", 0, match.start()) + 1,
+            )
+        )
+    return tuple(declarations)
+
+
+def _rust_generated_module_include_is_valid(body: str) -> bool:
+    """Check that an inline generated module includes one OUT_DIR Buffa file."""
+
+    code = _mask_rust_non_code(body)
+    includes = list(re.finditer(r"\binclude!\s*\(", code))
+    if len(includes) != 1:
+        return False
+    include = includes[0]
+    end = _rust_balanced_delimited_end(
+        code, code.find("(", include.start(), include.end()), "(", ")"
+    )
+    if end is None:
+        return False
+    # Inspect the actual macro call after comments are removed.  Ordinary
+    # strings are retained here so the generated path can be validated, while
+    # a comment/string-only fake include was already excluded by ``code``.
+    call = _mask_rust_comments(body[include.start() : end])
+    return re.fullmatch(
+        r"\s*include!\s*\(\s*concat!\s*\(\s*env!\s*\(\s*\"OUT_DIR\"\s*\)"
+        r"\s*,\s*\"[^\"]*buffa[^\"]*\"\s*\)\s*\)\s*",
+        call,
+        re.IGNORECASE | re.DOTALL,
+    ) is not None
+
+
+def _rust_statement_end(code: str, start: int) -> int:
+    """Find a top-level semicolon or item-body opening after ``start``."""
+
+    parentheses = 0
+    brackets = 0
+    cursor = start
+    while cursor < len(code):
+        character = code[cursor]
+        if character == "(":
+            parentheses += 1
+        elif character == ")" and parentheses:
+            parentheses -= 1
+        elif character == "[":
+            brackets += 1
+        elif character == "]" and brackets:
+            brackets -= 1
+        elif not parentheses and not brackets:
+            if character == ";":
+                return cursor + 1
+            if character == "{":
+                return cursor
+        cursor += 1
+    return len(code)
+
+
+def _rust_root_generated_public_leaks(
+    source: str, modules: frozenset[str]
+) -> tuple[int, ...]:
+    """Return root-line numbers exposing generated modules or aliases publicly."""
+
+    if not modules:
+        return ()
+    code = _mask_rust_non_code(source)
+    module_pattern = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:" + "|".join(
+            re.escape(module) for module in sorted(modules, key=len, reverse=True)
+        ) + r")(?![A-Za-z0-9_#])"
+    )
+    aliases: set[str] = set()
+    leaking_lines: set[int] = set()
+    use_pattern = re.compile(
+        r"(?m)^[ \t]*(?P<visibility>pub(?:[ \t]*\([^()\r\n]*\))?[ \t\r\n]+)?"
+        r"use\b"
+    )
+    public_item_pattern = re.compile(
+        r"(?m)^[ \t]*pub(?:[ \t]*\([^()\r\n]*\))?[ \t\r\n]+"
+        r"(?P<kind>type|struct|enum|trait|union|const|static|fn)\b"
+    )
+
+    for match in use_pattern.finditer(code):
+        if _rust_brace_depth_at(code, match.start()) != 0:
+            continue
+        end = _rust_statement_end(code, match.end())
+        declaration = code[match.start() : end]
+        direct = module_pattern.search(declaration) is not None
+        for alias in re.finditer(
+            r"\b(?:r#)?[A-Za-z_][A-Za-z0-9_]*\b[ \t\r\n]+as[ \t\r\n]+"
+            r"(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b",
+            declaration,
+        ):
+            prefix = declaration[: alias.start("name")]
+            if module_pattern.search(prefix) is not None:
+                aliases.add(alias.group("name"))
+        public = match.group("visibility") is not None
+        if public and (direct or any(
+            re.search(
+                rf"(?<![A-Za-z0-9_#]){re.escape(alias)}(?![A-Za-z0-9_#])",
+                declaration,
+            )
+            for alias in aliases
+        )):
+            leaking_lines.add(code.count("\n", 0, match.start()) + 1)
+
+    for match in public_item_pattern.finditer(code):
+        if _rust_brace_depth_at(code, match.start()) != 0:
+            continue
+        end = _rust_statement_end(code, match.end())
+        if match.group("kind") in {"struct", "enum", "trait", "union"}:
+            balanced_end = _rust_balanced_delimited_end(code, end)
+            if balanced_end is not None:
+                end = balanced_end
+        declaration = code[match.start() : end]
+        if module_pattern.search(declaration) is not None or any(
+            re.search(
+                rf"(?<![A-Za-z0-9_#]){re.escape(alias)}(?![A-Za-z0-9_#])",
+                declaration,
+            )
+            for alias in aliases
+        ):
+            leaking_lines.add(code.count("\n", 0, match.start()) + 1)
+    return tuple(sorted(leaking_lines))
+
+
+def _rust_function_scope_spans(source: str) -> tuple[tuple[int, int], ...]:
+    """Return balanced function-item spans, including methods and nested fns."""
+
+    code = _mask_rust_non_code(source)
+    spans: list[tuple[int, int]] = []
+    for declaration in RUST_FUNCTION_DECLARATION.finditer(code):
+        opening = _rust_statement_end(code, declaration.end())
+        if opening >= len(code) or code[opening] != "{":
+            continue
+        end = _rust_balanced_delimited_end(code, opening)
+        if end is not None:
+            spans.append((declaration.start(), end))
+    return tuple(spans)
+
+
+def _rust_focused_receiver_is_bound(
+    code: str,
+    receiver: str,
+    scope_start: int,
+    offset: int,
+) -> bool:
+    """Resolve the nearest active binding of ``receiver`` to a focused Package.
+
+    A flat search of the function body is insufficient here: a binding in a
+    completed sibling block must not affect a later call, and a nested shadow
+    must override (then release) an outer binding.  Track lexical blocks and
+    process declarations in source order so the exemption follows Rust's
+    scope rules closely without pretending to be a full type checker.
+    """
+
+    focused_type = re.compile(
+        r"\b(?:FocusedNumbersPackage|litchi_numbers[ \t\r\n]*::[ \t\r\n]*Package)\b"
+    )
+    body_open = _rust_statement_end(code, scope_start)
+    if body_open >= offset or code[body_open] != "{":
+        body_open = code.find("{", scope_start, offset)
+    if body_open < 0 or body_open >= offset:
+        return False
+
+    # ``{``/``}`` events are deliberately taken from the masked source passed
+    # by the caller, so braces in comments, strings, and character literals do
+    # not create phantom scopes.
+    events: list[tuple[int, int, str, re.Match[str] | None]] = []
+    for cursor in range(body_open + 1, offset):
+        if code[cursor] == "{":
+            events.append((cursor, 0, "open", None))
+        elif code[cursor] == "}":
+            events.append((cursor, 0, "close", None))
+
+    assignment = re.compile(
+        rf"(?<![A-Za-z0-9_.])(?P<let>let[ \t]+(?:mut[ \t]+)?)?"
+        rf"{re.escape(receiver)}[ \t]*(?:\:[ \t]*(?P<type>[^;=\n{{}}]+))?"
+        rf"[ \t]*=[ \t]*(?P<rhs>[^;\n{{}}]*)"
+    )
+    for match in assignment.finditer(code, body_open + 1, offset):
+        events.append((match.start(), 1, "binding", match))
+
+    # A declaration without an initializer still establishes the focused type
+    # when it is explicitly annotated.  The assignment expression above is
+    # intentionally kept separate so a later plain assignment can shadow it.
+    typed = re.compile(
+        rf"(?<![A-Za-z0-9_.])let[ \t]+(?:mut[ \t]+)?"
+        rf"{re.escape(receiver)}[ \t]*:[ \t]*(?P<type>[^;=\n{{}}]+)"
+        r"[ \t]*;"
+    )
+    for match in typed.finditer(code, body_open + 1, offset):
+        events.append((match.start(), 1, "typed", match))
+    events.sort(key=lambda event: (event[0], event[1]))
+
+    root_context = body_open
+    contexts: dict[int, dict[str, bool]] = {root_context: {}}
+    stack = [root_context]
+    header = code[scope_start:body_open]
+    parameter = re.compile(
+        rf"\b{re.escape(receiver)}[ \t]*:[ \t]*(?P<type>[^,)=]+)"
+    )
+    for match in parameter.finditer(header):
+        contexts[root_context][receiver] = focused_type.search(
+            match.group("type")
+        ) is not None
+
+    for _position, _priority, kind, match in events:
+        if kind == "open":
+            block = _position
+            contexts[block] = {}
+            stack.append(block)
+            continue
+        if kind == "close":
+            if len(stack) > 1:
+                stack.pop()
+            continue
+        if match is None or not stack:
+            continue
+        if kind == "typed":
+            is_focused = focused_type.search(match.group("type")) is not None
+            contexts[stack[-1]][receiver] = is_focused
+            continue
+
+        # ``let`` always creates a binding in the current block.  An ordinary
+        # assignment updates the nearest existing binding; if none exists,
+        # keep it local so a later same-block call cannot inherit a binding
+        # from an unrelated scope.
+        is_focused = bool(
+            (match.group("type") and focused_type.search(match.group("type")))
+            or focused_type.search(match.group("rhs"))
+        )
+        if match.group("let"):
+            contexts[stack[-1]][receiver] = is_focused
+            continue
+        target = next((block for block in reversed(stack) if receiver in contexts[block]), None)
+        contexts[target or stack[-1]][receiver] = is_focused
+
+    return bool(stack and contexts[stack[-1]].get(receiver, False))
+
+
+def _rust_focused_format_call_is_allowed(
+    code: str,
+    offset: int,
+    scopes: tuple[tuple[int, int], ...],
+) -> bool:
+    """Allow only an exact focused Package receiver for a retired method call."""
+
+    containing = [
+        span for span in scopes if span[0] <= offset < span[1]
+    ]
+    scope_start = max((span[0] for span in containing), default=0)
+    prefix = code[scope_start:offset]
+    receiver = re.search(
+        r"(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)[ \t\r\n]*\.[ \t\r\n]*$",
+        prefix,
+    )
+    if receiver is not None and _rust_focused_receiver_is_bound(
+        code, receiver.group("receiver"), scope_start, offset
+    ):
+        return True
+    if re.search(
+        r"litchi_numbers[ \t\r\n]*::[ \t\r\n]*Package[ \t\r\n]*\.[ \t\r\n]*$",
+        prefix,
+    ) is not None:
+        return True
+
+    # Permit associated/constructor calls only when the receiver path itself
+    # is the focused Package.  The old broad ``[^;{}]*`` matcher could let an
+    # unrelated receiver on the same statement inherit this exemption.
+    imported_aliases = _rust_focused_package_import_aliases(
+        code, ecosystem="Numbers"
+    )
+    static_qualifier = r"(?:litchi_numbers[ \t\r\n]*::[ \t\r\n]*Package"
+    if imported_aliases:
+        static_qualifier += "|" + "|".join(
+            re.escape(alias)
+            for alias in sorted(imported_aliases, key=len, reverse=True)
+        )
+    static_qualifier += ")"
+    return re.search(
+        static_qualifier + r"[ \t\r\n]*::[ \t\r\n]*"
+        r"[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*\([^;{}]*\)[ \t\r\n]*\??"
+        r"[ \t\r\n]*\.[ \t\r\n]*$",
+        prefix,
+    ) is not None
+
+
+def _iwa_example_and_test_paths(root: Path) -> tuple[Path, ...]:
+    """Return every standalone litchi-iwa example and integration test source."""
+
+    paths: set[Path] = set()
+    for relative_root in (
+        IWA_CORE_EXAMPLE_SOURCE_ROOT,
+        Path("crates/litchi-iwa/tests"),
+    ):
+        absolute_root = root / relative_root
+        if absolute_root.is_dir():
+            paths.update(absolute_root.rglob("*.rs"))
+    return tuple(sorted(paths))
+
+
+def _iwa_standalone_source_code(path: Path, root: Path) -> str:
+    """Mask trivia and example-only cfg(test) items for a standalone route."""
+
+    source = path.read_text(encoding="utf-8")
+    if "examples" in path.relative_to(root).parts:
+        source = _mask_rust_cfg_test_items(source)
+    return _mask_rust_non_code(source)
+
+
+def _rust_focused_package_import_aliases(
+    code: str, *, ecosystem: str
+) -> frozenset[str]:
+    """Return aliases importing ``Package`` from one focused format crate."""
+
+    qualifier = {
+        "Pages": "litchi_pages",
+        "Keynote": "litchi_keynote",
+        "Numbers": "litchi_numbers",
+    }.get(ecosystem)
+    if qualifier is None:
+        raise ValueError(f"unsupported focused package ecosystem: {ecosystem}")
+    aliases: set[str] = set()
+    import_pattern = re.compile(
+        rf"(?m)^[ \t]*(?:pub[ \t]+)?use[ \t]+{qualifier}"
+        rf"[ \t]*::[ \t]*(?P<items>[^;]+);"
+    )
+    for import_match in import_pattern.finditer(code):
+        items = import_match.group("items").strip()
+        if items.startswith("{") and items.endswith("}"):
+            items = items[1:-1]
+        for item in items.split(","):
+            match = re.fullmatch(
+                r"(?:r#)?Package(?:[ \t]+as[ \t]+"
+                r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*))?",
+                item.strip(),
+            )
+            if match is not None:
+                aliases.add(match.group("alias") or "Package")
+    return frozenset(aliases)
+
+
+def _rust_package_value_is_bound(
+    code: str,
+    receiver: str,
+    scope_start: int,
+    offset: int,
+    *,
+    ecosystem: str,
+) -> bool | None:
+    """Resolve one focused package/commit value in its lexical scope."""
+
+    if ecosystem == "Pages":
+        aliases = {"PagesPackage", "FocusedPagesPackage"}
+        package_path = "litchi_pages"
+    elif ecosystem == "Numbers":
+        aliases = {"NumbersPackage", "FocusedNumbersPackage"}
+        package_path = "litchi_numbers"
+    else:
+        aliases = {"KeynotePackage", "FocusedKeynotePackage"}
+        package_path = "litchi_keynote"
+    aliases.update(_rust_focused_package_import_aliases(code, ecosystem=ecosystem))
+    package_type = (
+        rf"(?:{package_path}[ \t\r\n]*::[ \t\r\n]*Package|"
+        + "|".join(re.escape(alias) for alias in sorted(aliases, key=len, reverse=True))
+        + r")"
+    )
+    focused_type = re.compile(
+        rf"(?<![A-Za-z0-9_]){package_type}(?![A-Za-z0-9_])"
+    )
+    body_open = _rust_statement_end(code, scope_start)
+    if body_open >= offset or code[body_open] != "{":
+        body_open = code.find("{", scope_start, offset)
+    if body_open < 0 or body_open >= offset:
+        return None
+
+    events: list[tuple[int, int, str, re.Match[str] | None]] = []
+    for cursor in range(body_open + 1, offset):
+        if code[cursor] == "{":
+            events.append((cursor, 0, "open", None))
+        elif code[cursor] == "}":
+            events.append((cursor, 0, "close", None))
+    assignment = re.compile(
+        rf"(?<![A-Za-z0-9_.])(?P<let>let[ \t]+(?:mut[ \t]+)?)?"
+        rf"(?P<name>[A-Za-z_][A-Za-z0-9_]*)[ \t]*"
+        rf"(?:\:[ \t]*(?P<type>[^;=\n{{}}]+))?[ \t]*=[ \t]*"
+        rf"(?P<rhs>[^;\n{{}}]*)"
+    )
+    for match in assignment.finditer(code, body_open + 1, offset):
+        events.append((match.start(), 1, "binding", match))
+    typed = re.compile(
+        rf"(?<![A-Za-z0-9_.])let[ \t]+(?:mut[ \t]+)?"
+        rf"(?P<name>[A-Za-z_][A-Za-z0-9_]*)[ \t]*:[ \t]*"
+        rf"(?P<type>[^;=\n{{}}]+)[ \t]*;"
+    )
+    for match in typed.finditer(code, body_open + 1, offset):
+        events.append((match.start(), 1, "typed", match))
+    events.sort(key=lambda event: (event[0], event[1]))
+
+    root_context = body_open
+    contexts: dict[int, dict[str, bool]] = {root_context: {}}
+    stack = [root_context]
+    receiver_was_bound = False
+    header = code[scope_start:body_open]
+    parameter = re.compile(
+        r"\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)[ \t]*:[ \t]*(?P<type>[^,)=]+)"
+    )
+    for match in parameter.finditer(header):
+        name = match.group("name")
+        contexts[root_context][name] = (
+            focused_type.search(match.group("type")) is not None
+        )
+        if name == receiver:
+            receiver_was_bound = True
+
+    constructor = re.compile(
+        rf"{focused_type.pattern}[ \t\r\n]*::[ \t\r\n]*"
+        r"[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*\("
+    )
+    for _position, _priority, kind, match in events:
+        if kind == "open":
+            contexts[_position] = {}
+            stack.append(_position)
+            continue
+        if kind == "close":
+            if len(stack) > 1:
+                stack.pop()
+            continue
+        if match is None or not stack:
+            continue
+        if kind == "typed":
+            name = match.group("name")
+            contexts[stack[-1]][name] = (
+                focused_type.search(match.group("type")) is not None
+            )
+            if name == receiver:
+                receiver_was_bound = True
+            continue
+
+        rhs = match.group("rhs")
+        is_focused = bool(
+            (match.group("type") and focused_type.search(match.group("type")))
+            or constructor.search(rhs)
+        )
+        if not is_focused:
+            base = re.match(
+                r"[ \t\r\n]*(?:&[ \t\r\n]*)?"
+                r"(?P<base>[A-Za-z_][A-Za-z0-9_]*)[ \t\r\n]*\.",
+                rhs,
+            )
+            if base is not None:
+                is_focused = any(
+                    contexts[block].get(base.group("base"), False)
+                    for block in reversed(stack)
+                )
+        name = match.group("name")
+        if name == receiver:
+            receiver_was_bound = True
+        if match.group("let"):
+            contexts[stack[-1]][name] = is_focused
+            continue
+        target = next((block for block in reversed(stack) if name in contexts[block]), None)
+        contexts[target or stack[-1]][name] = is_focused
+
+    if any(contexts[block].get(receiver, False) for block in reversed(stack)):
+        return True
+    # ``None`` distinguishes an unbound conventional name (which legacy
+    # snippets are allowed to use as a focused placeholder) from an explicit
+    # binding whose type/value is known not to be the focused package.  The
+    # distinction prevents ``let package: GenericPackage = ...`` from using
+    # the placeholder exemption while retaining compatibility for prose-like
+    # examples such as ``package.set_section_text(...)``.
+    return False if receiver_was_bound else None
+
+
+def _rust_standalone_route_targets_other_ecosystem(
+    code: str,
+    offset: int,
+    scopes: tuple[tuple[int, int], ...],
+    *,
+    ecosystem: str,
+) -> bool:
+    """Avoid cross-format method-name collisions in standalone route scans."""
+
+    containing = [span for span in scopes if span[0] <= offset < span[1]]
+    scope_start = max((span[0] for span in containing), default=0)
+    prefix = code[scope_start:offset]
+    receiver = re.search(
+        r"(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)[ \t\r\n]*\.[ \t\r\n]*$",
+        prefix,
+    )
+    ecosystems = ("Numbers", "Pages", "Keynote")
+    for candidate in ecosystems:
+        if candidate == ecosystem:
+            continue
+        if receiver is not None and _rust_package_value_is_bound(
+            code,
+            receiver.group("receiver"),
+            scope_start,
+            offset,
+            ecosystem=candidate,
+        ):
+            return True
+
+        qualifier = {
+            "Numbers": "litchi_numbers",
+            "Pages": "litchi_pages",
+            "Keynote": "litchi_keynote",
+        }[candidate]
+        imported_aliases = _rust_focused_package_import_aliases(
+            code, ecosystem=candidate
+        )
+        static_qualifier = r"(?:" + "|".join(
+            [
+                rf"{qualifier}[ \t\r\n]*::[ \t\r\n]*Package",
+                *(
+                    re.escape(alias)
+                    for alias in sorted(imported_aliases, key=len, reverse=True)
+                ),
+            ]
+        ) + r")"
+        if re.search(
+            rf"{static_qualifier}[ \t\r\n]*::[ \t\r\n]*$|"
+            rf"{static_qualifier}[ \t\r\n]*\.[ \t\r\n]*$|"
+            rf"{static_qualifier}[ \t\r\n]*::[ \t\r\n]*"
+            r"[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*\([^;{}]*\)[ \t\r\n]*\??"
+            r"[ \t\r\n]*\.[ \t\r\n]*$",
+            prefix,
+        ) is not None:
+            return True
+    return False
+
+
+def _rust_package_call_is_allowed(
+    code: str,
+    offset: int,
+    scopes: tuple[tuple[int, int], ...],
+    *,
+    ecosystem: str,
+) -> bool:
+    """Allow a retired spelling only when its focused package receiver is exact."""
+
+    containing = [span for span in scopes if span[0] <= offset < span[1]]
+    scope_start = max((span[0] for span in containing), default=0)
+    prefix = code[scope_start:offset]
+    receiver = re.search(
+        r"(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)[ \t\r\n]*\.[ \t\r\n]*$",
+        prefix,
+    )
+    if receiver is not None and _rust_package_value_is_bound(
+        code,
+        receiver.group("receiver"),
+        scope_start,
+        offset,
+        ecosystem=ecosystem,
+    ):
+        return True
+    if receiver is not None and receiver.group("receiver") in {
+        "package",
+        "focused_package",
+        "pages_package" if ecosystem == "Pages" else "keynote_package",
+        "focused_pages_package" if ecosystem == "Pages" else "focused_keynote",
+    } and _rust_package_value_is_bound(
+        code,
+        receiver.group("receiver"),
+        scope_start,
+        offset,
+        ecosystem=ecosystem,
+    ) is None:
+        return True
+    qualifier = "litchi_pages" if ecosystem == "Pages" else "litchi_keynote"
+    # Standalone examples commonly import the focused package under a short
+    # alias (``PagesPackage``/``KeynotePackage``) or as the unqualified
+    # ``Package`` name.  Treat those aliases as focused only when the source
+    # actually imports them from the matching format crate; otherwise a
+    # coincidental ``Package::old_route`` in a generic example would bypass
+    # the retired-route ratchet.
+    imported_aliases = _rust_focused_package_import_aliases(
+        code, ecosystem=ecosystem
+    )
+    # Keep the conventional aliases useful for the receiver resolver even in
+    # a snippet whose import appears outside the function scope.  The static
+    # path exemption below remains import-sensitive for short aliases.
+    static_qualifier = r"(?:" + "|".join(
+        [
+            rf"{qualifier}[ \t\r\n]*::[ \t\r\n]*Package",
+            *(
+                re.escape(alias)
+                for alias in sorted(imported_aliases, key=len, reverse=True)
+            ),
+        ]
+    ) + ")"
+    static_prefix = re.search(
+        rf"{static_qualifier}[ \t\r\n]*::[ \t\r\n]*$",
+        prefix,
+    )
+    if static_prefix is not None:
+        # UFCS is a valid spelling for focused package methods whose first
+        # argument is ``&Package`` (for example, ``Package::insert_*``).
+        # Resolve that argument against the same lexical package bindings as
+        # ordinary method calls; a bare ``Package::old_route`` is not enough
+        # to qualify as a focused call.
+        first_argument = re.match(
+            r"[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*\([ \t\r\n]*&[ \t\r\n]*"
+            r"(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)\b",
+            code[offset:],
+        )
+        if first_argument is not None:
+            if _rust_package_value_is_bound(
+                code,
+                first_argument.group("receiver"),
+                scope_start,
+                offset,
+                ecosystem=ecosystem,
+            ):
+                return True
+    if re.search(
+        rf"{static_qualifier}[ \t\r\n]*\.[ \t\r\n]*$",
+        prefix,
+    ) is not None:
+        return True
+    package_chain = re.search(
+        r"\b(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)[ \t\r\n]*\.[ \t\r\n]*package"
+        r"[ \t\r\n]*\([ \t\r\n]*\)[ \t\r\n]*\??[ \t\r\n]*\.[ \t\r\n]*$",
+        prefix,
+    )
+    if package_chain is not None and _rust_package_value_is_bound(
+        code,
+        package_chain.group("receiver"),
+        scope_start,
+        offset,
+        ecosystem=ecosystem,
+    ):
+        return True
+    return re.search(
+        rf"{static_qualifier}[ \t\r\n]*::[ \t\r\n]*"
+        r"[A-Za-z_][A-Za-z0-9_]*[ \t\r\n]*\([^;{}]*\)[ \t\r\n]*\??[ \t\r\n]*\.[ \t\r\n]*$",
+        prefix,
+    ) is not None
+
+
+def _retired_iwa_route_inventory(
+    prefix: str,
+) -> tuple[frozenset[str], frozenset[str], frozenset[str]]:
+    """Collect retired method/helper/test names declared by one ecosystem."""
+
+    methods: set[str] = set()
+    helpers: set[str] = set()
+    tests: set[str] = set()
+    for constant, value in globals().items():
+        if not constant.startswith(prefix):
+            continue
+        if constant.endswith("_METHODS"):
+            target = methods
+        elif constant.endswith("_HELPERS") or constant.endswith("_HELPER"):
+            target = helpers
+        elif constant.endswith("_TESTS"):
+            target = tests
+        else:
+            continue
+        if isinstance(value, str):
+            target.add(value)
+        elif isinstance(value, (tuple, list, frozenset, set)):
+            target.update(item for item in value if isinstance(item, str))
+    return frozenset(methods), frozenset(helpers), frozenset(tests)
+
+
+def _audit_iwa_standalone_retired_routes(
+    root: Path,
+    *,
+    ecosystem: str,
+    label: str,
+) -> list[str]:
+    """Scan every litchi-iwa example/test for retired format routes."""
+
+    prefix = (
+        "RETIRED_IWA_PAGES_"
+        if ecosystem == "Pages"
+        else "RETIRED_IWA_KEYNOTE_"
+    )
+    methods, helpers, tests = _retired_iwa_route_inventory(prefix)
+    if not methods and not helpers and not tests:
+        return []
+    method_pattern = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:r#)?(?P<name>(?:"
+        + "|".join(
+            re.escape(name) for name in sorted(methods, key=len, reverse=True)
+        )
+        + r"))(?![A-Za-z0-9_])[ \t\r\n]*\("
+    )
+    helper_pattern = (
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?(?P<name>(?:"
+            + "|".join(
+                re.escape(name) for name in sorted(helpers, key=len, reverse=True)
+            )
+            + r"))(?![A-Za-z0-9_])"
+        )
+        if helpers
+        else re.compile(r"(?!)")
+    )
+    test_pattern = (
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?(?P<name>(?:"
+            + "|".join(
+                re.escape(name) for name in sorted(tests, key=len, reverse=True)
+            )
+            + r"))(?![A-Za-z0-9_])"
+        )
+        if tests
+        else re.compile(r"(?!)")
+    )
+    ambiguous = {"rename_table"}
+    violations: set[str] = set()
+    for path in _iwa_example_and_test_paths(root):
+        code = _iwa_standalone_source_code(path, root)
+        lower_context = f"{path.stem.lower()}\n{code.lower()}"
+        scopes = _rust_function_scope_spans(code)
+        declaration_spans = {
+            (match.start(1), match.end(1))
+            for match in RUST_FUNCTION_DECLARATION.finditer(code)
+        }
+        for match in method_pattern.finditer(code):
+            name = match.group("name")
+            if name in ambiguous and not any(
+                token in lower_context
+                for token in (ecosystem.lower(), "litchi_" + ecosystem.lower())
+            ):
+                continue
+            line_number = code.count("\n", 0, match.start("name")) + 1
+            if any(
+                start <= match.start("name") < end
+                for start, end in declaration_spans
+            ):
+                violations.add(
+                    f"retired litchi-iwa {label} example/test method {name}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            elif not _rust_package_call_is_allowed(
+                code, match.start("name"), scopes, ecosystem=ecosystem
+            ) and not _rust_standalone_route_targets_other_ecosystem(
+                code, match.start("name"), scopes, ecosystem=ecosystem
+            ):
+                violations.add(
+                    f"retired litchi-iwa {label} example/test route {name}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+        for pattern, kind in ((helper_pattern, "helper"), (test_pattern, "test")):
+            for match in pattern.finditer(code):
+                name = match.group("name")
+                if name in ambiguous and not any(
+                    token in lower_context
+                    for token in (ecosystem.lower(), "litchi_" + ecosystem.lower())
+                ):
+                    continue
+                line_number = code.count("\n", 0, match.start("name")) + 1
+                violations.add(
+                    f"retired litchi-iwa {label} example/test {kind} {name}: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+    return sorted(violations)
 
 
 def _rust_impl_headers(source: str) -> list[tuple[str, int]]:
@@ -17256,6 +18305,29 @@ def _rust_canonical_exports(
     return frozenset(exported)
 
 
+def _rust_root_canonical_exports(
+    source: str, names: frozenset[str]
+) -> frozenset[str]:
+    """Return canonical public names declared/reexported at the root scope."""
+
+    exported: set[str] = set()
+    for name in names:
+        escaped = re.escape(name)
+        patterns = (
+            re.compile(
+                rf"(?m)^[ \t]*pub[ \t\r\n]+(?:struct|enum|type|trait|union)"
+                rf"[ \t\r\n]+(?:r#)?{escaped}\b"
+            ),
+            re.compile(
+                rf"(?m)^[ \t]*pub[ \t\r\n]+use[^;\n]*"
+                rf"(?:r#)?{escaped}\b"
+            ),
+        )
+        if any(_rust_root_level_matches(source, pattern) for pattern in patterns):
+            exported.add(name)
+    return frozenset(exported)
+
+
 def audit_iwa_keynote_source_topology(root: Path = ROOT) -> list[str]:
     """Prevent retired Keynote mutation surfaces from returning to the host."""
 
@@ -17289,6 +18361,13 @@ def audit_iwa_keynote_source_topology(root: Path = ROOT) -> list[str]:
                 f"{match.group('method')}: {IWA_KEYNOTE_README}:{line_number}"
             )
 
+    violations.extend(
+        _audit_iwa_standalone_retired_routes(
+            root,
+            ecosystem="Keynote",
+            label="Keynote",
+        )
+    )
     return sorted(set(violations))
 
 
@@ -22114,24 +23193,20 @@ def audit_numbers_table_cell_number_format_codec_source_topology(
     )
     codec_lib_production = _mask_rust_cfg_test_items(codec_lib_raw)
     codec_lib_code = _mask_rust_non_code(codec_lib_production)
-    if NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_HIDDEN_MODULE.search(
-        codec_lib_code
-    ) is None:
+    if not _rust_root_level_matches(
+        codec_lib_production,
+        NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_HIDDEN_MODULE,
+    ):
         violations.append(
             "focused litchi-numbers Number-format public API is missing hidden "
             f"codec module {NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_MODULE}: "
             f"{NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_PUBLIC_SOURCE}"
         )
-    generated_matches: list[tuple[str, re.Match[str]]] = []
-    for module in NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_GENERATED_MODULES:
-        generated_module = re.compile(
-            rf"(?m)^\s*(?P<visibility>pub(?:\([^()]*\))?\s+)?mod\s+"
-            rf"{re.escape(module)}\b"
-        )
-        generated_match = generated_module.search(codec_lib_code)
-        if generated_match is not None:
-            generated_matches.append((module, generated_match))
-    if not generated_matches:
+    generated_declarations = _rust_root_level_module_declarations(
+        codec_lib_production,
+        frozenset(NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_GENERATED_MODULES),
+    )
+    if not generated_declarations:
         violations.append(
             "focused litchi-numbers Number-format public API is missing private "
             "Buffa generated projection module (one of "
@@ -22139,17 +23214,22 @@ def audit_numbers_table_cell_number_format_codec_source_topology(
             f"{NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_PUBLIC_SOURCE}"
         )
     else:
-        for module, generated_match in generated_matches:
-            if generated_match.group("visibility") is not None:
-                line_number = codec_lib_code.count("\n", 0, generated_match.start()) + 1
+        for module, visibility, shape, body, line_number in generated_declarations:
+            if visibility is not None:
                 violations.append(
                     "focused litchi-numbers Number-format generated projection module "
                     f"must remain private: {NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
                 )
-    if any(
-        re.search(rf"\bpub\s+use[^;]*{re.escape(module)}", codec_lib_code)
-        is not None
-        for module in NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_GENERATED_MODULES
+            if shape == "invalid" or (
+                shape == "inline" and not _rust_generated_module_include_is_valid(body)
+            ):
+                violations.append(
+                    "focused litchi-numbers Number-format generated projection "
+                    f"module has invalid include shape: {NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
+                )
+    if _rust_root_generated_public_leaks(
+        codec_lib_production,
+        frozenset(NUMBERS_TABLE_CELL_NUMBER_FORMAT_CODEC_GENERATED_MODULES),
     ):
         violations.append(
             "focused litchi-numbers Number-format public API reexports its Buffa "
@@ -22162,7 +23242,7 @@ def audit_numbers_table_cell_number_format_codec_source_topology(
     if re.search(
         r"#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\][\s\S]{0,1200}"
         r"#\s*\[\s*test\s*\]",
-        codec_raw,
+        _mask_rust_non_code(codec_raw),
     ) is None:
         violations.append(
             "focused litchi-numbers Number-format hidden codec is missing its "
@@ -22483,7 +23563,7 @@ def audit_numbers_table_cell_number_format_facade_source_topology(
             )
 
     for label, marker in NUMBERS_TABLE_CELL_NUMBER_FORMAT_OWNER_REQUIRED_MARKERS.items():
-        if marker.search(owner_related_source) is None:
+        if marker.search(owner_code) is None:
             violations.append(
                 "focused litchi-numbers Number-format owner is missing "
                 f"{label} transaction marker: {NUMBERS_TABLE_CELL_NUMBER_FORMAT_OWNER_SOURCE}"
@@ -22658,6 +23738,7 @@ def audit_iwa_numbers_table_cell_number_format_source_topology(
             production = _mask_rust_cfg_test_items(
                 path.read_text(encoding="utf-8")
             )
+        function_scopes = _rust_function_scope_spans(production)
         for name, line_number in _rust_function_declarations(production):
             if name in RETIRED_IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_METHOD_SET:
                 violations.append(
@@ -22676,6 +23757,10 @@ def audit_iwa_numbers_table_cell_number_format_source_topology(
             if re.search(
                 rf"\bfn\s+(?:r#)?{re.escape(match.group('method'))}\b",
                 line,
+            ):
+                continue
+            if _rust_focused_format_call_is_allowed(
+                code, match.start("method"), function_scopes
             ):
                 continue
             line_number = code.count("\n", 0, match.start("method")) + 1
@@ -22872,23 +23957,10 @@ def audit_iwa_numbers_table_cell_number_format_source_topology(
             route,
         ) is not None
 
-    # Compute the concrete source ranges reachable from every retained
-    # compatibility shell before scanning calls.  This lets the no-production-
-    # call ratchet permit the shell's own focused Package route (even when its
-    # receiver is named ``source``) while rejecting look-alike calls elsewhere.
-    focused_compatibility_ranges: set[tuple[Path, int, int]] = set()
-    for path in source_paths:
-        production = production_sources[path]
-        for method in RETIRED_IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_METHODS:
-            body = _rust_any_function_body(production, method)
-            if body is None:
-                continue
-            _route, ranges = cached_focused_route(method, path, body)
-            focused_compatibility_ranges.update(ranges)
-
     for path in source_paths:
         production = production_sources[path]
         code = _mask_rust_non_code(production)
+        function_scopes = _rust_function_scope_spans(production)
         deprecated = deprecated_names(production)
         for declaration, line_number in _rust_public_declarations(production):
             identifiers = {
@@ -22958,22 +24030,14 @@ def audit_iwa_numbers_table_cell_number_format_source_topology(
                 line,
             ):
                 continue
-            # The focused read method keeps the historical spelling.  Allow a
-            # call only when the receiver is visibly the focused package; an
-            # editor/raw-ID caller remains a migration violation.
-            if match.group("method") == "table_cell_number_format":
-                if any(
-                    candidate_path == path
-                    and start <= match.start() < end
-                    for candidate_path, start, end in focused_compatibility_ranges
-                ) and re.search(
-                    rf"\b(?:package|source|focused_package|"
-                    rf"focused_number_format_package|focused_numbers_package)"
-                    rf"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?"
-                    rf"{re.escape(match.group('method'))}[ \t\r\n]*\(",
-                    line,
-                ) is not None:
-                    continue
+            # A focused Package call may retain the historical spelling, but
+            # only an exact receiver in its lexical scope qualifies.  A
+            # host/editor caller (even one sharing the name ``package``) stays
+            # visible to the retirement ratchet.
+            if _rust_focused_format_call_is_allowed(
+                code, match.start("method"), function_scopes
+            ):
+                continue
             line_number = code.count("\n", 0, match.start("method")) + 1
             violations.append(
                 "unscoped litchi-iwa Numbers Number-format raw-ID production call "
@@ -23003,7 +24067,12 @@ def _numbers_table_cell_text_format_owner_present(root: Path) -> bool:
     return (
         owner_path.is_file()
         and bool(_mask_rust_non_code(owner_source).strip())
-        and NUMBERS_PACKAGE_TABLE_CELL_TEXT_FORMAT_MODULE.search(package_source)
+        # Keep activation broad enough to audit a nested decoy, then require
+        # the actual owner module at the package root in the facade audit.
+        and re.search(
+            r"\bmod[ \t\r\n]+(?:r#)?table_cell_text_format\b",
+            package_source,
+        )
         is not None
     )
 
@@ -23208,51 +24277,53 @@ def audit_numbers_table_cell_text_format_codec_source_topology(
     codec_lib_code = _mask_rust_non_code(
         _mask_rust_cfg_test_items(codec_lib_raw)
     )
+    codec_lib_production = _mask_rust_cfg_test_items(codec_lib_raw)
     hidden_module = re.compile(
-        rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+        rf"(?m)^[ \t]*#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
         rf"pub\s+mod\s+{re.escape(NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_MODULE)}\b"
     )
-    if hidden_module.search(codec_lib_code) is None:
+    if not _rust_root_level_matches(codec_lib_production, hidden_module):
         violations.append(
             "focused litchi-numbers Text-format public API is missing hidden codec "
             f"module {NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_MODULE}: "
             f"{NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_PUBLIC_SOURCE}"
         )
 
-    generated_matches: list[tuple[str, re.Match[str]]] = []
-    for module in NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_GENERATED_MODULES:
-        generated = re.compile(
-            rf"(?m)^\s*(?P<visibility>pub(?:\([^()]*\))?\s+)?mod\s+"
-            rf"{re.escape(module)}\b"
-        ).search(codec_lib_code)
-        if generated is not None:
-            generated_matches.append((module, generated))
-    if not generated_matches:
+    generated_declarations = _rust_root_level_module_declarations(
+        codec_lib_production,
+        frozenset(NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_GENERATED_MODULES),
+    )
+    if not generated_declarations:
         violations.append(
             "focused litchi-numbers Text-format public API is missing a private "
             f"Buffa generated projection: {NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_PUBLIC_SOURCE}"
         )
     else:
-        for module, generated in generated_matches:
-            if generated.group("visibility") is not None:
-                line_number = codec_lib_code.count("\n", 0, generated.start()) + 1
+        for module, visibility, shape, body, line_number in generated_declarations:
+            if visibility is not None:
                 violations.append(
                     "focused litchi-numbers Text-format generated projection module "
                     f"must remain private: {NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
                 )
-    if any(
-        re.search(rf"\bpub\s+use[^;]*{re.escape(module)}", codec_lib_code)
-        is not None
-        for module in NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_GENERATED_MODULES
+            if shape == "invalid" or (
+                shape == "inline" and not _rust_generated_module_include_is_valid(body)
+            ):
+                violations.append(
+                    "focused litchi-numbers Text-format generated projection module "
+                    f"has invalid include shape: {NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
+                )
+    if _rust_root_generated_public_leaks(
+        codec_lib_production,
+        frozenset(NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_GENERATED_MODULES),
     ):
         violations.append(
             "focused litchi-numbers Text-format public API reexports its Buffa "
             f"generated projection: {NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_PUBLIC_SOURCE}"
         )
     if re.search(
-        r"#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\][\s\S]{0,1200}"
+        r"#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\][\s\S]{0,4096}"
         r"#\s*\[\s*test\s*\]",
-        codec_raw,
+        _mask_rust_non_code(dedicated_raw),
     ) is None:
         violations.append(
             "focused litchi-numbers Text-format hidden codec is missing its "
@@ -23278,33 +24349,50 @@ def audit_numbers_table_cell_text_format_facade_source_topology(
         for path in semantic_paths
     )
     semantic_code = _mask_rust_non_code(semantic_source)
-    if re.search(
-        r"\bpub\s+struct\s+(?:r#)?Text\b|"
-        r"\bpub\s+use[^;]*\bText\b",
-        semantic_code,
-    ) is None:
+    canonical_text_patterns = (
+        re.compile(
+            r"(?m)^[ \t]*pub[ \t\r\n]+struct[ \t\r\n]+(?:r#)?Text\b"
+        ),
+        re.compile(r"(?m)^[ \t]*pub[ \t\r\n]+use[^;\n]*\bText\b"),
+    )
+    if not any(
+        _rust_root_level_matches(semantic_source, pattern)
+        for pattern in canonical_text_patterns
+    ):
         violations.append(
             "focused litchi-numbers Text-format public API is missing canonical "
             f"cell::data_format::Text: {NUMBERS_TABLE_CELL_TEXT_FORMAT_SEMANTIC_SOURCE}"
         )
 
     transaction_paths = _numbers_table_cell_text_format_transaction_sources(root)
-    transaction_source = "\n".join(
-        _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
-        for path in transaction_paths
+    inline_transaction = _rust_public_module_body(semantic_source, "transaction")
+    external_transaction = root / NUMBERS_TABLE_CELL_TEXT_FORMAT_TRANSACTION_SOURCE
+    transaction_source = (
+        inline_transaction
+        if inline_transaction is not None
+        else _mask_rust_cfg_test_items(
+            external_transaction.read_text(encoding="utf-8")
+        )
+        if external_transaction.is_file()
+        else ""
     )
     transaction_code = _mask_rust_non_code(transaction_source)
-    if (
-        re.search(r"\bpub\s+mod\s+transaction\b", semantic_code) is None
-        and re.search(r"\bpub\s+mod\s+transaction\b", transaction_code) is None
+    transaction_module = re.compile(
+        r"(?m)^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?transaction\b"
+    )
+    if not (
+        _rust_root_level_matches(semantic_source, transaction_module)
+        or _rust_root_level_matches(transaction_source, transaction_module)
     ):
         violations.append(
             "focused litchi-numbers Text-format public API is missing the Text "
             f"transaction namespace: {NUMBERS_TABLE_CELL_TEXT_FORMAT_SEMANTIC_SOURCE}"
         )
-    transaction_exports = _rust_canonical_exports(
-        transaction_source,
-        frozenset(NUMBERS_TABLE_CELL_TEXT_FORMAT_TRANSACTION_TYPES),
+    transaction_names = frozenset(NUMBERS_TABLE_CELL_TEXT_FORMAT_TRANSACTION_TYPES)
+    transaction_exports = (
+        _rust_canonical_exports(transaction_source, transaction_names)
+        if inline_transaction is not None
+        else _rust_root_canonical_exports(transaction_source, transaction_names)
     )
     for name in NUMBERS_TABLE_CELL_TEXT_FORMAT_TRANSACTION_TYPES:
         if name not in transaction_exports:
@@ -23320,15 +24408,22 @@ def audit_numbers_table_cell_text_format_facade_source_topology(
         else ""
     )
     data_format_code = _mask_rust_non_code(data_format_source)
-    if (
-        PUBLIC_NUMBERS_CELL_DATA_FORMAT_TEXT_MODULE.search(data_format_code) is None
-        and not re.search(r"\bpub\s+struct\s+(?:r#)?Text\b", data_format_code)
+    if not (
+        _rust_root_level_matches(
+            data_format_source, PUBLIC_NUMBERS_CELL_DATA_FORMAT_TEXT_MODULE
+        )
+        or _rust_root_level_matches(
+            data_format_source,
+            re.compile(
+                r"(?m)^[ \t]*pub[ \t\r\n]+struct[ \t\r\n]+(?:r#)?Text\b"
+            ),
+        )
     ):
         violations.append(
             "focused litchi-numbers Text-format public API is missing canonical "
             f"cell::data_format::text module: {data_format_path.relative_to(root)}"
         )
-    if "Text" not in _rust_canonical_exports(
+    if "Text" not in _rust_root_canonical_exports(
         data_format_source, frozenset({"Text"})
     ):
         violations.append(
@@ -23343,16 +24438,18 @@ def audit_numbers_table_cell_text_format_facade_source_topology(
         else ""
     )
     package_code = _mask_rust_non_code(package_source)
-    if NUMBERS_PACKAGE_TABLE_CELL_TEXT_FORMAT_MODULE.search(package_code) is None:
+    if not _rust_root_level_matches(
+        package_source, NUMBERS_PACKAGE_TABLE_CELL_TEXT_FORMAT_MODULE
+    ):
         violations.append(
             "focused litchi-numbers Text-format public API is missing private "
             f"package owner module: {package_path.relative_to(root)}"
         )
-    public_package = PUBLIC_NUMBERS_PACKAGE_TABLE_CELL_TEXT_FORMAT_MODULE.search(
-        package_code
+    public_package = _rust_root_level_matches(
+        package_source, PUBLIC_NUMBERS_PACKAGE_TABLE_CELL_TEXT_FORMAT_MODULE
     )
-    if public_package is not None:
-        line_number = package_code.count("\n", 0, public_package.start()) + 1
+    if public_package:
+        line_number = package_code.count("\n", 0, public_package[0].start()) + 1
         violations.append(
             "focused litchi-numbers Text-format public API exposes its public "
             f"package owner module: {package_path.relative_to(root)}:{line_number}"
@@ -23364,9 +24461,10 @@ def audit_numbers_table_cell_text_format_facade_source_topology(
         if lib_path.is_file()
         else ""
     )
-    if re.search(
-        r"\bpub\s+mod\s+(?:r#)?cell\b", _mask_rust_non_code(lib_source)
-    ) is None:
+    if not _rust_root_level_matches(
+        lib_source,
+        re.compile(r"(?m)^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?cell\b"),
+    ):
         violations.append(
             "focused litchi-numbers Text-format public API is missing root cell "
             f"module: {lib_path.relative_to(root)}"
@@ -23388,7 +24486,7 @@ def audit_numbers_table_cell_text_format_facade_source_topology(
         if path.is_file()
     )
     owner_code = _mask_rust_non_code(owner_related_source)
-    owner_exports = _rust_canonical_exports(
+    owner_exports = _rust_root_canonical_exports(
         owner_related_source,
         frozenset(NUMBERS_TABLE_CELL_TEXT_FORMAT_TRANSACTION_TYPES),
     )
@@ -23489,7 +24587,7 @@ def audit_numbers_table_cell_text_format_facade_source_topology(
             )
 
     for label, marker in NUMBERS_TABLE_CELL_TEXT_FORMAT_OWNER_REQUIRED_MARKERS.items():
-        if marker.search(owner_related_source) is None:
+        if marker.search(owner_code) is None:
             violations.append(
                 "focused litchi-numbers Text-format owner is missing "
                 f"{label} transaction marker: {owner_path.relative_to(root)}"
@@ -23631,7 +24729,7 @@ def audit_numbers_table_cell_text_format_facade_source_topology(
                 f"#[test] coverage: {integration_path}"
             )
         for label, marker in NUMBERS_TABLE_CELL_TEXT_FORMAT_INTEGRATION_MARKERS.items():
-            if marker.search(integration_source) is None:
+            if marker.search(integration_code) is None:
                 violations.append(
                     "focused litchi-numbers Text-format integration test is missing "
                     f"{label}: {integration_path}"
@@ -23674,6 +24772,365 @@ def audit_numbers_table_cell_text_format_facade_source_topology(
                 f"{corpus}"
             )
 
+    return sorted(set(violations))
+
+
+def _numbers_table_cell_date_time_format_owner_present(root: Path) -> bool:
+    """Return whether the focused Date & Time-format owner has landed."""
+
+    owner_path = root / NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_OWNER_SOURCE
+    semantic_path = root / NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_SEMANTIC_SOURCE
+    package_path = root / Path("crates/litchi-numbers/src/package.rs")
+    owner_source = (
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+        if owner_path.is_file()
+        else ""
+    )
+    semantic_source = (
+        _mask_rust_cfg_test_items(semantic_path.read_text(encoding="utf-8"))
+        if semantic_path.is_file()
+        else ""
+    )
+    package_source = (
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return (
+        owner_path.is_file()
+        and semantic_path.is_file()
+        and bool(_mask_rust_non_code(owner_source).strip())
+        and bool(_mask_rust_non_code(semantic_source).strip())
+        and bool(
+            _rust_root_level_matches(
+                package_source,
+                re.compile(
+                    r"(?m)^[ \t]*pub[ \t]*\([ \t]*crate[ \t]*\)[ \t]+mod"
+                    r"[ \t\r\n]+(?:r#)?table_cell_date_time_format\b"
+                ),
+            )
+        )
+    )
+
+
+def _numbers_table_cell_date_time_format_public_leak(
+    identifier: str,
+) -> str | None:
+    """Classify archive, wire, generated, or identifier vocabulary."""
+
+    if identifier in NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_RAW_MARKERS:
+        return "raw identifier or archive type"
+    return _iwork_public_leak(identifier)
+
+
+def audit_numbers_table_cell_date_time_format_codec_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the private strict Buffa/lazy Date & Time codec seam."""
+
+    if not _numbers_table_cell_date_time_format_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    codec_path = root / NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_SOURCE
+    codec_paths = tuple(
+        root / path
+        for path in NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    )
+    codec_raw = "\n".join(
+        path.read_text(encoding="utf-8") for path in codec_paths
+    )
+    codec_production = _mask_rust_cfg_test_items(codec_raw)
+    codec_code = _mask_rust_non_code(codec_production)
+    if not codec_path.is_file() or not codec_code.strip():
+        violations.append(
+            "focused litchi-numbers Date & Time-format boundary is missing strict "
+            f"codec source: {NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_SOURCE}"
+        )
+
+    for api in NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_REQUIRED_APIS:
+        if _numbers_table_cell_number_format_api_present(codec_code, api):
+            continue
+        violations.append(
+            "focused litchi-numbers Date & Time-format hidden codec is missing "
+            f"strict API {api}: {NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_SOURCE}"
+        )
+
+    for marker, description in (
+        ("buffa", "Buffa projection ingress"),
+        ("decode_lazy_view", "lazy Buffa view"),
+        ("Budget::new", "bounded wire preflight"),
+        ("unknown", "unknown-field preservation"),
+        ("extend_from_slice", "source-preserving rewrite"),
+        ("execution_requirements", "prepared bounded rewrite"),
+        ("execute", "prepared bounded execution"),
+    ):
+        if re.search(re.escape(marker), codec_code, re.IGNORECASE):
+            continue
+        violations.append(
+            "focused litchi-numbers Date & Time-format hidden codec is missing "
+            f"{description}: {NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_SOURCE}"
+        )
+    if re.search(
+        r"(?:NATIVE_DATE_TIME_FORMAT_TYPE|DATE_TIME_FORMAT_TYPE)\s*"
+        r":\s*(?:u\d+\s*)?=\s*261\b|"
+        r"(?:NATIVE_DATE_TIME_FORMAT_TYPE|DATE_TIME_FORMAT_TYPE)\b"
+        r"[\s\S]{0,200}\b261\b",
+        codec_code,
+    ) is None:
+        violations.append(
+            "focused litchi-numbers Date & Time-format hidden codec must retain "
+            f"native type 261: {NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_SOURCE}"
+        )
+    if re.search(r"\b(?:prost|prost_types)\b", codec_code) is not None:
+        violations.append(
+            "focused litchi-numbers Date & Time-format hidden codec retains a "
+            f"Prost production path: {NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_SOURCE}"
+        )
+
+    # ``Budget::new`` is the shared scanner's preflight marker.  Require it to
+    # occur before the first lazy-view force so a future wrapper cannot claim
+    # lazy decoding while entering the generated view without limits.
+    lazy = [
+        match.start()
+        for match in re.finditer(r"\b(?:decode_lazy_view|decode_view|LazyView)\b", codec_code)
+    ]
+    preflight = [
+        match.start()
+        for match in re.finditer(
+            r"\b(?:preflight|Budget\s*::\s*new|scan_date_time_format)\b",
+            codec_code,
+            re.IGNORECASE,
+        )
+    ]
+    if lazy and (not preflight or min(preflight) > min(lazy)):
+        violations.append(
+            "focused litchi-numbers Date & Time-format hidden codec must preflight "
+            f"wire before forcing its lazy Buffa view: {NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_SOURCE}"
+        )
+
+    public_path = root / NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_PUBLIC_SOURCE
+    public_raw = (
+        public_path.read_text(encoding="utf-8") if public_path.is_file() else ""
+    )
+    public_production = _mask_rust_cfg_test_items(public_raw)
+    hidden_module = re.compile(
+        rf"(?m)^[ \t]*#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+        rf"pub\s+mod\s+{re.escape(NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_MODULE)}\b"
+    )
+    if not _rust_root_level_matches(public_production, hidden_module):
+        violations.append(
+            "focused litchi-numbers Date & Time-format public API is missing hidden "
+            f"codec module {NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_MODULE}: "
+            f"{NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_PUBLIC_SOURCE}"
+        )
+    generated = _rust_root_level_module_declarations(
+        public_production,
+        frozenset({NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_GENERATED_MODULE}),
+    )
+    if not generated:
+        violations.append(
+            "focused litchi-numbers Date & Time-format public API is missing a "
+            f"private Buffa generated projection: {NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_PUBLIC_SOURCE}"
+        )
+    for _module, visibility, shape, body, line_number in generated:
+        if visibility is not None:
+            violations.append(
+                "focused litchi-numbers Date & Time-format generated projection "
+                f"must remain private: {NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
+            )
+        if shape == "invalid" or (
+            shape == "inline" and not _rust_generated_module_include_is_valid(body)
+        ):
+            violations.append(
+                "focused litchi-numbers Date & Time-format generated projection "
+                f"module has invalid include shape: {NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
+            )
+    if _rust_root_generated_public_leaks(
+        public_production,
+        frozenset({NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_GENERATED_MODULE}),
+    ):
+        violations.append(
+            "focused litchi-numbers Date & Time-format public API reexports its "
+            f"Buffa generated projection: {NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_PUBLIC_SOURCE}"
+        )
+
+    # The dedicated wrapper must carry an explicit hostile-wire test module;
+    # shared-core tests alone are not enough to prove the Date & Time seam is
+    # exercised after a refactor.
+    if re.search(
+        r"#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\][\s\S]{0,4096}"
+        r"#\s*\[\s*test\s*\]",
+        _mask_rust_non_code(
+            codec_path.read_text(encoding="utf-8") if codec_path.is_file() else ""
+        ),
+    ) is None:
+        violations.append(
+            "focused litchi-numbers Date & Time-format hidden codec is missing its "
+            f"cfg(test) hostile-wire harness: {NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_CODEC_SOURCE}"
+        )
+    return sorted(set(violations))
+
+
+def audit_numbers_table_cell_date_time_format_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the archive-free Date & Time semantic facade."""
+
+    if not (root / NUMBERS_SOURCE_ROOT).is_dir() or not _numbers_table_cell_date_time_format_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    semantic_path = root / NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_SEMANTIC_SOURCE
+    semantic_source = _mask_rust_cfg_test_items(
+        semantic_path.read_text(encoding="utf-8")
+    )
+    if not _rust_root_level_matches(
+        semantic_source,
+        re.compile(r"(?m)^[ \t]*pub\s+struct\s+(?:r#)?DateTime\b"),
+    ):
+        violations.append(
+            "focused litchi-numbers Date & Time-format public API is missing "
+            f"canonical cell::data_format::DateTime: {NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_SEMANTIC_SOURCE}"
+        )
+    if not _rust_root_level_matches(
+        semantic_source,
+        re.compile(r"(?m)^[ \t]*pub\s+mod\s+(?:r#)?transaction\b"),
+    ):
+        violations.append(
+            "focused litchi-numbers Date & Time-format public API is missing its "
+            f"transaction namespace: {NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_SEMANTIC_SOURCE}"
+        )
+
+    data_format_path = root / Path("crates/litchi-numbers/src/cell/data_format.rs")
+    data_format_source = (
+        _mask_rust_cfg_test_items(data_format_path.read_text(encoding="utf-8"))
+        if data_format_path.is_file()
+        else ""
+    )
+    if not _rust_root_level_matches(
+        data_format_source,
+        re.compile(
+            r"(?m)^[ \t]*pub\s+mod\s+(?:r#)?date_time\b[ \t\r\n]*(?:;|\{)"
+        ),
+    ):
+        violations.append(
+            "focused litchi-numbers Date & Time-format public API is missing its "
+            f"canonical date_time module: {data_format_path.relative_to(root)}"
+        )
+    if not _rust_root_level_matches(
+        data_format_source,
+        re.compile(
+            r"(?m)^[ \t]*pub\s+use\s+(?:r#)?date_time\s*::\s*"
+            r"(?:r#)?DateTime\b"
+        ),
+    ):
+        violations.append(
+            "focused litchi-numbers Date & Time-format public API is missing its "
+            f"canonical DateTime reexport: {data_format_path.relative_to(root)}"
+        )
+
+    package_path = root / Path("crates/litchi-numbers/src/package.rs")
+    package_source = (
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    private_module = re.compile(
+        r"(?m)^[ \t]*pub\s*\([ \t]*crate[ \t]*\)\s+mod\s+"
+        r"(?:r#)?table_cell_date_time_format\b[ \t\r\n]*(?:;|\{)"
+    )
+    if not _rust_root_level_matches(package_source, private_module):
+        violations.append(
+            "focused litchi-numbers Date & Time-format public API is missing its "
+            f"private package owner module: {package_path.relative_to(root)}"
+        )
+    public_module = re.compile(
+        r"(?m)^[ \t]*pub\s+mod\s+(?:r#)?table_cell_date_time_format\b"
+    )
+    public_matches = _rust_root_level_matches(package_source, public_module)
+    if public_matches:
+        line_number = package_source.count("\n", 0, public_matches[0].start()) + 1
+        violations.append(
+            "focused litchi-numbers Date & Time-format public API exposes its "
+            f"package owner module: {package_path.relative_to(root)}:{line_number}"
+        )
+
+    owner_path = root / NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_OWNER_SOURCE
+    owner_source = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    owner_methods = {
+        name: (declaration, line_number)
+        for name, declaration, line_number in _rust_public_methods_in_impl(
+            owner_source, "Package"
+        )
+    }
+    expected_signatures = {
+        "table_cell_date_time_format": (r"Option\s*<\s*DateTime\s*>", False),
+        "edit_table_cell_date_time_format": (r"\bEdit\b", False),
+        "apply_table_cell_date_time_format": (r"\bPatch\b", True),
+    }
+    for method in NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_OWNER_METHODS:
+        record = owner_methods.get(method)
+        if record is None:
+            violations.append(
+                "focused litchi-numbers Date & Time-format public API is missing "
+                f"Package method {method}: {owner_path.relative_to(root)}"
+            )
+            continue
+        declaration, line_number = record
+        signature, needs_commit = expected_signatures[method]
+        if not re.search(signature, declaration):
+            violations.append(
+                "focused litchi-numbers Date & Time-format Package method has an "
+                f"unexpected signature {method}: {owner_path.relative_to(root)}:{line_number}"
+            )
+        if method != "apply_table_cell_date_time_format":
+            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+                if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
+                    violations.append(
+                        "focused litchi-numbers Date & Time-format Package method "
+                        f"{method} must accept selector-first {selector}: "
+                        f"{owner_path.relative_to(root)}:{line_number}"
+                    )
+        if needs_commit and not re.search(r"\bCommit\b", declaration):
+            violations.append(
+                "focused litchi-numbers Date & Time-format apply must return Commit: "
+                f"{owner_path.relative_to(root)}:{line_number}"
+            )
+
+    # Public declarations in the semantic owner may expose only validated
+    # values and selectors. Masked declarations make comments/strings unable
+    # to satisfy these checks, while private implementation details remain
+    # outside the public-declaration scanner.
+    for path, source in (
+        (semantic_path, semantic_source),
+        (owner_path, owner_source),
+    ):
+        for declaration, line_number in _rust_public_declarations(source):
+            for identifier_match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = identifier_match.group(1)
+                reason = _numbers_table_cell_date_time_format_public_leak(identifier)
+                if reason is None:
+                    continue
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, identifier_match.start(1)
+                )
+                violations.append(
+                    "focused litchi-numbers Date & Time-format public API exposes "
+                    f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                )
+            for pattern, label in (
+                (RUST_BYTE_SLICE, "raw byte slice"),
+                (NUMBERS_TABLE_CELL_NUMBER_FORMAT_PUBLIC_RAW_CONTAINER, "raw byte container"),
+                (NUMBERS_TABLE_CELL_NUMBER_FORMAT_TYPED_RAW_ID_PARAMETER, "typed raw identifier parameter"),
+            ):
+                for match in pattern.finditer(declaration):
+                    value = re.sub(r"\s+", " ", match.group(0)).strip()
+                    violations.append(
+                        "focused litchi-numbers Date & Time-format public API exposes "
+                        f"{label} {value}: {path.relative_to(root)}:{line_number}"
+                    )
     return sorted(set(violations))
 
 
@@ -24501,46 +25958,51 @@ def audit_numbers_table_cell_percentage_format_codec_source_topology(
     codec_lib_code = _mask_rust_non_code(
         _mask_rust_cfg_test_items(codec_lib_raw)
     )
+    codec_lib_production = _mask_rust_cfg_test_items(codec_lib_raw)
     hidden_modules = (
         NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_MODULE,
         NUMBERS_TABLE_CELL_DISPLAY_FORMAT_CODEC_MODULE,
     )
-    if not any(
-        re.search(
-            rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
-            rf"pub\s+mod\s+{re.escape(module)}\b",
-            codec_lib_code,
+    hidden_module_matches = tuple(
+        _rust_root_level_matches(
+            codec_lib_production,
+            re.compile(
+                rf"(?m)^[ \t]*#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+                rf"pub\s+mod\s+{re.escape(module)}\b"
+            ),
         )
         for module in hidden_modules
-    ):
+    )
+    if not any(hidden_module_matches):
         violations.append(
             "focused litchi-numbers Percentage-format public API is missing a "
             f"hidden codec module: {NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_PUBLIC_SOURCE}"
         )
-    generated_matches: list[tuple[str, re.Match[str]]] = []
-    for module in NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_GENERATED_MODULES:
-        generated = re.compile(
-            rf"(?m)^\s*(?P<visibility>pub(?:\([^()]*\))?\s+)?mod\s+"
-            rf"{re.escape(module)}\b"
-        ).search(codec_lib_code)
-        if generated is not None:
-            generated_matches.append((module, generated))
-    if not generated_matches:
+    generated_declarations = _rust_root_level_module_declarations(
+        codec_lib_production,
+        frozenset(NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_GENERATED_MODULES),
+    )
+    if not generated_declarations:
         violations.append(
             "focused litchi-numbers Percentage-format public API is missing a "
             f"private Buffa generated projection: {NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_PUBLIC_SOURCE}"
         )
-    for module, generated in generated_matches:
-        if generated.group("visibility") is not None:
-            line_number = codec_lib_code.count("\n", 0, generated.start()) + 1
+    for module, visibility, shape, body, line_number in generated_declarations:
+        if visibility is not None:
             violations.append(
                 "focused litchi-numbers Percentage-format generated projection "
                 f"must remain private: {NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
             )
-    if any(
-        re.search(rf"\bpub\s+use[^;]*{re.escape(module)}", codec_lib_code)
-        is not None
-        for module in NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_GENERATED_MODULES
+        if shape == "invalid" or (
+            shape == "inline" and not _rust_generated_module_include_is_valid(body)
+        ):
+            violations.append(
+                "focused litchi-numbers Percentage-format generated projection "
+                f"module has invalid include shape: {NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
+            )
+    if _rust_root_generated_public_leaks(
+        codec_lib_production,
+        frozenset(NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_CODEC_GENERATED_MODULES),
     ):
         violations.append(
             "focused litchi-numbers Percentage-format public API reexports its "
@@ -24671,46 +26133,51 @@ def audit_numbers_table_cell_currency_format_codec_source_topology(
     codec_lib_code = _mask_rust_non_code(
         _mask_rust_cfg_test_items(codec_lib_raw)
     )
+    codec_lib_production = _mask_rust_cfg_test_items(codec_lib_raw)
     hidden_modules = (
         NUMBERS_TABLE_CELL_CURRENCY_FORMAT_CODEC_MODULE,
         NUMBERS_TABLE_CELL_DISPLAY_FORMAT_CODEC_MODULE,
     )
-    if not any(
-        re.search(
-            rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
-            rf"pub\s+mod\s+{re.escape(module)}\b",
-            codec_lib_code,
+    hidden_module_matches = tuple(
+        _rust_root_level_matches(
+            codec_lib_production,
+            re.compile(
+                rf"(?m)^[ \t]*#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+                rf"pub\s+mod\s+{re.escape(module)}\b"
+            ),
         )
         for module in hidden_modules
-    ):
+    )
+    if not any(hidden_module_matches):
         violations.append(
             "focused litchi-numbers Currency-format public API is missing a "
             f"hidden codec module: {NUMBERS_TABLE_CELL_CURRENCY_FORMAT_CODEC_PUBLIC_SOURCE}"
         )
-    generated_matches: list[tuple[str, re.Match[str]]] = []
-    for module in NUMBERS_TABLE_CELL_CURRENCY_FORMAT_CODEC_GENERATED_MODULES:
-        generated = re.compile(
-            rf"(?m)^\s*(?P<visibility>pub(?:\([^()]*\))?\s+)?mod\s+"
-            rf"{re.escape(module)}\b"
-        ).search(codec_lib_code)
-        if generated is not None:
-            generated_matches.append((module, generated))
-    if not generated_matches:
+    generated_declarations = _rust_root_level_module_declarations(
+        codec_lib_production,
+        frozenset(NUMBERS_TABLE_CELL_CURRENCY_FORMAT_CODEC_GENERATED_MODULES),
+    )
+    if not generated_declarations:
         violations.append(
             "focused litchi-numbers Currency-format public API is missing a "
             f"private Buffa generated projection: {NUMBERS_TABLE_CELL_CURRENCY_FORMAT_CODEC_PUBLIC_SOURCE}"
         )
-    for module, generated in generated_matches:
-        if generated.group("visibility") is not None:
-            line_number = codec_lib_code.count("\n", 0, generated.start()) + 1
+    for module, visibility, shape, body, line_number in generated_declarations:
+        if visibility is not None:
             violations.append(
                 "focused litchi-numbers Currency-format generated projection "
                 f"must remain private: {NUMBERS_TABLE_CELL_CURRENCY_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
             )
-    if any(
-        re.search(rf"\bpub\s+use[^;]*{re.escape(module)}", codec_lib_code)
-        is not None
-        for module in NUMBERS_TABLE_CELL_CURRENCY_FORMAT_CODEC_GENERATED_MODULES
+        if shape == "invalid" or (
+            shape == "inline" and not _rust_generated_module_include_is_valid(body)
+        ):
+            violations.append(
+                "focused litchi-numbers Currency-format generated projection "
+                f"module has invalid include shape: {NUMBERS_TABLE_CELL_CURRENCY_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
+            )
+    if _rust_root_generated_public_leaks(
+        codec_lib_production,
+        frozenset(NUMBERS_TABLE_CELL_CURRENCY_FORMAT_CODEC_GENERATED_MODULES),
     ):
         violations.append(
             "focused litchi-numbers Currency-format public API reexports its "
@@ -24912,46 +26379,51 @@ def audit_numbers_table_cell_fraction_format_codec_source_topology(
     codec_lib_code = _mask_rust_non_code(
         _mask_rust_cfg_test_items(codec_lib_raw)
     )
+    codec_lib_production = _mask_rust_cfg_test_items(codec_lib_raw)
     hidden_modules = (
         NUMBERS_TABLE_CELL_FRACTION_FORMAT_CODEC_MODULE,
         NUMBERS_TABLE_CELL_DISPLAY_FORMAT_CODEC_MODULE,
     )
-    if not any(
-        re.search(
-            rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
-            rf"pub\s+mod\s+{re.escape(module)}\b",
-            codec_lib_code,
+    hidden_module_matches = tuple(
+        _rust_root_level_matches(
+            codec_lib_production,
+            re.compile(
+                rf"(?m)^[ \t]*#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+                rf"pub\s+mod\s+{re.escape(module)}\b"
+            ),
         )
         for module in hidden_modules
-    ):
+    )
+    if not any(hidden_module_matches):
         violations.append(
             "focused litchi-numbers Fraction-format public API is missing a "
             f"hidden codec module: {NUMBERS_TABLE_CELL_FRACTION_FORMAT_CODEC_PUBLIC_SOURCE}"
         )
-    generated_matches: list[tuple[str, re.Match[str]]] = []
-    for module in NUMBERS_TABLE_CELL_FRACTION_FORMAT_CODEC_GENERATED_MODULES:
-        generated = re.compile(
-            rf"(?m)^\s*(?P<visibility>pub(?:\([^()]*\))?\s+)?mod\s+"
-            rf"{re.escape(module)}\b"
-        ).search(codec_lib_code)
-        if generated is not None:
-            generated_matches.append((module, generated))
-    if not generated_matches:
+    generated_declarations = _rust_root_level_module_declarations(
+        codec_lib_production,
+        frozenset(NUMBERS_TABLE_CELL_FRACTION_FORMAT_CODEC_GENERATED_MODULES),
+    )
+    if not generated_declarations:
         violations.append(
             "focused litchi-numbers Fraction-format public API is missing a "
             f"private Buffa generated projection: {NUMBERS_TABLE_CELL_FRACTION_FORMAT_CODEC_PUBLIC_SOURCE}"
         )
-    for module, generated in generated_matches:
-        if generated.group("visibility") is not None:
-            line_number = codec_lib_code.count("\n", 0, generated.start()) + 1
+    for module, visibility, shape, body, line_number in generated_declarations:
+        if visibility is not None:
             violations.append(
                 "focused litchi-numbers Fraction-format generated projection "
                 f"must remain private: {NUMBERS_TABLE_CELL_FRACTION_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
             )
-    if any(
-        re.search(rf"\bpub\s+use[^;]*{re.escape(module)}", codec_lib_code)
-        is not None
-        for module in NUMBERS_TABLE_CELL_FRACTION_FORMAT_CODEC_GENERATED_MODULES
+        if shape == "invalid" or (
+            shape == "inline" and not _rust_generated_module_include_is_valid(body)
+        ):
+            violations.append(
+                "focused litchi-numbers Fraction-format generated projection "
+                f"module has invalid include shape: {NUMBERS_TABLE_CELL_FRACTION_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
+            )
+    if _rust_root_generated_public_leaks(
+        codec_lib_production,
+        frozenset(NUMBERS_TABLE_CELL_FRACTION_FORMAT_CODEC_GENERATED_MODULES),
     ):
         violations.append(
             "focused litchi-numbers Fraction-format public API reexports its "
@@ -25496,46 +26968,51 @@ def audit_numbers_table_cell_scientific_format_codec_source_topology(
     codec_lib_code = _mask_rust_non_code(
         _mask_rust_cfg_test_items(codec_lib_raw)
     )
+    codec_lib_production = _mask_rust_cfg_test_items(codec_lib_raw)
     hidden_modules = (
         NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_CODEC_MODULE,
         NUMBERS_TABLE_CELL_DISPLAY_FORMAT_CODEC_MODULE,
     )
-    if not any(
-        re.search(
-            rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
-            rf"pub\s+mod\s+{re.escape(module)}\b",
-            codec_lib_code,
+    hidden_module_matches = tuple(
+        _rust_root_level_matches(
+            codec_lib_production,
+            re.compile(
+                rf"(?m)^[ \t]*#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+                rf"pub\s+mod\s+{re.escape(module)}\b"
+            ),
         )
         for module in hidden_modules
-    ):
+    )
+    if not any(hidden_module_matches):
         violations.append(
             "focused litchi-numbers Scientific-format public API is missing a "
             f"hidden codec module: {NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_CODEC_PUBLIC_SOURCE}"
         )
-    generated_matches: list[tuple[str, re.Match[str]]] = []
-    for module in NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_CODEC_GENERATED_MODULES:
-        generated = re.compile(
-            rf"(?m)^\s*(?P<visibility>pub(?:\([^()]*\))?\s+)?mod\s+"
-            rf"{re.escape(module)}\b"
-        ).search(codec_lib_code)
-        if generated is not None:
-            generated_matches.append((module, generated))
-    if not generated_matches:
+    generated_declarations = _rust_root_level_module_declarations(
+        codec_lib_production,
+        frozenset(NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_CODEC_GENERATED_MODULES),
+    )
+    if not generated_declarations:
         violations.append(
             "focused litchi-numbers Scientific-format public API is missing a "
             f"private Buffa generated projection: {NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_CODEC_PUBLIC_SOURCE}"
         )
-    for module, generated in generated_matches:
-        if generated.group("visibility") is not None:
-            line_number = codec_lib_code.count("\n", 0, generated.start()) + 1
+    for module, visibility, shape, body, line_number in generated_declarations:
+        if visibility is not None:
             violations.append(
                 "focused litchi-numbers Scientific-format generated projection "
                 f"must remain private: {NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
             )
-    if any(
-        re.search(rf"\bpub\s+use[^;]*{re.escape(module)}", codec_lib_code)
-        is not None
-        for module in NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_CODEC_GENERATED_MODULES
+        if shape == "invalid" or (
+            shape == "inline" and not _rust_generated_module_include_is_valid(body)
+        ):
+            violations.append(
+                "focused litchi-numbers Scientific-format generated projection "
+                f"module has invalid include shape: {NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
+            )
+    if _rust_root_generated_public_leaks(
+        codec_lib_production,
+        frozenset(NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_CODEC_GENERATED_MODULES),
     ):
         violations.append(
             "focused litchi-numbers Scientific-format public API reexports its "
@@ -28247,13 +29724,6 @@ def _audit_iwa_numbers_table_cell_format_retirement(
         + "|".join(re.escape(name) for name in sorted(focused_tests, key=len, reverse=True))
         + r"))(?![A-Za-z0-9_])"
     )
-    focused_call_pattern = {
-        "Percentage": IWA_NUMBERS_TABLE_CELL_PERCENTAGE_FORMAT_FOCUSED_CALL,
-        "Currency": IWA_NUMBERS_TABLE_CELL_CURRENCY_FORMAT_FOCUSED_CALL,
-        "Scientific": IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_FOCUSED_CALL,
-        "Text": IWA_NUMBERS_TABLE_CELL_TEXT_FORMAT_FOCUSED_CALL,
-    }[label]
-
     violations: set[str] = set()
     for path in sorted(source_root.rglob("*.rs")):
         relative = path.relative_to(root)
@@ -28265,25 +29735,7 @@ def _audit_iwa_numbers_table_cell_format_retirement(
             production = _mask_rust_cfg_test_items(source)
         code = _mask_rust_non_code(production)
         all_code = _mask_rust_non_code(source)
-        focused_receiver_names = {
-            match.group("receiver")
-            for match in re.finditer(
-                r"\b(?:let[ \t]+(?:mut[ \t]+)?)?"
-                r"(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)[ \t]*"
-                r"(?::[^;=\n]*)?[=][^;\n]*"
-                r"\b(?:FocusedNumbersPackage|litchi_numbers[ \t]*::[ \t]*Package)\b",
-                code,
-            )
-        }
-        focused_receiver_names.update(
-            match.group("receiver")
-            for match in re.finditer(
-                r"\b(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)[ \t]*:[ \t]*"
-                r"(?:&[ \t]*)?(?:FocusedNumbersPackage|"
-                r"litchi_numbers[ \t]*::[ \t]*Package)\b",
-                code,
-            )
-        )
+        function_scopes = _rust_function_scope_spans(production)
 
         declaration_spans = {
             (match.start(1), match.end(1))
@@ -28291,21 +29743,14 @@ def _audit_iwa_numbers_table_cell_format_retirement(
         }
         for match in method_pattern.finditer(code):
             name = match.group("name")
-            line_start = code.rfind("\n", 0, match.start("name")) + 1
-            receiver_match = re.search(
-                r"(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)[ \t]*\.[ \t]*$",
-                code[line_start : match.start("name")],
-            )
             # Calls through the focused Package are canonical and may remain
             # in a migration-host adapter.  The retired surface is the
             # NumbersEditor raw-ID method, not the focused owner call with the
-            # same semantic method name.
-            if any(
-                candidate.start() <= match.start("name") < candidate.end()
-                for candidate in focused_call_pattern.finditer(code)
-            ) or (
-                receiver_match is not None
-                and receiver_match.group("receiver") in focused_receiver_names
+            # same semantic method name.  Validate the receiver and its local
+            # scope exactly; a focused call elsewhere on a statement or in a
+            # different function must not exempt an unrelated receiver.
+            if _rust_focused_format_call_is_allowed(
+                code, match.start("name"), function_scopes
             ):
                 continue
             line_number = code.count("\n", 0, match.start("name")) + 1
@@ -28431,6 +29876,39 @@ def audit_iwa_numbers_table_cell_text_format_source_topology(
     # The old table-number-formats example is intentionally obsolete once the
     # focused owner is active.  Examples are outside the host source tree, so
     # inspect this exact path separately and keep comments/literals harmless.
+    method_pattern = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>(?:"
+        + "|".join(
+            re.escape(name)
+            for name in RETIRED_IWA_NUMBERS_TABLE_CELL_TEXT_FORMAT_METHODS
+        )
+        + r"))(?![A-Za-z0-9_])[ \t\r\n]*\("
+    )
+    helper_pattern = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:r#)?(?P<name>(?:"
+        + "|".join(
+            re.escape(name)
+            for name in sorted(
+                RETIRED_IWA_NUMBERS_TABLE_CELL_TEXT_FORMAT_HELPER_SET
+                | RETIRED_IWA_NUMBERS_TABLE_CELL_TEXT_FORMAT_FOCUSED_HELPERS,
+                key=len,
+                reverse=True,
+            )
+        )
+        + r"))(?![A-Za-z0-9_])"
+    )
+    test_pattern = re.compile(
+        r"(?<![A-Za-z0-9_#])(?:r#)?(?P<name>(?:"
+        + "|".join(
+            re.escape(name)
+            for name in sorted(
+                RETIRED_IWA_NUMBERS_TABLE_CELL_TEXT_FORMAT_FOCUSED_TESTS,
+                key=len,
+                reverse=True,
+            )
+        )
+        + r"))(?![A-Za-z0-9_])"
+    )
     example_path = root / RETIRED_IWA_NUMBERS_TABLE_CELL_TEXT_FORMAT_EXAMPLE
     if example_path.is_file():
         source = _mask_rust_non_code(example_path.read_text(encoding="utf-8"))
@@ -28449,6 +29927,42 @@ def audit_iwa_numbers_table_cell_text_format_source_topology(
                 violations.append(
                     "retired litchi-iwa Numbers Text-format example symbol "
                     f"{name}: {RETIRED_IWA_NUMBERS_TABLE_CELL_TEXT_FORMAT_EXAMPLE}:{line_number}"
+                )
+
+    # Keep the retirement gate complete across standalone examples and
+    # integration tests, not only the historical example tombstone.  These
+    # paths are intentionally separate from ``src/**/tests.rs``: existing
+    # unit-test modules retain their documented cfg(test) compatibility
+    # behavior, while Cargo examples/tests are user-facing migration routes.
+    for path in _iwa_example_and_test_paths(root):
+        code = _iwa_standalone_source_code(path, root)
+        scopes = _rust_function_scope_spans(code)
+        declarations = {
+            (match.start(1), match.end(1))
+            for match in RUST_FUNCTION_DECLARATION.finditer(code)
+        }
+        for match in method_pattern.finditer(code):
+            if any(
+                start <= match.start("method") < end
+                for start, end in declarations
+            ) or _rust_focused_format_call_is_allowed(
+                code, match.start("method"), scopes
+            ):
+                continue
+            line_number = code.count("\n", 0, match.start("method")) + 1
+            violations.append(
+                "retired litchi-iwa Numbers Text-format example/test route "
+                f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+            )
+        for pattern, kind in (
+            (helper_pattern, "helper"),
+            (test_pattern, "test"),
+        ):
+            for match in pattern.finditer(code):
+                line_number = code.count("\n", 0, match.start("name")) + 1
+                violations.append(
+                    "retired litchi-iwa Numbers Text-format example/test "
+                    f"{kind} {match.group('name')}: {path.relative_to(root)}:{line_number}"
                 )
     return sorted(set(violations))
 
@@ -32917,6 +34431,13 @@ def audit_iwa_pages_section_text_source_topology(
                     f"{match.group('method')}: {IWA_PAGES_README}:{line_number}"
                 )
 
+    violations.extend(
+        _audit_iwa_standalone_retired_routes(
+            root,
+            ecosystem="Pages",
+            label="Pages",
+        )
+    )
     return sorted(set(violations))
 
 
@@ -39146,6 +40667,14 @@ def _keynote_chart_arrangement_check_codec(root: Path) -> list[str]:
                 "focused litchi-keynote chart-arrangement codec must not expose Buffa "
                 f"generated types: {KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}:{line_number}"
             )
+    if _rust_root_generated_public_leaks(
+        codec,
+        frozenset({KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE}),
+    ):
+        violations.append(
+            "focused litchi-keynote chart-arrangement codec must not expose Buffa "
+            f"generated aliases: {KEYNOTE_CHART_ARRANGEMENT_CODEC_SOURCE}"
+        )
 
     if not public_path.is_file():
         violations.append(
@@ -39157,29 +40686,37 @@ def _keynote_chart_arrangement_check_codec(root: Path) -> list[str]:
     raw_public = public_path.read_text(encoding="utf-8")
     public = _mask_rust_cfg_test_items(raw_public)
     public_code = _mask_rust_non_code(public)
-    if KEYNOTE_CHART_ARRANGEMENT_CODEC_HIDDEN_MODULE.search(public_code) is None:
+    if not _rust_root_level_matches(public, KEYNOTE_CHART_ARRANGEMENT_CODEC_HIDDEN_MODULE):
         violations.append(
             "focused litchi-keynote chart-arrangement codec module must be hidden: "
             f"{KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}"
         )
-    if re.search(
-        rf"(?m)^\s*mod\s+{re.escape(KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE)}\b",
-        public_code,
-    ) is None:
+    generated_declarations = _rust_root_level_module_declarations(
+        public,
+        frozenset({KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE}),
+    )
+    if not generated_declarations:
         violations.append(
             "focused litchi-keynote chart-arrangement codec is missing its private "
             f"Buffa generated module: {KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}"
         )
-    if KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_GENERATED_MODULE.search(public_code):
-        violations.append(
-            "focused litchi-keynote chart-arrangement codec generated module must "
-            f"remain private: {KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}"
-        )
-    if re.search(
-        rf"(?m)^\s*pub\s+use\b[^;\n]*"
-        rf"{re.escape(KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE)}\b",
-        public_code,
-    ) is not None:
+    for module, visibility, shape, body, line_number in generated_declarations:
+        if visibility is not None:
+            violations.append(
+                "focused litchi-keynote chart-arrangement codec generated module must "
+                f"remain private: {KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}:{line_number}"
+            )
+        if shape == "invalid" or (
+            shape == "inline" and not _rust_generated_module_include_is_valid(body)
+        ):
+            violations.append(
+                "focused litchi-keynote chart-arrangement codec generated module has "
+                f"invalid include shape: {KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}:{line_number}"
+            )
+    if _rust_root_generated_public_leaks(
+        public,
+        frozenset({KEYNOTE_CHART_ARRANGEMENT_CODEC_GENERATED_MODULE}),
+    ):
         violations.append(
             "focused litchi-keynote chart-arrangement codec must not re-export Buffa "
             f"generated types: {KEYNOTE_CHART_ARRANGEMENT_CODEC_PUBLIC_SOURCE}"
@@ -51313,6 +52850,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_table_cell_number_format_source_topology()
         + audit_numbers_table_cell_text_format_codec_source_topology()
         + audit_numbers_table_cell_text_format_facade_source_topology()
+        + audit_numbers_table_cell_date_time_format_codec_source_topology()
+        + audit_numbers_table_cell_date_time_format_facade_source_topology()
         + audit_iwa_numbers_table_cell_text_format_source_topology()
         + audit_numbers_table_cell_percentage_format_codec_source_topology()
         + audit_numbers_table_cell_percentage_format_facade_source_topology()

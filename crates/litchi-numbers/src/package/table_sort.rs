@@ -1580,7 +1580,7 @@ fn invalid_source() -> Error {
     }
 }
 
-fn map_header_error(error: table_headers::Error) -> Error {
+pub(super) fn map_header_error(error: table_headers::Error) -> Error {
     match error {
         table_headers::Error::SheetNotFound => Error::SheetNotFound,
         table_headers::Error::TableNotFound => Error::TableNotFound,
@@ -1633,7 +1633,7 @@ fn map_header_error(error: table_headers::Error) -> Error {
     }
 }
 
-fn map_codec_error(error: codec::DecodeError) -> Error {
+pub(super) fn map_codec_error(error: codec::DecodeError) -> Error {
     if let Some(amount) = error.allocation_amount() {
         return Error::Allocation {
             amount,
@@ -1689,7 +1689,7 @@ fn map_codec_error(error: codec::DecodeError) -> Error {
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
+pub(super) fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         ArchiveError::Limit {
             kind,
@@ -1722,7 +1722,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> Error {
+pub(super) fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         CoreError::Limit {
             kind,

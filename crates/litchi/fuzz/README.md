@@ -11,6 +11,13 @@ must not acquire a dependency on the legacy `litchi-iwa` migration host.
 package also declares internal archive, wire, and schema dependencies used by
 other focused targets to construct bounded in-memory fixtures.
 
+`fuzz_targets/numbers_table_cell_api.rs` is retained as source-only review
+material and is intentionally not registered in `Cargo.toml` until its
+standalone harness is revalidated. A source file alone is not a runnable
+cargo-fuzz target and must not be counted as root coverage. The analogous
+source-only protobuf harness is documented in
+`crates/litchi-iwa-protos/fuzz/MANIFEST.md`.
+
 `keynote_soundtrack_items` is the focused selector-first soundtrack media
 lifecycle target. It first offers arbitrary bytes to bounded Keynote ingress,
 then reuses a bounded command prefix against source-built packages with an
@@ -307,6 +314,20 @@ transaction boundary uses only archive-free `Text`, `SheetSelector`,
 `corpus/numbers_table_cell_text_format/` are compact command bytes rather than
 native package copies.
 
+`numbers_table_cell_date_time_format` is the focused selector-first Date &
+Time-format lifecycle target. It first offers arbitrary bytes to bounded
+Numbers ingress, then replays a finite command prefix against deterministic
+shared and unshared Date & Time sources. The target covers index/name sheet
+and table selectors, checked coordinate mutations, explicit Date & Time
+pattern boundaries, no-op/set/clear/reset, exact-source patch application,
+stale and inverse conflicts, candidate readback, locked and malformed graph
+refusal, source-byte atomicity, and bounded ingress, semantic, transaction,
+and output limits. Only archive-free `DateTime`, selectors, and
+`CellPosition` values cross the package API; native IDs, generated messages,
+and wire payloads stay below the fixture/adapter boundary. Recipes under
+`corpus/numbers_table_cell_date_time_format/` are compact command bytes, not
+native package copies.
+
 `numbers_table_cell_control` is the unified selector-first cell-control
 lifecycle target. It drives Checkbox, StarRating, Slider, Stepper, and
 Pop-Up Menu values through `Package::{table_cell_control_format,
@@ -451,9 +472,11 @@ semantic profile. Appearance commands consume at most 1 KiB after optional
 source-built package receive every command stream.
 
 `keynote_slide_table_dimension` uses the same finite Keynote physical and
-semantic profile. Dimension commands consume at most 1 KiB after optional
-`hex:` decoding; keep `-max_len` at 4 KiB so malformed ingress and both
-source-built package variants receive every command stream.
+semantic profile. Dimension commands consume at most 1 MiB after optional
+`hex:` decoding; the encoded prefix is bounded before reservation and allows
+only a small amount of formatting whitespace. Keep `-max_len` at 4 KiB so
+malformed ingress and both source-built package variants receive every command
+stream.
 
 `keynote_slide_table_name` uses the same finite Keynote physical and semantic
 profile. Name commands consume at most 1 KiB after optional `hex:` decoding;
@@ -845,6 +868,15 @@ seeds:
 ```sh
 cargo +nightly fuzz run numbers_table_cell_fraction_format \
   corpus/numbers_table_cell_fraction_format -- \
+  -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Numbers table-cell Date & Time-format target with its command
+seeds:
+
+```sh
+cargo +nightly fuzz run numbers_table_cell_date_time_format \
+  corpus/numbers_table_cell_date_time_format -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 

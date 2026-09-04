@@ -9,6 +9,10 @@ use thiserror::Error;
 
 const ROOT_PREVIEW_NAMES: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"];
 
+pub(super) fn is_root_preview_name(name: &str) -> bool {
+    ROOT_PREVIEW_NAMES.contains(&name)
+}
+
 /// A private, content-redacted rendering-cache planning failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 pub(super) enum RenderingInvalidationError {

@@ -7852,3 +7852,93 @@ development-only edges, debts
 gate 1 remains closed and gate 5 remains passing; gates 2, 3, 4, and 6 remain
 open. The monolithic `litchi-iwa` crate therefore remains until the remaining
 focused ownership, semantic/native parity, and host-boundary gates close.
+
+## 2026-09-04 amendment: focused Numbers Date & Time ownership and E3/E4 record
+
+The focused `litchi-numbers::Package` now owns the selector-first Date & Time
+display-format transaction for one existing rooted cell. Its archive-free
+`DateTime` type hides native IDs, BNC/list records, IWA member names, and wire
+objects, and the metadata-only setter changes only the display pattern. Native
+type 261 admission is strict: explicit marker `0x0008`, kind `3`, and fields
+1/14 are required; Empty/type-5 Date and the evidenced type-9 numeric/formula
+shape are admitted, while plain type-2, marker-zero, wrong/reserved, and
+ambiguous shapes are refused. The API uses a lazy Buffa view after strict
+preflight, bounds patterns to 4096 bytes, and retains exact COW/refcounts,
+unknown/unselected bytes, scalar value, inverse, and locality. Generic
+source-built `DataFormat::DateTime`, broad `TextDateTimeField` smart-field
+lifecycle, and Pages/Keynote compatibility remain in the migration host. The
+dedicated host raw-ID DateTime surface is not retired by this amendment.
+
+Computer Use verified this operation against real Numbers 14.4 build
+7043.0.93 on macOS 26.5.2. In Sheet 1 / Table 1 / B2, A1 contained
+`Litchi DateTime producer — 東京😀`; B2 held scalar
+`2026-09-04 12:34:56` with source pattern `yyyy-MM-dd H:mm:ss`. Litchi set
+`yyyy/MM/dd HH:mm:ss`. The source package (138,744 bytes,
+SHA-256 `0e0a8b8c2a6bbf3676723a9926da3be37b2ff6e2c86221618df957da665a76c8`)
+and focused candidate (138,745 bytes,
+SHA-256 `d114d4aba1b970b567e4ae6912140757585afaa5fe12a2a9ef0e8eed2c81415b`)
+had only `Index/Tables/Tile.iwa` and
+`Index/Tables/DataList-904498-2.iwa` changed pre-native; the inverse was
+source-identical.
+
+Numbers opened the candidate without repair, recovery, or conversion, showed
+B2 `2026/09/04 12:34:56` and Actual `9/4/2026 12:34:56 PM`, and the inspector
+showed Date & Time / date `2026/01/05` / time `19:08:09`. A distinct native
+save, close, and exact-path reopen retained the marker, value, and settings.
+Native resave normalized document, calculation, stylesheet, metadata,
+view-state, and preview entries, while the
+exact DateTime members in those two Tile/DataList files remained byte-identical
+to the candidate. The native-resaved artifact was 138,725 bytes with SHA-256
+`4e489da196bac7416c8c6d827afb2a6264892d4856a5a33dc0a18c6c2d2b1b0c`.
+
+The strict normalized reread used the same pattern and reported
+`changed=false`, `touched_components=0`, `full_reparse=false`, and
+`scalar_value=untouched`; `datetime-reread.numbers` was `cmp=0` and had the
+same 138,725-byte size and SHA-256 as the native-resaved artifact. This is
+operation-specific E3/E4 evidence for this one existing type-9 cell/pattern,
+not broad DateTime/package/native-byte-parity evidence, a general native
+acceptance claim, or proof of host retirement.
+
+No package, dependency edge, ordered migration debt, or deletion gate closes.
+The topology remains 64 workspace packages, 238 internal dependency
+declarations, 227 canonical edges, 11 development-only edges, debts
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. Deletion
+gate 1 remains closed and gate 5 remains passing; gates 2, 3, 4, and 6 remain
+open. The monolithic `litchi-iwa` crate remains until the remaining focused
+ownership, semantic/native parity, and host-boundary gates close.
+
+## 2026-09-04 amendment: current owner and compatibility-boundary correction
+
+This amendment records the current boundaries without rewriting earlier
+historical wave entries. The focused Numbers scalar display-format owners are
+now seven: Number, Percentage, Currency, Scientific, Fraction, Text, and Date
+& Time. Dedicated raw-ID Number, Percentage, Currency, Scientific, and Fraction
+convenience routes are retired. There is no dedicated host Text route, while
+dedicated host raw-ID Date & Time retirement is not claimed. Generic source-built
+or cross-format `DataFormat` mutation, including Text and Date & Time, and
+attached-table compatibility helpers remain host-owned.
+
+The focused Date & Time owner carries a bounded native date/time pattern string
+(maximum 4096 bytes). It checks the native envelope and admitted fields, but it
+does not validate pattern grammar. This is a metadata-only existing-cell
+operation and does not claim a locale formatter or broad Date & Time owner.
+
+Numbers persisted-sort and table-relocation compatibility are deliberately
+narrow. Exact package snapshots use the focused semantic transactions; a
+structural, family, lock, budget, stale-source, or locality refusal is terminal
+and is not retried through a physical or generic host writer. Only historical
+source-built snapshots whose storage is outside the semantic projection may use
+the respective doc-hidden physical bridge: persisted-sort field 44 or physical
+table relocation. These bridges are migration-host compatibility seams, not
+public owners or second implementations, and the legacy reader performs
+candidate readback before publication.
+
+The focused `litchi-keynote::Package` owns physical `Sort Now` and its
+`RowRange` transaction for admitted exact sources. The legacy host no longer
+provides a general physical-sort fallback: it retains only the explicitly
+source-built compatibility route and broader cells/table-graph work. Focused
+Keynote refusals are terminal. None of these owner transfers closes an ordered
+debt, changes the host count, or advances an ADR 0028 deletion gate; the current
+topology remains 64 workspace packages, 238 internal dependency declarations,
+227 canonical edges, 11 development-only edges, 11 ordered debts
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.

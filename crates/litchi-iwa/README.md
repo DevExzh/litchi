@@ -146,8 +146,9 @@ println!("objects: {}", stats.total_objects);
   including automatic-language sentinels and lossless boundary deletion
 - Native cross-suite text-hyperlink CRUD with typed nonempty UTF-16 ranges,
   lossless web, mail, and Keynote navigation targets, and owned-object cleanup
-- Native cross-suite Date & Time smart-field CRUD with typed ICU formats,
-  locale identifiers, formatter styles, refresh plans, and Apple-reference instants
+- Native cross-suite Date & Time smart-field CRUD with typed native date/time
+  pattern strings, locale identifiers, formatter styles, refresh plans, and
+  Apple-reference instants; pattern grammar is not validated
 - Native Pages page-number/page-count attachment CRUD with typed kinds, exact
   U+FFFC placement, lossless number metadata, and header/footer support
 - Native Pages body-bookmark CRUD with typed names, lossless visibility values,
@@ -168,14 +169,14 @@ println!("objects: {}", stats.total_objects);
   and transactional insertion
 - Source-free and wire-preserving Keynote per-slide number visibility with native
   placeholder ownership and z-order invariants
-- Native Keynote build-in/build-out object CRUD with typed On Click / After Transition /
+- Native Keynote build-in/build-out effect CRUD with typed On Click / After Transition /
   With Previous / After Previous timing, typed Rotate / Scale / Opacity / Move actions,
   editable Bézier motion paths and custom timing curves, typed Blink / Bounce / Flip / Jiggle / Pop / Pulse
   emphasis actions, typed Keyboard / Shimmer / Skid / Swoosh / Trace build-in/build-out
-  effects with native direction models, wire-preserving
-  move/reorder operations, validated raw CRUD for unmapped native build parameters,
-  component UUIDs,
-  and slide-node cache maintenance
+  effects with native direction models, validated raw CRUD for unmapped native build parameters,
+  component UUIDs, and slide-node cache maintenance. Focused `litchi-keynote` owns the
+  bounded existing-build playback-order transaction; this host retains effect, timing,
+  and add/update/remove compatibility only.
 - `litchi-keynote::transition` selector-first modern slide-transition reads
   and exact-source set/clear transactions with reversible patches. A private
   Buffa lazy view projects known fields, while validated raw records remain the
@@ -363,19 +364,25 @@ wrappers for those operations. See `create_keynote_movie.rs` for the focused
 package workflow. Movie labels remain independent through duplicate, delete,
 and package round-trip operations.
 
-They likewise expose `flip_body_movie`, `flip_sheet_movie`, and
-`flip_slide_movie`, preserving their video and poster assets, playback settings,
-and metadata; see `create_*_flipped_movie` for scratch-file examples.
+Body and sheet movies likewise expose `flip_body_movie` and `flip_sheet_movie`,
+preserving their video and poster assets, playback settings, and metadata; see
+`create_*_flipped_movie` for scratch-file examples. Keynote slide-movie
+reflection is owned by the focused `litchi-keynote` geometry transaction; the
+host's typed selector bridge delegates to that owner and retains no independent
+flip implementation.
 
 Movies with native original-size metadata can also restore just their displayed
 dimensions through `restore_body_movie_original_size`,
-or `restore_sheet_movie_original_size`. Keynote slide movie position and
-displayed-size edits, including original-size restoration, use the
-selector-first `litchi_keynote::Package::{slide_movie_geometry,
-edit_slide_movie_geometry,apply_slide_movie_geometry}` API; native angle and
-reflection flags remain in the compatibility Arrange operation.
-Those operations retain the current position and transform while returning an
-error for media that has no original dimensions; see
+or `restore_sheet_movie_original_size`. Keynote slide movie position,
+displayed-size, and supported transform edits, including original-size
+restoration, use the selector-first
+`litchi_keynote::Package::{slide_movie_geometry,edit_slide_movie_geometry,
+apply_slide_movie_geometry}` API; native angle and reflection flags are part of
+that focused transaction. The compatibility host retains only its delegating
+selector bridge plus unrelated movie creation/removal, media, offset, property,
+and graph operations. Those
+operations retain the current position and transform while returning an error
+for media that has no original dimensions; see
 `create_*_original_size_movie` for scratch-file examples.
 
 ### Create Pages documents from scratch
@@ -1228,16 +1235,36 @@ transactions, not `NumbersEditor` raw-ID calls. They stage a complete batch
 before publication, so any rejected coordinate, dependency, or cache update
 leaves the package unchanged:
 
-Existing-cell Number, Percentage, Currency, and Scientific format transactions
-follow the same focused-package rule. Their former `NumbersEditor` raw-ID
-convenience methods and format-specific bridge/fallback helpers are retired;
-generic source-built or cross-format `DataFormat` compatibility helpers and
-attached table callers remain migration-host-only compatibility surfaces.
+Existing-cell Number, Percentage, Currency, Scientific, Fraction, Text, and
+Date & Time format transactions follow the same focused-package rule. The
+former `NumbersEditor` raw-ID convenience methods and format-specific
+bridge/fallback helpers are retired for Number, Percentage, Currency,
+Scientific, and Fraction. There is no dedicated host raw-ID Text route; the
+focused Text owner handles that existing-cell operation. Dedicated host raw-ID
+Date & Time retirement is not claimed. Generic source-built or cross-format
+`DataFormat` compatibility helpers, source-built `DataFormat::Text` and
+`DataFormat::DateTime`, and attached table callers remain migration-host-only
+compatibility surfaces.
+The host `NumbersEditor` semantic/table Date & Time get/set/reset methods
+(`table_cell_date_time_format`, `set_table_cell_date_time_format`, and
+`reset_table_cell_date_time_format`) remain available for that compatibility
+surface.
 
-The dedicated `NumbersEditor` Text-format convenience methods follow the same
-boundary: use the generic `DataFormat::Text` path for source-built Numbers
-compatibility, while the attached Pages and Keynote table callers remain
-available for their still-hosted cross-format compatibility surfaces.
+The focused `litchi-numbers` Text-format owner handles existing-cell Text
+through its selector-first package API. For source-built Numbers compatibility,
+the generic `DataFormat::Text` path remains host-owned, while the attached Pages
+and Keynote table callers remain available for their still-hosted cross-format
+compatibility surfaces.
+
+The focused `litchi-numbers` Date & Time owner likewise handles one existing
+cell through selector-first `Package` APIs, with a bounded native date/time pattern string
+and strict native type-261 admission. Its byte bound and field
+envelope are checked, but pattern grammar is not validated. This does not replace the broad host
+`TextDateTimeField` smart-field lifecycle described below: its raw/native
+identity-bearing path remains available for compatibility, as do the Pages and
+Keynote wrappers. Native evidence for the focused owner is limited to the one
+recorded Numbers type-9 cell/pattern and its operation-specific save/close/
+reopen cycle; it is not a suite-wide DateTime or host-exit claim.
 
 ```rust,no_run
 use litchi_numbers::{Package, SheetSelector, TableSelector};
@@ -2657,8 +2684,10 @@ Native Date & Time fields use `TextDateTimeField` and lossless typed formatter
 settings. Existing text can be attached to a field, or `insert_*_date_time_field`
 can atomically insert caller-supplied localized display text and its smart-field
 object. The crate deliberately does not emulate Apple's locale formatter: the
-display text is explicit while the ICU pattern, locale, date/time styles,
-refresh plan, update flag, and Apple-reference-date instant remain structured.
+display text is explicit while the native date/time pattern string, locale,
+date/time styles, refresh plan, update flag, and Apple-reference-date instant
+remain structured. The pattern string is bounded at the focused owner boundary;
+its grammar is not validated.
 Deletion retains visible text and reclaims the owned field object; ordinary text
 replacement also reclaims orphaned fields. Pages body and text-box, Numbers
 sheet text-box, and Keynote slide text-box wrappers enforce document ownership.
@@ -3200,14 +3229,18 @@ source-preserving rewrite continues to preserve previews, field 45,
 unknown fields, and untouched archive entries, while retaining exact no-op,
 inverse, and conflict behavior.
 
-This is persisted-configuration hardening only. Physical `Sort Now` and
-`RowRange`-based row execution, cells, and table storage remain owned by the
-legacy `litchi-iwa` host. The amendment makes no native semantic acceptance,
-performance, fuzz-exhaustiveness, broader Keynote authoring, or monolith-
-deletion claim. The authoritative topology remains 64 workspace packages,
-237 internal dependency declarations, 226 canonical edges, and 11 ordered
-migration debts `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, with one migration
-host; no migration debt is retired and no host exits.
+This is persisted-configuration hardening only. At the 2026-08-31 checkpoint,
+physical `Sort Now` and `RowRange`-based row execution were still host-owned;
+the later focused `litchi-keynote` owner now owns those physical-sort
+transactions. The legacy host retains only its explicitly source-built
+compatibility route and broader cells/table-storage work; exact focused-owner
+refusals are terminal and do not fall back to a host physical executor. The
+amendment makes no native semantic acceptance, performance, fuzz-exhaustiveness,
+broader Keynote authoring, or monolith-deletion claim. The authoritative
+topology remains 64 workspace packages, 237 internal dependency declarations,
+226 canonical edges, and 11 ordered migration debts
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, with one migration host; no
+migration debt is retired and no host exits.
 
 ## 2026-09-01 Numbers table relocation focused owner
 
@@ -3223,14 +3256,15 @@ moves are exact no-ops; changed moves provide exact-source, conflict-checked
 patches and inverses with locality checks while preserving table content.
 
 The public legacy `NumbersEditor::move_table` entry point and its host example
-are retired. A crate-private adapter remains only for populated-sheet
-duplication: historical host-built packages whose cell storage is outside the
-current semantic projection use the doc-hidden, selector-first physical-
-admission seam in `litchi-numbers`; that seam calls the same rewrite and
-verification engine, and the legacy reader validates the candidate before
+are retired. Exact snapshots use the focused semantic `litchi-numbers`
+transaction, and any focused refusal is terminal. A crate-private physical
+bridge remains only for populated-sheet duplication of historical source-built
+packages whose cell storage is outside the current semantic projection; that
+bridge uses the doc-hidden, selector-first admission seam in `litchi-numbers`,
+the same rewrite and verification engine, and legacy candidate readback before
 publication. Unsupported graphs remain fail-closed. This note supersedes the
-older migration prose that described physical table moves as host-owned. It is
-a bounded ownership transfer only: no migration debt, dependency edge, host,
-or monolith-deletion claim changes. The current topology remains 64 packages,
-238 internal declarations, 227 canonical edges, 11 development-only edges, 11
-ordered debts, and one migration host.
+older migration prose that described physical table moves as generally
+host-owned. It is a bounded ownership transfer only: no migration debt,
+dependency edge, host, or monolith-deletion claim changes. The current topology
+remains 64 packages, 238 internal declarations, 227 canonical edges, 11
+development-only edges, 11 ordered debts, and one migration host.

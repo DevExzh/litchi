@@ -698,7 +698,7 @@ fn read_add_insert_replace_remove_are_ordered_and_semantic() -> TestResult {
     let mut add = package.edit_soundtrack_items()?;
     add.add(audio("appended.wav", THIRD_AUDIO)?)?;
     let added = add.commit()?;
-    assert_eq!(added.diagnostics().changed(), true);
+    assert!(added.diagnostics().changed());
     assert_eq!(item_summary(added.package())?.len(), 3);
     assert_eq!(item_summary(added.package())?[2].1, "appended.wav");
 

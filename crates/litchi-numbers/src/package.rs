@@ -52,6 +52,7 @@ pub(crate) mod table_appearance;
 pub(crate) mod table_cell_control;
 pub(crate) mod table_cell_control_native;
 pub(crate) mod table_cell_currency_format;
+pub(crate) mod table_cell_date_time_format;
 pub(crate) mod table_cell_display_format_native;
 pub(crate) mod table_cell_edit;
 pub(crate) mod table_cell_fraction_format;
@@ -73,6 +74,11 @@ pub(crate) mod table_relocation;
 )]
 mod table_relocation_compat;
 pub(crate) mod table_sort;
+#[allow(
+    dead_code,
+    reason = "The physical-only persisted-sort seam is retained solely for legacy migration snapshots."
+)]
+mod table_sort_compat;
 pub(crate) mod table_title;
 
 use std::collections::HashSet;

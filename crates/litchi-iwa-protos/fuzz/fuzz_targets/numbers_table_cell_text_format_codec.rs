@@ -18,11 +18,13 @@ const MAX_OUTPUT_BYTES: usize = 128 * 1024;
 const MAX_FIELDS: usize = 16 * 1024;
 const MAX_WORK_BYTES: usize = 512 * 1024;
 const MAX_RECURSION: u32 = 64;
+const MAX_FIELD_NUMBER: u32 = 0x1fff_ffff;
 
 const CANONICAL_TEXT: &[u8] = &[0x08, 0x84, 0x02];
 const UNKNOWN_SCALAR: &[u8] = &[0xa0, 0x06, 0x81, 0x00];
 const UNKNOWN_GROUP: &[u8] = &[0xa3, 0x06, 0xa8, 0x06, 0x01, 0xa4, 0x06];
 const UNKNOWN_LENGTH: &[u8] = &[0xb2, 0x06, 0x03, 0x01, 0x7f, 0x00];
+const UNKNOWN_HIGH_SCALAR: &[u8] = &[0xf8, 0xff, 0xff, 0xff, 0x0f, 0x01];
 
 const FIXED_CASES: &[&[u8]] = &[
     // Canonical native Text (field 1 = 260).
@@ -41,6 +43,18 @@ const FIXED_CASES: &[&[u8]] = &[
     &[
         0xb2, 0x06, 0x03, b't', b'x', b't', 0x08, 0x84, 0x02, 0xa0, 0x06, 0x81, 0x00,
     ],
+    // The maximum legal protobuf field number remains opaque.
+    &[0xf8, 0xff, 0xff, 0xff, 0x0f, 0x01, 0x08, 0x84, 0x02],
+    // Unknown noncanonical keys and lengths are rejected; only scalar values
+    // have the compatibility exception exercised by UNKNOWN_SCALAR above.
+    &[0xa0, 0x86, 0x00, 0x01, 0x08, 0x84, 0x02],
+    &[0xb2, 0x06, 0x80, 0x00, 0x08, 0x84, 0x02],
+    &[
+        0xa3, 0x06, 0xb2, 0x06, 0x80, 0x00, 0xa4, 0x06, 0x08, 0x84, 0x02,
+    ],
+    // Reserved wire types are malformed even for unknown field numbers.
+    &[0xd6, 0x02],
+    &[0xd7, 0x02],
     // Missing, duplicate, and wrong-wire/type known fields.
     &[],
     &[0x08, 0x84, 0x02, 0x08, 0x84, 0x02],
@@ -74,6 +88,9 @@ fuzz_target!(|data: &[u8]| {
         for fixed in FIXED_CASES {
             exercise_source(fixed, b"fixed-text-format");
         }
+        exercise_unknown_wire_matrix();
+        exercise_known_field_rejections();
+        exercise_malformed_group_matrix();
         exercise_canonical_writes();
         exercise_encoding_markers();
         exercise_limit_guards();
@@ -278,7 +295,20 @@ fn assert_prepare_report(
 }
 
 fn assert_known_unknown_spans_preserved(source: &[u8], candidate: &[u8]) {
-    for unknown in [UNKNOWN_SCALAR, UNKNOWN_GROUP, UNKNOWN_LENGTH] {
+    let source_shape = parse_root_shape(source)
+        .expect("successful Text-format source must have valid root wire records");
+    let candidate_shape = parse_root_shape(candidate)
+        .expect("rewritten Text-format candidate must have valid root wire records");
+    assert_eq!(
+        source_shape, candidate_shape,
+        "Text-format rewrite changed unknown-span order or multiplicity"
+    );
+    for unknown in [
+        UNKNOWN_SCALAR,
+        UNKNOWN_GROUP,
+        UNKNOWN_LENGTH,
+        UNKNOWN_HIGH_SCALAR,
+    ] {
         if source
             .windows(unknown.len())
             .any(|window| window == unknown)
@@ -290,6 +320,234 @@ fn assert_known_unknown_spans_preserved(source: &[u8], candidate: &[u8]) {
                 "source unknown Text-format span was not preserved"
             );
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RootField<'source> {
+    Selected,
+    Unknown(&'source [u8]),
+}
+
+fn parse_root_shape(source: &[u8]) -> Option<Vec<RootField<'_>>> {
+    let mut fields = Vec::new();
+    let mut offset = 0usize;
+    while offset < source.len() {
+        let start = offset;
+        let (key, key_len, canonical) = read_wire_varint(source, offset)?;
+        if !canonical {
+            return None;
+        }
+        let number = u32::try_from(key >> 3).ok()?;
+        let wire = u8::try_from(key & 7).ok()?;
+        if number == 0 || number > MAX_FIELD_NUMBER {
+            return None;
+        }
+        offset = offset.checked_add(key_len)?;
+        offset = skip_wire_value(source, offset, wire, number, 0)?;
+        let raw = source.get(start..offset)?;
+        fields.push(if number == 1 {
+            RootField::Selected
+        } else {
+            RootField::Unknown(raw)
+        });
+    }
+    Some(fields)
+}
+
+fn skip_wire_value(
+    source: &[u8],
+    mut offset: usize,
+    wire: u8,
+    number: u32,
+    depth: u32,
+) -> Option<usize> {
+    match wire {
+        0 => {
+            let (_, length, _) = read_wire_varint(source, offset)?;
+            offset.checked_add(length)
+        },
+        1 => offset.checked_add(8).filter(|end| *end <= source.len()),
+        2 => {
+            let (length, length_bytes, canonical) = read_wire_varint(source, offset)?;
+            if !canonical {
+                return None;
+            }
+            offset = offset.checked_add(length_bytes)?;
+            let length = usize::try_from(length).ok()?;
+            offset
+                .checked_add(length)
+                .filter(|end| *end <= source.len())
+        },
+        3 => {
+            if depth >= MAX_RECURSION {
+                return None;
+            }
+            let mut cursor = offset;
+            while cursor < source.len() {
+                let (key, key_len, canonical) = read_wire_varint(source, cursor)?;
+                if !canonical {
+                    return None;
+                }
+                let nested_number = u32::try_from(key >> 3).ok()?;
+                let nested_wire = u8::try_from(key & 7).ok()?;
+                if nested_number == 0 || nested_number > MAX_FIELD_NUMBER {
+                    return None;
+                }
+                cursor = cursor.checked_add(key_len)?;
+                if nested_wire == 4 {
+                    return (nested_number == number).then_some(cursor);
+                }
+                cursor = skip_wire_value(source, cursor, nested_wire, nested_number, depth + 1)?;
+            }
+            None
+        },
+        4 | 6 | 7 => None,
+        5 => offset.checked_add(4).filter(|end| *end <= source.len()),
+        _ => None,
+    }
+}
+
+fn read_wire_varint(source: &[u8], offset: usize) -> Option<(u64, usize, bool)> {
+    let mut value = 0u64;
+    let mut shift = 0u32;
+    let mut cursor = offset;
+    while cursor < source.len() && cursor.checked_sub(offset)? < 10 {
+        let byte = source[cursor];
+        let part = u64::from(byte & 0x7f);
+        if shift == 63 && part > 1 {
+            return None;
+        }
+        value |= part.checked_shl(shift)?;
+        cursor += 1;
+        if byte & 0x80 == 0 {
+            let consumed = cursor.checked_sub(offset)?;
+            let canonical = encoded_wire_varint_len(value) == consumed;
+            return Some((value, consumed, canonical));
+        }
+        shift += 7;
+    }
+    None
+}
+
+const fn encoded_wire_varint_len(value: u64) -> usize {
+    if value == 0 {
+        1
+    } else {
+        (64usize - value.leading_zeros() as usize).div_ceil(7)
+    }
+}
+
+fn push_varint(output: &mut Vec<u8>, mut value: u64) {
+    while value >= 0x80 {
+        output.push((value as u8 & 0x7f) | 0x80);
+        value >>= 7;
+    }
+    output.push(value as u8);
+}
+
+fn wire_key(number: u32, wire: u8) -> Vec<u8> {
+    let mut output = Vec::new();
+    push_varint(&mut output, (u64::from(number) << 3) | u64::from(wire));
+    output
+}
+
+fn varint_field(number: u32, value: u64) -> Vec<u8> {
+    let mut output = wire_key(number, 0);
+    push_varint(&mut output, value);
+    output
+}
+
+fn fixed32_field(number: u32, value: [u8; 4]) -> Vec<u8> {
+    let mut output = wire_key(number, 5);
+    output.extend_from_slice(&value);
+    output
+}
+
+fn fixed64_field(number: u32, value: [u8; 8]) -> Vec<u8> {
+    let mut output = wire_key(number, 1);
+    output.extend_from_slice(&value);
+    output
+}
+
+fn length_field(number: u32, value: &[u8]) -> Vec<u8> {
+    let mut output = wire_key(number, 2);
+    push_varint(&mut output, value.len() as u64);
+    output.extend_from_slice(value);
+    output
+}
+
+fn group_field(number: u32, body: &[u8]) -> Vec<u8> {
+    let mut output = wire_key(number, 3);
+    output.extend_from_slice(body);
+    output.extend_from_slice(&wire_key(number, 4));
+    output
+}
+
+fn source_with_extra(extra: &[u8]) -> Vec<u8> {
+    let mut source = Vec::with_capacity(CANONICAL_TEXT.len() + extra.len());
+    source.extend_from_slice(extra);
+    source.extend_from_slice(CANONICAL_TEXT);
+    source
+}
+
+fn exercise_unknown_wire_matrix() {
+    let nested = varint_field(50, 9);
+    let records = [
+        varint_field(46, 7),
+        fixed64_field(47, [0x89, 0xab, 0xcd, 0xef, 0x10, 0x32, 0x54, 0x76]),
+        length_field(48, &[0x00, 0xff, 0x80]),
+        group_field(49, &nested),
+        varint_field(MAX_FIELD_NUMBER, 1),
+    ];
+    let mut source = Vec::new();
+    for record in records {
+        source.extend_from_slice(&record);
+    }
+    source.extend_from_slice(CANONICAL_TEXT);
+    exercise_source(&source, b"unknown-wire-matrix");
+
+    // A canonical key plus an overlong value is the one noncanonical unknown
+    // spelling intentionally admitted by this projection.
+    let mut overlong = source_with_extra(UNKNOWN_SCALAR);
+    overlong.extend_from_slice(UNKNOWN_GROUP);
+    exercise_source(&overlong, b"unknown-overlong-value");
+}
+
+fn exercise_known_field_rejections() {
+    for number in 2..=45 {
+        for extra in [
+            varint_field(number, 0),
+            fixed64_field(number, [0; 8]),
+            length_field(number, &[0]),
+            fixed32_field(number, [0; 4]),
+            group_field(number, &[]),
+        ] {
+            exercise_source(&source_with_extra(&extra), b"known-sibling-field");
+        }
+    }
+}
+
+fn exercise_malformed_group_matrix() {
+    let malformed = [
+        wire_key(46, 4),
+        wire_key(46, 6),
+        wire_key(46, 7),
+        [wire_key(46, 1), vec![0; 7]].concat(),
+        [wire_key(46, 5), vec![0; 3]].concat(),
+        [wire_key(46, 2), vec![2, 0]].concat(),
+        [wire_key(46, 3), varint_field(47, 1)].concat(),
+        [wire_key(46, 3), varint_field(47, 1), wire_key(48, 4)].concat(),
+        [
+            wire_key(46, 3),
+            wire_key(47, 3),
+            wire_key(46, 4),
+            wire_key(47, 4),
+        ]
+        .concat(),
+    ];
+    for extra in malformed {
+        exercise_source(&source_with_extra(&extra), b"malformed-wire");
     }
 }
 
@@ -336,12 +594,25 @@ fn exercise_limit_profiles(source: &[u8], report: codec::DecodeReport) {
     if source.is_empty() {
         return;
     }
+    let exact = codec::DecodeOptions::new(
+        source.len(),
+        source.len(),
+        report.fields(),
+        report.work_bytes(),
+        report.max_depth().max(1),
+        0,
+        0,
+        0,
+    );
+    codec::decode_text_format(source, exact)
+        .unwrap_or_else(|error| panic!("exact Text-format decode limits failed: {error}"));
+
     let input_limited = codec::DecodeOptions::new(
         source.len() - 1,
-        MAX_OUTPUT_BYTES.max(source.len()),
-        MAX_FIELDS,
-        MAX_WORK_BYTES,
-        MAX_RECURSION,
+        source.len(),
+        report.fields(),
+        report.work_bytes(),
+        report.max_depth().max(1),
         0,
         0,
         0,
@@ -352,11 +623,11 @@ fn exercise_limit_profiles(source: &[u8], report: codec::DecodeReport) {
 
     if report.fields() > 0 {
         let limited = codec::DecodeOptions::new(
-            MAX_INPUT_BYTES.max(source.len()),
-            MAX_OUTPUT_BYTES.max(source.len()),
+            source.len(),
+            source.len(),
             report.fields() - 1,
-            MAX_WORK_BYTES,
-            MAX_RECURSION,
+            report.work_bytes(),
+            report.max_depth().max(1),
             0,
             0,
             0,
@@ -368,11 +639,11 @@ fn exercise_limit_profiles(source: &[u8], report: codec::DecodeReport) {
 
     if report.work_bytes() > 0 {
         let limited = codec::DecodeOptions::new(
-            MAX_INPUT_BYTES.max(source.len()),
-            MAX_OUTPUT_BYTES.max(source.len()),
-            MAX_FIELDS,
+            source.len(),
+            source.len(),
+            report.fields(),
             report.work_bytes() - 1,
-            MAX_RECURSION,
+            report.max_depth().max(1),
             0,
             0,
             0,
@@ -384,10 +655,10 @@ fn exercise_limit_profiles(source: &[u8], report: codec::DecodeReport) {
 
     if report.max_depth() > 0 {
         let limited = codec::DecodeOptions::new(
-            MAX_INPUT_BYTES.max(source.len()),
-            MAX_OUTPUT_BYTES.max(source.len()),
-            MAX_FIELDS,
-            MAX_WORK_BYTES,
+            source.len(),
+            source.len(),
+            report.fields(),
+            report.work_bytes(),
             report.max_depth() - 1,
             0,
             0,
@@ -434,6 +705,19 @@ fn exercise_canonical_writes() {
             .bytes(),
         output.bytes()
     );
+    let exact = codec::RewriteExecutionLimits::exact(requirements);
+    for limits in [
+        exact.with_output_bytes(requirements.output_bytes() - 1),
+        exact.with_fields(requirements.fields() - 1),
+        exact.with_work_bytes(requirements.work_bytes() - 1),
+        exact.with_allocations(0),
+        exact.with_retained_bytes(requirements.retained_bytes() - 1),
+    ] {
+        assert!(
+            prepared.execute(limits).is_err(),
+            "canonical Text-format write accepted one-below exact limits"
+        );
+    }
     black_box(output);
 }
 
@@ -479,6 +763,28 @@ fn exercise_limit_guards() {
         prepared.execute(codec::RewriteExecutionLimits::exact(requirements).with_allocations(0)),
         |limit| matches!(limit, codec::DecodeLimit::Allocation { .. }),
     );
+
+    // A group chain beyond the finite scanner depth must fail with a typed
+    // nesting limit instead of recursing or allocating without bound.
+    let deep = deep_group_source((MAX_RECURSION + 1) as usize);
+    let error = codec::decode_text_format(&deep, options(&deep))
+        .expect_err("deep Text-format group unexpectedly decoded");
+    assert!(matches!(
+        error.resource_limit(),
+        Some(codec::DecodeLimit::Nesting { .. })
+    ));
+    observe_error(error);
+}
+
+fn deep_group_source(depth: usize) -> Vec<u8> {
+    let mut source = CANONICAL_TEXT.to_vec();
+    for _ in 0..depth {
+        source.extend_from_slice(&wire_key(46, 3));
+    }
+    for _ in 0..depth {
+        source.extend_from_slice(&wire_key(46, 4));
+    }
+    source
 }
 
 fn observe_error(error: codec::DecodeError) {

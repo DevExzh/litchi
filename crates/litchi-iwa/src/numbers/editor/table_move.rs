@@ -12,7 +12,6 @@ use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelec
 impl NumbersEditor {
     /// Move an existing table for the internal populated-sheet duplication path.
     ///
-    ///
     /// The historical workbook-wide public route was retired; this narrow
     /// crate-private method keeps only the duplication implementation's
     /// selector adaptation and legacy readback validation.
@@ -33,36 +32,46 @@ impl NumbersEditor {
             return Ok(table);
         }
 
+        let source_built = !self.package.source_is_exact();
         let (source_sheet, focused_table) =
             super::selectors::focused_table_location(self, table_id)?;
         let source_bytes = self.to_bytes()?;
-        let bytes = match FocusedNumbersPackage::from_bytes(&source_bytes) {
-            Ok(source) => {
-                let commit = source
-                    .move_table(source_sheet, focused_table, target)
-                    .map_err(|error| {
-                        Error::InvalidFormat(format!("focused Numbers table move failed: {error}"))
-                    })?;
-                let mut bytes = Vec::new();
-                commit
-                    .package()
-                    .write_to(&mut bytes)
-                    .map_err(|error| Error::Io(error.into_io_error()))?;
-                bytes
-            },
-            Err(_projection_error) => {
-                FocusedNumbersPackage::__move_table_from_bytes_for_compatibility(
-                    &source_bytes,
-                    source_sheet,
-                    focused_table,
-                    target,
-                )
+        let bytes = if source_built {
+            // A legacy builder snapshot is normalized to an exact byte owner
+            // before the focused crate's private compatibility admission runs.
+            // The migration host still performs no archive or wire mutation.
+            FocusedNumbersPackage::__move_table_from_bytes_for_compatibility(
+                &source_bytes,
+                source_sheet,
+                focused_table,
+                target,
+            )
+            .map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "focused Numbers table-move compatibility admission failed: {error}"
+                ))
+            })?
+        } else {
+            // Exact snapshots stay on the focused owner once ingress is
+            // attempted.  A focused ingress/read/edit/commit failure is
+            // terminal; the physical bridge is reserved for source-built
+            // snapshots above.
+            let source = FocusedNumbersPackage::from_bytes(&source_bytes).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "focused Numbers table-move source validation failed: {error}"
+                ))
+            })?;
+            let commit = source
+                .move_table(source_sheet, focused_table, target)
                 .map_err(|error| {
-                    Error::InvalidFormat(format!(
-                        "focused Numbers table-move compatibility admission failed: {error}"
-                    ))
-                })?
-            },
+                    Error::InvalidFormat(format!("focused Numbers table move failed: {error}"))
+                })?;
+            let mut bytes = Vec::new();
+            commit
+                .package()
+                .write_to(&mut bytes)
+                .map_err(|error| Error::Io(error.into_io_error()))?;
+            bytes
         };
         let verified = Self::from_bytes(&bytes)?;
         let verified_owner = find_table_owner(verified.package(), table_id)?;

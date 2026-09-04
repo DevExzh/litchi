@@ -419,10 +419,7 @@ fn malformed_required_identifiers_digest_names_and_counts_fail_closed() {
         false,
     );
     let error = inspect_package_metadata_media(&empty_name, options(&empty_name)).unwrap_err();
-    assert!(matches!(
-        error.resource_limit(),
-        Some(DecodeLimit::NameBytes { maximum: 4096, .. })
-    ));
+    assert_eq!(error.invalid_reason(), Some(InvalidReason::InvalidName));
 }
 
 #[test]
