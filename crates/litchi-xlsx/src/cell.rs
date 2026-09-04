@@ -392,6 +392,14 @@ impl Number {
     /// Validate and retain a numeric lexical form without normalizing it.
     pub fn new(value: impl Into<Box<str>>) -> Result<Self> {
         let value = value.into();
+        Self::validate_lexical(&value)?;
+        Ok(Self(value))
+    }
+
+    /// Validate a worksheet number without taking ownership of its lexical
+    /// form. This is used by streaming readers that must validate an
+    /// unselected value while retaining ownership only for selected cells.
+    pub(crate) fn validate_lexical(value: &str) -> Result<()> {
         let parsed = value
             .trim()
             .parse::<f64>()
@@ -399,7 +407,7 @@ impl Number {
         if !parsed.is_finite() {
             return Err(invalid(format!("non-finite worksheet number '{value}'")));
         }
-        Ok(Self(value))
+        Ok(())
     }
 
     /// Exact stored lexical form.
@@ -1056,6 +1064,28 @@ mod tests {
         assert!(Number::new("NaN").is_err());
         assert!(Number::new("not a number").is_err());
         assert!(Number::try_from(f64::INFINITY).is_err());
+    }
+
+    #[test]
+    fn borrowed_number_validation_matches_owned_constructor_errors() {
+        for (value, expected) in [
+            ("not a number", "invalid worksheet number 'not a number'"),
+            ("NaN", "non-finite worksheet number 'NaN'"),
+            ("1e999", "non-finite worksheet number '1e999'"),
+        ] {
+            let borrowed = Number::validate_lexical(value)
+                .expect_err("invalid borrowed number")
+                .to_string();
+            let owned = Number::new(value)
+                .expect_err("invalid owned number")
+                .to_string();
+            assert_eq!(borrowed, owned);
+            assert!(owned.contains(expected));
+        }
+        for value in ["  -0.000  ", "6.02E+23"] {
+            Number::validate_lexical(value).expect("valid borrowed number");
+            Number::new(value).expect("valid owned number");
+        }
     }
 
     #[test]
