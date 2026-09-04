@@ -450,6 +450,9 @@ where
             .next_entry()
             .map_err(|error| map_metadata_limit_error(error, metadata_prefix_u64, limits))?
         {
+            if policy == PreservationPolicy::Zip32Only && record.is_zip64() {
+                return Err(unsupported("ZIP64 entry preservation is not enabled"));
+            }
             if !record.wayfinder().borrowed_provenance_supported() {
                 return Err(unsupported("unresolved ZIP64 entry fields"));
             }
@@ -520,6 +523,9 @@ where
             .next_entry()
             .map_err(|error| map_metadata_limit_error(error, metadata_prefix_u64, limits))?
         {
+            if policy == PreservationPolicy::Zip32Only && record.is_zip64() {
+                return Err(unsupported("ZIP64 entry preservation is not enabled"));
+            }
             let wayfinder = record.wayfinder();
             if !wayfinder.borrowed_provenance_supported() {
                 return Err(unsupported("unresolved ZIP64 entry fields"));
@@ -2498,6 +2504,30 @@ mod tests {
                     .unwrap(),
                 data
             );
+        }
+    }
+
+    #[test]
+    fn default_policy_refuses_projected_zip64_descriptor_before_publication() {
+        let payload = [
+            crate::DataDescriptor::SIGNATURE.to_le_bytes().as_slice(),
+            b"payload bytes".as_slice(),
+        ]
+        .concat();
+        for signed in [true, false] {
+            let data = zip64_descriptor_archive(&payload, signed);
+            let (archive, mut buffer) = indexed(&data);
+            assert!(!archive.is_zip64());
+            let sink = b"untouched".to_vec();
+            let error = match PreservationIndex::new(&archive, &mut buffer) {
+                Ok(_) => panic!("default policy must refuse projected ZIP64 entry"),
+                Err(error) => error,
+            };
+            assert!(matches!(
+                error.kind(),
+                ErrorKind::UnsupportedPreservation { .. }
+            ));
+            assert_eq!(sink, b"untouched");
         }
     }
 

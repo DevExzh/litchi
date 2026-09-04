@@ -1486,6 +1486,110 @@ mod tests {
         bytes
     }
 
+    fn promote_member_to_zip64_descriptor(mut bytes: Vec<u8>, membername: &str) -> Vec<u8> {
+        let archive = soapberry_zip::ZipArchive::from_slice(&bytes).expect("parse ZIP");
+        let central = archive.directory_offset() as usize;
+        let eocd = archive.eocd_offset() as usize;
+        let (target_local, target_central, payload_end) = archive
+            .entries()
+            .find_map(|entry| {
+                let entry = entry.expect("central entry");
+                (entry.file_path().as_ref() == membername.as_bytes()).then(|| {
+                    let payload_end = archive
+                        .get_entry(entry.wayfinder())
+                        .expect("target entry")
+                        .compressed_data_range()
+                        .1 as usize;
+                    (
+                        entry.local_header_offset() as usize,
+                        entry.central_directory_offset() as usize,
+                        payload_end,
+                    )
+                })
+            })
+            .expect("target member");
+        let next_local = archive
+            .entries()
+            .map(|entry| entry.expect("central entry").local_header_offset() as usize)
+            .filter(|&offset| offset > target_local)
+            .min()
+            .unwrap_or(central);
+        let descriptor_len = next_local - payload_end;
+        assert!(matches!(descriptor_len, 12 | 16));
+        let signed = descriptor_len == 16;
+        let crc_offset = payload_end + usize::from(signed) * 4;
+        let crc = read_u32(&bytes, crc_offset);
+        let compressed = read_u32(&bytes, target_central + 20);
+        let uncompressed = read_u32(&bytes, target_central + 24);
+
+        let mut descriptor = Vec::with_capacity(descriptor_len + 8);
+        if signed {
+            descriptor.extend_from_slice(&0x0807_4b50_u32.to_le_bytes());
+        }
+        descriptor.extend_from_slice(&crc.to_le_bytes());
+        descriptor.extend_from_slice(&u64::from(compressed).to_le_bytes());
+        descriptor.extend_from_slice(&u64::from(uncompressed).to_le_bytes());
+        bytes.splice(payload_end..next_local, descriptor.iter().copied());
+
+        let shifted_central = central + 8;
+        let shifted_eocd = eocd + 8;
+        let mut central_cursor = shifted_central;
+        while central_cursor < shifted_eocd {
+            let length = central_record_len(&bytes, central_cursor);
+            let local_offset = read_u32(&bytes, central_cursor + 42);
+            if usize::try_from(local_offset).unwrap() > target_local {
+                let shifted = local_offset.checked_add(8).expect("local offset shift");
+                bytes[central_cursor + 42..central_cursor + 46]
+                    .copy_from_slice(&shifted.to_le_bytes());
+            }
+            central_cursor += length;
+        }
+
+        let target_central = target_central + 8;
+        let target_record_len = central_record_len(&bytes, target_central);
+        let target_record = bytes[target_central..target_central + target_record_len].to_vec();
+        let name_len = usize::from(read_u16(&bytes, target_central + 28));
+        let old_extra_len = usize::from(read_u16(&bytes, target_central + 30));
+        let variable_start = 46 + name_len;
+        let old_extra_end = variable_start + old_extra_len;
+        let mut promoted = target_record[..variable_start].to_vec();
+        promoted[20..24].copy_from_slice(&u32::MAX.to_le_bytes());
+        promoted[24..28].copy_from_slice(&u32::MAX.to_le_bytes());
+        let mut zip64_extra = Vec::with_capacity(20);
+        zip64_extra.extend_from_slice(&1u16.to_le_bytes());
+        zip64_extra.extend_from_slice(&16u16.to_le_bytes());
+        zip64_extra.extend_from_slice(&u64::from(uncompressed).to_le_bytes());
+        zip64_extra.extend_from_slice(&u64::from(compressed).to_le_bytes());
+        promoted[30..32].copy_from_slice(
+            &u16::try_from(old_extra_len + zip64_extra.len())
+                .expect("ZIP64 extra length")
+                .to_le_bytes(),
+        );
+        promoted.extend_from_slice(&target_record[variable_start..old_extra_end]);
+        promoted.extend_from_slice(&zip64_extra);
+        promoted.extend_from_slice(&target_record[old_extra_end..]);
+        assert_eq!(promoted.len(), target_record_len + 20);
+        bytes.splice(
+            target_central..target_central + target_record_len,
+            promoted.iter().copied(),
+        );
+
+        let final_eocd = shifted_eocd + 20;
+        let central_size = read_u32(&bytes, final_eocd + 12);
+        bytes[final_eocd + 12..final_eocd + 16].copy_from_slice(
+            &central_size
+                .checked_add(20)
+                .expect("central size")
+                .to_le_bytes(),
+        );
+        bytes[final_eocd + 16..final_eocd + 20].copy_from_slice(
+            &u32::try_from(shifted_central)
+                .expect("central offset")
+                .to_le_bytes(),
+        );
+        bytes
+    }
+
     fn source_with_non_part_framing() -> (Vec<u8>, PackURI) {
         let content_types = br#"<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/custom/first.bin" ContentType="application/octet-stream"/><Override PartName="/custom/second.bin" ContentType="application/octet-stream"/></Types>"#;
         let relationships = br#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>"#;
@@ -2406,6 +2510,37 @@ mod tests {
         let mut output = Vec::new();
         let error = PackageWriter::write_to_stream(&mut output, &package)
             .expect_err("default OPC ZIP64 preservation must refuse before output");
+        assert!(matches!(
+            error,
+            crate::OpcError::PreservationUnavailable { .. }
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn projected_zip64_descriptor_source_refuses_normalization_before_output() {
+        let (source, first, _second) = two_part_source(b"projected ZIP64 fallback");
+        let source = promote_member_to_zip64_descriptor(source, first.membername());
+        let archive = soapberry_zip::ZipArchive::from_slice(&source).expect("open projected ZIP64");
+        assert!(!archive.is_zip64());
+        assert!(archive.entries().any(|entry| {
+            let entry = entry.expect("central entry");
+            entry.file_path().as_ref() == first.membername().as_bytes() && entry.is_zip64()
+        }));
+
+        let mut package = OpcPackage::from_vec(source).expect("open projected ZIP64 OPC");
+        package
+            .get_part_mut(&first)
+            .expect("first part")
+            .set_blob(b"projected ZIP64 changed".to_vec());
+
+        assert!(matches!(
+            PackageWriter::to_bytes(&package),
+            Err(crate::OpcError::PreservationUnavailable { .. })
+        ));
+        let mut output = Vec::new();
+        let error = PackageWriter::write_to_stream(&mut output, &package)
+            .expect_err("projected ZIP64 preservation must refuse before output");
         assert!(matches!(
             error,
             crate::OpcError::PreservationUnavailable { .. }
