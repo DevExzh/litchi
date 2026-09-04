@@ -2701,6 +2701,7 @@ impl<'a> ZipFileHeaderRecord<'a> {
                 let start = u64::try_from(start)
                     .map_err(|_| Error::from(ErrorKind::Eof))?
                     .checked_add(ZipFileHeaderFixed::SIZE as u64)
+                    .and_then(|offset| offset.checked_add(u64::from(header.file_name_len)))
                     .and_then(|offset| offset.checked_add(4))
                     .and_then(|offset| central_directory_offset.checked_add(offset))
                     .ok_or_else(|| Error::from(ErrorKind::Eof))?;
@@ -3245,12 +3246,29 @@ mod tests {
         local_header_offset: u32,
         extra: &[u8],
     ) -> ZipFileHeaderFixed {
-        let name = b"item";
+        central_fixed_with_zip64_extra_name_len(
+            4,
+            uncompressed_size,
+            compressed_size,
+            disk_number_start,
+            local_header_offset,
+            extra,
+        )
+    }
+
+    fn central_fixed_with_zip64_extra_name_len(
+        name_len: u16,
+        uncompressed_size: u32,
+        compressed_size: u32,
+        disk_number_start: u16,
+        local_header_offset: u32,
+        extra: &[u8],
+    ) -> ZipFileHeaderFixed {
         let mut bytes = vec![0u8; ZipFileHeaderFixed::SIZE];
         bytes[0..4].copy_from_slice(&CENTRAL_HEADER_SIGNATURE.to_le_bytes());
         bytes[20..24].copy_from_slice(&compressed_size.to_le_bytes());
         bytes[24..28].copy_from_slice(&uncompressed_size.to_le_bytes());
-        bytes[28..30].copy_from_slice(&(name.len() as u16).to_le_bytes());
+        bytes[28..30].copy_from_slice(&name_len.to_le_bytes());
         bytes[30..32].copy_from_slice(&(extra.len() as u16).to_le_bytes());
         bytes[34..36].copy_from_slice(&disk_number_start.to_le_bytes());
         bytes[42..46].copy_from_slice(&local_header_offset.to_le_bytes());
@@ -3281,8 +3299,48 @@ mod tests {
         assert_eq!(record.local_header_offset(), 1234);
         assert_eq!(
             record.zip64_local_header_offset_range(),
-            Some(123 + ZipFileHeaderFixed::SIZE as u64 + 4 + 16..123 + 46 + 4 + 24)
+            Some(123 + ZipFileHeaderFixed::SIZE as u64 + 4 + 4 + 16..123 + 46 + 4 + 4 + 24)
         );
+    }
+
+    #[test]
+    fn central_zip64_offset_range_tracks_variable_raw_file_names() {
+        let names = [
+            Vec::new(),
+            b"item".to_vec(),
+            vec![0xe6, 0x96, 0x87, 0xf0, 0x9f, 0x92, 0xa9],
+            vec![0xa5; usize::from(u16::MAX)],
+        ];
+        let central_directory_offset = 123u64;
+        let value = 0x1122_3344_5566_7788u64;
+        let body = value.to_le_bytes();
+
+        for name in names {
+            let extra = zip64_extra(&body);
+            let name_len = u16::try_from(name.len()).unwrap();
+            let header =
+                central_fixed_with_zip64_extra_name_len(name_len, 1, 1, 0, u32::MAX, &extra);
+            let record = ZipFileHeaderRecord::from_parts(
+                header,
+                &name,
+                &extra,
+                b"",
+                central_directory_offset,
+            )
+            .unwrap();
+            let range = record
+                .zip64_local_header_offset_range()
+                .expect("ZIP64 local-header offset should have a patch range");
+            assert_eq!(range.end - range.start, 8);
+
+            let central_start = usize::try_from(central_directory_offset).unwrap();
+            let extra_start = central_start + ZipFileHeaderFixed::SIZE + name.len();
+            let mut source = vec![0u8; extra_start + extra.len()];
+            source[extra_start..].copy_from_slice(&extra);
+            let start = usize::try_from(range.start).unwrap();
+            let end = usize::try_from(range.end).unwrap();
+            assert_eq!(&source[start..end], &body);
+        }
     }
 
     #[test]
