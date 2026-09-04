@@ -39,6 +39,13 @@ OPC_SOURCE_MATERIALIZE_CASE = "opc_source_materialize"
 OPC_SOURCE_MATERIALIZE_ACCOUNTED_CASE = "opc_source_materialize_accounted"
 OPC_SOURCE_MATERIALIZE_ORACLE_VERSION = "prepared-part-digest-v1"
 OPC_SOURCE_MATERIALIZE_ORACLE_CONFIG_FIELD = "opc_source_materialize_oracle"
+XLSX_CELL_VALUES_RANGE_ACCOUNTING_CONFIG_FIELD = "xlsx_cell_values_range_accounting"
+XLSX_CELL_VALUES_RANGE_ACCOUNTING_VERSION = "compressed-member-intersections-v1"
+XLSX_CELL_VALUES_RANGE_ACCOUNTING_CASES = frozenset(
+    f"xlsx_source_backed_{managed}cell_values_{shape}_edit_save"
+    for managed in ("", "managed_")
+    for shape in ("one", "one_percent", "batch", "multi_sheet")
+)
 OPC_SOURCE_MATERIALIZATION_SOURCE_SCOPE = "in_process_instrumented_source_read_at"
 OPC_SOURCE_MATERIALIZATION_REQUEST_SCOPE = (
     "unavailable_in_process_source_does_not_record_requested_lengths"
@@ -1296,6 +1303,35 @@ def _validate_opc_source_materialize_oracle(
         )
 
 
+def _validate_xlsx_cell_values_range_accounting(
+    configuration: dict[str, Any], label: str
+) -> None:
+    """Keep legacy unconfigured ranges distinct from corrected observations.
+
+    Historical selectors may omit the marker. Exact configuration matching
+    prevents comparing their false-zero member counters with measured ranges.
+    These counters include compressed passthrough reads, not semantic decoding.
+    """
+    field = XLSX_CELL_VALUES_RANGE_ACCOUNTING_CONFIG_FIELD
+    if field in configuration and (
+        configuration[field] != XLSX_CELL_VALUES_RANGE_ACCOUNTING_VERSION
+    ):
+        raise ComparisonInputError(
+            f"{label}.configuration.{field} must be "
+            f"{XLSX_CELL_VALUES_RANGE_ACCOUNTING_VERSION!r}"
+        )
+    if field in configuration:
+        cases = configuration.get("cases")
+        if not isinstance(cases, list) or not any(
+            isinstance(case, str) and case in XLSX_CELL_VALUES_RANGE_ACCOUNTING_CASES
+            for case in cases
+        ):
+            raise ComparisonInputError(
+                f"{label}.configuration.{field} requires a source-backed "
+                "XLSX scalar cell-values edit/save case"
+            )
+
+
 def _validate_xlsx_managed_memory_evidence(
     report: dict[str, Any], label: str
 ) -> None:
@@ -1764,6 +1800,7 @@ def _validate_report_identity(
                 f"{label}.configuration.opc_cache_lock_diagnostics must be boolean"
             )
         _validate_opc_source_materialize_oracle(configuration, label)
+        _validate_xlsx_cell_values_range_accounting(configuration, label)
         _validate_xlsx_managed_memory_evidence(report, label)
         for field, expected in policy["expected_configuration"].items():
             actual = configuration.get(field)

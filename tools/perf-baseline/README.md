@@ -29,7 +29,21 @@ The reported duration is the sum of open/stage/commit and sequential
 publication segments; source cache diagnostics are sampled between those
 segments and immediately after managed publication; all such diagnostics are
 excluded. They are evidence for later release ABBA work, not a speedup claim.
-It does not
+Source-backed scalar-cell edit/save records also expose workbook and selected
+or unselected worksheet counters as compressed source-member intersections.
+The worksheet classification follows the actual update sheet set, so a
+single-sheet edit can show untouched worksheet overlap during raw publication
+while an all-sheet batch has no unselected worksheet range. Those unselected
+bytes are raw publication overlap evidence and do not claim semantic or
+decompressed worksheet reads. Reports carrying this observer classification
+identify it with configuration marker
+`xlsx_cell_values_range_accounting: "compressed-member-intersections-v1"`.
+The counters accumulate intersections across source reads in open, selector
+planning, commit, and publication; they are not reset at phase boundaries.
+Reading the counters after the timed interval is outside elapsed time, while
+the observer runs on the timed source reads. Historical reports without this
+marker may contain zero worksheet intersections; those zeroes are unconfigured
+evidence and do not prove that members were unread. The corpus generator does not
 depend on untracked office files, network state, or randomness. ODP builder
 timestamps are replaced with fixed metadata before measurement. The JSON
 report contains the generator parameters and SHA-256 hashes for the generated
@@ -1279,7 +1293,15 @@ check untouched media payloads. Source-backed outputs additionally compare raw
 local and central ZIP records for every unselected member, including media,
 relationships, content types, workbook, and unselected worksheets. Source read
 and successful materialization counters are sampled after the timed segments
-(with diagnostics excluded from the reported sum). Balanced release ABBA in
+(with diagnostics excluded from the reported sum). For these source-backed
+cell-value cases, workbook and worksheet counters are intersections with the
+compressed member data ranges identified before timing. An unselected worksheet
+counter can therefore be positive because sequential publication copies its
+untouched raw member; it does not indicate semantic or decompressed worksheet
+access. The counters are cumulative across open, selector planning, commit, and
+publication and are not reset between those phases. The single-sheet and
+multi-sheet update sets are classified separately, and the all-sheet batch has
+no unselected worksheet range. Balanced release ABBA in
 [change 0096](../../docs/performance/changes/0096-xlsx-source-provenance-publication.md)
 accepts removal of the redundant publication-time semantic worksheet reparse:
 source-backed p50 geomean improves 21.66%/22.65% in the two directions, while
