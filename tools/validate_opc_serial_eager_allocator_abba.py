@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """Fail-closed allocator ABBA validator for Change 0403.
 
-The opc_serial_eager_open selector is an in-process constructor probe.  It
-does not produce fresh-child, process, RSS, cold-cache, or claimable elapsed
-measurements.  This validator therefore accepts only the six operation-scoped
-allocator counters as observations:
+The opc_serial_eager_open selector is an in-process constructor probe.  Its
+global harness cache selector may be either the producer default
+``["warm", "cold-requested"]`` or the explicit ``["warm"]`` form, but it is
+inert for this non-filesystem operation: every result has no cache state or
+filesystem evidence.  The selected claim is always ``cache_state: warm``; a
+global ``cold-requested`` configuration does not constitute cold
+execution/evidence.  It does not produce fresh-child, process, RSS,
+cold-cache, or claimable elapsed measurements.  This validator therefore
+accepts only the six operation-scoped allocator counters as observations:
 
 * allocation/deallocation/reallocation/failed-allocation calls;
 * allocated/deallocated bytes.
@@ -38,6 +43,12 @@ SCHEMA_VERSION = 1
 VALIDATOR_NAME = "litchi-opc-serial-eager-allocator-abba"
 CASE = "opc_serial_eager_open"
 CACHE_STATE = "warm"
+GLOBAL_CACHE_STATES = ["warm", "cold-requested"]
+ACCEPTED_GLOBAL_CACHE_STATES = (tuple([CACHE_STATE]), tuple(GLOBAL_CACHE_STATES))
+CACHE_CLAIM_SCOPE = (
+    "cache_state: warm; in-process constructor only; global cold-requested "
+    "configuration does not constitute cold execution/evidence"
+)
 SAMPLE_COUNT = 15
 WARMUP_COUNT = 3
 WORKERS = [1]
@@ -289,6 +300,7 @@ RESULT_KEYS = {
     "output_sha256",
     "operation_metrics",
 }
+OPTIONAL_NULL_RESULT_KEYS = {"cache_state"}
 CORPUS_REPORT_KEYS = {
     key for key in CONTRACT_CORPUS_KEYS if key not in {"part_count", "part_names_sha256", "part_payload_sha256"}
 } - {"rtf_variant"} | {"xlsx"}
@@ -874,7 +886,7 @@ def _expected_configuration() -> dict[str, Any]:
     return {
         "samples_per_case": SAMPLE_COUNT,
         "warmup_iterations_per_case": WARMUP_COUNT,
-        "filesystem_cache_states": ["warm"],
+        "filesystem_cache_states": list(GLOBAL_CACHE_STATES),
         # These are compatibility-level harness fields.  The selected case
         # has no filesystem evidence and the operation itself is in-process.
         "filesystem_fresh_child_per_sample": True,
@@ -902,7 +914,21 @@ def _expected_configuration() -> dict[str, Any]:
 
 def _validate_configuration(value: Any, context: str) -> None:
     configuration = _exact_keys(value, CONFIGURATION_KEYS, context)
-    _expect(configuration, _expected_configuration(), context)
+    # This is a global harness selector envelope, not an observation from the
+    # selected in-process operation.  Keep the accepted values closed so a
+    # state, order, or duplicate cannot be laundered by the projection.
+    cache_states = _array(
+        configuration["filesystem_cache_states"],
+        f"{context}.filesystem_cache_states",
+    )
+    if tuple(cache_states) not in ACCEPTED_GLOBAL_CACHE_STATES:
+        raise ValidationError(
+            f"{context}.filesystem_cache_states must be exactly one of "
+            f"{[list(states) for states in ACCEPTED_GLOBAL_CACHE_STATES]!r}; got {cache_states!r}"
+        )
+    expected = _expected_configuration()
+    expected["filesystem_cache_states"] = cache_states
+    _expect(configuration, expected, context)
     _exact_keys(configuration["range_simulation"], RANGE_SIMULATION_KEYS, f"{context}.range_simulation")
     for key in RANGE_SIMULATION_KEYS:
         _integer(configuration["range_simulation"][key], f"{context}.range_simulation.{key}")
@@ -1216,7 +1242,20 @@ def _validate_corpus(value: Any, shape: str, context: str) -> dict[str, Any]:
 
 def _validate_result(value: Any, role: str, contract: Contract, index: int) -> RowEvidence:
     context = f"{role}.results[{index}]"
-    result = _exact_keys(value, RESULT_KEYS, context)
+    result = _object(value, context)
+    if "filesystem_evidence" in result:
+        raise ValidationError(
+            f"{context}.filesystem_evidence is forbidden for the in-process selector"
+        )
+    actual_keys = set(result)
+    missing = RESULT_KEYS - actual_keys
+    extra = actual_keys - RESULT_KEYS - OPTIONAL_NULL_RESULT_KEYS
+    if missing or extra:
+        raise ValidationError(
+            f"{context} has unexpected keys (missing={sorted(missing)}, extra={sorted(extra)})"
+        )
+    if "cache_state" in result:
+        _expect(result["cache_state"], None, f"{context}.cache_state")
     _expect(result["case"], CASE, f"{context}.case")
     _expect(result["sink"], None, f"{context}.sink")
     corpus_obj = _object(result["corpus"], f"{context}.corpus")
@@ -1272,9 +1311,15 @@ def _environment_identity(report: Mapping[str, Any]) -> dict[str, Any]:
 
 def _validate_cross_report(reports: Mapping[str, ValidatedReport], contract: Contract) -> None:
     first = reports["A1"]
+    first_cache_states = first.report["configuration"]["filesystem_cache_states"]
     for role in ROLES:
         if role == "A1":
             continue
+        _expect(
+            reports[role].report["configuration"]["filesystem_cache_states"],
+            first_cache_states,
+            f"{role}/A1 filesystem cache selector identity",
+        )
         _expect(_environment_identity(reports[role].report), _environment_identity(first.report), f"{role}/A1 environment identity")
         _expect(reports[role].report["configuration"], first.report["configuration"], f"{role}/A1 configuration identity")
         _expect(reports[role].report["parallel_metrics"]["configured_worker_budget"], first.report["parallel_metrics"]["configured_worker_budget"], f"{role}/A1 worker identity")
@@ -1311,6 +1356,10 @@ def _validator_source_sha256() -> str:
 
 
 def _projection(reports: Mapping[str, ValidatedReport], contract: Contract) -> dict[str, Any]:
+    # Retain the producer's global selector list, while keeping the selected
+    # claim explicitly warm and in-process.  A cold-requested envelope is not
+    # evidence of cold execution.
+    producer_cache_states = reports["A1"].report["configuration"]["filesystem_cache_states"]
     rows = []
     for shape in SHAPES:
         a1 = reports["A1"].rows[shape]
@@ -1363,7 +1412,8 @@ def _projection(reports: Mapping[str, ValidatedReport], contract: Contract) -> d
             "samples_per_leg": SAMPLE_COUNT,
             "warmup_iterations_per_leg": WARMUP_COUNT,
             "cache_state": CACHE_STATE,
-            "cache_claim_scope": "warm in-process constructor only; no cold-cache claim",
+            "configuration_cache_states": list(producer_cache_states),
+            "cache_claim_scope": CACHE_CLAIM_SCOPE,
             "execution_workers": WORKERS,
             "fixed_shapes": list(SHAPES),
             "operation_vector_alignment": "operation_metrics.sample_indices equals elapsed_ns.sample_order",
@@ -1438,7 +1488,7 @@ def _projection(reports: Mapping[str, ValidatedReport], contract: Contract) -> d
             "logical_io": {"claimable": False, "reason": "the timed constructor has no logical ReadAt boundary; source vectors are not applicable"},
             "physical_io": {"claimable": False, "reason": "no physical-storage counter is collected and in-process logical evidence is not physical I/O"},
             "fresh_child_per_sample": {"claimable": False, "reason": "operation metrics have no child-process identity"},
-            "cold_cache": {"claimable": False, "reason": "only warm in-process constructor rows are selected"},
+            "cold_cache": {"claimable": False, "reason": CACHE_CLAIM_SCOPE},
         },
         "rows": rows,
     }
