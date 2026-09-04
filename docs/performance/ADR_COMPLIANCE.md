@@ -1,5 +1,14 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0408: explicit serial materialization accounting
+
+[0408](changes/0408-opc-materialization-evidence.md) adds caller-owned reports
+at the existing OPC/ZIP ownership boundary, preserving managed refusal, source
+freshness, cache sharing and partial-error semantics. It adds no executor,
+ambient I/O or archive dependency. Its ADR matrix covers 0001–0006, 0008,
+0010–0011 and 0024. The accompanying profile is descriptive; compiler/oracle
+changes and the untracked goal file preclude a clean ABBA claim for this capture.
+
 ## Change 0402 compliance update
 
 0402 remains a private `litchi-opc` implementation change inside

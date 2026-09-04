@@ -1,5 +1,23 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0408: attributable materialization baseline
+
+[0408](changes/0408-opc-materialization-evidence.md) prepares verifier expectations
+once, adds explicit serial materialization ZIP accounting, and captures debug-1
+release binaries with frame pointers. Source `eba1f302eb1e04519925d1791a2f9d299e908d89`
+uses CPU 2, 20 warmups and 500 samples on the same four-4-MiB-Part synthetic
+corpus as 0406. Normal p50/p95/p99 are 2.184/2.213/2.222 ms. A separate allocator
+run records 55 allocations and 16,861,253 allocated bytes per operation; the
+accounted selector records 16,777,216 decoded bytes and zero output bytes.
+
+Caller reports now attribute 71.82% of whole-process samples to verification
+and 16.34% to materialization. They establish usable phase attribution, with
+remaining unknown frames documented in the capture. LLC events are unsupported;
+all-zero L1 results remain unvalidated. These descriptive runs authorize no
+speedup, operation-peak-memory, cold-filesystem, or scaling claim. The
+[artifact bundle](results/change-0408/) retains samples, catalogs, CPU data,
+flamegraph, exact commands, source/binary hashes and validation logs.
+
 ## Change 0402: unmanaged OPC overlay validation decoder reuse
 
 Candidate `51964019db3f6b0787645e3a56c2ecb83bdca65c` follows control

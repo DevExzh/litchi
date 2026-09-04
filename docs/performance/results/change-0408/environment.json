@@ -1,0 +1,38 @@
+{
+  "source_before": {
+    "revision": "eba1f302eb1e04519925d1791a2f9d299e908d89",
+    "status": "?? docs/GOAL.md",
+    "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+  },
+  "binaries": {
+    "litchi-perf-baseline": {
+      "path": "/tmp/litchi-goal-fp-target/release/litchi-perf-baseline",
+      "sha256": "c16cf669b3a7879612d253166205a26db950163f426e8030e9e707fd9bd2f509",
+      "bytes": 449449904
+    },
+    "litchi-perf-baseline-alloc": {
+      "path": "/tmp/litchi-goal-fp-target/release/litchi-perf-baseline-alloc",
+      "sha256": "4081fd6103339e7f49c3af46f3ab63965c7f4015b41119589ef871b487c033dd",
+      "bytes": 449453904
+    }
+  },
+  "build_environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "CARGO_TARGET_DIR": "/tmp/litchi-goal-fp-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "strip": "Cargo default (none)",
+    "split_debuginfo": "Cargo target default"
+  },
+  "runtime_environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "DEBUGINFOD_URLS": ""
+  },
+  "cpu": 2,
+  "sample_scope": "in-process operation; external profilers include setup and full verification",
+  "performance_claim": "none",
+  "clean_abba_claim_eligible": false
+}

@@ -1,0 +1,9 @@
+{
+  "flamegraph": "/home/zhuhe/.cargo/bin/flamegraph",
+  "zstd": "/usr/bin/zstd",
+  "taskset": "/usr/bin/taskset",
+  "readelf": "/usr/bin/readelf",
+  "perf": "/usr/bin/perf",
+  "cargo": "/home/zhuhe/.cargo/bin/cargo",
+  "rustc": "/home/zhuhe/.cargo/bin/rustc"
+}

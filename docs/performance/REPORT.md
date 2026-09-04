@@ -1,5 +1,16 @@
 # Performance program phase report
 
+## Current evidence update: change 0408
+
+[0408](changes/0408-opc-materialization-evidence.md) records a new descriptive
+OPC materialization baseline after preparing the verifier oracle once and
+building with frame pointers. It measures p50 2.184 ms, 55 allocation calls,
+16,861,253 allocated bytes and 16,777,216 decoded bytes per operation in the
+separately scoped normal, allocator and accounted runs. Caller attribution now
+distinguishes verification from materialization. This batch authorizes no
+before/after speedup; broad non-iWork completion remains open, including the
+wider CRUD/cold/scaling matrix and usable native L1/LLC evidence.
+
 ## Change 0402: unmanaged OPC overlay validation decoder reuse
 
 Change 0402 compares candidate

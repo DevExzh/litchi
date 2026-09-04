@@ -1,0 +1,766 @@
+[
+  {
+    "label": "flamegraph-version",
+    "argv": [
+      "flamegraph",
+      "--version"
+    ],
+    "started_utc": "2026-09-04T22:11:10.550512+00:00",
+    "wall_seconds": 0.0010216140071861446,
+    "exit_code": 0
+  },
+  {
+    "label": "zstd-version",
+    "argv": [
+      "zstd",
+      "--version"
+    ],
+    "started_utc": "2026-09-04T22:11:10.551634+00:00",
+    "wall_seconds": 0.0007682629948249087,
+    "exit_code": 0
+  },
+  {
+    "label": "taskset-version",
+    "argv": [
+      "taskset",
+      "--version"
+    ],
+    "started_utc": "2026-09-04T22:11:10.552463+00:00",
+    "wall_seconds": 0.0005811619921587408,
+    "exit_code": 0
+  },
+  {
+    "label": "readelf-version",
+    "argv": [
+      "readelf",
+      "--version"
+    ],
+    "started_utc": "2026-09-04T22:11:10.553082+00:00",
+    "wall_seconds": 0.0007591230096295476,
+    "exit_code": 0
+  },
+  {
+    "label": "rustc",
+    "argv": [
+      "rustc",
+      "+1.98.1",
+      "-vV"
+    ],
+    "started_utc": "2026-09-04T22:11:10.554013+00:00",
+    "wall_seconds": 0.0067531349923228845,
+    "exit_code": 0
+  },
+  {
+    "label": "cargo",
+    "argv": [
+      "cargo",
+      "+1.98.1",
+      "-V"
+    ],
+    "started_utc": "2026-09-04T22:11:10.560808+00:00",
+    "wall_seconds": 0.004340786996181123,
+    "exit_code": 0
+  },
+  {
+    "label": "cpu",
+    "argv": [
+      "lscpu"
+    ],
+    "started_utc": "2026-09-04T22:11:10.565193+00:00",
+    "wall_seconds": 0.004905038003926165,
+    "exit_code": 0
+  },
+  {
+    "label": "memory",
+    "argv": [
+      "free",
+      "-b"
+    ],
+    "started_utc": "2026-09-04T22:11:10.570135+00:00",
+    "wall_seconds": 0.0007093520107446238,
+    "exit_code": 0
+  },
+  {
+    "label": "perf-version",
+    "argv": [
+      "perf",
+      "--version"
+    ],
+    "started_utc": "2026-09-04T22:11:10.570878+00:00",
+    "wall_seconds": 0.011220672997296788,
+    "exit_code": 0
+  },
+  {
+    "label": "normal-sections",
+    "argv": [
+      "readelf",
+      "-S",
+      "--wide",
+      "/tmp/litchi-goal-fp-target/release/litchi-perf-baseline"
+    ],
+    "started_utc": "2026-09-04T22:11:10.582132+00:00",
+    "wall_seconds": 0.0007059030031086877,
+    "exit_code": 0
+  },
+  {
+    "label": "normal-build-id",
+    "argv": [
+      "readelf",
+      "-n",
+      "/tmp/litchi-goal-fp-target/release/litchi-perf-baseline"
+    ],
+    "started_utc": "2026-09-04T22:11:10.582873+00:00",
+    "wall_seconds": 0.0006595320010092109,
+    "exit_code": 0
+  },
+  {
+    "label": "allocator-build-id",
+    "argv": [
+      "readelf",
+      "-n",
+      "/tmp/litchi-goal-fp-target/release/litchi-perf-baseline-alloc"
+    ],
+    "started_utc": "2026-09-04T22:11:10.583568+00:00",
+    "wall_seconds": 0.0004943620006088167,
+    "exit_code": 0
+  },
+  {
+    "label": "normal",
+    "argv": [
+      "taskset",
+      "-c",
+      "2",
+      "/usr/bin/time",
+      "-v",
+      "-o",
+      "/tmp/litchi-goal-0408/time-v.txt",
+      "/tmp/litchi-goal-fp-target/release/litchi-perf-baseline",
+      "--case",
+      "opc_source_materialize",
+      "--shape",
+      "few-large",
+      "--payload",
+      "incompressible",
+      "--warmup",
+      "20",
+      "--samples",
+      "500",
+      "--json",
+      "/tmp/litchi-goal-0408/normal.json",
+      "--corpus-manifest",
+      "/tmp/litchi-goal-0408/normal.catalog.json"
+    ],
+    "started_utc": "2026-09-04T22:11:10.584100+00:00",
+    "wall_seconds": 7.035541646997444,
+    "exit_code": 0
+  },
+  {
+    "label": "allocator",
+    "argv": [
+      "taskset",
+      "-c",
+      "2",
+      "/tmp/litchi-goal-fp-target/release/litchi-perf-baseline-alloc",
+      "--case",
+      "opc_source_materialize",
+      "--shape",
+      "few-large",
+      "--payload",
+      "incompressible",
+      "--warmup",
+      "20",
+      "--samples",
+      "500",
+      "--json",
+      "/tmp/litchi-goal-0408/allocator.json",
+      "--corpus-manifest",
+      "/tmp/litchi-goal-0408/allocator.catalog.json"
+    ],
+    "started_utc": "2026-09-04T22:11:17.619805+00:00",
+    "wall_seconds": 7.045853254996473,
+    "exit_code": 0
+  },
+  {
+    "label": "accounted",
+    "argv": [
+      "taskset",
+      "-c",
+      "2",
+      "/tmp/litchi-goal-fp-target/release/litchi-perf-baseline",
+      "--case",
+      "opc_source_materialize_accounted",
+      "--shape",
+      "few-large",
+      "--payload",
+      "incompressible",
+      "--warmup",
+      "20",
+      "--samples",
+      "500",
+      "--json",
+      "/tmp/litchi-goal-0408/accounted.json",
+      "--corpus-manifest",
+      "/tmp/litchi-goal-0408/accounted.catalog.json"
+    ],
+    "started_utc": "2026-09-04T22:11:24.665864+00:00",
+    "wall_seconds": 7.015805611008545,
+    "exit_code": 0
+  },
+  {
+    "label": "perf-stat",
+    "argv": [
+      "taskset",
+      "-c",
+      "2",
+      "perf",
+      "stat",
+      "-x,",
+      "-o",
+      "/tmp/litchi-goal-0408/perf-stat.csv",
+      "-e",
+      "cycles,instructions,branches,branch-misses,cache-misses,page-faults",
+      "--",
+      "/tmp/litchi-goal-fp-target/release/litchi-perf-baseline",
+      "--case",
+      "opc_source_materialize",
+      "--shape",
+      "few-large",
+      "--payload",
+      "incompressible",
+      "--warmup",
+      "20",
+      "--samples",
+      "500",
+      "--json",
+      "/tmp/litchi-goal-0408/perf-stat.json",
+      "--corpus-manifest",
+      "/tmp/litchi-goal-0408/perf-stat.catalog.json"
+    ],
+    "started_utc": "2026-09-04T22:11:31.681828+00:00",
+    "wall_seconds": 7.099358774008579,
+    "exit_code": 0
+  },
+  {
+    "label": "perf-cache",
+    "argv": [
+      "taskset",
+      "-c",
+      "2",
+      "perf",
+      "stat",
+      "-x,",
+      "-o",
+      "/tmp/litchi-goal-0408/perf-cache.csv",
+      "-e",
+      "L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses",
+      "--",
+      "/tmp/litchi-goal-fp-target/release/litchi-perf-baseline",
+      "--case",
+      "opc_source_materialize",
+      "--shape",
+      "few-large",
+      "--payload",
+      "incompressible",
+      "--warmup",
+      "20",
+      "--samples",
+      "500",
+      "--json",
+      "/tmp/litchi-goal-0408/perf-cache.json",
+      "--corpus-manifest",
+      "/tmp/litchi-goal-0408/perf-cache.catalog.json"
+    ],
+    "started_utc": "2026-09-04T22:11:38.781350+00:00",
+    "wall_seconds": 7.039588461993844,
+    "exit_code": 0
+  },
+  {
+    "label": "perf-record",
+    "argv": [
+      "taskset",
+      "-c",
+      "2",
+      "perf",
+      "record",
+      "--no-buildid-cache",
+      "-e",
+      "cycles:u",
+      "-F",
+      "999",
+      "--call-graph",
+      "fp,127",
+      "-o",
+      "/tmp/litchi-goal-0408/perf.data",
+      "--",
+      "/tmp/litchi-goal-fp-target/release/litchi-perf-baseline",
+      "--case",
+      "opc_source_materialize",
+      "--shape",
+      "few-large",
+      "--payload",
+      "incompressible",
+      "--warmup",
+      "20",
+      "--samples",
+      "500",
+      "--json",
+      "/tmp/litchi-goal-0408/perf-record.json",
+      "--corpus-manifest",
+      "/tmp/litchi-goal-0408/perf-record.catalog.json"
+    ],
+    "started_utc": "2026-09-04T22:11:45.821083+00:00",
+    "wall_seconds": 7.195928449989879,
+    "exit_code": 0
+  },
+  {
+    "label": "perf-self",
+    "argv": [
+      "perf",
+      "report",
+      "--stdio",
+      "--no-children",
+      "--call-graph=graph,0.5,127,caller,function,percent",
+      "--percent-limit=0.5",
+      "-i",
+      "/tmp/litchi-goal-0408/perf.data"
+    ],
+    "started_utc": "2026-09-04T22:11:53.017220+00:00",
+    "wall_seconds": 13.004749982996145,
+    "exit_code": 0
+  },
+  {
+    "label": "perf-inclusive",
+    "argv": [
+      "perf",
+      "report",
+      "--stdio",
+      "--children",
+      "--call-graph=graph,0.5,127,caller,function,percent",
+      "--percent-limit=0.5",
+      "-i",
+      "/tmp/litchi-goal-0408/perf.data"
+    ],
+    "started_utc": "2026-09-04T22:12:06.022191+00:00",
+    "wall_seconds": 13.049662429999444,
+    "exit_code": 0
+  },
+  {
+    "label": "perf-script",
+    "argv": [
+      "perf",
+      "script",
+      "-i",
+      "/tmp/litchi-goal-0408/perf.data"
+    ],
+    "started_utc": "2026-09-04T22:12:19.072086+00:00",
+    "wall_seconds": 12.993919244996505,
+    "exit_code": 0
+  },
+  {
+    "label": "flamegraph",
+    "argv": [
+      "flamegraph",
+      "--perfdata",
+      "/tmp/litchi-goal-0408/perf.data",
+      "--no-inline",
+      "--deterministic",
+      "--title",
+      "OPC materialization: whole-process CPU samples",
+      "--output",
+      "/tmp/litchi-goal-0408/cpu-flamegraph.svg"
+    ],
+    "started_utc": "2026-09-04T22:12:32.066234+00:00",
+    "wall_seconds": 0.452864512000815,
+    "exit_code": 0
+  },
+  {
+    "label": "compress-perf-record.catalog.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-f",
+      "/tmp/litchi-goal-0408/perf-record.catalog.json",
+      "-o",
+      "/tmp/litchi-goal-0408/perf-record.catalog.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.255136+00:00",
+    "wall_seconds": 0.0014893449988448992,
+    "exit_code": 0
+  },
+  {
+    "label": "test-compression-perf-record.catalog.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-t",
+      "/tmp/litchi-goal-0408/perf-record.catalog.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.256823+00:00",
+    "wall_seconds": 0.0012470349902287126,
+    "exit_code": 0
+  },
+  {
+    "label": "compress-perf-record.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-f",
+      "/tmp/litchi-goal-0408/perf-record.json",
+      "-o",
+      "/tmp/litchi-goal-0408/perf-record.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.258875+00:00",
+    "wall_seconds": 0.0013926950050517917,
+    "exit_code": 0
+  },
+  {
+    "label": "test-compression-perf-record.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-t",
+      "/tmp/litchi-goal-0408/perf-record.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.260433+00:00",
+    "wall_seconds": 0.0009397130052093416,
+    "exit_code": 0
+  },
+  {
+    "label": "compress-perf-cache.catalog.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-f",
+      "/tmp/litchi-goal-0408/perf-cache.catalog.json",
+      "-o",
+      "/tmp/litchi-goal-0408/perf-cache.catalog.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.262673+00:00",
+    "wall_seconds": 0.0011405149998608977,
+    "exit_code": 0
+  },
+  {
+    "label": "test-compression-perf-cache.catalog.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-t",
+      "/tmp/litchi-goal-0408/perf-cache.catalog.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.263968+00:00",
+    "wall_seconds": 0.0008030129974940792,
+    "exit_code": 0
+  },
+  {
+    "label": "compress-perf-cache.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-f",
+      "/tmp/litchi-goal-0408/perf-cache.json",
+      "-o",
+      "/tmp/litchi-goal-0408/perf-cache.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.265474+00:00",
+    "wall_seconds": 0.0017960169934667647,
+    "exit_code": 0
+  },
+  {
+    "label": "test-compression-perf-cache.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-t",
+      "/tmp/litchi-goal-0408/perf-cache.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.267392+00:00",
+    "wall_seconds": 0.0014722560008522123,
+    "exit_code": 0
+  },
+  {
+    "label": "compress-perf-stat.catalog.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-f",
+      "/tmp/litchi-goal-0408/perf-stat.catalog.json",
+      "-o",
+      "/tmp/litchi-goal-0408/perf-stat.catalog.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.270246+00:00",
+    "wall_seconds": 0.0010640940017765388,
+    "exit_code": 0
+  },
+  {
+    "label": "test-compression-perf-stat.catalog.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-t",
+      "/tmp/litchi-goal-0408/perf-stat.catalog.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.271461+00:00",
+    "wall_seconds": 0.0009053630055859685,
+    "exit_code": 0
+  },
+  {
+    "label": "compress-perf-stat.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-f",
+      "/tmp/litchi-goal-0408/perf-stat.json",
+      "-o",
+      "/tmp/litchi-goal-0408/perf-stat.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.273102+00:00",
+    "wall_seconds": 0.0013531649892684072,
+    "exit_code": 0
+  },
+  {
+    "label": "test-compression-perf-stat.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-t",
+      "/tmp/litchi-goal-0408/perf-stat.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.274567+00:00",
+    "wall_seconds": 0.0011120749986730516,
+    "exit_code": 0
+  },
+  {
+    "label": "compress-accounted.catalog.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-f",
+      "/tmp/litchi-goal-0408/accounted.catalog.json",
+      "-o",
+      "/tmp/litchi-goal-0408/accounted.catalog.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.276951+00:00",
+    "wall_seconds": 0.0010890039993682876,
+    "exit_code": 0
+  },
+  {
+    "label": "test-compression-accounted.catalog.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-t",
+      "/tmp/litchi-goal-0408/accounted.catalog.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.278129+00:00",
+    "wall_seconds": 0.0007792530086589977,
+    "exit_code": 0
+  },
+  {
+    "label": "compress-accounted.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-f",
+      "/tmp/litchi-goal-0408/accounted.json",
+      "-o",
+      "/tmp/litchi-goal-0408/accounted.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.279612+00:00",
+    "wall_seconds": 0.0014766850072192028,
+    "exit_code": 0
+  },
+  {
+    "label": "test-compression-accounted.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-t",
+      "/tmp/litchi-goal-0408/accounted.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.281211+00:00",
+    "wall_seconds": 0.0009226630063494667,
+    "exit_code": 0
+  },
+  {
+    "label": "compress-allocator.catalog.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-f",
+      "/tmp/litchi-goal-0408/allocator.catalog.json",
+      "-o",
+      "/tmp/litchi-goal-0408/allocator.catalog.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.283535+00:00",
+    "wall_seconds": 0.0010462240024935454,
+    "exit_code": 0
+  },
+  {
+    "label": "test-compression-allocator.catalog.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-t",
+      "/tmp/litchi-goal-0408/allocator.catalog.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.284700+00:00",
+    "wall_seconds": 0.0008216230053221807,
+    "exit_code": 0
+  },
+  {
+    "label": "compress-allocator.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-f",
+      "/tmp/litchi-goal-0408/allocator.json",
+      "-o",
+      "/tmp/litchi-goal-0408/allocator.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.286180+00:00",
+    "wall_seconds": 0.0014909849996911362,
+    "exit_code": 0
+  },
+  {
+    "label": "test-compression-allocator.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-t",
+      "/tmp/litchi-goal-0408/allocator.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.287763+00:00",
+    "wall_seconds": 0.0009700929949758574,
+    "exit_code": 0
+  },
+  {
+    "label": "compress-normal.catalog.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-f",
+      "/tmp/litchi-goal-0408/normal.catalog.json",
+      "-o",
+      "/tmp/litchi-goal-0408/normal.catalog.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.290090+00:00",
+    "wall_seconds": 0.0010941339860437438,
+    "exit_code": 0
+  },
+  {
+    "label": "test-compression-normal.catalog.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-t",
+      "/tmp/litchi-goal-0408/normal.catalog.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.291305+00:00",
+    "wall_seconds": 0.0008444029954262078,
+    "exit_code": 0
+  },
+  {
+    "label": "compress-normal.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-f",
+      "/tmp/litchi-goal-0408/normal.json",
+      "-o",
+      "/tmp/litchi-goal-0408/normal.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.292856+00:00",
+    "wall_seconds": 0.0013134449982317165,
+    "exit_code": 0
+  },
+  {
+    "label": "test-compression-normal.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-t",
+      "/tmp/litchi-goal-0408/normal.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.294295+00:00",
+    "wall_seconds": 0.0009141530026681721,
+    "exit_code": 0
+  },
+  {
+    "label": "compress-environment.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-f",
+      "/tmp/litchi-goal-0408/environment.json",
+      "-o",
+      "/tmp/litchi-goal-0408/environment.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.296365+00:00",
+    "wall_seconds": 0.0009179240005323663,
+    "exit_code": 0
+  },
+  {
+    "label": "test-compression-environment.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-t",
+      "/tmp/litchi-goal-0408/environment.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.297397+00:00",
+    "wall_seconds": 0.0007423930073855445,
+    "exit_code": 0
+  },
+  {
+    "label": "compress-tool-paths.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-f",
+      "/tmp/litchi-goal-0408/tool-paths.json",
+      "-o",
+      "/tmp/litchi-goal-0408/tool-paths.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.298801+00:00",
+    "wall_seconds": 0.0010047429968835786,
+    "exit_code": 0
+  },
+  {
+    "label": "test-compression-tool-paths.json",
+    "argv": [
+      "zstd",
+      "-q",
+      "-t",
+      "/tmp/litchi-goal-0408/tool-paths.json.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.299930+00:00",
+    "wall_seconds": 0.0007937829941511154,
+    "exit_code": 0
+  },
+  {
+    "label": "compress-perf-script.stdout",
+    "argv": [
+      "zstd",
+      "-q",
+      "-f",
+      "/tmp/litchi-goal-0408/perf-script.stdout",
+      "-o",
+      "/tmp/litchi-goal-0408/perf-script.stdout.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.301603+00:00",
+    "wall_seconds": 0.007822450003004633,
+    "exit_code": 0
+  },
+  {
+    "label": "test-compression-perf-script.stdout",
+    "argv": [
+      "zstd",
+      "-q",
+      "-t",
+      "/tmp/litchi-goal-0408/perf-script.stdout.zst"
+    ],
+    "started_utc": "2026-09-04T22:12:33.309568+00:00",
+    "wall_seconds": 0.0036073630035389215,
+    "exit_code": 0
+  }
+]

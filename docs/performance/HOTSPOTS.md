@@ -28,6 +28,17 @@ The normal run lacks operation-local allocator counters and the CPU call
 chains contain unresolved frames; no speedup or complete phase attribution
 is claimed.
 
+[Change 0408](changes/0408-opc-materialization-evidence.md) removes repeated
+expected-payload generation from the sample loop and restores useful caller
+chains with a frame-pointer build. Whole-process verification remains dominant
+(71.82% inclusive); materialization is 16.34%. Operation-local allocation volume
+is 16,861,253 bytes for 16,777,216 decoded bytes, with 55 allocations and one
+serial decoder session. This is descriptive allocation evidence, not a proof
+about copy volume or a justification for a broad layout/SIMD rewrite. The next
+profiling work should extend important CRUD scenarios and validate native cache
+PMU events; the L1 aliases returned unvalidated zeroes and LLC aliases were
+unsupported. No production speedup is claimed by this batch.
+
 ## Change 0402 update
 
 The selected-source validation loop in
