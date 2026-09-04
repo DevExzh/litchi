@@ -14,11 +14,15 @@ use crate::error::OpcError;
 /// sink, including ZIP framing and generated records.  On a partial operation
 /// all counters retain the work accepted or observed before the error.
 ///
-/// This first propagation slice covers cold single-Part reads, exact source
+/// This propagation slice covers cold single-Part reads, serial source-backed
+/// package materialization through one decoder session, exact source
 /// publication, and the singular one-Part overlay publisher.  Ordinary eager
-/// package reads, parallel or bulk operations, topology publishers, batch
-/// overlays, `PartWriter`, and performance-report schemas intentionally remain
-/// outside this report until their operation boundaries are reviewed.
+/// package reads, other parallel or bulk operations, topology publishers,
+/// batch overlays, and `PartWriter` intentionally remain outside this report
+/// until their operation boundaries are reviewed.
+/// Materialization contributes only the physical payload work for cold Parts;
+/// it does not retain or expose archive types and does not claim output-byte
+/// accounting for the in-memory owning package it constructs.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct OpcOperationAccounting {
     compressed_deflate_payload_bytes_read: u64,
