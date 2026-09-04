@@ -1,5 +1,39 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0397: accepted OPC owned-open validation/index deduplication
+
+Production commit `f275d4566` is the measured candidate
+`f20d3f417edc3f3da07bf515676b8e71285ad76f`, compared with control
+`6e98db9ece29c1e50241cf3e84c9410ce71dd748`. The owning
+`OpcPackage::from_vec(owned)` path removes one redundant eager ZIP
+validation/index pass before the real `PhysPkgReader`; `authorize_owned_source`
+still performs preservation work, and public `OwnedPhysPkgReader` remains
+eager-validating. Path, `from_reader`, and session paths are correctness-only,
+not separately timed. Limits, error ordering, session charging, and exact
+mixed-storage byte preservation remain covered.
+
+The opt-in `opc_casefold_owned_open` selector raises the selectable registry
+from **418** to **419** while the default remains **36 cases / 198 rows**.
+Fixed stored corpora contain 256, 2,047, 2,048, and 16,384 ordinary Parts with
+32-byte payloads. CPU-2 A1/B1/B2/A2 ABBA used one worker, five warmups, and 30
+samples under rustc/Cargo/Rustdoc 1.98.1 because pinned 1.95 lacks Cargo. Normal,
+non-allocator release-binary p50 speedups (A1→B1 / A2→B2; positive is faster)
+are, in corpus order, `+8.617829% / +8.204676%`,
+`+8.298670% / +8.719476%`, `+8.945417% / +8.268274%`, and
+`+4.648655% / +4.348226%`; pooled p50 is
+`+8.452941% / +8.356702% / +8.490980% / +4.645459%`.
+
+Allocator elapsed time is observational only. On each ABBA leg, exact
+allocation/deallocation call reductions are `-1,038 / -8,202 / -8,206 /
+-65,550`, and allocated/deallocated-byte reductions are
+`-152,024 / -1,212,620 / -1,212,888 / -9,699,800`, in the same corpus order.
+Per-sample net-live after-before bytes and reallocations are exactly unchanged;
+raw global live-before/after baselines are not cross-run metrics. The accepted
+claim is p50 only; no p99 claim follows. See the [0397 change record](changes/0397-opc-owned-open-validation-index.md)
+and [evidence bundle](results/change-0397/) for source hashes and rejected
+invalid captures. No RSS, peak operation-memory, physical-I/O, cold/cache,
+throughput, format/facade, or generalized constructor claim follows.
+
 ## Change 0396: rejected OPC exact-lookup experiments and benchmark coverage
 
 The existing four opt-in case-fold selectors are expanded to seven: this
