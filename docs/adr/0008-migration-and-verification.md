@@ -3123,7 +3123,7 @@ the host heading helper confused `Heading 1`'s display name with style ID
 `Heading1` and omitted default Heading4 through Heading9 definitions. Exact-ID
 plus typed `Outline::{H1, ..., H9}` wire levels and save/reopen catalog
 regressions cover the correction. The final
-`owner_native_smoke` document contains scalar settings plus body and block-quote
+`docx_owner_native_smoke` document contains scalar settings plus body and block-quote
 divisions; Word for macOS opened it without repair, rendered its Heading 1 and
 body text, and identified the heading with the native Heading 1 style. No
 Office edit/resave, Strict native check, version matrix, extension-preserving
@@ -3153,7 +3153,7 @@ edits from being silently discarded. The owner passes 71 unit tests, three
 doctests, and one compile-fail test; the focused host passes all eight
 integration tests and producer-asset parity passes. Warning-denied Clippy and
 rustdoc plus targeted formatting, diff, stale-name, and boundary gates pass.
-The `owner_native_smoke` example
+The `pptx_owner_native_smoke` example
 creates a typed definition used by a two-row table and verifies it after reopen.
 Desktop PowerPoint for macOS opened that Transitional artifact without repair,
 rendered the table and text, and exposed native Table Design and Table Layout

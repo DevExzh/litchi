@@ -116,7 +116,7 @@ through eight, and the style writer emits `w:outlineLvl`. A save/reopen
 regression proves that `Title` plus all nine heading IDs resolve with the exact
 structural outline levels in the saved style catalog.
 
-After those corrections, `owner_native_smoke` generated a document containing
+After those corrections, `docx_owner_native_smoke` generated a document containing
 scalar web settings, a body division, a block-quote division, a Heading 1, and
 ordinary text. Desktop Word for macOS opened `web-settings-owner.docx` without
 a recovery prompt, rendered both paragraphs, and selected the native Heading 1
