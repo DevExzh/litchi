@@ -1155,22 +1155,38 @@ impl Package {
         let payload = unique_payload(&show_object.messages, &[SHOW_MESSAGE_TYPE], "Keynote show")?;
         let mut budget = SemanticBudget::new(self.semantic_limits());
         budget.charge_references(1, SemanticPath::Show)?;
-        let preflight_slide_count =
-            preflight_show(payload, self.semantic_wire_limits()?, &mut budget)?;
-        let show = decode_show_snapshot(
+        // This is a selected-local read: the codec validates the outer show
+        // and slide-tree framing plus the selected nested reference, but does
+        // not materialize or validate unrelated slide-reference payloads.
+        // Complete-show callers continue through `decode_show`, whose
+        // full-show preflight remains the semantic validation authority.
+        let selected = decode_show_slide_reference(
             payload,
+            index,
             self.semantic_limits().max_slides(),
             self.semantic_wire_limits()?,
         )?;
-        if show.slide_node_identifiers().len() != preflight_slide_count {
-            return Err(ReadError::Decode(
-                "Keynote show slide count disagrees with wire preflight".to_owned(),
-            ));
-        }
-        Ok(self
-            .slide_records(show.slide_node_identifiers(), &mut budget)?
-            .get(index)
-            .copied())
+        let Some(selected) = selected else {
+            return Ok(None);
+        };
+        let node_identifier = selected.identifier();
+        let node_object = self.required_object(node_identifier, "Keynote slide node")?;
+        let node_payload = unique_payload(
+            &node_object.messages,
+            &[SLIDE_NODE_MESSAGE_TYPE],
+            "Keynote slide node",
+        )?;
+        let (slide_identifier, is_skipped) = decode_slide_node_projection(
+            node_payload,
+            self.semantic_wire_limits()?,
+            SemanticPath::Slide { index },
+        )?;
+        budget.charge_references(1, SemanticPath::Slide { index })?;
+        Ok(Some(SlideRecord {
+            node_identifier,
+            slide_identifier,
+            is_skipped,
+        }))
     }
 
     fn parse_slide(
@@ -1930,6 +1946,83 @@ fn decode_show_snapshot(
             }
         } else {
             ReadError::InvalidFormat(format!("Keynote show projection is malformed: {error}"))
+        }
+    })
+}
+
+fn decode_show_slide_reference<'source>(
+    payload: &'source [u8],
+    index: usize,
+    max_slide_references: usize,
+    wire_limits: WireLimits,
+) -> ReadResult<Option<keynote_show_codec::SlideReferenceSnapshot<'source>>> {
+    let recursion_limit = u32::try_from(wire_limits.max_nesting()).map_err(|_error| {
+        ReadError::InvalidFormat("Keynote show nesting limit does not fit u32".to_owned())
+    })?;
+    keynote_show_codec::decode_slide_reference_at(
+        payload,
+        index,
+        keynote_show_codec::DecodeOptions::new(
+            payload.len(),
+            max_slide_references,
+            recursion_limit,
+        )
+        .with_max_fields(wire_limits.max_fields())
+        .with_max_work_bytes(wire_limits.max_rewrite_work()),
+    )
+    .map_err(|error| {
+        if let Some((observed, maximum)) = error.slide_reference_limit_values() {
+            ReadError::SemanticLimit {
+                kind: SemanticLimitKind::Slides,
+                observed,
+                maximum,
+                path: SemanticPath::Show,
+            }
+        } else if let Some((observed, maximum)) = error.field_limit_values() {
+            ReadError::PayloadLimit {
+                kind: PayloadLimitKind::Fields,
+                observed,
+                maximum,
+                path: SemanticPath::Slide { index },
+            }
+        } else if let Some((observed, maximum)) = error.work_limit_values() {
+            ReadError::PayloadLimit {
+                kind: PayloadLimitKind::Work,
+                observed,
+                maximum,
+                path: SemanticPath::Slide { index },
+            }
+        } else if let Some(limit) = error.wire_resource_limit() {
+            match limit {
+                keynote_show_codec::WireResourceLimit::Bytes { observed, maximum } => {
+                    ReadError::PayloadLimit {
+                        kind: PayloadLimitKind::Bytes,
+                        observed,
+                        maximum,
+                        path: SemanticPath::Slide { index },
+                    }
+                },
+                keynote_show_codec::WireResourceLimit::Nesting { observed, maximum } => {
+                    ReadError::PayloadLimit {
+                        kind: PayloadLimitKind::Nesting,
+                        observed: usize::try_from(observed).unwrap_or(usize::MAX),
+                        maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+                        path: SemanticPath::Slide { index },
+                    }
+                },
+                _ => ReadError::InvalidFormat(
+                    "Keynote selected slide reference exceeded an unknown wire resource".to_owned(),
+                ),
+            }
+        } else if let Some(amount) = error.allocation_amount() {
+            ReadError::Allocation {
+                resource: "Keynote selected slide reference",
+                amount,
+            }
+        } else {
+            ReadError::InvalidFormat(format!(
+                "Keynote selected slide reference projection is malformed: {error}"
+            ))
         }
     })
 }

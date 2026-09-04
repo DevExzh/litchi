@@ -20,6 +20,8 @@ pub mod percentage;
 pub mod pop_up_menu;
 /// Scientific-notation display values and selector-first transactions for existing cells.
 pub mod scientific;
+/// Literal-text display values and selector-first transactions.
+pub mod text;
 
 pub use control::{CellControl, NotCellControl, Slider, Stepper};
 pub use currency::{Currency, CurrencyCode, CurrencyStyle};

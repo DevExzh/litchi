@@ -707,8 +707,8 @@ pub(super) fn rewrite_scalar_control(
 /// the existing transaction facade; the Percentage facade imports the shared
 /// owner directly.
 pub(super) use super::table_cell_display_format_native::{
-    NumberFormatReadError, read_number_format, read_number_format_with_budget,
-    rewrite_number_format,
+    NumberFormatReadError, TextFormatReadError, read_number_format, read_number_format_with_budget,
+    read_text_format, read_text_format_with_budget, rewrite_number_format, rewrite_text_format,
 };
 
 #[derive(Clone)]
@@ -1011,6 +1011,29 @@ impl BncReferenceCensus<'_> {
                     self.failure = Some(error);
                     return false;
                 },
+            }
+        } else if cell.cell_format_kind() == Some(litchi_numbers_wire::TEXT_CELL_FORMAT_KIND) {
+            // Older wire versions do not expose Text's retained generic
+            // Number edge through `secondary_format_identifier`; recover it
+            // only in this private census route. A later wire helper may
+            // expose it directly, in which case the branch above wins and
+            // prevents double-counting.
+            let Ok(identifier) =
+                super::table_cell_display_format_native::text_secondary_identifier_for_census(
+                    source, &cell, self.path,
+                )
+            else {
+                return false;
+            };
+            if let Some(identifier) = identifier {
+                match Self::increment(&mut self.formats, identifier, self.budget, self.path) {
+                    Ok(true) => {},
+                    Ok(false) => return false,
+                    Err(error) => {
+                        self.failure = Some(error);
+                        return false;
+                    },
+                }
             }
         }
         if let Some(identifier) = control {

@@ -1,0 +1,14 @@
+syntax = "proto2";
+
+// Narrow lazy-view parity projection for the native Text display format.
+//
+// TSK.FormatStructArchive is shared by every Numbers display family.  The
+// handwritten codec owns the complete source payload and its unknown-field
+// policy; this sidecar intentionally projects only the discriminator needed
+// to prove that a Text payload crossed the Buffa boundary with the expected
+// scalar shape.
+package LitchiIwaNumbersTableCellTextFormatProjection;
+
+message FormatStructArchive {
+  optional uint32 format_type = 1;
+}

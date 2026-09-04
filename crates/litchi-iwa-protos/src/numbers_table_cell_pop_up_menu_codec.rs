@@ -22,6 +22,7 @@ use buffa::DecodeOptions as BuffaDecodeOptions;
 
 use crate::buffa_numbers_table_cell_currency_format_generated::LitchiIwaNumbersTableCellCurrencyFormatProjection as currency_projection;
 use crate::buffa_numbers_table_cell_pop_up_menu_generated::LitchiIwaNumbersTableCellPopUpMenuProjection as projection;
+use crate::buffa_numbers_table_cell_text_format_generated::LitchiIwaNumbersTableCellTextFormatProjection as text_projection;
 
 const POPUP_ITEM_FIELD: u32 = 2;
 const POPUP_DEPRECATED_ITEM_FIELD: u32 = 1;
@@ -721,6 +722,9 @@ pub const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
 /// Native Numbers display-format discriminator for a scientific cell.
 pub const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
 
+/// Native Numbers display-format discriminator for a Text cell.
+pub const NATIVE_TEXT_FORMAT_TYPE: u32 = 260;
+
 /// Native Numbers display-format discriminator for a fraction cell.
 pub const NATIVE_FRACTION_FORMAT_TYPE: u32 = 262;
 
@@ -889,6 +893,269 @@ impl NumberFormatWrite {
         self.show_thousands_separator = value;
         self
     }
+}
+
+/// Borrowed semantic facts for one strict native Text `FormatStructArchive`.
+///
+/// Text has no display-format scalar payload beyond its native discriminator.
+/// The complete source remains authoritative so unknown extension fields and
+/// groups can be retained byte-for-byte by a prepared rewrite.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct TextFormatSnapshot<'source> {
+    source: &'source [u8],
+    format_type: u32,
+}
+
+impl<'source> TextFormatSnapshot<'source> {
+    pub(crate) const fn raw(self) -> &'source [u8] {
+        self.source
+    }
+
+    pub(crate) const fn format_type(self) -> u32 {
+        self.format_type
+    }
+}
+
+/// Scalar values accepted by the strict native Text writer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct TextFormatWrite;
+
+impl TextFormatWrite {
+    pub(crate) const fn new() -> Self {
+        Self
+    }
+
+    pub(crate) const fn from_snapshot(_snapshot: TextFormatSnapshot<'_>) -> Self {
+        Self
+    }
+
+    pub(crate) const fn format_type(self) -> u32 {
+        NATIVE_TEXT_FORMAT_TYPE
+    }
+}
+
+/// Prepared source-preserving native Text rewrite.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PreparedTextFormatRewrite<'source> {
+    source: &'source [u8],
+    layout: TextFormatLayout,
+    write: TextFormatWrite,
+    requirements: RewriteExecutionRequirements,
+    candidate_work: usize,
+    verify_options: DecodeOptions,
+}
+
+impl PreparedTextFormatRewrite<'_> {
+    pub(crate) const fn execution_requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    pub(crate) fn prepare_report(self) -> DecodeReport {
+        report_from_requirements(self.requirements)
+    }
+
+    pub(crate) fn execute(
+        self,
+        limits: RewriteExecutionLimits,
+    ) -> Result<RewriteOutput, DecodeError> {
+        check_requirements(self.requirements, limits)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.requirements.output_bytes)
+            .map_err(|_| {
+                DecodeError::limited(DecodeLimit::Allocation {
+                    requested: self.requirements.output_bytes,
+                })
+            })?;
+        emit_text_format_rewrite(&mut bytes, self.source, self.layout)?;
+        if bytes.len() != self.requirements.output_bytes {
+            return Err(DecodeError::invalid());
+        }
+        verify_text_format_candidate(
+            &bytes,
+            self.write,
+            self.verify_options,
+            self.layout,
+            self.candidate_work,
+        )?;
+        Ok(RewriteOutput {
+            bytes,
+            report: report_from_requirements(self.requirements),
+        })
+    }
+}
+
+/// Prepared canonical native Text append.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PreparedTextFormatWrite {
+    requirements: RewriteExecutionRequirements,
+    verify_options: DecodeOptions,
+}
+
+impl PreparedTextFormatWrite {
+    pub(crate) const fn execution_requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    pub(crate) fn prepare_report(self) -> DecodeReport {
+        report_from_requirements(self.requirements)
+    }
+
+    pub(crate) fn execute(
+        self,
+        limits: RewriteExecutionLimits,
+    ) -> Result<RewriteOutput, DecodeError> {
+        check_requirements(self.requirements, limits)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.requirements.output_bytes)
+            .map_err(|_| {
+                DecodeError::limited(DecodeLimit::Allocation {
+                    requested: self.requirements.output_bytes,
+                })
+            })?;
+        emit_text_format_canonical(&mut bytes)?;
+        if bytes.len() != self.requirements.output_bytes {
+            return Err(DecodeError::invalid());
+        }
+        verify_text_format_candidate(
+            &bytes,
+            TextFormatWrite::new(),
+            self.verify_options,
+            TextFormatLayout {
+                fields: 1,
+                max_depth: 0,
+                span: None,
+            },
+            bytes
+                .len()
+                .checked_mul(2)
+                .ok_or_else(DecodeError::invalid)?,
+        )?;
+        Ok(RewriteOutput {
+            bytes,
+            report: report_from_requirements(self.requirements),
+        })
+    }
+}
+
+/// Strictly decode one native Text `FormatStructArchive`.
+pub(crate) fn decode_text_format(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<TextFormatSnapshot<'_>, DecodeError> {
+    Ok(decode_text_format_with_report(source, options)?.0)
+}
+
+/// Strictly decode one native Text format and return measured wire usage.
+pub(crate) fn decode_text_format_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(TextFormatSnapshot<'_>, DecodeReport), DecodeError> {
+    let (snapshot, _layout, report) = scan_text_format(source, options)?;
+    Ok((snapshot, report))
+}
+
+/// Prepare a source-preserving native Text format rewrite.
+pub(crate) fn prepare_text_format_rewrite<'source>(
+    source: &'source [u8],
+    write: TextFormatWrite,
+    options: DecodeOptions,
+) -> Result<PreparedTextFormatRewrite<'source>, DecodeError> {
+    validate_text_format_write(write)?;
+    let (_snapshot, layout, source_report) = scan_text_format(source, options)?;
+    let output_bytes = source.len();
+    // Text rewrites are byte-for-byte source preserving, so the emitted
+    // candidate has the same scan shape and work as the source preflight.
+    // This matters for balanced unknown groups: the bounded scanner charges
+    // the enclosing group record and its nested records independently, so
+    // the measured work can exceed a simple `2 * output_bytes` estimate.
+    let candidate_work = source_report.work_bytes();
+    let fields = layout
+        .fields
+        .checked_mul(2)
+        .ok_or_else(DecodeError::invalid)?;
+    let work_bytes = source_report
+        .work_bytes()
+        .checked_add(output_bytes)
+        .and_then(|work| work.checked_add(candidate_work))
+        .ok_or_else(DecodeError::invalid)?;
+    let retained_bytes = source
+        .len()
+        .checked_add(output_bytes)
+        .ok_or_else(DecodeError::invalid)?;
+    let requirements = RewriteExecutionRequirements {
+        output_bytes,
+        fields,
+        work_bytes,
+        max_depth: layout.max_depth,
+        references: 0,
+        items: 0,
+        text_bytes: 0,
+        allocations: 1,
+        retained_bytes,
+        scratch_bytes: 0,
+    };
+    check_options(requirements, options)?;
+    Ok(PreparedTextFormatRewrite {
+        source,
+        layout,
+        write,
+        requirements,
+        candidate_work,
+        verify_options: options,
+    })
+}
+
+/// Rewrite one native Text format while preserving unknown source fields.
+pub(crate) fn rewrite_text_format(
+    source: &[u8],
+    write: TextFormatWrite,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_text_format_rewrite(source, write, options)?;
+    prepared.execute(RewriteExecutionLimits::exact(
+        prepared.execution_requirements(),
+    ))
+}
+
+/// Prepare a canonical native Text format payload for a new list entry.
+pub(crate) fn prepare_text_format_write(
+    write: TextFormatWrite,
+    options: DecodeOptions,
+) -> Result<PreparedTextFormatWrite, DecodeError> {
+    validate_text_format_write(write)?;
+    let output_bytes = text_format_canonical_output_len()?;
+    let requirements = RewriteExecutionRequirements {
+        output_bytes,
+        fields: 1,
+        work_bytes: output_bytes
+            .checked_mul(3)
+            .ok_or_else(DecodeError::invalid)?,
+        max_depth: 0,
+        references: 0,
+        items: 0,
+        text_bytes: 0,
+        allocations: 1,
+        retained_bytes: output_bytes,
+        scratch_bytes: 0,
+    };
+    check_options(requirements, options)?;
+    Ok(PreparedTextFormatWrite {
+        requirements,
+        verify_options: options,
+    })
+}
+
+/// Encode a canonical native Text format payload for a new list entry.
+pub(crate) fn canonical_text_format(
+    write: TextFormatWrite,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_text_format_write(write, options)?;
+    prepared.execute(RewriteExecutionLimits::exact(
+        prepared.execution_requirements(),
+    ))
 }
 
 /// Strictly decode one plain-number `FormatStructArchive`.
@@ -2621,6 +2888,136 @@ fn verify_fraction_format_candidate(
         || report.work_bytes() != candidate_work
         || report.max_depth() != layout.max_depth
         || FractionFormatWrite::from_snapshot(snapshot) != write
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone, Copy)]
+struct TextFieldSpan {
+    end: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct TextFormatLayout {
+    fields: usize,
+    max_depth: u32,
+    span: Option<TextFieldSpan>,
+}
+
+fn scan_text_format<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+) -> Result<(TextFormatSnapshot<'source>, TextFormatLayout, DecodeReport), DecodeError> {
+    let mut budget = Budget::new(source, options)?;
+    let mut format_type = None;
+    let mut span = None;
+    let mut offset = 0usize;
+    while offset < source.len() {
+        let field = parse_one_field_limited(source, offset, 0, options.recursion_limit)?;
+        budget.field(field.raw.len(), 0)?;
+        budget.nested_fields(
+            field.nested_fields,
+            field.nested_work_bytes,
+            field.nested_max_depth,
+        )?;
+        match field.number {
+            FORMAT_TYPE_FIELD => {
+                if field.wire != 0 || span.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                format_type =
+                    Some(u32::try_from(field.known_varint()?).map_err(|_| DecodeError::invalid())?);
+                span = Some(TextFieldSpan { end: field.end });
+            },
+            number if number <= NUMBER_FORMAT_MAX_KNOWN_FIELD => {
+                // Every other TSK.FormatStructArchive field belongs to a
+                // different display family. Treating one as opaque would let
+                // a caller publish another format through the Text route.
+                return Err(DecodeError::invalid());
+            },
+            _ => {},
+        }
+        offset = field.end;
+    }
+    let format_type = format_type.ok_or_else(DecodeError::invalid)?;
+    if format_type != NATIVE_TEXT_FORMAT_TYPE {
+        return Err(DecodeError::invalid());
+    }
+    let snapshot = TextFormatSnapshot {
+        source,
+        format_type,
+    };
+    buffa_text_format_parity(source, snapshot, &mut budget)?;
+    let report = budget.finish(0);
+    let layout = TextFormatLayout {
+        fields: report.fields(),
+        max_depth: report.max_depth(),
+        span,
+    };
+    Ok((snapshot, layout, report))
+}
+
+fn buffa_text_format_parity(
+    source: &[u8],
+    snapshot: TextFormatSnapshot<'_>,
+    budget: &mut Budget,
+) -> Result<(), DecodeError> {
+    let options = budget.options;
+    let view: text_projection::FormatStructArchiveLazyView<'_> = BuffaDecodeOptions::new()
+        .with_max_message_size(options.max_message_bytes)
+        .with_unknown_field_limit(options.max_fields)
+        .with_element_memory_limit(0)
+        .with_recursion_limit(options.recursion_limit)
+        .decode_lazy_view(source)
+        .map_err(|_| DecodeError::invalid())?;
+    if view.format_type != Some(snapshot.format_type) {
+        return Err(DecodeError::invalid());
+    }
+    budget.work(source.len())?;
+    Ok(())
+}
+
+fn validate_text_format_write(_write: TextFormatWrite) -> Result<(), DecodeError> {
+    Ok(())
+}
+
+fn text_format_canonical_output_len() -> Result<usize, DecodeError> {
+    number_format_field_len(FORMAT_TYPE_FIELD, u64::from(NATIVE_TEXT_FORMAT_TYPE))
+}
+
+fn emit_text_format_canonical(output: &mut Vec<u8>) -> Result<(), DecodeError> {
+    emit_varint_field(
+        output,
+        FORMAT_TYPE_FIELD,
+        u64::from(NATIVE_TEXT_FORMAT_TYPE),
+    )
+}
+
+fn emit_text_format_rewrite(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    layout: TextFormatLayout,
+) -> Result<(), DecodeError> {
+    let span = layout.span.ok_or_else(DecodeError::invalid)?;
+    output.extend_from_slice(source.get(..span.end).ok_or_else(DecodeError::invalid)?);
+    output.extend_from_slice(source.get(span.end..).ok_or_else(DecodeError::invalid)?);
+    Ok(())
+}
+
+fn verify_text_format_candidate(
+    source: &[u8],
+    write: TextFormatWrite,
+    options: DecodeOptions,
+    layout: TextFormatLayout,
+    candidate_work: usize,
+) -> Result<(), DecodeError> {
+    let (snapshot, report) = decode_text_format_with_report(source, options)?;
+    if report.fields() != layout.fields
+        || report.work_bytes() != candidate_work
+        || report.max_depth() != layout.max_depth
+        || TextFormatWrite::from_snapshot(snapshot) != write
     {
         return Err(DecodeError::invalid());
     }

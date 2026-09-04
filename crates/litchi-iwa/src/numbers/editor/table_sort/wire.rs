@@ -2,90 +2,55 @@
 
 use super::*;
 
-use crate::wire::{
-    repeated_length_delimited_payloads, repeated_varint_values,
-    rewrite_repeated_length_delimited_fields, transform_length_delimited_field,
-};
+use litchi_iwa_protos::table_sort_order_codec as codec;
 
 const SORT_ORDER_FIELD: u32 = 44;
-const SORT_TYPE_FIELD: u32 = 1;
-const SORT_RULES_FIELD: u32 = 2;
-const SORT_RULE_COLUMN_FIELD: u32 = 1;
-const SORT_RULE_DIRECTION_FIELD: u32 = 2;
+
+fn codec_options(source: &[u8], model: &TableModelArchive) -> codec::DecodeOptions {
+    let columns = usize::try_from(model.number_of_columns).unwrap_or(usize::MAX);
+    codec::DecodeOptions::for_source(source).with_max_columns(columns)
+}
+
+fn codec_error(error: codec::DecodeError) -> Error {
+    Error::InvalidFormat(error.to_string())
+}
 
 pub(super) fn read_native_table_sort_order_wire(
     original: &[u8],
     model: &TableModelArchive,
-) -> Result<Option<tst::TableSortOrderArchive>> {
-    let payloads = repeated_length_delimited_payloads(original, SORT_ORDER_FIELD)?;
-    let native = match payloads.as_slice() {
-        [] => None,
-        [payload] => {
-            let native = tst::TableSortOrderArchive::decode(*payload)?;
-            validate_sort_order_wire_payload(payload, &native)?;
-            Some(native)
-        },
-        _ => {
-            return Err(Error::InvalidFormat(
-                "Numbers table sort-order wire field is duplicated".to_owned(),
-            ));
-        },
-    };
-    if native.as_ref() != model.sort_order.as_ref() {
+) -> Result<Option<codec::SortOrderSnapshot>> {
+    let snapshot = codec::decode_table_model_sort_order(original, codec_options(original, model))
+        .map_err(codec_error)?;
+    let has_sort_field =
+        !crate::wire::repeated_length_delimited_payloads(original, SORT_ORDER_FIELD)?.is_empty();
+    if has_sort_field != model.sort_order.is_some() {
         return Err(Error::InvalidFormat(
             "Numbers table sort-order wire payload is missing or inconsistent".to_owned(),
         ));
     }
-    Ok(native)
-}
-
-fn validate_sort_order_wire_payload(
-    payload: &[u8],
-    native: &tst::TableSortOrderArchive,
-) -> Result<()> {
-    validate_required_varint(payload, SORT_TYPE_FIELD, native.r#type as u64, "type")?;
-    let raw_rules = repeated_length_delimited_payloads(payload, SORT_RULES_FIELD)?;
-    if raw_rules.len() != native.rules.len() {
-        return Err(Error::InvalidFormat(
-            "Numbers table sort order has an inconsistent rule wire payload".to_owned(),
-        ));
+    if let Some(native) = model.sort_order.as_ref() {
+        let consistent = match snapshot.as_ref() {
+            Some(snapshot) => {
+                native.r#type == snapshot.scope().native_value()
+                    && native.rules.len() == snapshot.rules().len()
+                    && native
+                        .rules
+                        .iter()
+                        .zip(snapshot.rules())
+                        .all(|(native, rule)| {
+                            native.index == rule.column()
+                                && native.direction == rule.direction().native_value()
+                        })
+            },
+            None => native.rules.is_empty() && matches!(native.r#type, 0 | 1),
+        };
+        if !consistent {
+            return Err(Error::InvalidFormat(
+                "Numbers table sort-order wire payload is missing or inconsistent".to_owned(),
+            ));
+        }
     }
-    for (raw, rule) in raw_rules.into_iter().zip(&native.rules) {
-        validate_required_varint(
-            raw,
-            SORT_RULE_COLUMN_FIELD,
-            u64::from(rule.index),
-            "column index",
-        )?;
-        validate_required_varint(
-            raw,
-            SORT_RULE_DIRECTION_FIELD,
-            rule.direction as u64,
-            "direction",
-        )?;
-    }
-    Ok(())
-}
-
-fn validate_required_varint(
-    data: &[u8],
-    field_number: u32,
-    expected: u64,
-    name: &str,
-) -> Result<()> {
-    let values = repeated_varint_values(data, field_number)?;
-    match values.as_slice() {
-        [value] if *value == expected => Ok(()),
-        [] => Err(Error::InvalidFormat(format!(
-            "Numbers table sort {name} field is missing"
-        ))),
-        [_] => Err(Error::InvalidFormat(format!(
-            "Numbers table sort {name} field is inconsistent"
-        ))),
-        _ => Err(Error::InvalidFormat(format!(
-            "Numbers table sort {name} field is duplicated"
-        ))),
-    }
+    Ok(snapshot)
 }
 
 pub(super) fn delete_table_sort_column_wire(
@@ -97,18 +62,29 @@ pub(super) fn delete_table_sort_column_wire(
     let Some(previous) = read_native_table_sort_order_wire(original, model)? else {
         return Ok(original.to_vec());
     };
-    let mut expected = previous.clone();
-    expected
-        .rules
-        .retain(|rule| rule.index != column && rule.index < new_columns);
-    if expected == previous {
+    let rules = previous
+        .rules()
+        .iter()
+        .copied()
+        .filter(|rule| rule.column() != column && rule.column() < new_columns)
+        .collect::<Vec<_>>();
+    let expected = if rules.is_empty() {
+        None
+    } else {
+        Some(codec::SortOrderSnapshot::new(previous.scope(), rules).map_err(codec_error)?)
+    };
+    if expected.as_ref() == Some(&previous) {
         return Ok(original.to_vec());
     }
-    let data = transform_length_delimited_field(original, SORT_ORDER_FIELD, |sort_order| {
-        delete_sort_column_wire(sort_order, &previous, &expected, column, new_columns)
-    })?;
+    let data = codec::rewrite_table_model_sort_order(
+        original,
+        expected.clone(),
+        codec_options(original, model),
+    )
+    .map_err(codec_error)?
+    .into_bytes();
     let verified = TableModelArchive::decode(data.as_slice())?;
-    if read_native_table_sort_order_wire(&data, &verified)?.as_ref() != Some(&expected) {
+    if read_native_table_sort_order_wire(&data, &verified)? != expected {
         return Err(Error::InvalidFormat(
             "Numbers table sort-order column deletion failed validation".to_owned(),
         ));
@@ -116,30 +92,108 @@ pub(super) fn delete_table_sort_column_wire(
     Ok(data)
 }
 
-fn delete_sort_column_wire(
-    original: &[u8],
-    previous: &tst::TableSortOrderArchive,
-    expected: &tst::TableSortOrderArchive,
-    column: u32,
-    new_columns: u32,
-) -> Result<Vec<u8>> {
-    let raw_rules = repeated_length_delimited_payloads(original, SORT_RULES_FIELD)?;
-    if raw_rules.len() != previous.rules.len() {
-        return Err(Error::InvalidFormat(
-            "Numbers table sort order has an inconsistent rule wire payload".to_owned(),
-        ));
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::numbers::NumbersDocumentBuilder;
+    use crate::protobuf::tst::TableModelArchive;
+    use prost::Message;
+
+    fn table_model_source() -> Vec<u8> {
+        let editor = NumbersDocumentBuilder::new()
+            .table_dimensions(2, 3)
+            .build()
+            .expect("source-built Numbers table");
+        let table_id = editor.tables().expect("table catalog")[0].object_id;
+        let archive = editor
+            .package
+            .archive("Index/Document.iwa")
+            .expect("document archive");
+        let object = archive.object(table_id).expect("table model object");
+        let message_index = find_table_model_message(object).expect("table model message");
+        let source = object.messages[message_index].data.clone();
+        source
     }
-    let retained = raw_rules
-        .into_iter()
-        .zip(&previous.rules)
-        .filter(|(_, rule)| rule.index != column && rule.index < new_columns)
-        .map(|(raw, _)| raw.to_vec())
-        .collect::<Vec<_>>();
-    let data = rewrite_repeated_length_delimited_fields(original, SORT_RULES_FIELD, &retained)?;
-    if tst::TableSortOrderArchive::decode(data.as_slice())? != *expected {
-        return Err(Error::InvalidFormat(
-            "Numbers table sort-rule deletion failed validation".to_owned(),
-        ));
+
+    #[test]
+    fn strict_codec_reads_semantics_without_eager_sort_archive_decode() {
+        let source = table_model_source();
+        let order = codec::SortOrderSnapshot::new(
+            codec::SortScope::EntireTable,
+            [codec::SortRule::new(1, codec::SortDirection::Ascending)],
+        )
+        .expect("sort order");
+        let sort_payload = codec::canonical_table_sort_order(&order).expect("sort payload");
+        let source =
+            crate::wire::append_repeated_length_delimited_field(&source, 44, &sort_payload)
+                .expect("sort field");
+        let model = TableModelArchive::decode(source.as_slice()).expect("model with sort");
+        assert_eq!(model.number_of_columns, 3);
+        assert_eq!(
+            read_native_table_sort_order_wire(&source, &model).expect("strict sort read"),
+            Some(order)
+        );
     }
-    Ok(data)
+
+    #[test]
+    fn strict_codec_rewrite_keeps_unknown_outer_sort_and_rule_fields() {
+        let mut source = table_model_source();
+        let order = codec::SortOrderSnapshot::new(
+            codec::SortScope::EntireTable,
+            [
+                codec::SortRule::new(1, codec::SortDirection::Ascending),
+                codec::SortRule::new(2, codec::SortDirection::Descending),
+            ],
+        )
+        .expect("sort order");
+        let mut sort_payload = codec::canonical_table_sort_order(&order).expect("sort payload");
+        let sort_unknown = {
+            let mut bytes = Vec::new();
+            crate::wire::append_varint_field(&mut bytes, 98, 980).expect("sort unknown");
+            bytes
+        };
+        sort_payload.extend_from_slice(&sort_unknown);
+        let rule_unknown = {
+            let mut bytes = Vec::new();
+            crate::wire::append_varint_field(&mut bytes, 97, 970).expect("rule unknown");
+            bytes
+        };
+        sort_payload =
+            crate::wire::transform_length_delimited_fields_at_path(&sort_payload, &[2], |rule| {
+                let mut rule = rule.to_vec();
+                rule.extend_from_slice(&rule_unknown);
+                Ok(rule)
+            })
+            .expect("rule unknown");
+        crate::wire::append_varint_field(&mut source, 99, 990).expect("outer unknown");
+        crate::wire::append_length_delimited_field(&mut source, 44, &sort_payload)
+            .expect("sort field");
+        let model = TableModelArchive::decode(source.as_slice()).expect("model with sort");
+
+        let changed =
+            delete_table_sort_column_wire(&source, &model, 2, 2).expect("column deletion rewrite");
+        let changed_model = TableModelArchive::decode(changed.as_slice()).expect("rewritten model");
+        let changed_sort = crate::wire::repeated_length_delimited_payloads(&changed, 44)
+            .expect("sort payloads")
+            .pop()
+            .expect("sort payload");
+        let changed_rules =
+            crate::wire::repeated_length_delimited_payloads(changed_sort, 2).expect("sort rules");
+        assert_eq!(changed_rules.len(), 1);
+        assert!(changed_rules[0].ends_with(&rule_unknown));
+        assert!(changed_sort.ends_with(&sort_unknown));
+        assert!(
+            crate::wire::parse_wire_fields(&changed)
+                .expect("outer fields")
+                .iter()
+                .any(|field| field.number() == 99)
+        );
+        assert_eq!(
+            read_native_table_sort_order_wire(&changed, &changed_model)
+                .expect("strict rewritten sort read")
+                .expect("remaining sort rule")
+                .rules(),
+            &[codec::SortRule::new(1, codec::SortDirection::Ascending)]
+        );
+    }
 }

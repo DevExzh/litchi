@@ -213,36 +213,6 @@ pub(super) fn reset_cell_custom_format(
     }
 }
 
-pub(super) fn cell_text_format(
-    package: &IWorkPackage,
-    table_id: u64,
-    row: usize,
-    column: usize,
-) -> Result<Option<Text>> {
-    match cell_data_format(package, table_id, row, column)? {
-        DataFormat::Automatic => Ok(None),
-        DataFormat::Text(format) => Ok(Some(format)),
-        _ => Err(Error::InvalidFormat(
-            "Table cell does not use the Text data format".to_owned(),
-        )),
-    }
-}
-
-pub(super) fn reset_cell_text_format(
-    package: &mut IWorkPackage,
-    table_id: u64,
-    row: usize,
-    column: usize,
-) -> Result<bool> {
-    match cell_data_format(package, table_id, row, column)? {
-        DataFormat::Automatic => Ok(false),
-        DataFormat::Text(_) => reset_cell_data_format(package, table_id, row, column),
-        _ => Err(Error::InvalidFormat(
-            "Cannot reset Text format from a non-Text cell".to_owned(),
-        )),
-    }
-}
-
 pub(super) fn cell_currency_format(
     package: &IWorkPackage,
     table_id: u64,
@@ -2036,7 +2006,7 @@ mod tests {
     }
 
     #[test]
-    fn source_built_table_roundtrips_reuses_and_resets_text_formats() {
+    fn source_built_table_roundtrips_reuses_and_resets_generic_text_formats() {
         let mut editor = NumbersDocumentBuilder::new()
             .table_name("Text")
             .table_dimensions(3, 3)
@@ -2051,8 +2021,12 @@ mod tests {
             CellValue::Text("00123".to_owned()),
         )
         .unwrap();
-        editor.set_table_cell_text_format(table_id, 1, 1).unwrap();
-        editor.set_table_cell_text_format(table_id, 1, 2).unwrap();
+        editor
+            .set_table_cell_data_format(table_id, 1, 1, DataFormat::Text(Text))
+            .unwrap();
+        editor
+            .set_table_cell_data_format(table_id, 1, 2, DataFormat::Text(Text))
+            .unwrap();
 
         let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
         let formats = resolve_format_table(editor.package(), &location).unwrap();
@@ -2065,12 +2039,12 @@ mod tests {
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            reopened.table_cell_text_format(table_id, 1, 1).unwrap(),
-            Some(Text)
+            reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
+            DataFormat::Text(Text)
         );
         assert_eq!(
-            reopened.table_cell_text_format(table_id, 1, 2).unwrap(),
-            Some(Text)
+            reopened.table_cell_data_format(table_id, 1, 2).unwrap(),
+            DataFormat::Text(Text)
         );
         let document = compatibility_document_from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert_eq!(
@@ -2091,19 +2065,19 @@ mod tests {
         )
         .unwrap();
         let before = reopened.to_bytes().unwrap();
-        assert!(reopened.set_table_cell_text_format(table_id, 2, 1).is_err());
+        assert!(
+            reopened
+                .set_table_cell_data_format(table_id, 2, 1, DataFormat::Text(Text))
+                .is_err()
+        );
         assert_eq!(reopened.to_bytes().unwrap(), before);
 
-        assert!(
-            reopened
-                .reset_table_cell_text_format(table_id, 1, 1)
-                .unwrap()
-        );
-        assert!(
-            reopened
-                .reset_table_cell_text_format(table_id, 1, 2)
-                .unwrap()
-        );
+        reopened
+            .set_table_cell_data_format(table_id, 1, 1, DataFormat::Automatic)
+            .unwrap();
+        reopened
+            .set_table_cell_data_format(table_id, 1, 2, DataFormat::Automatic)
+            .unwrap();
         let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
         let formats = resolve_format_table(reopened.package(), &location).unwrap();
         assert!(formats.entries.is_empty());

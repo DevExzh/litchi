@@ -14,7 +14,7 @@ use litchi_numbers::cell::data_format::numeral_system::{
 use litchi_numbers::cell::data_format::{
     self as numbers, CellControl, Checkbox, Currency, CurrencyCode, CurrencyStyle, DateTime,
     DecimalPlaces, Duration, FixedDecimalPlaces, Fraction, FractionAccuracy, NegativeStyle, Number,
-    NumeralSystem, Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper,
+    NumeralSystem, Percentage, PopUpMenu, Scientific, Slider, StarRating, Stepper, Text,
 };
 
 const ROW: usize = 1;
@@ -321,7 +321,12 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         POP_UP_MENU_COLUMN,
         numbers_pop_up_menu_format()?.into(),
     )?;
-    editor.set_table_cell_text_format(table_id, ROW, TEXT_COLUMN)?;
+    editor.set_table_cell_data_format(
+        table_id,
+        ROW,
+        TEXT_COLUMN,
+        numbers::DataFormat::Text(Text),
+    )?;
     editor.set_table_cell_custom_format(
         table_id,
         ROW,
@@ -503,7 +508,12 @@ fn create_pages(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         TEXT_COLUMN,
         CellValue::Text("Invoice 001".to_owned()),
     )?;
-    editor.set_table_cell_text_format(table_id, ROW, TEXT_COLUMN)?;
+    editor.set_table_cell_data_format(
+        table_id,
+        ROW,
+        TEXT_COLUMN,
+        numbers::DataFormat::Text(Text),
+    )?;
     editor.set_table_cell(
         table_id,
         ROW,
@@ -566,12 +576,12 @@ fn create_keynote(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         NUMBER_COLUMN,
         CellValue::number(NUMBER_VALUE)?,
     )?;
-    editor.set_slide_table_cell_number_format(
+    editor.set_slide_table_cell_data_format(
         0,
         table.model_object_id,
         ROW,
         NUMBER_COLUMN,
-        semantic_format()?,
+        numbers::DataFormat::Number(semantic_format()?),
     )?;
     editor.set_slide_table_cell(
         0,

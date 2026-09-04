@@ -94,7 +94,7 @@ fn normalize_input(data: &[u8]) -> Option<Vec<u8>> {
         }
         return decode_hex(encoded);
     }
-    Some(data.to_vec())
+    (data.len() <= MAX_INPUT_BYTES).then(|| data.to_vec())
 }
 
 fn decode_hex(encoded: &[u8]) -> Option<Vec<u8>> {

@@ -311,12 +311,15 @@ from `-1.0` to `1.0` (`0.25` is `25%`), while `ImageEnhancement` models the
 automatic Enhance switch. The setters preserve all unmapped advanced native
 adjustments and opaque wire fields.
 
-All source-built and existing direct drawables also expose native Arrange
-stacking through `body_drawable_order`, `sheet_drawable_order`, and
+Source-built and existing direct drawables in the compatibility host expose
+native Arrange stacking through `sheet_drawable_order` and
 `slide_drawable_order`. Each list runs back-to-front; its setter requires an
 exact permutation, while `move_*_drawable` accepts typed
 `DrawableLayerMove::{ToBack, Backward, Forward, ToFront}` commands. See the
-`create_*_stacked_shapes` examples for complete scratch-file workflows.
+`create_numbers_stacked_shapes` and `create_keynote_stacked_shapes` examples
+for complete scratch-file workflows. Pages body drawable stacking is owned by
+the focused `litchi-pages` package and uses source-bound handles rather than
+the legacy raw-ID editor API.
 
 Ordinary source-built and existing shapes expose the native Flip buttons via
 `DrawableFlipAxis::{Horizontal, Vertical}` and `flip_body_shape`,
@@ -1225,11 +1228,16 @@ transactions, not `NumbersEditor` raw-ID calls. They stage a complete batch
 before publication, so any rejected coordinate, dependency, or cache update
 leaves the package unchanged:
 
-Existing-cell Percentage, Currency, and Scientific format transactions follow
-the same focused-package rule. Their former `NumbersEditor` raw-ID convenience
-methods and format-specific bridge/fallback helpers are retired; generic
-source-built or cross-format `DataFormat` compatibility helpers and attached
-table callers remain migration-host-only compatibility surfaces.
+Existing-cell Number, Percentage, Currency, and Scientific format transactions
+follow the same focused-package rule. Their former `NumbersEditor` raw-ID
+convenience methods and format-specific bridge/fallback helpers are retired;
+generic source-built or cross-format `DataFormat` compatibility helpers and
+attached table callers remain migration-host-only compatibility surfaces.
+
+The dedicated `NumbersEditor` Text-format convenience methods follow the same
+boundary: use the generic `DataFormat::Text` path for source-built Numbers
+compatibility, while the attached Pages and Keynote table callers remain
+available for their still-hosted cross-format compatibility surfaces.
 
 ```rust,no_run
 use litchi_numbers::{Package, SheetSelector, TableSelector};
@@ -2474,8 +2482,8 @@ Comment-only empty cells and tables that did not yet have a comment list are
 created transactionally. Adding that list patches only the nested
 `DataStore.commentStorageTable` reference instead of re-encoding the table
 model, so unknown table-model and data-store extensions remain intact. The
-`edit_numbers_comment` and `edit_numbers_comment_reply` examples exercise
-both compatibility-host thread layers.
+`edit_numbers_comment_reply` example exercises the remaining
+compatibility-host direct-reply thread layer.
 
 Direct drawable comments use the shared `IWorkDrawableCommentEditor` across
 Pages, Numbers, and Keynote protobufs. It resolves every supported nesting of

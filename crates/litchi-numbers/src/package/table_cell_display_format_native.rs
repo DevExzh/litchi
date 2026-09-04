@@ -1,4 +1,4 @@
-//! Private native owner for focused decimal display-format transactions.
+//! Private native owner for focused display-format transactions.
 //!
 //! Number, Percentage, Scientific, and Fraction cells use the same BNC decimal
 //! cell kind and the same format-list graph. This module keeps that graph
@@ -15,8 +15,9 @@ use litchi_iwa_protos::{
     numbers_table_cell_percentage_format_codec as percentage_codec,
     numbers_table_cell_scientific_format_codec as scientific_codec,
     numbers_table_cell_storage_codec as storage_codec,
+    numbers_table_cell_text_format_codec as text_codec,
 };
-use litchi_numbers_wire::{BncCell, NumericCellType};
+use litchi_numbers_wire::{BncCell, CellDataFormatKind, NumericCellType};
 
 use super::table_cell_control_native as native;
 use super::{
@@ -24,6 +25,7 @@ use super::{
     table_cell_pop_up_menu::{CellTarget, Error, Path, TransactionBudget},
     table_cell_pop_up_menu_native as popup_native,
 };
+use crate::cell::data_format::Text;
 use crate::cell::data_format::currency::{Currency, CurrencyCode, CurrencyStyle};
 use crate::cell::data_format::number::{
     DecimalPlaces, FixedDecimalPlaces, Fraction, FractionAccuracy, NegativeStyle, Number,
@@ -35,8 +37,64 @@ const CURRENCY_FORMAT_TYPE: u32 = currency_codec::NATIVE_CURRENCY_FORMAT_TYPE;
 const PERCENTAGE_FORMAT_TYPE: u32 = percentage_codec::NATIVE_PERCENTAGE_FORMAT_TYPE;
 const SCIENTIFIC_FORMAT_TYPE: u32 = scientific_codec::NATIVE_SCIENTIFIC_FORMAT_TYPE;
 const FRACTION_FORMAT_TYPE: u32 = fraction_codec::NATIVE_FRACTION_FORMAT_TYPE;
+// Numbers stores the plain Text display format in the same
+// `FormatStructArchive` family as the scalar formats.  The strict control
+// codec accepts this native discriminator while this private owner keeps it
+// out of the public API.
+const TEXT_FORMAT_TYPE: u32 = text_codec::NATIVE_TEXT_FORMAT_TYPE;
 
-/// The only display families admitted by the focused decimal owner.
+// BNC v5's fixed-layout fields are private to `litchi-numbers-wire`.  The
+// converted-text marker retains the generic Number-format key in field
+// `CELL_FORMAT_IDENTIFIER_FLAG`; this local, private layout is used only to
+// preserve and validate that native secondary reference.  No identifier
+// crosses the Numbers package boundary.
+const BNC_HEADER_LEN: usize = 12;
+const BNC_EXPLICIT_FORMAT_FLAGS_START: usize = 6;
+const BNC_EXPLICIT_FORMAT_FLAGS_END: usize = 8;
+const BNC_CELL_FORMAT_KIND_FLAG: u32 = 0x0000_1000;
+const BNC_CELL_FORMAT_IDENTIFIER_FLAG: u32 = 0x0000_2000;
+const BNC_CURRENCY_FORMAT_IDENTIFIER_FLAG: u32 = 0x0000_4000;
+const BNC_DATE_TIME_FORMAT_IDENTIFIER_FLAG: u32 = 0x0000_8000;
+const BNC_DURATION_FORMAT_IDENTIFIER_FLAG: u32 = 0x0001_0000;
+const BNC_TEXT_FORMAT_IDENTIFIER_FLAG: u32 = 0x0002_0000;
+const BNC_CHECKBOX_FORMAT_IDENTIFIER_FLAG: u32 = 0x0004_0000;
+const BNC_RESERVED_KNOWN_FIELD_FLAG: u32 = 0x0010_0000;
+const BNC_CONTROL_CELL_SPEC_FLAG: u32 = 0x0000_0400;
+const BNC_TEXT_ALLOWED_FORMAT_FLAGS: u32 =
+    BNC_CELL_FORMAT_KIND_FLAG | BNC_CELL_FORMAT_IDENTIFIER_FLAG | BNC_TEXT_FORMAT_IDENTIFIER_FLAG;
+const BNC_FORMAT_FLAGS: u32 = BNC_CONTROL_CELL_SPEC_FLAG
+    | BNC_CELL_FORMAT_KIND_FLAG
+    | BNC_CELL_FORMAT_IDENTIFIER_FLAG
+    | BNC_CURRENCY_FORMAT_IDENTIFIER_FLAG
+    | BNC_DATE_TIME_FORMAT_IDENTIFIER_FLAG
+    | BNC_DURATION_FORMAT_IDENTIFIER_FLAG
+    | BNC_TEXT_FORMAT_IDENTIFIER_FLAG
+    | BNC_CHECKBOX_FORMAT_IDENTIFIER_FLAG;
+const BNC_FIELD_LAYOUT: &[(u32, usize)] = &[
+    (0x0000_0001, 16),
+    (0x0000_0002, 8),
+    (0x0000_0004, 8),
+    (0x0000_0008, 4),
+    (0x0000_0010, 4),
+    (0x0000_0020, 4),
+    (0x0000_0040, 4),
+    (0x0000_0080, 4),
+    (0x0000_0100, 4),
+    (0x0000_0200, 4),
+    (BNC_CONTROL_CELL_SPEC_FLAG, 4),
+    (0x0000_0800, 4),
+    (BNC_CELL_FORMAT_KIND_FLAG, 4),
+    (BNC_CELL_FORMAT_IDENTIFIER_FLAG, 4),
+    (BNC_CURRENCY_FORMAT_IDENTIFIER_FLAG, 4),
+    (BNC_DATE_TIME_FORMAT_IDENTIFIER_FLAG, 4),
+    (BNC_DURATION_FORMAT_IDENTIFIER_FLAG, 4),
+    (BNC_TEXT_FORMAT_IDENTIFIER_FLAG, 4),
+    (BNC_CHECKBOX_FORMAT_IDENTIFIER_FLAG, 4),
+    (0x0008_0000, 4),
+    (0x0010_0000, 4),
+];
+
+/// The only display families admitted by the focused display-format owner.
 ///
 /// The enum is private to the package adapter.  In particular, callers cannot
 /// supply an arbitrary native discriminator and use this route as a generic
@@ -48,6 +106,7 @@ pub(super) enum DisplayFormatFamily {
     Percentage,
     Scientific,
     Fraction,
+    Text,
 }
 
 impl DisplayFormatFamily {
@@ -58,6 +117,7 @@ impl DisplayFormatFamily {
             Self::Percentage => PERCENTAGE_FORMAT_TYPE,
             Self::Scientific => SCIENTIFIC_FORMAT_TYPE,
             Self::Fraction => FRACTION_FORMAT_TYPE,
+            Self::Text => TEXT_FORMAT_TYPE,
         }
     }
 }
@@ -139,6 +199,19 @@ impl From<Error> for FractionFormatReadError {
     }
 }
 
+/// Typed native failure returned to the Text package facade.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum TextFormatReadError {
+    WrongFormatFamily,
+    Native(Error),
+}
+
+impl From<Error> for TextFormatReadError {
+    fn from(error: Error) -> Self {
+        Self::Native(error)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NativeDisplayValue {
     Number(Number),
@@ -146,6 +219,7 @@ enum NativeDisplayValue {
     Percentage(Percentage),
     Scientific(Scientific),
     Fraction(Fraction),
+    Text(Text),
 }
 
 impl NativeDisplayValue {
@@ -156,6 +230,7 @@ impl NativeDisplayValue {
             Self::Percentage(_) => DisplayFormatFamily::Percentage,
             Self::Scientific(_) => DisplayFormatFamily::Scientific,
             Self::Fraction(_) => DisplayFormatFamily::Fraction,
+            Self::Text(_) => DisplayFormatFamily::Text,
         }
     }
 
@@ -233,6 +308,7 @@ impl NativeDisplayValue {
                 NativeDisplayValue::Scientific(Scientific::new(decimal_places))
             },
             DisplayFormatFamily::Fraction => return Err(Error::InvalidSource { path }),
+            DisplayFormatFamily::Text => return Err(Error::InvalidSource { path }),
         };
         Ok(value)
     }
@@ -486,6 +562,282 @@ fn charge_display_tile_patch_budget(
     Ok(())
 }
 
+#[derive(Debug, Clone, Copy)]
+struct TextCellMetadata {
+    generic_identifier: Option<u32>,
+    text_identifier: Option<u32>,
+    text_identifier_offset: Option<usize>,
+}
+
+/// Inspect the fixed BNC metadata needed by the Text owner.
+///
+/// `BncCell` deliberately does not expose the generic secondary identifier
+/// carried by native converted-text cells (`0x81`).  Keeping this small
+/// parser private lets the package owner preserve that reference without
+/// widening the low-level wire API or leaking an ID through the semantic
+/// facade.  The preceding `BncCell::parse` still owns version, field-width,
+/// and unknown-flag validation; these checks only recover offsets and reject
+/// metadata from another family.
+fn inspect_text_cell_metadata(
+    source: &[u8],
+    cell: &BncCell,
+    path: Path,
+) -> Result<TextCellMetadata, Error> {
+    if source.len() < BNC_HEADER_LEN {
+        return Err(Error::InvalidSource { path });
+    }
+    let flags = u32::from_le_bytes(
+        source[BNC_HEADER_LEN - 4..BNC_HEADER_LEN]
+            .try_into()
+            .map_err(|_| Error::InvalidSource { path })?,
+    );
+    if flags & BNC_RESERVED_KNOWN_FIELD_FLAG != 0 {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    if flags & BNC_FORMAT_FLAGS & !BNC_TEXT_ALLOWED_FORMAT_FLAGS != 0 {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    if cell.cell_format_kind() != Some(litchi_numbers_wire::TEXT_CELL_FORMAT_KIND) {
+        return Err(Error::UnsupportedDependency { path });
+    }
+
+    let mut offset = BNC_HEADER_LEN;
+    let mut generic_identifier = None;
+    let mut text_identifier = None;
+    let mut text_identifier_offset = None;
+    for &(flag, size) in BNC_FIELD_LAYOUT {
+        if flags & flag == 0 {
+            continue;
+        }
+        let end = offset
+            .checked_add(size)
+            .ok_or(Error::InvalidSource { path })?;
+        let bytes = source
+            .get(offset..end)
+            .ok_or(Error::InvalidSource { path })?;
+        if flag == BNC_CELL_FORMAT_IDENTIFIER_FLAG {
+            generic_identifier = Some(u32::from_le_bytes(
+                bytes
+                    .try_into()
+                    .map_err(|_| Error::InvalidSource { path })?,
+            ));
+        } else if flag == BNC_TEXT_FORMAT_IDENTIFIER_FLAG {
+            text_identifier = Some(u32::from_le_bytes(
+                bytes
+                    .try_into()
+                    .map_err(|_| Error::InvalidSource { path })?,
+            ));
+            text_identifier_offset = Some(offset);
+        }
+        offset = end;
+    }
+    if offset > source.len() {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok(TextCellMetadata {
+        generic_identifier,
+        text_identifier,
+        text_identifier_offset,
+    })
+}
+
+fn bnc_has_reserved_known_field(source: &[u8]) -> bool {
+    source
+        .get(BNC_HEADER_LEN - 4..BNC_HEADER_LEN)
+        .and_then(|bytes| bytes.try_into().ok())
+        .map(u32::from_le_bytes)
+        .is_some_and(|flags| flags & BNC_RESERVED_KNOWN_FIELD_FLAG != 0)
+}
+
+fn validate_text_cell_metadata(
+    source: &[u8],
+    cell: &BncCell,
+    path: Path,
+) -> Result<TextCellMetadata, Error> {
+    let metadata = inspect_text_cell_metadata(source, cell, path)?;
+    let explicit_flags = cell.explicit_format_flags();
+    let valid_value = matches!(
+        cell.stored_value(),
+        litchi_numbers_wire::StoredValue::Empty | litchi_numbers_wire::StoredValue::Text(_)
+    );
+    let valid_marker = match explicit_flags {
+        // A native Text cell may carry its Text key with no explicit marker
+        // when it is still using the workbook's automatic/default display.
+        // Treat that shape as a valid Text owner, but never publish it when a
+        // caller explicitly stages Text (the write path uses 0x80).
+        0 | litchi_numbers_wire::EXPLICIT_TEXT_FORMAT => metadata.generic_identifier.is_none(),
+        litchi_numbers_wire::EXPLICIT_CONVERTED_TEXT_FORMAT => metadata
+            .generic_identifier
+            .is_some_and(|identifier| identifier != 0),
+        _ => false,
+    };
+    if !valid_value
+        || !valid_marker
+        || cell.control_cell_spec_identifier().is_some()
+        || metadata
+            .text_identifier
+            .is_none_or(|identifier| identifier == 0)
+    {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    Ok(metadata)
+}
+
+/// Return the generic format-table reference retained by a converted Text
+/// cell for the native reference census.
+///
+/// The value is intentionally kept behind the package-native seam. It is a
+/// graph edge used to validate list refcounts, not part of the public Text
+/// semantic value or transaction API.
+pub(super) fn text_secondary_identifier_for_census(
+    source: &[u8],
+    cell: &BncCell,
+    path: Path,
+) -> Result<Option<u32>, Error> {
+    if cell.cell_format_kind() != Some(litchi_numbers_wire::TEXT_CELL_FORMAT_KIND) {
+        return Ok(None);
+    }
+    let metadata = validate_text_cell_metadata(source, cell, path)?;
+    if cell.explicit_format_flags() == litchi_numbers_wire::EXPLICIT_CONVERTED_TEXT_FORMAT {
+        Ok(metadata.generic_identifier)
+    } else {
+        Ok(None)
+    }
+}
+
+fn rewrite_text_cell_metadata(
+    source: &[u8],
+    desired_identifier: Option<u32>,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<u8>, Error> {
+    let output_limit = source
+        .len()
+        .checked_add(8)
+        .ok_or(Error::InvalidSource { path })?;
+    let owned_cell_bytes = source
+        .len()
+        .checked_add(output_limit)
+        .ok_or(Error::InvalidSource { path })?;
+    let work = output_limit
+        .checked_mul(2)
+        .and_then(|amount| amount.checked_add(source.len()))
+        .ok_or(Error::InvalidSource { path })?;
+    let allocations = litchi_numbers_wire::MAX_OWNED_BNC_PARSE_ALLOCATIONS
+        .checked_mul(2)
+        .and_then(|amount| amount.checked_add(2))
+        .ok_or(Error::InvalidSource { path })?;
+    budget.charge_allocations(allocations, path)?;
+    budget.charge_scratch_bytes(owned_cell_bytes, path)?;
+    budget.charge_retained_bytes(output_limit, path)?;
+    budget.charge_transaction_work(work, path)?;
+
+    let mut cell = BncCell::parse(source).map_err(|_| Error::InvalidSource { path })?;
+    let source_value = cell.stored_value();
+    let source_cache = cell
+        .cached_scalar()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let metadata = if cell.cell_format_kind() == Some(litchi_numbers_wire::TEXT_CELL_FORMAT_KIND) {
+        Some(validate_text_cell_metadata(source, &cell, path)?)
+    } else {
+        None
+    };
+
+    // Installing a Text display format on an automatic numeric/formula/date
+    // cell would make the generic BNC setter convert its scalar. This owner
+    // is metadata-only: only an empty or already-text value may enter the
+    // canonical Text path.
+    if desired_identifier.is_some()
+        && metadata.is_none()
+        && !matches!(
+            source_value,
+            litchi_numbers_wire::StoredValue::Empty | litchi_numbers_wire::StoredValue::Text(_)
+        )
+    {
+        return Err(Error::UnsupportedDependency { path });
+    }
+
+    let output = match desired_identifier {
+        Some(0) => return Err(Error::InvalidSource { path }),
+        Some(identifier) => {
+            if let Some(metadata) = metadata {
+                // Existing native Text cells have a fixed-width text key. A
+                // direct byte patch is the only way to retain the converted
+                // Text marker and its generic Number reference exactly. The
+                // marker-zero/default shape is promoted to plain explicit
+                // Text, never to converted Text.
+                let offset = metadata
+                    .text_identifier_offset
+                    .ok_or(Error::InvalidSource { path })?;
+                let mut output = Vec::new();
+                output
+                    .try_reserve_exact(source.len())
+                    .map_err(|_| Error::Allocation {
+                        amount: source.len(),
+                        path,
+                    })?;
+                output.extend_from_slice(source);
+                output[offset..offset + 4].copy_from_slice(&identifier.to_le_bytes());
+                if cell.explicit_format_flags() == 0 {
+                    output[BNC_EXPLICIT_FORMAT_FLAGS_START..BNC_EXPLICIT_FORMAT_FLAGS_END]
+                        .copy_from_slice(&litchi_numbers_wire::EXPLICIT_TEXT_FORMAT.to_le_bytes());
+                }
+                output
+            } else {
+                cell.set_data_format_identifier(identifier, CellDataFormatKind::Text, None)
+                    .map_err(|_| Error::UnsupportedDependency { path })?;
+                cell.try_encode_with_limit(output_limit)
+                    .map_err(|error| map_bnc_error(error, path))?
+            }
+        },
+        None => {
+            cell.clear_explicit_format();
+            cell.try_encode_with_limit(output_limit)
+                .map_err(|error| map_bnc_error(error, path))?
+        },
+    };
+    let candidate = BncCell::parse(&output).map_err(|_| Error::Verification)?;
+    if candidate.stored_value() != source_value
+        || candidate.cached_scalar().map_err(|_| Error::Verification)? != source_cache
+    {
+        return Err(Error::Verification);
+    }
+    match desired_identifier {
+        Some(identifier) => {
+            let candidate_metadata = validate_text_cell_metadata(&output, &candidate, path)?;
+            if candidate_metadata.text_identifier != Some(identifier)
+                || metadata.is_some_and(|source_metadata| {
+                    candidate_metadata.generic_identifier != source_metadata.generic_identifier
+                })
+            {
+                return Err(Error::Verification);
+            }
+        },
+        None => {
+            if candidate.explicit_format_flags() != 0
+                || candidate.cell_format_kind().is_some()
+                || candidate.format_identifier().is_some()
+                || candidate.control_cell_spec_identifier().is_some()
+            {
+                return Err(Error::Verification);
+            }
+        },
+    }
+    Ok(output)
+}
+
+fn map_bnc_error(error: litchi_numbers_wire::Error, path: Path) -> Error {
+    match error {
+        litchi_numbers_wire::Error::Allocation { requested } => Error::Allocation {
+            amount: requested,
+            path,
+        },
+        litchi_numbers_wire::Error::InvalidFormat(_)
+        | litchi_numbers_wire::Error::ParseError(_)
+        | litchi_numbers_wire::Error::OutputLimitExceeded { .. } => Error::InvalidSource { path },
+    }
+}
+
 /// Read one existing Number format with a fresh transaction ledger.
 pub(super) fn read_number_format(
     source: &Package,
@@ -511,6 +863,7 @@ pub(super) fn read_number_format_with_budget(
         | Ok(Some(NativeDisplayValue::Percentage(_)))
         | Ok(Some(NativeDisplayValue::Scientific(_)))
         | Ok(Some(NativeDisplayValue::Fraction(_)))
+        | Ok(Some(NativeDisplayValue::Text(_)))
         | Err(DisplayReadError::WrongFormatFamily) => Err(NumberFormatReadError::WrongFormatFamily),
         Err(DisplayReadError::Native(error)) => Err(NumberFormatReadError::Native(error)),
     }
@@ -547,6 +900,7 @@ pub(super) fn read_currency_format_with_budget(
         | Ok(Some(NativeDisplayValue::Percentage(_)))
         | Ok(Some(NativeDisplayValue::Scientific(_)))
         | Ok(Some(NativeDisplayValue::Fraction(_)))
+        | Ok(Some(NativeDisplayValue::Text(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(CurrencyFormatReadError::WrongFormatFamily)
         },
@@ -585,6 +939,7 @@ pub(super) fn read_percentage_format_with_budget(
         | Ok(Some(NativeDisplayValue::Currency(_)))
         | Ok(Some(NativeDisplayValue::Scientific(_)))
         | Ok(Some(NativeDisplayValue::Fraction(_)))
+        | Ok(Some(NativeDisplayValue::Text(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(PercentageFormatReadError::WrongFormatFamily)
         },
@@ -623,6 +978,7 @@ pub(super) fn read_scientific_format_with_budget(
         | Ok(Some(NativeDisplayValue::Currency(_)))
         | Ok(Some(NativeDisplayValue::Percentage(_)))
         | Ok(Some(NativeDisplayValue::Fraction(_)))
+        | Ok(Some(NativeDisplayValue::Text(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(ScientificFormatReadError::WrongFormatFamily)
         },
@@ -661,10 +1017,41 @@ pub(super) fn read_fraction_format_with_budget(
         | Ok(Some(NativeDisplayValue::Currency(_)))
         | Ok(Some(NativeDisplayValue::Percentage(_)))
         | Ok(Some(NativeDisplayValue::Scientific(_)))
+        | Ok(Some(NativeDisplayValue::Text(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(FractionFormatReadError::WrongFormatFamily)
         },
         Err(DisplayReadError::Native(error)) => Err(FractionFormatReadError::Native(error)),
+    }
+}
+
+/// Read one existing Text format with a fresh transaction ledger.
+pub(super) fn read_text_format(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+) -> Result<Option<Text>, TextFormatReadError> {
+    let mut budget = TransactionBudget::for_cell_control(source);
+    read_text_format_with_budget(source, target, path, &mut budget)
+}
+
+/// Read one existing Text format against a caller-owned transaction ledger.
+pub(super) fn read_text_format_with_budget(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Option<Text>, TextFormatReadError> {
+    match read_display_format_with_budget(DisplayFormatFamily::Text, source, target, path, budget) {
+        Ok(None) => Ok(None),
+        Ok(Some(NativeDisplayValue::Text(value))) => Ok(Some(value)),
+        Ok(Some(NativeDisplayValue::Number(_)))
+        | Ok(Some(NativeDisplayValue::Currency(_)))
+        | Ok(Some(NativeDisplayValue::Percentage(_)))
+        | Ok(Some(NativeDisplayValue::Scientific(_)))
+        | Ok(Some(NativeDisplayValue::Fraction(_)))
+        | Err(DisplayReadError::WrongFormatFamily) => Err(TextFormatReadError::WrongFormatFamily),
+        Err(DisplayReadError::Native(error)) => Err(TextFormatReadError::Native(error)),
     }
 }
 
@@ -770,6 +1157,26 @@ pub(super) fn rewrite_fraction_format(
     )
 }
 
+/// Rewrite one ordinary Text cell without manufacturing a CellSpec graph.
+pub(super) fn rewrite_text_format(
+    source: &Package,
+    target: CellTarget,
+    before: Option<&Text>,
+    after: Option<&Text>,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<native::NativeControlOutput, Error> {
+    rewrite_display_format(
+        DisplayFormatFamily::Text,
+        source,
+        target,
+        before.copied().map(NativeDisplayValue::Text),
+        after.copied().map(NativeDisplayValue::Text),
+        path,
+        budget,
+    )
+}
+
 fn read_display_format_with_budget(
     family: DisplayFormatFamily,
     source: &Package,
@@ -857,12 +1264,21 @@ fn read_display_format_with_budget(
     .map_err(|_| Error::InvalidSource { path })?;
     charge_owned_bnc_parse(cell_source.len(), path, budget)?;
     let cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
+    if bnc_has_reserved_known_field(cell_source) {
+        return Err(Error::UnsupportedDependency { path }.into());
+    }
     let format_identifier = cell.format_identifier();
     if cell.control_cell_spec_identifier().is_some() {
         return Err(DisplayReadError::WrongFormatFamily);
     }
     let explicit_flags = cell.explicit_format_flags();
-    let secondary_identifier = cell.secondary_format_identifier();
+    let secondary_identifier =
+        if cell.cell_format_kind() == Some(litchi_numbers_wire::TEXT_CELL_FORMAT_KIND) {
+            Some(validate_text_cell_metadata(cell_source, &cell, path)?)
+                .and_then(|metadata| metadata.generic_identifier)
+        } else {
+            cell.secondary_format_identifier()
+        };
     match (family, cell.cell_format_kind()) {
         (
             DisplayFormatFamily::Number
@@ -892,6 +1308,24 @@ fn read_display_format_with_budget(
                 || !currency_cell_type_matches_value(&cell, true)
             {
                 return Err(Error::InvalidSource { path }.into());
+            }
+        },
+        (DisplayFormatFamily::Text, Some(litchi_numbers_wire::TEXT_CELL_FORMAT_KIND)) => {
+            let valid_marker = match explicit_flags {
+                0 | litchi_numbers_wire::EXPLICIT_TEXT_FORMAT => secondary_identifier.is_none(),
+                litchi_numbers_wire::EXPLICIT_CONVERTED_TEXT_FORMAT => {
+                    secondary_identifier.is_some_and(|identifier| identifier != 0)
+                },
+                _ => false,
+            };
+            if !valid_marker
+                || !matches!(
+                    cell.stored_value(),
+                    litchi_numbers_wire::StoredValue::Empty
+                        | litchi_numbers_wire::StoredValue::Text(_)
+                )
+            {
+                return Err(DisplayReadError::WrongFormatFamily);
             }
         },
         (_, Some(_)) => return Err(DisplayReadError::WrongFormatFamily),
@@ -1122,8 +1556,17 @@ fn rewrite_display_format(
     .map_err(|_| Error::InvalidSource { path })?;
     charge_owned_bnc_parse(cell_source.len(), path, budget)?;
     let cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
+    if bnc_has_reserved_known_field(cell_source) {
+        return Err(Error::UnsupportedDependency { path });
+    }
     let old_format = cell.format_identifier();
-    let old_secondary = cell.secondary_format_identifier();
+    let old_secondary =
+        if cell.cell_format_kind() == Some(litchi_numbers_wire::TEXT_CELL_FORMAT_KIND) {
+            Some(validate_text_cell_metadata(cell_source, &cell, path)?)
+                .and_then(|metadata| metadata.generic_identifier)
+        } else {
+            cell.secondary_format_identifier()
+        };
     if cell.control_cell_spec_identifier().is_some() {
         return Err(Error::UnsupportedDependency { path });
     }
@@ -1159,11 +1602,36 @@ fn rewrite_display_format(
                 return Err(Error::UnsupportedDependency { path });
             }
         },
+        (DisplayFormatFamily::Text, Some(identifier), Some(kind))
+            if identifier != 0 && kind == litchi_numbers_wire::TEXT_CELL_FORMAT_KIND =>
+        {
+            let metadata = validate_text_cell_metadata(cell_source, &cell, path)?;
+            let expected_marker = match explicit_flags {
+                0 => old_secondary.is_none() && before.is_none(),
+                litchi_numbers_wire::EXPLICIT_TEXT_FORMAT => old_secondary.is_none(),
+                litchi_numbers_wire::EXPLICIT_CONVERTED_TEXT_FORMAT => {
+                    old_secondary.is_some_and(|identifier| identifier != 0)
+                },
+                _ => false,
+            };
+            if !expected_marker
+                || metadata.text_identifier != Some(identifier)
+                || old_secondary != metadata.generic_identifier
+            {
+                return Err(Error::UnsupportedDependency { path });
+            }
+        },
         (_, None, None)
             if explicit_flags == 0
                 && old_secondary.is_none()
                 && (family != DisplayFormatFamily::Currency
-                    || currency_cell_type_matches_value(&cell, false)) => {},
+                    || currency_cell_type_matches_value(&cell, false))
+                && (family != DisplayFormatFamily::Text
+                    || matches!(
+                        cell.stored_value(),
+                        litchi_numbers_wire::StoredValue::Empty
+                            | litchi_numbers_wire::StoredValue::Text(_)
+                    )) => {},
         _ => return Err(Error::UnsupportedDependency { path }),
     }
     let format_table_identifier = store
@@ -1243,7 +1711,10 @@ fn rewrite_display_format(
         path,
     )?;
 
-    if family == DisplayFormatFamily::Currency {
+    if matches!(
+        family,
+        DisplayFormatFamily::Currency | DisplayFormatFamily::Text
+    ) {
         if let Some(secondary_identifier) = old_secondary {
             let secondary_entry = format_facts
                 .entries
@@ -1284,6 +1755,13 @@ fn rewrite_display_format(
             | DisplayFormatFamily::Percentage
             | DisplayFormatFamily::Scientific
             | DisplayFormatFamily::Fraction => litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT,
+            DisplayFormatFamily::Text => {
+                if old_secondary.is_some() {
+                    litchi_numbers_wire::EXPLICIT_CONVERTED_TEXT_FORMAT
+                } else {
+                    litchi_numbers_wire::EXPLICIT_TEXT_FORMAT
+                }
+            },
         };
         if explicit_flags == expected_explicit {
             if before != Some(current) {
@@ -1328,7 +1806,11 @@ fn rewrite_display_format(
         budget,
         path,
     )?;
-    if family == DisplayFormatFamily::Currency && after.is_none() {
+    if matches!(
+        family,
+        DisplayFormatFamily::Currency | DisplayFormatFamily::Text
+    ) && after.is_none()
+    {
         if let Some(secondary_identifier) = old_secondary {
             (new_format, _) = native::mutate_list(
                 &new_format,
@@ -1344,12 +1826,16 @@ fn rewrite_display_format(
         let key = new_format_key.ok_or(Error::InvalidSource { path })?;
         if family == DisplayFormatFamily::Currency {
             rewrite_currency_cell_metadata(cell_source, Some(key), path, budget)?
+        } else if family == DisplayFormatFamily::Text {
+            rewrite_text_cell_metadata(cell_source, Some(key), path, budget)?
         } else {
             rewrite_display_cell_metadata(cell_source, Some(key), path, budget)?
         }
     } else {
         if family == DisplayFormatFamily::Currency {
             rewrite_currency_cell_metadata(cell_source, None, path, budget)?
+        } else if family == DisplayFormatFamily::Text {
+            rewrite_text_cell_metadata(cell_source, None, path, budget)?
         } else {
             rewrite_display_cell_metadata(cell_source, None, path, budget)?
         }
@@ -1631,6 +2117,15 @@ fn decode_display_payload(
                 path,
             )?))
         },
+        DisplayFormatFamily::Text => {
+            let (snapshot, report) = text_codec::decode_text_format_with_report(source, options)
+                .map_err(|error| native::map_control_error(error, path))?;
+            native::charge_control_decode_report(budget, report, path)?;
+            if snapshot.format_type() != TEXT_FORMAT_TYPE {
+                return Err(Error::InvalidSource { path }.into());
+            }
+            Ok(NativeDisplayValue::Text(Text))
+        },
     }
 }
 
@@ -1749,6 +2244,18 @@ fn prepare_display_rewrite(
             .map_err(|error| native::map_control_error(error, path))?;
             execute_fraction_rewrite(prepared, budget, path)
         },
+        DisplayFormatFamily::Text => {
+            let NativeDisplayValue::Text(_) = value else {
+                return Err(Error::UnsupportedDependency { path });
+            };
+            let prepared = text_codec::prepare_text_format_rewrite(
+                source,
+                text_codec::TextFormatWrite::new(),
+                options,
+            )
+            .map_err(|error| native::map_control_error(error, path))?;
+            execute_text_rewrite(prepared, budget, path)
+        },
     }
 }
 
@@ -1834,6 +2341,15 @@ fn prepare_display_append(
             )
             .map_err(|error| native::map_control_error(error, path))?;
             execute_fraction_append(prepared, budget, path)
+        },
+        DisplayFormatFamily::Text => {
+            let NativeDisplayValue::Text(_) = value else {
+                return Err(Error::UnsupportedDependency { path });
+            };
+            let prepared =
+                text_codec::prepare_text_format_write(text_codec::TextFormatWrite::new(), options)
+                    .map_err(|error| native::map_control_error(error, path))?;
+            execute_text_append(prepared, budget, path)
         },
     }
 }
@@ -2032,9 +2548,83 @@ fn execute_currency_append(
     Ok(output.into_bytes())
 }
 
+fn execute_text_append(
+    prepared: text_codec::PreparedTextFormatWrite,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let requirements = prepared.execution_requirements();
+    native::charge_control_requirements(budget, requirements, path)?;
+    let output = prepared
+        .execute(text_codec::RewriteExecutionLimits::exact(requirements))
+        .map_err(|error| native::map_control_error(error, path))?;
+    native::verify_control_report(output.report(), requirements, path)?;
+    Ok(output.into_bytes())
+}
+
+fn execute_text_rewrite(
+    prepared: text_codec::PreparedTextFormatRewrite<'_>,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let requirements = prepared.execution_requirements();
+    native::charge_control_requirements(budget, requirements, path)?;
+    let output = prepared
+        .execute(text_codec::RewriteExecutionLimits::exact(requirements))
+        .map_err(|error| native::map_control_error(error, path))?;
+    native::verify_control_report(output.report(), requirements, path)?;
+    Ok(output.into_bytes())
+}
+
 fn display_read_error_to_write_error(error: DisplayReadError, path: Path) -> Error {
     match error {
         DisplayReadError::WrongFormatFamily => Error::UnsupportedDependency { path },
         DisplayReadError::Native(error) => error,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Path, validate_text_cell_metadata};
+    use litchi_numbers_wire::BncCell;
+
+    fn hex(value: &str) -> Vec<u8> {
+        value
+            .as_bytes()
+            .chunks_exact(2)
+            .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn native_marker_zero_text_is_valid_default_metadata() {
+        let source = hex("050000000000000000100200050000000c000000");
+        let cell = BncCell::parse(&source).expect("native marker-zero Text cell");
+        assert_eq!(cell.explicit_format_flags(), 0);
+        let metadata = validate_text_cell_metadata(&source, &cell, Path::Package)
+            .expect("marker-zero Text metadata");
+        assert_eq!(metadata.generic_identifier, None);
+        assert_eq!(metadata.text_identifier, Some(12));
+    }
+
+    #[test]
+    fn native_converted_text_retains_a_generic_number_edge() {
+        let source = hex("0503000000008100083002000200000005000000010000000c000000");
+        let cell = BncCell::parse(&source).expect("native converted Text cell");
+        let metadata = validate_text_cell_metadata(&source, &cell, Path::Package)
+            .expect("converted Text metadata");
+        assert_eq!(metadata.generic_identifier, Some(1));
+        assert_eq!(metadata.text_identifier, Some(12));
+    }
+
+    #[test]
+    fn reserved_text_metadata_is_rejected_before_publication() {
+        let mut source = hex("050000000000800000100200050000000c000000");
+        let mut flags = u32::from_le_bytes(source[8..12].try_into().unwrap());
+        flags |= 0x0010_0000;
+        source[8..12].copy_from_slice(&flags.to_le_bytes());
+        source.extend_from_slice(&[0; 4]);
+        let cell = BncCell::parse(&source).expect("reserved field remains parseable");
+        assert!(validate_text_cell_metadata(&source, &cell, Path::Package).is_err());
     }
 }

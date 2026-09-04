@@ -59,6 +59,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/numbers_table_cell_currency_format_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_scientific_format_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_fraction_format_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_table_cell_text_format_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec.rs");
     // Keep the native Numbers and Pages message-ID routes tied to their schema
     // projections when this crate is built from the workspace. Published
@@ -209,6 +210,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         buffa_projection_directory,
     )?;
     enforce_numbers_table_cell_control_codec_provenance(proto_directory)?;
+    enforce_numbers_table_cell_text_format_codec_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
     enforce_package_metadata_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_formula_projection_provenance(proto_directory, buffa_projection_directory)?;
     enforce_pages_native_message_provenance(proto_directory)?;
@@ -811,6 +816,28 @@ fn main() -> Result<(), Box<dyn Error>> {
         &buffa_numbers_table_cell_fraction_format_out_directory,
     )?;
 
+    // Text keeps only the native discriminator in its lazy parity sidecar.
+    // The complete source payload remains authoritative so unknown extension
+    // records can be retained by the handwritten rewrite path.
+    let buffa_numbers_table_cell_text_format_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-numbers-table-cell-text-format");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSTTableCellTextFormatArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_numbers_table_cell_text_format_out_directory)
+        .include_file("iwa_numbers_table_cell_text_format_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_numbers_table_cell_text_format_projection_budget(
+        &buffa_numbers_table_cell_text_format_out_directory,
+    )?;
+
     let buffa_table_cell_dependency_out_directory =
         PathBuf::from(env::var("OUT_DIR")?).join("buffa-numbers-table-cell-dependency");
     buffa_build::Config::new()
@@ -1382,6 +1409,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "1589841fb465e50cdeab485b01b8177a0e0c95239d30da7dce5c013e6f5c4f8f",
         ),
         (
+            "TSTTableCellTextFormatArchive.proto",
+            542,
+            "ad88c732d8c7ba3ebc7303e6fb8af739cd19ab6a885bdc6f4f31af3d57ad28bb",
+        ),
+        (
             "TSTTableHeaderSettingsArchive.proto",
             930,
             "1236d9a9d0116885c7140683e5de2d33b6a083435bf3d3cfbebf91172c856d24",
@@ -1671,6 +1703,11 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "mod buffa_numbers_table_cell_fraction_format_generated {",
         ),
         (
+            "src/numbers_table_cell_pop_up_menu_codec.rs",
+            "crate::buffa_numbers_table_cell_text_format_generated::",
+            "mod buffa_numbers_table_cell_text_format_generated {",
+        ),
+        (
             "src/numbers_table_cell_dependency_codec.rs",
             "crate::buffa_numbers_table_cell_dependency_generated::",
             "mod buffa_numbers_table_cell_dependency_generated {",
@@ -1767,6 +1804,7 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
         "src/numbers_table_cell_currency_format_codec.rs",
         "src/numbers_table_cell_scientific_format_codec.rs",
         "src/numbers_table_cell_fraction_format_codec.rs",
+        "src/numbers_table_cell_text_format_codec.rs",
     ];
 
     let mut expected_paths = CODECS
@@ -4430,6 +4468,126 @@ fn enforce_numbers_table_cell_fraction_format_projection_budget(
             "Numbers table-cell fraction projection generated {files} files/{bytes} bytes/{repeated_views} repeated/{lazy_repeated_views} lazy repeated/{lazy_message_fields} lazy message fields; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated or deferred message views"
         )
         .into());
+    }
+    Ok(())
+}
+
+fn enforce_numbers_table_cell_text_format_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 128 * 1024;
+
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    let mut lazy_message_fields = 0usize;
+    let mut files = 0usize;
+    for entry in fs::read_dir(directory)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("text generated file count overflow")?;
+        let generated = fs::read(entry.path())?;
+        bytes = bytes
+            .checked_add(u64::try_from(generated.len())?)
+            .ok_or("text generated byte count overflow")?;
+        let text = std::str::from_utf8(&generated)?;
+        repeated_views = repeated_views
+            .checked_add(text.matches("RepeatedView").count())
+            .ok_or("text repeated-view count overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(text.matches("LazyRepeatedView").count())
+            .ok_or("text lazy-repeated-view count overflow")?;
+        lazy_message_fields = lazy_message_fields
+            .checked_add(text.matches("LazyMessageFieldView").count())
+            .ok_or("text lazy-message-field count overflow")?;
+    }
+    if files != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || repeated_views != 0
+        || lazy_repeated_views != 0
+        || lazy_message_fields != 0
+    {
+        return Err(format!(
+            "Numbers table-cell text projection generated {files} files/{bytes} bytes/{repeated_views} repeated/{lazy_repeated_views} lazy repeated/{lazy_message_fields} lazy message fields; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated or deferred message views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_numbers_table_cell_text_format_codec_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const CODEC_MARKERS: [&str; 21] = [
+        "pub const EXPLICIT_TEXT_FORMAT: u16 = 0x0080;",
+        "pub const EXPLICIT_CONVERTED_TEXT_FORMAT: u16 = 0x0081;",
+        "pub const TEXT_CELL_FORMAT_KIND: u32 = 5;",
+        "pub enum TextFormatEncoding",
+        "pub struct TextFormatSnapshot<'source>",
+        "pub struct TextFormatWrite(core::TextFormatWrite);",
+        "pub struct PreparedTextFormatRewrite<'source>",
+        "pub struct PreparedTextFormatWrite(core::PreparedTextFormatWrite);",
+        "pub fn decode_text_format(",
+        "pub fn decode_text_format_with_report(",
+        "pub fn decode_text_format_encoding(",
+        "pub fn prepare_text_format_rewrite<'source>(",
+        "pub fn rewrite_text_format(",
+        "pub fn prepare_text_format_write(",
+        "pub use prepare_text_format_write as prepare_text_format_append;",
+        "pub fn canonical_text_format(",
+        "pub use rewrite_text_format as rewrite_table_cell_text_format;",
+        "core::decode_text_format(source, options)",
+        "core::decode_text_format_with_report(source, options)",
+        "core::prepare_text_format_rewrite(source, write.0, options)",
+        "core::canonical_text_format(write.0, options)",
+    ];
+    const PROJECTION_MARKERS: [&str; 5] = [
+        "syntax = \"proto2\";",
+        "package LitchiIwaNumbersTableCellTextFormatProjection;",
+        "message FormatStructArchive {",
+        "optional uint32 format_type = 1;",
+        "}",
+    ];
+    let tsk = fs::read_to_string(proto_directory.join("TSKArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSTTableCellTextFormatArchive.proto"))?;
+    let codec = fs::read_to_string("src/numbers_table_cell_text_format_codec.rs")?;
+    let lib = fs::read_to_string("src/lib.rs")?;
+    let production_codec = production_codec_source(&codec);
+    if !CODEC_MARKERS
+        .iter()
+        .all(|marker| codec.matches(marker).count() == 1)
+        || !PROJECTION_MARKERS
+            .iter()
+            .all(|marker| projection.matches(marker).count() >= 1)
+        || tsk.matches("message FormatStructArchive {").count() != 1
+        || tsk.matches("optional uint32 format_type = 1;").count() != 1
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || projection.contains("import ")
+        || lib
+            .matches("pub mod numbers_table_cell_text_format_codec;")
+            .count()
+            != 1
+        || lib
+            .matches("mod buffa_numbers_table_cell_text_format_generated {")
+            .count()
+            != 1
+        || production_codec.contains("prost::")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "Numbers table-cell Text projection/codec drifted from TSK.FormatStructArchive, exposed generated storage, or introduced production encoding".into(),
+        );
     }
     Ok(())
 }
