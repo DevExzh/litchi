@@ -5,6 +5,7 @@
 //! that ownership boundary explicit and converts only at the high-level
 //! facade seam.
 
+use crate::sheet::selection::SelectedWorksheet;
 use crate::xlsx::{self, Address, Rect};
 use litchi_core::sheet::{
     Cell as CoreCell, CellIterator, CellValue, Result as SheetResult, RowIterator, WorkbookTrait,
@@ -17,7 +18,7 @@ fn boxed_error(error: impl std::fmt::Display) -> BoxError {
     Box::new(litchi_core::Error::Other(error.to_string()))
 }
 
-fn boxed_xlsx_error(error: xlsx::Error) -> BoxError {
+pub(in crate::sheet) fn boxed_xlsx_error(error: xlsx::Error) -> BoxError {
     match error {
         xlsx::Error::Package(litchi_opc::OpcError::SourceChanged { expected, actual }) => {
             Box::new(litchi_core::Error::SourceChanged {
@@ -127,6 +128,25 @@ impl Workbook {
                 .map(|_| ())
                 .map_err(boxed_xlsx_error),
         }
+    }
+
+    pub(crate) fn selected_sheet<'a>(
+        &self,
+        selector: impl Into<xlsx::Selector<'a>>,
+    ) -> SheetResult<Option<SelectedWorksheet>> {
+        self.ensure_source_current()?;
+        let selector = selector.into();
+        let selected = match &self.workbook {
+            WorkbookModel::Owned(workbook) => workbook
+                .sheet(selector)
+                .map(|worksheet| worksheet.map(SelectedWorksheet::from_owned)),
+            WorkbookModel::Source(workbook) => workbook
+                .sheet(selector)
+                .map(|worksheet| worksheet.map(SelectedWorksheet::from_source)),
+        }
+        .map_err(boxed_xlsx_error);
+        self.ensure_source_current()?;
+        selected
     }
 
     #[cfg(test)]
@@ -582,8 +602,8 @@ impl CoreCell for XlsxCell {
 mod tests {
     use std::io::{Cursor, Write};
 
-    use super::{boxed_xlsx_error, xlsx};
-    use crate::sheet::{CellValue, WorkbookTrait};
+    use super::{Workbook as AdapterWorkbook, boxed_xlsx_error, xlsx};
+    use crate::sheet::{CellValue, SelectedCellView, WorkbookTrait};
 
     #[test]
     fn package_publication_capabilities_reach_the_core_error_class() {
@@ -602,6 +622,44 @@ mod tests {
                 Some(litchi_core::Error::Unsupported(_))
             ));
         }
+    }
+
+    #[test]
+    fn selected_sheet_bridge_matches_owned_and_source_models() {
+        let bytes = fixture(false, false);
+        let owned = AdapterWorkbook::new(
+            xlsx::Workbook::from_bytes(bytes.clone()).expect("eager XLSX workbook"),
+        );
+        let source = AdapterWorkbook::from_source_backed(
+            xlsx::SourceBackedWorkbook::from_reader(Cursor::new(bytes))
+                .expect("source-backed XLSX workbook"),
+        );
+
+        let owned_sheet = owned
+            .selected_sheet("fIrSt")
+            .unwrap()
+            .expect("owned selected sheet");
+        let source_sheet = source
+            .selected_sheet(0usize)
+            .unwrap()
+            .expect("source selected sheet");
+        assert_eq!(owned_sheet.name(), source_sheet.name());
+        assert_eq!(owned_sheet.position(), source_sheet.position());
+        assert_eq!(
+            owned_sheet.cell("A1").unwrap(),
+            source_sheet.cell((0_u32, 0_u32)).unwrap()
+        );
+        assert!(matches!(
+            owned_sheet.cell("A1").unwrap(),
+            SelectedCellView::Stored(xlsx::Cell::Value(xlsx::Value::Number(ref value)))
+                if value.as_str() == "7"
+        ));
+        assert_eq!(
+            owned_sheet.cells("A1:B2").unwrap(),
+            source_sheet.cells((0_u32, 0_u32, 2_u32, 2_u32)).unwrap()
+        );
+        assert!(owned.selected_sheet("missing").unwrap().is_none());
+        assert!(source.selected_sheet(2usize).unwrap().is_none());
     }
 
     const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";

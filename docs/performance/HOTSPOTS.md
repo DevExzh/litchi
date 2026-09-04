@@ -1,5 +1,27 @@
 # Performance hotspot inventory
 
+## Change 0398 update
+
+0398 adds no measured performance result or accepted hotspot ranking. The
+xlsx-gated unified `litchi::sheet::Workbook::sheet` selector returns
+`Result<Option<SelectedWorksheet>>` by case-insensitive name or zero-based
+position, with `Ok(None)` for a missing/out-of-bounds selector. Its private
+eager/source wrapper is lifetime-free and `Clone + Send + Sync`; selected
+`cell` and sparse `cells` reads return owned exact XLSX views while preserving
+the `Missing`/`Covered`/`Stored(Cell)` and `Empty`/`Formula`/`Unknown` states.
+
+Source selection remains catalog-only and XLSX owns the selected scanner,
+fallback, cache, freshness, limits, cancellation, and typed source-change
+behavior. Eager bridge parity, typed XLSX `NotWorksheet` for charts/non-grid
+sheets, core `Unsupported` for non-XLSX runtimes, and unchanged legacy 1-based
+dynamic traits are correctness coverage. The registry remains **419** and the
+default remains **36 cases / 198 rows**; focused validation is four XLSX
+public tests, five with XLSB, one owned/source bridge, one non-XLSX runtime,
+and feature checks. `performance_claim: none`; `claim_authorized: false`.
+See the [0398 change record](changes/0398-unified-xlsx-sheet-selectors.md);
+no latency, allocation, RSS, physical-I/O, cache, throughput, or
+generalization claim follows.
+
 ## Change 0397 update
 
 The owning OPC open hotspot was one redundant eager ZIP validation/index pass

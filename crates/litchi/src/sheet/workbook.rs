@@ -2,6 +2,8 @@
 
 use super::types::Result;
 use super::workbook_types::WorkbookImpl;
+#[cfg(feature = "xlsx")]
+use super::{SelectedWorksheet, WorksheetSelector};
 #[allow(unused_imports, reason = "re-exported for sheet implementations")]
 use crate::sheet::WorkbookTrait;
 use litchi_core::{Error, Metadata};
@@ -533,6 +535,26 @@ impl Workbook {
         })
     }
 
+    /// Select one XLSX worksheet by canonical name or zero-based position.
+    ///
+    /// Selecting a handle is catalog-only for source-backed workbooks. Cell
+    /// and sparse range reads remain deferred until requested through the
+    /// returned [`SelectedWorksheet`]. A missing name or position returns
+    /// `Ok(None)`. Other runtime workbook formats return an explicit
+    /// [`Error::Unsupported`] failure rather than a lossy format-neutral view.
+    #[cfg(feature = "xlsx")]
+    pub fn sheet<'a>(
+        &self,
+        selector: impl Into<WorksheetSelector<'a>>,
+    ) -> Result<Option<SelectedWorksheet>> {
+        if let WorkbookImpl::Xlsx(workbook) = &self.inner {
+            return workbook.selected_sheet(selector);
+        }
+        Err(Box::new(Error::Unsupported(
+            "selected worksheet access is currently available only for XLSX workbooks".to_owned(),
+        )))
+    }
+
     /// Get all worksheet names.
     ///
     /// # Examples
@@ -812,6 +834,25 @@ impl Workbook {
             application: Some("Numbers".to_owned()),
             ..Metadata::default()
         }
+    }
+}
+
+#[cfg(all(test, feature = "xlsx"))]
+mod selected_sheet_runtime_tests {
+    use super::{Workbook, WorkbookImpl};
+
+    #[test]
+    fn non_xlsx_runtime_variant_is_explicitly_unsupported() {
+        let workbook = Workbook {
+            inner: WorkbookImpl::Other,
+            cached_metadata: litchi_core::Metadata::default(),
+        };
+        let error = workbook.sheet("Sheet1").unwrap_err();
+        assert!(matches!(
+            error.downcast_ref::<litchi_core::Error>(),
+            Some(litchi_core::Error::Unsupported(message))
+                if message.contains("only for XLSX")
+        ));
     }
 }
 

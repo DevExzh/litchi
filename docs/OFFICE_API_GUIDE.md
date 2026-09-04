@@ -658,6 +658,72 @@ if let Some(title) = props.title {
 }
 ```
 
+### Unified XLSX worksheet and cell selection
+
+With the `xlsx` feature enabled, the unified sheet facade exposes one
+read-only selector surface for XLSX workbooks:
+
+```rust
+use litchi::sheet::{SelectedCellView, Workbook};
+
+fn inspect_xlsx(path: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let workbook = Workbook::open(path)?;
+    println!("worksheets: {}", workbook.worksheet_count()?);
+
+    // Names use case-insensitive XLSX matching. A missing name or an
+    // out-of-bounds zero-based position returns Ok(None).
+    let Some(by_name) = workbook.sheet("dAtA")? else {
+        return Ok(());
+    };
+    let Some(by_position) = workbook.sheet(0usize)? else {
+        return Ok(());
+    };
+    assert_eq!(by_name.position(), by_position.position());
+
+    // A1 references use Excel's one-based lexical notation. Raw tuples use
+    // zero-based (row, column) coordinates.
+    let a1 = by_name.cell("A1")?;
+    let raw = by_name.cell((0_u32, 0_u32))?;
+    assert_eq!(a1, raw);
+
+    match by_name.cell("B2")? {
+        SelectedCellView::Missing => println!("no stored cell"),
+        SelectedCellView::Covered(range) => println!("covered by {range}"),
+        SelectedCellView::Stored(cell) => println!("stored cell: {cell:?}"),
+    }
+
+    // A1 range endpoints are inclusive; raw bounds are zero-based and
+    // half-open. The result is an owned sparse Vec<SelectedCell>.
+    let _a1_cells = by_name.cells("A1:F3")?;
+    let _raw_cells = by_name.cells((0_u32, 0_u32, 3_u32, 6_u32))?;
+    Ok(())
+}
+```
+
+`Workbook::sheet(name_or_position)` returns
+`Result<Option<SelectedWorksheet>>`. Names are case-insensitive and positions
+are zero-based; `None` means that the requested name or position is absent.
+`SelectedWorksheet` is a lifetime-free, `Clone + Send + Sync` owned handle
+backed by a private `Owned`/`Source` wrapper. Its `name()` and
+`position()` report the canonical worksheet name and checked zero-based
+workbook position.
+
+`cell` returns an owned `SelectedCellView`: `Missing` means no stored cell or
+covering merge, `Covered` identifies a merged follower, and `Stored(Cell)`
+preserves the XLSX `Empty`, `Formula`, and `Unknown` states without converting
+them through the legacy dynamic facade. `cells` returns an owned sparse
+`Vec<SelectedCell>` and does not synthesize absent cells or merged followers.
+Invalid cell coordinates and ranges remain typed XLSX errors.
+
+Selection is catalog-only for source-backed workbooks; worksheet and range
+payloads are deferred until a selected read. The XLSX-owned selected scanner,
+fallback materialization, deferred-Part cache, source-freshness fence,
+resource limits, cancellation checks, and typed source-change errors remain
+in force. Eager XLSX opens expose the same selected semantics. A chart or
+other non-grid XLSX sheet returns the typed XLSX `NotWorksheet` error, while a
+non-XLSX runtime workbook returns the core `Unsupported` error. The existing
+legacy 1-based dynamic worksheet traits are unchanged.
+
 ## Performance Tips
 
 1. **Lazy Loading**: Content is loaded on-demand. Access only what you need.

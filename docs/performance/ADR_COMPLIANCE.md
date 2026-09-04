@@ -1,5 +1,32 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0398 compliance update
+
+0398 adds a private unified XLSX selected-view wrapper behind the xlsx-gated
+`litchi::sheet` facade. `Workbook::sheet(name_or_zero_based_position)` returns
+`Result<Option<SelectedWorksheet>>`; names are case-insensitive, positions are
+zero-based, and missing/out-of-bounds selectors return `Ok(None)`. The handle
+is lifetime-free, `Clone + Send + Sync`, and keeps eager/source ownership
+private. `cell` returns owned exact `SelectedCellView` states and `cells`
+returns an owned sparse `Vec<SelectedCell>`; A1 is one-based lexical notation,
+while raw cell and half-open range tuples are zero-based. Stored `Empty`,
+`Formula`, and `Unknown` states are preserved.
+
+The selected scanner/fallback/cache/freshness/limits/cancellation and typed
+source-change behavior remain XLSX-owned; source selection is catalog-only.
+Eager bridge parity, typed XLSX `NotWorksheet` for non-grid sheets, core
+`Unsupported` for non-XLSX runtimes, and unchanged legacy 1-based dynamic
+traits remain in scope. No public raw type, dependency edge, runtime handle,
+lock, unsafe path, CRUD mutation, or format-neutral promise is introduced.
+
+The selector registry remains **419** and the default remains **36 cases /
+198 rows** because no harness selector is added. Focused validation covers
+four XLSX public tests, five with XLSB, one owned/source bridge, one non-XLSX
+runtime check, and feature checks. Stable rustc/Cargo/Rustdoc 1.98.1 was used
+because pinned 1.95 lacks Cargo. `performance_claim: none`;
+`claim_authorized: false`; no latency, allocation, RSS, physical-I/O, cache,
+throughput, or generalization claim follows. See the [0398 record](changes/0398-unified-xlsx-sheet-selectors.md).
+
 ## Change 0397 compliance update
 
 Production commit `f275d4566` removes one redundant eager ZIP
