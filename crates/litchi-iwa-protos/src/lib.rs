@@ -966,6 +966,53 @@ mod buffa_numbers_table_cell_date_time_format_generated {
     ));
 }
 
+/// Private lazy-view roots for the Numbers custom-format registry and its
+/// selected `FormatStructArchive` scalar fields.  Repeated registry entries
+/// and nested condition payloads are represented as borrowed bytes; the
+/// strict custom-format codec owns their complete validation and rewrites.
+#[doc(hidden)]
+mod buffa_numbers_table_cell_custom_format_generated {
+    #![allow(
+        clippy::all,
+        clippy::pedantic,
+        clippy::arbitrary_source_item_ordering,
+        clippy::allow_attributes_without_reason,
+        clippy::module_name_repetitions,
+        clippy::shadow_same,
+        elided_lifetimes_in_paths,
+        unreachable_pub,
+        non_snake_case,
+        reason = "Private Buffa generated projection."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-numbers-table-cell-custom-format/iwa_numbers_table_cell_custom_format_buffa_protos.rs"
+    ));
+}
+
+/// Private lazy-view roots for the scalar Numbers duration-format envelope.
+/// The handwritten decoder owns the complete source payload, including
+/// unknown fields and groups; this sidecar is parity-only.
+#[doc(hidden)]
+mod buffa_numbers_table_cell_duration_format_generated {
+    #![allow(
+        clippy::all,
+        clippy::pedantic,
+        clippy::arbitrary_source_item_ordering,
+        clippy::allow_attributes_without_reason,
+        clippy::module_name_repetitions,
+        clippy::shadow_same,
+        elided_lifetimes_in_paths,
+        unreachable_pub,
+        non_snake_case,
+        reason = "buffa-build output is generated from the derived wire projection."
+    )]
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-numbers-table-cell-duration-format/iwa_numbers_table_cell_duration_format_buffa_protos.rs"
+    ));
+}
+
 /// Private lazy-view roots for Numbers formula dependency envelopes.
 #[doc(hidden)]
 mod buffa_numbers_table_cell_dependency_generated {
@@ -1896,6 +1943,16 @@ pub mod numbers_table_cell_text_format_codec;
 /// to the shared table-cell implementation.
 #[doc(hidden)]
 pub mod numbers_table_cell_date_time_format_codec;
+
+/// Strict source-preserving native Numbers custom-format registry codec.
+/// Generated lazy views remain private to this crate; callers receive only
+/// source-borrowed snapshots and measured rewrite plans.
+#[doc(hidden)]
+pub mod numbers_table_cell_custom_format_codec;
+
+/// Strict source-preserving native Numbers Duration format codec.
+#[doc(hidden)]
+pub mod numbers_table_cell_duration_format_codec;
 
 /// Format-neutral spelling for the Numbers interactive-cell control seam.
 #[doc(hidden)]

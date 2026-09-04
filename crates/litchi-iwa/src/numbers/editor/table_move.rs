@@ -73,7 +73,7 @@ impl NumbersEditor {
                 .map_err(|error| Error::Io(error.into_io_error()))?;
             bytes
         };
-        let verified = Self::from_bytes(&bytes)?;
+        let verified = Self::from_validation_bytes(&bytes, source_built)?;
         let verified_owner = find_table_owner(verified.package(), table_id)?;
         let verified_table = verified
             .tables()?

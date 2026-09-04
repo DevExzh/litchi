@@ -7,6 +7,9 @@
 //! It intentionally exposes no native identifiers or arbitrary format-type
 //! input to the package API.
 
+use std::borrow::Cow;
+
+use litchi_iwa_common::{decode_varint_from_bytes, wire::WireView};
 use litchi_iwa_protos::{
     numbers_table_cell_control_codec as control_codec,
     numbers_table_cell_currency_format_codec as currency_codec,
@@ -27,6 +30,10 @@ use super::{
     table_cell_pop_up_menu_native as popup_native,
 };
 use crate::cell::data_format::currency::{Currency, CurrencyCode, CurrencyStyle};
+use crate::cell::data_format::custom::{
+    Condition, ConditionValue, Custom, DateTime as CustomDateTime, DateTimePattern, MAX_NAME_BYTES,
+    MAX_PATTERN_BYTES, Name, Number as CustomNumber, NumberPattern, NumberRule, Text as CustomText,
+};
 use crate::cell::data_format::number::{
     DecimalPlaces, FixedDecimalPlaces, Fraction, FractionAccuracy, NegativeStyle, Number,
     Percentage, Scientific, ThousandsSeparator,
@@ -2200,6 +2207,1822 @@ fn rewrite_display_format(
     })
 }
 
+fn resolve_custom_cell_graph(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+    for_write: bool,
+    budget: &mut TransactionBudget,
+) -> Result<CustomCellGraph, Error> {
+    let model_component = source
+        .state
+        .components
+        .catalog()
+        .get_index(target.component_index)
+        .ok_or(Error::InvalidSource { path })?;
+    let model_object =
+        native::unique_object(model_component.archive(), target.model_identifier, path)?;
+    let model_index = native::unique_message_index(model_object, 6_001, path)?;
+    let model_payload = &model_object.messages[model_index].data;
+    let (model, model_report) = storage_codec::decode_table_model_with_report(
+        model_payload,
+        budget.residual_storage_options(model_payload),
+    )
+    .map_err(|error| native::map_storage_error(error, path))?;
+    native::charge_storage_report(budget, model_report, path)?;
+    let (store, store_report) = storage_codec::decode_data_store_with_report(
+        model.base_data_store(),
+        budget.residual_storage_options(model.base_data_store()),
+    )
+    .map_err(|error| native::map_storage_error(error, path))?;
+    native::charge_storage_report(budget, store_report, path)?;
+    if store.deprecated_custom_format_table().is_some() {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    let tile_options = budget.residual_storage_options(store.tiles());
+    let mut tile_visitor = native::TileReferenceCollector::new(budget, path);
+    let decoded_tiles = storage_codec::decode_tile_storage_with_visitor(
+        store.tiles(),
+        tile_options,
+        &mut tile_visitor,
+    );
+    let tile_references = tile_visitor.finish()?;
+    let (tile_storage, tile_report) =
+        decoded_tiles.map_err(|error| native::map_storage_error(error, path))?;
+    native::charge_storage_report(budget, tile_report, path)?;
+    let tile_size = tile_storage
+        .tile_size()
+        .filter(|size| *size != 0)
+        .ok_or(Error::InvalidSource { path })?;
+    let tile_id = target.position.row() / tile_size;
+    let mut tile_matches = tile_references
+        .iter()
+        .filter(|(id, _)| *id == tile_id)
+        .map(|(_, reference)| *reference);
+    let tile_identifier = tile_matches.next().ok_or(Error::CellNotFound)?;
+    if tile_matches.next().is_some()
+        || tile_identifier == target.model_identifier
+        || tile_references.iter().any(|(_, reference)| *reference == 0)
+        || tile_references
+            .iter()
+            .enumerate()
+            .any(|(index, (id, reference))| {
+                tile_references[index + 1..]
+                    .iter()
+                    .any(|(other_id, other_reference)| {
+                        id == other_id || reference == other_reference
+                    })
+            })
+    {
+        return Err(Error::InvalidSource { path });
+    }
+    popup::validate_selected_model_reference(source, target, tile_identifier, path)?;
+    if for_write {
+        native::require_exclusive_selected_model_reference(
+            source,
+            target,
+            tile_identifier,
+            path,
+            budget,
+        )?;
+    }
+    let tile_component_index = native::resolved_component_index(source, tile_identifier, path)?;
+    let tile_archive = source
+        .state
+        .components
+        .catalog()
+        .get_index(tile_component_index)
+        .ok_or(Error::InvalidSource { path })?
+        .archive();
+    let tile_object = native::unique_object(tile_archive, tile_identifier, path)?;
+    let tile_message_index = native::unique_message_index(tile_object, 6_002, path)?;
+    let tile_payload = native::copy_payload_with_budget(
+        &tile_object.messages[tile_message_index].data,
+        budget,
+        path,
+    )?;
+    let cell_source = popup_native::tile_cell(
+        &tile_payload,
+        target.position.row(),
+        target.position.column(),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    let cell_source = cell_source.to_vec();
+    charge_owned_bnc_parse(cell_source.len(), path, budget)?;
+    let cell = BncCell::parse(&cell_source).map_err(|_| Error::InvalidSource { path })?;
+    native::validate_bnc_format_metadata(&cell_source, &cell, path)?;
+    if cell.control_cell_spec_identifier().is_some() {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    let format_identifier = cell.format_identifier();
+    if format_identifier.is_some_and(|identifier| identifier == 0) {
+        return Err(Error::InvalidSource { path });
+    }
+    let explicit_flags = cell.explicit_format_flags();
+    let kind = cell.cell_format_kind();
+    if kind == Some(litchi_numbers_wire::TEXT_CELL_FORMAT_KIND) {
+        let metadata = validate_text_cell_metadata(&cell_source, &cell, path)?;
+        if metadata.generic_identifier.is_some() {
+            // Converted Text retains a secondary Number edge.  It is not a
+            // Custom owner shape; accepting it would require moving two
+            // families and could strand the secondary key.
+            return Err(Error::UnsupportedDependency { path });
+        }
+    }
+    if format_identifier.is_none() {
+        if explicit_flags != 0 {
+            return Err(Error::UnsupportedDependency { path });
+        }
+    }
+    let format_table_identifier = store
+        .format_table()
+        .ok_or(Error::InvalidSource { path })?
+        .identifier();
+    if format_table_identifier == target.model_identifier
+        || format_table_identifier == tile_identifier
+    {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    popup::validate_selected_model_reference(source, target, format_table_identifier, path)?;
+    if for_write {
+        native::require_exclusive_selected_model_reference(
+            source,
+            target,
+            format_table_identifier,
+            path,
+            budget,
+        )?;
+    }
+    let format_component_index =
+        native::resolved_component_index(source, format_table_identifier, path)?;
+    let format_archive = source
+        .state
+        .components
+        .catalog()
+        .get_index(format_component_index)
+        .ok_or(Error::InvalidSource { path })?
+        .archive();
+    let format_object = native::unique_object(format_archive, format_table_identifier, path)?;
+    let format_message =
+        native::unique_list_message(format_object, FORMAT_LIST_TYPE, budget, path)?;
+    let format_message_index = format_message.message_index;
+    let format_payload = native::copy_payload_with_budget(format_message.payload, budget, path)?;
+    let format_type = storage_codec::decode_table_data_list_type_with_report(
+        &format_payload,
+        budget.residual_storage_options(&format_payload),
+    )
+    .map_err(|error| native::map_storage_error(error, path))?;
+    let (list_type, list_report) = format_type;
+    native::charge_storage_report(budget, list_report, path)?;
+    if list_type.list_type() != FORMAT_LIST_TYPE {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    let facts = native::list_facts(&format_payload, budget, path)?;
+    let _ = facts
+        .entries
+        .iter()
+        .find(|entry| Some(entry.key) == format_identifier);
+    native::validate_format_refcounts(source, &tile_references, &facts.entries, budget, path)?;
+    if let Some(identifier) = format_identifier {
+        let entry = facts
+            .entries
+            .iter()
+            .find(|entry| entry.key == identifier)
+            .ok_or(Error::InvalidSource { path })?;
+        if !entry.is_format || entry.ref_count == 0 || entry.payload.is_empty() {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    Ok(CustomCellGraph {
+        tile_component_index,
+        tile_identifier,
+        tile_message_index,
+        tile_payload,
+        cell_source,
+        format_component_index,
+        format_table_identifier,
+        format_message_index,
+        format_payload,
+        format_identifier,
+        explicit_flags,
+        cell_kind: kind,
+    })
+}
+
+fn selected_custom_reference(
+    graph: &CustomCellGraph,
+    key: u32,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<CustomReference, Error> {
+    let facts = native::list_facts_without_input(&graph.format_payload, budget, path)?;
+    let entry = facts
+        .entries
+        .iter()
+        .find(|entry| entry.key == key)
+        .ok_or(Error::InvalidSource { path })?;
+    if !entry.is_format || entry.ref_count == 0 || entry.payload.is_empty() {
+        return Err(Error::InvalidSource { path });
+    }
+    parse_custom_reference(&entry.payload, budget, path)?
+        .ok_or(Error::UnsupportedDependency { path })
+}
+
+fn selected_custom_reference_payload(
+    graph: &CustomCellGraph,
+    key: u32,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<u8>, Error> {
+    let facts = native::list_facts_without_input(&graph.format_payload, budget, path)?;
+    let entry = facts
+        .entries
+        .iter()
+        .find(|entry| entry.key == key)
+        .ok_or(Error::InvalidSource { path })?;
+    if !entry.is_format || entry.ref_count == 0 || entry.payload.is_empty() {
+        return Err(Error::InvalidSource { path });
+    }
+    budget.charge_allocations(1, path)?;
+    budget.charge_scratch_bytes(entry.payload.len(), path)?;
+    budget.charge_retained_bytes(entry.payload.len(), path)?;
+    let mut payload = Vec::new();
+    payload
+        .try_reserve_exact(entry.payload.len())
+        .map_err(|_| Error::Allocation {
+            amount: entry.payload.len(),
+            path,
+        })?;
+    payload.extend_from_slice(&entry.payload);
+    Ok(payload)
+}
+
+fn custom_reference_matches_cell(format_type: u32, graph: &CustomCellGraph, flags: u16) -> bool {
+    matches!(
+        (format_type, graph.cell_kind, flags),
+        (
+            CUSTOM_NUMBER_FORMAT_TYPE,
+            Some(litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND),
+            litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT,
+        ) | (
+            CUSTOM_TEXT_FORMAT_TYPE,
+            Some(litchi_numbers_wire::TEXT_CELL_FORMAT_KIND),
+            litchi_numbers_wire::EXPLICIT_TEXT_FORMAT,
+        ) | (
+            CUSTOM_DATE_TIME_FORMAT_TYPE,
+            Some(litchi_numbers_wire::DATE_TIME_CELL_FORMAT_KIND),
+            litchi_numbers_wire::EXPLICIT_DATE_TIME_FORMAT,
+        )
+    )
+}
+
+fn validate_custom_graph_ownership(
+    source: &Package,
+    target: CellTarget,
+    graph: &CustomCellGraph,
+    registry: CustomRegistryLocation,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<(), Error> {
+    let facts = native::validate_metadata_ownership(
+        source,
+        &[
+            target.component_index,
+            graph.tile_component_index,
+            graph.format_component_index,
+            registry.component_index,
+        ],
+        budget,
+        path,
+    )?;
+    native::validate_cross_component_reference(
+        &facts,
+        target.component_index,
+        graph.tile_component_index,
+        graph.tile_identifier,
+        path,
+    )?;
+    native::validate_cross_component_reference(
+        &facts,
+        target.component_index,
+        graph.format_component_index,
+        graph.format_table_identifier,
+        path,
+    )?;
+    let document_component = source
+        .state
+        .components
+        .catalog()
+        .iter()
+        .position(|component| component.name() == "Index/Document.iwa")
+        .ok_or(Error::InvalidSource { path })?;
+    native::validate_cross_component_reference(
+        &facts,
+        document_component,
+        registry.component_index,
+        registry.object_identifier,
+        path,
+    )?;
+    facts
+        .current_uuids_if_registered(&[
+            (target.component_index, target.model_identifier),
+            (graph.tile_component_index, graph.tile_identifier),
+            (graph.format_component_index, graph.format_table_identifier),
+            (registry.component_index, registry.object_identifier),
+        ])
+        .map_err(|_| Error::UnsupportedDependency { path })?;
+    Ok(())
+}
+
+fn locate_custom_registry(
+    source: &Package,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<CustomRegistryLocation, Error> {
+    let document_archive = source
+        .state
+        .components
+        .get_archive("Index/Document.iwa")
+        .ok_or(Error::UnsupportedSource)?;
+    let document_object = native::unique_object(document_archive, 1, path)?;
+    let document_index =
+        native::unique_message_index(document_object, DOCUMENT_MESSAGE_TYPE, path)?;
+    let root = &document_object.messages[document_index].data;
+    let view = custom_wire_view(root, budget, 0, path)?;
+    let mut references = Vec::new();
+    for field in view
+        .fields()
+        .filter(|field| field.number() == CUSTOM_REGISTRY_REFERENCE_FIELD)
+    {
+        if field.wire_type() != 2 {
+            return Err(Error::InvalidSource { path });
+        }
+        field
+            .validate_canonical_framing()
+            .map_err(|_| Error::InvalidSource { path })?;
+        references.push(field.payload());
+    }
+    if references.len() != 1 {
+        return Err(Error::InvalidSource { path });
+    }
+    let registry_identifier =
+        super::table_headers::resolve::local_reference_identifier(references[0])
+            .map_err(|_| Error::InvalidSource { path })?;
+    let resolved = source
+        .state
+        .index
+        .resolve_ref_id(&source.state.components, registry_identifier)
+        .map_err(|_| Error::InvalidSource { path })?
+        .ok_or(Error::InvalidSource { path })?;
+    let component_index = resolved.component_index;
+    let object = source
+        .state
+        .components
+        .catalog()
+        .get_index(component_index)
+        .and_then(|component| component.archive().objects.get(resolved.object_index))
+        .ok_or(Error::InvalidSource { path })?;
+    if object.archive_info.identifier != Some(registry_identifier) || object.messages.len() != 1 {
+        return Err(Error::InvalidSource { path });
+    }
+    let message = object
+        .messages
+        .first()
+        .ok_or(Error::InvalidSource { path })?;
+    if message.type_ != CUSTOM_FORMAT_REGISTRY_MESSAGE_TYPE {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    for (other_component_index, component) in source.state.components.catalog().iter().enumerate() {
+        for other in &component.archive().objects {
+            for candidate in &other.messages {
+                if other_component_index == component_index
+                    && other.archive_info.identifier == Some(registry_identifier)
+                    && candidate.type_ == message.type_
+                    && candidate.data == message.data
+                {
+                    continue;
+                }
+                if candidate.type_ == message.type_
+                    && parse_registry_shape(&candidate.data, budget, path).is_ok()
+                {
+                    return Err(Error::UnsupportedDependency { path });
+                }
+            }
+        }
+    }
+    Ok(CustomRegistryLocation {
+        component_index,
+        object_identifier: registry_identifier,
+        message_index: 0,
+        message_type: message.type_,
+    })
+}
+
+fn registry_payload(
+    source: &Package,
+    location: CustomRegistryLocation,
+    path: Path,
+) -> Result<&[u8], Error> {
+    let archive = source
+        .state
+        .components
+        .catalog()
+        .get_index(location.component_index)
+        .ok_or(Error::InvalidSource { path })?
+        .archive();
+    let object = native::unique_object(archive, location.object_identifier, path)?;
+    let message = object
+        .messages
+        .get(location.message_index)
+        .filter(|message| message.type_ == location.message_type)
+        .ok_or(Error::InvalidSource { path })?;
+    Ok(&message.data)
+}
+
+fn parse_registry_shape(
+    source: &[u8],
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<(), ()> {
+    let fields = custom_wire_view(source, budget, 0, path).map_err(|_| ())?;
+    let mut uuids = 0usize;
+    let mut formats = 0usize;
+    for field in fields.fields() {
+        match field.number() {
+            CUSTOM_REGISTRY_UUID_FIELD => {
+                if field.wire_type() != 2 {
+                    return Err(());
+                }
+                uuids = uuids.checked_add(1).ok_or(())?;
+            },
+            CUSTOM_REGISTRY_FORMAT_FIELD => {
+                if field.wire_type() != 2 {
+                    return Err(());
+                }
+                formats = formats.checked_add(1).ok_or(())?;
+            },
+            _ => {},
+        }
+    }
+    if uuids == formats { Ok(()) } else { Err(()) }
+}
+
+fn parse_custom_registry<'source>(
+    source: &'source [u8],
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<CustomRegistryFacts<'source>, Error> {
+    let view = custom_wire_view(source, budget, 0, path)?;
+    let mut uuid_count = 0usize;
+    let mut format_count = 0usize;
+    for field in view.fields() {
+        match field.number() {
+            CUSTOM_REGISTRY_UUID_FIELD | CUSTOM_REGISTRY_FORMAT_FIELD => {
+                if field.wire_type() != 2 {
+                    return Err(Error::InvalidSource { path });
+                }
+                field
+                    .validate_canonical_framing()
+                    .map_err(|_| Error::InvalidSource { path })?;
+                let count = if field.number() == CUSTOM_REGISTRY_UUID_FIELD {
+                    &mut uuid_count
+                } else {
+                    &mut format_count
+                };
+                *count = count.checked_add(1).ok_or(Error::InvalidSource { path })?;
+            },
+            _ => {},
+        }
+    }
+    if uuid_count != format_count {
+        return Err(Error::InvalidSource { path });
+    }
+    let entry_count = uuid_count;
+    let payload_items = entry_count
+        .checked_mul(2)
+        .ok_or(Error::InvalidSource { path })?;
+    budget.charge_payload_items(payload_items, path)?;
+    budget.charge_payload_references(entry_count, path)?;
+    // UUID uniqueness is checked with a bounded linear census below. Charge
+    // that worst-case work before entering the loop so a hostile registry
+    // cannot turn the no-allocation check into an unbounded CPU path.
+    let uniqueness_work = entry_count
+        .checked_mul(entry_count.saturating_sub(1))
+        .and_then(|work| work.checked_div(2))
+        .ok_or(Error::InvalidSource { path })?;
+    budget.charge_transaction_work(uniqueness_work, path)?;
+
+    let mut uuid_payloads = Vec::new();
+    let mut format_payloads = Vec::new();
+    let mut entries = Vec::new();
+    if entry_count != 0 {
+        budget.charge_allocations(3, path)?;
+        uuid_payloads
+            .try_reserve_exact(entry_count)
+            .map_err(|_| Error::Allocation {
+                amount: entry_count,
+                path,
+            })?;
+        format_payloads
+            .try_reserve_exact(entry_count)
+            .map_err(|_| Error::Allocation {
+                amount: entry_count,
+                path,
+            })?;
+        entries
+            .try_reserve_exact(entry_count)
+            .map_err(|_| Error::Allocation {
+                amount: entry_count,
+                path,
+            })?;
+    }
+    // Keep source payloads borrowed. A rewrite promotes only newly appended
+    // records to `Cow::Owned`; existing registry bytes never get cloned just
+    // to establish the semantic index.
+    for field in view.fields() {
+        match field.number() {
+            CUSTOM_REGISTRY_UUID_FIELD => uuid_payloads.push(Cow::Borrowed(field.payload())),
+            CUSTOM_REGISTRY_FORMAT_FIELD => format_payloads.push(Cow::Borrowed(field.payload())),
+            _ => {},
+        }
+    }
+    for (uuid_payload, format_payload) in uuid_payloads.iter().zip(&format_payloads) {
+        let uuid = parse_custom_uuid(uuid_payload.as_ref(), budget, path)?;
+        if entries
+            .iter()
+            .any(|entry: &CustomRegistryEntry| entry.uuid == uuid)
+        {
+            return Err(Error::InvalidSource { path });
+        }
+        let format = parse_custom_archive(format_payload.as_ref(), budget, path)?;
+        if custom_format_type(&format) == 0 {
+            return Err(Error::InvalidSource { path });
+        }
+        entries.push(CustomRegistryEntry {
+            uuid,
+            format: Some(format),
+        });
+    }
+    Ok(CustomRegistryFacts {
+        source,
+        uuid_payloads,
+        format_payloads,
+        entries,
+    })
+}
+
+fn rewrite_custom_registry(
+    registry: &CustomRegistryFacts<'_>,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<u8>, Error> {
+    let mut output = wire_rewrite_repeated(
+        registry.source,
+        CUSTOM_REGISTRY_UUID_FIELD,
+        &registry.uuid_payloads,
+        path,
+        budget,
+    )?;
+    output = wire_rewrite_repeated(
+        &output,
+        CUSTOM_REGISTRY_FORMAT_FIELD,
+        &registry.format_payloads,
+        path,
+        budget,
+    )?;
+    Ok(output)
+}
+
+fn wire_rewrite_repeated<'source>(
+    source: &[u8],
+    field_number: u32,
+    replacements: &[Cow<'source, [u8]>],
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<u8>, Error> {
+    let view = custom_wire_view(source, budget, 0, path)?;
+    let mut matched_count = 0usize;
+    let mut removed_bytes = 0usize;
+    for field in view.fields().filter(|field| field.number() == field_number) {
+        if field.wire_type() != 2 || field.validate_canonical_framing().is_err() {
+            return Err(Error::InvalidSource { path });
+        }
+        matched_count = matched_count
+            .checked_add(1)
+            .ok_or(Error::InvalidSource { path })?;
+        removed_bytes = removed_bytes
+            .checked_add(field.raw().len())
+            .ok_or(Error::InvalidSource { path })?;
+    }
+    let retained_bytes = source
+        .len()
+        .checked_sub(removed_bytes)
+        .ok_or(Error::InvalidSource { path })?;
+    let replacement_bytes = replacements.iter().try_fold(0usize, |total, replacement| {
+        let replacement = replacement.as_ref();
+        let key = (u64::from(field_number) << 3) | 2;
+        total
+            .checked_add(litchi_iwa_common::varint::encoded_len(key))
+            .and_then(|total| {
+                total.checked_add(litchi_iwa_common::varint::encoded_len(
+                    replacement.len() as u64
+                ))
+            })
+            .and_then(|total| total.checked_add(replacement.len()))
+            .ok_or(Error::InvalidSource { path })
+    })?;
+    let output_len = retained_bytes
+        .checked_add(replacement_bytes)
+        .ok_or(Error::InvalidSource { path })?;
+    budget.charge_output(output_len, path)?;
+    budget.charge_allocations(1, path)?;
+    budget.charge_scratch_bytes(output_len, path)?;
+    budget.charge_retained_bytes(output_len, path)?;
+    budget.charge_transaction_work(output_len, path)?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|_| Error::Allocation {
+            amount: output_len,
+            path,
+        })?;
+    let mut matched = 0usize;
+    for field in view.fields() {
+        if field.number() != field_number {
+            output.extend_from_slice(field.raw());
+            continue;
+        }
+        if let Some(replacement) = replacements.get(matched) {
+            let replacement = replacement.as_ref();
+            output.extend_from_slice(field.key());
+            litchi_iwa_common::varint::encode_varint_into(
+                &mut output,
+                u64::try_from(replacement.len()).map_err(|_| Error::InvalidSource { path })?,
+            );
+            output.extend_from_slice(replacement);
+        }
+        matched = matched.saturating_add(1);
+    }
+    for replacement in replacements.iter().skip(matched_count) {
+        let key = (u64::from(field_number) << 3) | 2;
+        let replacement = replacement.as_ref();
+        litchi_iwa_common::varint::encode_varint_into(&mut output, key);
+        litchi_iwa_common::varint::encode_varint_into(
+            &mut output,
+            u64::try_from(replacement.len()).map_err(|_| Error::InvalidSource { path })?,
+        );
+        output.extend_from_slice(replacement);
+    }
+    if output.len() != output_len {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok(output)
+}
+
+fn custom_wire_view<'source>(
+    source: &'source [u8],
+    budget: &mut TransactionBudget,
+    depth: u32,
+    path: Path,
+) -> Result<WireView<'source>, Error> {
+    budget.charge_wire_bytes(source.len(), path)?;
+    budget.charge_wire_work(source.len(), path)?;
+    budget.charge_wire_nesting(depth, path)?;
+    let view = WireView::parse(source).map_err(|_| Error::InvalidSource { path })?;
+    budget.charge_wire_fields(view.len(), path)?;
+    Ok(view)
+}
+
+fn parse_custom_uuid(
+    source: &[u8],
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<CustomUuid, Error> {
+    let view = custom_wire_view(source, budget, 1, path)?;
+    let lower = parse_required_varint(&view, 1, path)?;
+    let upper = parse_required_varint(&view, 2, path)?;
+    if lower == 0 || upper == 0 {
+        return Err(Error::InvalidSource { path });
+    }
+    budget.charge_wire_reference_bytes(source.len(), path)?;
+    Ok(CustomUuid { lower, upper })
+}
+
+fn parse_required_varint(view: &WireView<'_>, number: u32, path: Path) -> Result<u64, Error> {
+    let mut found = None;
+    for field in view.fields().filter(|field| field.number() == number) {
+        if found.is_some() || field.wire_type() != 0 {
+            return Err(Error::InvalidSource { path });
+        }
+        field
+            .validate_canonical_key()
+            .map_err(|_| Error::InvalidSource { path })?;
+        let payload = field.payload();
+        let (value, width) =
+            decode_varint_from_bytes(payload).map_err(|_| Error::InvalidSource { path })?;
+        if width != payload.len() || litchi_iwa_common::varint::encoded_len(value) != width {
+            return Err(Error::InvalidSource { path });
+        }
+        found = Some(value);
+    }
+    found.ok_or(Error::InvalidSource { path })
+}
+
+fn parse_optional_varint(
+    view: &WireView<'_>,
+    number: u32,
+    path: Path,
+) -> Result<Option<u64>, Error> {
+    let mut found = None;
+    for field in view.fields().filter(|field| field.number() == number) {
+        if found.is_some() || field.wire_type() != 0 {
+            return Err(Error::InvalidSource { path });
+        }
+        field
+            .validate_canonical_key()
+            .map_err(|_| Error::InvalidSource { path })?;
+        let payload = field.payload();
+        let (value, width) =
+            decode_varint_from_bytes(payload).map_err(|_| Error::InvalidSource { path })?;
+        if width != payload.len() || litchi_iwa_common::varint::encoded_len(value) != width {
+            return Err(Error::InvalidSource { path });
+        }
+        found = Some(value);
+    }
+    Ok(found)
+}
+
+fn parse_optional_bool(
+    view: &WireView<'_>,
+    number: u32,
+    path: Path,
+) -> Result<Option<bool>, Error> {
+    parse_optional_varint(view, number, path)?.map_or(Ok(None), |value| match value {
+        0 => Ok(Some(false)),
+        1 => Ok(Some(true)),
+        _ => Err(Error::InvalidSource { path }),
+    })
+}
+
+fn parse_required_string(
+    view: &WireView<'_>,
+    number: u32,
+    maximum: usize,
+    reject_surrounding_whitespace: bool,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<String, Error> {
+    let mut found = None;
+    for field in view.fields().filter(|field| field.number() == number) {
+        if found.is_some() || field.wire_type() != 2 {
+            return Err(Error::InvalidSource { path });
+        }
+        field
+            .validate_canonical_framing()
+            .map_err(|_| Error::InvalidSource { path })?;
+        let payload = field.payload();
+        let value = std::str::from_utf8(payload).map_err(|_| Error::InvalidSource { path })?;
+        // Validate the borrowed bytes and debit their text budget before a
+        // `String` is materialized. This keeps hostile oversized or control
+        // laden names/patterns fail-closed without an attacker-sized heap
+        // allocation, even though semantic constructors validate again.
+        if value.is_empty()
+            || value.len() > maximum
+            || value.chars().any(char::is_control)
+            || (reject_surrounding_whitespace && value.trim() != value)
+        {
+            return Err(Error::InvalidSource { path });
+        }
+        budget.charge_wire_text_bytes(value.len(), path)?;
+        budget.charge_allocations(1, path)?;
+        let mut owned = String::new();
+        owned
+            .try_reserve_exact(value.len())
+            .map_err(|_| Error::Allocation {
+                amount: value.len(),
+                path,
+            })?;
+        owned.push_str(value);
+        let value = owned;
+        found = Some(value);
+    }
+    found.ok_or(Error::InvalidSource { path })
+}
+
+fn parse_required_bytes<'source>(
+    view: &WireView<'source>,
+    number: u32,
+    path: Path,
+) -> Result<&'source [u8], Error> {
+    let mut found = None;
+    for field in view.fields().filter(|field| field.number() == number) {
+        if found.is_some() || field.wire_type() != 2 {
+            return Err(Error::InvalidSource { path });
+        }
+        field
+            .validate_canonical_framing()
+            .map_err(|_| Error::InvalidSource { path })?;
+        found = Some(field.payload());
+    }
+    found.ok_or(Error::InvalidSource { path })
+}
+
+fn parse_fixed32(view: &WireView<'_>, number: u32, path: Path) -> Result<Option<u32>, Error> {
+    let mut found = None;
+    for field in view.fields().filter(|field| field.number() == number) {
+        if found.is_some() || field.wire_type() != 5 || field.payload().len() != 4 {
+            return Err(Error::InvalidSource { path });
+        }
+        field
+            .validate_canonical_key()
+            .map_err(|_| Error::InvalidSource { path })?;
+        found = Some(u32::from_le_bytes(
+            field
+                .payload()
+                .try_into()
+                .map_err(|_| Error::InvalidSource { path })?,
+        ));
+    }
+    Ok(found)
+}
+
+fn parse_fixed64(view: &WireView<'_>, number: u32, path: Path) -> Result<Option<u64>, Error> {
+    let mut found = None;
+    for field in view.fields().filter(|field| field.number() == number) {
+        if found.is_some() || field.wire_type() != 1 || field.payload().len() != 8 {
+            return Err(Error::InvalidSource { path });
+        }
+        field
+            .validate_canonical_key()
+            .map_err(|_| Error::InvalidSource { path })?;
+        found = Some(u64::from_le_bytes(
+            field
+                .payload()
+                .try_into()
+                .map_err(|_| Error::InvalidSource { path })?,
+        ));
+    }
+    Ok(found)
+}
+
+fn custom_format_type(value: &Custom) -> u32 {
+    match value {
+        Custom::Number(_) => CUSTOM_NUMBER_FORMAT_TYPE,
+        Custom::Text(_) => CUSTOM_TEXT_FORMAT_TYPE,
+        Custom::DateTime(_) => CUSTOM_DATE_TIME_FORMAT_TYPE,
+    }
+}
+
+fn parse_custom_archive(
+    source: &[u8],
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Custom, Error> {
+    let view = custom_wire_view(source, budget, 1, path)?;
+    let name = Name::from_owned(parse_required_string(
+        &view,
+        CUSTOM_FORMAT_NAME_FIELD,
+        MAX_NAME_BYTES,
+        true,
+        budget,
+        path,
+    )?)
+    .map_err(|_| Error::InvalidSource { path })?;
+    let pre_type = u32::try_from(parse_required_varint(
+        &view,
+        CUSTOM_FORMAT_PRE_TYPE_FIELD,
+        path,
+    )?)
+    .map_err(|_| Error::InvalidSource { path })?;
+    if !matches!(
+        pre_type,
+        CUSTOM_NUMBER_FORMAT_TYPE | CUSTOM_TEXT_FORMAT_TYPE | CUSTOM_DATE_TIME_FORMAT_TYPE
+    ) {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    let declared_type = parse_optional_varint(&view, CUSTOM_FORMAT_TYPE_FIELD, path)?;
+    if declared_type.is_some_and(|value| value != u64::from(pre_type)) {
+        return Err(Error::InvalidSource { path });
+    }
+    let default_payload = parse_required_bytes(&view, CUSTOM_FORMAT_DEFAULT_FIELD, path)?;
+    let (_, default_pattern) = parse_custom_pattern(default_payload, pre_type, budget, path)?;
+    let condition_count = view
+        .fields()
+        .filter(|field| field.number() == CUSTOM_FORMAT_CONDITION_FIELD)
+        .count();
+    if condition_count > crate::cell::data_format::custom::MAX_RULES {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    let mut conditions = Vec::new();
+    if condition_count != 0 {
+        budget.charge_allocations(1, path)?;
+        conditions
+            .try_reserve_exact(condition_count)
+            .map_err(|_| Error::Allocation {
+                amount: condition_count,
+                path,
+            })?;
+    }
+    for field in view
+        .fields()
+        .filter(|field| field.number() == CUSTOM_FORMAT_CONDITION_FIELD)
+    {
+        if field.wire_type() != 2 {
+            return Err(Error::InvalidSource { path });
+        }
+        field
+            .validate_canonical_framing()
+            .map_err(|_| Error::InvalidSource { path })?;
+        conditions.push(parse_custom_condition(
+            field.payload(),
+            pre_type,
+            budget,
+            path,
+        )?);
+    }
+    match pre_type {
+        CUSTOM_NUMBER_FORMAT_TYPE => {
+            let pattern = NumberPattern::from_owned(default_pattern)
+                .map_err(|_| Error::InvalidSource { path })?;
+            let mut rules = Vec::new();
+            if !conditions.is_empty() {
+                budget.charge_allocations(1, path)?;
+                rules
+                    .try_reserve_exact(conditions.len())
+                    .map_err(|_| Error::Allocation {
+                        amount: conditions.len(),
+                        path,
+                    })?;
+            }
+            for (condition, pattern) in conditions {
+                let pattern = NumberPattern::from_owned(pattern)
+                    .map_err(|_| Error::InvalidSource { path })?;
+                rules.push(NumberRule::new(condition, pattern));
+            }
+            Ok(Custom::Number(
+                CustomNumber::try_with_rules(name, pattern, rules)
+                    .map_err(|_| Error::InvalidSource { path })?,
+            ))
+        },
+        CUSTOM_TEXT_FORMAT_TYPE => {
+            if !conditions.is_empty() {
+                return Err(Error::UnsupportedDependency { path });
+            }
+            let (prefix, suffix, includes_cell) =
+                split_custom_text_pattern(default_pattern, budget, path)?;
+            let value = if includes_cell {
+                CustomText::try_new(name, prefix, suffix)
+            } else {
+                CustomText::try_literal(name, prefix)
+            }
+            .map_err(|_| Error::InvalidSource { path })?;
+            Ok(Custom::Text(value))
+        },
+        CUSTOM_DATE_TIME_FORMAT_TYPE => {
+            if !conditions.is_empty() {
+                return Err(Error::UnsupportedDependency { path });
+            }
+            let pattern = DateTimePattern::from_owned(default_pattern)
+                .map_err(|_| Error::InvalidSource { path })?;
+            Ok(Custom::DateTime(CustomDateTime::new(name, pattern)))
+        },
+        _ => Err(Error::UnsupportedDependency { path }),
+    }
+}
+
+fn parse_custom_condition(
+    source: &[u8],
+    expected_type: u32,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<(Condition, String), Error> {
+    let view = custom_wire_view(source, budget, 2, path)?;
+    let condition_type = u32::try_from(parse_required_varint(
+        &view,
+        CUSTOM_CONDITION_TYPE_FIELD,
+        path,
+    )?)
+    .map_err(|_| Error::InvalidSource { path })?;
+    let fixed = parse_fixed32(&view, CUSTOM_CONDITION_FLOAT_FIELD, path)?;
+    let double = parse_fixed64(&view, CUSTOM_CONDITION_DOUBLE_FIELD, path)?;
+    if fixed.is_some() == double.is_some() {
+        return Err(Error::InvalidSource { path });
+    }
+    let threshold = if let Some(value) = double {
+        f64::from_bits(value)
+    } else {
+        f32::from_bits(fixed.ok_or(Error::InvalidSource { path })?) as f64
+    };
+    let threshold =
+        ConditionValue::try_new(threshold).map_err(|_| Error::InvalidSource { path })?;
+    let condition = match condition_type {
+        0 => Condition::EqualTo(threshold),
+        1 => Condition::LessThan(threshold),
+        2 => Condition::LessThanOrEqualTo(threshold),
+        3 => Condition::GreaterThan(threshold),
+        4 => Condition::GreaterThanOrEqualTo(threshold),
+        _ => return Err(Error::UnsupportedDependency { path }),
+    };
+    let format_payload = parse_required_bytes(&view, CUSTOM_CONDITION_FORMAT_FIELD, path)?;
+    let (format_type, pattern) = parse_custom_pattern(format_payload, expected_type, budget, path)?;
+    if format_type != expected_type {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    Ok((condition, pattern))
+}
+
+fn parse_custom_pattern(
+    source: &[u8],
+    expected_type: u32,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<(u32, String), Error> {
+    let view = custom_wire_view(source, budget, 2, path)?;
+    let format_type = u32::try_from(parse_required_varint(
+        &view,
+        CUSTOM_PATTERN_TYPE_FIELD,
+        path,
+    )?)
+    .map_err(|_| Error::InvalidSource { path })?;
+    if format_type != expected_type {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    let pattern = parse_required_string(
+        &view,
+        CUSTOM_PATTERN_STRING_FIELD,
+        MAX_PATTERN_BYTES,
+        false,
+        budget,
+        path,
+    )?;
+    // The custom pattern is a strict FormatStructArchive shape.  Optional
+    // fields are accepted only when they carry the native custom defaults;
+    // all other known fields belong to a different owner and are rejected.
+    let show_thousands = parse_optional_bool(&view, 5, path)?;
+    if expected_type != CUSTOM_NUMBER_FORMAT_TYPE && show_thousands.is_some_and(|value| value) {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    if parse_optional_bool(&view, 6, path)?.is_some_and(|value| value)
+        || parse_optional_varint(&view, 11, path)?
+            .is_some_and(|value| value != u64::from(CUSTOM_FRACTION_SENTINEL))
+        || parse_optional_fixed64_one(&view, 19, path)? == Some(false)
+        || parse_optional_bool(&view, 20, path)?.is_some_and(|value| value)
+        || parse_optional_bool(&view, 36, path)?.is_some_and(|value| value)
+    {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    for field_number in [27_u32, 28, 29, 30, 31, 34, 35] {
+        if parse_optional_varint(&view, field_number, path)?.is_some_and(|value| value != 0) {
+            return Err(Error::UnsupportedDependency { path });
+        }
+    }
+    if let Some(contains_integer) = parse_optional_bool(&view, 37, path)? {
+        let expected = expected_type == CUSTOM_NUMBER_FORMAT_TYPE
+            && pattern
+                .chars()
+                .any(|character| matches!(character, '#' | '0'));
+        if contains_integer != expected {
+            return Err(Error::UnsupportedDependency { path });
+        }
+    }
+    for field in view.fields() {
+        if field.number() > 45
+            || matches!(
+                field.number(),
+                1 | 5 | 6 | 11 | 18 | 19 | 20 | 27 | 28 | 29 | 30 | 31 | 34 | 35 | 36 | 37
+            )
+        {
+            continue;
+        }
+        return Err(Error::UnsupportedDependency { path });
+    }
+    Ok((format_type, pattern))
+}
+
+fn parse_optional_fixed64_one(
+    view: &WireView<'_>,
+    number: u32,
+    path: Path,
+) -> Result<Option<bool>, Error> {
+    Ok(parse_fixed64(view, number, path)?.map(|bits| f64::from_bits(bits) == 1.0))
+}
+
+fn split_custom_text_pattern(
+    pattern: String,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<(String, String, bool), Error> {
+    let Some((prefix, suffix)) = pattern.split_once(CUSTOM_TEXT_VALUE_TOKEN) else {
+        if pattern.is_empty() {
+            return Err(Error::InvalidSource { path });
+        }
+        // The owned pattern can be adopted directly by the literal Text
+        // constructor. This avoids a second pattern-sized clone.
+        return Ok((pattern, String::new(), false));
+    };
+    if suffix.contains(CUSTOM_TEXT_VALUE_TOKEN) {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    budget.charge_allocations(2, path)?;
+    let mut prefix_owned = String::new();
+    prefix_owned
+        .try_reserve_exact(prefix.len())
+        .map_err(|_| Error::Allocation {
+            amount: prefix.len(),
+            path,
+        })?;
+    prefix_owned.push_str(prefix);
+    let mut suffix_owned = String::new();
+    suffix_owned
+        .try_reserve_exact(suffix.len())
+        .map_err(|_| Error::Allocation {
+            amount: suffix.len(),
+            path,
+        })?;
+    suffix_owned.push_str(suffix);
+    Ok((prefix_owned, suffix_owned, true))
+}
+
+fn custom_varint_field_len(field: u32, value: u64) -> usize {
+    litchi_iwa_common::varint::encoded_len(u64::from(field) << 3)
+        .saturating_add(litchi_iwa_common::varint::encoded_len(value))
+}
+
+fn custom_bytes_field_len(field: u32, payload_len: usize) -> Result<usize, Error> {
+    let payload_len = u64::try_from(payload_len).map_err(|_| Error::InvalidSource {
+        path: Path::Package,
+    })?;
+    custom_varint_field_len(field, payload_len)
+        .checked_add(payload_len as usize)
+        .ok_or(Error::InvalidSource {
+            path: Path::Package,
+        })
+}
+
+fn custom_fixed64_field_len(field: u32) -> usize {
+    litchi_iwa_common::varint::encoded_len((u64::from(field) << 3) | 1) + 8
+}
+
+fn custom_pattern_encoded_len(format_type: u32, pattern_len: usize) -> Result<usize, Error> {
+    let mut length = 0usize;
+    // All constant pattern fields are emitted canonically as varints. Their
+    // values are included here (rather than using a blanket overhead) so the
+    // reservation remains an exact preflight for the fallible output Vec.
+    for (field, value) in [
+        (CUSTOM_PATTERN_TYPE_FIELD, u64::from(format_type)),
+        (
+            5,
+            u64::from(format_type == CUSTOM_NUMBER_FORMAT_TYPE && pattern_len != 0),
+        ),
+        (6, 0),
+        (11, u64::from(CUSTOM_FRACTION_SENTINEL)),
+        (20, 0),
+        (27, 0),
+        (28, 0),
+        (29, 0),
+        (30, 0),
+        (31, 0),
+        (34, 0),
+        (35, 0),
+        (36, 0),
+        (
+            37,
+            u64::from(format_type == CUSTOM_NUMBER_FORMAT_TYPE && pattern_len != 0),
+        ),
+    ] {
+        length = length
+            .checked_add(custom_varint_field_len(field, value))
+            .ok_or(Error::InvalidSource {
+                path: Path::Package,
+            })?;
+    }
+    let pattern_field_len = custom_bytes_field_len(CUSTOM_PATTERN_STRING_FIELD, pattern_len)?;
+    length = length
+        .checked_add(pattern_field_len)
+        .and_then(|length| length.checked_add(custom_fixed64_field_len(19)))
+        .ok_or(Error::InvalidSource {
+            path: Path::Package,
+        })?;
+    Ok(length)
+}
+
+fn custom_condition_encoded_len(format_type: u32, pattern_len: usize) -> Result<usize, Error> {
+    let pattern_len = custom_pattern_encoded_len(format_type, pattern_len)?;
+    let condition_format_len = custom_bytes_field_len(CUSTOM_CONDITION_FORMAT_FIELD, pattern_len)?;
+    custom_varint_field_len(CUSTOM_CONDITION_TYPE_FIELD, 0)
+        .checked_add(custom_fixed64_field_len(CUSTOM_CONDITION_DOUBLE_FIELD))
+        .and_then(|length| length.checked_add(condition_format_len))
+        .ok_or(Error::InvalidSource {
+            path: Path::Package,
+        })
+}
+
+fn custom_archive_encoded_len(
+    name_len: usize,
+    format_type: u32,
+    default_pattern_len: usize,
+    rules: Option<&[NumberRule]>,
+) -> Result<usize, Error> {
+    let default_pattern_len = custom_pattern_encoded_len(format_type, default_pattern_len)?;
+    let name_field_len = custom_bytes_field_len(CUSTOM_FORMAT_NAME_FIELD, name_len)?;
+    let default_field_len =
+        custom_bytes_field_len(CUSTOM_FORMAT_DEFAULT_FIELD, default_pattern_len)?;
+    let mut length = name_field_len
+        .checked_add(custom_varint_field_len(
+            CUSTOM_FORMAT_PRE_TYPE_FIELD,
+            u64::from(format_type),
+        ))
+        .and_then(|length| length.checked_add(default_field_len))
+        .ok_or(Error::InvalidSource {
+            path: Path::Package,
+        })?;
+    if let Some(rules) = rules {
+        for rule in rules {
+            let condition_len =
+                custom_condition_encoded_len(format_type, rule.pattern().as_str().len())?;
+            length = length
+                .checked_add(custom_bytes_field_len(
+                    CUSTOM_FORMAT_CONDITION_FIELD,
+                    condition_len,
+                )?)
+                .ok_or(Error::InvalidSource {
+                    path: Path::Package,
+                })?;
+        }
+    }
+    length = length
+        .checked_add(custom_varint_field_len(
+            CUSTOM_FORMAT_TYPE_FIELD,
+            u64::from(format_type),
+        ))
+        .ok_or(Error::InvalidSource {
+            path: Path::Package,
+        })?;
+    Ok(length)
+}
+
+fn encode_custom_registry_entry(
+    uuid: CustomUuid,
+    value: &Custom,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<(Vec<u8>, Vec<u8>), Error> {
+    let uuid_payload = encode_custom_uuid(uuid, path, budget)?;
+    let format_payload = encode_custom_archive(value, path, budget)?;
+    Ok((uuid_payload, format_payload))
+}
+
+fn encode_custom_archive(
+    value: &Custom,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<u8>, Error> {
+    let (name, format_type, default_pattern, rules): (
+        &str,
+        u32,
+        Cow<'_, str>,
+        Option<&[NumberRule]>,
+    ) = match value {
+        Custom::Number(value) => (
+            value.name().as_str(),
+            CUSTOM_NUMBER_FORMAT_TYPE,
+            Cow::Borrowed(value.default_pattern().as_str()),
+            Some(value.rules()),
+        ),
+        Custom::Text(value) => {
+            let default_pattern = if value.includes_cell_text() {
+                let length = value
+                    .prefix()
+                    .len()
+                    .checked_add(value.suffix().len())
+                    .and_then(|length| length.checked_add(CUSTOM_TEXT_VALUE_TOKEN.len_utf8()))
+                    .ok_or(Error::InvalidSource { path })?;
+                budget.charge_allocations(1, path)?;
+                let mut pattern = String::new();
+                pattern
+                    .try_reserve_exact(length)
+                    .map_err(|_| Error::Allocation {
+                        amount: length,
+                        path,
+                    })?;
+                pattern.push_str(value.prefix());
+                pattern.push(CUSTOM_TEXT_VALUE_TOKEN);
+                pattern.push_str(value.suffix());
+                Cow::Owned(pattern)
+            } else {
+                Cow::Borrowed(value.prefix())
+            };
+            (
+                value.name().as_str(),
+                CUSTOM_TEXT_FORMAT_TYPE,
+                default_pattern,
+                None,
+            )
+        },
+        Custom::DateTime(value) => (
+            value.name().as_str(),
+            CUSTOM_DATE_TIME_FORMAT_TYPE,
+            Cow::Borrowed(value.pattern().as_str()),
+            None,
+        ),
+    };
+    let output_len =
+        custom_archive_encoded_len(name.len(), format_type, default_pattern.len(), rules)?;
+    budget.charge_allocations(1, path)?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|_| Error::Allocation {
+            amount: output_len,
+            path,
+        })?;
+    append_custom_string(&mut output, CUSTOM_FORMAT_NAME_FIELD, name, path)?;
+    append_custom_varint(
+        &mut output,
+        CUSTOM_FORMAT_PRE_TYPE_FIELD,
+        u64::from(format_type),
+        path,
+    )?;
+    let pattern = encode_custom_pattern(format_type, default_pattern.as_ref(), path, budget)?;
+    append_custom_bytes(&mut output, CUSTOM_FORMAT_DEFAULT_FIELD, &pattern, path)?;
+    if let Some(rules) = rules {
+        for rule in rules {
+            let condition = encode_custom_condition(rule, format_type, path, budget)?;
+            append_custom_bytes(&mut output, CUSTOM_FORMAT_CONDITION_FIELD, &condition, path)?;
+        }
+    }
+    append_custom_varint(
+        &mut output,
+        CUSTOM_FORMAT_TYPE_FIELD,
+        u64::from(format_type),
+        path,
+    )?;
+    if output.len() != output_len {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok(output)
+}
+
+fn encode_custom_pattern(
+    format_type: u32,
+    pattern: &str,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<u8>, Error> {
+    let output_len = custom_pattern_encoded_len(format_type, pattern.len())?;
+    budget.charge_allocations(1, path)?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|_| Error::Allocation {
+            amount: output_len,
+            path,
+        })?;
+    append_custom_varint(
+        &mut output,
+        CUSTOM_PATTERN_TYPE_FIELD,
+        u64::from(format_type),
+        path,
+    )?;
+    append_custom_varint(
+        &mut output,
+        5,
+        u64::from(format_type == CUSTOM_NUMBER_FORMAT_TYPE && pattern.contains(',')),
+        path,
+    )?;
+    append_custom_varint(&mut output, 6, 0, path)?;
+    append_custom_varint(&mut output, 11, u64::from(CUSTOM_FRACTION_SENTINEL), path)?;
+    append_custom_string(&mut output, CUSTOM_PATTERN_STRING_FIELD, pattern, path)?;
+    append_custom_fixed64(&mut output, 19, 1.0_f64.to_bits(), path)?;
+    append_custom_varint(&mut output, 20, 0, path)?;
+    for field in [27_u32, 28, 29, 30, 31, 34, 35] {
+        append_custom_varint(&mut output, field, 0, path)?;
+    }
+    append_custom_varint(&mut output, 36, 0, path)?;
+    append_custom_varint(
+        &mut output,
+        37,
+        u64::from(
+            format_type == CUSTOM_NUMBER_FORMAT_TYPE
+                && pattern
+                    .chars()
+                    .any(|character| matches!(character, '#' | '0')),
+        ),
+        path,
+    )?;
+    if output.len() != output_len {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok(output)
+}
+
+fn encode_custom_condition(
+    rule: &NumberRule,
+    format_type: u32,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<u8>, Error> {
+    let output_len = custom_condition_encoded_len(format_type, rule.pattern().as_str().len())?;
+    budget.charge_allocations(1, path)?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|_| Error::Allocation {
+            amount: output_len,
+            path,
+        })?;
+    let condition_type = match rule.condition() {
+        Condition::EqualTo(_) => 0,
+        Condition::LessThan(_) => 1,
+        Condition::LessThanOrEqualTo(_) => 2,
+        Condition::GreaterThan(_) => 3,
+        Condition::GreaterThanOrEqualTo(_) => 4,
+    };
+    append_custom_varint(
+        &mut output,
+        CUSTOM_CONDITION_TYPE_FIELD,
+        condition_type,
+        path,
+    )?;
+    append_custom_fixed64(
+        &mut output,
+        CUSTOM_CONDITION_DOUBLE_FIELD,
+        rule.condition().threshold().value().to_bits(),
+        path,
+    )?;
+    let pattern = encode_custom_pattern(format_type, rule.pattern().as_str(), path, budget)?;
+    append_custom_bytes(&mut output, CUSTOM_CONDITION_FORMAT_FIELD, &pattern, path)?;
+    if output.len() != output_len {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok(output)
+}
+
+fn append_custom_varint(
+    output: &mut Vec<u8>,
+    field: u32,
+    value: u64,
+    path: Path,
+) -> Result<(), Error> {
+    if field == 0 || field > 0x1fff_ffff {
+        return Err(Error::InvalidSource { path });
+    }
+    litchi_iwa_common::varint::encode_varint_into(output, u64::from(field) << 3);
+    litchi_iwa_common::varint::encode_varint_into(output, value);
+    Ok(())
+}
+
+fn append_custom_bytes(
+    output: &mut Vec<u8>,
+    field: u32,
+    value: &[u8],
+    path: Path,
+) -> Result<(), Error> {
+    if field == 0 || field > 0x1fff_ffff {
+        return Err(Error::InvalidSource { path });
+    }
+    let length = u64::try_from(value.len()).map_err(|_| Error::InvalidSource { path })?;
+    litchi_iwa_common::varint::encode_varint_into(output, (u64::from(field) << 3) | 2);
+    litchi_iwa_common::varint::encode_varint_into(output, length);
+    output.extend_from_slice(value);
+    Ok(())
+}
+
+fn append_custom_string(
+    output: &mut Vec<u8>,
+    field: u32,
+    value: &str,
+    path: Path,
+) -> Result<(), Error> {
+    append_custom_bytes(output, field, value.as_bytes(), path)
+}
+
+fn append_custom_fixed64(
+    output: &mut Vec<u8>,
+    field: u32,
+    value: u64,
+    _path: Path,
+) -> Result<(), Error> {
+    if field == 0 || field > 0x1fff_ffff {
+        return Err(Error::InvalidSource { path: _path });
+    }
+    let key = (u64::from(field) << 3) | 1;
+    litchi_iwa_common::varint::encode_varint_into(output, key);
+    output.extend_from_slice(&value.to_le_bytes());
+    Ok(())
+}
+
+fn encode_custom_uuid(
+    uuid: CustomUuid,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<u8>, Error> {
+    let output_len = custom_varint_field_len(1, uuid.lower)
+        .checked_add(custom_varint_field_len(2, uuid.upper))
+        .ok_or(Error::InvalidSource { path })?;
+    budget.charge_allocations(1, path)?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|_| Error::Allocation {
+            amount: output_len,
+            path,
+        })?;
+    append_custom_varint(&mut output, 1, uuid.lower, path)?;
+    append_custom_varint(&mut output, 2, uuid.upper, path)?;
+    if output.len() != output_len {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok(output)
+}
+
+fn encode_custom_reference(
+    format_type: u32,
+    uuid: CustomUuid,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<u8>, Error> {
+    let uuid_len = custom_varint_field_len(1, uuid.lower)
+        .checked_add(custom_varint_field_len(2, uuid.upper))
+        .ok_or(Error::InvalidSource { path })?;
+    let output_len = custom_varint_field_len(CUSTOM_REFERENCE_TYPE_FIELD, u64::from(format_type))
+        .checked_add(custom_bytes_field_len(
+            CUSTOM_REFERENCE_UUID_FIELD,
+            uuid_len,
+        )?)
+        .ok_or(Error::InvalidSource { path })?;
+    budget.charge_allocations(1, path)?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|_| Error::Allocation {
+            amount: output_len,
+            path,
+        })?;
+    append_custom_varint(
+        &mut output,
+        CUSTOM_REFERENCE_TYPE_FIELD,
+        u64::from(format_type),
+        path,
+    )?;
+    let uuid_payload = encode_custom_uuid(uuid, path, budget)?;
+    append_custom_bytes(
+        &mut output,
+        CUSTOM_REFERENCE_UUID_FIELD,
+        &uuid_payload,
+        path,
+    )?;
+    if output.len() != output_len {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok(output)
+}
+
+fn rewrite_custom_reference(
+    source: &[u8],
+    format_type: u32,
+    uuid: CustomUuid,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<u8>, Error> {
+    // Both common wire patch helpers allocate a complete replacement buffer.
+    // Debit the first reservation before invoking it; the UUID payload has
+    // its own charge in `encode_custom_uuid`, and the second patch is charged
+    // immediately before its allocation below.
+    budget.charge_allocations(1, path)?;
+    let output = litchi_iwa_common::wire::patch_varint_field(
+        source,
+        CUSTOM_REFERENCE_TYPE_FIELD,
+        true,
+        Some(u64::from(format_type)),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    let uuid_payload = encode_custom_uuid(uuid, path, budget)?;
+    budget.charge_allocations(1, path)?;
+    let output = litchi_iwa_common::wire::patch_length_delimited_field(
+        &output,
+        CUSTOM_REFERENCE_UUID_FIELD,
+        true,
+        Some(&uuid_payload),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    Ok(output)
+}
+
+fn rewrite_custom_cell_clear(
+    source: &[u8],
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<u8>, Error> {
+    charge_owned_bnc_parse(source.len(), path, budget)?;
+    let mut cell = BncCell::parse(source).map_err(|_| Error::InvalidSource { path })?;
+    cell.clear_explicit_format();
+    cell.try_encode_with_limit(
+        source
+            .len()
+            .checked_add(16)
+            .ok_or(Error::InvalidSource { path })?,
+    )
+    .map_err(|_| Error::InvalidSource { path })
+}
+
+fn fresh_custom_uuid(entries: &[CustomRegistryEntry]) -> CustomUuid {
+    loop {
+        let bytes = litchi_core::id::generate_guid_bytes();
+        let uuid = CustomUuid {
+            lower: u64::from_le_bytes(bytes[..8].try_into().expect("GUID lower width")),
+            upper: u64::from_le_bytes(bytes[8..].try_into().expect("GUID upper width")),
+        };
+        if uuid.lower != 0 && uuid.upper != 0 && !entries.iter().any(|entry| entry.uuid == uuid) {
+            return uuid;
+        }
+    }
+}
+
+fn custom_uuid_is_referenced(
+    source: &Package,
+    replacement_component: usize,
+    replacement_identifier: u64,
+    replacement_message: usize,
+    replacement_payload: &[u8],
+    needle: CustomUuid,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<bool, Error> {
+    for (component_index, component) in source.state.components.catalog().iter().enumerate() {
+        for object in &component.archive().objects {
+            let object_identifier = object.archive_info.identifier.unwrap_or(0);
+            for (message_index, message) in object.messages.iter().enumerate() {
+                let payload = if component_index == replacement_component
+                    && object_identifier == replacement_identifier
+                    && message_index == replacement_message
+                {
+                    replacement_payload
+                } else {
+                    &message.data
+                };
+                if message.type_ == TABLE_DATA_LIST_MESSAGE_TYPE {
+                    let (list_type, report) =
+                        storage_codec::decode_table_data_list_type_with_report(
+                            payload,
+                            budget.residual_storage_options(payload),
+                        )
+                        .map_err(|error| native::map_storage_error(error, path))?;
+                    native::charge_storage_report(budget, report, path)?;
+                    if list_type.list_type() == CUSTOM_FORMAT_LIST_TYPE {
+                        return Err(Error::UnsupportedDependency { path });
+                    }
+                    if list_type.list_type() != FORMAT_LIST_TYPE {
+                        continue;
+                    }
+                    let facts = if component_index == replacement_component
+                        && object_identifier == replacement_identifier
+                        && message_index == replacement_message
+                    {
+                        native::list_facts_without_input(payload, budget, path)?
+                    } else {
+                        native::list_facts(payload, budget, path)?
+                    };
+                    for entry in facts.entries.iter().filter(|entry| entry.is_format) {
+                        if let Some(reference) =
+                            parse_custom_reference(&entry.payload, budget, path)?
+                        {
+                            if reference.uuid == needle {
+                                return Ok(true);
+                            }
+                        }
+                    }
+                } else if message.type_ == TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE {
+                    let (list_type, report) =
+                        storage_codec::decode_table_data_list_segment_type_with_report(
+                            payload,
+                            budget.residual_storage_options(payload),
+                        )
+                        .map_err(|error| native::map_storage_error(error, path))?;
+                    native::charge_storage_report(budget, report, path)?;
+                    if matches!(
+                        list_type.list_type(),
+                        CUSTOM_FORMAT_LIST_TYPE | FORMAT_LIST_TYPE
+                    ) {
+                        return Err(Error::UnsupportedDependency { path });
+                    }
+                }
+            }
+        }
+    }
+    Ok(false)
+}
+
+fn parse_custom_reference(
+    source: &[u8],
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Option<CustomReference>, Error> {
+    let view = custom_wire_view(source, budget, 1, path)?;
+    let format_type = parse_optional_varint(&view, CUSTOM_REFERENCE_TYPE_FIELD, path)?;
+    let mut uuid_payload = None;
+    let mut other_known = false;
+    for field in view.fields() {
+        match field.number() {
+            CUSTOM_REFERENCE_TYPE_FIELD => {},
+            CUSTOM_REFERENCE_UUID_FIELD => {
+                if uuid_payload.is_some() || field.wire_type() != 2 {
+                    return Err(Error::InvalidSource { path });
+                }
+                field
+                    .validate_canonical_framing()
+                    .map_err(|_| Error::InvalidSource { path })?;
+                uuid_payload = Some(field.payload());
+            },
+            number if number <= 45 => other_known = true,
+            _ => {},
+        }
+    }
+    if format_type.is_none() && uuid_payload.is_none() {
+        return Ok(None);
+    }
+    let format_type = u32::try_from(format_type.ok_or(Error::InvalidSource { path })?)
+        .map_err(|_| Error::InvalidSource { path })?;
+    if !matches!(
+        format_type,
+        CUSTOM_NUMBER_FORMAT_TYPE | CUSTOM_TEXT_FORMAT_TYPE | CUSTOM_DATE_TIME_FORMAT_TYPE
+    ) {
+        if uuid_payload.is_none() {
+            return Ok(None);
+        }
+        return Err(Error::UnsupportedDependency { path });
+    }
+    if other_known {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    let uuid = parse_custom_uuid(
+        uuid_payload.ok_or(Error::InvalidSource { path })?,
+        budget,
+        path,
+    )?;
+    Ok(Some(CustomReference { format_type, uuid }))
+}
+
+fn validate_custom_legacy_routes(
+    source: &Package,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<(), Error> {
+    let document_archive = source
+        .state
+        .components
+        .get_archive("Index/Document.iwa")
+        .ok_or(Error::UnsupportedSource)?;
+    let document_object = native::unique_object(document_archive, 1, path)?;
+    let document_index =
+        native::unique_message_index(document_object, DOCUMENT_MESSAGE_TYPE, path)?;
+    let root = &document_object.messages[document_index].data;
+    let root_view = custom_wire_view(root, budget, 0, path)?;
+    for field in root_view
+        .fields()
+        .filter(|field| field.number() == DOCUMENT_LEGACY_SUPER_FIELD)
+    {
+        if field.wire_type() != 2 {
+            return Err(Error::InvalidSource { path });
+        }
+        field
+            .validate_canonical_framing()
+            .map_err(|_| Error::InvalidSource { path })?;
+        let legacy = custom_wire_view(field.payload(), budget, 1, path)?;
+        if legacy
+            .fields()
+            .any(|nested| matches!(nested.number(), 7 | 12))
+        {
+            return Err(Error::UnsupportedDependency { path });
+        }
+    }
+    for component in source.state.components.catalog().iter() {
+        for object in &component.archive().objects {
+            for message in &object.messages {
+                if message.type_ != 6_001 {
+                    continue;
+                }
+                let (model, report) = storage_codec::decode_table_model_with_report(
+                    &message.data,
+                    budget.residual_storage_options(&message.data),
+                )
+                .map_err(|error| native::map_storage_error(error, path))?;
+                native::charge_storage_report(budget, report, path)?;
+                let (store, report) = storage_codec::decode_data_store_with_report(
+                    model.base_data_store(),
+                    budget.residual_storage_options(model.base_data_store()),
+                )
+                .map_err(|error| native::map_storage_error(error, path))?;
+                native::charge_storage_report(budget, report, path)?;
+                if store.deprecated_custom_format_table().is_some() {
+                    return Err(Error::UnsupportedDependency { path });
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 fn decode_display_payload(
     family: DisplayFormatFamily,
     source: &[u8],
@@ -2872,9 +4695,548 @@ fn display_read_error_to_write_error(error: DisplayReadError, path: Path) -> Err
     }
 }
 
+// -------------------------------------------------------------------------
+// Document-scoped Custom format owner
+// -------------------------------------------------------------------------
+
+// The custom registry is reached only through TN.DocumentArchive field 9.
+// The object/message type is intentionally not part of the public contract:
+// source-built Numbers files and older producers have used different object
+// type tags while retaining this rooted reference.  The format-list entries
+// themselves are ordinary TSK.FormatStructArchive values (field 41 is the
+// custom UUID).
+const CUSTOM_REGISTRY_REFERENCE_FIELD: u32 = 9;
+const CUSTOM_REGISTRY_UUID_FIELD: u32 = 1;
+const CUSTOM_REGISTRY_FORMAT_FIELD: u32 = 2;
+const CUSTOM_REFERENCE_TYPE_FIELD: u32 = 1;
+const CUSTOM_REFERENCE_UUID_FIELD: u32 = 41;
+const CUSTOM_FORMAT_NAME_FIELD: u32 = 1;
+const CUSTOM_FORMAT_PRE_TYPE_FIELD: u32 = 2;
+const CUSTOM_FORMAT_DEFAULT_FIELD: u32 = 3;
+const CUSTOM_FORMAT_CONDITION_FIELD: u32 = 4;
+const CUSTOM_FORMAT_TYPE_FIELD: u32 = 5;
+const CUSTOM_PATTERN_TYPE_FIELD: u32 = 1;
+const CUSTOM_PATTERN_STRING_FIELD: u32 = 18;
+const CUSTOM_CONDITION_TYPE_FIELD: u32 = 1;
+const CUSTOM_CONDITION_FLOAT_FIELD: u32 = 2;
+const CUSTOM_CONDITION_FORMAT_FIELD: u32 = 3;
+const CUSTOM_CONDITION_DOUBLE_FIELD: u32 = 4;
+const CUSTOM_NUMBER_FORMAT_TYPE: u32 = 270;
+const CUSTOM_TEXT_FORMAT_TYPE: u32 = 271;
+const CUSTOM_DATE_TIME_FORMAT_TYPE: u32 = 272;
+const CUSTOM_FRACTION_SENTINEL: u32 = (-3_i32) as u32;
+const CUSTOM_TEXT_VALUE_TOKEN: char = '\u{e421}';
+const TABLE_DATA_LIST_MESSAGE_TYPE: u32 = 6_005;
+const TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE: u32 = 6_011;
+const CUSTOM_FORMAT_REGISTRY_MESSAGE_TYPE: u32 = 222;
+const FORMAT_LIST_TYPE: i32 = 2;
+// TST.TableDataList.ListType::CUSTOM_FORMAT.  This is distinct from the
+// document registry's native message type (222).
+const CUSTOM_FORMAT_LIST_TYPE: i32 = 6;
+const DOCUMENT_MESSAGE_TYPE: u32 = 1;
+// TN.DocumentArchive.super is field 8, the legacy TSA envelope.  The
+// current document-scoped custom registry reference is field 9 (the
+// `CUSTOM_REGISTRY_REFERENCE_FIELD` above); keeping this legacy selector
+// separately prevents the required super envelope from becoming a registry
+// route by accident.
+const DOCUMENT_LEGACY_SUPER_FIELD: u32 = 8;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum CustomFormatReadError {
+    WrongFormatFamily,
+    Native(Error),
+}
+
+impl From<Error> for CustomFormatReadError {
+    fn from(error: Error) -> Self {
+        Self::Native(error)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct CustomUuid {
+    lower: u64,
+    upper: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CustomRegistryEntry {
+    uuid: CustomUuid,
+    // Existing entries own their semantic projection. Newly appended entries
+    // need no second semantic allocation: their canonical payload is already
+    // available in the parallel registry vectors and is verified on reopen.
+    format: Option<Custom>,
+}
+
+#[derive(Debug)]
+struct CustomRegistryFacts<'source> {
+    source: &'source [u8],
+    uuid_payloads: Vec<Cow<'source, [u8]>>,
+    format_payloads: Vec<Cow<'source, [u8]>>,
+    entries: Vec<CustomRegistryEntry>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CustomRegistryLocation {
+    component_index: usize,
+    object_identifier: u64,
+    message_index: usize,
+    message_type: u32,
+}
+
+#[derive(Debug)]
+struct CustomCellGraph {
+    tile_component_index: usize,
+    tile_identifier: u64,
+    tile_message_index: usize,
+    tile_payload: Vec<u8>,
+    cell_source: Vec<u8>,
+    format_component_index: usize,
+    format_table_identifier: u64,
+    format_message_index: usize,
+    format_payload: Vec<u8>,
+    format_identifier: Option<u32>,
+    explicit_flags: u16,
+    cell_kind: Option<u32>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CustomReference {
+    format_type: u32,
+    uuid: CustomUuid,
+}
+
+/// Read one existing cell's document-scoped Custom display format.
+pub(super) fn read_custom_format(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+) -> Result<Option<Custom>, CustomFormatReadError> {
+    let mut budget = TransactionBudget::for_cell_control(source);
+    read_custom_format_with_budget(source, target, path, &mut budget)
+}
+
+/// Read one Custom display format against a caller-owned transaction ledger.
+pub(super) fn read_custom_format_with_budget(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Option<Custom>, CustomFormatReadError> {
+    let graph = resolve_custom_cell_graph(source, target, path, false, budget)
+        .map_err(CustomFormatReadError::Native)?;
+    let Some(format_identifier) = graph.format_identifier else {
+        if graph.explicit_flags != 0 {
+            return Err(CustomFormatReadError::WrongFormatFamily);
+        }
+        return Ok(None);
+    };
+    if graph.explicit_flags == 0 {
+        // The format-list edge still has to be structurally valid.  This is
+        // an automatic state, not permission to interpret a malformed entry.
+        match selected_custom_reference(&graph, format_identifier, path, budget) {
+            Ok(reference) => {
+                if !custom_reference_matches_cell(
+                    reference.format_type,
+                    &graph,
+                    graph.explicit_flags,
+                ) {
+                    return Err(CustomFormatReadError::WrongFormatFamily);
+                }
+            },
+            Err(Error::UnsupportedDependency { .. }) => {
+                return Err(CustomFormatReadError::WrongFormatFamily);
+            },
+            Err(error) => return Err(CustomFormatReadError::Native(error)),
+        }
+        return Ok(None);
+    }
+    let reference = match selected_custom_reference(&graph, format_identifier, path, budget) {
+        Ok(reference) => reference,
+        Err(Error::UnsupportedDependency { .. }) => {
+            return Err(CustomFormatReadError::WrongFormatFamily);
+        },
+        Err(error) => return Err(CustomFormatReadError::Native(error)),
+    };
+    let registry_location =
+        locate_custom_registry(source, path, budget).map_err(CustomFormatReadError::Native)?;
+    let registry_payload =
+        registry_payload(source, registry_location, path).map_err(CustomFormatReadError::Native)?;
+    let registry = parse_custom_registry(registry_payload, budget, path)
+        .map_err(CustomFormatReadError::Native)?;
+    validate_custom_legacy_routes(source, path, budget).map_err(CustomFormatReadError::Native)?;
+    validate_custom_graph_ownership(source, target, &graph, registry_location, path, budget)
+        .map_err(CustomFormatReadError::Native)?;
+    let custom = registry
+        .entries
+        .iter()
+        .find(|entry| entry.uuid == reference.uuid)
+        .ok_or(CustomFormatReadError::Native(Error::InvalidSource { path }))?;
+    if !custom_reference_matches_cell(reference.format_type, &graph, graph.explicit_flags) {
+        return Err(CustomFormatReadError::WrongFormatFamily);
+    }
+    let format = custom
+        .format
+        .as_ref()
+        .ok_or(CustomFormatReadError::Native(Error::InvalidSource { path }))?;
+    if custom_format_type(format) != reference.format_type {
+        return Err(CustomFormatReadError::WrongFormatFamily);
+    }
+    Ok(Some(format.clone()))
+}
+
+/// Rewrite one existing cell's document-scoped Custom display format.
+pub(super) fn rewrite_custom_format(
+    source: &Package,
+    target: CellTarget,
+    before: Option<&Custom>,
+    after: Option<&Custom>,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<native::NativeControlOutput, Error> {
+    if target.locked {
+        return Err(Error::TableLocked { path });
+    }
+    if let (Some(before), Some(after)) = (before, after) {
+        if custom_format_type(before) != custom_format_type(after) {
+            return Err(Error::UnsupportedDependency { path });
+        }
+    }
+    let graph = resolve_custom_cell_graph(source, target, path, true, budget)?;
+    let registry_location = locate_custom_registry(source, path, budget)?;
+    let registry_payload = registry_payload(source, registry_location, path)?;
+    let mut registry = parse_custom_registry(registry_payload, budget, path)?;
+    let mut registry_changed = false;
+    validate_custom_legacy_routes(source, path, budget)?;
+    validate_custom_graph_ownership(source, target, &graph, registry_location, path, budget)?;
+
+    let current = if let Some(key) = graph.format_identifier {
+        if graph.explicit_flags == 0 {
+            None
+        } else {
+            let reference = selected_custom_reference(&graph, key, path, budget)?;
+            let entry = registry
+                .entries
+                .iter()
+                .find(|entry| entry.uuid == reference.uuid)
+                .ok_or(Error::InvalidSource { path })?;
+            let format = entry.format.as_ref().ok_or(Error::InvalidSource { path })?;
+            if custom_format_type(format) != reference.format_type
+                || !custom_reference_matches_cell(
+                    reference.format_type,
+                    &graph,
+                    graph.explicit_flags,
+                )
+            {
+                return Err(Error::UnsupportedDependency { path });
+            }
+            Some(format.clone())
+        }
+    } else {
+        if graph.explicit_flags != 0 {
+            return Err(Error::UnsupportedDependency { path });
+        }
+        None
+    };
+    if current.as_ref() != before {
+        return Err(Error::PatchConflict);
+    }
+
+    let old_reference = if graph.explicit_flags == 0 {
+        None
+    } else {
+        graph
+            .format_identifier
+            .map(|key| selected_custom_reference(&graph, key, path, budget))
+            .transpose()?
+    };
+    let old_reference_payload = if old_reference.is_some() {
+        graph
+            .format_identifier
+            .map(|key| selected_custom_reference_payload(&graph, key, path, budget))
+            .transpose()?
+    } else {
+        None
+    };
+    let desired_reference = if let Some(after) = after {
+        let expected_type = custom_format_type(after);
+        let uuid = registry
+            .entries
+            .iter()
+            .find(|entry| entry.format.as_ref().is_some_and(|format| format == after))
+            .map(|entry| entry.uuid)
+            .unwrap_or_else(|| fresh_custom_uuid(&registry.entries));
+        if !registry.entries.iter().any(|entry| entry.uuid == uuid) {
+            // The source vectors are reserved to their exact input length by
+            // the parser. Appending therefore has to be charged and reserved
+            // before any new owned payload reaches the allocator.
+            budget.charge_allocations(3, path)?;
+            registry
+                .uuid_payloads
+                .try_reserve_exact(1)
+                .map_err(|_| Error::Allocation { amount: 1, path })?;
+            registry
+                .format_payloads
+                .try_reserve_exact(1)
+                .map_err(|_| Error::Allocation { amount: 1, path })?;
+            registry
+                .entries
+                .try_reserve_exact(1)
+                .map_err(|_| Error::Allocation { amount: 1, path })?;
+            let (uuid_payload, format_payload) =
+                encode_custom_registry_entry(uuid, after, path, budget)?;
+            registry.uuid_payloads.push(Cow::Owned(uuid_payload));
+            registry.format_payloads.push(Cow::Owned(format_payload));
+            registry
+                .entries
+                .push(CustomRegistryEntry { uuid, format: None });
+            registry_changed = true;
+        }
+        let payload = if let Some(old_payload) = old_reference_payload.as_deref() {
+            rewrite_custom_reference(old_payload, expected_type, uuid, path, budget)?
+        } else {
+            encode_custom_reference(expected_type, uuid, path, budget)?
+        };
+        Some((uuid, payload))
+    } else {
+        None
+    };
+
+    let desired_payload = desired_reference
+        .as_ref()
+        .map(|(_, payload)| payload.as_slice());
+    let (new_format, new_format_key) = native::mutate_list(
+        &graph.format_payload,
+        graph.format_identifier,
+        desired_payload,
+        true,
+        budget,
+        path,
+    )?;
+    let replacement_cell = if let Some(key) = new_format_key {
+        match after {
+            Some(Custom::Text(_)) => {
+                rewrite_text_cell_metadata(&graph.cell_source, Some(key), path, budget)?
+            },
+            Some(Custom::DateTime(_)) => {
+                rewrite_date_time_cell_metadata(&graph.cell_source, Some(key), path, budget)?
+            },
+            Some(Custom::Number(_)) => {
+                rewrite_display_cell_metadata(&graph.cell_source, Some(key), path, budget)?
+            },
+            None => rewrite_custom_cell_clear(&graph.cell_source, path, budget)?,
+        }
+    } else {
+        match before {
+            Some(Custom::Text(_)) => {
+                rewrite_text_cell_metadata(&graph.cell_source, None, path, budget)?
+            },
+            Some(Custom::DateTime(_)) => {
+                rewrite_date_time_cell_metadata(&graph.cell_source, None, path, budget)?
+            },
+            Some(Custom::Number(_)) => {
+                rewrite_display_cell_metadata(&graph.cell_source, None, path, budget)?
+            },
+            None => return Err(Error::PatchConflict),
+        }
+    };
+
+    // The cull decision is made only after the candidate format list exists.
+    // Every current direct format list in every component is inspected. A
+    // segmented list is an unsupported ownership route, never an opaque list
+    // that can be guessed at during UUID cleanup.
+    if let Some(old_reference) = old_reference {
+        let referenced = custom_uuid_is_referenced(
+            source,
+            graph.format_component_index,
+            graph.format_table_identifier,
+            graph.format_message_index,
+            &new_format,
+            old_reference.uuid,
+            budget,
+            path,
+        )?;
+        if !referenced {
+            if let Some(index) = registry
+                .entries
+                .iter()
+                .position(|entry| entry.uuid == old_reference.uuid)
+            {
+                registry.entries.remove(index);
+                registry.uuid_payloads.remove(index);
+                registry.format_payloads.remove(index);
+                registry_changed = true;
+            }
+        }
+    }
+    let new_registry = if registry_changed {
+        Some(rewrite_custom_registry(&registry, path, budget)?)
+    } else {
+        None
+    };
+
+    charge_display_tile_patch_budget(
+        graph.tile_payload.len(),
+        replacement_cell.len(),
+        budget,
+        path,
+    )?;
+    let patched_tile = popup_native::patch_tile_cell(
+        &graph.tile_payload,
+        target.position.row(),
+        target.position.column(),
+        &replacement_cell,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+
+    let archive_limits = source
+        .state
+        .options
+        .archive()
+        .effective_archive_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let mut component_indices = vec![graph.tile_component_index, graph.format_component_index];
+    if registry_changed {
+        component_indices.push(registry_location.component_index);
+    }
+    component_indices.sort_unstable();
+    component_indices.dedup();
+    let mut archives = component_indices
+        .iter()
+        .map(|&component_index| {
+            let component = source
+                .state
+                .components
+                .catalog()
+                .get_index(component_index)
+                .ok_or(Error::InvalidSource { path })?;
+            budget.charge_archive(
+                component.archive(),
+                native::archive_serialized_bound(component.archive(), archive_limits, path)?,
+                path,
+            )?;
+            Ok::<_, Error>((component_index, component.archive().clone()))
+        })
+        .collect::<Result<Vec<_>, Error>>()?;
+    popup_native::validate_message_without_object_references(
+        source
+            .state
+            .components
+            .catalog()
+            .get_index(graph.format_component_index)
+            .ok_or(Error::InvalidSource { path })?
+            .archive(),
+        graph.format_table_identifier,
+        graph.format_message_index,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    popup_native::replace_message_preserving_header(
+        native::archive_for_mut(&mut archives, graph.format_component_index, path)?,
+        graph.format_table_identifier,
+        graph.format_message_index,
+        new_format,
+        archive_limits,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    popup_native::replace_message_preserving_header(
+        native::archive_for_mut(&mut archives, graph.tile_component_index, path)?,
+        graph.tile_identifier,
+        graph.tile_message_index,
+        patched_tile,
+        archive_limits,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    if let Some(new_registry) = new_registry {
+        popup_native::validate_message_without_object_references(
+            source
+                .state
+                .components
+                .catalog()
+                .get_index(registry_location.component_index)
+                .ok_or(Error::InvalidSource { path })?
+                .archive(),
+            registry_location.object_identifier,
+            registry_location.message_index,
+        )
+        .map_err(|_| Error::InvalidSource { path })?;
+        popup_native::replace_message_preserving_header(
+            native::archive_for_mut(&mut archives, registry_location.component_index, path)?,
+            registry_location.object_identifier,
+            registry_location.message_index,
+            new_registry,
+            archive_limits,
+        )
+        .map_err(|_| Error::InvalidSource { path })?;
+    }
+
+    let mut members = Vec::new();
+    members
+        .try_reserve_exact(archives.len())
+        .map_err(|_| Error::Allocation {
+            amount: archives.len(),
+            path,
+        })?;
+    for (component_index, archive) in archives {
+        let changed_identifiers = [
+            (graph.tile_component_index, graph.tile_identifier),
+            (graph.format_component_index, graph.format_table_identifier),
+            (
+                registry_location.component_index,
+                registry_location.object_identifier,
+            ),
+        ]
+        .iter()
+        .filter_map(|(owner, identifier)| (*owner == component_index).then_some(*identifier))
+        .collect::<Vec<_>>();
+        popup_native::verify_archive_object_locality(
+            source
+                .state
+                .components
+                .catalog()
+                .get_index(component_index)
+                .ok_or(Error::InvalidSource { path })?
+                .archive(),
+            &archive,
+            &changed_identifiers,
+        )
+        .map_err(|_| Error::Verification)?;
+        let archive_bytes = archive
+            .to_bytes_with_limits(archive_limits)
+            .map_err(|_| Error::InvalidSource { path })?;
+        budget.charge_payload_bytes(archive_bytes.len(), path)?;
+        let member_name = source
+            .state
+            .components
+            .catalog()
+            .get_index(component_index)
+            .ok_or(Error::InvalidSource { path })?
+            .name()
+            .to_owned();
+        members.push(native::NativeControlMember {
+            member_name,
+            archive_bytes,
+        });
+    }
+    Ok(native::NativeControlOutput {
+        members,
+        component_indices,
+        changed_objects: vec![
+            (graph.tile_component_index, graph.tile_identifier),
+            (graph.format_component_index, graph.format_table_identifier),
+            (
+                registry_location.component_index,
+                registry_location.object_identifier,
+            ),
+        ],
+    })
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Path, validate_text_cell_metadata};
+    use super::{
+        CUSTOM_REGISTRY_REFERENCE_FIELD, DOCUMENT_LEGACY_SUPER_FIELD, Path,
+        validate_text_cell_metadata,
+    };
     use litchi_numbers_wire::BncCell;
 
     fn hex(value: &str) -> Vec<u8> {
@@ -2915,5 +5277,12 @@ mod tests {
         source.extend_from_slice(&[0; 4]);
         let cell = BncCell::parse(&source).expect("reserved field remains parseable");
         assert!(validate_text_cell_metadata(&source, &cell, Path::Package).is_err());
+    }
+
+    #[test]
+    fn custom_registry_root_and_legacy_super_routes_are_distinct() {
+        assert_eq!(CUSTOM_REGISTRY_REFERENCE_FIELD, 9);
+        assert_eq!(DOCUMENT_LEGACY_SUPER_FIELD, 8);
+        assert_ne!(CUSTOM_REGISTRY_REFERENCE_FIELD, DOCUMENT_LEGACY_SUPER_FIELD);
     }
 }

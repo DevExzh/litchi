@@ -577,6 +577,36 @@ fn table_model_discovery_rejects_duplicate_canonical_models_transactionally() {
 }
 
 #[test]
+fn source_built_table_catalog_uses_compatibility_appearance_projection() {
+    let editor = NumbersEditor::from_package(test_package()).unwrap();
+    assert!(!editor.package().source_is_exact());
+
+    let tables = editor
+        .tables()
+        .expect("source-built table catalog compatibility projection");
+    assert_eq!(tables.len(), 1);
+    assert_eq!(tables[0].appearance, Default::default());
+}
+
+#[test]
+fn exact_table_catalog_appearance_refusal_is_terminal_and_atomic() {
+    let source = test_package().to_bytes().unwrap();
+    let editor = NumbersEditor::from_bytes(&source).unwrap();
+    assert!(editor.package().source_is_exact());
+    let before = editor.to_bytes().unwrap();
+
+    let error = editor
+        .tables()
+        .expect_err("exact focused appearance refusal must not use compatibility projection");
+    assert!(matches!(
+        error,
+        Error::InvalidFormat(message)
+            if message.starts_with("focused Numbers table-appearance")
+    ));
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
 fn ordinary_text_box_crud_is_guarded_and_byte_exact() {
     let mut editor = NumbersEditor::from_package(test_package_with_text_box()).unwrap();
     let baseline = editor.to_bytes().unwrap();

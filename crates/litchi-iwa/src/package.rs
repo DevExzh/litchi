@@ -617,6 +617,17 @@ impl IWorkPackage {
         self.source.as_deref()
     }
 
+    /// Discard an exact byte baseline after internally reopening a package
+    /// that originated from the legacy source builder.
+    ///
+    /// This is intentionally crate-private and does not change entry data. It
+    /// prevents a validation reparse from manufacturing exact-source
+    /// provenance for a compatibility graph that never had it. Public byte
+    /// ingress retains its exact source normally.
+    pub(crate) fn discard_exact_source_for_compatibility(&mut self) {
+        self.source = None;
+    }
+
     /// Return the monotonic revision of this mutable package view.
     ///
     /// Format-specific editors use this compact token to reject an archive

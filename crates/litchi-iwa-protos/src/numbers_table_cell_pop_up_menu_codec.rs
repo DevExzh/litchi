@@ -22,6 +22,7 @@ use buffa::DecodeOptions as BuffaDecodeOptions;
 
 use crate::buffa_numbers_table_cell_currency_format_generated::LitchiIwaNumbersTableCellCurrencyFormatProjection as currency_projection;
 use crate::buffa_numbers_table_cell_date_time_format_generated::LitchiIwaNumbersTableCellDateTimeFormatProjection as date_time_projection;
+use crate::buffa_numbers_table_cell_duration_format_generated::LitchiIwaNumbersTableCellDurationFormatProjection as duration_projection;
 use crate::buffa_numbers_table_cell_pop_up_menu_generated::LitchiIwaNumbersTableCellPopUpMenuProjection as projection;
 use crate::buffa_numbers_table_cell_text_format_generated::LitchiIwaNumbersTableCellTextFormatProjection as text_projection;
 
@@ -56,6 +57,7 @@ const FORMAT_SUPPRESS_TIME_FORMAT_FIELD: u32 = 13;
 const FORMAT_DATE_TIME_FORMAT_FIELD: u32 = 14;
 const FORMAT_DURATION_UNIT_LARGEST_FIELD: u32 = 15;
 const FORMAT_DURATION_UNIT_SMALLEST_FIELD: u32 = 16;
+const FORMAT_USE_AUTOMATIC_DURATION_UNITS_FIELD: u32 = 40;
 const FORMAT_REQUIRES_FRACTION_REPLACEMENT_FIELD: u32 = 20;
 const FORMAT_CONTROL_MINIMUM_FIELD: u32 = 21;
 const FORMAT_CONTROL_MAXIMUM_FIELD: u32 = 22;
@@ -728,6 +730,36 @@ pub const NATIVE_TEXT_FORMAT_TYPE: u32 = 260;
 
 /// Native Numbers display-format discriminator for a date-and-time cell.
 pub const NATIVE_DATE_TIME_FORMAT_TYPE: u32 = 261;
+
+/// Native Numbers display-format discriminator for a duration cell.
+pub const NATIVE_DURATION_FORMAT_TYPE: u32 = 268;
+
+/// Native duration presentation style that uses colon-separated fields.
+pub const NATIVE_DURATION_STYLE_COLON: u32 = 0;
+
+/// Native duration presentation style that uses abbreviated unit symbols.
+pub const NATIVE_DURATION_STYLE_ABBREVIATED: u32 = 1;
+
+/// Native duration presentation style that uses complete unit names.
+pub const NATIVE_DURATION_STYLE_FULL_NAMES: u32 = 2;
+
+/// Native duration unit bit for weeks.
+pub const NATIVE_DURATION_UNIT_WEEKS: u32 = 1;
+
+/// Native duration unit bit for days.
+pub const NATIVE_DURATION_UNIT_DAYS: u32 = 2;
+
+/// Native duration unit bit for hours.
+pub const NATIVE_DURATION_UNIT_HOURS: u32 = 4;
+
+/// Native duration unit bit for minutes.
+pub const NATIVE_DURATION_UNIT_MINUTES: u32 = 8;
+
+/// Native duration unit bit for seconds.
+pub const NATIVE_DURATION_UNIT_SECONDS: u32 = 16;
+
+/// Native duration unit bit for milliseconds.
+pub const NATIVE_DURATION_UNIT_MILLISECONDS: u32 = 32;
 
 /// Maximum UTF-8 size of the native date-and-time pattern field.
 pub const MAX_DATE_TIME_PATTERN_BYTES: usize = 4 * 1_024;
@@ -3325,6 +3357,369 @@ pub(crate) fn canonical_date_time_format(
     ))
 }
 
+/// Borrowed semantic facts for one strict native Duration
+/// `FormatStructArchive`.
+///
+/// The complete source payload remains available through [`Self::raw`].
+/// Unknown extension fields and groups are never decoded into owned storage
+/// and are copied byte-for-byte by [`rewrite_duration_format`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DurationFormatSnapshot<'source> {
+    source: &'source [u8],
+    format_type: u32,
+    duration_style: u32,
+    duration_unit_largest: u32,
+    duration_unit_smallest: u32,
+    use_automatic_duration_units: bool,
+}
+
+impl<'source> DurationFormatSnapshot<'source> {
+    pub(crate) const fn raw(self) -> &'source [u8] {
+        self.source
+    }
+
+    pub(crate) const fn format_type(self) -> u32 {
+        self.format_type
+    }
+
+    pub(crate) const fn duration_style(self) -> u32 {
+        self.duration_style
+    }
+
+    pub(crate) const fn duration_unit_largest(self) -> u32 {
+        self.duration_unit_largest
+    }
+
+    pub(crate) const fn duration_unit_smallest(self) -> u32 {
+        self.duration_unit_smallest
+    }
+
+    pub(crate) const fn use_automatic_duration_units(self) -> bool {
+        self.use_automatic_duration_units
+    }
+}
+
+/// Scalar values accepted by the strict native Duration writer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DurationFormatWrite {
+    duration_style: u32,
+    duration_unit_largest: u32,
+    duration_unit_smallest: u32,
+    use_automatic_duration_units: bool,
+}
+
+impl DurationFormatWrite {
+    pub(crate) const fn new(
+        duration_style: u32,
+        duration_unit_largest: u32,
+        duration_unit_smallest: u32,
+        use_automatic_duration_units: bool,
+    ) -> Self {
+        Self {
+            duration_style,
+            duration_unit_largest,
+            duration_unit_smallest,
+            use_automatic_duration_units,
+        }
+    }
+
+    pub(crate) const fn from_snapshot(snapshot: DurationFormatSnapshot<'_>) -> Self {
+        Self::new(
+            snapshot.duration_style,
+            snapshot.duration_unit_largest,
+            snapshot.duration_unit_smallest,
+            snapshot.use_automatic_duration_units,
+        )
+    }
+
+    pub(crate) const fn duration_style(self) -> u32 {
+        self.duration_style
+    }
+
+    pub(crate) const fn duration_unit_largest(self) -> u32 {
+        self.duration_unit_largest
+    }
+
+    pub(crate) const fn duration_unit_smallest(self) -> u32 {
+        self.duration_unit_smallest
+    }
+
+    pub(crate) const fn use_automatic_duration_units(self) -> bool {
+        self.use_automatic_duration_units
+    }
+
+    pub(crate) const fn with_duration_style(self, value: u32) -> Self {
+        Self {
+            duration_style: value,
+            ..self
+        }
+    }
+
+    pub(crate) const fn with_duration_unit_largest(self, value: u32) -> Self {
+        Self {
+            duration_unit_largest: value,
+            ..self
+        }
+    }
+
+    pub(crate) const fn with_duration_unit_smallest(self, value: u32) -> Self {
+        Self {
+            duration_unit_smallest: value,
+            ..self
+        }
+    }
+
+    pub(crate) const fn with_use_automatic_duration_units(self, value: bool) -> Self {
+        Self {
+            use_automatic_duration_units: value,
+            ..self
+        }
+    }
+}
+
+/// Prepared source-preserving native Duration rewrite.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PreparedDurationFormatRewrite<'source> {
+    source: &'source [u8],
+    layout: DurationFormatLayout,
+    write: DurationFormatWrite,
+    requirements: RewriteExecutionRequirements,
+    candidate_work: usize,
+    verify_options: DecodeOptions,
+}
+
+impl PreparedDurationFormatRewrite<'_> {
+    pub(crate) const fn execution_requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    pub(crate) fn prepare_report(self) -> DecodeReport {
+        report_from_requirements(self.requirements)
+    }
+
+    pub(crate) fn execute(
+        self,
+        limits: RewriteExecutionLimits,
+    ) -> Result<RewriteOutput, DecodeError> {
+        check_requirements(self.requirements, limits)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.requirements.output_bytes)
+            .map_err(|_| {
+                DecodeError::limited(DecodeLimit::Allocation {
+                    requested: self.requirements.output_bytes,
+                })
+            })?;
+        emit_duration_format_rewrite(&mut bytes, self.source, self.layout, self.write)?;
+        if bytes.len() != self.requirements.output_bytes {
+            return Err(DecodeError::invalid());
+        }
+        verify_duration_format_candidate(
+            &bytes,
+            self.write,
+            self.verify_options,
+            self.layout,
+            self.requirements,
+            self.candidate_work,
+        )?;
+        Ok(RewriteOutput {
+            bytes,
+            report: report_from_requirements(self.requirements),
+        })
+    }
+}
+
+/// Prepared canonical native Duration append.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PreparedDurationFormatWrite {
+    write: DurationFormatWrite,
+    requirements: RewriteExecutionRequirements,
+    verify_options: DecodeOptions,
+}
+
+impl PreparedDurationFormatWrite {
+    pub(crate) const fn execution_requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    pub(crate) fn prepare_report(self) -> DecodeReport {
+        report_from_requirements(self.requirements)
+    }
+
+    pub(crate) fn execute(
+        self,
+        limits: RewriteExecutionLimits,
+    ) -> Result<RewriteOutput, DecodeError> {
+        check_requirements(self.requirements, limits)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.requirements.output_bytes)
+            .map_err(|_| {
+                DecodeError::limited(DecodeLimit::Allocation {
+                    requested: self.requirements.output_bytes,
+                })
+            })?;
+        emit_duration_format_canonical(&mut bytes, self.write)?;
+        if bytes.len() != self.requirements.output_bytes {
+            return Err(DecodeError::invalid());
+        }
+        verify_duration_format_candidate(
+            &bytes,
+            self.write,
+            self.verify_options,
+            DurationFormatLayout {
+                fields: 5,
+                max_depth: 0,
+                spans: [None, None, None, None, None],
+            },
+            self.requirements,
+            bytes
+                .len()
+                .checked_mul(2)
+                .ok_or_else(DecodeError::invalid)?,
+        )?;
+        Ok(RewriteOutput {
+            bytes,
+            report: report_from_requirements(self.requirements),
+        })
+    }
+}
+
+/// Strictly decode one native Duration `FormatStructArchive`.
+pub(crate) fn decode_duration_format(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<DurationFormatSnapshot<'_>, DecodeError> {
+    Ok(decode_duration_format_with_report(source, options)?.0)
+}
+
+/// Strictly decode one native Duration format and return measured wire use.
+pub(crate) fn decode_duration_format_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(DurationFormatSnapshot<'_>, DecodeReport), DecodeError> {
+    let (snapshot, _layout, report) = scan_duration_format(source, options)?;
+    Ok((snapshot, report))
+}
+
+/// Prepare a source-preserving native Duration format rewrite.
+pub(crate) fn prepare_duration_format_rewrite<'source>(
+    source: &'source [u8],
+    write: DurationFormatWrite,
+    options: DecodeOptions,
+) -> Result<PreparedDurationFormatRewrite<'source>, DecodeError> {
+    validate_duration_format_write(write)?;
+    let (_snapshot, layout, source_report) = scan_duration_format(source, options)?;
+    let output_bytes = duration_format_rewrite_output_len(source, layout, write)?;
+    let old_selected_bytes = duration_format_selected_source_len(layout)?;
+    let new_selected_bytes = duration_format_selected_write_len(write)?;
+    let source_parse_work = source_report
+        .work_bytes()
+        .checked_sub(source.len())
+        .ok_or_else(DecodeError::invalid)?;
+    let candidate_parse_work = source_parse_work
+        .checked_sub(old_selected_bytes)
+        .and_then(|work| work.checked_add(new_selected_bytes))
+        .ok_or_else(DecodeError::invalid)?;
+    let candidate_work = candidate_parse_work
+        .checked_add(output_bytes)
+        .ok_or_else(DecodeError::invalid)?;
+    let requirements = RewriteExecutionRequirements {
+        output_bytes,
+        fields: layout.fields,
+        work_bytes: source_report
+            .work_bytes()
+            .checked_add(output_bytes)
+            .and_then(|work| work.checked_add(candidate_work))
+            .ok_or_else(DecodeError::invalid)?,
+        max_depth: layout.max_depth,
+        references: 0,
+        items: 0,
+        text_bytes: 0,
+        allocations: 1,
+        retained_bytes: source
+            .len()
+            .checked_add(output_bytes)
+            .ok_or_else(DecodeError::invalid)?,
+        scratch_bytes: 0,
+    };
+    check_options(requirements, options)?;
+    Ok(PreparedDurationFormatRewrite {
+        source,
+        layout,
+        write,
+        requirements,
+        candidate_work,
+        verify_options: options,
+    })
+}
+
+/// Rewrite one native Duration format while preserving unknown source fields.
+pub(crate) fn rewrite_duration_format(
+    source: &[u8],
+    write: DurationFormatWrite,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_duration_format_rewrite(source, write, options)?;
+    prepared.execute(RewriteExecutionLimits::exact(
+        prepared.execution_requirements(),
+    ))
+}
+
+/// Prepare a canonical native Duration format payload for a new list entry.
+pub(crate) fn prepare_duration_format_write(
+    write: DurationFormatWrite,
+    options: DecodeOptions,
+) -> Result<PreparedDurationFormatWrite, DecodeError> {
+    validate_duration_format_write(write)?;
+    let output_bytes = duration_format_canonical_output_len(write)?;
+    let requirements = RewriteExecutionRequirements {
+        output_bytes,
+        fields: 5,
+        work_bytes: output_bytes
+            .checked_mul(3)
+            .ok_or_else(DecodeError::invalid)?,
+        max_depth: 0,
+        references: 0,
+        items: 0,
+        text_bytes: 0,
+        allocations: 1,
+        retained_bytes: output_bytes,
+        scratch_bytes: 0,
+    };
+    check_options(requirements, options)?;
+    Ok(PreparedDurationFormatWrite {
+        write,
+        requirements,
+        verify_options: options,
+    })
+}
+
+/// Encode a canonical native Duration format payload for a new list entry.
+pub(crate) fn canonical_duration_format(
+    write: DurationFormatWrite,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_duration_format_write(write, options)?;
+    prepared.execute(RewriteExecutionLimits::exact(
+        prepared.execution_requirements(),
+    ))
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DurationFieldSpan {
+    number: u32,
+    start: usize,
+    end: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DurationFormatLayout {
+    fields: usize,
+    max_depth: u32,
+    spans: [Option<DurationFieldSpan>; 5],
+}
+
 fn scan_date_time_format<'source>(
     source: &'source [u8],
     options: DecodeOptions,
@@ -3528,6 +3923,344 @@ fn verify_date_time_format_candidate(
         || report.max_depth() != layout.max_depth
         || report.text_bytes() != requirements.text_bytes
         || DateTimeFormatWrite::from_snapshot(snapshot) != write
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(())
+}
+
+fn scan_duration_format<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+) -> Result<
+    (
+        DurationFormatSnapshot<'source>,
+        DurationFormatLayout,
+        DecodeReport,
+    ),
+    DecodeError,
+> {
+    let mut budget = Budget::new(source, options)?;
+    let mut format_type = None;
+    let mut duration_style = None;
+    let mut duration_unit_largest = None;
+    let mut duration_unit_smallest = None;
+    let mut use_automatic_duration_units = None;
+    let mut spans = [None; 5];
+    let mut offset = 0usize;
+    while offset < source.len() {
+        let field = parse_one_field_limited(source, offset, 0, options.recursion_limit)?;
+        budget.field(field.raw.len(), 0)?;
+        budget.nested_fields(
+            field.nested_fields,
+            field.nested_work_bytes,
+            field.nested_max_depth,
+        )?;
+        let start = offset;
+        offset = field.end;
+        let slot = match field.number {
+            FORMAT_TYPE_FIELD => Some(0),
+            FORMAT_DURATION_STYLE_FIELD => Some(1),
+            FORMAT_DURATION_UNIT_LARGEST_FIELD => Some(2),
+            FORMAT_DURATION_UNIT_SMALLEST_FIELD => Some(3),
+            FORMAT_USE_AUTOMATIC_DURATION_UNITS_FIELD => Some(4),
+            number if number <= NUMBER_FORMAT_MAX_KNOWN_FIELD => {
+                // Every other TSK.FormatStructArchive field belongs to a
+                // different display family. Treating one as opaque would let
+                // a caller publish another format through the Duration route.
+                return Err(DecodeError::invalid());
+            },
+            _ => {
+                budget.mark_unknown();
+                None
+            },
+        };
+        let Some(slot) = slot else {
+            continue;
+        };
+        if field.wire != 0 || spans[slot].is_some() {
+            return Err(DecodeError::invalid());
+        }
+        let value = field.known_varint()?;
+        spans[slot] = Some(DurationFieldSpan {
+            number: field.number,
+            start,
+            end: field.end,
+        });
+        match slot {
+            0 => {
+                format_type = Some(u32::try_from(value).map_err(|_| DecodeError::invalid())?);
+            },
+            1 => {
+                duration_style = Some(u32::try_from(value).map_err(|_| DecodeError::invalid())?);
+            },
+            2 => {
+                duration_unit_largest =
+                    Some(u32::try_from(value).map_err(|_| DecodeError::invalid())?);
+            },
+            3 => {
+                duration_unit_smallest =
+                    Some(u32::try_from(value).map_err(|_| DecodeError::invalid())?);
+            },
+            4 => {
+                if value > 1 {
+                    return Err(DecodeError::invalid());
+                }
+                use_automatic_duration_units = Some(value != 0);
+            },
+            _ => unreachable!("duration format slot is bounded"),
+        }
+    }
+    let format_type = format_type.ok_or_else(DecodeError::invalid)?;
+    let duration_style = duration_style.ok_or_else(DecodeError::invalid)?;
+    let duration_unit_largest = duration_unit_largest.ok_or_else(DecodeError::invalid)?;
+    let duration_unit_smallest = duration_unit_smallest.ok_or_else(DecodeError::invalid)?;
+    let use_automatic_duration_units =
+        use_automatic_duration_units.ok_or_else(DecodeError::invalid)?;
+    if format_type != NATIVE_DURATION_FORMAT_TYPE
+        || duration_style > NATIVE_DURATION_STYLE_FULL_NAMES
+        || !valid_duration_unit(duration_unit_largest)
+        || !valid_duration_unit(duration_unit_smallest)
+        || duration_unit_rank(duration_unit_largest) > duration_unit_rank(duration_unit_smallest)
+    {
+        return Err(DecodeError::invalid());
+    }
+    let snapshot = DurationFormatSnapshot {
+        source,
+        format_type,
+        duration_style,
+        duration_unit_largest,
+        duration_unit_smallest,
+        use_automatic_duration_units,
+    };
+    buffa_duration_format_parity(source, snapshot, &mut budget)?;
+    let report = budget.finish(0);
+    let layout = DurationFormatLayout {
+        fields: report.fields(),
+        max_depth: report.max_depth(),
+        spans,
+    };
+    Ok((snapshot, layout, report))
+}
+
+fn buffa_duration_format_parity(
+    source: &[u8],
+    snapshot: DurationFormatSnapshot<'_>,
+    budget: &mut Budget,
+) -> Result<(), DecodeError> {
+    let options = budget.options;
+    let view: duration_projection::FormatStructArchiveLazyView<'_> = BuffaDecodeOptions::new()
+        .with_max_message_size(options.max_message_bytes)
+        .with_unknown_field_limit(options.max_fields)
+        .with_element_memory_limit(0)
+        .with_recursion_limit(options.recursion_limit)
+        .decode_lazy_view(source)
+        .map_err(|_| DecodeError::invalid())?;
+    if view.format_type != Some(snapshot.format_type)
+        || view.duration_style != Some(snapshot.duration_style)
+        || view.duration_unit_largest != Some(snapshot.duration_unit_largest)
+        || view.duration_unit_smallest != Some(snapshot.duration_unit_smallest)
+        || view.use_automatic_duration_units != Some(snapshot.use_automatic_duration_units)
+    {
+        return Err(DecodeError::invalid());
+    }
+    budget.work(source.len())?;
+    Ok(())
+}
+
+const fn valid_duration_unit(value: u32) -> bool {
+    matches!(
+        value,
+        NATIVE_DURATION_UNIT_WEEKS
+            | NATIVE_DURATION_UNIT_DAYS
+            | NATIVE_DURATION_UNIT_HOURS
+            | NATIVE_DURATION_UNIT_MINUTES
+            | NATIVE_DURATION_UNIT_SECONDS
+            | NATIVE_DURATION_UNIT_MILLISECONDS
+    )
+}
+
+const fn duration_unit_rank(value: u32) -> u8 {
+    match value {
+        NATIVE_DURATION_UNIT_WEEKS => 0,
+        NATIVE_DURATION_UNIT_DAYS => 1,
+        NATIVE_DURATION_UNIT_HOURS => 2,
+        NATIVE_DURATION_UNIT_MINUTES => 3,
+        NATIVE_DURATION_UNIT_SECONDS => 4,
+        NATIVE_DURATION_UNIT_MILLISECONDS => 5,
+        _ => u8::MAX,
+    }
+}
+
+fn validate_duration_format_write(write: DurationFormatWrite) -> Result<(), DecodeError> {
+    if write.duration_style > NATIVE_DURATION_STYLE_FULL_NAMES
+        || !valid_duration_unit(write.duration_unit_largest)
+        || !valid_duration_unit(write.duration_unit_smallest)
+        || duration_unit_rank(write.duration_unit_largest)
+            > duration_unit_rank(write.duration_unit_smallest)
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(())
+}
+
+fn duration_format_selected_source_len(layout: DurationFormatLayout) -> Result<usize, DecodeError> {
+    let mut length = 0usize;
+    for span in layout.spans {
+        let span = span.ok_or_else(DecodeError::invalid)?;
+        length = length
+            .checked_add(
+                span.end
+                    .checked_sub(span.start)
+                    .ok_or_else(DecodeError::invalid)?,
+            )
+            .ok_or_else(DecodeError::invalid)?;
+    }
+    Ok(length)
+}
+
+fn duration_format_selected_write_len(write: DurationFormatWrite) -> Result<usize, DecodeError> {
+    let fields = [
+        (FORMAT_TYPE_FIELD, u64::from(NATIVE_DURATION_FORMAT_TYPE)),
+        (FORMAT_DURATION_STYLE_FIELD, u64::from(write.duration_style)),
+        (
+            FORMAT_DURATION_UNIT_LARGEST_FIELD,
+            u64::from(write.duration_unit_largest),
+        ),
+        (
+            FORMAT_DURATION_UNIT_SMALLEST_FIELD,
+            u64::from(write.duration_unit_smallest),
+        ),
+        (
+            FORMAT_USE_AUTOMATIC_DURATION_UNITS_FIELD,
+            u64::from(write.use_automatic_duration_units),
+        ),
+    ];
+    let mut length = 0usize;
+    for (number, value) in fields {
+        length = length
+            .checked_add(duration_format_field_len(number, value)?)
+            .ok_or_else(DecodeError::invalid)?;
+    }
+    Ok(length)
+}
+
+fn duration_format_field_len(number: u32, value: u64) -> Result<usize, DecodeError> {
+    number_format_field_len(number, value)
+}
+
+fn duration_format_rewrite_output_len(
+    source: &[u8],
+    layout: DurationFormatLayout,
+    write: DurationFormatWrite,
+) -> Result<usize, DecodeError> {
+    let old = duration_format_selected_source_len(layout)?;
+    let new = duration_format_selected_write_len(write)?;
+    source
+        .len()
+        .checked_sub(old)
+        .and_then(|length| length.checked_add(new))
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn duration_format_canonical_output_len(write: DurationFormatWrite) -> Result<usize, DecodeError> {
+    duration_format_selected_write_len(write)
+}
+
+fn emit_duration_format_canonical(
+    output: &mut Vec<u8>,
+    write: DurationFormatWrite,
+) -> Result<(), DecodeError> {
+    emit_varint_field(
+        output,
+        FORMAT_TYPE_FIELD,
+        u64::from(NATIVE_DURATION_FORMAT_TYPE),
+    )?;
+    emit_varint_field(
+        output,
+        FORMAT_DURATION_STYLE_FIELD,
+        u64::from(write.duration_style),
+    )?;
+    emit_varint_field(
+        output,
+        FORMAT_DURATION_UNIT_LARGEST_FIELD,
+        u64::from(write.duration_unit_largest),
+    )?;
+    emit_varint_field(
+        output,
+        FORMAT_DURATION_UNIT_SMALLEST_FIELD,
+        u64::from(write.duration_unit_smallest),
+    )?;
+    emit_varint_field(
+        output,
+        FORMAT_USE_AUTOMATIC_DURATION_UNITS_FIELD,
+        u64::from(write.use_automatic_duration_units),
+    )?;
+    Ok(())
+}
+
+fn emit_duration_format_rewrite(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    layout: DurationFormatLayout,
+    write: DurationFormatWrite,
+) -> Result<(), DecodeError> {
+    let mut ordered = [
+        layout.spans[0].ok_or_else(DecodeError::invalid)?,
+        layout.spans[1].ok_or_else(DecodeError::invalid)?,
+        layout.spans[2].ok_or_else(DecodeError::invalid)?,
+        layout.spans[3].ok_or_else(DecodeError::invalid)?,
+        layout.spans[4].ok_or_else(DecodeError::invalid)?,
+    ];
+    for index in 1..ordered.len() {
+        let mut cursor = index;
+        while cursor > 0 && ordered[cursor].start < ordered[cursor - 1].start {
+            ordered.swap(cursor, cursor - 1);
+            cursor -= 1;
+        }
+    }
+    let mut source_offset = 0usize;
+    for span in ordered {
+        output.extend_from_slice(
+            source
+                .get(source_offset..span.start)
+                .ok_or_else(DecodeError::invalid)?,
+        );
+        let value = match span.number {
+            FORMAT_TYPE_FIELD => u64::from(NATIVE_DURATION_FORMAT_TYPE),
+            FORMAT_DURATION_STYLE_FIELD => u64::from(write.duration_style),
+            FORMAT_DURATION_UNIT_LARGEST_FIELD => u64::from(write.duration_unit_largest),
+            FORMAT_DURATION_UNIT_SMALLEST_FIELD => u64::from(write.duration_unit_smallest),
+            FORMAT_USE_AUTOMATIC_DURATION_UNITS_FIELD => {
+                u64::from(write.use_automatic_duration_units)
+            },
+            _ => return Err(DecodeError::invalid()),
+        };
+        emit_varint_field(output, span.number, value)?;
+        source_offset = span.end;
+    }
+    output.extend_from_slice(
+        source
+            .get(source_offset..)
+            .ok_or_else(DecodeError::invalid)?,
+    );
+    Ok(())
+}
+
+fn verify_duration_format_candidate(
+    source: &[u8],
+    write: DurationFormatWrite,
+    options: DecodeOptions,
+    layout: DurationFormatLayout,
+    requirements: RewriteExecutionRequirements,
+    candidate_work: usize,
+) -> Result<(), DecodeError> {
+    let (snapshot, report) = decode_duration_format_with_report(source, options)?;
+    if report.fields() != layout.fields
+        || report.work_bytes() != candidate_work
+        || report.max_depth() != layout.max_depth
+        || DurationFormatWrite::from_snapshot(snapshot) != write
+        || report.text_bytes() != requirements.text_bytes
     {
         return Err(DecodeError::invalid());
     }

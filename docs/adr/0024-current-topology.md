@@ -4084,3 +4084,76 @@ edge, debt retirement, migration-host removal, or monolith-deletion-gate
 closure; the current topology remains 64 workspace packages, 238 internal
 declarations, 227 canonical edges, 11 development-only edges, 11 ordered
 debts `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
+
+## 2026-09-04 amendment: Numbers Date & Time raw-ID route retirement
+
+The production `NumbersEditor` raw-ID Date & Time convenience routes are now
+retired. This removes a dedicated host API surface only. Generic source-built
+or cross-format `DataFormat::DateTime`, the broad `TextDateTimeField`
+smart-field lifecycle, and attached Pages/Keynote table compatibility remain
+host-owned, so the migration host and its manifest/debt topology are
+unchanged. No package, dependency edge, ordered debt, or deletion gate is
+closed by this amendment.
+
+The authoritative current inventory remains 64 workspace packages, 238
+internal dependency declarations, 227 canonical edges, 11 development-only
+edges, 11 ordered migration debts with IDs
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
+
+## 2026-09-04 amendment: Numbers existing-cell Custom-format owner
+
+`litchi-numbers::Package` now owns the bounded selector-first Custom-format
+transaction for one existing rooted Numbers cell. The public API is
+`Package::{table_cell_custom_format, edit_table_cell_custom_format,
+apply_table_cell_custom_format}` with a `SheetSelector`, sheet-scoped
+`TableSelector`, and checked `CellPosition`; the semantic value is the
+archive-free `Custom` enum with Number, Text, and Date & Time variants.
+
+The private document registry is rooted by `TN.DocumentArchive` field 9 and
+message type 222. Its custom archive format discriminators are 270 (Number),
+271 (Text), and 272 (Date & Time). Handwritten wire preflight runs before the
+private lazy Buffa view, and deterministic source-built exact-source fixtures
+provide E1 evidence only. There is no Apple-authored fixture or E2/E3/E4
+evidence.
+
+Custom edits are exact-source transactions with copy-on-write publication,
+candidate reopen/readback, exact inverse patches, physical-locality checks,
+unknown/unselected field and member preservation, format-list/refcount
+closure, and private UUID handling. Semantically equal registry entries are
+reused; shared references remain live, replacement entries receive UUIDs, and
+unused entries are culled only after their last reference is cleared. The
+focused package suite passes 19/19, the strict custom-format codec passes 8/8,
+and both fuzz targets complete 100-run AddressSanitizer smokes. This amendment
+claims no native Numbers acceptance or native save/resave
+evidence, no generic Custom-format authoring, and no retirement of the legacy
+`NumbersEditor` Custom route; host Custom compatibility remains in the
+migration host.
+
+No workspace package, dependency edge, ordered migration debt, migration host,
+or ADR 0028 deletion gate changes by this owner addition. The authoritative
+topology remains 64 workspace packages, 238 internal dependency declarations,
+227 canonical edges, 11 development-only edges, 11 ordered migration debts
+with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
+
+## 2026-09-04 amendment: Numbers Duration format groundwork (no owner)
+
+The landed Duration work is limited to a strict native type-268
+`FormatStructArchive` codec and narrow Buffa projection. It admits fields 1,
+7, 15, 16, and 40; styles `0/1/2` (Colon/Abbreviated/FullNames); and unit
+bits `1/2/4/8/16/32` (Weeks/Days/Hours/Minutes/Seconds/Milliseconds). BNC
+shape handling records marker `0x0004` for an explicit primary-only Duration
+reference and `0x0005` when the shared generic Number secondary is retained.
+Wire and source-built host tests cover native round-trips, scalar/formula
+preservation, compatibility conversion, format reuse/reset, and both marker
+shapes; the codec fuzz target completes a 100-run AddressSanitizer smoke. A
+disposable Numbers 14.4 probe supplied the marker/secondary
+provenance; it was not an app acceptance or save/resave cycle.
+
+This groundwork does not add a focused `litchi-numbers` package owner or
+selector API. Duration remains unsupported in the public Numbers owner matrix,
+and the legacy `NumbersEditor`/generic host compatibility route is not retired.
+No workspace package, dependency edge, ordered debt, migration host, or ADR
+0028 deletion gate changes. The authoritative topology remains 64 workspace
+packages, 238 internal dependency declarations, 227 canonical edges, 11
+development-only edges, 11 ordered migration debts with IDs `[1, 2, 4, 8, 10,
+12, 13, 14, 15, 16, 17]`, and one migration host.

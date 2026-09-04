@@ -20,6 +20,22 @@ impl NumbersEditor {
         Ok(Self { package })
     }
 
+    /// Reopen a staged package while retaining legacy source-built
+    /// provenance across the internal byte-validation boundary.
+    ///
+    /// A public `from_bytes` call always denotes an exact source. This helper
+    /// is reserved for transactions that started from an `IWorkPackage`
+    /// without an exact source and must not turn that compatibility graph into
+    /// an exact focused-owner candidate merely because validation serialized
+    /// it once.
+    pub(crate) fn from_validation_bytes(bytes: &[u8], source_built: bool) -> Result<Self> {
+        let mut editor = Self::from_bytes(bytes)?;
+        if source_built {
+            editor.package.discard_exact_source_for_compatibility();
+        }
+        Ok(editor)
+    }
+
     pub fn sheets(&self) -> Result<Vec<NumbersSheetInfo>> {
         let document = numbers_document(&self.package)?;
         let locations = object_locations(&self.package)?;
@@ -52,52 +68,49 @@ impl NumbersEditor {
     }
 
     pub fn tables(&self) -> Result<Vec<NumbersTableInfo>> {
-        let focused_package = Package::from_bytes(&self.package.to_bytes()?);
-        let read_focused_appearance = litchi_numbers::Package::table_appearance;
+        let source_built = !self.package.source_is_exact();
         // Source-built and older compatibility packages may not carry the
-        // strict Metadata ownership required for focused appearance edits.
+        // strict Metadata ownership required for focused appearance reads.
         // Preserve their read-only table catalog behavior through the shared
-        // legacy projector; all appearance mutation remains in litchi-numbers.
+        // legacy projector. Once an exact source is admitted to the focused
+        // owner, every ingress/read failure is terminal.
+        let focused_package = if source_built {
+            None
+        } else {
+            let source = self.package.exact_source_bytes().ok_or_else(|| {
+                Error::InvalidFormat(
+                    "focused Numbers table-appearance source is not exact".to_owned(),
+                )
+            })?;
+            Some(Package::from_bytes(source).map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "focused Numbers table-appearance source failed: {error}"
+                ))
+            })?)
+        };
+        let read_focused_appearance = litchi_numbers::Package::table_appearance;
         let read_compatibility_appearance = crate::table_appearance::table_appearance;
         let mut tables = table_models(&self.package)?
             .into_iter()
             .map(|descriptor| {
-                let (sheet_selector, table_selector) =
-                    selectors::focused_table_location(self, descriptor.object_id)?;
                 Ok(NumbersTableInfo {
                     object_id: descriptor.object_id,
                     index: 0,
                     name: descriptor.model.table_name,
                     rows: descriptor.model.number_of_rows as usize,
                     columns: descriptor.model.number_of_columns as usize,
-                    appearance: match &focused_package {
-                        Ok(package) => match read_focused_appearance(
-                            package,
-                            sheet_selector,
-                            table_selector,
-                        ) {
-                            Ok(appearance) => appearance,
-                            Err(focused_error) => read_compatibility_appearance(
-                                &self.package,
-                                descriptor.object_id,
-                            )
-                            .map_err(|compatibility_error| {
+                    appearance: if let Some(package) = focused_package.as_ref() {
+                        let (sheet_selector, table_selector) =
+                            selectors::focused_table_location(self, descriptor.object_id)?;
+                        read_focused_appearance(package, sheet_selector, table_selector).map_err(
+                            |error| {
                                 Error::InvalidFormat(format!(
-                                    "Numbers table-appearance projection failed: focused owner: \
-                                     {focused_error}; compatibility reader: {compatibility_error}"
+                                    "focused Numbers table-appearance read failed: {error}"
                                 ))
-                            })?,
-                        },
-                        Err(focused_error) => read_compatibility_appearance(
-                            &self.package,
-                            descriptor.object_id,
-                        )
-                        .map_err(|compatibility_error| {
-                            Error::InvalidFormat(format!(
-                                "Numbers table-appearance package projection failed: focused owner: \
-                                 {focused_error}; compatibility reader: {compatibility_error}"
-                            ))
-                        })?,
+                            },
+                        )?
+                    } else {
+                        read_compatibility_appearance(&self.package, descriptor.object_id)?
                     },
                 })
             })
@@ -169,10 +182,11 @@ impl NumbersEditor {
         columns: usize,
     ) -> Result<()> {
         let table_id = selectors::table_id(self, selector)?;
+        let source_built = !self.package.source_is_exact();
         let mut staged = self.package.clone();
         resize_attached_table_in_package(&mut staged, table_id, rows, columns)?;
 
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = NumbersEditor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let resized = verified
             .tables()?
             .into_iter()
@@ -320,9 +334,9 @@ impl NumbersEditor {
         removed_identifiers.extend(private_owned_ids);
         release_package_identifier_suffix(&mut staged, &removed_identifiers)?;
 
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
-        if verified
-            .tables()?
+        let source_built = !self.package.source_is_exact();
+        let verified = NumbersEditor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
+        if table_models(verified.package())?
             .iter()
             .any(|candidate| candidate.object_id == table_id)
         {
@@ -367,7 +381,8 @@ impl NumbersEditor {
             });
             Ok(())
         })?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let source_built = !self.package.source_is_exact();
+        let verified = NumbersEditor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let created = verified
             .sheets()?
             .into_iter()
@@ -469,7 +484,8 @@ impl NumbersEditor {
             Ok(())
         })?;
 
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let source_built = !self.package.source_is_exact();
+        let verified = NumbersEditor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let created = verified
             .tables()?
             .into_iter()
@@ -494,6 +510,7 @@ impl NumbersEditor {
     /// copy-on-write sharing.
     #[allow(deprecated)]
     pub fn duplicate_table(&mut self, selector: TableSelector<'_>) -> Result<NumbersTableInfo> {
+        let source_built = !self.package.source_is_exact();
         let table_id = selectors::table_id(self, selector)?;
         let descriptors = table_models(&self.package)?;
         let source = descriptors
@@ -552,7 +569,7 @@ impl NumbersEditor {
             Ok(())
         })?;
 
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = NumbersEditor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let created = verified
             .tables()?
             .into_iter()

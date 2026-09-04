@@ -16,7 +16,6 @@ use litchi_iwa_protos::{table_appearance_codec, table_info_codec, table_model_di
 #[derive(Debug, Clone)]
 pub(super) struct SlideTableGraph {
     pub(super) info: KeynoteSlideTableInfo,
-    pub(super) table_archive: String,
     pub(super) slide_archive: String,
     pub(super) slide_component_id: u64,
 }
@@ -121,7 +120,6 @@ pub(super) fn slide_table_graph_from_graph(
     let model = decode_table_model(graph, model_id)?;
     let table_position =
         graph_table_position(graph, &context.slide.drawables_z_order, drawable_object_id)?;
-    let table_archive = graph.archive_name(drawable_object_id)?.to_owned();
     let slide_archive = graph.archive_name(context.slide_id)?.to_owned();
     let slide_component_id = component_identifier_for_entry(editor.package(), &slide_archive)?
         .ok_or_else(|| {
@@ -152,7 +150,6 @@ pub(super) fn slide_table_graph_from_graph(
             appearance,
             lock_state,
         },
-        table_archive,
         slide_archive,
         slide_component_id,
     })
@@ -399,10 +396,6 @@ pub(super) fn slide_table_graph_from_catalog_context(
         &context.slide.drawables_z_order,
         drawable_object_id,
     )?;
-    let table_archive = catalog
-        .archive_name(drawable_object_id)
-        .map_err(map_catalog_error)?
-        .to_owned();
     let slide_archive = catalog
         .archive_name(context.slide_id)
         .map_err(map_catalog_error)?
@@ -437,7 +430,6 @@ pub(super) fn slide_table_graph_from_catalog_context(
             appearance,
             lock_state,
         },
-        table_archive,
         slide_archive,
         slide_component_id,
     })
@@ -907,12 +899,6 @@ fn decode_table_model(graph: &ObjectGraph, model_id: u64) -> Result<TableModelAr
     Ok(model.clone())
 }
 
-#[allow(dead_code)]
-pub(super) fn table_template(package: &IWorkPackage) -> Result<(u64, u64)> {
-    let graph = ObjectGraph::read(package)?;
-    table_template_from_graph(&graph)
-}
-
 /// Find a table template through the bounded catalog.
 pub(super) fn table_template_from_catalog(
     package: &IWorkPackage,
@@ -965,39 +951,6 @@ pub(super) fn table_template_from_catalog(
     candidate.ok_or_else(|| {
         Error::InvalidFormat("Keynote package has no native table creation template".to_owned())
     })
-}
-
-/// Find a table template in an already-built graph.
-pub(super) fn table_template_from_graph(graph: &ObjectGraph) -> Result<(u64, u64)> {
-    let mut candidates = graph.objects.keys().copied().collect::<Vec<_>>();
-    candidates.sort_unstable();
-    for info_id in candidates {
-        let Some(messages) = graph.objects.get(&info_id) else {
-            continue;
-        };
-        if !messages
-            .iter()
-            .any(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
-        {
-            continue;
-        }
-        validate_graph_table_info_role(graph, info_id)?;
-        for message in messages
-            .iter()
-            .filter(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
-        {
-            let Ok(info) = TableInfoArchive::decode(message.data.as_slice()) else {
-                continue;
-            };
-            let model_id = info.table_model.identifier;
-            if model_id != 0 && decode_table_model(graph, model_id).is_ok() {
-                return Ok((info_id, model_id));
-            }
-        }
-    }
-    Err(Error::InvalidFormat(
-        "Keynote package has no native table creation template".to_owned(),
-    ))
 }
 
 #[cfg(test)]

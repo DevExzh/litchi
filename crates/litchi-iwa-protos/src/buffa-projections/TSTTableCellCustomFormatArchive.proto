@@ -1,0 +1,51 @@
+// Narrow lazy-view parity projection for the native Numbers custom-format
+// registry.  Repeated registry records and nested condition payloads remain
+// source-authoritative bytes; the handwritten codec bounds and validates those
+// records before forcing the private borrowed views below.
+syntax = "proto2";
+
+package LitchiIwaNumbersTableCellCustomFormatProjection;
+
+message UuidArchive {
+  required uint64 lower = 1;
+  required uint64 upper = 2;
+}
+
+message FormatStructArchive {
+  optional uint32 format_type = 1;
+  optional bool show_thousands_separator = 5;
+  optional bool use_accounting_style = 6;
+  optional uint32 fraction_accuracy = 11;
+  optional string custom_format_string = 18;
+  optional double scale_factor = 19;
+  optional bool requires_fraction_replacement = 20;
+  optional uint32 decimal_width = 27;
+  optional uint32 min_integer_width = 28;
+  optional uint32 num_nonspace_integer_digits = 29;
+  optional uint32 num_nonspace_decimal_digits = 30;
+  optional uint32 index_from_right_last_integer = 31;
+  optional uint32 num_hash_decimal_digits = 34;
+  optional uint32 total_num_decimal_digits = 35;
+  optional bool is_complex = 36;
+  optional bool contains_integer_token = 37;
+}
+
+message Condition {
+  required uint32 condition_type = 1;
+  optional float condition_value = 2;
+  required bytes condition_format = 3;
+  optional double condition_value_dbl = 4;
+}
+
+message CustomFormatArchive {
+  required string name = 1;
+  required uint32 format_type_pre_bnc = 2;
+  required bytes default_format = 3;
+  repeated bytes conditions = 4;
+  optional uint32 format_type = 5;
+}
+
+message CustomFormatListArchive {
+  repeated bytes uuids = 1;
+  repeated bytes custom_formats = 2;
+}

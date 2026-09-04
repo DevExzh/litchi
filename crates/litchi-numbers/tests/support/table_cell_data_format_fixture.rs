@@ -39,6 +39,12 @@ pub(crate) const UNRELATED_MEMBER: &str = "Index/Unrelated.iwa";
 pub(crate) const METADATA_MEMBER: &str = "Index/Metadata.iwa";
 /// A current component with no table ownership, used by metadata routing.
 pub(crate) const VIEW_STATE_MEMBER: &str = "Index/ViewState.iwa";
+/// The document component containing the rooted custom-format registry.
+///
+/// Numbers source builders place object 34 (message type 222) beside the
+/// document root.  Keeping this alias explicit lets custom locality tests
+/// name the registry owner without inventing a second, unrooted component.
+pub(crate) const CUSTOM_MEMBER: &str = DOCUMENT_MEMBER;
 /// A deterministic arbitrary data member used by locality assertions.
 pub(crate) const SENTINEL_MEMBER: &str = "Data/data-format-sentinel.bin";
 /// The three canonical Numbers previews.
@@ -56,17 +62,84 @@ pub(crate) const UNRELATED_OBJECT_ID: u64 = 700;
 pub(crate) const METADATA_OBJECT_ID: u64 = 900;
 pub(crate) const VIEW_STATE_OBJECT_ID: u64 = 800;
 pub(crate) const ALIASED_SIDECAR_ID: u64 = 7;
+/// Root object containing the document-scoped custom-format registry.  The
+/// Numbers source builder uses object identifier 34 for this sidecar.
+pub(crate) const CUSTOM_REGISTRY_ID: u64 = 34;
+/// An optional deprecated table-scoped custom-format registry.
+pub(crate) const DEPRECATED_CUSTOM_TABLE_ID: u64 = 35;
+/// A second registry used by foreign/detached-reference fixtures.
+pub(crate) const DETACHED_CUSTOM_REGISTRY_ID: u64 = 36;
 
 /// Native message types used by the synthetic graph.
 pub(crate) const TABLE_INFO_TYPE: u32 = 6_000;
 pub(crate) const TABLE_MODEL_TYPE: u32 = 6_001;
 pub(crate) const TILE_TYPE: u32 = 6_002;
 pub(crate) const TABLE_DATA_LIST_TYPE: u32 = 6_005;
+/// Native Numbers message type used by the document-scoped
+/// `TSK.CustomFormatListArchive` object.
+pub(crate) const CUSTOM_FORMAT_LIST_TYPE: u32 = 222;
 pub(crate) const METADATA_TYPE: u32 = 11_006;
 
 /// Format-list keys referenced by the two fixture cells.
 pub(crate) const FIRST_FORMAT_KEY: u32 = 1;
 pub(crate) const SECOND_FORMAT_KEY: u32 = 2;
+
+/// A document-scoped custom format family represented by the fixture.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum CustomFamily {
+    Number,
+    Text,
+    DateTime,
+}
+
+impl CustomFamily {
+    /// Native `TSK.FormatStructArchive.format_type` for a custom family.
+    pub(crate) const fn native_type(self) -> u32 {
+        match self {
+            Self::Number => CUSTOM_NUMBER_FORMAT_TYPE,
+            Self::Text => CUSTOM_TEXT_FORMAT_TYPE,
+            Self::DateTime => CUSTOM_DATE_TIME_FORMAT_TYPE,
+        }
+    }
+
+    /// Native BNC cell kind used by the custom format's selected cells.
+    pub(crate) const fn cell_kind(self) -> CellDataFormatKind {
+        match self {
+            Self::Number => CellDataFormatKind::NumberOrPercentage,
+            Self::Text => CellDataFormatKind::Text,
+            Self::DateTime => CellDataFormatKind::DateTime,
+        }
+    }
+}
+
+/// Custom format discriminators from Numbers' `FormatType` enum.
+pub(crate) const CUSTOM_NUMBER_FORMAT_TYPE: u32 = 270;
+pub(crate) const CUSTOM_TEXT_FORMAT_TYPE: u32 = 271;
+pub(crate) const CUSTOM_DATE_TIME_FORMAT_TYPE: u32 = 272;
+
+/// Stable UUID pairs used by custom-format registry fixtures.
+pub(crate) const CUSTOM_UUID_ONE: (u64, u64) = (0x1111_2222_3333_4444, 0xaaaabbbb_ccccdddd);
+pub(crate) const CUSTOM_UUID_TWO: (u64, u64) = (0x5555_6666_7777_8888, 0xeeeeffff_00001111);
+pub(crate) const FOREIGN_CUSTOM_UUID: (u64, u64) = (0x9999_aaaa_bbbb_cccc, 0xdddd_eeee_ffff_0001);
+pub(crate) const ZERO_CUSTOM_UUID: (u64, u64) = (0, 0);
+
+/// Controlled malformed custom-registry variants.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum CustomCorruption {
+    StaleUuid,
+    ForeignUuid,
+    DuplicateUuid,
+    ZeroUuid,
+    MissingRegistry,
+    DetachedRegistry,
+    Field8CustomEntry,
+    DeprecatedTableRegistry,
+    WrongFamily,
+    DuplicateFormatEntry,
+    MissingFormatEntry,
+    RefcountMismatch,
+    MalformedRegistryPayload,
+}
 
 const BNC_CELL_FORMAT_KIND_FLAG: u32 = 0x0000_1000;
 const BNC_CELL_FORMAT_IDENTIFIER_FLAG: u32 = 0x0000_2000;
@@ -254,6 +327,364 @@ pub(crate) fn synthetic_package_for(
         ],
         Limits::default(),
     )?)
+}
+
+/// Build a rooted package with a document-scoped custom-format registry.
+///
+/// The table's ordinary format list contains a `FormatStructArchive` whose
+/// custom type and `custom_uid` select an entry in the rooted
+/// `TSK.CustomFormatListArchive` object beside the document root.  Keeping the
+/// registry in the document component gives focused-owner tests a real
+/// document/table cross-component edge while retaining the small,
+/// deterministic table graph used by the other format suites.
+pub(crate) fn custom_package(family: CustomFamily) -> FixtureResult<Vec<u8>> {
+    custom_package_for(family, FormatSharing::Shared)
+}
+
+/// Build a custom package with either one shared or two distinct cell format
+/// references.  The unshared form keeps both UUIDs in the document registry,
+/// which lets tests prove semantic UUID reuse without allocating a duplicate.
+pub(crate) fn custom_package_for(
+    family: CustomFamily,
+    sharing: FormatSharing,
+) -> FixtureResult<Vec<u8>> {
+    let baseline_family = match family {
+        CustomFamily::Number => FormatFamily::Number,
+        CustomFamily::Text => FormatFamily::Text,
+        CustomFamily::DateTime => FormatFamily::DateTime,
+    };
+    let source = synthetic_package_for(baseline_family, FormatSharing::Shared)?;
+    let source = rewrite_tile_cells(&source, |cells| {
+        if cells.len() < 2 {
+            return Err(io::Error::other("custom format fixture has fewer than two cells").into());
+        }
+        let second_key = match sharing {
+            FormatSharing::Shared => FIRST_FORMAT_KEY,
+            FormatSharing::Unshared => SECOND_FORMAT_KEY,
+        };
+        let first = custom_cell(family, FIRST_FORMAT_KEY, 45200.5, 1)?;
+        let second = custom_cell(family, second_key, 45201.25, 2)?;
+        cells[0] = first;
+        cells[1] = second;
+        Ok(())
+    })?;
+    let source = rewrite_format_list_payload_for_test(&source, |list| {
+        list.entries.clear();
+        list.entries.push(custom_format_reference_entry(
+            FIRST_FORMAT_KEY,
+            match sharing {
+                FormatSharing::Shared => 2,
+                FormatSharing::Unshared => 1,
+            },
+            family,
+            CUSTOM_UUID_ONE,
+        ));
+        if matches!(sharing, FormatSharing::Unshared) {
+            list.entries.push(custom_format_reference_entry(
+                SECOND_FORMAT_KEY,
+                1,
+                family,
+                CUSTOM_UUID_TWO,
+            ));
+        }
+        Ok(())
+    })?;
+    let registry_payload =
+        custom_registry_payload(family, matches!(sharing, FormatSharing::Unshared))?;
+    attach_custom_registry(&source, registry_payload, true)
+}
+
+/// Build one of the hostile custom-registry graphs used by atomic-refusal
+/// tests.  Every helper returns a complete package and leaves its input
+/// untouched so callers can compare exact source bytes after refusal.
+pub(crate) fn corrupted_custom_package(
+    family: CustomFamily,
+    corruption: CustomCorruption,
+) -> FixtureResult<Vec<u8>> {
+    let source = custom_package(family)?;
+    let source = match corruption {
+        CustomCorruption::StaleUuid => rewrite_custom_uid(&source, (0xdead, 0xbeef))?,
+        CustomCorruption::ForeignUuid => rewrite_custom_uid(&source, FOREIGN_CUSTOM_UUID)?,
+        CustomCorruption::DuplicateUuid => duplicate_custom_uuid(&source)?,
+        CustomCorruption::ZeroUuid => rewrite_custom_uid(&source, ZERO_CUSTOM_UUID)?,
+        CustomCorruption::MissingRegistry => detach_custom_registry_reference(&source, false)?,
+        CustomCorruption::DetachedRegistry => detach_custom_registry_reference(&source, true)?,
+        CustomCorruption::Field8CustomEntry => field8_custom_entry(&source)?,
+        CustomCorruption::DeprecatedTableRegistry => deprecated_custom_table_registry(&source)?,
+        CustomCorruption::WrongFamily => rewrite_member(&source, CUSTOM_MEMBER, |archive| {
+            let registry = archive
+                .object_mut(CUSTOM_REGISTRY_ID)
+                .ok_or_else(|| io::Error::other("custom registry is missing"))?;
+            let message = registry
+                .messages
+                .first_mut()
+                .ok_or_else(|| io::Error::other("custom registry payload is missing"))?;
+            let mut decoded = tsk::CustomFormatListArchive::decode(message.data.as_slice())?;
+            let wrong = match family {
+                CustomFamily::Number => CustomFamily::Text,
+                CustomFamily::Text => CustomFamily::DateTime,
+                CustomFamily::DateTime => CustomFamily::Number,
+            };
+            let first = decoded
+                .custom_formats
+                .first_mut()
+                .ok_or_else(|| io::Error::other("custom registry format is missing"))?;
+            *first = custom_archive(wrong, false);
+            message.data = decoded.encode_to_vec();
+            Ok(())
+        })?,
+        CustomCorruption::DuplicateFormatEntry => {
+            rewrite_format_list_payload_for_test(&source, |list| {
+                let entry = list
+                    .entries
+                    .first()
+                    .cloned()
+                    .ok_or_else(|| io::Error::other("custom format entry is missing"))?;
+                list.entries.push(entry);
+                Ok(())
+            })?
+        },
+        CustomCorruption::MissingFormatEntry => {
+            rewrite_format_list_payload_for_test(&source, |list| {
+                list.entries.retain(|entry| entry.key != FIRST_FORMAT_KEY);
+                Ok(())
+            })?
+        },
+        CustomCorruption::RefcountMismatch => {
+            rewrite_format_list_payload_for_test(&source, |list| {
+                let entry = list
+                    .entries
+                    .first_mut()
+                    .ok_or_else(|| io::Error::other("custom format entry is missing"))?;
+                entry.refcount = 1;
+                Ok(())
+            })?
+        },
+        CustomCorruption::MalformedRegistryPayload => {
+            rewrite_member(&source, CUSTOM_MEMBER, |archive| {
+                let registry = archive
+                    .object_mut(CUSTOM_REGISTRY_ID)
+                    .ok_or_else(|| io::Error::other("custom registry is missing"))?;
+                let message = registry
+                    .messages
+                    .first_mut()
+                    .ok_or_else(|| io::Error::other("custom registry payload is missing"))?;
+                message.data = vec![0x80];
+                Ok(())
+            })?
+        },
+    };
+    Ok(source)
+}
+
+fn custom_cell(
+    family: CustomFamily,
+    format_key: u32,
+    date_value: f64,
+    string_key: u32,
+) -> FixtureResult<Vec<u8>> {
+    match family {
+        CustomFamily::Number => formatted_cell(format_key, family.cell_kind(), 1234.5),
+        CustomFamily::Text => formatted_text_cell(format_key, string_key),
+        CustomFamily::DateTime => formatted_date_time_cell(format_key, date_value),
+    }
+}
+
+fn custom_format_reference_entry(
+    key: u32,
+    refcount: u32,
+    family: CustomFamily,
+    uuid: (u64, u64),
+) -> tst::table_data_list::ListEntry {
+    tst::table_data_list::ListEntry {
+        key,
+        refcount,
+        format: Some(tsk::FormatStructArchive {
+            format_type: Some(family.native_type()),
+            custom_uid: Some(tsp::Uuid {
+                lower: uuid.0,
+                upper: uuid.1,
+            }),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+fn custom_archive(family: CustomFamily, second: bool) -> tsk::CustomFormatArchive {
+    let (name, default_pattern, format_type) = match (family, second) {
+        (CustomFamily::Number, false) => ("Accounting", "#,##0.00", CUSTOM_NUMBER_FORMAT_TYPE),
+        (CustomFamily::Number, true) => ("Plain Number", "#,##0", CUSTOM_NUMBER_FORMAT_TYPE),
+        (CustomFamily::Text, false) => ("Identifier", "ID: \u{e421} !", CUSTOM_TEXT_FORMAT_TYPE),
+        (CustomFamily::Text, true) => ("Literal Text", "Value=\u{e421}", CUSTOM_TEXT_FORMAT_TYPE),
+        (CustomFamily::DateTime, false) => {
+            ("Long Date", "EEEE, MMMM d, y", CUSTOM_DATE_TIME_FORMAT_TYPE)
+        },
+        (CustomFamily::DateTime, true) => {
+            ("Short Date", "MM/dd/yyyy", CUSTOM_DATE_TIME_FORMAT_TYPE)
+        },
+    };
+    let mut archive = tsk::CustomFormatArchive {
+        name: name.to_owned(),
+        format_type_pre_bnc: format_type,
+        default_format: Box::new(custom_pattern_archive(
+            format_type,
+            default_pattern,
+            matches!(family, CustomFamily::Number) && default_pattern.contains(','),
+            matches!(family, CustomFamily::Number),
+        )),
+        format_type: Some(format_type),
+        ..Default::default()
+    };
+    if matches!((family, second), (CustomFamily::Number, false)) {
+        archive
+            .conditions
+            .push(tsk::custom_format_archive::Condition {
+                condition_type: 1,
+                condition_value_dbl: Some(0.0),
+                condition_format: custom_pattern_archive(format_type, "(#,##0.00)", true, true),
+                ..Default::default()
+            });
+        archive
+            .conditions
+            .push(tsk::custom_format_archive::Condition {
+                condition_type: 4,
+                condition_value_dbl: Some(1000.0),
+                condition_format: custom_pattern_archive(format_type, ">#,##0.00", true, true),
+                ..Default::default()
+            });
+    }
+    archive
+}
+
+fn custom_pattern_archive(
+    format_type: u32,
+    pattern: &str,
+    show_thousands_separator: bool,
+    contains_integer_token: bool,
+) -> tsk::FormatStructArchive {
+    tsk::FormatStructArchive {
+        format_type: Some(format_type),
+        show_thousands_separator: Some(show_thousands_separator),
+        use_accounting_style: Some(false),
+        fraction_accuracy: Some((-3_i32) as u32),
+        custom_format_string: Some(pattern.to_owned()),
+        scale_factor: Some(1.0),
+        requires_fraction_replacement: Some(false),
+        decimal_width: Some(0),
+        min_integer_width: Some(0),
+        num_nonspace_integer_digits: Some(0),
+        num_nonspace_decimal_digits: Some(0),
+        index_from_right_last_integer: Some(0),
+        num_hash_decimal_digits: Some(0),
+        total_num_decimal_digits: Some(0),
+        is_complex: Some(false),
+        contains_integer_token: Some(contains_integer_token),
+        ..Default::default()
+    }
+}
+
+fn custom_registry_payload(family: CustomFamily, include_second: bool) -> FixtureResult<Vec<u8>> {
+    let mut registry = tsk::CustomFormatListArchive {
+        uuids: vec![tsp::Uuid {
+            lower: CUSTOM_UUID_ONE.0,
+            upper: CUSTOM_UUID_ONE.1,
+        }],
+        custom_formats: vec![custom_archive(family, false)],
+    };
+    if include_second {
+        registry.uuids.push(tsp::Uuid {
+            lower: CUSTOM_UUID_TWO.0,
+            upper: CUSTOM_UUID_TWO.1,
+        });
+        registry.custom_formats.push(custom_archive(family, true));
+    }
+    let encoded = registry.encode_to_vec();
+    let view = WireView::parse(&encoded)?;
+    let mut output = Vec::with_capacity(encoded.len().saturating_add(64));
+    for field in view.fields() {
+        if field.number() != 2 {
+            output.extend_from_slice(field.raw());
+            continue;
+        }
+        let mut archive = field.payload().to_vec();
+        // A nested unknown record is intentionally attached to every
+        // registry archive.  Focused rewrites must preserve it even when the
+        // selected custom format is copied to a new UUID.
+        append_length_delimited_field(&mut archive, 94, b"custom-archive-extension")?;
+        append_length_delimited_field(&mut output, 2, &archive)?;
+    }
+    Ok(output)
+}
+
+fn attach_custom_registry(
+    source: &[u8],
+    registry_payload: Vec<u8>,
+    add_unknown_fields: bool,
+) -> FixtureResult<Vec<u8>> {
+    let mut registry_data = registry_payload;
+    if add_unknown_fields {
+        // Keep unknown records both before and after the repeated custom
+        // payloads.  They make registry rewrites prove order/span retention
+        // instead of merely proving that one scalar survived.
+        append_length_delimited_field(&mut registry_data, 90, b"custom-registry-before")?;
+        append_varint_field(&mut registry_data, 91, 0xc0de_0001)?;
+    }
+    let registry = object(CUSTOM_REGISTRY_ID, CUSTOM_FORMAT_LIST_TYPE, registry_data)?;
+    let source = rewrite_member(source, DOCUMENT_MEMBER, |archive| {
+        {
+            let document = archive
+                .object_mut(DOCUMENT_ID)
+                .ok_or_else(|| io::Error::other("custom document object is missing"))?;
+            let message = document
+                .messages
+                .first_mut()
+                .ok_or_else(|| io::Error::other("custom document payload is missing"))?;
+            let mut decoded = tn::DocumentArchive::decode(message.data.as_slice())?;
+            decoded.custom_format_list = Some(reference(CUSTOM_REGISTRY_ID));
+            message.data = decoded.encode_to_vec();
+            let info = document
+                .archive_info
+                .message_infos
+                .first_mut()
+                .ok_or_else(|| io::Error::other("custom document metadata is missing"))?;
+            if !info.object_references.contains(&CUSTOM_REGISTRY_ID) {
+                info.object_references.push(CUSTOM_REGISTRY_ID);
+            }
+        }
+        archive.objects.push(registry);
+        Ok(())
+    })?;
+    rewrite_custom_metadata(&source)
+}
+
+fn rewrite_custom_metadata(source: &[u8]) -> FixtureResult<Vec<u8>> {
+    rewrite_member(source, METADATA_MEMBER, |archive| {
+        let metadata = archive
+            .object_mut(METADATA_OBJECT_ID)
+            .ok_or_else(|| io::Error::other("custom metadata object is missing"))?;
+        let message = metadata
+            .messages
+            .first_mut()
+            .ok_or_else(|| io::Error::other("custom metadata payload is missing"))?;
+        let mut decoded = tsp::PackageMetadata::decode(message.data.as_slice())?;
+        let document = decoded
+            .components
+            .iter_mut()
+            .find(|component| component.preferred_locator == "Document")
+            .ok_or_else(|| io::Error::other("custom Document component is missing"))?;
+        if !document
+            .object_uuid_map_entries
+            .iter()
+            .any(|entry| entry.identifier == CUSTOM_REGISTRY_ID)
+        {
+            document
+                .object_uuid_map_entries
+                .push(uuid_entry(CUSTOM_REGISTRY_ID));
+        }
+        message.data = decoded.encode_to_vec();
+        Ok(())
+    })
 }
 
 /// Build a Currency fixture whose selected cell carries both native
@@ -1480,6 +1911,197 @@ fn rewrite_format_list(
     })
 }
 
+fn rewrite_custom_uid(source: &[u8], uuid: (u64, u64)) -> FixtureResult<Vec<u8>> {
+    rewrite_format_list_payload_for_test(source, |list| {
+        let entry = list
+            .entries
+            .first_mut()
+            .ok_or_else(|| io::Error::other("custom format reference is missing"))?;
+        let format = entry
+            .format
+            .as_mut()
+            .ok_or_else(|| io::Error::other("custom format descriptor is missing"))?;
+        format.custom_uid = Some(tsp::Uuid {
+            lower: uuid.0,
+            upper: uuid.1,
+        });
+        Ok(())
+    })
+}
+
+fn duplicate_custom_uuid(source: &[u8]) -> FixtureResult<Vec<u8>> {
+    rewrite_member(source, CUSTOM_MEMBER, |archive| {
+        let registry = archive
+            .object_mut(CUSTOM_REGISTRY_ID)
+            .ok_or_else(|| io::Error::other("custom registry is missing"))?;
+        let message = registry
+            .messages
+            .first_mut()
+            .ok_or_else(|| io::Error::other("custom registry payload is missing"))?;
+        let mut decoded = tsk::CustomFormatListArchive::decode(message.data.as_slice())?;
+        let first = decoded
+            .custom_formats
+            .first()
+            .cloned()
+            .ok_or_else(|| io::Error::other("custom registry format is missing"))?;
+        decoded.uuids.push(tsp::Uuid {
+            lower: CUSTOM_UUID_ONE.0,
+            upper: CUSTOM_UUID_ONE.1,
+        });
+        decoded.custom_formats.push(first);
+        message.data = decoded.encode_to_vec();
+        Ok(())
+    })
+}
+
+fn detach_custom_registry_reference(
+    source: &[u8],
+    retain_detached_registry: bool,
+) -> FixtureResult<Vec<u8>> {
+    let registry_payload = custom_registry_payload(CustomFamily::Number, true)?;
+    let detached_registry = object(
+        DETACHED_CUSTOM_REGISTRY_ID,
+        CUSTOM_FORMAT_LIST_TYPE,
+        registry_payload,
+    )?;
+    let source = rewrite_member(source, DOCUMENT_MEMBER, |archive| {
+        {
+            let document = archive
+                .object_mut(DOCUMENT_ID)
+                .ok_or_else(|| io::Error::other("custom document object is missing"))?;
+            let message = document
+                .messages
+                .first_mut()
+                .ok_or_else(|| io::Error::other("custom document payload is missing"))?;
+            let mut decoded = tn::DocumentArchive::decode(message.data.as_slice())?;
+            decoded.custom_format_list = if retain_detached_registry {
+                Some(reference(DETACHED_CUSTOM_REGISTRY_ID))
+            } else {
+                None
+            };
+            message.data = decoded.encode_to_vec();
+            let info = document
+                .archive_info
+                .message_infos
+                .first_mut()
+                .ok_or_else(|| io::Error::other("custom document metadata is missing"))?;
+            info.object_references
+                .retain(|id| *id != CUSTOM_REGISTRY_ID && *id != DETACHED_CUSTOM_REGISTRY_ID);
+        }
+        if retain_detached_registry {
+            archive.objects.push(detached_registry);
+        }
+        Ok(())
+    })?;
+    if !retain_detached_registry {
+        return Ok(source);
+    }
+    rewrite_member(&source, METADATA_MEMBER, |archive| {
+        let metadata = archive
+            .object_mut(METADATA_OBJECT_ID)
+            .ok_or_else(|| io::Error::other("custom metadata object is missing"))?;
+        let message = metadata
+            .messages
+            .first_mut()
+            .ok_or_else(|| io::Error::other("custom metadata payload is missing"))?;
+        let mut decoded = tsp::PackageMetadata::decode(message.data.as_slice())?;
+        let document = decoded
+            .components
+            .iter_mut()
+            .find(|component| component.preferred_locator == "Document")
+            .ok_or_else(|| io::Error::other("custom Document component is missing"))?;
+        if !document
+            .object_uuid_map_entries
+            .iter()
+            .any(|entry| entry.identifier == DETACHED_CUSTOM_REGISTRY_ID)
+        {
+            document
+                .object_uuid_map_entries
+                .push(uuid_entry(DETACHED_CUSTOM_REGISTRY_ID));
+        }
+        message.data = decoded.encode_to_vec();
+        Ok(())
+    })
+}
+
+fn field8_custom_entry(source: &[u8]) -> FixtureResult<Vec<u8>> {
+    rewrite_format_list_payload_for_test(source, |list| {
+        let entry = list
+            .entries
+            .first_mut()
+            .ok_or_else(|| io::Error::other("custom format reference is missing"))?;
+        let archive = custom_archive(CustomFamily::Number, false);
+        entry.format = None;
+        entry.custom_format = Some(archive);
+        Ok(())
+    })
+}
+
+fn deprecated_custom_table_registry(source: &[u8]) -> FixtureResult<Vec<u8>> {
+    let source = rewrite_tables(source, |archive| {
+        let model = archive
+            .object_mut(TABLE_MODEL_ID)
+            .ok_or_else(|| io::Error::other("custom format model is missing"))?;
+        let message = model
+            .messages
+            .first_mut()
+            .ok_or_else(|| io::Error::other("custom format model payload is missing"))?;
+        let mut decoded = tst::TableModelArchive::decode(message.data.as_slice())?;
+        decoded.base_data_store.deprecated_custom_format_table =
+            Some(reference(DEPRECATED_CUSTOM_TABLE_ID));
+        message.data = decoded.encode_to_vec();
+        let info = model
+            .archive_info
+            .message_infos
+            .first_mut()
+            .ok_or_else(|| io::Error::other("custom format model metadata is missing"))?;
+        if !info.object_references.contains(&DEPRECATED_CUSTOM_TABLE_ID) {
+            info.object_references.push(DEPRECATED_CUSTOM_TABLE_ID);
+        }
+
+        let payload = tst::TableDataList {
+            list_type: tst::table_data_list::ListType::CustomFormat as i32,
+            next_list_id: 32,
+            entries: vec![tst::table_data_list::ListEntry {
+                key: FIRST_FORMAT_KEY,
+                refcount: 2,
+                custom_format: Some(custom_archive(CustomFamily::Number, false)),
+                ..Default::default()
+            }],
+            is_new_for_bnc: Some(true),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        archive.objects.push(object(
+            DEPRECATED_CUSTOM_TABLE_ID,
+            TABLE_DATA_LIST_TYPE,
+            payload,
+        )?);
+        Ok(())
+    })?;
+    rewrite_member(&source, METADATA_MEMBER, |archive| {
+        let metadata = archive
+            .object_mut(METADATA_OBJECT_ID)
+            .ok_or_else(|| io::Error::other("custom metadata object is missing"))?;
+        let message = metadata
+            .messages
+            .first_mut()
+            .ok_or_else(|| io::Error::other("custom metadata payload is missing"))?;
+        let mut decoded = tsp::PackageMetadata::decode(message.data.as_slice())?;
+        if let Some(component) = decoded
+            .components
+            .iter_mut()
+            .find(|component| component.preferred_locator == "Tables")
+        {
+            component
+                .object_uuid_map_entries
+                .push(uuid_entry(DEPRECATED_CUSTOM_TABLE_ID));
+        }
+        message.data = decoded.encode_to_vec();
+        Ok(())
+    })
+}
+
 /// Rewrite the selected format list for focused integration fixtures.
 ///
 /// This narrow test-only seam lets a package test construct a valid graph
@@ -1549,6 +2171,70 @@ pub(crate) fn format_payload_by_key(source: &[u8], key: u32) -> FixtureResult<Ve
             .ok_or_else(|| io::Error::other("format payload field is missing").into());
     }
     Err(io::Error::other(format!("format entry key {key} is missing")).into())
+}
+
+/// Return the rooted custom-format registry payload without re-encoding it.
+pub(crate) fn custom_registry_payload_bytes(source: &[u8]) -> FixtureResult<Vec<u8>> {
+    object_message(
+        source,
+        CUSTOM_MEMBER,
+        CUSTOM_REGISTRY_ID,
+        CUSTOM_FORMAT_LIST_TYPE,
+    )
+}
+
+/// Return exact `(UUID lower, UUID upper, custom-format name)` registry facts.
+pub(crate) fn custom_registry_facts(source: &[u8]) -> FixtureResult<Vec<((u64, u64), String)>> {
+    let payload = custom_registry_payload_bytes(source)?;
+    let registry = tsk::CustomFormatListArchive::decode(payload.as_slice())?;
+    Ok(registry
+        .uuids
+        .iter()
+        .zip(registry.custom_formats.iter())
+        .map(|(uuid, format)| ((uuid.lower, uuid.upper), format.name.clone()))
+        .collect())
+}
+
+/// Return one exact custom archive payload selected by its semantic name.
+/// This helper intentionally walks raw fields so unknown records and their
+/// source spans remain available to preservation assertions.
+pub(crate) fn custom_archive_payload_by_name(source: &[u8], name: &str) -> FixtureResult<Vec<u8>> {
+    let payload = custom_registry_payload_bytes(source)?;
+    let view = WireView::parse(&payload)?;
+    for field in view.fields().filter(|field| field.number() == 2) {
+        let archive = tsk::CustomFormatArchive::decode(field.payload())?;
+        if archive.name == name {
+            return Ok(field.payload().to_vec());
+        }
+    }
+    Err(io::Error::other(format!("custom format {name} is missing")).into())
+}
+
+/// Return a raw field record from the document-scoped custom registry.
+pub(crate) fn custom_registry_field_record(
+    source: &[u8],
+    field_number: u32,
+) -> FixtureResult<Vec<u8>> {
+    unknown_field_record(&custom_registry_payload_bytes(source)?, field_number)
+}
+
+/// Return a raw field record from one custom-format archive payload.
+pub(crate) fn custom_archive_field_record(
+    source: &[u8],
+    name: &str,
+    field_number: u32,
+) -> FixtureResult<Vec<u8>> {
+    unknown_field_record(&custom_archive_payload_by_name(source, name)?, field_number)
+}
+
+/// Return the exact `FormatStructArchive` selected by a table-local key.
+pub(crate) fn custom_format_descriptor(
+    source: &[u8],
+    key: u32,
+) -> FixtureResult<tsk::FormatStructArchive> {
+    Ok(tsk::FormatStructArchive::decode(
+        format_payload_by_key(source, key)?.as_slice(),
+    )?)
 }
 
 /// Return one exact raw extension record from a decoded format payload.

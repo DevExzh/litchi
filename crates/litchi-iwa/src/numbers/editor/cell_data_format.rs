@@ -1153,7 +1153,9 @@ fn format_reference(cell: &BncCell) -> Result<CellFormatReference> {
             identifier,
             secondary: None,
         }),
-        (bnc::EXPLICIT_DURATION_FORMAT, Some(bnc::DURATION_CELL_FORMAT_KIND), Some(identifier)) => {
+        (explicit, Some(bnc::DURATION_CELL_FORMAT_KIND), Some(identifier))
+            if explicit == bnc::explicit_duration_format_flags(secondary.is_some()) =>
+        {
             Ok(CellFormatReference::Explicit {
                 identifier,
                 secondary,
@@ -2290,6 +2292,26 @@ mod tests {
     }
 
     #[test]
+    fn native_primary_only_duration_reference_is_recognized() {
+        // Numbers 14.4 writes marker 0x0004 when the explicit Duration
+        // format has no retained generic Number-format secondary.
+        let native = [
+            0x05, 0x07, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x02, 0x10, 0x01, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x80, 0xaf, 0x4b, 0x41, 0x04, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+        ];
+        let cell = BncCell::parse(&native).unwrap();
+        let CellFormatReference::Explicit {
+            identifier,
+            secondary,
+        } = format_reference(&cell).unwrap()
+        else {
+            panic!("native primary-only Duration cell was not treated as explicit");
+        };
+        assert_eq!(identifier, 3);
+        assert_eq!(secondary, None);
+    }
+
+    #[test]
     fn source_built_table_roundtrips_reuses_and_resets_date_time_formats() {
         let mut editor = NumbersDocumentBuilder::new()
             .table_name("Dates")
@@ -2315,10 +2337,10 @@ mod tests {
         )
         .unwrap();
         editor
-            .set_table_cell_date_time_format(table_id, 1, 1, date_time.clone())
+            .set_table_cell_data_format(table_id, 1, 1, DataFormat::DateTime(date_time.clone()))
             .unwrap();
         editor
-            .set_table_cell_date_time_format(table_id, 1, 2, date_time.clone())
+            .set_table_cell_data_format(table_id, 1, 2, DataFormat::DateTime(date_time.clone()))
             .unwrap();
 
         let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
@@ -2328,27 +2350,19 @@ mod tests {
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            reopened
-                .table_cell_date_time_format(table_id, 1, 1)
-                .unwrap(),
-            Some(date_time.clone())
+            reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
+            DataFormat::DateTime(date_time.clone())
         );
-        assert!(
-            reopened
-                .reset_table_cell_date_time_format(table_id, 1, 1)
-                .unwrap()
-        );
+        reopened
+            .set_table_cell_data_format(table_id, 1, 1, DataFormat::Automatic)
+            .unwrap();
         assert_eq!(
-            reopened
-                .table_cell_date_time_format(table_id, 1, 2)
-                .unwrap(),
-            Some(date_time)
+            reopened.table_cell_data_format(table_id, 1, 2).unwrap(),
+            DataFormat::DateTime(date_time.clone())
         );
-        assert!(
-            reopened
-                .reset_table_cell_date_time_format(table_id, 1, 2)
-                .unwrap()
-        );
+        reopened
+            .set_table_cell_data_format(table_id, 1, 2, DataFormat::Automatic)
+            .unwrap();
         let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
         assert!(
             resolve_format_table(reopened.package(), &location)
