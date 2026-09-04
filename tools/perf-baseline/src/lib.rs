@@ -990,6 +990,7 @@ enum Case {
     OpcSourceOverlayMultiPartNoop,
     OpcSourceOverlayMultiPartMixed,
     OpcCasefoldEagerOpen,
+    OpcCasefoldOwnedOpen,
     OpcCasefoldSourceOpen,
     OpcCasefoldEagerLookup,
     OpcCasefoldSourceLookup,
@@ -1452,6 +1453,7 @@ impl Case {
             Self::OpcSourceOverlayMultiPartNoop => "opc_source_overlay_multi_part_noop",
             Self::OpcSourceOverlayMultiPartMixed => "opc_source_overlay_multi_part_mixed",
             Self::OpcCasefoldEagerOpen => "opc_casefold_eager_open",
+            Self::OpcCasefoldOwnedOpen => "opc_casefold_owned_open",
             Self::OpcCasefoldSourceOpen => "opc_casefold_source_open",
             Self::OpcCasefoldEagerLookup => "opc_casefold_eager_lookup",
             Self::OpcCasefoldSourceLookup => "opc_casefold_source_lookup",
@@ -2032,6 +2034,7 @@ impl Case {
         matches!(
             self,
             Self::OpcCasefoldEagerOpen
+                | Self::OpcCasefoldOwnedOpen
                 | Self::OpcCasefoldSourceOpen
                 | Self::OpcCasefoldEagerLookup
                 | Self::OpcCasefoldSourceLookup
@@ -2044,8 +2047,14 @@ impl Case {
     const fn is_opc_casefold_open(self) -> bool {
         matches!(
             self,
-            Self::OpcCasefoldEagerOpen | Self::OpcCasefoldSourceOpen
+            Self::OpcCasefoldEagerOpen
+                | Self::OpcCasefoldOwnedOpen
+                | Self::OpcCasefoldSourceOpen
         )
+    }
+
+    const fn is_opc_casefold_owned_open(self) -> bool {
+        matches!(self, Self::OpcCasefoldOwnedOpen)
     }
 
     const fn is_opc_casefold_source_backed(self) -> bool {
@@ -3919,6 +3928,12 @@ struct OpcCasefoldLookupSummary {
     lookup_count: usize,
     expected_output_sha256: String,
     observed_output_sha256: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    owned_part_count_verified: Option<Vec<bool>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    owned_payload_sha256: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    owned_exact_source_sha256: Option<Vec<String>>,
     source_counter_scope: &'static str,
     source_read_calls: Vec<u64>,
     source_read_bytes: Vec<u64>,
@@ -10496,6 +10511,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "opc_source_overlay_multi_part_noop" => Some(Case::OpcSourceOverlayMultiPartNoop),
         "opc_source_overlay_multi_part_mixed" => Some(Case::OpcSourceOverlayMultiPartMixed),
         "opc_casefold_eager_open" => Some(Case::OpcCasefoldEagerOpen),
+        "opc_casefold_owned_open" => Some(Case::OpcCasefoldOwnedOpen),
         "opc_casefold_source_open" => Some(Case::OpcCasefoldSourceOpen),
         "opc_casefold_eager_lookup" => Some(Case::OpcCasefoldEagerLookup),
         "opc_casefold_source_lookup" => Some(Case::OpcCasefoldSourceLookup),
@@ -11125,7 +11141,8 @@ fn usage_text() -> String {
                                        opc_noop_save,opc_mutated_save,opc_source_open,\n\
                                        opc_source_open_main_read,opc_source_cached_main_read,\n\
                                        opc_source_materialize,\n\
-                                       opc_casefold_eager_open,opc_casefold_source_open,\n\
+                                       opc_casefold_eager_open,opc_casefold_owned_open,\n\
+                                       opc_casefold_source_open,\n\
                                        opc_casefold_eager_lookup,opc_casefold_source_lookup,\n\
                                        opc_casefold_source_exact_lookup,\n\
                                        opc_casefold_source_case_alias_lookup,\n\
@@ -20698,6 +20715,7 @@ fn run_case_with_config(
             Err("OPC relationship-heavy case uses its dedicated corpus runner".into())
         },
         Case::OpcCasefoldEagerOpen
+        | Case::OpcCasefoldOwnedOpen
         | Case::OpcCasefoldSourceOpen
         | Case::OpcCasefoldEagerLookup
         | Case::OpcCasefoldSourceLookup
@@ -49779,6 +49797,9 @@ struct OpcCasefoldRunEvidence {
     elapsed: Vec<u64>,
     observations: Vec<operation_metrics::InProcessObservation>,
     observed_output_sha256: Vec<String>,
+    owned_part_count_verified: Vec<bool>,
+    owned_payload_sha256: Vec<String>,
+    owned_exact_source_sha256: Vec<String>,
     source_read_calls: Vec<u64>,
     source_read_bytes: Vec<u64>,
     source_version_calls: Vec<u64>,
@@ -49856,6 +49877,30 @@ fn opc_casefold_source_name_digest(
         return Err("source-backed OPC case-fold name oracle differs from corpus".into());
     }
     Ok(opc_casefold_canonical_name_digest(&names))
+}
+
+fn opc_casefold_owned_payload_digest(
+    package: &OpcPackage,
+    corpus: &OpcCasefoldCorpus,
+) -> Result<String, Box<dyn Error>> {
+    let mut framed = Vec::new();
+    for (name, partname) in corpus
+        .part_names
+        .iter()
+        .zip(corpus.canonical_partnames.iter())
+    {
+        let payload = package.get_part(partname)?.blob();
+        if payload.len() != OPC_CASEFOLD_PART_BYTES {
+            return Err("owned OPC case-fold payload differs from fixed part size".into());
+        }
+        let name_len = u64::try_from(name.len()).unwrap_or(u64::MAX);
+        let payload_len = u64::try_from(payload.len()).unwrap_or(u64::MAX);
+        framed.extend_from_slice(&name_len.to_le_bytes());
+        framed.extend_from_slice(name.as_bytes());
+        framed.extend_from_slice(&payload_len.to_le_bytes());
+        framed.extend_from_slice(payload);
+    }
+    Ok(sha256_hex(&framed))
 }
 
 fn validate_opc_casefold_lookup_partname(
@@ -49965,6 +50010,66 @@ fn run_opc_casefold_eager_open(
         if output_digest != corpus.canonical_name_oracle_sha256 {
             return Err("eager OPC case-fold open returned an unstable name oracle".into());
         }
+        evidence.record(
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+            output_digest,
+            None,
+        )?;
+    }
+    Ok(evidence)
+}
+
+fn run_opc_casefold_owned_open(
+    corpus: &OpcCasefoldCorpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<OpcCasefoldRunEvidence, Box<dyn Error>> {
+    let mut evidence = OpcCasefoldRunEvidence::default();
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        // Clone the owned archive before entering either measurement region;
+        // only the production owned constructor is timed and allocation-counted.
+        let owned = corpus.archive.clone();
+        let allocation_region = allocation_metrics::begin();
+        let started = Instant::now();
+        let package = OpcPackage::from_vec(owned)?;
+        std::hint::black_box(&package);
+        let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
+
+        // All correctness gates stay outside the timed constructor: package
+        // topology, canonical names, materialized payloads, and exact-source
+        // publication are independently checked for every measured sample.
+        let part_count = package.part_count();
+        let part_count_verified = part_count == corpus.manifest.entry_count;
+        if !part_count_verified {
+            return Err("owned OPC case-fold open part count differs from corpus".into());
+        }
+        let name_digest = opc_casefold_eager_name_digest(&package, corpus)?;
+        if name_digest != corpus.canonical_name_oracle_sha256 {
+            return Err("owned OPC case-fold open name oracle differs from corpus".into());
+        }
+        let payload_digest = opc_casefold_owned_payload_digest(&package, corpus)?;
+        if payload_digest != corpus.part_payload_sha256 {
+            return Err("owned OPC case-fold open payload oracle differs from corpus".into());
+        }
+        let exact_source = PackageWriter::to_bytes(&package)?;
+        let exact_source_sha256 = sha256_hex(&exact_source);
+        if exact_source != corpus.archive {
+            return Err("owned OPC case-fold open did not retain exact source bytes".into());
+        }
+        if exact_source_sha256 != corpus.manifest.archive_sha256 {
+            return Err("owned OPC case-fold exact-source digest differs from corpus".into());
+        }
+        let output_digest = name_digest;
+        if iteration >= warmup_iterations {
+            evidence.owned_part_count_verified.push(part_count_verified);
+            evidence.owned_payload_sha256.push(payload_digest);
+            evidence.owned_exact_source_sha256.push(exact_source_sha256);
+        }
+        std::hint::black_box((&package, &output_digest));
         evidence.record(
             iteration,
             warmup_iterations,
@@ -50292,12 +50397,15 @@ fn run_opc_casefold_lookup(
         return Err("invalid case passed to OPC case-fold lookup runner".into());
     }
     let open = case.is_opc_casefold_open();
+    let owned_open = case.is_opc_casefold_owned_open();
     let source_backed = case.is_opc_casefold_source_backed();
     let class_index = case.opc_casefold_source_class();
     let mut evidence = if let Some(class_index) = class_index {
         run_opc_casefold_source_class_lookup(corpus, class_index, warmup_iterations, samples)?
     } else if open {
-        if source_backed {
+        if owned_open {
+            run_opc_casefold_owned_open(corpus, warmup_iterations, samples)?
+        } else if source_backed {
             run_opc_casefold_source_open(corpus, warmup_iterations, samples)?
         } else {
             run_opc_casefold_eager_open(corpus, warmup_iterations, samples)?
@@ -50318,6 +50426,11 @@ fn run_opc_casefold_lookup(
         reorder_sample_vector(&mut evidence.source_payload_read_calls, &sample_order)?;
         reorder_sample_vector(&mut evidence.source_payload_read_bytes, &sample_order)?;
         reorder_sample_vector(&mut evidence.source_max_in_flight_reads, &sample_order)?;
+    }
+    if owned_open {
+        reorder_sample_vector(&mut evidence.owned_part_count_verified, &sample_order)?;
+        reorder_sample_vector(&mut evidence.owned_payload_sha256, &sample_order)?;
+        reorder_sample_vector(&mut evidence.owned_exact_source_sha256, &sample_order)?;
     }
     let operation_metrics =
         operation_metrics::from_in_process_observations_without_sink(&evidence.observations)?;
@@ -50362,7 +50475,9 @@ fn run_opc_casefold_lookup(
     {
         return Err("OPC case-fold measured output digests are unstable".into());
     }
-    let source_counter_scope = if source_backed {
+    let source_counter_scope = if owned_open {
+        "not_applicable_immutable_owned_slice"
+    } else if source_backed {
         if open {
             "independent_untimed_instrumented_source_open_replay"
         } else if class_index.is_some() {
@@ -50379,7 +50494,9 @@ fn run_opc_casefold_lookup(
         } else {
             "OpcPackage"
         },
-        operation: if open {
+        operation: if owned_open {
+            "owned_open"
+        } else if open {
             "open"
         } else if let Some(class_index) = class_index {
             [
@@ -50391,7 +50508,9 @@ fn run_opc_casefold_lookup(
             "repeated_lookup"
         },
         timing_scope: if open {
-            if source_backed {
+            if owned_open {
+                "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded"
+            } else if source_backed {
                 "SourceBackedPackage::from_read_at over litchi_core::OwnedSource only; source ownership, instrumented replay, and post-open name oracle excluded"
             } else {
                 "OpcPackage::from_bytes only; archive clone and post-open name oracle excluded"
@@ -50424,6 +50543,10 @@ fn run_opc_casefold_lookup(
         lookup_count,
         expected_output_sha256: expected_output_sha256.clone(),
         observed_output_sha256: evidence.observed_output_sha256.clone(),
+        owned_part_count_verified: owned_open.then_some(evidence.owned_part_count_verified.clone()),
+        owned_payload_sha256: owned_open.then_some(evidence.owned_payload_sha256.clone()),
+        owned_exact_source_sha256: owned_open
+            .then_some(evidence.owned_exact_source_sha256.clone()),
         source_counter_scope,
         source_read_calls: evidence.source_read_calls.clone(),
         source_read_bytes: evidence.source_read_bytes.clone(),
@@ -54307,6 +54430,81 @@ mod tests {
     }
 
     #[test]
+    fn opc_casefold_owned_open_selector_is_opt_in_and_reports_owned_scope() {
+        let case = Case::OpcCasefoldOwnedOpen;
+        assert_eq!(parse_case(case.name()), Some(case));
+        assert_eq!(case.name(), "opc_casefold_owned_open");
+        assert!(case.is_opc_casefold_lookup());
+        assert!(case.is_opc_casefold_open());
+        assert!(case.is_opc_casefold_owned_open());
+        assert!(!case.is_opc_casefold_source_backed());
+        assert!(!Case::DEFAULT.contains(&case));
+        assert!(usage_text().contains(case.name()));
+        assert_eq!(Case::DEFAULT.len(), 36);
+
+        for part_count in [256, 2_047, 2_048, 16_384] {
+            let corpus = build_opc_casefold_corpus(part_count).unwrap();
+            let measured = run_opc_casefold_lookup(case, &corpus, 0, 1).unwrap();
+            assert_eq!(measured.corpus.entry_count, part_count);
+            assert_eq!(measured.corpus.archive_member_count, part_count + 2);
+            assert_eq!(measured.elapsed_ns.samples.len(), 1);
+            assert_eq!(
+                measured.output_sha256.as_deref(),
+                Some(corpus.canonical_name_oracle_sha256.as_str())
+            );
+
+            let summary = measured
+                .source
+                .unwrap()
+                .opc_casefold_lookup
+                .expect("owned OPC case-fold open summary");
+            assert_eq!(summary.implementation, "OpcPackage");
+            assert_eq!(summary.operation, "owned_open");
+            assert_eq!(
+                summary.timing_scope,
+                "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded"
+            );
+            assert_eq!(
+                summary.source_counter_scope,
+                "not_applicable_immutable_owned_slice"
+            );
+            assert_eq!(summary.lookup_count, 0);
+            assert_eq!(
+                summary.observed_output_sha256,
+                vec![corpus.canonical_name_oracle_sha256]
+            );
+            assert_eq!(summary.owned_part_count_verified, Some(vec![true]));
+            assert_eq!(
+                summary.owned_payload_sha256,
+                Some(vec![corpus.part_payload_sha256])
+            );
+            assert_eq!(
+                summary.owned_exact_source_sha256,
+                Some(vec![corpus.manifest.archive_sha256])
+            );
+            assert!(summary.malformed_equivalent_name_gate_verified);
+            assert!(measured.operation_metrics.is_some());
+        }
+
+        let eager_corpus = build_opc_casefold_corpus(256).unwrap();
+        let eager =
+            run_opc_casefold_lookup(Case::OpcCasefoldEagerOpen, &eager_corpus, 0, 1).unwrap();
+        let eager_summary = eager
+            .source
+            .unwrap()
+            .opc_casefold_lookup
+            .expect("eager OPC case-fold open summary");
+        assert_eq!(eager_summary.operation, "open");
+        assert_eq!(
+            eager_summary.timing_scope,
+            "OpcPackage::from_bytes only; archive clone and post-open name oracle excluded"
+        );
+        assert!(eager_summary.owned_part_count_verified.is_none());
+        assert!(eager_summary.owned_payload_sha256.is_none());
+        assert!(eager_summary.owned_exact_source_sha256.is_none());
+    }
+
+    #[test]
     fn zip_index_retains_member_count_oracle_and_actual_samples() {
         let corpus = build_opc_corpus(CorpusShape::ManySmall, PayloadKind::Compressible).unwrap();
         let measured = run_case(Case::ZipIndex, &corpus, 1, 2).unwrap();
@@ -54585,7 +54783,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 418);
+        assert_eq!(selectable_count, 419);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
