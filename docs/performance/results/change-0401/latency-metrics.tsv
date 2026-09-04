@@ -1,0 +1,9 @@
+profile	case	row_type	comparison	leg	implementation	sample_count	min_ns	p50_ns	mean_ns	p95_ns	p99_ns	max_ns	standard_deviation_ns	ci95_lower_ns	ci95_upper_ns	candidate_reduction_p50_percent	candidate_reduction_mean_percent	candidate_reduction_p95_percent	candidate_reduction_p99_percent	same_implementation_drift_p50_percent	same_implementation_drift_mean_percent	same_implementation_drift_p95_percent	same_implementation_drift_p99_percent
+normal	xlsx_file_selected_cell	leg	-	a1	control	500	3486402	3545910	3553345.2400000016	3617006	3666826	3698197	31247.093398619916	3550599.702592367	3556090.7774076364	-	-	-	-	-	-	-	-
+normal	xlsx_file_selected_cell	leg	-	b1	candidate	500	3495856	3546360	3549806.8920000014	3594386	3623918	3693008	23784.03938744378	3547717.0985907437	3551896.685409259	-	-	-	-	-	-	-	-
+normal	xlsx_file_selected_cell	leg	-	b2	candidate	500	3498136	3546925	3551949.4499999997	3601226	3637156	3748686	27125.528286489887	3549566.0554339085	3554332.844566091	-	-	-	-	-	-	-	-
+normal	xlsx_file_selected_cell	leg	-	a2	control	500	3494735	3545675	3552893.1779999994	3608375	3638806	3838117	32675.06379394267	3550022.1714459276	3555764.184554071	-	-	-	-	-	-	-	-
+normal	xlsx_file_selected_cell	candidate_reduction	a1_to_b1	-	candidate	-	-	-	-	-	-	-	-	-	-	-0.012690677428361125	0.09957794025103593	0.6253791118953079	1.1701673327286324	-	-	-	-
+normal	xlsx_file_selected_cell	candidate_reduction	a2_to_b2	-	candidate	-	-	-	-	-	-	-	-	-	-	-0.035254218167203706	0.02656223963735658	0.19812242352859666	0.04534454433679619	-	-	-	-
+normal	xlsx_file_selected_cell	same_implementation_drift	control	-	control	-	-	-	-	-	-	-	-	-	-	-	-	-	-	-0.006627353768144144	-0.012722152492062553	-0.23862277253618047	-0.7641486124512045
+normal	xlsx_file_selected_cell	same_implementation_drift	candidate	-	candidate	-	-	-	-	-	-	-	-	-	-	-	-	-	-	0.015931828691954565	0.06035702969721797	0.19029675722084383	0.3652952412278644

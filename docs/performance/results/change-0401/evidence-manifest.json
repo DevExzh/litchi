@@ -1,0 +1,371 @@
+{
+  "schema_version": 1,
+  "manifest_kind": "litchi-performance-evidence",
+  "change": "0401",
+  "outcome": "accepted_scoped_production_change",
+  "claim_authorized": true,
+  "self_excluded": true,
+  "accepted_deliverable": "warm normal selected-cell mean/p95/p99 latency claim with exact operation-scoped allocator call/byte observations",
+  "mechanism": "unselected numeric ownership elision in the selected-cell streaming scanner",
+  "revisions": {
+    "control": "0859063be5a67bd2aafb3531f2126020b2b5000d",
+    "candidate": "87f26d5ee02a1903e668bf7f60fa3ef954a0c3fb",
+    "baseline_context": "Change 0400 final control included dimension-bearing selected streaming and numeric scratch"
+  },
+  "protocol": {
+    "case": "xlsx_file_selected_cell",
+    "order": [
+      "A1_control",
+      "B1_candidate",
+      "B2_candidate",
+      "A2_control"
+    ],
+    "cache_state": "warm",
+    "fresh_child_per_sample": true,
+    "process_isolated": true,
+    "filesystem_root_selected": true,
+    "cpu_affinity": "2",
+    "execution_workers": [
+      1
+    ],
+    "normal": {
+      "profile": "release",
+      "instrumentation": "none",
+      "warmups_per_leg": 20,
+      "samples_per_leg": 500,
+      "accepted_statistics": [
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "rejected_statistics": {
+        "p50": "candidate is not lower in both paired directions"
+      }
+    },
+    "allocator": {
+      "profile": "release",
+      "instrumentation": "system_allocator_operation_scoped",
+      "warmups_per_leg": 3,
+      "samples_per_leg": 30,
+      "allocator_vectors_claimable_in_scope": true,
+      "elapsed_latency_claimable": false,
+      "live_peak_rss_claimable": false
+    }
+  },
+  "toolchain": {
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "cargo": "1.98.1",
+    "rustdoc": "1.98.1",
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "host": "AMD EPYC 9R45; Linux 7.0.0-1011-aws; tmpfs"
+  },
+  "corpus": {
+    "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+    "name": "xlsx-cell-values-medium",
+    "shape": "medium",
+    "sheet_count": 4,
+    "rows_per_sheet": 48,
+    "columns_per_sheet": 48,
+    "selected_sheet_numeric_cell_count": 2304,
+    "total_workbook_cell_count": 9216,
+    "archive_member_count": 17,
+    "archive_bytes": 4226429,
+    "uncompressed_payload_bytes": 4231168,
+    "compression": "deflate",
+    "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+    "semantic_sha256": "020fdd140d2959ea4f480676a3d4d0bf840927e25251cb6cad37a043ab80627e"
+  },
+  "selected_cell_oracle": {
+    "canonical_sheet_name": "Bench01",
+    "sheet_position": 1,
+    "prepared_selector": "bEnCh01",
+    "cell_address": "M29",
+    "zero_based_row": 28,
+    "zero_based_column": 12,
+    "view": "stored",
+    "value_kind": "number",
+    "lexical_value": "1028012",
+    "digest": "36e53d9002ae8c433ad918b400196fb886fa675f850076808ac51327d1f42ac1"
+  },
+  "binary_identities": {
+    "normal": {
+      "control": {
+        "sha256": "ffbbb641868c1f12a7fbb805565cc64bcf9e8a8be4d732f4ba72ec12f72cfa79",
+        "bytes": 54765200,
+        "profile": "release"
+      },
+      "candidate": {
+        "sha256": "5a660baeb69600b28422174616ee03e8c5e38948a4c513a42adb635372d2cd5e",
+        "bytes": 54755640,
+        "profile": "release"
+      }
+    },
+    "allocator": {
+      "control": {
+        "sha256": "2173aa6e718eb056f22c9187279e632fff659850c630438376ac29c577704f71",
+        "bytes": 54767312,
+        "profile": "release"
+      },
+      "candidate": {
+        "sha256": "068bef7e6be0824f8bde4a5494e61e02dc0feb40653e748d91c86a5058c40d66",
+        "bytes": 54758784,
+        "profile": "release"
+      }
+    }
+  },
+  "compression": {
+    "encoding": "zstd",
+    "cli": "zstd 1.5.7",
+    "level": 3,
+    "threads": 1,
+    "checksum": "XXH64",
+    "content_size": true,
+    "all_frames_tested": true,
+    "all_decompressed_raw_identities_verified": true
+  },
+  "validation": {
+    "normal_summary": {
+      "command": "python3 tools/perf_abba_summary.py --case xlsx_file_selected_cell A1 B1 B2 A2 --json-out OUTPUT",
+      "statistics_recomputed_from_2000_raw_samples": true,
+      "canonical_summary_sha256": "2eba7abdb7eddd97b1379f3b9d594098a0a845d023294901568a5efee9865f1e",
+      "accepted_statistics": [
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "rejected_statistics": {
+        "p50": "candidate is not lower in both paired directions"
+      }
+    },
+    "allocator_abba": {
+      "command": "python3 tools/validate_perf_allocator_abba_0401.py --a1 A1 --b1 B1 --b2 B2 --a2 A2 --projection allocation-metrics.json",
+      "status": "passed",
+      "raw_reports": 4,
+      "raw_samples": 120,
+      "unique_child_process_ids": 120,
+      "exact_allocator_vectors": 40,
+      "allocator_elapsed_time_evaluated": false,
+      "live_peak_rss_evaluated_as_claim": false
+    },
+    "correctness": {
+      "focused_numeric_regressions": "4 streaming_0401 scanner tests passed; borrowed_number_validation_matches_owned_constructor_errors passed separately",
+      "full_litchi_xlsx_library_tests": "923 passed",
+      "cargo_check_litchi_xlsx": "passed under Rust 1.98.1",
+      "changed_file_rustfmt": "passed",
+      "git_diff_check": "passed",
+      "normal_selected_oracle_samples": "2,000/2,000 exact",
+      "allocator_selected_oracle_samples": "120/120 exact"
+    },
+    "withheld": [
+      "normal p50",
+      "allocator elapsed latency",
+      "RSS, peak operation memory, and process-wide memory behavior",
+      "physical I/O, cold-cache, throughput, and scaling",
+      "broad XLSX or selector generalization",
+      "7-byte-per-cell or proportional-saving generalization"
+    ]
+  },
+  "provenance": {
+    "source_sha256": {
+      "hash_definition": "SHA-256 of each exact source file at the stated revision",
+      "control": {
+        "crates/litchi-xlsx/src/cell.rs": {
+          "bytes": 32071,
+          "sha256": "a8f874db61bc040aa25814ee320856adc103bc25c48a8cf88947b09b278136d0"
+        },
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs": {
+          "bytes": 53180,
+          "sha256": "9460b4c1f7acd9763071ad42463073ef4cb75bac91ea4c670352f82fd8327651"
+        },
+        "crates/litchi-xlsx/src/raw/worksheet/tests.rs": {
+          "bytes": 107891,
+          "sha256": "f0c842d14b0c7ce983c85a86556c9d9b977c1c24b7c44ca7df2acbe2aa16abf7"
+        }
+      },
+      "candidate": {
+        "crates/litchi-xlsx/src/cell.rs": {
+          "bytes": 33315,
+          "sha256": "26bd09c58eda4996e67b0999a7430bcd462fb51430cf2c8601cc0ecac044bd06"
+        },
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs": {
+          "bytes": 53558,
+          "sha256": "d3353047a918002a01972cb5de425e695a60e1964ec8cdcfa6d56ed80c2cfcbb"
+        },
+        "crates/litchi-xlsx/src/raw/worksheet/tests.rs": {
+          "bytes": 113053,
+          "sha256": "b6304ab044837de28bcdc2ecbefda6d03d922b4297aaddb028d23e7fbe6a376e"
+        }
+      }
+    },
+    "validator_sha256": {
+      "tools/perf_abba_summary.py": {
+        "bytes": 278201,
+        "sha256": "96720d73c26d80b1dfd19073a0630f87dfe9d6615b26f92095d4d4e48e3b35c5"
+      },
+      "tools/test_perf_abba_summary.py": {
+        "bytes": 175262,
+        "sha256": "e7635c3cbbbaaaa89cb167aa812f095860eaa5eb6ad0eb448cfc188665c01ffe"
+      },
+      "tools/validate_perf_allocator_abba_0401.py": {
+        "bytes": 39288,
+        "sha256": "ff9364d7f7172dfb9820d37f8ebbf393607431da4e2f372b01a2a7f65f731540"
+      },
+      "tools/test_validate_perf_allocator_abba_0401.py": {
+        "bytes": 11837,
+        "sha256": "5a20f573cea59a72bc3429896aa9b2620c9c9723446d85ae2f336740551c1830"
+      }
+    },
+    "normal_package_manifest_source_sha256": "b0a3a57d74f31f62d15a12ddc8c754404497652ba1aaac4efa9bed9b04c6c015",
+    "package_manifest_summary_path_normalized": true
+  },
+  "artifacts": [
+    {
+      "path": "README.md",
+      "role": "human_readme",
+      "bytes": 11150,
+      "sha256": "6f8cbab470b313017873bf1701759337d07fb6af5e0113f0c2a243150217fdba"
+    },
+    {
+      "path": "adjudication.json",
+      "role": "adjudication",
+      "bytes": 20684,
+      "sha256": "607cafd676b3bd9dfbb88bff9ce538989218839790693a45e1785cbe0f8e758f",
+      "canonical_bytes": 16243,
+      "canonical_sha256": "73a7db9544a7c4e3b2c8e2238f16e92e2caeabb5afce7092b61d009668bb9ee7"
+    },
+    {
+      "path": "allocation-metrics.json",
+      "role": "allocator_projection",
+      "bytes": 35497,
+      "sha256": "a51d6b7fcebef93949cc3e9423420b2f6cc738cabcfc205912f63edbbeff56ff",
+      "canonical_bytes": 24718,
+      "canonical_sha256": "2c65b726e66ec17727a8cd99bacbd164e0fa38efe15d2e2848581240bad2b4b6"
+    },
+    {
+      "path": "latency-metrics.tsv",
+      "role": "normal_latency_projection",
+      "bytes": 1911,
+      "sha256": "75c532a6007788ccc56825454c88e6db3c3b5e3cdea53681ab4bbf28fd6e50fc"
+    },
+    {
+      "path": "summary.json",
+      "role": "normal_abba_summary",
+      "bytes": 22238,
+      "sha256": "4703ba850063db6295bcc752b1616a6334509cb947821f2ab2dbce4c70275b0b",
+      "canonical_bytes": 17841,
+      "canonical_sha256": "2eba7abdb7eddd97b1379f3b9d594098a0a845d023294901568a5efee9865f1e"
+    },
+    {
+      "path": "0401-xlsx-selected-numeric-elision-abba-manifest.json",
+      "role": "normal_abba_package_manifest",
+      "bytes": 4232,
+      "sha256": "cd9b38445d0ce3f9502f69b7cc11e44ce291ae81358055608d56816ba2605513",
+      "canonical_bytes": 3449,
+      "canonical_sha256": "203346e2b203cd8e0539b05df54a132e3825f8ededb6b1c5d8a5a41ccbe5e787"
+    },
+    {
+      "path": "a1-normal.json.zst",
+      "role": "normal_control_A1_report",
+      "bytes": 25381,
+      "sha256": "a6b8fc7c4af01201d7c74412337bf8c77c20ec93465964b5cb0e1dcddb8c1601",
+      "encoding": "zstd",
+      "compressed_bytes": 25381,
+      "compressed_sha256": "a6b8fc7c4af01201d7c74412337bf8c77c20ec93465964b5cb0e1dcddb8c1601",
+      "raw_bytes": 1311556,
+      "raw_sha256": "0df31b045aca035bd10c94c9a44463ccc1e96658e7a7d364e26a29719c05dde5",
+      "canonical_bytes": 789866,
+      "canonical_sha256": "da8e1e5d30e551f401bf4410eff6132fe2dcbd9d5e7baa75eed914e78e8df682"
+    },
+    {
+      "path": "b1-normal.json.zst",
+      "role": "normal_candidate_B1_report",
+      "bytes": 25063,
+      "sha256": "f750c2cacab0adcaee3ed449957c2fa5087b5a4281f145e587c153ee6568fa12",
+      "encoding": "zstd",
+      "compressed_bytes": 25063,
+      "compressed_sha256": "f750c2cacab0adcaee3ed449957c2fa5087b5a4281f145e587c153ee6568fa12",
+      "raw_bytes": 1311557,
+      "raw_sha256": "6e603e3ff8afc7d9e76ee92ea3284bcc45bd875d414168f7cce44d90d447003c",
+      "canonical_bytes": 789867,
+      "canonical_sha256": "eca17f0b8a2f1eb39b5fc657ff3b25c4787d30a1013adc23f0f773e4f94dff82"
+    },
+    {
+      "path": "b2-normal.json.zst",
+      "role": "normal_candidate_B2_report",
+      "bytes": 24861,
+      "sha256": "3c7b49aad43f424959949d62d47a2fb7370009f9538852e74ffead0555232648",
+      "encoding": "zstd",
+      "compressed_bytes": 24861,
+      "compressed_sha256": "3c7b49aad43f424959949d62d47a2fb7370009f9538852e74ffead0555232648",
+      "raw_bytes": 1311558,
+      "raw_sha256": "ccf1d580f4ec584ac63494387a965724cef665e637b8eab4ea5abb35684b3df6",
+      "canonical_bytes": 789868,
+      "canonical_sha256": "3d7bab4d8af8e7898cb795d726e7f4aa26bd29325aea7125f4438d22aef40982"
+    },
+    {
+      "path": "a2-normal.json.zst",
+      "role": "normal_control_A2_report",
+      "bytes": 25417,
+      "sha256": "2b8dc62fd552fea8d69e32dcbe59dd615324e815a8b798db002bf3eb38c605a3",
+      "encoding": "zstd",
+      "compressed_bytes": 25417,
+      "compressed_sha256": "2b8dc62fd552fea8d69e32dcbe59dd615324e815a8b798db002bf3eb38c605a3",
+      "raw_bytes": 1311555,
+      "raw_sha256": "7c71fa050e2bcded48db2873d1523eff90e6908cc073c0aab55dbe6322357896",
+      "canonical_bytes": 789865,
+      "canonical_sha256": "daff333036d2a4df56374f44cc204c8db1baa9eb2b51050bcfade38eb6688fc0"
+    },
+    {
+      "path": "a1-allocator.json.zst",
+      "role": "allocator_control_A1_report",
+      "bytes": 5773,
+      "sha256": "f4912accd4e1554e5a7e476fe070e94b5ded42dcd299c8ec9ba440d4f4c9bf91",
+      "encoding": "zstd",
+      "compressed_bytes": 5773,
+      "compressed_sha256": "f4912accd4e1554e5a7e476fe070e94b5ded42dcd299c8ec9ba440d4f4c9bf91",
+      "raw_bytes": 119356,
+      "raw_sha256": "f5500add997da772fd73895c34bf583ae8ad31fdfb1920805a8355f6d85db8b7",
+      "canonical_bytes": 71653,
+      "canonical_sha256": "f349e5f4ba128c467d26a6f0b3d9b0095df92e6e20be9ded7869438248e11ea5"
+    },
+    {
+      "path": "b1-allocator.json.zst",
+      "role": "allocator_candidate_B1_report",
+      "bytes": 5741,
+      "sha256": "e872d05a208b226111914d0bd5e8b3035146188ecdd840b1c22cf82afc01c067",
+      "encoding": "zstd",
+      "compressed_bytes": 5741,
+      "compressed_sha256": "e872d05a208b226111914d0bd5e8b3035146188ecdd840b1c22cf82afc01c067",
+      "raw_bytes": 119358,
+      "raw_sha256": "fec46059fb9f26c4269b0fddfa90c8a98550b1a1687c1d3135530e9324289468",
+      "canonical_bytes": 71655,
+      "canonical_sha256": "34fce07a720c1e06769e9432b8e331381129e38850ae64f74cc64b45ac5893b6"
+    },
+    {
+      "path": "b2-allocator.json.zst",
+      "role": "allocator_candidate_B2_report",
+      "bytes": 5710,
+      "sha256": "ed67fd38d63237fa104108ddd1c2c21d47030d09e4bdfa5eb4c8b924b91e0770",
+      "encoding": "zstd",
+      "compressed_bytes": 5710,
+      "compressed_sha256": "ed67fd38d63237fa104108ddd1c2c21d47030d09e4bdfa5eb4c8b924b91e0770",
+      "raw_bytes": 119358,
+      "raw_sha256": "cf4518f6edd204b7715cfda754ab5225a9ce184f3322566164e0f39de4926e98",
+      "canonical_bytes": 71655,
+      "canonical_sha256": "89439eb087097eed239e66d3ce59c7adcd0e47f7c5fcbf31cba8e3e0721b89e9"
+    },
+    {
+      "path": "a2-allocator.json.zst",
+      "role": "allocator_control_A2_report",
+      "bytes": 5698,
+      "sha256": "6f51c0c3bbe94bd1023d93b1102cfbc4db3a2790bd19baa55e05ad84389b8b5c",
+      "encoding": "zstd",
+      "compressed_bytes": 5698,
+      "compressed_sha256": "6f51c0c3bbe94bd1023d93b1102cfbc4db3a2790bd19baa55e05ad84389b8b5c",
+      "raw_bytes": 119357,
+      "raw_sha256": "39a476050ae3c8454f850f27c86249ac14c054bf80d521b9848c92a005f6170d",
+      "canonical_bytes": 71654,
+      "canonical_sha256": "ec33aabc28c2f0cc9cec3687529daf2dcc01692619a505fc7a007967c62f8a80"
+    }
+  ]
+}
