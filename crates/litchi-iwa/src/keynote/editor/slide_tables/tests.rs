@@ -422,7 +422,7 @@ fn source_built_table_roundtrips_cell_layout_crud() {
 }
 
 #[test]
-fn source_built_table_roundtrips_number_format_crud() {
+fn source_built_table_roundtrips_number_data_format_crud() {
     let mut editor = KeynoteDocumentBuilder::new().build().unwrap();
     let (position, size) = table_geometry();
     let table = editor
@@ -433,6 +433,7 @@ fn source_built_table_roundtrips_number_format_crud() {
         NegativeStyle::Parentheses,
         ThousandsSeparator::Shown,
     );
+    let data_format = DataFormat::Number(format);
     editor
         .set_slide_table_cell(
             0,
@@ -443,26 +444,24 @@ fn source_built_table_roundtrips_number_format_crud() {
         )
         .unwrap();
     editor
-        .set_slide_table_cell_number_format(0, table.model_object_id, 1, 1, format)
+        .set_slide_table_cell_data_format(0, table.model_object_id, 1, 1, data_format.clone())
         .unwrap();
 
     let mut reopened = KeynoteEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     assert_eq!(
         reopened
-            .slide_table_cell_number_format(0, table.model_object_id, 1, 1)
+            .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        Some(format)
+        data_format
     );
-    assert!(
-        reopened
-            .reset_slide_table_cell_number_format(0, table.model_object_id, 1, 1)
-            .unwrap()
-    );
+    reopened
+        .set_slide_table_cell_data_format(0, table.model_object_id, 1, 1, DataFormat::Automatic)
+        .unwrap();
     assert_eq!(
         reopened
-            .slide_table_cell_number_format(0, table.model_object_id, 1, 1)
+            .slide_table_cell_data_format(0, table.model_object_id, 1, 1)
             .unwrap(),
-        None
+        DataFormat::Automatic
     );
 }
 

@@ -333,12 +333,18 @@ impl PagesEditor {
         column: usize,
     ) -> Result<Option<Text>> {
         self.require_body_table(model_object_id)?;
-        crate::numbers::editor::table_cell_text_format_in_package(
+        match crate::numbers::editor::table_cell_data_format_in_package(
             self.package(),
             model_object_id,
             row,
             column,
-        )
+        )? {
+            DataFormat::Automatic => Ok(None),
+            DataFormat::Text(format) => Ok(Some(format)),
+            _ => Err(Error::InvalidFormat(
+                "Pages table cell does not use the Text data format".to_owned(),
+            )),
+        }
     }
 
     /// Create or replace an explicit Text format transactionally.
@@ -359,8 +365,17 @@ impl PagesEditor {
         column: usize,
     ) -> Result<bool> {
         self.require_body_table(model_object_id)?;
+        match self.table_cell_data_format(model_object_id, row, column)? {
+            DataFormat::Automatic => return Ok(false),
+            DataFormat::Text(_) => {},
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "Cannot reset Pages Text format from a non-Text cell".to_owned(),
+                ));
+            },
+        }
         let mut staged = self.package().clone();
-        let changed = crate::numbers::editor::reset_table_cell_text_format_in_package(
+        let changed = crate::numbers::editor::reset_table_cell_data_format_in_package(
             &mut staged,
             model_object_id,
             row,

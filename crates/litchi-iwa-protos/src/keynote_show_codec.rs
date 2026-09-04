@@ -495,6 +495,47 @@ pub struct ReferencesSnapshot {
     recording_identifier: Option<u64>,
 }
 
+/// Borrowed semantic facts from one selected `KN.SlideTreeArchive.slides`
+/// reference.
+///
+/// The nested reference payload is borrowed from the caller-owned show bytes;
+/// no slide-order collection is materialized. This snapshot is deliberately
+/// separate from [`ShowSnapshot`], whose contract validates and retains the
+/// complete slide order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SlideReferenceSnapshot<'source> {
+    raw: &'source [u8],
+    identifier: u64,
+    deprecated_type: Option<i32>,
+    deprecated_is_external: Option<bool>,
+}
+
+impl<'source> SlideReferenceSnapshot<'source> {
+    /// Required native slide-node identifier.
+    #[must_use]
+    pub const fn identifier(self) -> u64 {
+        self.identifier
+    }
+
+    /// Optional deprecated native type hint, preserving encoded presence.
+    #[must_use]
+    pub const fn deprecated_type(self) -> Option<i32> {
+        self.deprecated_type
+    }
+
+    /// Optional deprecated external-reference marker.
+    #[must_use]
+    pub const fn deprecated_is_external(self) -> Option<bool> {
+        self.deprecated_is_external
+    }
+
+    /// Exact nested `TSP.Reference` payload borrowed from the source.
+    #[must_use]
+    pub const fn raw(self) -> &'source [u8] {
+        self.raw
+    }
+}
+
 impl ReferencesSnapshot {
     /// Identifier of the required Keynote theme object.
     #[must_use]
@@ -819,6 +860,36 @@ pub fn decode_references(
     })
 }
 
+/// Decode one selected slide-node reference without allocating the complete
+/// slide-ID collection.
+///
+/// `source` is a complete `KN.ShowArchive` payload and `index` is the
+/// zero-based position in its embedded `KN.SlideTreeArchive.slides` field.
+/// The complete known show envelope, root reference, and every repeated slide
+/// reference are validated by the same strict preflight used by
+/// [`decode_show`]. The selected nested `TSP.Reference` is then projected
+/// through the lazy Buffa view without allocating the complete slide-ID
+/// collection. Consequently, this preserves full-show validation while
+/// changing only the selected result's retention contract; it is safe to use
+/// wherever complete show validation is required.
+pub fn decode_slide_reference_at<'source>(
+    source: &'source [u8],
+    index: usize,
+    options: DecodeOptions,
+) -> Result<Option<SlideReferenceSnapshot<'source>>, DecodeError> {
+    validate_decode_input(source, options)?;
+    let mut budget = Budget::new(options);
+    let preflight = preflight_show(source, options, &mut budget)?;
+    let nested_options = options.descend(&budget)?;
+    selected_slide_reference(
+        preflight.slide_tree,
+        index,
+        nested_options,
+        preflight.slide_count,
+        &mut budget,
+    )
+}
+
 /// Decode only the bounded Keynote presentation settings projection.
 ///
 /// The strict handwritten pass validates the complete known show envelope and
@@ -833,6 +904,70 @@ pub fn decode_settings(
     let mut budget = Budget::new(options);
     let preflight = preflight_show(source, options, &mut budget)?;
     project_settings(source, options, &preflight, &mut budget)
+}
+
+fn selected_slide_reference<'source>(
+    source: &'source [u8],
+    index: usize,
+    options: DecodeOptions,
+    expected_slide_count: usize,
+    budget: &mut Budget,
+) -> Result<Option<SlideReferenceSnapshot<'source>>, DecodeError> {
+    budget.charge_work(source.len())?;
+    let reference_options = options.descend(budget)?;
+    let mut slide_count = 0usize;
+    let mut selected = None;
+    let mut remaining = source;
+    while let Some(field) = next_strict_field(&mut remaining, options.recursion_limit, budget)? {
+        match field.number {
+            SLIDE_TREE_ROOT_FIELD => {
+                // The root slide-node edge is outside the selected ordered
+                // list. Validate its framing, but leave its nested reference
+                // local to full-show validation.
+                field.length_delimited()?;
+            },
+            SLIDE_TREE_SLIDES_FIELD => {
+                let payload = field.length_delimited()?;
+                slide_count = slide_count
+                    .checked_add(1)
+                    .ok_or_else(DecodeError::projection)?;
+                if slide_count - 1 == index {
+                    let strict = preflight_reference(payload, reference_options, budget)?;
+                    selected = Some(project_selected_reference(
+                        payload,
+                        reference_options,
+                        strict,
+                        budget,
+                    )?);
+                }
+            },
+            _ => {},
+        }
+    }
+    if slide_count != expected_slide_count {
+        return Err(DecodeError::projection());
+    }
+    Ok(selected)
+}
+
+fn project_selected_reference<'source>(
+    payload: &'source [u8],
+    options: DecodeOptions,
+    strict: RawReference,
+    budget: &mut Budget,
+) -> Result<SlideReferenceSnapshot<'source>, DecodeError> {
+    budget.charge_work(payload.len())?;
+    let view: projection::ReferenceLazyView<'source> = options.buffa().decode_lazy_view(payload)?;
+    let projected = force_reference_projection(&view)?;
+    if projected != strict {
+        return Err(DecodeError::projection());
+    }
+    Ok(SlideReferenceSnapshot {
+        raw: payload,
+        identifier: projected.identifier,
+        deprecated_type: projected.deprecated_type,
+        deprecated_is_external: projected.deprecated_is_external,
+    })
 }
 
 fn validate_decode_input(source: &[u8], options: DecodeOptions) -> Result<(), DecodeError> {
@@ -1708,6 +1843,84 @@ mod tests {
         );
         assert!(snapshot.has_deprecated_root_slide_node());
         assert!(snapshot.has_slide_list());
+        Ok(())
+    }
+
+    #[test]
+    fn selected_slide_reference_borrows_only_the_requested_nested_payload()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let source = show(&[30, 10, 20]).encode_to_vec();
+        let selected = decode_slide_reference_at(&source, 1, options(&source, 3))?
+            .ok_or("selected slide reference is unexpectedly absent")?;
+
+        assert_eq!(selected.identifier(), 10);
+        assert_eq!(selected.deprecated_type(), Some(7));
+        assert_eq!(selected.deprecated_is_external(), Some(false));
+        let mut expected_raw = varint_field(REFERENCE_IDENTIFIER_FIELD, 10);
+        expected_raw.extend(varint_field(REFERENCE_DEPRECATED_TYPE_FIELD, 7));
+        expected_raw.extend(varint_field(REFERENCE_DEPRECATED_EXTERNAL_FIELD, 0));
+        assert_eq!(selected.raw(), expected_raw);
+        let source_start = source.as_ptr() as usize;
+        let source_end = source_start + source.len();
+        let selected_start = selected.raw().as_ptr() as usize;
+        let selected_end = selected_start + selected.raw().len();
+        assert!(selected_start >= source_start && selected_end <= source_end);
+        Ok(())
+    }
+
+    #[test]
+    fn selected_slide_reference_rejects_malformed_unselected_reference()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let malformed_unselected = [
+            varint_field(REFERENCE_IDENTIFIER_FIELD, 1),
+            varint_field(REFERENCE_IDENTIFIER_FIELD, 2),
+        ]
+        .concat();
+        let mut tree = length_delimited_field(SLIDE_TREE_SLIDES_FIELD, &malformed_unselected);
+        tree.extend(length_delimited_field(
+            SLIDE_TREE_SLIDES_FIELD,
+            &varint_field(REFERENCE_IDENTIFIER_FIELD, 7),
+        ));
+        let source = minimal_show_with_tree(&tree);
+        let error = assert_error(decode_slide_reference_at(&source, 1, options(&source, 2)));
+        assert_eq!(
+            error.duplicate_singular_field(),
+            Some("TSP.Reference.identifier")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn selected_slide_reference_rejects_malformed_known_show_setting()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut source = minimal_show(&[7]);
+        source.extend(varint_field(SHOW_SLIDE_NUMBERS_VISIBLE_FIELD, 2));
+        let error = assert_error(decode_slide_reference_at(&source, 0, options(&source, 1)));
+        assert_eq!(
+            error.noncanonical_reason(),
+            Some("bool scalar is not zero or one")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn selected_slide_reference_rejects_malformed_selected_payload() {
+        let mut malformed = varint_field(REFERENCE_IDENTIFIER_FIELD, 1);
+        malformed.extend(varint_field(REFERENCE_IDENTIFIER_FIELD, 2));
+        let tree = length_delimited_field(SLIDE_TREE_SLIDES_FIELD, &malformed);
+        let source = minimal_show_with_tree(&tree);
+        let error = assert_error(decode_slide_reference_at(&source, 0, options(&source, 1)));
+        assert_eq!(
+            error.duplicate_singular_field(),
+            Some("TSP.Reference.identifier")
+        );
+    }
+
+    #[test]
+    fn selected_slide_reference_reports_absent_position_without_materializing_ids()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let source = minimal_show(&[1, 2]);
+        assert!(decode_slide_reference_at(&source, 2, options(&source, 2))?.is_none());
         Ok(())
     }
 

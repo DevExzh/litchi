@@ -7766,3 +7766,89 @@ development-only edges, debts `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and
 one migration host. Closing deletion gate 1 by deleting the nested fuzz
 manifest removes no root workspace edge, debt item, or host; the monolithic
 `litchi-iwa` crate therefore remains until the other gates close.
+
+## 2026-09-04 amendment: Numbers Text ownership and bounded host-surface exits
+
+The focused Numbers package now owns the public, selector-first Text-format
+surface for one existing rooted table cell. `litchi_numbers::Package` exposes
+`table_cell_text_format`, `edit_table_cell_text_format`, and
+`apply_table_cell_text_format`; its archive-free `Text`, `Edit`, `Patch`,
+`Commit`, diagnostics, limits, and typed errors keep BNC records, format-list
+keys, IWA members, wire records, and native object identifiers private. The
+checked-in `crates/litchi-numbers/examples/edit_table_cell_text_format.rs`
+demonstrates name/index sheet and table selectors plus a checked A1 position.
+The transaction supports explicit Text and automatic reads, set/clear/reset,
+exact no-op, source-bound conflict and inverse behavior, bounded candidate
+verification, and content-redacted failures. It changes display metadata only:
+custom Text, Pop-Up Menu, rich text, and numeric-to-Text value conversion are
+outside this owner.
+
+The native seam distinguishes plain explicit Text (`0x80`) from the converted
+Text shape (`0x81`), where the latter retains a generic Number-format
+reference. An unchanged converted shape is admitted and preserved; a new
+explicit Text attachment emits canonical plain Text rather than claiming
+numeric conversion, while clearing removes the explicit metadata.
+The strict Text `FormatStructArchive` codec validates framing and the selected
+discriminator before its private Buffa lazy projection, and source bytes stay
+authoritative for unknown spans and exact rewrites. Generated Buffa values do
+not cross the semantic package boundary. These are bounded ownership and
+preservation semantics, not a zero-copy, allocation-free, throughput, latency,
+RSS, or package-wide performance claim.
+
+The Text codec has focused malformed, duplicate, wrong-wire, unknown-span,
+marker, and rewrite coverage, together with checked-in bounded protocol and
+package fuzz targets/corpora. The focused Numbers integration suite reports
+19/19 passing cases, including marker-zero automatic cells, plain `0x80`, and
+converted `0x81` source shapes. This is E1 synthetic/self-roundtrip evidence.
+The checked-in native-producer fixture proves that its B2 Text cell uses a
+type-260 format entry with marker zero; the focused owner reads that shape as
+automatic, clears it as an exact no-op, and promotes an explicit attachment to
+`0x80` without changing its stored Text. A separate exploratory Apple Numbers
+probe used disposable input
+`/private/tmp/litchi-numbers-text-native.doNnU0/text-native-source.numbers`:
+the pristine 136,357-byte source had SHA-256
+`f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`;
+Numbers converted B3 to Text, displayed `Value: Text` and accessibility text
+`Text 42`, and retained that state after save, close, and reopen with the
+converted `0x81` shape. The
+disposable native-saved copy was 136,016 bytes and was moved to Trash; no
+native artifact was checked in. This is E2 producer observation only. No
+Litchi-mutated candidate was opened by Numbers, no frozen focused artifact or
+native-resaved candidate promotion was produced, and no strict focused-owner
+reread of a native-resaved candidate exists. Text therefore has no E3 or E4
+acceptance evidence and is not package-wide native certification.
+
+The dedicated Numbers migration-host Text read/set/reset routes and their
+host helper ownership are retired. Generic host
+`DataFormat::Text` compatibility remains, while the Pages and Keynote
+dedicated Text compatibility routes remain until their focused ownership is
+complete. The Keynote migration-host Number convenience routes are also
+retired, with the focused Keynote existing-cell Number owner remaining the
+destination. The Pages migration-host drawable-order editor is retired; the
+focused Pages body drawable-order owner remains the semantic destination, and
+host reachability inspection is not a claim of broader drawable ownership.
+Obsolete host examples removed in this wave are
+`create_pages_stacked_shapes.rs`, `edit_keynote_movie_geometry.rs`,
+`edit_numbers_comment.rs`, `edit_pages_body_footnotes.rs`,
+`edit_pages_header_footer.rs`, and `inspect_numbers_document.rs`. Remaining
+compatibility examples do not imply host or monolith exit.
+
+Numbers persisted table-sort reads and rewrites now route through the private
+Buffa-backed `table_sort_order_codec` alias (the
+`numbers_table_sort_order_codec` implementation). Its strict field-44
+projection preserves opaque model fields, unknown sort/order records, and
+bounded source-preserving rewrites; this is wire and resource hardening, not a
+measured eager-path performance result. Keynote selected build-order reads now
+validate the selected show/slide references through bounded borrowed/lazy
+projections before inspecting selected object payloads. This selector-first
+optimization is operation-scoped: complete-show validation, strict topology,
+and broader package lazy-decoding claims remain unchanged.
+
+No workspace package or canonical dependency edge was added by this wave, and
+no ordered debt or deletion gate was closed. The topology remains 64 workspace
+packages, 238 internal dependency declarations, 227 canonical edges, 11
+development-only edges, debts
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. Deletion
+gate 1 remains closed and gate 5 remains passing; gates 2, 3, 4, and 6 remain
+open. The monolithic `litchi-iwa` crate therefore remains until the remaining
+focused ownership, semantic/native parity, and host-boundary gates close.

@@ -294,6 +294,19 @@ public `Package` operations at the transaction boundary; the checked-in
 recipes under `corpus/numbers_table_cell_fraction_format/` are small command
 inputs rather than native package copies.
 
+`numbers_table_cell_text_format` is the focused selector-first Text-format
+lifecycle target. It replays bounded command bytes against shared, inherited,
+and converted Text fixtures, covering selector reads, no-op/set/clear/reset,
+strict Number-family refusal, locked and malformed ownership, exact patch
+apply/inverse/stale conflicts, candidate readback, and changed-versus-no-op
+diagnostics. It also checks bounded ingress and semantic limits plus exact
+source atomicity on rejected operations. The converted fixture is intentionally
+exercised as an exact no-op so its `0x81` marker remains byte-preserving; the
+transaction boundary uses only archive-free `Text`, `SheetSelector`,
+`TableSelector`, and `CellPosition` values, with no raw IDs. Recipes under
+`corpus/numbers_table_cell_text_format/` are compact command bytes rather than
+native package copies.
+
 `numbers_table_cell_control` is the unified selector-first cell-control
 lifecycle target. It drives Checkbox, StarRating, Slider, Stepper, and
 Pop-Up Menu values through `Package::{table_cell_control_format,

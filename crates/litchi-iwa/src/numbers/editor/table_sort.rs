@@ -1,11 +1,11 @@
 //! Typed sort-rule configuration and execution for Numbers tables.
 
 use super::*;
+use litchi_iwa_protos::table_sort_order_codec as codec;
 use litchi_numbers::Package as FocusedNumbersPackage;
 use litchi_numbers::SheetSelector;
 use litchi_numbers::TableSelector;
 use litchi_numbers::table::sort::{self, ColumnIndex, Direction, Order, RowRange, Rule, Scope};
-
 mod apply;
 mod wire;
 
@@ -24,17 +24,23 @@ fn invalid_stored_sort(error: sort::Error) -> Error {
     ))
 }
 
-fn order_from_native(sort: &tst::TableSortOrderArchive) -> Result<Option<Order>> {
-    if sort.rules.is_empty() {
+fn order_from_native(sort: &codec::SortOrderSnapshot) -> Result<Option<Order>> {
+    if sort.rules().is_empty() {
         return Ok(None);
     }
-    let scope = Scope::from_native(sort.r#type).map_err(invalid_stored_sort)?;
+    let scope = match sort.scope() {
+        codec::SortScope::EntireTable => Scope::EntireTable,
+        codec::SortScope::SelectedRows => Scope::SelectedRows,
+    };
     let rules = sort
-        .rules
+        .rules()
         .iter()
         .map(|rule| {
-            let direction = Direction::from_native(rule.direction).map_err(invalid_stored_sort)?;
-            let column = ColumnIndex::from_native(rule.index).map_err(invalid_stored_sort)?;
+            let direction = match rule.direction() {
+                codec::SortDirection::Ascending => Direction::Ascending,
+                codec::SortDirection::Descending => Direction::Descending,
+            };
+            let column = ColumnIndex::from_native(rule.column()).map_err(invalid_stored_sort)?;
             Ok(Rule::new(column, direction))
         })
         .collect::<Result<Vec<_>>>()?;
@@ -291,7 +297,7 @@ pub(super) fn read_attached_table_sort_order(
 fn read_native_table_sort_order(
     package: &IWorkPackage,
     descriptor: &TableDescriptor,
-) -> Result<Option<tst::TableSortOrderArchive>> {
+) -> Result<Option<codec::SortOrderSnapshot>> {
     let locations = object_locations(package)?;
     let archive_name = locations.get(&descriptor.object_id).ok_or_else(|| {
         Error::InvalidFormat(format!(
@@ -396,9 +402,9 @@ pub(super) fn delete_table_sort_column(
         return Ok(());
     };
     if !native
-        .rules
+        .rules()
         .iter()
-        .any(|rule| rule.index == column || rule.index >= new_columns)
+        .any(|rule| rule.column() == column || rule.column() >= new_columns)
     {
         return Ok(());
     }

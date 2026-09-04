@@ -245,6 +245,54 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
   -timeout=10 -rss_limit_mb=2048
 ```
 
+## Numbers Text cell-format codec
+
+`numbers_table_cell_text_format_codec` exercises the strict native Text
+variant of the borrowed `FormatStructArchive` seam. It accepts only native
+format type 260 and keeps the selected value lazy and source-borrowed while
+unknown scalar, fixed-width, length-delimited, and balanced group records
+remain opaque and source-preserving. The fixed recipes cover canonical type
+260, unknown-record interleaving, duplicate/missing/wrong-wire/noncanonical
+known fields, and truncated or mismatched groups. Canonical writes also check
+the plain (`0x80`) and converted (`0x81`) BNC markers without exposing raw
+format IDs to callers.
+
+Scalar and measured decode paths must agree, successful rewrites must retain
+the complete source byte-for-byte, and exact replay is checked against
+one-below output, field, work, depth, allocation, retained-byte, and scratch
+limits. Inputs are bounded at 64 KiB, with 128 KiB output, 16,384 fields,
+512 KiB of aggregate work, and nesting depth 64. Corpus entries are compact
+hand-authored `hex:` wire recipes rather than native Numbers package bytes.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check numbers_table_cell_text_format_codec
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build output
+outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-text-format-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+cp corpus/numbers_table_cell_text_format_codec/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  numbers_table_cell_text_format_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
 ## Numbers formula-archive codec
 
 `numbers_formula_archive` sends one bounded, caller-owned

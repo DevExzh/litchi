@@ -14,9 +14,7 @@ use litchi_numbers::cell::data_format::control::{Slider, Stepper};
 use litchi_numbers::cell::data_format::custom::Custom;
 use litchi_numbers::cell::data_format::date_time::DateTime;
 use litchi_numbers::cell::data_format::duration::Duration;
-use litchi_numbers::cell::data_format::number::{
-    Currency, Fraction, Number, Percentage, Scientific,
-};
+use litchi_numbers::cell::data_format::number::{Currency, Fraction, Percentage, Scientific};
 use litchi_numbers::cell::data_format::numeral_system::NumeralSystem;
 use litchi_numbers::cell::data_format::pop_up_menu::PopUpMenu;
 use litchi_numbers::cell::data_format::{Checkbox, DataFormat, StarRating, Text};
@@ -549,88 +547,6 @@ impl KeynoteEditor {
         Ok(())
     }
 
-    /// Read an explicit decimal-number format for one slide-table cell.
-    ///
-    /// `None` means the cell uses iWork's automatic data format.
-    pub fn slide_table_cell_number_format(
-        &self,
-        slide_index: usize,
-        model_object_id: u64,
-        row: usize,
-        column: usize,
-    ) -> Result<Option<Number>> {
-        require_table_model(self, slide_index, model_object_id)?;
-        crate::numbers::editor::common_table_cell_number_format_in_package(
-            self.package(),
-            model_object_id,
-            row,
-            column,
-        )
-    }
-
-    /// Create or replace an explicit decimal-number format transactionally.
-    pub fn set_slide_table_cell_number_format(
-        &mut self,
-        slide_index: usize,
-        model_object_id: u64,
-        row: usize,
-        column: usize,
-        format: Number,
-    ) -> Result<()> {
-        require_table_model(self, slide_index, model_object_id)?;
-        let mut staged = self.package().clone();
-        crate::numbers::editor::set_common_table_cell_number_format_in_package(
-            &mut staged,
-            model_object_id,
-            row,
-            column,
-            format,
-        )?;
-        let verified = Self::from_bytes(&staged.to_bytes()?)?;
-        require_table_model(&verified, slide_index, model_object_id)?;
-        if verified.slide_table_cell_number_format(slide_index, model_object_id, row, column)?
-            != Some(format)
-        {
-            return Err(Error::InvalidFormat(
-                "Keynote table-cell number format failed package validation".to_owned(),
-            ));
-        }
-        *self = verified;
-        Ok(())
-    }
-
-    /// Restore iWork's automatic data format for one slide-table cell.
-    pub fn reset_slide_table_cell_number_format(
-        &mut self,
-        slide_index: usize,
-        model_object_id: u64,
-        row: usize,
-        column: usize,
-    ) -> Result<bool> {
-        require_table_model(self, slide_index, model_object_id)?;
-        let mut staged = self.package().clone();
-        let changed = crate::numbers::editor::reset_table_cell_number_format_in_package(
-            &mut staged,
-            model_object_id,
-            row,
-            column,
-        )?;
-        if changed {
-            let verified = Self::from_bytes(&staged.to_bytes()?)?;
-            require_table_model(&verified, slide_index, model_object_id)?;
-            if verified
-                .slide_table_cell_number_format(slide_index, model_object_id, row, column)?
-                .is_some()
-            {
-                return Err(Error::InvalidFormat(
-                    "Keynote table-cell number-format reset failed package validation".to_owned(),
-                ));
-            }
-            *self = verified;
-        }
-        Ok(changed)
-    }
-
     /// Read an explicit Text format for one slide-table cell.
     pub fn slide_table_cell_text_format(
         &self,
@@ -640,12 +556,18 @@ impl KeynoteEditor {
         column: usize,
     ) -> Result<Option<Text>> {
         require_table_model(self, slide_index, model_object_id)?;
-        crate::numbers::editor::table_cell_text_format_in_package(
+        match crate::numbers::editor::table_cell_data_format_in_package(
             self.package(),
             model_object_id,
             row,
             column,
-        )
+        )? {
+            DataFormat::Automatic => Ok(None),
+            DataFormat::Text(format) => Ok(Some(format)),
+            _ => Err(Error::InvalidFormat(
+                "Keynote slide-table cell does not use the Text data format".to_owned(),
+            )),
+        }
     }
 
     /// Create or replace an explicit Text format transactionally.
@@ -674,8 +596,17 @@ impl KeynoteEditor {
         column: usize,
     ) -> Result<bool> {
         require_table_model(self, slide_index, model_object_id)?;
+        match self.slide_table_cell_data_format(slide_index, model_object_id, row, column)? {
+            DataFormat::Automatic => return Ok(false),
+            DataFormat::Text(_) => {},
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "Cannot reset Keynote Text format from a non-Text cell".to_owned(),
+                ));
+            },
+        }
         let mut staged = self.package().clone();
-        let changed = crate::numbers::editor::reset_table_cell_text_format_in_package(
+        let changed = crate::numbers::editor::reset_table_cell_data_format_in_package(
             &mut staged,
             model_object_id,
             row,

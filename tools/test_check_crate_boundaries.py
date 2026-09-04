@@ -1195,6 +1195,151 @@ def add_numbers_table_cell_number_format_canonical_scaffold(root: Path) -> None:
     )
 
 
+def add_numbers_table_cell_text_format_canonical_scaffold(root: Path) -> None:
+    """Create a complete selector-first Text-format boundary fixture."""
+
+    semantic = root / boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub mod transaction;\n"
+        "#[derive(Clone, Copy)]\n"
+        "pub struct Text;\n",
+        encoding="utf-8",
+    )
+    transaction = root / boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_TRANSACTION_SOURCE
+    transaction.parent.mkdir(parents=True, exist_ok=True)
+    transaction.write_text(
+        "pub use crate::package::table_cell_text_format::{"
+        + ", ".join(boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_TRANSACTION_TYPES)
+        + "};\n",
+        encoding="utf-8",
+    )
+
+    owner = root / boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "".join(
+            f"pub struct {name};\n"
+            for name in boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_TRANSACTION_TYPES
+        )
+        + "fn existing_cell_resolution() {}\n"
+        + "fn format_table_refcount_reference_entry_closure() {}\n"
+        + "fn exact_source_inverse_no_op_patch() {}\n"
+        + "fn candidate_reopen_readback_locality_same_content() {}\n"
+        + "fn budget_preflight_bounded_allocation_limit() {}\n"
+        + "fn unsupported_ambiguous_cross_component_fail_closed() {}\n"
+        + "fn text_format_uses_native_text_family() {}\n"
+        + "impl Package {\n"
+        + "pub fn table_cell_text_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Option<Text>, Error> {}\n"
+        + "pub fn edit_table_cell_text_format<'sheet, 'table, 'cell>(&self, sheet: SheetSelector<'sheet>, table: TableSelector<'table>, position: CellPosition<'cell>) -> Result<Edit, Error> {}\n"
+        + "pub fn apply_table_cell_text_format(&self, patch: &Patch) -> Result<Commit, Error> {}\n"
+        + "}\n"
+        + "impl Edit {\n"
+        + "pub fn before(&self) -> Option<Text> { None }\n"
+        + "pub fn after(&self) -> Option<Text> { None }\n"
+        + "pub fn set(self, value: Text) -> Self { let _ = value; self }\n"
+        + "pub fn clear(self) -> Self { self }\n"
+        + "pub fn reset(self) -> Self { self }\n"
+        + "pub fn commit(self) -> Result<Commit, Error> { todo!() }\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+
+    lib_export, package_export, data_format_export = (
+        root / path
+        for path in boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_EXPORT_SOURCES[:3]
+    )
+    lib_export.parent.mkdir(parents=True, exist_ok=True)
+    lib_export.write_text("pub mod cell;\n", encoding="utf-8")
+    package_export.parent.mkdir(parents=True, exist_ok=True)
+    package_export.write_text(
+        "pub(crate) mod table_cell_text_format;\n", encoding="utf-8"
+    )
+    data_format_export.parent.mkdir(parents=True, exist_ok=True)
+    data_format_export.write_text(
+        "pub mod text;\npub use text::Text;\n", encoding="utf-8"
+    )
+
+    codec = root / boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "use buffa::DecodeOptions;\n"
+        "pub const NATIVE_TEXT_FORMAT_TYPE: u32 = 260;\n"
+        "pub struct TextFormatSnapshot;\n"
+        "pub struct TextFormatWrite;\n"
+        "pub struct PreparedTextFormatRewrite;\n"
+        "pub struct RewriteExecutionRequirements;\n"
+        "pub struct RewriteExecutionLimits;\n"
+        "pub fn decode_text_format_with_report() {\n"
+        "    preflight; let _ = DecodeOptions::new().decode_lazy_view(bytes);\n"
+        "    duplicate; noncanonical; unknown; raw; extend_from_slice;\n"
+        "    format_table; registry; refcount; reference; entry;\n"
+        "    format_type; canonical_text; validate_text; Text;\n"
+        "}\n"
+        "pub fn prepare_text_format_rewrite() {}\n"
+        "pub fn canonical_text_format() { NATIVE_TEXT_FORMAT_TYPE; format_type; plain_text; }\n"
+        "pub fn rewrite_text_format() { MAX_RECURSION_LIMIT; execution_requirements; execute; }\n"
+        "fn strict_projection() { buffa_numbers_table_cell_text_format_generated; }\n"
+        "#[cfg(test)]\nmod tests { #[test] fn text_format_round_trip_and_hostile_wire() {} }\n",
+        encoding="utf-8",
+    )
+    codec_lib = root / boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_PUBLIC_SOURCE
+    codec_lib.parent.mkdir(parents=True, exist_ok=True)
+    codec_lib.write_text(
+        "#[doc(hidden)]\n"
+        f"pub mod {boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_MODULE};\n"
+        f"mod {boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_GENERATED_MODULE};\n",
+        encoding="utf-8",
+    )
+
+    integration = root / boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_INTEGRATION_SOURCE
+    integration.parent.mkdir(parents=True, exist_ok=True)
+    integration.write_text(
+        "#[test]\n"
+        "fn text_format_read_explicit_Text_and_automatic_Option() { explicit Text; automatic Option; read; }\n"
+        "fn set_reset_transaction() { edit_table_cell_text_format; set; clear; reset; automatic; }\n"
+        "fn exact_no_op_and_inverse_restore_bytes() { no_op; unchanged; inverse; byte_for_byte; }\n"
+        "fn conflict_fail_closed() { stale; foreign; ambiguous; conflict; unsupported; malformed; }\n"
+        "fn selector_locality_reopen_readback() { SheetSelector; TableSelector; CellPosition; locality; reopen; readback; }\n",
+        encoding="utf-8",
+    )
+
+    for fuzz_path in (
+        boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_FUZZ_SOURCE,
+        boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_FUZZ_SOURCE,
+    ):
+        absolute = root / fuzz_path
+        absolute.parent.mkdir(parents=True, exist_ok=True)
+        absolute.write_text(
+            "#![no_main]\nuse libfuzzer_sys::fuzz_target;\n"
+            "fuzz_target!(|data: &[u8]| { let _ = data; });\n",
+            encoding="utf-8",
+        )
+    for corpus in (
+        boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_FUZZ_CORPUS,
+        boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_FUZZ_CORPUS,
+    ):
+        absolute = root / corpus
+        absolute.mkdir(parents=True, exist_ok=True)
+        (absolute / "canonical_text.seed").write_bytes(b"text")
+
+    example = root / boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_EXAMPLE
+    example.parent.mkdir(parents=True, exist_ok=True)
+    example.write_text(
+        "fn main() { package.edit_table_cell_text_format(); }\n",
+        encoding="utf-8",
+    )
+
+    host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_TEXT_FORMAT_SOURCE[0]
+    host.parent.mkdir(parents=True, exist_ok=True)
+    host.write_text(
+        "fn generic_text_format_route() {\n"
+        "    set_cell_data_format();\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+
 def add_numbers_table_cell_percentage_format_canonical_scaffold(
     root: Path,
     *,
@@ -5833,7 +5978,7 @@ class BoundaryPolicyTests(unittest.TestCase):
     def test_iwork_examples_reject_legacy_editor_and_native_id_calls(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            example = root / boundaries.IWORK_EXAMPLE_SOURCES[1]
+            example = root / boundaries.IWORK_EXAMPLE_SOURCES[0]
             example.parent.mkdir(parents=True)
             example.write_text(
                 "use litchi_iwa::numbers::NumbersEditor;\n"
@@ -5860,16 +6005,31 @@ class BoundaryPolicyTests(unittest.TestCase):
                     boundaries.IWORK_EXAMPLE_SOURCES[0],
                     "use litchi::iwork::Document;\nfn main() {}\n",
                 ),
-                (
-                    boundaries.IWORK_EXAMPLE_SOURCES[1],
-                    "use litchi_numbers::Document;\nfn main() {}\n",
-                ),
             ):
                 example = root / relative
                 example.parent.mkdir(parents=True, exist_ok=True)
                 example.write_text(source, encoding="utf-8")
 
             self.assertEqual(boundaries.audit_iwork_example_source_topology(root), [])
+
+    def test_retired_iwa_obsolete_examples_require_absence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(
+                boundaries.audit_retired_iwa_obsolete_examples_source_topology(root),
+                [],
+            )
+            for relative in boundaries.RETIRED_IWA_OBSOLETE_EXAMPLE_PATHS:
+                example = root / relative
+                example.parent.mkdir(parents=True, exist_ok=True)
+                example.write_text("fn main() {}\n", encoding="utf-8")
+
+            violations = boundaries.audit_retired_iwa_obsolete_examples_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), len(boundaries.RETIRED_IWA_OBSOLETE_EXAMPLE_PATHS))
+            for relative in boundaries.RETIRED_IWA_OBSOLETE_EXAMPLE_PATHS:
+                self.assertTrue(any(str(relative) in item for item in violations), violations)
 
     def test_litchi_facade_requires_an_empty_default_feature(self) -> None:
         snapshot = valid_snapshot(self.policy)
@@ -18290,6 +18450,56 @@ fn rewrite_movie_title_operation(
         ):
             self.assertIn(expression, main_source)
 
+    def test_iwa_keynote_slide_table_number_format_retirement_masks_cfg_test_and_scopes_generic_routes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables.rs"
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text(
+                "#[cfg(test)]\n"
+                "pub fn slide_table_cell_number_format() {}\n"
+                "#[cfg(test)]\n"
+                "fn test_only() { editor.set_slide_table_cell_number_format(); }\n"
+                "pub fn slide_table_cell_data_format() {}\n"
+                "fn generic_route() { editor.table_cell_number_format(); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_number_format_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            source.write_text(
+                source.read_text(encoding="utf-8")
+                + "pub fn reset_slide_table_cell_number_format() {}\n"
+                + "fn stale_call() { editor.slide_table_cell_number_format(); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_keynote_slide_table_number_format_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("method returned reset_slide_table_cell_number_format" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("production call slide_table_cell_number_format" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_keynote_slide_table_number_format_retirement_is_in_main_dispatch(
+        self,
+    ) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_keynote_slide_table_number_format_source_topology()",
+            main_source,
+        )
+
     def test_keynote_slide_table_headers_facade_is_dormant_then_strict(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -19188,6 +19398,11 @@ fn rewrite_movie_title_operation(
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source_path = root / boundaries.IWA_PAGES_DRAWABLE_ORDER_SOURCE
+            # The old body-order module is now retired; its absence is the
+            # expected state and must not be reported as an incomplete codec.
+            self.assertEqual(
+                boundaries.audit_iwa_pages_drawable_order_source_topology(root), []
+            )
             source_path.parent.mkdir(parents=True)
             source_path.write_text(
                 "fn read_order(bytes: &[u8]) { decode_drawable_order(bytes); }\n"
@@ -19197,10 +19412,69 @@ fn rewrite_movie_title_operation(
             violations = boundaries.audit_iwa_pages_drawable_order_source_topology(root)
             self.assertTrue(any("neutral pages_drawable_order_codec" in item for item in violations), violations)
 
+    def test_pages_drawable_order_retirement_accepts_shared_routes_and_rejects_host_surface(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(
+                boundaries.audit_iwa_pages_drawable_order_retirement_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            editor = root / boundaries.IWA_PAGES_SOURCE_ROOT / "editor.rs"
+            editor.parent.mkdir(parents=True, exist_ok=True)
+            editor.write_text(
+                "use litchi_iwa_protos::pages_drawable_order_codec;\n"
+                "fn extend_reachable_drawable_order() { pages_drawable_order_codec::decode_drawable_order(bytes); }\n"
+                "fn patch_pages_zorder() { pages_drawable_order_codec::rewrite_drawable_order(bytes, ids); }\n"
+                "#[cfg(test)]\n"
+                "pub fn body_drawable_order() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_drawable_order_retirement_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            editor.write_text(
+                editor.read_text(encoding="utf-8")
+                + "pub fn body_drawable_order(&self) {}\n"
+                + "fn call_old_route() { self.set_body_drawable_order(&ids); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_pages_drawable_order_retirement_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("method returned body_drawable_order" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("production call set_body_drawable_order" in item for item in violations),
+                violations,
+            )
+
+            retired_module = root / boundaries.RETIRED_IWA_PAGES_DRAWABLE_ORDER_MODULE
+            retired_module.parent.mkdir(parents=True, exist_ok=True)
+            retired_module.write_text("// the removed module returned\n", encoding="utf-8")
+            violations = boundaries.audit_iwa_pages_drawable_order_retirement_source_topology(
+                root
+            )
+            self.assertTrue(any("module returned" in item for item in violations), violations)
+
     def test_pages_drawable_order_audit_is_in_main_dispatch(self) -> None:
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
             "+ audit_iwa_pages_drawable_order_source_topology()", main_source
+        )
+        self.assertIn(
+            "+ audit_iwa_pages_drawable_order_retirement_source_topology()",
+            main_source,
         )
 
     def test_focused_keynote_chart_caption_requires_one_aggregate_budget_and_masks_decoys(
@@ -33853,6 +34127,285 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
+    def test_numbers_table_cell_text_format_positive_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_text_format_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_text_format_codec_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_text_format_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_text_format_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_text_format_codec_requires_strict_lazy_projection(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_text_format_canonical_scaffold(root)
+            codec = root / boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_SOURCE
+            complete = codec.read_text(encoding="utf-8")
+            shared = root / boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_IMPLEMENTATION_SOURCES[2]
+            shared.parent.mkdir(parents=True, exist_ok=True)
+            shared.write_text(
+                "decode_text_format_with_report prepare_text_format_rewrite "
+                "TextFormatSnapshot TextFormatWrite PreparedTextFormatRewrite "
+                "RewriteExecutionRequirements RewriteExecutionLimits "
+                "canonical_text_format rewrite_text_format decode_lazy_view buffa "
+                "preflight duplicate noncanonical unknown raw extend_from_slice "
+                "MAX_RECURSION_LIMIT execution_requirements execute "
+                "NATIVE_TEXT_FORMAT_TYPE format_type canonical_text validate_text Text "
+                "format_table registry refcount reference entry Budget::new\n",
+                encoding="utf-8",
+            )
+            codec.unlink()
+            violations = boundaries.audit_numbers_table_cell_text_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing strict codec source" in item for item in violations),
+                violations,
+            )
+            codec.write_text("//! wrapper placeholder only\n", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_text_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("wrapper is missing or empty" in item for item in violations),
+                violations,
+            )
+            codec.write_text(complete, encoding="utf-8")
+            shared.unlink()
+            for marker, expected in (
+                ("preflight; ", "strict canonical ingress"),
+                ("duplicate; ", "strict canonical ingress"),
+                ("unknown; raw; extend_from_slice;", "unknown/raw preservation"),
+                ("MAX_RECURSION_LIMIT; ", "bounded prepared rewrite"),
+                ("fn text_format_uses_native_text_family() {}", "text format family"),
+                ("format_table; registry; refcount; reference; entry;", "registry/refcount closure"),
+            ):
+                with self.subTest(marker=marker):
+                    missing = complete.replace(marker, "")
+                    if expected == "text format family":
+                        for family_marker in (
+                            "NATIVE_TEXT_FORMAT_TYPE: u32 = 260",
+                            "NATIVE_TEXT_FORMAT_TYPE",
+                            "format_type;",
+                            "canonical_text_format",
+                            "canonical_text",
+                            "validate_text",
+                            "plain_text",
+                            "text_format",
+                            "Text",
+                        ):
+                            missing = missing.replace(family_marker, "")
+                    codec.write_text(missing, encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_text_format_codec_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing strict {expected} marker" in item for item in violations),
+                        (expected, violations),
+                    )
+
+            codec.write_text(
+                complete.replace("NATIVE_TEXT_FORMAT_TYPE: u32 = 260", "NATIVE_TEXT_FORMAT_TYPE: u32 = 256"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_text_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("native type 260" in item for item in violations), violations)
+
+            codec.write_text(complete.replace("preflight; let _ =", "let _ ="), encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_text_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("preflight wire before" in item for item in violations), violations)
+
+            codec.write_text(complete + "use prost::Message;\n", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_text_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("Prost production path" in item for item in violations), violations)
+
+            codec.write_text(complete, encoding="utf-8")
+            public = root / boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_PUBLIC_SOURCE
+            public_complete = public.read_text(encoding="utf-8")
+            public.write_text(
+                public_complete.replace(
+                    boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_GENERATED_MODULE,
+                    "buffa_numbers_table_cell_display_format_generated",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_text_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing a private Buffa generated projection" in item for item in violations),
+                violations,
+            )
+            public.write_text(public_complete, encoding="utf-8")
+            public.write_text(
+                public.read_text(encoding="utf-8").replace(
+                    f"mod {boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_GENERATED_MODULE};",
+                    f"pub mod {boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_CODEC_GENERATED_MODULE};",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_text_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("generated projection module must remain private" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_table_cell_text_format_facade_rejects_raw_aliases_and_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_text_format_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type TextFormatEdit = Edit;\n"
+                + "pub type TextCommit = Commit;\n"
+                + "pub fn raw_text_format(table_id: TableId, row: usize, "
+                + "source_bytes: Vec<u8>, view: WireView, archive: Archive) {}\n"
+                + "pub fn monolith(editor: NumbersEditor) {}\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.NUMBERS_TABLE_CELL_TEXT_FORMAT_EXPORT_SOURCES[1]
+            package.write_text(
+                "pub mod table_cell_text_format;\n"
+                "pub use table_cell_text_format::*;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_text_format_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "retains flat alias TextFormatEdit",
+                "retains flat alias TextCommit",
+                "typed raw identifier parameter table_id: TableId",
+                "raw identifier/coordinate parameter row: usize",
+                "opaque raw byte container source_bytes: Vec<u8>",
+                "wire type WireView",
+                "archive/IWA type Archive",
+                "raw helper raw_text_format",
+                "monolithic host type NumbersEditor",
+                "exposes its public package owner module",
+                "retains root aliases via glob",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_iwa_numbers_table_cell_text_format_retires_raw_id_routes_and_decoys(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_text_format_canonical_scaffold(root)
+            host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_TEXT_FORMAT_SOURCE[0]
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_text_format_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            host.write_text(
+                "impl NumbersEditor {\n"
+                + "".join(
+                    f"pub fn {method}(&self) {{}}\n"
+                    for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_TEXT_FORMAT_METHODS
+                )
+                + "}\n"
+                + "".join(
+                    f"fn {helper}() {{}}\n"
+                    for helper in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_TEXT_FORMAT_HELPERS
+                ),
+                encoding="utf-8",
+            )
+            test_source = root / boundaries.IWA_NUMBERS_EDITOR_TEST_SOURCE
+            test_source.parent.mkdir(parents=True, exist_ok=True)
+            test_source.write_text(
+                "#[cfg(test)]\n"
+                "mod text_format_fallback_policy_tests {\n"
+                "    #[test] fn exact_sources_never_fallback_after_structural_admission_failure() {}\n"
+                "}\n"
+                "fn focused_text_format_round_trips_through_legacy_host_bridge() {}\n"
+                "fn source_built_text_format_keeps_legacy_host_compatibility() {}\n"
+                "fn source_built_table_roundtrips_reuses_and_resets_text_formats() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_text_format_source_topology(
+                root
+            )
+            for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_TEXT_FORMAT_METHODS:
+                self.assertTrue(
+                    any(f"raw-ID method returned {method}" in item for item in violations),
+                    (method, violations),
+                )
+            for helper in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_TEXT_FORMAT_HELPERS:
+                self.assertTrue(
+                    any(f"focused bridge/fallback helper {helper}" in item for item in violations),
+                    (helper, violations),
+                )
+            for test_name in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_TEXT_FORMAT_FOCUSED_TESTS:
+                self.assertTrue(
+                    any(f"focused bridge/fallback test {test_name}" in item for item in violations),
+                    (test_name, violations),
+                )
+
+            host.write_text(
+                "// table_cell_text_format(); focused_text_format();\n"
+                'const NOTE: &str = "set_table_cell_text_format focused_text_format_fallback_policy_tests";\n'
+                "fn text_format_summary() {}\n"
+                "fn focused_text_formatting() {}\n"
+                "#[cfg(test)]\n"
+                "fn test_decoy() { editor.reset_table_cell_text_format(); }\n",
+                encoding="utf-8",
+            )
+            test_source.write_text(
+                "// focused_text_format_round_trips_through_legacy_host_bridge\n"
+                'const NOTE: &str = "source_built_text_format_keeps_legacy_host_compatibility";\n'
+                "fn text_format_fallback_policy_tests_extra() {}\n"
+                "fn exact_sources_never_fallback_after_structural_admission_failure_extra() {}\n",
+                encoding="utf-8",
+            )
+            retired_example = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_TEXT_FORMAT_EXAMPLE
+            retired_example.parent.mkdir(parents=True, exist_ok=True)
+            retired_example.write_text(
+                "// set_table_cell_text_format()\n"
+                'const NOTE: &str = "table_cell_text_format";\n',
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_text_format_source_topology(
+                    root
+                ),
+                [],
+            )
+
     def test_numbers_table_cell_percentage_format_positive_contract_and_shared_core(
         self,
     ) -> None:
@@ -35302,6 +35855,9 @@ fn rewrite_movie_title_operation(
             "audit_numbers_table_cell_number_format_codec_source_topology",
             "audit_numbers_table_cell_number_format_facade_source_topology",
             "audit_iwa_numbers_table_cell_number_format_source_topology",
+            "audit_numbers_table_cell_text_format_codec_source_topology",
+            "audit_numbers_table_cell_text_format_facade_source_topology",
+            "audit_iwa_numbers_table_cell_text_format_source_topology",
             "audit_numbers_table_cell_percentage_format_codec_source_topology",
             "audit_numbers_table_cell_percentage_format_facade_source_topology",
             "audit_iwa_numbers_table_cell_percentage_format_source_topology",
@@ -35327,6 +35883,9 @@ fn rewrite_movie_title_operation(
             "audit_numbers_table_cell_number_format_codec_source_topology",
             "audit_numbers_table_cell_number_format_facade_source_topology",
             "audit_iwa_numbers_table_cell_number_format_source_topology",
+            "audit_numbers_table_cell_text_format_codec_source_topology",
+            "audit_numbers_table_cell_text_format_facade_source_topology",
+            "audit_iwa_numbers_table_cell_text_format_source_topology",
             "audit_numbers_table_cell_percentage_format_codec_source_topology",
             "audit_numbers_table_cell_percentage_format_facade_source_topology",
             "audit_iwa_numbers_table_cell_percentage_format_source_topology",

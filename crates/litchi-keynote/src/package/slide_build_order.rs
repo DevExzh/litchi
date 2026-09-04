@@ -20,7 +20,8 @@ use thiserror::Error;
 
 use super::{
     BUILD_MESSAGE_TYPE, Package, PhysicalSource, ReadError, SHOW_MESSAGE_TYPE, SLIDE_MESSAGE_TYPE,
-    SLIDE_NODE_MESSAGE_TYPE, decode_show_snapshot, decode_slide_node_projection, unique_payload,
+    SLIDE_NODE_MESSAGE_TYPE, decode_show_slide_reference, decode_slide_node_projection,
+    unique_payload,
 };
 use crate::{SlideSelector, SlideSelectorError};
 
@@ -714,14 +715,15 @@ fn slide_identifier_at_position(
     let show_payload = unique_payload(&show_object.messages, &[SHOW_MESSAGE_TYPE], "Keynote show")
         .map_err(map_read_error)?;
     let limits = source.semantic_wire_limits().map_err(map_read_error)?;
-    let snapshot =
-        decode_show_snapshot(show_payload, source.semantic_limits().max_slides(), limits)
-            .map_err(map_read_error)?;
-    let node_identifier = snapshot
-        .slide_node_identifiers()
-        .get(position.get())
-        .copied()
-        .ok_or(SlideBuildOrderError::SlidePositionNotFound { position })?;
+    let node_identifier = decode_show_slide_reference(
+        show_payload,
+        position.get(),
+        source.semantic_limits().max_slides(),
+        limits,
+    )
+    .map_err(map_read_error)?
+    .map(|reference| reference.identifier())
+    .ok_or(SlideBuildOrderError::SlidePositionNotFound { position })?;
     let node_object = source
         .required_object(node_identifier, "Keynote slide node")
         .map_err(map_read_error)?;

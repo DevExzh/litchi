@@ -89,6 +89,7 @@ pub(crate) enum FormatFamily {
     Percentage,
     Scientific,
     Fraction,
+    Text,
 }
 
 impl FormatFamily {
@@ -100,6 +101,7 @@ impl FormatFamily {
             Self::Percentage => NATIVE_PERCENTAGE_FORMAT_TYPE,
             Self::Scientific => NATIVE_SCIENTIFIC_FORMAT_TYPE,
             Self::Fraction => NATIVE_FRACTION_FORMAT_TYPE,
+            Self::Text => NATIVE_TEXT_FORMAT_TYPE,
         }
     }
 }
@@ -114,6 +116,8 @@ pub(crate) const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
 pub(crate) const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
 /// Native Fraction format-list discriminator.
 pub(crate) const NATIVE_FRACTION_FORMAT_TYPE: u32 = 262;
+/// Native Text format-list discriminator.
+pub(crate) const NATIVE_TEXT_FORMAT_TYPE: u32 = 260;
 
 /// Whether the two cells initially share their format-list entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -160,8 +164,9 @@ pub(crate) enum Corruption {
 /// extensions, preview bytes, and the unrelated member are all fixed.  `Shared`
 /// gives both cells a Number format with key one and refcount two;
 /// [`synthetic_package_for`] selects the corresponding Currency, Percentage,
-/// Scientific, or Fraction family.  `Unshared` gives the second cell a
-/// Percentage format with key two and two refcount-one entries.
+/// Scientific, Fraction, or Text family.  `Unshared` gives the second cell a
+/// Percentage format with key two and two refcount-one entries, except for
+/// Text where both entries remain native type-260 Text records.
 pub(crate) fn synthetic_package(sharing: FormatSharing) -> FixtureResult<Vec<u8>> {
     synthetic_package_for(FormatFamily::Number, sharing)
 }
@@ -559,18 +564,28 @@ fn tile_payload(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<t
         | FormatFamily::Percentage
         | FormatFamily::Scientific
         | FormatFamily::Fraction => CellDataFormatKind::NumberOrPercentage,
+        FormatFamily::Text => CellDataFormatKind::Text,
     };
-    let first = formatted_cell(FIRST_FORMAT_KEY, first_kind, 1234.5)?;
+    let first = if matches!(family, FormatFamily::Text) {
+        formatted_text_cell(FIRST_FORMAT_KEY, 1)?
+    } else {
+        formatted_cell(FIRST_FORMAT_KEY, first_kind, 1234.5)?
+    };
     let second_key = match sharing {
         FormatSharing::Shared => FIRST_FORMAT_KEY,
         FormatSharing::Unshared => SECOND_FORMAT_KEY,
     };
     let second_kind = match (family, sharing) {
         (FormatFamily::Currency, FormatSharing::Shared) => CellDataFormatKind::Currency,
+        (FormatFamily::Text, _) => CellDataFormatKind::Text,
         (_, FormatSharing::Shared) => CellDataFormatKind::NumberOrPercentage,
         (_, FormatSharing::Unshared) => CellDataFormatKind::NumberOrPercentage,
     };
-    let second = formatted_cell(second_key, second_kind, 0.25)?;
+    let second = if matches!(family, FormatFamily::Text) {
+        formatted_text_cell(second_key, 2)?
+    } else {
+        formatted_cell(second_key, second_kind, 0.25)?
+    };
     let (storage, offsets) = pack_row(&[first, second])?;
     Ok(tst::Tile {
         max_column: 1,
@@ -600,6 +615,13 @@ fn formatted_cell(format_key: u32, kind: CellDataFormatKind, value: f64) -> Fixt
     Ok(cell.encode())
 }
 
+fn formatted_text_cell(format_key: u32, string_key: u32) -> FixtureResult<Vec<u8>> {
+    let mut cell = BncCell::minimal();
+    cell.set_string(string_key);
+    cell.set_data_format_identifier(format_key, CellDataFormatKind::Text, None)?;
+    Ok(cell.encode())
+}
+
 fn sidecar_object(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<ArchiveObject> {
     let format_entries = match (family, sharing) {
         (FormatFamily::Currency, FormatSharing::Shared) => vec![currency_format_entry(
@@ -617,6 +639,13 @@ fn sidecar_object(family: FormatFamily, sharing: FormatSharing) -> FixtureResult
         (FormatFamily::Fraction, FormatSharing::Shared) => {
             vec![fraction_format_entry(FIRST_FORMAT_KEY, 2, 8)]
         },
+        (FormatFamily::Text, FormatSharing::Shared) => {
+            vec![text_format_entry(FIRST_FORMAT_KEY, 2)]
+        },
+        (FormatFamily::Text, FormatSharing::Unshared) => vec![
+            text_format_entry(FIRST_FORMAT_KEY, 1),
+            text_format_entry(SECOND_FORMAT_KEY, 1),
+        ],
         (FormatFamily::Currency, FormatSharing::Unshared) => vec![
             format_entry(FIRST_FORMAT_KEY, 1, NATIVE_NUMBER_FORMAT_TYPE, 2, 2, true),
             format_entry(
@@ -751,6 +780,18 @@ fn fraction_format_entry(
         format: Some(tsk::FormatStructArchive {
             format_type: Some(NATIVE_FRACTION_FORMAT_TYPE),
             fraction_accuracy: Some(accuracy),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+fn text_format_entry(key: u32, refcount: u32) -> tst::table_data_list::ListEntry {
+    tst::table_data_list::ListEntry {
+        key,
+        refcount,
+        format: Some(tsk::FormatStructArchive {
+            format_type: Some(NATIVE_TEXT_FORMAT_TYPE),
             ..Default::default()
         }),
         ..Default::default()
@@ -951,6 +992,82 @@ pub(crate) fn locked_table_package(source: &[u8]) -> FixtureResult<Vec<u8>> {
             .first_mut()
             .ok_or_else(|| io::Error::other("format fixture table info payload is missing"))?;
         message.data = patch_nested_varint_field(&message.data, &[1, 5], false, Some(1))?;
+        Ok(())
+    })
+}
+
+/// Build a Text fixture whose first cell has inherited formatting while the
+/// sibling retains the shared explicit Text entry.  This exercises the
+/// focused owner's ability to attach/detach an existing entry without
+/// manufacturing a second native record.
+pub(crate) fn text_inherited_first_package() -> FixtureResult<Vec<u8>> {
+    let source = synthetic_package_for(FormatFamily::Text, FormatSharing::Shared)?;
+    let source = rewrite_tile_cells(&source, |cells| {
+        let first = cells
+            .first_mut()
+            .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
+        let mut cell = BncCell::parse(first)?;
+        cell.clear_explicit_format();
+        *first = cell.encode();
+        Ok(())
+    })?;
+    rewrite_format_list_payload_for_test(&source, |list| {
+        let entry = list
+            .entries
+            .iter_mut()
+            .find(|entry| entry.key == FIRST_FORMAT_KEY)
+            .ok_or_else(|| io::Error::other("format fixture Text entry is missing"))?;
+        entry.refcount = 1;
+        Ok(())
+    })
+}
+
+/// Build a Text fixture using the native converted-text marker (`0x81`) on
+/// the selected cell.  The marker is distinct from canonical explicit Text
+/// (`0x80`) but has the same semantic owner and must survive an exact no-op.
+pub(crate) fn text_converted_package() -> FixtureResult<Vec<u8>> {
+    let source = synthetic_package_for(FormatFamily::Text, FormatSharing::Shared)?;
+    let source = rewrite_tile_cells(&source, |cells| {
+        let first = cells
+            .first_mut()
+            .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
+        let mut encoded = BncCell::parse(first)?.encode();
+        if encoded.len() < 24 {
+            return Err(io::Error::other("format fixture first cell is truncated").into());
+        }
+        // Converted Text keeps a generic Number format reference in the
+        // ordinary decimal identifier slot (field 0x2000), immediately
+        // before the Text-specific identifier.  Add that fixed-width field
+        // rather than merely flipping 0x80 to 0x81; the latter is an invalid
+        // BNC record and should never reach the focused owner.
+        let flags = u32::from_le_bytes(
+            encoded[8..12]
+                .try_into()
+                .map_err(|_| io::Error::other("format fixture flags are truncated"))?,
+        );
+        if flags & 0x0000_2000 != 0 {
+            return Err(
+                io::Error::other("format fixture already has a generic Text reference").into(),
+            );
+        }
+        encoded[8..12].copy_from_slice(&(flags | 0x0000_2000).to_le_bytes());
+        encoded.splice(20..20, SECOND_FORMAT_KEY.to_le_bytes());
+        encoded[6..8]
+            .copy_from_slice(&litchi_numbers_wire::EXPLICIT_CONVERTED_TEXT_FORMAT.to_le_bytes());
+        *first = encoded;
+        Ok(())
+    })?;
+    // The converted cell's generic identifier points at a live Number entry;
+    // its primary display entry remains the shared Text key.
+    rewrite_format_list_payload_for_test(&source, |list| {
+        list.entries.push(format_entry(
+            SECOND_FORMAT_KEY,
+            1,
+            NATIVE_NUMBER_FORMAT_TYPE,
+            2,
+            2,
+            true,
+        ));
         Ok(())
     })
 }

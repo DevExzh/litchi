@@ -897,24 +897,6 @@ pub(crate) fn reset_table_cell_number_format_in_package(
     cell_data_format::reset_cell_number_format(package, table_id, row, column)
 }
 
-pub(crate) fn table_cell_text_format_in_package(
-    package: &IWorkPackage,
-    table_id: u64,
-    row: usize,
-    column: usize,
-) -> Result<Option<Text>> {
-    cell_data_format::cell_text_format(package, table_id, row, column)
-}
-
-pub(crate) fn reset_table_cell_text_format_in_package(
-    package: &mut IWorkPackage,
-    table_id: u64,
-    row: usize,
-    column: usize,
-) -> Result<bool> {
-    cell_data_format::reset_cell_text_format(package, table_id, row, column)
-}
-
 pub(crate) fn table_cell_custom_format_in_package(
     package: &IWorkPackage,
     table_id: u64,
@@ -968,6 +950,15 @@ pub(crate) fn set_table_cell_data_format_in_package(
     format: &DataFormat,
 ) -> Result<()> {
     cell_data_format::set_cell_data_format(package, table_id, row, column, format)
+}
+
+pub(crate) fn reset_table_cell_data_format_in_package(
+    package: &mut IWorkPackage,
+    table_id: u64,
+    row: usize,
+    column: usize,
+) -> Result<bool> {
+    cell_data_format::reset_cell_data_format(package, table_id, row, column)
 }
 
 pub(crate) fn table_cell_percentage_format_in_package(
