@@ -134,6 +134,51 @@ def report(value=100, revision="baseline", corpus_sha="abc"):
     }
 
 
+def managed_xlsx_reports():
+    case = "xlsx_source_backed_managed_cell_values_one_edit_save"
+    payload_limit = 100
+    headroom = 64 * 1024
+    baseline = report()
+    current = report(revision="current")
+    for item in (baseline, current):
+        item["configuration"]["cases"] = [case]
+        item["configuration"][
+            "xlsx_cell_values_managed_planning_memory_headroom"
+        ] = headroom
+        item["results"][0]["case"] = case
+        item["results"][0]["source"]["xlsx_cell_values"] = {
+            "cache_budget_managed": True,
+            "payload_memory_limit": payload_limit,
+            "publication_planning_memory_headroom": headroom,
+            "cache_budget_memory_limit": payload_limit + headroom,
+        }
+    comparison_policy = policy()
+    comparison_policy["required_cases"] = [case]
+    corpus_identity = json.dumps(
+        baseline["results"][0]["corpus"],
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+    comparison_policy["expected_result_keys_sha256"] = (
+        perf_compare.result_key_manifest_sha256([(case, corpus_identity)])
+    )
+    return baseline, current, comparison_policy
+
+
+def legacy_managed_xlsx_reports():
+    baseline, current, comparison_policy = managed_xlsx_reports()
+    for item in (baseline, current):
+        item["configuration"].pop(
+            "xlsx_cell_values_managed_planning_memory_headroom"
+        )
+        evidence = item["results"][0]["source"]["xlsx_cell_values"]
+        evidence.pop("payload_memory_limit")
+        evidence.pop("publication_planning_memory_headroom")
+        evidence["cache_budget_memory_limit"] = 100
+    return baseline, current, comparison_policy
+
+
 def metric_vector(values, *, status="measured", scope="test_scope"):
     wrapper = {"status": status, "scope": scope}
     if values is not None:
@@ -3538,6 +3583,84 @@ class PerfCompareTests(unittest.TestCase):
             perf_compare.ComparisonInputError, "benchmark configuration mismatch"
         ):
             perf_compare.compare_reports(baseline, current, policy())
+
+    def test_managed_xlsx_planning_allowance_must_be_unsigned(self):
+        baseline, current, comparison_policy = managed_xlsx_reports()
+        current["configuration"][
+            "xlsx_cell_values_managed_planning_memory_headroom"
+        ] = True
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "unsigned 64-bit integer scalar"
+        ):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
+
+    def test_managed_xlsx_planning_allowance_is_required_by_new_source_evidence(self):
+        baseline, current, comparison_policy = managed_xlsx_reports()
+        del current["configuration"][
+            "xlsx_cell_values_managed_planning_memory_headroom"
+        ]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "required for new managed XLSX"
+        ):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
+
+    def test_managed_xlsx_planning_allowance_must_match_source_evidence(self):
+        baseline, current, comparison_policy = managed_xlsx_reports()
+        current["configuration"][
+            "xlsx_cell_values_managed_planning_memory_headroom"
+        ] += 1
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "does not match"
+        ):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
+
+    def test_managed_xlsx_resulting_memory_limit_must_include_planning_allowance(self):
+        baseline, current, comparison_policy = managed_xlsx_reports()
+        current["results"][0]["source"]["xlsx_cell_values"][
+            "cache_budget_memory_limit"
+        ] += 1
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "must equal payload_memory_limit"
+        ):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
+
+    def test_managed_xlsx_memory_tuple_is_validated(self):
+        baseline, current, comparison_policy = managed_xlsx_reports()
+        self.assertEqual(
+            perf_compare.compare_reports(baseline, current, comparison_policy)["status"],
+            "pass",
+        )
+        for field in (
+            "payload_memory_limit",
+            "publication_planning_memory_headroom",
+            "cache_budget_memory_limit",
+        ):
+            with self.subTest(missing=field):
+                malformed = copy.deepcopy(current)
+                del malformed["results"][0]["source"]["xlsx_cell_values"][field]
+                with self.assertRaises(perf_compare.ComparisonInputError):
+                    perf_compare.compare_reports(baseline, malformed, comparison_policy)
+            for value in (True, -1, 1.5, None, 2**64):
+                with self.subTest(field=field, invalid=value):
+                    malformed = copy.deepcopy(current)
+                    malformed["results"][0]["source"]["xlsx_cell_values"][field] = value
+                    with self.assertRaises(perf_compare.ComparisonInputError):
+                        perf_compare.compare_reports(baseline, malformed, comparison_policy)
+
+    def test_managed_xlsx_memory_tuple_rejects_sum_overflow(self):
+        baseline, current, comparison_policy = managed_xlsx_reports()
+        current["results"][0]["source"]["xlsx_cell_values"][
+            "payload_memory_limit"
+        ] = 2**64 - 1
+        with self.assertRaisesRegex(perf_compare.ComparisonInputError, "overflows"):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
+
+    def test_legacy_managed_xlsx_reports_remain_comparable(self):
+        baseline, current, comparison_policy = legacy_managed_xlsx_reports()
+        self.assertEqual(
+            perf_compare.compare_reports(baseline, current, comparison_policy)["status"],
+            "pass",
+        )
 
     def test_unapproved_corpus_manifest_fails_closed(self):
         comparison_policy = policy()
