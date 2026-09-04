@@ -709,6 +709,12 @@ _PARALLEL_OPC_CACHE_CONTENTION_CASES = {
     "opc_source_cache_control_contention",
     "opc_source_cache_managed_contention",
 }
+_XLSX_MANAGED_HEADROOM_CONFIG_FIELD = (
+    "xlsx_cell_values_managed_planning_memory_headroom"
+)
+_XLSX_PAYLOAD_MEMORY_LIMIT_FIELD = "payload_memory_limit"
+_XLSX_PUBLICATION_HEADROOM_FIELD = "publication_planning_memory_headroom"
+_XLSX_RESULTING_MEMORY_LIMIT_FIELD = "cache_budget_memory_limit"
 
 
 def _parallel_exact_keys(
@@ -1247,6 +1253,114 @@ def _parallel_configuration_identity(configuration: dict[str, Any]) -> dict[str,
     return normalized
 
 
+def _validate_xlsx_managed_memory_evidence(
+    report: dict[str, Any], label: str
+) -> None:
+    """Validate the managed XLSX planning allowance when the new fields exist.
+
+    Historical XLSX source evidence did not emit payload_memory_limit or
+    publication_planning_memory_headroom. Such evidence remains comparable as
+    old evidence. Once either field appears on managed evidence, the complete
+    new tuple and its configuration identity must be present and agree.
+    """
+
+    configuration = _require_object(
+        report.get("configuration"), f"{label}.configuration"
+    )
+    configured_headroom = None
+    if _XLSX_MANAGED_HEADROOM_CONFIG_FIELD in configuration:
+        configured_headroom = _parallel_scalar_value(
+            configuration[_XLSX_MANAGED_HEADROOM_CONFIG_FIELD],
+            f"{label}.configuration.{_XLSX_MANAGED_HEADROOM_CONFIG_FIELD}",
+        )
+
+    results = report.get("results")
+    if not isinstance(results, list):
+        return
+    for index, raw_result in enumerate(results):
+        if not isinstance(raw_result, dict):
+            continue
+        source = raw_result.get("source")
+        if not isinstance(source, dict):
+            continue
+        raw_evidence = source.get("xlsx_cell_values")
+        if raw_evidence is None:
+            continue
+        evidence_path = (
+            f"{label}.results[{index}].source.xlsx_cell_values"
+        )
+        evidence = _require_object(raw_evidence, evidence_path)
+        has_payload_limit = _XLSX_PAYLOAD_MEMORY_LIMIT_FIELD in evidence
+        has_headroom = _XLSX_PUBLICATION_HEADROOM_FIELD in evidence
+        if not (has_payload_limit or has_headroom):
+            continue
+
+        managed = evidence.get("cache_budget_managed")
+        if managed is not True:
+            if managed is not False:
+                raise ComparisonInputError(
+                    f"{evidence_path}.cache_budget_managed must be boolean"
+                )
+            if has_payload_limit != has_headroom:
+                raise ComparisonInputError(
+                    f"{evidence_path} must contain both new managed memory fields"
+                )
+            if any(
+                evidence[field] is not None
+                for field in (
+                    _XLSX_PAYLOAD_MEMORY_LIMIT_FIELD,
+                    _XLSX_PUBLICATION_HEADROOM_FIELD,
+                )
+                if field in evidence
+            ):
+                raise ComparisonInputError(
+                    f"{evidence_path} memory fields require cache_budget_managed=true"
+                )
+            continue
+
+        if not (has_payload_limit and has_headroom):
+            raise ComparisonInputError(
+                f"{evidence_path} must contain both new managed memory fields"
+            )
+        if configured_headroom is None:
+            raise ComparisonInputError(
+                f"{label}.configuration.{_XLSX_MANAGED_HEADROOM_CONFIG_FIELD} "
+                "is required for new managed XLSX source evidence"
+            )
+        payload_limit = _parallel_scalar_value(
+            evidence[_XLSX_PAYLOAD_MEMORY_LIMIT_FIELD],
+            f"{evidence_path}.{_XLSX_PAYLOAD_MEMORY_LIMIT_FIELD}",
+        )
+        evidence_headroom = _parallel_scalar_value(
+            evidence[_XLSX_PUBLICATION_HEADROOM_FIELD],
+            f"{evidence_path}.{_XLSX_PUBLICATION_HEADROOM_FIELD}",
+        )
+        if _XLSX_RESULTING_MEMORY_LIMIT_FIELD not in evidence:
+            raise ComparisonInputError(
+                f"{evidence_path}.{_XLSX_RESULTING_MEMORY_LIMIT_FIELD} is required "
+                "for new managed XLSX source evidence"
+            )
+        resulting_limit = _parallel_scalar_value(
+            evidence[_XLSX_RESULTING_MEMORY_LIMIT_FIELD],
+            f"{evidence_path}.{_XLSX_RESULTING_MEMORY_LIMIT_FIELD}",
+        )
+        if evidence_headroom != configured_headroom:
+            raise ComparisonInputError(
+                f"{evidence_path}.{_XLSX_PUBLICATION_HEADROOM_FIELD} does not "
+                f"match {label}.configuration.{_XLSX_MANAGED_HEADROOM_CONFIG_FIELD}"
+            )
+        if payload_limit > _PARALLEL_U64_MAX - evidence_headroom:
+            raise ComparisonInputError(
+                f"{evidence_path} managed memory limit overflows unsigned 64-bit sum"
+            )
+        if payload_limit + evidence_headroom != resulting_limit:
+            raise ComparisonInputError(
+                f"{evidence_path}.{_XLSX_RESULTING_MEMORY_LIMIT_FIELD} must equal "
+                f"{_XLSX_PAYLOAD_MEMORY_LIMIT_FIELD} plus "
+                f"{_XLSX_PUBLICATION_HEADROOM_FIELD}"
+            )
+
+
 def _validate_parallel_metrics(report: dict[str, Any], label: str) -> None:
     """Validate optional descriptive parallel metrics when a report emits them."""
     if "parallel_metrics" not in report:
@@ -1606,6 +1720,7 @@ def _validate_report_identity(
             raise ComparisonInputError(
                 f"{label}.configuration.opc_cache_lock_diagnostics must be boolean"
             )
+        _validate_xlsx_managed_memory_evidence(report, label)
         for field, expected in policy["expected_configuration"].items():
             actual = configuration.get(field)
             matches = (
