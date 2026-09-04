@@ -13,16 +13,17 @@ registry rises from **415** to **418**; the default remains **36 cases / 198
 rows**. The 2,047 corpus is the explicit control immediately below the 2,048
 production threshold. No production implementation is claimed by this batch.
 
-Every latency result and delta below is normal, non-allocator release-binary
-p50 evidence. Source-open measurements time normal unmanaged
+The latency deltas reported below are derived only from normal,
+non-allocator release-binary p50 evidence. Source-open measurements time normal unmanaged
 `SourceBackedPackage::from_read_at`; lookup measurements time fixed pre-open
 unmanaged packages. Values are ordered as **2,048 / 16,384 Parts**.
 Allocator-enabled latency is observational only; allocator runs provide
 lifecycle/allocation vectors. Validation-constructor coverage is
 correctness-only.
 The mapless exact candidate regressed approximately `+2,750% / +3,500%`.
-Scalar exact was `+20.22% / +12.42%` with `N` allocation savings; `std`
-prehashed exact was `+13.42% / +15.88%`; and direct `HashTable` exact was
+The preliminary scalar-`Vec` exact probe was `+14.85% / +20.96%`; the full
+inlined linear-probe ABBA was `+20.22% / +12.42%` with `N` allocation
+savings. `std` prehashed exact was `+13.42% / +15.88%`; and direct `HashTable` exact was
 `+14.66% / +13.36%`, with a high-sample follow-up still approximately
 `+14.7%`–`+15.6%`. The final pooled `Arc<str>` candidate regressed exact
 lookup `+6.09% / +6.96%`, source-open `+3.38% / +4.30%`, and mixed lookup

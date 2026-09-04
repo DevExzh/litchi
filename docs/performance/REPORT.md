@@ -13,15 +13,17 @@ from **415** to **418** and the default remains **36 cases / 198 rows**; no
 CRUD surface or production lookup implementation is changed by 0396. The
 2,047 corpus is immediately below the 2,048 source case-fold threshold.
 
-Every latency result and delta below is normal, non-allocator release-binary
-p50 evidence. Source-open measurements time normal unmanaged
+The latency deltas reported below are derived only from normal,
+non-allocator release-binary p50 evidence. Source-open measurements time normal unmanaged
 `SourceBackedPackage::from_read_at`; lookup measurements time fixed pre-open
 unmanaged packages. Values are ordered as **2,048 / 16,384 Parts**.
 Allocator-enabled elapsed time is observational only, and
 validation-constructor coverage is correctness-only. The mapless exact
 experiment measured approximately
-`+2,750% / +3,500%`; scalar exact measured `+20.22% / +12.42%` while saving
-`N` allocation events; `std` prehashed exact measured `+13.42% / +15.88%`;
+`+2,750% / +3,500%`. The preliminary scalar-`Vec` exact probe measured
+`+14.85% / +20.96%`; the full inlined linear-probe ABBA measured
+`+20.22% / +12.42%` while saving `N` allocation events. `std` prehashed exact
+measured `+13.42% / +15.88%`;
 and direct `HashTable` exact measured `+14.66% / +13.36%`, with a high-sample
 follow-up around `+14.7%`–`+15.6%`. The final pooled `Arc<str>` experiment
 measured exact `+6.09% / +6.96%`, source-open `+3.38% / +4.30%`, and mixed

@@ -13,8 +13,8 @@ The exact, alias, miss, canonical-position, output, source-counter, and
 equivalent-name oracles are independent of elapsed time; the default matrix
 remains 36 cases / 198 rows and the selectable registry rises from 415 to 418.
 
-Every reported latency result and delta is normal, non-allocator release-binary
-p50 evidence. Source-open measurements time normal unmanaged
+Every latency delta reported in this summary is derived from normal,
+non-allocator release-binary p50 evidence. Source-open measurements time normal unmanaged
 `SourceBackedPackage::from_read_at`; lookup measurements time fixed pre-open
 unmanaged packages over the fixed 2,048/16,384-Part cases. Allocator-enabled
 elapsed time is observational only, and validation-constructor coverage is

@@ -47,8 +47,8 @@ semantic coverage and not a recommendation to change the production index.
 
 ## Timing and allocator boundary
 
-Every latency result and delta in this record, including the experiment table,
-is normal, non-allocator release-binary p50 evidence. Source-open measurements
+Every latency delta in the experiment table is derived from normal,
+non-allocator release-binary p50 evidence. Source-open measurements
 time normal unmanaged `SourceBackedPackage::from_read_at`; lookup measurements
 time fixed pre-open unmanaged packages. The paired values in the experiment
 table are in the order **2,048 Parts / 16,384 Parts**; raw ABBA reports retain
@@ -58,9 +58,12 @@ latency claim. Validation-constructor coverage is correctness-only. The 256-
 and 2,047-Part cases establish small-catalog and threshold boundary coverage,
 but no timing claim is made for them.
 
-Build, test, and capture commands selected Rust/Cargo 1.98.1 explicitly; the
-repository-pinned 1.95 installation does not include Cargo. The reports bind
-their exact `rustc 1.98.1` identity, binary hashes, revisions, and CPU.
+The retained bundle spans two compiler identities: the eight earliest
+mapless reports identify `rustc 1.95.0`, while the other 40 identify
+`rustc 1.98.1`. The final Arc gate and final harness QA selected
+Rust/Cargo/Rustdoc 1.98.1 explicitly because the repository-pinned 1.95
+installation does not include Cargo. Every report binds its exact compiler,
+binary hash, revision, and CPU identity.
 
 The control is revision `c0ca6cb5f22ddc68d827b743018855f6b9dc89bd`.
 The final pooled `Arc<str>` experiment is revision
@@ -78,7 +81,8 @@ failed optimization search into a success claim.
 | Candidate | Exact lookup p50 delta — normal, non-allocator release-binary p50 (2,048 / 16,384) | Other measured evidence | Decision |
 | --- | ---: | --- | --- |
 | Mapless exact lookup | approximately `+2,750% / +3,500%` | Removing the exact-name map routes exact queries through the case-fold ordering. | Rejected: severe exact-lookup regression. |
-| Scalar exact-position index | `+20.22% / +12.42%` | Saves `N` allocation events, with `N` equal to the ordinary Part count. | Rejected: allocation saving does not offset exact-lookup latency. |
+| Preliminary scalar-`Vec` exact-position probe | `+14.85% / +20.96%` | Five-sample probe before the final inlining/layout iteration. | Rejected: exact-lookup regression. |
+| Inlined linear-probe `Vec`, full ABBA | `+20.22% / +12.42%` | Saves `N` allocation events, with `N` equal to the ordinary Part count. | Rejected: allocation saving does not offset exact-lookup latency. |
 | `std` prehashed exact index | `+13.42% / +15.88%` | Prehashing does not recover the exact-name fast path under the measured protocol. | Rejected: exact-lookup regression. |
 | Direct `HashTable` exact index | `+14.66% / +13.36%` | A higher-sample follow-up remained approximately `+14.7%`–`+15.6%`. | Rejected: repeated exact-lookup regression. |
 | Final pooled `Arc<str>` PackURI storage | `+6.09% / +6.96%` | Source-open p50 `+3.38% / +4.30%`; mixed exact/alias/miss lookup `-0.59% / -0.50%`. Allocator source-open vectors add 3 allocation calls and approximately `N` deallocation calls; net-live bytes fall by 65,536 / 524,288 at 2,048 / 16,384 Parts. | Rejected: lifecycle and latency regressions outweigh the retained-live-byte observation. |
