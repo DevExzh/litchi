@@ -486,13 +486,14 @@ fn verify_candidate(
     {
         return Err(Error::Verification);
     }
-    verify_unchanged_entries(source, &candidate, target.native)
+    verify_unchanged_entries(source, &candidate, target, expected)
 }
 
 fn verify_unchanged_entries(
     source: &Package,
     candidate: &Package,
-    target: table_headers::Target,
+    target: &Target,
+    expected: Option<&Order>,
 ) -> Result<()> {
     let source_catalog =
         table_headers::rewrite::physical_source(source).map_err(map_header_error)?;
@@ -505,7 +506,7 @@ fn verify_unchanged_entries(
         .state
         .components
         .catalog()
-        .get_index(target.component_index)
+        .get_index(target.native.component_index)
         .ok_or(Error::Verification)?
         .name();
     for (before, after) in source_catalog
@@ -534,19 +535,20 @@ fn verify_unchanged_entries(
             return Err(Error::Verification);
         }
     }
-    verify_selected_component_objects(source, candidate, target)
+    verify_selected_component_objects(source, candidate, target, expected)
 }
 
 fn verify_selected_component_objects(
     source: &Package,
     candidate: &Package,
-    target: table_headers::Target,
+    target: &Target,
+    expected: Option<&Order>,
 ) -> Result<()> {
     let source_component = source
         .state
         .components
         .catalog()
-        .get_index(target.component_index)
+        .get_index(target.native.component_index)
         .ok_or(Error::Verification)?;
     let candidate_component = candidate
         .state
@@ -564,14 +566,14 @@ fn verify_selected_component_objects(
         .zip(&candidate_component.archive().objects)
         .enumerate()
     {
-        if object_index != target.object_index {
+        if object_index != target.native.object_index {
             if !before.same_content_ignoring_offsets(after) {
                 return Err(Error::Verification);
             }
             continue;
         }
-        if before.archive_info.identifier != Some(target.model_identifier)
-            || after.archive_info.identifier != Some(target.model_identifier)
+        if before.archive_info.identifier != Some(target.native.model_identifier)
+            || after.archive_info.identifier != Some(target.native.model_identifier)
             || before.archive_info.should_merge != after.archive_info.should_merge
             || before.messages.len() != after.messages.len()
             || before.archive_info.message_infos.len() != after.archive_info.message_infos.len()
@@ -591,16 +593,39 @@ fn verify_selected_component_objects(
                 .message_infos
                 .get(message_index)
                 .ok_or(Error::Verification)?;
-            if message_index == target.message_index {
+            if message_index == target.native.message_index {
                 if before_message.type_ != after_message.type_
                     || !message_info_preserved_except_length(before_info, after_info)
                 {
                     return Err(Error::Verification);
                 }
+                verify_selected_payload(
+                    &before_message.data,
+                    &after_message.data,
+                    target.columns,
+                    expected,
+                )?;
             } else if before_message != after_message || before_info != after_info {
                 return Err(Error::Verification);
             }
         }
+    }
+    Ok(())
+}
+
+fn verify_selected_payload(
+    source: &[u8],
+    candidate: &[u8],
+    columns: u32,
+    expected: Option<&Order>,
+) -> Result<()> {
+    let desired = expected.map(snapshot_from_order).transpose()?;
+    let options = codec::DecodeOptions::for_source(source)
+        .with_max_columns(usize::try_from(columns).unwrap_or(usize::MAX));
+    let permitted =
+        codec::rewrite_table_model_sort_order(source, desired, options).map_err(map_codec_error)?;
+    if candidate != permitted.output() {
+        return Err(Error::Verification);
     }
     Ok(())
 }
@@ -751,5 +776,45 @@ fn map_model_codec_error(error: model_codec::DecodeError) -> Error {
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
         maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
         path: Path::Package,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn one_rule_order() -> Order {
+        Order::new([Rule::new(
+            ColumnIndex::new(0).expect("column fits"),
+            Direction::Ascending,
+        )])
+        .expect("one-rule order")
+    }
+
+    #[test]
+    fn selected_payload_verification_allows_only_the_exact_field_44_rewrite() {
+        // Field 1 is outside the persisted-sort envelope and must remain
+        // byte-identical even when the requested sort semantics read back.
+        // Keep enough opaque model bytes for the codec's finite
+        // source-derived output budget to admit one newly-added rule.
+        let source = [
+            0x08, 0x07, 0x10, 0x01, 0x18, 0x01, 0x20, 0x01, 0x28, 0x01, 0x30, 0x01,
+        ];
+        let order = one_rule_order();
+        let desired = snapshot_from_order(&order).expect("sort snapshot");
+        let options = codec::DecodeOptions::for_source(&source).with_max_columns(1);
+        let candidate = codec::rewrite_table_model_sort_order(&source, Some(desired), options)
+            .expect("permitted rewrite")
+            .into_bytes();
+
+        verify_selected_payload(&source, &candidate, 1, Some(&order))
+            .expect("exact field-44 rewrite");
+
+        let mut collateral = candidate;
+        collateral[1] = 0x08;
+        assert_eq!(
+            verify_selected_payload(&source, &collateral, 1, Some(&order)),
+            Err(Error::Verification)
+        );
     }
 }

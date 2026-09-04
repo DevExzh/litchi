@@ -1556,6 +1556,92 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
 artifacts, and build output stay in the temporary root; set
 `KEEP_FUZZ_CORPUS=1` to retain it for review.
 
+## Numbers Custom format registry codec
+
+`numbers_table_cell_custom_format_codec` drives the strict, borrowed
+`TSK.CustomFormatListArchive` / `TSK.CustomFormatArchive` seam used by the
+document-scoped Numbers registry.  It exercises the parallel UUID/archive
+arrays, selected `FormatStructArchive` metadata, ordered Number conditions,
+all three native Custom families (Number 270, Text 271, and Date & Time 272),
+source-preserving rewrites, canonical writes, and private Buffa lazy parity.
+The registry root is the `TN.DocumentArchive` field-9 reference; the native
+registry object type is 222 and must not be confused with
+`TST.TableDataList.ListType::CUSTOM_FORMAT` value 6.
+
+Successful inputs are walked through borrowed iterators and rewrites with
+exact finite output/field/work/nesting/reference/format/condition/text,
+retained-byte, scratch, and allocation limits.  Fixed recipes and the
+generated fixture path keep missing, duplicate, wrong-wire, non-canonical,
+cross-family, zero/duplicate UUID, mismatched-array, non-finite threshold,
+unknown-span, and malformed-group failures reachable.  Unknown source spans
+remain byte-for-byte opaque during source-preserving rewrites; canonical
+writers are independently read back through the strict decoder.
+
+Inputs are bounded at 64 KiB with 128 KiB output, 16,384 fields, 512 KiB of
+work, 128 UUID/archive items, 32 native conditions per archive, 16 KiB of
+selected UTF-8 text, and nesting depth 64.  Corpus entries under
+`corpus/numbers_table_cell_custom_format_codec/` are hand-authored `hex:`
+recipes and contain no native Numbers package bytes.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check numbers_table_cell_custom_format_codec
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build
+output outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-custom-format-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cp corpus/numbers_table_cell_custom_format_codec/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  numbers_table_cell_custom_format_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
+`cargo +nightly fuzz run` is the sanitizer invocation.  Corpus additions,
+artifacts, and build output stay in the temporary root.
+
+## Numbers Duration cell-format codec
+
+`numbers_table_cell_duration_format_codec` drives the strict native Duration
+`FormatStructArchive` seam. It exercises all three presentation styles, the
+six ordered duration units, automatic and explicit unit selection,
+source-preserving rewrites, canonical appends, unknown scalar/group retention,
+lazy Buffa parity, and exact finite resource limits. Fixed recipes keep
+missing, duplicate, wrong-wire, non-canonical, incompatible, invalid-domain,
+and malformed-group failures reachable.
+
+Inputs are bounded at 64 KiB with 128 KiB output, 16,384 fields, 512 KiB of
+work, and nesting depth 64. Corpus entries are hand-authored `hex:` wire
+recipes and contain no native Numbers package bytes.
+
+List and type-check the target from this directory:
+
+```sh
+cargo +nightly fuzz list
+cargo +nightly fuzz check numbers_table_cell_duration_format_codec
+```
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build output
+outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-duration-format-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cp corpus/numbers_table_cell_duration_format_codec/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  numbers_table_cell_duration_format_codec "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```
+
 ## Keynote physical table-sort codec
 
 `keynote_table_physical_sort_codec` fuzzes the archive-free wire seam used by

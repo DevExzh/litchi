@@ -279,11 +279,11 @@ fn create_numbers(output: &Path) -> Result<(), Box<dyn std::error::Error>> {
         NUMERAL_SYSTEM_COLUMN,
         numbers_numeral_system_format()?,
     )?;
-    editor.set_table_cell_date_time_format(
+    editor.set_table_cell_data_format(
         table_id,
         ROW,
         DATE_TIME_COLUMN,
-        numbers_date_time_format(),
+        litchi_numbers::cell::data_format::DataFormat::DateTime(numbers_date_time_format()),
     )?;
     editor.set_table_cell_duration_format(
         table_id,

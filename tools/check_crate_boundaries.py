@@ -305,11 +305,6 @@ KEYNOTE_DOCUMENT_SEMANTIC_LIMIT_PARAMETERS = frozenset(
 # source file. Keep the production audit from treating that test-only module
 # body as a reachable crate item when walking the source tree.
 KEYNOTE_TEST_ONLY_SOURCE_NAMES = frozenset({"perf_tests.rs"})
-KEYNOTE_PRODUCTION_TEST_MODULE = re.compile(
-    r"^[ \t]*#[ \t]*\[[ \t]*cfg[ \t]*\([ \t]*test[ \t]*\)[ \t]*\]"
-    r"[ \t\r\n]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?mod\b",
-    re.MULTILINE,
-)
 KEYNOTE_GENERATED_PROTO_MODULES = (
     "kn",
     "knsos",
@@ -7542,6 +7537,270 @@ NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_RAW_MARKERS = frozenset(
         "Uuid",
     }
 )
+
+# The focused Numbers package now owns the selector-first Date & Time
+# transaction.  Keep the migration-host retirement inventory deliberately
+# narrow: the generic ``DataFormat`` helpers (``cell_date_time_format`` and
+# friends) remain a compatibility surface for source-built packages and for
+# the Pages/Keynote attached-table adapters.  Only these NumbersEditor
+# table-cell methods are retired once the focused owner is present.
+RETIRED_IWA_NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_METHODS = (
+    "table_cell_date_time_format",
+    "set_table_cell_date_time_format",
+    "reset_table_cell_date_time_format",
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_METHOD_SET = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_METHODS
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "table.rs",
+)
+IWA_NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_LEGACY_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>table_cell_date_time_format|"
+    r"set_table_cell_date_time_format|reset_table_cell_date_time_format)"
+    r"(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+
+# Custom is the document-scoped Numbers display-format owner.  Unlike the
+# scalar format owners above, its semantic value is an enum backed by a
+# private UUID-indexed registry.  Keep the checker explicit about every
+# ingress/export seam: a similarly named local helper must not be enough to
+# activate the focused owner, and none of the physical registry graph may
+# leak through the archive-free facade.  There is intentionally no
+# ``RETIRED_IWA_*CUSTOM*`` inventory here: the migration-host Custom route is
+# still compatibility-only and remains outside this ratchet.
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SEMANTIC_SOURCE = Path(
+    "crates/litchi-numbers/src/cell/data_format/custom.rs"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_TRANSACTION_SOURCE = (
+    NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SEMANTIC_SOURCE
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_SOURCE = Path(
+    "crates/litchi-numbers/src/package/table_cell_custom_format.rs"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_HELPER_ROOT = Path(
+    "crates/litchi-numbers/src/package/table_cell_custom_format"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_NATIVE_SOURCE = Path(
+    "crates/litchi-numbers/src/package/table_cell_display_format_native.rs"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/numbers_table_cell_custom_format_codec.rs"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_MODULE = (
+    "numbers_table_cell_custom_format_codec"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_GENERATED_MODULE = (
+    "buffa_numbers_table_cell_custom_format_generated"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_REQUIRED_APIS = (
+    "decode_custom_format_with_report",
+    "decode_custom_format_list_with_report",
+    "prepare_custom_format_rewrite",
+    "PreparedCustomFormatRewrite",
+    "prepare_custom_format_list_rewrite",
+    "PreparedCustomFormatListRewrite",
+    "RewriteExecutionRequirements",
+    "RewriteExecutionLimits",
+    "canonical_custom_format",
+    "canonical_custom_format_list",
+    "rewrite_custom_format",
+    "rewrite_custom_format_list",
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_TRANSACTION_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+    "Path",
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_METHODS = (
+    "table_cell_custom_format",
+    "edit_table_cell_custom_format",
+    "apply_table_cell_custom_format",
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SEMANTIC_TYPES = (
+    "Custom",
+    "Number",
+    "Text",
+    "DateTime",
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_PUBLIC_FLAT_ALIASES = frozenset(
+    prefix + suffix
+    for prefix in (
+        "CustomFormat",
+        "TableCellCustomFormat",
+        "CellCustomFormat",
+        "NumbersTableCellCustomFormat",
+    )
+    for suffix in NUMBERS_TABLE_CELL_CUSTOM_FORMAT_TRANSACTION_TYPES
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_PUBLIC_FLAT_ALIAS_PATTERN = re.compile(
+    r"(?:Custom|TableCellCustom|CellCustom|NumbersTableCellCustom)"
+    r"(?:Format)?(?:Edit|Patch|Commit|Diagnostics|Error|LimitKind|Path)\b"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:table_cell_custom_format|"
+    r"cell[ \t\r\n]*::[ \t\r\n]*data_format[ \t\r\n]*::[ \t\r\n]*"
+    r"(?:r#)?custom)(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "BncCell",
+        "ComponentCatalog",
+        "CustomFormatArchive",
+        "CustomFormatListArchive",
+        "CustomFormatListSnapshot",
+        "CustomFormatSnapshot",
+        "EntryEdit",
+        "ExactArtifacts",
+        "FormatStructArchive",
+        "IWorkPackage",
+        "OwnedExactArtifacts",
+        "RawMessage",
+        "SourceCatalog",
+        "SnappyStream",
+        "Uuid",
+        "UUID",
+    }
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeLimit",
+        "DecodeOptions",
+        "DecodeReport",
+        "RewriteOutput",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "bnc", "tn", "tst", "tsp", "tswp"}
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_PUBLIC_RAW_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|native_id|object_id|model_id|"
+    r"table_id|format_id|format_key|registry_id|entry_id|component_id|member_id|"
+    r"archive_id|message_id|uuid|uuid_pair|member|member_name|payload|"
+    r"payload_bytes|archive|archive_bytes|source_bytes|raw_bytes|wire_bytes|bytes)"
+    r"[ \t\r\n]*:[ \t\r\n]*(?:u64|u32|usize|i64|i32|&\s*\[\s*u8\s*\]|"
+    r"Vec\s*<\s*u8\s*>|Box\s*<\s*\[\s*u8\s*\]\s*>)"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_PUBLIC_RAW_CONTAINER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:source_bytes|raw_bytes|wire_bytes|payload|"
+    r"payload_bytes|archive_bytes|bytes)[ \t\r\n]*:[ \t\r\n]*(?:Vec\s*<\s*u8\s*>|"
+    r"Box\s*<\s*\[\s*u8\s*\]\s*>|"
+    r"(?:std\s*::\s*borrow\s*::\s*)?Cow\s*<[^>]*\[\s*u8\s*\]|"
+    r"(?:std\s*::\s*sync\s*::\s*)?Arc\s*<\s*\[\s*u8\s*\]\s*>)"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_PUBLIC_UUID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:uuid|uuid_pair|registry_uuid|custom_uuid)"
+    r"[ \t\r\n]*:[ \t\r\n]*(?:Uuid|UUID|[A-Z][A-Za-z0-9_]*(?:Uuid|UUID))\b"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_TYPED_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|key|registry_id|format_id|"
+    r"entry_id|member_id|component_id|archive_id|message_id|uuid)"
+    r"[ \t\r\n]*:[ \t\r\n]*(?:[A-Z][A-Za-z0-9_]*(?:Id|ID|Key|Identifier)|"
+    r"(?:u64|u32|usize|i64|i32))\b"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_RAW_HELPER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:read_custom_format|write_custom_format|"
+    r"rewrite_custom_format|read_custom_registry|rewrite_custom_registry|"
+    r"locate_custom_registry|registry_payload|parse_custom_registry|"
+    r"custom_format_type|custom_uid|format_identifier|object_identifier|"
+    r"member_name|payload_bytes|RawMessage|CustomFormatArchive)(?![A-Za-z0-9_])"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_REQUIRED_MARKERS = {
+    "document-scoped registry": re.compile(
+        r"(?<![A-Za-z0-9_])(?:document[_ -]?scoped|rooted|registry|"
+        r"custom[_ -]?format[_ -]?list|field[_ -]?9|message[_ -]?type)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "custom family discriminators": re.compile(
+        r"(?<![A-Za-z0-9_])(?:270|271|272|CUSTOM[_ -]?FORMAT[_ -]?TYPE|"
+        r"Number|Text|Date[_ -]?Time)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "format-list/refcount closure": re.compile(
+        r"(?<![A-Za-z0-9_])(?:format[_ -]?list|registry|refcount|ref_count|"
+        r"reference|reuse|cull|copy[_ -]?on[_ -]?write)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "exact-source transaction": re.compile(
+        r"(?<![A-Za-z0-9_])(?:exact[_ -]?source|source[_ -]?bound|"
+        r"PatchConflict|inverse|no[_ -]?op)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "candidate verification/locality": re.compile(
+        r"(?<![A-Za-z0-9_])(?:candidate|reopen|readback|locality|same[_ -]?content)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "bounded staging": re.compile(
+        r"(?<![A-Za-z0-9_])(?:budget|limit|preflight|bounded|allocation)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "fail-closed unsupported graph": re.compile(
+        r"(?<![A-Za-z0-9_])(?:unsupported|UnsupportedDependency|UnsupportedSource|"
+        r"ambiguous|cross[_ -]?component|fail[_ -]?closed)(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+}
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_INTEGRATION_SOURCE = Path(
+    "crates/litchi-numbers/tests/table_cell_custom_format.rs"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_EXAMPLE = Path(
+    "crates/litchi-numbers/examples/edit_table_cell_custom_format.rs"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_FUZZ_SOURCE = Path(
+    "crates/litchi-iwa-protos/fuzz/fuzz_targets/numbers_table_cell_custom_format_codec.rs"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_FUZZ_CORPUS = Path(
+    "crates/litchi-iwa-protos/fuzz/corpus/numbers_table_cell_custom_format_codec"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_FUZZ_SOURCE = Path(
+    "crates/litchi/fuzz/fuzz_targets/numbers_table_cell_custom_format.rs"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_FUZZ_CORPUS = Path(
+    "crates/litchi/fuzz/corpus/numbers_table_cell_custom_format"
+)
+NUMBERS_TABLE_CELL_CUSTOM_FORMAT_INTEGRATION_MARKERS = {
+    "all custom families": re.compile(
+        r"(?:Number|Text|Date[_ -]?Time|Custom)", re.IGNORECASE
+    ),
+    "set/clear/reset lifecycle": re.compile(
+        r"(?:set|clear|reset|automatic)", re.IGNORECASE
+    ),
+    "exact no-op and inverse": re.compile(
+        r"(?:no[_ -]?op|unchanged|inverse|byte[_ -]?for[_ -]?byte)",
+        re.IGNORECASE,
+    ),
+    "registry UUID/refcount closure": re.compile(
+        r"(?:uuid|registry|refcount|reference|reuse|cull)", re.IGNORECASE
+    ),
+    "unknown/member preservation": re.compile(
+        r"(?:unknown|member|nested|source[_ -]?span)", re.IGNORECASE
+    ),
+    "candidate/locality verification": re.compile(
+        r"(?:candidate|reopen|readback|locality|unchanged)", re.IGNORECASE
+    ),
+    "typed refusal coverage": re.compile(
+        r"(?:stale|foreign|wrong[_ -]?family|malformed|unsupported|locked|refus)",
+        re.IGNORECASE,
+    ),
+}
 
 # Percentage is deliberately audited as a separate focused owner.  It shares
 # the archive-free semantic family with Number, but its native format
@@ -25134,6 +25393,718 @@ def audit_numbers_table_cell_date_time_format_facade_source_topology(
     return sorted(set(violations))
 
 
+def _numbers_table_cell_custom_format_owner_present(root: Path) -> bool:
+    """Return whether the focused document-scoped Custom owner is active."""
+
+    owner_path = root / NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_SOURCE
+    semantic_path = root / NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SEMANTIC_SOURCE
+    package_path = root / NUMBERS_PACKAGE_SOURCE
+    owner_source = (
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+        if owner_path.is_file()
+        else ""
+    )
+    semantic_source = (
+        _mask_rust_cfg_test_items(semantic_path.read_text(encoding="utf-8"))
+        if semantic_path.is_file()
+        else ""
+    )
+    package_source = (
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    private_module = re.compile(
+        r"(?m)^[ \t]*pub\s*\([ \t]*crate[ \t]*\)\s+mod\s+"
+        r"(?:r#)?table_cell_custom_format\b"
+    )
+    return (
+        owner_path.is_file()
+        and semantic_path.is_file()
+        and bool(_mask_rust_non_code(owner_source).strip())
+        and bool(_mask_rust_non_code(semantic_source).strip())
+        and bool(_rust_root_level_matches(package_source, private_module))
+    )
+
+
+def _numbers_table_cell_custom_format_public_leak(
+    identifier: str,
+) -> str | None:
+    """Classify physical custom-registry vocabulary forbidden by the facade."""
+
+    if identifier in {"Uuid", "UUID", "ObjectId", "ObjectID", "FormatId", "FormatID"}:
+        return "native UUID or raw identifier"
+    if identifier in NUMBERS_TABLE_CELL_CUSTOM_FORMAT_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in NUMBERS_TABLE_CELL_CUSTOM_FORMAT_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in NUMBERS_TABLE_CELL_CUSTOM_FORMAT_WIRE_TYPES:
+        return "wire type"
+    if identifier == "litchi_iwa_common":
+        return None
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"buffa", "prost", "codec"} for word in words):
+        return "protobuf type"
+    if identifier in {"Member", "MemberName", "Payload", "Raw", "Archive"}:
+        return "native archive member or payload"
+    return _iwork_public_leak(identifier)
+
+
+def _numbers_table_cell_custom_format_owner_declaration(
+    declaration: str,
+) -> bool:
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_PATH.search(declaration) is not None or bool(
+        identifiers
+        & (
+            set(NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_METHODS)
+            | set(NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SEMANTIC_TYPES)
+            | set(NUMBERS_TABLE_CELL_CUSTOM_FORMAT_TRANSACTION_TYPES)
+            | {"custom", "custom_format"}
+        )
+    )
+
+
+def _is_numbers_table_cell_custom_format_public_declaration(
+    declaration: str,
+    *,
+    dedicated_source: bool,
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    return bool(
+        identifiers
+        & (
+            NUMBERS_TABLE_CELL_CUSTOM_FORMAT_PUBLIC_FLAT_ALIASES
+            | set(NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SEMANTIC_TYPES)
+            | {"Custom", "custom", "custom_format"}
+        )
+    ) or NUMBERS_TABLE_CELL_CUSTOM_FORMAT_PUBLIC_FLAT_ALIAS_PATTERN.search(
+        declaration
+    ) is not None or _numbers_table_cell_custom_format_owner_declaration(declaration)
+
+
+def _numbers_table_cell_custom_format_transaction_source(
+    root: Path,
+) -> tuple[Path, ...]:
+    """Return the inline semantic source or a future split transaction leaf."""
+
+    candidates = (
+        NUMBERS_TABLE_CELL_CUSTOM_FORMAT_TRANSACTION_SOURCE,
+        Path("crates/litchi-numbers/src/cell/data_format/custom/transaction.rs"),
+    )
+    return tuple(root / path for path in candidates if (root / path).is_file())
+
+
+def audit_numbers_table_cell_custom_format_codec_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the private strict Buffa/lazy Custom-registry codec seam."""
+
+    if not _numbers_table_cell_custom_format_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    codec_path = root / NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_SOURCE
+    codec_raw = codec_path.read_text(encoding="utf-8") if codec_path.is_file() else ""
+    codec_production = _mask_rust_cfg_test_items(codec_raw)
+    codec_code = _mask_rust_non_code(codec_production)
+    if not codec_path.is_file() or not codec_code.strip():
+        violations.append(
+            "focused litchi-numbers Custom-format boundary is missing strict codec "
+            f"source: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_SOURCE}"
+        )
+
+    for api in NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_REQUIRED_APIS:
+        if _numbers_table_cell_number_format_api_present(codec_code, api):
+            continue
+        violations.append(
+            "focused litchi-numbers Custom-format hidden codec is missing strict "
+            f"API {api}: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_SOURCE}"
+        )
+
+    marker_groups = {
+        "handwritten wire preflight": (
+            ("Budget::new", "preflight"),
+            ("scan_custom_format", "scan_custom_registry"),
+            ("scan_custom_format_list", "parallel"),
+        ),
+        "private lazy Buffa projection": (
+            ("decode_lazy_view", "LazyView"),
+            ("buffa",),
+            ("projection", "generated"),
+        ),
+        "strict hostile-field validation": (
+            ("duplicate", "unique"),
+            ("noncanonical", "canonical", "wire"),
+            ("unknown", "raw"),
+        ),
+        "UUID/list shape validation": (
+            ("uuid", "UUID"),
+            ("count", "formats"),
+            ("validate_unique_uuids", "unique"),
+        ),
+        "source-preserving bounded rewrite": (
+            ("extend_from_slice", "raw"),
+            ("execution_requirements", "Prepared"),
+            ("execute", "rewrite"),
+            ("retained", "scratch", "allocation"),
+        ),
+    }
+    for label, groups in marker_groups.items():
+        if all(
+            any(re.search(re.escape(marker), codec_code, re.IGNORECASE) for marker in group)
+            for group in groups
+        ):
+            continue
+        violations.append(
+            "focused litchi-numbers Custom-format hidden codec is missing strict "
+            f"{label} marker: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_SOURCE}"
+        )
+
+    for label, constant, value in (
+        (
+            "registry message type",
+            "CUSTOM_FORMAT_REGISTRY_MESSAGE_TYPE",
+            222,
+        ),
+        ("registry root field", "CUSTOM_FORMAT_REGISTRY_REFERENCE_FIELD", 9),
+        ("custom format-list kind", "CUSTOM_FORMAT_LIST_KIND", 6),
+        ("custom Number type", "NATIVE_CUSTOM_NUMBER_FORMAT_TYPE", 270),
+        ("custom Text type", "NATIVE_CUSTOM_TEXT_FORMAT_TYPE", 271),
+        (
+            "custom Date & Time type",
+            "NATIVE_CUSTOM_DATE_TIME_FORMAT_TYPE",
+            272,
+        ),
+    ):
+        if re.search(
+            rf"\b{re.escape(constant)}\b\s*:\s*[^=;\n]+?=\s*{value}\b",
+            codec_code,
+        ) is None:
+            violations.append(
+                "focused litchi-numbers Custom-format hidden codec is missing "
+                f"{label} {value}: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_SOURCE}"
+            )
+
+    if re.search(r"\b(?:prost|prost_types)\b", codec_code) is not None:
+        violations.append(
+            "focused litchi-numbers Custom-format hidden codec retains a Prost "
+            f"production path: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_SOURCE}"
+        )
+
+    lazy_positions = [
+        match.start()
+        for pattern in (r"\bdecode_lazy_view\b", r"\bLazyView\b")
+        for match in re.finditer(pattern, codec_code)
+    ]
+    preflight_positions = [
+        match.start()
+        for pattern in (
+            r"\bBudget\s*::\s*new\b",
+            r"\bpreflight\b",
+            r"\bscan_custom_format(?:_list)?\b",
+        )
+        for match in re.finditer(pattern, codec_code, re.IGNORECASE)
+    ]
+    if lazy_positions and (
+        not preflight_positions or min(preflight_positions) > min(lazy_positions)
+    ):
+        violations.append(
+            "focused litchi-numbers Custom-format hidden codec must preflight wire "
+            f"before forcing its lazy Buffa view: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_SOURCE}"
+        )
+
+    public_path = root / NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_PUBLIC_SOURCE
+    public_raw = public_path.read_text(encoding="utf-8") if public_path.is_file() else ""
+    public_production = _mask_rust_cfg_test_items(public_raw)
+    hidden_module = re.compile(
+        rf"(?m)^[ \t]*#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+        rf"pub\s+mod\s+{re.escape(NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_MODULE)}\b"
+    )
+    if not _rust_root_level_matches(public_production, hidden_module):
+        violations.append(
+            "focused litchi-numbers Custom-format public API is missing hidden codec "
+            f"module {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_MODULE}: "
+            f"{NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_PUBLIC_SOURCE}"
+        )
+
+    generated = _rust_root_level_module_declarations(
+        public_production,
+        frozenset({NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_GENERATED_MODULE}),
+    )
+    if not generated:
+        violations.append(
+            "focused litchi-numbers Custom-format public API is missing a private "
+            f"Buffa generated projection: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_PUBLIC_SOURCE}"
+        )
+    for _module, visibility, shape, body, line_number in generated:
+        if visibility is not None:
+            violations.append(
+                "focused litchi-numbers Custom-format generated projection module "
+                f"must remain private: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
+            )
+        if shape == "invalid" or (
+            shape == "inline" and not _rust_generated_module_include_is_valid(body)
+        ):
+            violations.append(
+                "focused litchi-numbers Custom-format generated projection module "
+                f"has invalid include shape: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
+            )
+    if _rust_root_generated_public_leaks(
+        public_production,
+        frozenset({NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_GENERATED_MODULE}),
+    ):
+        violations.append(
+            "focused litchi-numbers Custom-format public API reexports its Buffa "
+            f"generated projection: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_PUBLIC_SOURCE}"
+        )
+
+    if re.search(
+        r"#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\][\s\S]{0,4096}"
+        r"#\s*\[\s*test\s*\]",
+        _mask_rust_non_code(codec_raw),
+    ) is None:
+        violations.append(
+            "focused litchi-numbers Custom-format hidden codec is missing its "
+            f"cfg(test) hostile-wire harness: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_SOURCE}"
+        )
+    return sorted(set(violations))
+
+
+def audit_numbers_table_cell_custom_format_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free Custom-format facade."""
+
+    source_root = root / NUMBERS_SOURCE_ROOT
+    if not source_root.is_dir() or not _numbers_table_cell_custom_format_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    semantic_path = root / NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SEMANTIC_SOURCE
+    semantic_source = _mask_rust_cfg_test_items(
+        semantic_path.read_text(encoding="utf-8")
+    )
+    semantic_code = _mask_rust_non_code(semantic_source)
+
+    # Root module wiring must be real production declarations at each level;
+    # nested/test-only decoys do not activate a focused semantic facade.
+    lib_path = root / NUMBERS_SOURCE_ROOT / "lib.rs"
+    lib_source = (
+        _mask_rust_cfg_test_items(lib_path.read_text(encoding="utf-8"))
+        if lib_path.is_file()
+        else ""
+    )
+    cell_module_path = root / NUMBERS_SOURCE_ROOT / "cell" / "mod.rs"
+    cell_module_source = (
+        _mask_rust_cfg_test_items(cell_module_path.read_text(encoding="utf-8"))
+        if cell_module_path.is_file()
+        else ""
+    )
+    data_format_path = root / NUMBERS_SOURCE_ROOT / "cell" / "data_format.rs"
+    data_format_source = (
+        _mask_rust_cfg_test_items(data_format_path.read_text(encoding="utf-8"))
+        if data_format_path.is_file()
+        else ""
+    )
+    wiring = (
+        (
+            lib_source,
+            re.compile(r"(?m)^[ \t]*pub\s+mod\s+(?:r#)?cell\b"),
+            "root cell module",
+            lib_path,
+        ),
+        (
+            cell_module_source,
+            re.compile(r"(?m)^[ \t]*pub\s+mod\s+(?:r#)?data_format\b"),
+            "cell::data_format module",
+            cell_module_path,
+        ),
+        (
+            data_format_source,
+            re.compile(r"(?m)^[ \t]*pub\s+mod\s+(?:r#)?custom\b"),
+            "cell::data_format::custom module",
+            data_format_path,
+        ),
+    )
+    for source, pattern, label, path in wiring:
+        if not _rust_root_level_matches(source, pattern):
+            violations.append(
+                "focused litchi-numbers Custom-format public API is missing "
+                f"{label}: {path.relative_to(root)}"
+            )
+    if "Custom" not in _rust_root_canonical_exports(
+        data_format_source, frozenset({"Custom"})
+    ):
+        violations.append(
+            "focused litchi-numbers Custom-format public API is missing canonical "
+            f"Custom reexport: {data_format_path.relative_to(root)}"
+        )
+
+    if not _rust_root_level_matches(
+        semantic_source,
+        re.compile(r"(?m)^[ \t]*pub\s+enum\s+(?:r#)?Custom\b"),
+    ):
+        violations.append(
+            "focused litchi-numbers Custom-format public API is missing canonical "
+            f"cell::data_format::Custom: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SEMANTIC_SOURCE}"
+        )
+    variants = _rust_public_enum_variants(semantic_source, "Custom")
+    for variant in ("Number", "Text", "DateTime"):
+        if variant not in variants:
+            violations.append(
+                "focused litchi-numbers Custom-format public API is missing "
+                f"Custom::{variant}: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SEMANTIC_SOURCE}"
+            )
+
+    transaction_sources = _numbers_table_cell_custom_format_transaction_source(root)
+    transaction_source = "\n".join(
+        _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        for path in transaction_sources
+    )
+    inline_transaction = _rust_public_module_body(semantic_source, "transaction")
+    transaction_scope = inline_transaction or transaction_source
+    if inline_transaction is None and not transaction_source:
+        violations.append(
+            "focused litchi-numbers Custom-format public API is missing its "
+            f"transaction namespace: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SEMANTIC_SOURCE}"
+        )
+    elif not _rust_root_level_matches(
+        semantic_source,
+        re.compile(r"(?m)^[ \t]*pub\s+mod\s+(?:r#)?transaction\b"),
+    ) and not re.search(
+        r"(?m)^[ \t]*pub\s+mod\s+(?:r#)?transaction\b", transaction_source
+    ):
+        violations.append(
+            "focused litchi-numbers Custom-format public API is missing its "
+            f"transaction namespace: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SEMANTIC_SOURCE}"
+        )
+    transaction_exports = _rust_canonical_exports(
+        transaction_scope,
+        frozenset(NUMBERS_TABLE_CELL_CUSTOM_FORMAT_TRANSACTION_TYPES),
+    )
+    for name in NUMBERS_TABLE_CELL_CUSTOM_FORMAT_TRANSACTION_TYPES:
+        if name not in transaction_exports:
+            violations.append(
+                "focused litchi-numbers Custom-format public API is missing canonical "
+                f"transaction reexport {name}: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SEMANTIC_SOURCE}"
+            )
+    if transaction_scope and re.search(
+        r"\bpub\s+use\s+[^;]*package[^;]*table_cell_custom_format",
+        transaction_scope,
+    ) is None:
+        violations.append(
+            "focused litchi-numbers Custom-format transaction namespace must reexport "
+            f"the private package owner: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SEMANTIC_SOURCE}"
+        )
+
+    package_path = root / NUMBERS_PACKAGE_SOURCE
+    package_source = (
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    private_module = re.compile(
+        r"(?m)^[ \t]*pub\s*\([ \t]*crate[ \t]*\)\s+mod\s+"
+        r"(?:r#)?table_cell_custom_format\b"
+    )
+    if not _rust_root_level_matches(package_source, private_module):
+        violations.append(
+            "focused litchi-numbers Custom-format public API is missing private "
+            f"package owner module: {package_path.relative_to(root)}"
+        )
+    public_module = re.compile(
+        r"(?m)^[ \t]*pub\s+mod\s+(?:r#)?table_cell_custom_format\b"
+    )
+    public_matches = _rust_root_level_matches(package_source, public_module)
+    if public_matches:
+        line_number = package_source.count("\n", 0, public_matches[0].start()) + 1
+        violations.append(
+            "focused litchi-numbers Custom-format public API exposes its public "
+            f"package owner module: {package_path.relative_to(root)}:{line_number}"
+        )
+    for declaration, line_number in _rust_public_declarations(package_source):
+        if re.search(
+            r"\b(?:table_cell_custom_format|crate\s*::\s*package\s*::\s*"
+            r"table_cell_custom_format)\b",
+            declaration,
+        ) is None:
+            continue
+        if re.match(r"^[ \t]*pub\s+(?:use|type|const|static)\b", declaration):
+            violations.append(
+                "focused litchi-numbers Custom-format public API exposes a "
+                f"package-owner alias: {package_path.relative_to(root)}:{line_number}"
+            )
+
+    owner_path = root / NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_SOURCE
+    owner_source = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    owner_helper_root = root / NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_HELPER_ROOT
+    owner_related_paths = {owner_path}
+    if owner_helper_root.is_dir():
+        owner_related_paths.update(owner_helper_root.rglob("*.rs"))
+    owner_related_source = "\n".join(
+        _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        for path in sorted(owner_related_paths)
+        if path.is_file()
+    )
+    # Custom registry ownership is implemented by the shared private native
+    # display-format core.  Include it for topology markers, but never scan
+    # it as a public declaration: its raw IDs and member names are private by
+    # construction.
+    native_path = root / NUMBERS_TABLE_CELL_CUSTOM_FORMAT_NATIVE_SOURCE
+    native_source = (
+        _mask_rust_cfg_test_items(native_path.read_text(encoding="utf-8"))
+        if native_path.is_file()
+        else ""
+    )
+    owner_code = _mask_rust_non_code(
+        owner_related_source + "\n" + native_source
+    )
+    owner_methods = {
+        name: (declaration, line_number)
+        for name, declaration, line_number in _rust_public_methods_in_impl(
+            owner_related_source, "Package"
+        )
+    }
+    expected_signatures = {
+        "table_cell_custom_format": (r"Option\s*<\s*Custom\s*>", False),
+        "edit_table_cell_custom_format": (r"\bEdit\b", False),
+        "apply_table_cell_custom_format": (r"\bPatch\b", True),
+    }
+    for method in NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_METHODS:
+        record = owner_methods.get(method)
+        if record is None:
+            violations.append(
+                "focused litchi-numbers Custom-format public API is missing "
+                f"Package method {method}: {owner_path.relative_to(root)}"
+            )
+            continue
+        declaration, line_number = record
+        signature, needs_commit = expected_signatures[method]
+        if not re.search(signature, declaration):
+            violations.append(
+                "focused litchi-numbers Custom-format Package method has an "
+                f"unexpected signature {method}: {owner_path.relative_to(root)}:{line_number}"
+            )
+        if re.search(r"&\s*self\b", declaration) is None:
+            violations.append(
+                "focused litchi-numbers Custom-format Package method "
+                f"{method} must retain its Package receiver: "
+                f"{owner_path.relative_to(root)}:{line_number}"
+            )
+        if method != "apply_table_cell_custom_format":
+            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+                if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
+                    violations.append(
+                        "focused litchi-numbers Custom-format Package method "
+                        f"{method} must accept selector-first {selector}: "
+                        f"{owner_path.relative_to(root)}:{line_number}"
+                    )
+            selector_positions = [
+                declaration.find(selector)
+                for selector in ("SheetSelector", "TableSelector", "CellPosition")
+            ]
+            receiver_position = declaration.find("&self")
+            if (
+                receiver_position >= 0
+                and all(position >= 0 for position in selector_positions)
+                and (
+                    receiver_position > min(selector_positions)
+                    or selector_positions != sorted(selector_positions)
+                )
+            ):
+                violations.append(
+                    "focused litchi-numbers Custom-format Package method "
+                    f"{method} must keep sheet/table/cell selectors first: "
+                    f"{owner_path.relative_to(root)}:{line_number}"
+                )
+        if needs_commit and not re.search(r"\bCommit\b", declaration):
+            violations.append(
+                "focused litchi-numbers Custom-format apply must return Commit: "
+                f"{owner_path.relative_to(root)}:{line_number}"
+            )
+
+    for label, marker in NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_REQUIRED_MARKERS.items():
+        if marker.search(owner_code) is None:
+            violations.append(
+                "focused litchi-numbers Custom-format owner is missing "
+                f"{label} transaction marker: {owner_path.relative_to(root)}"
+            )
+
+    dedicated_sources = set(transaction_sources) | {owner_path}
+    if owner_helper_root.is_dir():
+        dedicated_sources.update(owner_helper_root.rglob("*.rs"))
+    export_sources = {
+        root / NUMBERS_SOURCE_ROOT / "lib.rs",
+        root / NUMBERS_SOURCE_ROOT / "cell" / "mod.rs",
+        root / NUMBERS_SOURCE_ROOT / "cell" / "data_format.rs",
+    }
+    export_sources.update(path for path in export_sources if path.is_file())
+    for path in sorted(dedicated_sources | export_sources):
+        if not path.is_file():
+            continue
+        dedicated_source = path in dedicated_sources
+        production_source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        for declaration, line_number in _rust_public_declarations(production_source):
+            if not _is_numbers_table_cell_custom_format_public_declaration(
+                declaration, dedicated_source=dedicated_source
+            ):
+                continue
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            public_use_or_type = identifiers[:2] in (["pub", "use"], ["pub", "type"])
+            if (
+                public_use_or_type
+                and "*" in declaration
+                and any(
+                    token in identifiers
+                    for token in ("custom", "custom_format", "table_cell_custom_format")
+                )
+            ):
+                violations.append(
+                    "focused litchi-numbers Custom-format public API retains root "
+                    f"aliases via glob: {path.relative_to(root)}:{line_number}"
+                )
+            for identifier_match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = identifier_match.group(1)
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, identifier_match.start(1)
+                )
+                if (
+                    identifier in NUMBERS_TABLE_CELL_CUSTOM_FORMAT_PUBLIC_FLAT_ALIASES
+                    or NUMBERS_TABLE_CELL_CUSTOM_FORMAT_PUBLIC_FLAT_ALIAS_PATTERN.fullmatch(
+                        identifier
+                    )
+                ):
+                    violations.append(
+                        "focused litchi-numbers Custom-format public API retains "
+                        f"flat alias {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+                reason = _numbers_table_cell_custom_format_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-numbers Custom-format public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                    )
+            for pattern, label in (
+                (RUST_BYTE_SLICE, "raw byte slice"),
+                (
+                    NUMBERS_TABLE_CELL_CUSTOM_FORMAT_PUBLIC_RAW_CONTAINER,
+                    "opaque raw byte container",
+                ),
+                (
+                    NUMBERS_TABLE_CELL_CUSTOM_FORMAT_TYPED_RAW_ID_PARAMETER,
+                    "typed raw identifier parameter",
+                ),
+                (
+                    NUMBERS_TABLE_CELL_CUSTOM_FORMAT_PUBLIC_UUID_PARAMETER,
+                    "native UUID parameter",
+                ),
+                (
+                    NUMBERS_TABLE_CELL_CUSTOM_FORMAT_PUBLIC_RAW_PARAMETER,
+                    "raw identifier/member/payload parameter",
+                ),
+                (NUMBERS_TABLE_CELL_CUSTOM_FORMAT_RAW_HELPER, "raw registry helper"),
+            ):
+                for match in pattern.finditer(declaration):
+                    value = re.sub(r"\s+", " ", match.group(0)).strip()
+                    value_line = line_number + declaration.count(
+                        "\n", 0, match.start()
+                    )
+                    violations.append(
+                        "focused litchi-numbers Custom-format public API exposes "
+                        f"{label} {value}: {path.relative_to(root)}:{value_line}"
+                    )
+
+    example_path = root / NUMBERS_TABLE_CELL_CUSTOM_FORMAT_EXAMPLE
+    if not example_path.is_file():
+        violations.append(
+            "focused litchi-numbers Custom-format boundary is missing example: "
+            f"{NUMBERS_TABLE_CELL_CUSTOM_FORMAT_EXAMPLE}"
+        )
+    else:
+        example_code = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(example_path.read_text(encoding="utf-8"))
+        )
+        if re.search(
+            r"\b(?:table_cell_custom_format|edit_table_cell_custom_format|"
+            r"apply_table_cell_custom_format)\s*\(",
+            example_code,
+        ) is None:
+            violations.append(
+                "focused litchi-numbers Custom-format example does not exercise "
+                f"the selector-first owner: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_EXAMPLE}"
+            )
+
+    integration_path = root / NUMBERS_TABLE_CELL_CUSTOM_FORMAT_INTEGRATION_SOURCE
+    if not integration_path.is_file():
+        violations.append(
+            "focused litchi-numbers Custom-format boundary is missing integration "
+            f"test: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_INTEGRATION_SOURCE}"
+        )
+    else:
+        integration_source = integration_path.read_text(encoding="utf-8")
+        integration_code = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(integration_source)
+        )
+        if re.search(r"#\s*\[\s*test\s*\]", integration_code) is None:
+            violations.append(
+                "focused litchi-numbers Custom-format integration test is missing "
+                f"#[test] coverage: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_INTEGRATION_SOURCE}"
+            )
+        for label, marker in NUMBERS_TABLE_CELL_CUSTOM_FORMAT_INTEGRATION_MARKERS.items():
+            if marker.search(integration_code) is None:
+                violations.append(
+                    "focused litchi-numbers Custom-format integration test is missing "
+                    f"{label}: {NUMBERS_TABLE_CELL_CUSTOM_FORMAT_INTEGRATION_SOURCE}"
+                )
+
+    for fuzz_path, label in (
+        (NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_FUZZ_SOURCE, "codec fuzz target"),
+        (NUMBERS_TABLE_CELL_CUSTOM_FORMAT_FUZZ_SOURCE, "package fuzz target"),
+    ):
+        absolute = root / fuzz_path
+        if not absolute.is_file():
+            violations.append(
+                "focused litchi-numbers Custom-format boundary is missing "
+                f"{label}: {fuzz_path}"
+            )
+        elif re.search(
+            r"\bfuzz_target!\s*\(",
+            _mask_rust_non_code(absolute.read_text(encoding="utf-8")),
+        ) is None:
+            violations.append(
+                "focused litchi-numbers Custom-format fuzz target is missing "
+                f"fuzz_target! harness: {fuzz_path}"
+            )
+    for corpus in (
+        NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_FUZZ_CORPUS,
+        NUMBERS_TABLE_CELL_CUSTOM_FORMAT_FUZZ_CORPUS,
+    ):
+        absolute = root / corpus
+        if not absolute.is_dir():
+            violations.append(
+                "focused litchi-numbers Custom-format boundary is missing fuzz "
+                f"corpus: {corpus}"
+            )
+        elif not any(path.is_file() for path in absolute.iterdir()):
+            violations.append(
+                "focused litchi-numbers Custom-format fuzz corpus must be nonempty: "
+                f"{corpus}"
+            )
+
+    return sorted(set(violations))
+
+
 def _numbers_table_cell_percentage_format_codec_paths(
     root: Path,
 ) -> tuple[Path, ...]:
@@ -29714,15 +30685,34 @@ def _audit_iwa_numbers_table_cell_format_retirement(
         + "|".join(re.escape(name) for name in methods)
         + r"))(?![A-Za-z0-9_])"
     )
-    helper_pattern = re.compile(
-        r"(?<![A-Za-z0-9_#])(?:r#)?(?P<name>(?:"
-        + "|".join(re.escape(name) for name in sorted(focused_helpers, key=len, reverse=True))
-        + r"))(?![A-Za-z0-9_])"
+    # Some focused owners (Date & Time is the first) retire only the three
+    # raw-ID methods.  An empty alternation would match every position and
+    # turn that valid no-helper configuration into a flood of false
+    # positives, so leave these patterns disabled when their inventories are
+    # empty.
+    helper_pattern = (
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?(?P<name>(?:"
+            + "|".join(
+                re.escape(name)
+                for name in sorted(focused_helpers, key=len, reverse=True)
+            )
+            + r"))(?![A-Za-z0-9_])"
+        )
+        if focused_helpers
+        else None
     )
-    test_pattern = re.compile(
-        r"(?<![A-Za-z0-9_#])(?:r#)?(?P<name>(?:"
-        + "|".join(re.escape(name) for name in sorted(focused_tests, key=len, reverse=True))
-        + r"))(?![A-Za-z0-9_])"
+    test_pattern = (
+        re.compile(
+            r"(?<![A-Za-z0-9_#])(?:r#)?(?P<name>(?:"
+            + "|".join(
+                re.escape(name)
+                for name in sorted(focused_tests, key=len, reverse=True)
+            )
+            + r"))(?![A-Za-z0-9_])"
+        )
+        if focused_tests
+        else None
     )
     violations: set[str] = set()
     for path in sorted(source_root.rglob("*.rs")):
@@ -29791,20 +30781,22 @@ def _audit_iwa_numbers_table_cell_format_retirement(
         # Focused helpers and tests are forbidden even when they occur in a
         # cfg(test) module.  Comments and literals are masked, so prose and
         # decoys cannot accidentally activate the retirement gate.
-        for match in helper_pattern.finditer(all_code):
-            name = match.group("name")
-            line_number = all_code.count("\n", 0, match.start("name")) + 1
-            violations.add(
-                f"retired litchi-iwa Numbers {label}-format focused "
-                f"bridge/fallback helper {name}: {relative}:{line_number}"
-            )
-        for match in test_pattern.finditer(all_code):
-            name = match.group("name")
-            line_number = all_code.count("\n", 0, match.start("name")) + 1
-            violations.add(
-                f"retired litchi-iwa Numbers {label}-format focused "
-                f"bridge/fallback test {name}: {relative}:{line_number}"
-            )
+        if helper_pattern is not None:
+            for match in helper_pattern.finditer(all_code):
+                name = match.group("name")
+                line_number = all_code.count("\n", 0, match.start("name")) + 1
+                violations.add(
+                    f"retired litchi-iwa Numbers {label}-format focused "
+                    f"bridge/fallback helper {name}: {relative}:{line_number}"
+                )
+        if test_pattern is not None:
+            for match in test_pattern.finditer(all_code):
+                name = match.group("name")
+                line_number = all_code.count("\n", 0, match.start("name")) + 1
+                violations.add(
+                    f"retired litchi-iwa Numbers {label}-format focused "
+                    f"bridge/fallback test {name}: {relative}:{line_number}"
+                )
 
     return sorted(violations)
 
@@ -29854,6 +30846,30 @@ def audit_iwa_numbers_table_cell_scientific_format_source_topology(
         methods=RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_METHODS,
         focused_helpers=RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_FOCUSED_HELPERS,
         focused_tests=RETIRED_IWA_NUMBERS_TABLE_CELL_SCIENTIFIC_FORMAT_FOCUSED_TESTS,
+    )
+
+
+def audit_iwa_numbers_table_cell_date_time_format_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire NumbersEditor Date & Time raw-ID methods after owner cutover.
+
+    Date & Time has no migration-only bridge/fallback helpers: source-built
+    and attached-table compatibility continues through the generic
+    ``DataFormat`` routes, while the focused ``litchi-numbers::Package`` owns
+    the selector-first DateTime transaction.  Pass empty inventories to the
+    shared retired-route scanner so only the dedicated NumbersEditor methods
+    are rejected.
+    """
+
+    if not _numbers_table_cell_date_time_format_owner_present(root):
+        return []
+    return _audit_iwa_numbers_table_cell_format_retirement(
+        root,
+        label="Date & Time",
+        methods=RETIRED_IWA_NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_METHODS,
+        focused_helpers=frozenset(),
+        focused_tests=frozenset(),
     )
 
 
@@ -40168,13 +41184,7 @@ def audit_keynote_package_no_eager_prost_source_topology(
             if path.name in KEYNOTE_TEST_ONLY_SOURCE_NAMES:
                 continue
             raw_source = path.read_text(encoding="utf-8")
-            masked_source = _mask_rust_non_code(raw_source)
-            test_module = KEYNOTE_PRODUCTION_TEST_MODULE.search(masked_source)
-            production_source = (
-                raw_source[: test_module.start()]
-                if test_module is not None
-                else raw_source
-            )
+            production_source = _mask_rust_cfg_test_items(raw_source)
             production_code = _mask_rust_non_code(production_source)
             for label, pattern in KEYNOTE_NO_EAGER_PROST_SOURCE_PATTERNS:
                 for match in pattern.finditer(production_code):
@@ -52852,7 +53862,10 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_table_cell_text_format_facade_source_topology()
         + audit_numbers_table_cell_date_time_format_codec_source_topology()
         + audit_numbers_table_cell_date_time_format_facade_source_topology()
+        + audit_iwa_numbers_table_cell_date_time_format_source_topology()
         + audit_iwa_numbers_table_cell_text_format_source_topology()
+        + audit_numbers_table_cell_custom_format_codec_source_topology()
+        + audit_numbers_table_cell_custom_format_facade_source_topology()
         + audit_numbers_table_cell_percentage_format_codec_source_topology()
         + audit_numbers_table_cell_percentage_format_facade_source_topology()
         + audit_iwa_numbers_table_cell_percentage_format_source_topology()

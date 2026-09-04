@@ -1237,18 +1237,18 @@ leaves the package unchanged:
 
 Existing-cell Number, Percentage, Currency, Scientific, Fraction, Text, and
 Date & Time format transactions follow the same focused-package rule. The
-former `NumbersEditor` raw-ID convenience methods and format-specific
-bridge/fallback helpers are retired for Number, Percentage, Currency,
-Scientific, and Fraction. There is no dedicated host raw-ID Text route; the
-focused Text owner handles that existing-cell operation. Dedicated host raw-ID
-Date & Time retirement is not claimed. Generic source-built or cross-format
-`DataFormat` compatibility helpers, source-built `DataFormat::Text` and
-`DataFormat::DateTime`, and attached table callers remain migration-host-only
+former `NumbersEditor` raw-ID convenience methods are retired for Number,
+Percentage, Currency, Scientific, Fraction, and Date & Time; their dedicated
+Number/Percentage/Currency/Scientific/Fraction bridge and fallback helpers are
+retired as well. There is no dedicated host raw-ID Text
+route; the focused Text owner handles that existing-cell operation. Generic
+source-built or cross-format `DataFormat` compatibility helpers, source-built
+`DataFormat::Text` and `DataFormat::DateTime`, the broad `TextDateTimeField`
+smart-field lifecycle, and attached Pages/Keynote table callers remain
+migration-host-only compatibility surfaces. The dedicated `NumbersEditor`
+semantic/table Date & Time get/set/reset methods are retired; attached
+PagesEditor and KeynoteEditor table wrappers remain available for their
 compatibility surfaces.
-The host `NumbersEditor` semantic/table Date & Time get/set/reset methods
-(`table_cell_date_time_format`, `set_table_cell_date_time_format`, and
-`reset_table_cell_date_time_format`) remain available for that compatibility
-surface.
 
 The focused `litchi-numbers` Text-format owner handles existing-cell Text
 through its selector-first package API. For source-built Numbers compatibility,
@@ -1265,6 +1265,16 @@ identity-bearing path remains available for compatibility, as do the Pages and
 Keynote wrappers. Native evidence for the focused owner is limited to the one
 recorded Numbers type-9 cell/pattern and its operation-specific save/close/
 reopen cycle; it is not a suite-wide DateTime or host-exit claim.
+
+The focused `litchi-numbers` Custom owner handles one existing rooted cell's
+document-scoped Number, Text, or Date & Time custom format through selector-first
+`Package` transactions. Native IDs, registry UUIDs, format-list keys, archive
+members, and wire payloads remain private. Its current evidence is limited to
+deterministic source-built exact-source fixtures and strict codec/package tests;
+there is no Apple-authored fixture, native Numbers acceptance/resave evidence,
+or E2/E3/E4 claim. The generic and source-built Custom compatibility routes
+remain host-owned, and a focused-owner refusal is terminal rather than a
+fallback trigger.
 
 ```rust,no_run
 use litchi_numbers::{Package, SheetSelector, TableSelector};

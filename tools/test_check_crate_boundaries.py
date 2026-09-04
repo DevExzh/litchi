@@ -1422,6 +1422,174 @@ def add_numbers_table_cell_date_time_format_canonical_scaffold(root: Path) -> No
         encoding="utf-8",
     )
 
+    # The focused owner does not retire the generic DataFormat compatibility
+    # helpers.  Keep a minimal Numbers host route in the fixture so the
+    # retirement audit can prove these names remain accepted.
+    host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_SOURCE[0]
+    host.parent.mkdir(parents=True, exist_ok=True)
+    host.write_text(
+        "fn generic_date_time_format_route() {\n"
+        "    cell_date_time_format(); set_cell_date_time_format();\n"
+        "    reset_cell_date_time_format(); table_cell_data_format();\n"
+        "    set_table_cell_data_format();\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+
+def add_numbers_table_cell_custom_format_canonical_scaffold(root: Path) -> None:
+    """Create the complete focused Custom owner and private codec seam."""
+
+    semantic = root / boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub mod transaction {\n"
+        "    pub use crate::package::table_cell_custom_format::{"
+        "Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path};\n"
+        "}\n"
+        "pub enum Custom { Number(Number), Text(Text), DateTime(DateTime) }\n"
+        "pub struct Number;\n"
+        "pub struct Text;\n"
+        "pub struct DateTime;\n",
+        encoding="utf-8",
+    )
+
+    owner = root / boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "pub enum Path { Package, Cell { sheet: usize, table: usize, position: CellPosition } }\n"
+        "pub enum LimitKind { PayloadBytes }\n"
+        "pub struct Edit;\n"
+        "pub struct Patch;\n"
+        "pub struct Commit;\n"
+        "pub struct Diagnostics;\n"
+        "pub struct Error;\n"
+        "fn custom_owner_policy() {\n"
+        "    document_scoped_registry; rooted; registry; field_9; message_type;\n"
+        "    270; 271; 272; Number; Text; Date_Time;\n"
+        "    format_list; refcount; reuse; cull; copy_on_write; reference;\n"
+        "    exact_source; source_bound; PatchConflict; inverse; no_op;\n"
+        "    candidate; reopen; readback; locality; same_content;\n"
+        "    budget; preflight; bounded; allocation; unsupported; fail_closed;\n"
+        "}\n"
+        "impl Package {\n"
+        "pub fn table_cell_custom_format<'sheet, 'table>(&self, "
+        "sheet: impl Into<SheetSelector<'sheet>>, "
+        "table: impl Into<TableSelector<'table>>, position: CellPosition) "
+        "-> Result<Option<Custom>, Error> {}\n"
+        "pub fn edit_table_cell_custom_format<'sheet, 'table>(&self, "
+        "sheet: impl Into<SheetSelector<'sheet>>, "
+        "table: impl Into<TableSelector<'table>>, position: CellPosition) "
+        "-> Result<Edit, Error> {}\n"
+        "pub fn apply_table_cell_custom_format(&self, patch: &Patch) "
+        "-> Result<Commit, Error> {}\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    lib = root / (boundaries.NUMBERS_SOURCE_ROOT / "lib.rs")
+    lib.parent.mkdir(parents=True, exist_ok=True)
+    lib.write_text("pub mod cell;\n", encoding="utf-8")
+    cell = root / (boundaries.NUMBERS_SOURCE_ROOT / "cell" / "mod.rs")
+    cell.parent.mkdir(parents=True, exist_ok=True)
+    cell.write_text("pub mod data_format;\n", encoding="utf-8")
+    data_format = root / (boundaries.NUMBERS_SOURCE_ROOT / "cell" / "data_format.rs")
+    data_format.parent.mkdir(parents=True, exist_ok=True)
+    data_format.write_text(
+        "pub mod custom;\npub use custom::Custom;\n", encoding="utf-8"
+    )
+    package = root / boundaries.NUMBERS_PACKAGE_SOURCE
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_text(
+        "pub(crate) mod table_cell_custom_format;\n", encoding="utf-8"
+    )
+
+    codec = root / boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "use buffa::DecodeOptions;\n"
+        "pub const CUSTOM_FORMAT_REGISTRY_MESSAGE_TYPE: u32 = 222;\n"
+        "pub const CUSTOM_FORMAT_REGISTRY_REFERENCE_FIELD: u32 = 9;\n"
+        "pub const CUSTOM_FORMAT_LIST_KIND: u32 = 6;\n"
+        "pub const NATIVE_CUSTOM_NUMBER_FORMAT_TYPE: u32 = 270;\n"
+        "pub const NATIVE_CUSTOM_TEXT_FORMAT_TYPE: u32 = 271;\n"
+        "pub const NATIVE_CUSTOM_DATE_TIME_FORMAT_TYPE: u32 = 272;\n"
+        "pub struct DecodeOptions;\n"
+        "pub struct DecodeReport;\n"
+        "pub struct DecodeError;\n"
+        "pub struct PreparedCustomFormatRewrite;\n"
+        "pub struct PreparedCustomFormatListRewrite;\n"
+        "pub struct RewriteExecutionRequirements;\n"
+        "pub struct RewriteExecutionLimits;\n"
+        "pub struct RewriteOutput;\n"
+        "pub fn decode_custom_format_with_report() {}\n"
+        "pub fn decode_custom_format_list_with_report() {}\n"
+        "pub fn prepare_custom_format_rewrite() {}\n"
+        "pub fn prepare_custom_format_list_rewrite() {}\n"
+        "pub fn canonical_custom_format() {}\n"
+        "pub fn canonical_custom_format_list() {}\n"
+        "pub fn rewrite_custom_format() {}\n"
+        "pub fn rewrite_custom_format_list() {}\n"
+        "fn scanner() {\n"
+        "    Budget::new; preflight; scan_custom_format; scan_custom_format_list;\n"
+        "    decode_lazy_view; LazyView; buffa; projection; generated;\n"
+        "    duplicate; unique; noncanonical; canonical; wire; unknown; raw;\n"
+        "    uuid; UUID; count; validate_unique_uuids; zero;\n"
+        "    extend_from_slice; execution_requirements; Prepared; execute;\n"
+        "    retained; scratch; allocation;\n"
+        "}\n"
+        "#[cfg(test)]\n"
+        "mod tests { #[test] fn hostile_wire_and_registry_rejection() {} }\n",
+        encoding="utf-8",
+    )
+    public = root / boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_PUBLIC_SOURCE
+    public.parent.mkdir(parents=True, exist_ok=True)
+    public.write_text(
+        "#[doc(hidden)]\n"
+        f"pub mod {boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_MODULE};\n"
+        "#[doc(hidden)]\n"
+        f"mod {boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_GENERATED_MODULE} {{\n"
+        "    include!(concat!(env!(\"OUT_DIR\"), "
+        "\"/buffa-numbers-table-cell-custom-format/generated.rs\"));\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    integration = root / boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_INTEGRATION_SOURCE
+    integration.parent.mkdir(parents=True, exist_ok=True)
+    integration.write_text(
+        "#[test] fn custom_number_text_date_time_set_clear_reset_noop_inverse() {\n"
+        "    Number; Text; Date_Time; Custom; set; clear; reset; automatic;\n"
+        "    no_op; inverse; byte_for_byte; uuid; registry; refcount; reference;\n"
+        "    reuse; cull; unknown; member; nested; source_span; candidate; reopen;\n"
+        "    readback; locality; stale; foreign; wrong_family; malformed; unsupported;\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    example = root / boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_EXAMPLE
+    example.parent.mkdir(parents=True, exist_ok=True)
+    example.write_text(
+        "fn main() { package.table_cell_custom_format(); "
+        "package.edit_table_cell_custom_format(); "
+        "package.apply_table_cell_custom_format(); }\n",
+        encoding="utf-8",
+    )
+
+    for fuzz_path in (
+        boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_FUZZ_SOURCE,
+        boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_FUZZ_SOURCE,
+    ):
+        target = root / fuzz_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("fuzz_target!(|data: &[u8]| { let _ = data; });\n", encoding="utf-8")
+    for corpus in (
+        boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_FUZZ_CORPUS,
+        boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_FUZZ_CORPUS,
+    ):
+        absolute = root / corpus
+        absolute.mkdir(parents=True, exist_ok=True)
+        (absolute / "hostile.seed").write_bytes(b"custom")
+
 
 def add_numbers_table_cell_percentage_format_canonical_scaffold(
     root: Path,
@@ -15307,6 +15475,71 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertEqual(
                 boundaries.audit_keynote_package_no_eager_prost_source_topology(root),
                 [],
+            )
+
+    def test_focused_keynote_package_no_eager_prost_rejects_production_after_test_module(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.KEYNOTE_SOURCE_ROOT / "package.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = prost::Message::decode(bytes);\n"
+                "    }\n"
+                "}\n"
+                "fn production_after_tests(bytes: &[u8]) {\n"
+                "    let _ = prost::Message::decode(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_keynote_package_no_eager_prost_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn(
+                "focused litchi-keynote production source uses prost::Message: "
+                "crates/litchi-keynote/src/package.rs:9",
+                violations,
+            )
+
+    def test_focused_keynote_package_no_eager_prost_rejects_production_after_nested_test_module(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.KEYNOTE_SOURCE_ROOT / "package.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "mod production {\n"
+                "    #[cfg(test)]\n"
+                "    mod tests {\n"
+                "        use prost::Message;\n"
+                "        fn decode(bytes: &[u8]) {\n"
+                "            let _ = prost::Message::decode(bytes);\n"
+                "        }\n"
+                "    }\n"
+                "\n"
+                "    fn production_after_tests(bytes: &[u8]) {\n"
+                "        let _ = prost::Message::decode(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_keynote_package_no_eager_prost_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn(
+                "focused litchi-keynote production source uses prost::Message: "
+                "crates/litchi-keynote/src/package.rs:11",
+                violations,
             )
 
     def test_focused_keynote_package_no_eager_prost_rejects_production_markers(
@@ -34663,6 +34896,12 @@ fn rewrite_movie_title_operation(
                 ),
                 [],
             )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_date_time_format_source_topology(
+                    root
+                ),
+                [],
+            )
 
     def test_numbers_table_cell_date_time_format_rejects_generated_leaks_and_raw_api(
         self,
@@ -34716,6 +34955,444 @@ fn rewrite_movie_title_operation(
                 any("public API reexports its Buffa generated projection" in item for item in violations),
                 violations,
             )
+
+    def test_iwa_numbers_table_cell_date_time_format_retires_raw_id_routes_and_preserves_compatibility(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_date_time_format_canonical_scaffold(root)
+            host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_SOURCE[0]
+
+            # Generic DataFormat compatibility remains valid, and attached
+            # table methods in the Pages/Keynote hosts are outside this audit.
+            pages = root / "crates/litchi-iwa/src/pages/editor/tables/semantic.rs"
+            pages.parent.mkdir(parents=True, exist_ok=True)
+            pages.write_text(
+                "impl PagesEditor {\n"
+                "    pub fn table_cell_date_time_format(&self) {}\n"
+                "    pub fn set_table_cell_date_time_format(&mut self) {}\n"
+                "    pub fn reset_table_cell_date_time_format(&mut self) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            keynote = root / "crates/litchi-iwa/src/keynote/editor/slide_tables.rs"
+            keynote.parent.mkdir(parents=True, exist_ok=True)
+            keynote.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_table_cell_date_time_format(&self) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_date_time_format_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            # A returned NumbersEditor method is retired as soon as the
+            # focused owner is present.
+            host.write_text(
+                "impl NumbersEditor {\n"
+                + "\n".join(
+                    f"pub fn {method}(&self) {{}}"
+                    for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_METHODS
+                )
+                + "\n}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_date_time_format_source_topology(
+                root
+            )
+            for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_METHODS:
+                self.assertTrue(
+                    any(f"raw-ID method returned {method}" in item for item in violations),
+                    (method, violations),
+                )
+
+            # Comments, literals, and composite test-only items must not
+            # resurrect a production route.  Generic helpers are still
+            # intentionally allowed.
+            host.write_text(
+                "// table_cell_date_time_format(); set_table_cell_date_time_format();\n"
+                'const NOTE: &str = "reset_table_cell_date_time_format(";\n'
+                "#[cfg(all(test, feature = \"oracle\"))]\n"
+                "fn hidden_all() { editor.table_cell_date_time_format(); }\n"
+                "#[cfg(any(all(test, feature = \"oracle\"), all(test, unix)))]\n"
+                "fn hidden_nested() { editor.set_table_cell_date_time_format(); }\n"
+                "fn generic_date_time_route() {\n"
+                "    cell_date_time_format(); set_cell_date_time_format();\n"
+                "    reset_cell_date_time_format(); table_cell_data_format();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_date_time_format_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            # A focused receiver is exempt only in its lexical binding scope;
+            # a generic shadow and an editor receiver remain visible.
+            host.write_text(
+                "use litchi_numbers::Package as FocusedNumbersPackage;\n"
+                "fn scoped_routes() {\n"
+                "    let package = FocusedNumbersPackage::from_bytes(bytes);\n"
+                "    {\n"
+                "        let package = GenericPackage::new();\n"
+                "        package.table_cell_date_time_format();\n"
+                "    }\n"
+                "    package.table_cell_date_time_format();\n"
+                "    {\n"
+                "        let package = FocusedNumbersPackage::from_bytes(bytes);\n"
+                "        package.set_table_cell_date_time_format();\n"
+                "    }\n"
+                "    litchi_numbers::Package::from_bytes(bytes)?.reset_table_cell_date_time_format();\n"
+                "    editor.table_cell_date_time_format();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_date_time_format_source_topology(
+                root
+            )
+            production_calls = [
+                item
+                for item in violations
+                if "raw-ID production call" in item
+            ]
+            self.assertEqual(len(production_calls), 2, violations)
+            self.assertTrue(
+                any("table_cell_date_time_format" in item for item in production_calls),
+                violations,
+            )
+            self.assertEqual(
+                sum("table_cell_date_time_format" in item for item in production_calls),
+                2,
+                violations,
+            )
+            self.assertFalse(
+                any("set_table_cell_date_time_format" in item for item in production_calls),
+                violations,
+            )
+            self.assertFalse(
+                any("reset_table_cell_date_time_format" in item for item in production_calls),
+                violations,
+            )
+
+    def test_iwa_numbers_table_cell_date_time_format_owner_gate_masks_test_decoys(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_OWNER_SOURCE
+            semantic = root / boundaries.NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_SEMANTIC_SOURCE
+            package = root / "crates/litchi-numbers/src/package.rs"
+            for path, source in (
+                (
+                    owner,
+                    "#[cfg(all(test, feature = \"oracle\"))]\n"
+                    "pub fn fake_owner() { table_cell_date_time_format(); }\n",
+                ),
+                (
+                    semantic,
+                    "#[cfg(any(all(test, feature = \"oracle\"), all(test, unix)))]\n"
+                    "pub struct DateTime;\n",
+                ),
+                (
+                    package,
+                    "#[cfg(all(test, feature = \"oracle\"))]\n"
+                    "pub(crate) mod table_cell_date_time_format;\n",
+                ),
+            ):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(source, encoding="utf-8")
+            host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_SOURCE[0]
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "fn bypass() { editor.table_cell_date_time_format(); }\n",
+                encoding="utf-8",
+            )
+
+            self.assertFalse(
+                boundaries._numbers_table_cell_date_time_format_owner_present(root)
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_date_time_format_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_custom_format_boundary_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_custom_format_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_custom_format_codec_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_custom_format_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            # The focused owner is deliberately not coupled to a host-retirement
+            # audit: the migration-host Custom route remains compatibility-only.
+            self.assertNotIn(
+                "audit_iwa_numbers_table_cell_custom_format",
+                vars(boundaries),
+            )
+
+    def test_numbers_table_cell_custom_format_codec_rejects_decoys_and_bad_projection(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_custom_format_canonical_scaffold(root)
+            codec = root / boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_SOURCE
+            complete = codec.read_text(encoding="utf-8")
+
+            # Comments and string literals must not satisfy the production
+            # preflight/lazy-view marker groups.
+            decoy = re.sub(
+                r"fn scanner\(\) \{[\s\S]*?\n\}\n#\[cfg\(test\)\]",
+                "// Budget::new preflight scan_custom_format scan_custom_format_list "
+                "decode_lazy_view LazyView buffa projection generated duplicate "
+                "unique noncanonical canonical wire unknown raw uuid count "
+                "validate_unique_uuids extend_from_slice execution_requirements "
+                "Prepared execute retained scratch allocation\n"
+                'const NOTE: &str = "all strict codec markers are only decoys";\n'
+                "#[cfg(test)]",
+                complete,
+            )
+            codec.write_text(decoy, encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_custom_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing strict handwritten wire preflight marker" in item for item in violations),
+                violations,
+            )
+
+            # Lazy decoding is only legal after the bounded wire preflight.
+            codec.write_text(
+                complete.replace(
+                    "Budget::new; preflight; scan_custom_format; scan_custom_format_list;\n"
+                    "    decode_lazy_view; LazyView; buffa; projection; generated;",
+                    "decode_lazy_view; LazyView; Budget::new; preflight; "
+                    "scan_custom_format; scan_custom_format_list; buffa; projection; generated;",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_custom_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must preflight wire before" in item for item in violations),
+                violations,
+            )
+
+            # Each wire discriminator is tied to its named constant, not merely
+            # to an unrelated occurrence of the same integer.
+            codec.write_text(
+                complete.replace(
+                    "CUSTOM_FORMAT_REGISTRY_MESSAGE_TYPE: u32 = 222",
+                    "CUSTOM_FORMAT_REGISTRY_MESSAGE_TYPE: u32 = 223",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_custom_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing registry message type 222" in item for item in violations),
+                violations,
+            )
+
+            # The generated Buffa projection is private and must use the
+            # build-script output path.
+            public = root / boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_PUBLIC_SOURCE
+            public.write_text(
+                "#[doc(hidden)]\n"
+                f"pub mod {boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_MODULE};\n"
+                f"pub mod {boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_GENERATED_MODULE};\n",
+                encoding="utf-8",
+            )
+            codec.write_text(complete, encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_custom_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("generated projection module must remain private" in item for item in violations),
+                violations,
+            )
+
+            public.write_text(
+                "#[doc(hidden)]\n"
+                f"pub mod {boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_MODULE};\n"
+                f"mod {boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_GENERATED_MODULE} {{\n"
+                "    include!(\"not-a-buffa-generated-file.rs\");\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_custom_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("generated projection module has invalid include shape" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_table_cell_custom_format_facade_rejects_poisoned_receivers_and_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_custom_format_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_SOURCE
+            complete_owner = owner.read_text(encoding="utf-8")
+
+            # An impl nested beneath a decoy module must not be mistaken for
+            # the root Package receiver.
+            poisoned = complete_owner.replace(
+                "impl Package {\n", "mod decoy_receiver {\nimpl Package {\n", 1
+            ) + "}\n"
+            owner.write_text(poisoned, encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_custom_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing Package method table_cell_custom_format" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing Package method edit_table_cell_custom_format" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                complete_owner.replace("&self", "self", 1), encoding="utf-8"
+            )
+            violations = boundaries.audit_numbers_table_cell_custom_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must retain its Package receiver" in item for item in violations),
+                violations,
+            )
+
+            # Public declarations cannot smuggle native UUIDs, member names,
+            # payload buffers, or raw registry helpers through the facade.
+            owner.write_text(
+                complete_owner
+                + "pub fn leak(uuid: Uuid, member_name: Vec<u8>, payload_bytes: Vec<u8>) {}\n"
+                + "pub fn read_custom_registry() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_custom_format_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "native UUID or raw identifier Uuid",
+                "raw identifier/member/payload parameter member_name: Vec<u8>",
+                "opaque raw byte container payload_bytes: Vec<u8>",
+                "raw registry helper read_custom_registry",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    (fragment, violations),
+                )
+
+            # A public package module and nested export decoys cannot activate
+            # or widen the private owner seam.
+            package = root / boundaries.NUMBERS_PACKAGE_SOURCE
+            package.write_text(
+                "pub(crate) mod table_cell_custom_format;\n"
+                "pub mod table_cell_custom_format;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_custom_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("exposes its public package owner module" in item for item in violations),
+                violations,
+            )
+
+            lib = root / boundaries.NUMBERS_SOURCE_ROOT / "lib.rs"
+            lib.write_text("mod decoy { pub mod cell; }\n", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_custom_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("missing root cell module" in item for item in violations), violations)
+
+    def test_numbers_table_cell_custom_format_masks_cfg_comments_and_strings(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_custom_format_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            source = re.sub(
+                r"fn custom_owner_policy\(\) \{[\s\S]*?\n\}\nimpl Package",
+                "// fn custom_owner_policy() { document_scoped_registry format_list "
+                "exact_source candidate budget unsupported fail_closed }\n"
+                "const NOTE: &str = \"document_scoped_registry format_list exact_source \"\n"
+                "    \"candidate budget unsupported fail_closed\";\n"
+                "impl Package",
+                source,
+            )
+            source += (
+                "// pub fn leak(uuid: Uuid, payload_bytes: Vec<u8>) {}\n"
+                'const DECOY: &str = "Uuid payload_bytes read_custom_registry";\n'
+            )
+            owner.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_custom_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing document-scoped registry transaction marker" in item for item in violations),
+                violations,
+            )
+
+            # Test-only owner, semantic, and module declarations are ignored;
+            # this also proves a host Custom method cannot be retired by this
+            # focused checker while the owner is inactive.
+            owner.write_text(
+                "#[cfg(all(test, feature = \"oracle\"))]\n"
+                "pub fn fake_owner() { table_cell_custom_format(); }\n",
+                encoding="utf-8",
+            )
+            semantic = root / boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SEMANTIC_SOURCE
+            semantic.write_text(
+                "#[cfg(any(all(test, feature = \"oracle\"), all(test, unix)))]\n"
+                "pub enum Custom { Number, Text, DateTime }\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.NUMBERS_PACKAGE_SOURCE
+            package.write_text(
+                "#[cfg(all(test, feature = \"oracle\"))]\n"
+                "pub(crate) mod table_cell_custom_format;\n",
+                encoding="utf-8",
+            )
+            self.assertFalse(
+                boundaries._numbers_table_cell_custom_format_owner_present(root)
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_custom_format_codec_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_custom_format_facade_source_topology(root),
+                [],
+            )
+
 
     def test_numbers_table_cell_text_format_codec_requires_strict_lazy_projection(
         self,
@@ -36507,7 +37184,10 @@ fn rewrite_movie_title_operation(
             "audit_numbers_table_cell_text_format_facade_source_topology",
             "audit_numbers_table_cell_date_time_format_codec_source_topology",
             "audit_numbers_table_cell_date_time_format_facade_source_topology",
+            "audit_iwa_numbers_table_cell_date_time_format_source_topology",
             "audit_iwa_numbers_table_cell_text_format_source_topology",
+            "audit_numbers_table_cell_custom_format_codec_source_topology",
+            "audit_numbers_table_cell_custom_format_facade_source_topology",
             "audit_numbers_table_cell_percentage_format_codec_source_topology",
             "audit_numbers_table_cell_percentage_format_facade_source_topology",
             "audit_iwa_numbers_table_cell_percentage_format_source_topology",
@@ -36537,7 +37217,10 @@ fn rewrite_movie_title_operation(
             "audit_numbers_table_cell_text_format_facade_source_topology",
             "audit_numbers_table_cell_date_time_format_codec_source_topology",
             "audit_numbers_table_cell_date_time_format_facade_source_topology",
+            "audit_iwa_numbers_table_cell_date_time_format_source_topology",
             "audit_iwa_numbers_table_cell_text_format_source_topology",
+            "audit_numbers_table_cell_custom_format_codec_source_topology",
+            "audit_numbers_table_cell_custom_format_facade_source_topology",
             "audit_numbers_table_cell_percentage_format_codec_source_topology",
             "audit_numbers_table_cell_percentage_format_facade_source_topology",
             "audit_iwa_numbers_table_cell_percentage_format_source_topology",

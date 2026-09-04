@@ -83,3 +83,6 @@ coverage
 !/corpus/numbers_table_cell_date_time_format/
 /corpus/numbers_table_cell_date_time_format/*
 !/corpus/numbers_table_cell_date_time_format/*.seed
+!/corpus/numbers_table_cell_custom_format/
+/corpus/numbers_table_cell_custom_format/*
+!/corpus/numbers_table_cell_custom_format/*.seed

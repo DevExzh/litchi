@@ -61,6 +61,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=src/numbers_table_cell_fraction_format_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_text_format_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_date_time_format_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_table_cell_custom_format_codec.rs");
+    println!("cargo:rerun-if-changed=src/numbers_table_cell_duration_format_codec.rs");
     println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec.rs");
     // Keep the native Numbers and Pages message-ID routes tied to their schema
     // projections when this crate is built from the workspace. Published
@@ -216,6 +218,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         buffa_projection_directory,
     )?;
     enforce_numbers_table_cell_date_time_format_codec_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
+    enforce_numbers_table_cell_custom_format_codec_provenance(
+        proto_directory,
+        buffa_projection_directory,
+    )?;
+    enforce_numbers_table_cell_duration_format_codec_provenance(
         proto_directory,
         buffa_projection_directory,
     )?;
@@ -866,6 +876,53 @@ fn main() -> Result<(), Box<dyn Error>> {
         &buffa_numbers_table_cell_date_time_format_out_directory,
     )?;
 
+    // Custom-format registries contain repeated UUID/archive/condition
+    // payloads. Keep those entries as borrowed bytes in the Buffa sidecar so
+    // generated code cannot materialise input-width collections; the strict
+    // handwritten layer scans and rewrites every nested archive while this
+    // projection checks only the selected scalar shapes.
+    let buffa_numbers_table_cell_custom_format_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-numbers-table-cell-custom-format");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSTTableCellCustomFormatArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_numbers_table_cell_custom_format_out_directory)
+        .include_file("iwa_numbers_table_cell_custom_format_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_numbers_table_cell_custom_format_projection_budget(
+        &buffa_numbers_table_cell_custom_format_out_directory,
+    )?;
+
+    // Duration keeps the native discriminator, presentation style, unit range,
+    // and automatic-unit flag in its lazy parity sidecar. The complete source
+    // payload remains authoritative so unknown extension records and groups
+    // are retained by the handwritten rewrite path.
+    let buffa_numbers_table_cell_duration_format_out_directory =
+        PathBuf::from(env::var("OUT_DIR")?).join("buffa-numbers-table-cell-duration-format");
+    buffa_build::Config::new()
+        .files(&[buffa_projection_directory.join("TSTTableCellDurationFormatArchive.proto")])
+        .includes(&[buffa_projection_directory])
+        .out_dir(&buffa_numbers_table_cell_duration_format_out_directory)
+        .include_file("iwa_numbers_table_cell_duration_format_buffa_protos.rs")
+        .generate_views(true)
+        .lazy_views(true)
+        .preserve_unknown_fields(false)
+        .generate_json(false)
+        .generate_text(false)
+        .reflect_mode(buffa_build::ReflectMode::Off)
+        .idiomatic_field_names(true)
+        .compile()?;
+    enforce_numbers_table_cell_duration_format_projection_budget(
+        &buffa_numbers_table_cell_duration_format_out_directory,
+    )?;
+
     let buffa_table_cell_dependency_out_directory =
         PathBuf::from(env::var("OUT_DIR")?).join("buffa-numbers-table-cell-dependency");
     buffa_build::Config::new()
@@ -1432,6 +1489,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "4ef644e216db906924e7ea1cc6af3a16b1441ddcc707b25a019752667eb95149",
         ),
         (
+            "TSTTableCellCustomFormatArchive.proto",
+            1689,
+            "313411278103bc00da1d8de9e8837540a746d9f360f2f4a24ffdf1d3e7c94dde",
+        ),
+        (
             "TSTTableCellFractionFormatArchive.proto",
             534,
             "1589841fb465e50cdeab485b01b8177a0e0c95239d30da7dce5c013e6f5c4f8f",
@@ -1445,6 +1507,11 @@ fn enforce_projection_schema_ratchets(projection_directory: &Path) -> Result<(),
             "TSTTableCellDateTimeFormatArchive.proto",
             501,
             "108e057fc1db2d181c223aaa3b6e5d6b222d7acd69478cd77163e445be8e776a",
+        ),
+        (
+            "TSTTableCellDurationFormatArchive.proto",
+            624,
+            "db2ca567faa7cefae63c48aacf29cb630bc634bb577bb92a0c60f6e855439583",
         ),
         (
             "TSTTableHeaderSettingsArchive.proto",
@@ -1746,6 +1813,16 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
             "mod buffa_numbers_table_cell_date_time_format_generated {",
         ),
         (
+            "src/numbers_table_cell_custom_format_codec.rs",
+            "crate::buffa_numbers_table_cell_custom_format_generated::",
+            "mod buffa_numbers_table_cell_custom_format_generated {",
+        ),
+        (
+            "src/numbers_table_cell_pop_up_menu_codec.rs",
+            "crate::buffa_numbers_table_cell_duration_format_generated::",
+            "mod buffa_numbers_table_cell_duration_format_generated {",
+        ),
+        (
             "src/numbers_table_cell_dependency_codec.rs",
             "crate::buffa_numbers_table_cell_dependency_generated::",
             "mod buffa_numbers_table_cell_dependency_generated {",
@@ -1844,6 +1921,7 @@ fn enforce_production_ingress_ratchets() -> Result<(), Box<dyn Error>> {
         "src/numbers_table_cell_fraction_format_codec.rs",
         "src/numbers_table_cell_text_format_codec.rs",
         "src/numbers_table_cell_date_time_format_codec.rs",
+        "src/numbers_table_cell_duration_format_codec.rs",
     ];
 
     let mut expected_paths = CODECS
@@ -4607,6 +4685,208 @@ fn enforce_numbers_table_cell_date_time_format_projection_budget(
     Ok(())
 }
 
+fn enforce_numbers_table_cell_custom_format_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    // The custom sidecar intentionally contains repeated scalar byte views;
+    // nested custom archives and conditions are parsed by the handwritten
+    // source-preserving codec. Keep the generated closure bounded and forbid
+    // eager/deferred message ownership from widening that boundary.
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 256 * 1024;
+
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    let mut lazy_message_fields = 0usize;
+    let mut files = 0usize;
+    for entry in fs::read_dir(directory)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("custom generated file count overflow")?;
+        let generated = fs::read(entry.path())?;
+        bytes = bytes
+            .checked_add(u64::try_from(generated.len())?)
+            .ok_or("custom generated byte count overflow")?;
+        let text = std::str::from_utf8(&generated)?;
+        repeated_views = repeated_views
+            .checked_add(text.matches("RepeatedView").count())
+            .ok_or("custom repeated-view count overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(text.matches("LazyRepeatedView").count())
+            .ok_or("custom lazy-repeated-view count overflow")?;
+        lazy_message_fields = lazy_message_fields
+            .checked_add(text.matches("LazyMessageFieldView").count())
+            .ok_or("custom lazy-message-field count overflow")?;
+    }
+    if files != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || repeated_views == 0
+        || lazy_repeated_views != 0
+        || lazy_message_fields != 0
+    {
+        return Err(format!(
+            "Numbers table-cell custom projection generated {files} files/{bytes} bytes/{repeated_views} repeated/{lazy_repeated_views} lazy repeated/{lazy_message_fields} lazy message fields; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, repeated views, and no deferred message fields"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn enforce_numbers_table_cell_custom_format_codec_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const CODEC_MARKERS: [&str; 30] = [
+        "pub const CUSTOM_FORMAT_REGISTRY_MESSAGE_TYPE: u32 = 222;",
+        "pub const CUSTOM_FORMAT_LIST_MESSAGE_TYPE: u32 = CUSTOM_FORMAT_REGISTRY_MESSAGE_TYPE;",
+        "pub const CUSTOM_FORMAT_REGISTRY_REFERENCE_FIELD: u32 = 9;",
+        "pub const CUSTOM_FORMAT_LIST_KIND: u32 = 6;",
+        "pub const NATIVE_CUSTOM_NUMBER_FORMAT_TYPE: u32 = 270;",
+        "pub const NATIVE_CUSTOM_TEXT_FORMAT_TYPE: u32 = 271;",
+        "pub const NATIVE_CUSTOM_DATE_TIME_FORMAT_TYPE: u32 = 272;",
+        "pub const NATIVE_CUSTOM_FRACTION_SENTINEL: u32 = u32::MAX - 2;",
+        "pub struct FormatStructSnapshot<'source>",
+        "pub struct FormatStructWrite<'source>",
+        "pub struct CustomFormatSnapshot<'source>",
+        "pub struct CustomFormatWrite<'source, 'conditions>",
+        "pub struct CustomFormatListSnapshot<'source>",
+        "pub struct CustomFormatListWrite<'source, 'items>",
+        "pub struct PreparedCustomFormatRewrite<'source, 'conditions>",
+        "pub struct PreparedCustomFormatListRewrite<'source, 'items>",
+        "pub fn decode_format_struct(",
+        "pub fn decode_custom_format(",
+        "pub fn decode_custom_format_list(",
+        "pub fn prepare_custom_format_rewrite<'source, 'conditions>(",
+        "pub fn rewrite_custom_format(",
+        "pub fn prepare_custom_format_write<'source, 'conditions>(",
+        "pub fn canonical_custom_format(",
+        "pub fn prepare_custom_format_list_rewrite<'source, 'items>(",
+        "pub fn rewrite_custom_format_list(",
+        "pub fn prepare_custom_format_list_write<'source, 'items>(",
+        "pub fn canonical_custom_format_list(",
+        "fn decode_uuid_with_budget(",
+        "fn validate_unique_uuids(",
+        "buffa_numbers_table_cell_custom_format_generated::",
+    ];
+    const PROJECTION_MARKERS: [&str; 12] = [
+        "syntax = \"proto2\";",
+        "package LitchiIwaNumbersTableCellCustomFormatProjection;",
+        "message UuidArchive {",
+        "message FormatStructArchive {",
+        "optional uint32 format_type = 1;",
+        "optional string custom_format_string = 18;",
+        "message Condition {",
+        "message CustomFormatArchive {",
+        "repeated bytes conditions = 4;",
+        "message CustomFormatListArchive {",
+        "repeated bytes uuids = 1;",
+        "repeated bytes custom_formats = 2;",
+    ];
+    let tn = fs::read_to_string(proto_directory.join("TNArchives.proto"))?;
+    let tst = fs::read_to_string(proto_directory.join("TSTArchives.proto"))?;
+    let tsk = fs::read_to_string(proto_directory.join("TSKArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSTTableCellCustomFormatArchive.proto"))?;
+    let codec = fs::read_to_string("src/numbers_table_cell_custom_format_codec.rs")?;
+    let lib = fs::read_to_string("src/lib.rs")?;
+    let production_codec = production_codec_source(&codec);
+    if !CODEC_MARKERS
+        .iter()
+        .all(|marker| codec.matches(marker).count() == 1)
+        || !PROJECTION_MARKERS
+            .iter()
+            .all(|marker| projection.matches(marker).count() == 1)
+        || tn
+            .matches("optional .TSP.Reference custom_format_list = 9;")
+            .count()
+            != 1
+        || tst.matches("CUSTOM_FORMAT = 6;").count() != 1
+        || tsk.matches("message FormatStructArchive {").count() != 1
+        || tsk.matches("message CustomFormatArchive {").count() != 1
+        || tsk.matches("message CustomFormatListArchive {").count() != 1
+        || tsk.matches("repeated .TSP.UUID uuids = 1;").count() != 1
+        || tsk
+            .matches("repeated .TSK.CustomFormatArchive custom_formats = 2;")
+            .count()
+            != 1
+        || projection.len() > 3 * 1024
+        || projection.contains("import ")
+        || lib
+            .matches("pub mod numbers_table_cell_custom_format_codec;")
+            .count()
+            != 1
+        || lib
+            .matches("mod buffa_numbers_table_cell_custom_format_generated {")
+            .count()
+            != 1
+        || !production_codec.contains("crate::buffa_numbers_table_cell_custom_format_generated::")
+        || !production_codec.contains("decode_lazy_view(")
+        || production_codec.contains("prost::")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "Numbers table-cell Custom projection/codec drifted from TSK custom archives, exposed generated storage, or introduced production encoding".into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_numbers_table_cell_duration_format_projection_budget(
+    directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const EXPECTED_FILES: usize = 5;
+    const MAX_GENERATED_BYTES: u64 = 128 * 1024;
+
+    let mut bytes = 0u64;
+    let mut repeated_views = 0usize;
+    let mut lazy_repeated_views = 0usize;
+    let mut lazy_message_fields = 0usize;
+    let mut files = 0usize;
+    for entry in fs::read_dir(directory)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            continue;
+        }
+        files = files
+            .checked_add(1)
+            .ok_or("duration generated file count overflow")?;
+        let generated = fs::read(entry.path())?;
+        bytes = bytes
+            .checked_add(u64::try_from(generated.len())?)
+            .ok_or("duration generated byte count overflow")?;
+        let text = std::str::from_utf8(&generated)?;
+        repeated_views = repeated_views
+            .checked_add(text.matches("RepeatedView").count())
+            .ok_or("duration repeated-view count overflow")?;
+        lazy_repeated_views = lazy_repeated_views
+            .checked_add(text.matches("LazyRepeatedView").count())
+            .ok_or("duration lazy-repeated-view count overflow")?;
+        lazy_message_fields = lazy_message_fields
+            .checked_add(text.matches("LazyMessageFieldView").count())
+            .ok_or("duration lazy-message-field count overflow")?;
+    }
+    if files != EXPECTED_FILES
+        || bytes > MAX_GENERATED_BYTES
+        || repeated_views != 0
+        || lazy_repeated_views != 0
+        || lazy_message_fields != 0
+    {
+        return Err(format!(
+            "Numbers table-cell duration projection generated {files} files/{bytes} bytes/{repeated_views} repeated/{lazy_repeated_views} lazy repeated/{lazy_message_fields} lazy message fields; expected {EXPECTED_FILES} files, at most {MAX_GENERATED_BYTES} bytes, and no repeated or deferred message views"
+        )
+        .into());
+    }
+    Ok(())
+}
+
 fn enforce_numbers_table_cell_text_format_codec_provenance(
     proto_directory: &Path,
     projection_directory: &Path,
@@ -4752,6 +5032,110 @@ fn enforce_numbers_table_cell_date_time_format_codec_provenance(
     {
         return Err(
             "Numbers table-cell DateTime projection/codec drifted from TSK.FormatStructArchive, exposed generated storage, or introduced production encoding".into(),
+        );
+    }
+    Ok(())
+}
+
+fn enforce_numbers_table_cell_duration_format_codec_provenance(
+    proto_directory: &Path,
+    projection_directory: &Path,
+) -> Result<(), Box<dyn Error>> {
+    const CODEC_MARKERS: [&str; 31] = [
+        "use crate::numbers_table_cell_pop_up_menu_codec as core;",
+        "pub use core::NATIVE_DURATION_FORMAT_TYPE;",
+        "pub use core::NATIVE_DURATION_STYLE_COLON;",
+        "pub use core::NATIVE_DURATION_STYLE_ABBREVIATED;",
+        "pub use core::NATIVE_DURATION_STYLE_FULL_NAMES;",
+        "pub use core::NATIVE_DURATION_UNIT_WEEKS;",
+        "pub use core::NATIVE_DURATION_UNIT_DAYS;",
+        "pub use core::NATIVE_DURATION_UNIT_HOURS;",
+        "pub use core::NATIVE_DURATION_UNIT_MINUTES;",
+        "pub use core::NATIVE_DURATION_UNIT_SECONDS;",
+        "pub use core::NATIVE_DURATION_UNIT_MILLISECONDS;",
+        "pub enum DurationStyle",
+        "pub enum DurationUnit",
+        "pub struct DurationFormatSnapshot<'source>",
+        "pub struct DurationFormatWrite(core::DurationFormatWrite);",
+        "pub struct PreparedDurationFormatRewrite<'source>",
+        "pub struct PreparedDurationFormatWrite(core::PreparedDurationFormatWrite);",
+        "pub fn decode_duration_format(",
+        "pub fn decode_duration_format_with_report(",
+        "pub fn prepare_duration_format_rewrite<'source>(",
+        "pub fn rewrite_duration_format(",
+        "pub fn prepare_duration_format_write(",
+        "pub use prepare_duration_format_write as prepare_duration_format_append;",
+        "pub fn canonical_duration_format(",
+        "pub use rewrite_duration_format as rewrite_table_cell_duration_format;",
+        "core::decode_duration_format(source, options)",
+        "core::decode_duration_format_with_report(source, options)",
+        "core::prepare_duration_format_rewrite(source, write.0, options)",
+        "core::rewrite_duration_format(source, write.0, options)",
+        "core::prepare_duration_format_write(write.0, options)",
+        "core::canonical_duration_format(write.0, options)",
+    ];
+    const PROJECTION_MARKERS: [&str; 9] = [
+        "syntax = \"proto2\";",
+        "package LitchiIwaNumbersTableCellDurationFormatProjection;",
+        "message FormatStructArchive {",
+        "optional uint32 format_type = 1;",
+        "optional uint32 duration_style = 7;",
+        "optional uint32 duration_unit_largest = 15;",
+        "optional uint32 duration_unit_smallest = 16;",
+        "optional bool use_automatic_duration_units = 40;",
+        "}",
+    ];
+    let tsk = fs::read_to_string(proto_directory.join("TSKArchives.proto"))?;
+    let projection =
+        fs::read_to_string(projection_directory.join("TSTTableCellDurationFormatArchive.proto"))?;
+    let codec = fs::read_to_string("src/numbers_table_cell_duration_format_codec.rs")?;
+    let core_codec = fs::read_to_string("src/numbers_table_cell_pop_up_menu_codec.rs")?;
+    let lib = fs::read_to_string("src/lib.rs")?;
+    let production_codec = production_codec_source(&codec);
+    let production_core_codec = production_codec_source(&core_codec);
+    if !CODEC_MARKERS
+        .iter()
+        .all(|marker| codec.matches(marker).count() == 1)
+        || !PROJECTION_MARKERS
+            .iter()
+            .all(|marker| projection.matches(marker).count() == 1)
+        || tsk.matches("message FormatStructArchive {").count() != 1
+        || tsk.matches("optional uint32 format_type = 1;").count() != 1
+        || tsk.matches("optional uint32 duration_style = 7;").count() != 1
+        || tsk
+            .matches("optional uint32 duration_unit_largest = 15;")
+            .count()
+            != 1
+        || tsk
+            .matches("optional uint32 duration_unit_smallest = 16;")
+            .count()
+            != 1
+        || tsk
+            .matches("optional bool use_automatic_duration_units = 40;")
+            .count()
+            != 1
+        || projection.len() > 2 * 1024
+        || projection.contains("repeated ")
+        || projection.contains("import ")
+        || lib
+            .matches("pub mod numbers_table_cell_duration_format_codec;")
+            .count()
+            != 1
+        || lib
+            .matches("mod buffa_numbers_table_cell_duration_format_generated {")
+            .count()
+            != 1
+        || !production_core_codec
+            .contains("crate::buffa_numbers_table_cell_duration_format_generated::")
+        || !production_core_codec.contains("decode_lazy_view(")
+        || production_codec.contains("prost::")
+        || production_codec.contains("to_owned_message")
+        || production_codec.contains("encode_to_vec")
+        || production_codec.contains("try_encode")
+        || production_codec.contains(".encode(")
+    {
+        return Err(
+            "Numbers table-cell Duration projection/codec drifted from TSK.FormatStructArchive, exposed generated storage, or introduced production encoding".into(),
         );
     }
     Ok(())

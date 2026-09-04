@@ -53,10 +53,11 @@ impl NumbersEditor {
         selector: litchi_numbers::TableSelector<'_>,
         deletion: RowDeletion,
     ) -> Result<()> {
+        let source_built = !self.package.source_is_exact();
         let table_id = super::selectors::table_id(self, selector)?;
         let mut staged = self.package.clone();
         let (new_rows, columns) = remove_attached_table_row(&mut staged, table_id, deletion)?;
-        verify_numbers_dimensions(&staged, table_id, new_rows, columns)?;
+        verify_numbers_dimensions(&staged, table_id, new_rows, columns, source_built)?;
         self.package = staged;
         Ok(())
     }
@@ -73,10 +74,11 @@ impl NumbersEditor {
         selector: litchi_numbers::TableSelector<'_>,
         deletion: ColumnDeletion,
     ) -> Result<()> {
+        let source_built = !self.package.source_is_exact();
         let table_id = super::selectors::table_id(self, selector)?;
         let mut staged = self.package.clone();
         let (rows, new_columns) = remove_attached_table_column(&mut staged, table_id, deletion)?;
-        verify_numbers_dimensions(&staged, table_id, rows, new_columns)?;
+        verify_numbers_dimensions(&staged, table_id, rows, new_columns, source_built)?;
         self.package = staged;
         Ok(())
     }
@@ -618,8 +620,9 @@ fn verify_numbers_dimensions(
     table_id: u64,
     rows: usize,
     columns: usize,
+    source_built: bool,
 ) -> Result<()> {
-    let verified = NumbersEditor::from_bytes(&package.to_bytes()?)?;
+    let verified = NumbersEditor::from_validation_bytes(&package.to_bytes()?, source_built)?;
     let table = verified
         .tables()?
         .into_iter()

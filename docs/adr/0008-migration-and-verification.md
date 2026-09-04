@@ -15812,3 +15812,114 @@ string, capped at 4096 bytes. The focused owner validates the native envelope
 and admitted fields only; it does not validate pattern grammar or claim to
 implement Apple's locale formatter. This clarification changes no evidence
 grade, compatibility boundary, topology, debt, host, or deletion-gate status.
+
+## 2026-09-04 amendment: Numbers Date & Time raw-ID host-route retirement
+
+The dedicated production `NumbersEditor` raw-ID Date & Time convenience
+routes (`table_cell_date_time_format`, `set_table_cell_date_time_format`, and
+`reset_table_cell_date_time_format`) are retired. The focused
+`litchi_numbers::Package` selector-first owner remains the semantic route for
+the bounded existing-cell type-261 display-format operation described above;
+this API retirement does not expand that operation's evidence or scope.
+
+Generic source-built or cross-format `DataFormat::DateTime` compatibility,
+the broad `TextDateTimeField` smart-field lifecycle, and attached Pages/Keynote
+table compatibility wrappers remain in the migration host. Exact focused-owner
+refusals remain terminal; the host compatibility paths are not a fallback for
+an exact focused package. This is a production API-boundary correction only:
+it adds no native evidence and makes no broad DateTime, package, or
+native-byte-parity claim.
+
+No workspace package, manifest edge, ordered migration debt, migration host,
+or ADR 0028 deletion gate changes by this retirement. The current topology
+remains 64 workspace packages, 238 internal dependency declarations, 227
+canonical edges, 11 development-only edges, 11 ordered migration debts
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
+
+## 2026-09-04 amendment: Numbers existing-cell Custom-format owner
+
+The focused `litchi_numbers::Package` Custom owner is now source/build-valid
+for one existing rooted cell. Its selector-first API is
+`Package::{table_cell_custom_format, edit_table_cell_custom_format,
+apply_table_cell_custom_format}` with `SheetSelector`, sheet-scoped
+`TableSelector`, and checked `CellPosition`. Reads return the archive-free
+`Custom` value; edits stage `set`, `clear`, or `reset` and commit an exact
+source-bound patch with an exact inverse.
+
+The private document-scoped Custom registry is reached only through
+`TN.DocumentArchive` field 9 and registry message type 222. Custom archive
+format discriminators are 270 for Number, 271 for Text, and 272 for Date &
+Time. Native IDs, registry UUIDs, format-list keys, generated messages, IWA
+member names, and raw wire values remain below the public boundary. The strict
+handwritten wire scanner validates the bounded registry/archive shape before
+constructing a borrowed lazy Buffa view.
+
+Deterministic source-built exact-source fixtures, including no-op, changed, inverse,
+candidate-reopen, locality, unknown/unselected-byte, and typed-refusal checks,
+provide E1 evidence only. There is no Apple-authored fixture or E2/E3/E4
+evidence. Copy-on-write publication retains format-list/refcount closure;
+semantically equal registry entries reuse their UUID, shared references remain
+live, replacements receive private UUIDs, and unused entries are culled only
+after their final reference is cleared. The focused package integration suite
+passes 19/19, the strict custom-format codec passes 8/8, and both fuzz targets
+complete 100-run AddressSanitizer smokes.
+
+There is no native Numbers acceptance or native save/resave evidence for this
+Custom owner. This amendment does not retire the legacy
+`NumbersEditor` Custom route or claim generic Custom-format authoring; that
+host compatibility remains migration-host-only. No workspace package,
+dependency edge, ordered migration debt, migration host, or ADR 0028
+deletion gate changes. The current topology remains 64 workspace packages,
+238 internal dependency declarations, 227 canonical edges, 11
+development-only edges, 11 ordered migration debts with IDs
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
+
+## 2026-09-04 amendment: Numbers Duration format groundwork (codec/probe only)
+
+This amendment records the landed native Duration substrate, not a new focused
+Numbers owner. The strict type-268 codec and narrow Buffa projection are
+available in [`litchi-iwa-protos::numbers_table_cell_duration_format_codec`](../../crates/litchi-iwa-protos/src/numbers_table_cell_duration_format_codec.rs)
+and [`TSTTableCellDurationFormatArchive.proto`](../../crates/litchi-iwa-protos/src/buffa-projections/TSTTableCellDurationFormatArchive.proto).
+The projection admits the native `FormatStructArchive` fields 1 (`format_type`),
+7 (`duration_style`), 15 (`duration_unit_largest`), 16
+(`duration_unit_smallest`), and 40 (`use_automatic_duration_units`). Strict
+preflight checks the required-field, duplicate, wire-type, domain, and unit
+ordering rules, preserves unknown source fields/groups, and keeps canonical
+encoding separate from source-preserving rewrites.
+
+Native Duration style values are `0` (Colon), `1` (Abbreviated), and `2`
+(FullNames). Unit bits are Weeks `1`, Days `2`, Hours `4`, Minutes `8`,
+Seconds `16`, and Milliseconds `32`. The BNC seam records the native explicit
+marker split: `0x0004` is a primary-only Duration reference, while `0x0005`
+is a Duration reference retaining the shared generic Number secondary. The
+captured native shapes also include the automatic marker-zero/kind-four
+compatibility form; that form is not a focused package owner claim.
+
+Wire-level coverage in [`litchi-numbers-wire`](../../crates/litchi-numbers-wire/src/lib.rs)
+round-trips the native automatic and explicit cells, checks the primary-only
+and generic-Number-secondary marker forms, preserves Duration scalar/formula
+cache and opaque tail bytes during metadata-only rewrites, and exercises the
+existing compatibility conversion between spreadsheet-day Numbers and
+second-based Duration values. The source-built host coverage in
+[`cell_data_format.rs`](../../crates/litchi-iwa/src/numbers/editor/cell_data_format.rs)
+uses `NumbersEditor` to share/reopen/reset a Duration format entry and
+recognizes both native explicit marker shapes. This is wire/host source-built
+coverage; it is not a `litchi_numbers::Package` owner or selector API.
+The Duration codec fuzz target also completes a 100-run AddressSanitizer smoke.
+
+A disposable Apple Numbers 14.4 probe supplied the native marker/secondary
+shape evidence used by these fixtures: marker `0x0004` for an explicit
+primary-only Duration and marker `0x0005` when a generic Number reference is
+retained. The probe is provenance/shape evidence only. No Litchi focused
+candidate was accepted, saved/resaved, closed, or reopened in this record, so
+there is no app-acceptance, E3, or E4 claim.
+
+Duration remains unsupported in the public
+[Numbers owner matrix](../../crates/litchi-numbers/docs/FEATURE_MATRIX.md):
+there is no focused `litchi-numbers` package owner, no selector-first Duration
+API, and no retirement of the legacy `NumbersEditor`/generic host Duration
+compatibility route. No workspace package, dependency edge, ordered migration
+debt, migration host, or ADR 0028 deletion gate changes. The current topology
+remains 64 workspace packages, 238 internal dependency declarations, 227
+canonical edges, 11 development-only edges, 11 ordered migration debts with
+IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.

@@ -27,9 +27,10 @@ impl NumbersEditor {
         insertion: RowInsertion,
     ) -> Result<()> {
         let table_id = super::selectors::table_id(self, selector)?;
+        let source_built = !self.package.source_is_exact();
         let mut staged = self.package.clone();
         let new_rows = insert_attached_table_row(&mut staged, table_id, insertion)?;
-        let verified = NumbersEditor::from_bytes(&staged.to_bytes()?)?;
+        let verified = NumbersEditor::from_validation_bytes(&staged.to_bytes()?, source_built)?;
         let table = verified
             .tables()?
             .into_iter()

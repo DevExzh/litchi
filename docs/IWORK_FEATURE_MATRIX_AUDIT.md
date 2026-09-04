@@ -1,7 +1,7 @@
 # iWork Feature-Matrix Audit
 
 > Source audit starting at committed `d33f30f41` (2026-09-01) and including the focused
-> Scientific-, Fraction-, Text-, and Date & Time-format owner work plus the current Keynote physical `Sort Now` owner
+> Scientific-, Fraction-, Text-, Date & Time-, and Custom-format owner work plus the current Keynote physical `Sort Now` owner
 > work from that baseline. This document records the rationale and cross-suite gaps behind the three
 > authoritative app matrices and does not replace them.
 
@@ -66,10 +66,42 @@ touched components, `full_reparse=false`, scalar value untouched, and a
 byte-identical 138,725-byte output (SHA-256
 `4e489da196bac7416c8c6d827afb2a6264892d4856a5a33dc0a18c6c2d2b1b0c`). This
 evidence is limited to that existing type-9 cell/pattern; it is not a broad
-DateTime/package or native-byte-parity claim. Dedicated host raw-ID DateTime
-retirement is not claimed. Generic source-built `DataFormat::DateTime`, broad
-smart-field paths, and Pages/Keynote compatibility remain host-owned. The
-source/candidate/native-resaved ledger is in ADR 0008.
+DateTime/package or native-byte-parity claim. The dedicated raw-ID
+`NumbersEditor` Date & Time route is retired. Generic source-built or
+cross-format `DataFormat::DateTime`, broad smart-field paths, and attached
+Pages/Keynote table compatibility remain host-owned. The source/candidate/
+native-resaved ledger is in ADR 0008.
+
+The focused Custom owner now exposes
+`litchi_numbers::Package::{table_cell_custom_format, edit_table_cell_custom_format,
+apply_table_cell_custom_format}` for one existing rooted cell selected by
+`SheetSelector`, sheet-scoped `TableSelector`, and checked `CellPosition`. Its
+archive-free `Custom` value covers the document-scoped Number, Text, and Date &
+Time registry entries rooted by `TN.DocumentArchive` field 9 and message type
+222; custom archive discriminators are 270 (Number), 271 (Text), and 272 (Date
+& Time). Handwritten wire preflight precedes the private lazy Buffa view.
+Deterministic source-built exact-source fixtures provide E1 evidence only;
+there is no Apple-authored fixture or E2/E3/E4 evidence. Exact source-bound
+transactions preserve unknown/unselected fields and members, enforce
+format-list/refcount closure, keep UUIDs private while reusing equal entries,
+retaining shared references, allocating replacements, and culling only unused
+entries, and verify candidate reopen/readback, inverse, and physical locality.
+The focused package tests pass 19/19 and the strict custom-format codec tests
+pass 8/8. No native Numbers acceptance or native save/resave evidence is
+claimed, and no legacy `NumbersEditor` Custom route is retired; host Custom
+compatibility remains migration-host-only.
+
+Duration has substrate-only groundwork: a strict native type-268
+`FormatStructArchive` codec and narrow Buffa projection for fields 1, 7, 15,
+16, and 40, with styles `0/1/2` and unit bits `1/2/4/8/16/32`. Native BNC
+shape evidence distinguishes marker `0x0004` for an explicit primary-only
+Duration reference from marker `0x0005` when a shared generic Number secondary
+is retained. Wire and source-built host coverage exercises those native
+shapes, scalar/formula preservation, compatibility conversion, and registry
+reuse/reset. A disposable Numbers 14.4 probe supplied the native shape
+provenance only; it is not app acceptance or save/resave evidence. There is no
+focused `litchi-numbers` package owner or selector API, no host retirement, and
+no E3/E4 claim. Duration remains unsupported in the public Numbers matrix.
 
 Numbers persisted-sort compatibility is narrower than the semantic owner. Exact
 package snapshots use the focused semantic persisted-sort transaction, so a
@@ -186,8 +218,9 @@ Primary references: [package boundary](../crates/litchi-keynote/src/package.rs#L
 | Existing-cell Scientific display formats | 🟡 | ✅ | 🟡 | Selector-first [`table_cell_scientific_format`](../crates/litchi-numbers/src/package/table_cell_scientific_format.rs#L382) and archive-free [`Scientific`](../crates/litchi-numbers/src/cell/data_format/scientific.rs#L1) cover one existing cell's fixed decimal precision, native minus-sign negatives, and hidden thousands separator with explicit-to-automatic reset semantics. The package target passed 19/19, strict Buffa type-259 codec 4/4, wire library 34/34, and filtered legacy bridge 6/6; bounded codec/package sanitizer smokes each completed 100 executions. Numbers 14.4 opened, saved, closed, and reopened the precision-7 candidate without repair while preserving B2 text and B3 scalar 42, and strict reread was byte-identical. [ADR 0008](adr/0008-migration-and-verification.md#2026-09-01-amendment-numbers-existing-cell-scientific-format-native-validation-record) freezes the hashes and limits this to operation-specific E3/E4 evidence. |
 | Existing-cell Fraction display formats | 🟡 | ✅ | 🟡 | Selector-first [`table_cell_fraction_format`](../crates/litchi-numbers/src/package/table_cell_fraction_format.rs#L389) and archive-free [`Fraction`](../crates/litchi-numbers/src/cell/data_format/fraction.rs#L1) expose all nine `FractionAccuracy` denominator strategies for one existing cell, with explicit-to-inherited clearing. The native type-262 codec performs strict preflight before a lazy Buffa view; field 20 (`requires_fraction_replacement`) is preserved when absent or canonical `false` and rejects `true`. The focused package integration run passed 22/22, library codec tests 4/4, direct codec tests 3/3, and wire tests 36/36; checked-in fuzz corpora contain 44 proto seeds and 18 package seeds, and both targets completed 100-run AddressSanitizer smokes. Computer Use recorded operation-specific native E3/E4 evidence for a disposable Eighths source and Eighths→Hundredths edit; before native opening, exactly two uncompressed members differed while entry names/order and every other member payload matched. Exact source/candidate/native-resaved hashes are in ADR 0008. This does not promote all nine native UI variants, arbitrary-producer parity, native byte parity after Numbers normalization, package-wide performance, or a deletion-gate claim. |
 | Existing-cell Text display formats | 🟡 | ✅ | 🟡 | Selector-first [`table_cell_text_format`](../crates/litchi-numbers/src/package/table_cell_text_format.rs#L382) and archive-free [`Text`](../crates/litchi-numbers/src/cell/data_format.rs#L89) expose an explicit marker for one existing cell with set/clear/reset and exact inverse behavior. The owner keeps native IDs, format-table records, and wire values private; strict preflight, lazy Buffa inspection, bounded copy-on-write/refcount edits, candidate reopen/readback, scalar/unrelated-byte preservation, locality, and typed family refusal remain part of the focused contract. New explicit attachments use canonical marker `0x80`; an unchanged admitted converted-Text source with marker `0x81` and retained Number provenance is preserved exactly. Evidence is E1 plus checked-in native-fixture E2 read/no-op only; no native E3/E4 acceptance claim is made. See the [Numbers matrix](../crates/litchi-numbers/docs/FEATURE_MATRIX.md#cells-formulas-controls-and-annotations). |
-| Existing-cell Date & Time display formats | 🟡 | ✅ | 🟡 | Selector-first [`table_cell_date_time_format`](../crates/litchi-numbers/src/package/table_cell_date_time_format.rs#L1) and archive-free [`DateTime`](../crates/litchi-numbers/src/cell/data_format/date_time.rs#L1) own one existing cell's bounded native date/time pattern string. Type 261 requires explicit marker `0x0008`, kind `3`, and strict fields 1/14; admitted shapes are Empty/type-5 Date and the evidenced type-9 numeric/formula shape, while plain type-2, marker-zero, wrong/reserved, and ambiguous shapes fail closed. The native date/time pattern string is bounded to 4096 bytes; the owner checks its envelope and admitted fields only, and pattern grammar is not validated. Metadata-only writes perform strict preflight before lazy Buffa and preserve COW/refcounts, unknown/unselected bytes, scalar value, inverse, and locality. Numbers 14.4 (build 7043.0.93, macOS 26.5.2) opened the candidate without repair/conversion and retained the A1 marker and B2 value/settings through native save/close/exact-path reopen; the DateTime members in `Index/Tables/Tile.iwa` and `Index/Tables/DataList-904498-2.iwa` remained byte-identical across native normalization. This is operation-specific E3/E4 app-cycle evidence for one existing type-9 cell/pattern. Strict normalized reread of the native-resaved artifact passed as `changed=false`, with zero touched components, `full_reparse=false`, scalar value untouched, and byte-identical 138,725-byte output (SHA-256 `4e489da196bac7416c8c6d827afb2a6264892d4856a5a33dc0a18c6c2d2b1b0c`). Dedicated host raw-ID DateTime retirement is not claimed; generic source-built `DataFormat::DateTime`, broad smart-field paths, and Pages/Keynote compatibility remain host-owned. See [ADR 0008](adr/0008-migration-and-verification.md#2026-09-04-amendment-numbers-existing-cell-date-time-native-verification-record). |
-| Other generic display formats and rich styles | ❌ | ❌ | ❌ | Outside the focused Number/Percentage/Currency/Scientific/Fraction/Text/Date & Time operations above, no general package getter or formatting transaction is exposed; duration, custom, and rich-style families remain unsupported at this owner boundary. |
+| Existing-cell Date & Time display formats | 🟡 | ✅ | 🟡 | Selector-first [`table_cell_date_time_format`](../crates/litchi-numbers/src/package/table_cell_date_time_format.rs#L1) and archive-free [`DateTime`](../crates/litchi-numbers/src/cell/data_format/date_time.rs#L1) own one existing cell's bounded native date/time pattern string. Type 261 requires explicit marker `0x0008`, kind `3`, and strict fields 1/14; admitted shapes are Empty/type-5 Date and the evidenced type-9 numeric/formula shape, while plain type-2, marker-zero, wrong/reserved, and ambiguous shapes fail closed. The native date/time pattern string is bounded to 4096 bytes; the owner checks its envelope and admitted fields only, and pattern grammar is not validated. Metadata-only writes perform strict preflight before lazy Buffa and preserve COW/refcounts, unknown/unselected bytes, scalar value, inverse, and locality. Numbers 14.4 (build 7043.0.93, macOS 26.5.2) opened the candidate without repair/conversion and retained the A1 marker and B2 value/settings through native save/close/exact-path reopen; the DateTime members in `Index/Tables/Tile.iwa` and `Index/Tables/DataList-904498-2.iwa` remained byte-identical across native normalization. This is operation-specific E3/E4 app-cycle evidence for one existing type-9 cell/pattern. Strict normalized reread of the native-resaved artifact passed as `changed=false`, with zero touched components, `full_reparse=false`, scalar value untouched, and byte-identical 138,725-byte output (SHA-256 `4e489da196bac7416c8c6d827afb2a6264892d4856a5a33dc0a18c6c2d2b1b0c`). The dedicated raw-ID `NumbersEditor` Date & Time route is retired; generic source-built or cross-format `DataFormat::DateTime`, broad smart-field paths, and attached Pages/Keynote table compatibility remain host-owned. See [ADR 0008](adr/0008-migration-and-verification.md#2026-09-04-amendment-numbers-existing-cell-date-time-native-verification-record) and the current-boundary amendment in [ADR 0008](adr/0008-migration-and-verification.md#2026-09-04-amendment-numbers-date-time-raw-id-host-route-retirement). |
+| Existing-cell Custom display formats | 🟡 | ✅ | 🟡 | Selector-first [`litchi_numbers::Package::{table_cell_custom_format, edit_table_cell_custom_format, apply_table_cell_custom_format}`](../crates/litchi-numbers/src/package/table_cell_custom_format.rs#L319) exposes one existing rooted cell's archive-free `Custom` value and exact-source read/set/clear/reset/inverse transactions. The private registry is rooted by `TN.DocumentArchive` field 9 and message type 222; custom archive discriminators are 270 (Number), 271 (Text), and 272 (Date & Time). Strict wire preflight precedes a private lazy Buffa view; deterministic source-built exact-source fixtures provide E1 evidence only. The transaction preserves unknown/unselected fields and members, enforces format-list/refcount closure, keeps UUIDs private while reusing equal entries, retaining shared references, allocating replacements, and culling only unused entries, and verifies candidate reopen/readback, exact inverse, physical locality, content-redacted diagnostics, and typed budget/refusal paths. The focused package suite passes 19/19 and the strict codec passes 8/8. No Apple-authored fixture, native Numbers acceptance, native save/resave, or E2/E3/E4 evidence is claimed, and no legacy `NumbersEditor` Custom route is retired; host Custom compatibility remains migration-host-only. See the [Numbers matrix](../crates/litchi-numbers/docs/FEATURE_MATRIX.md#cells-formulas-controls-and-annotations). |
+| Other generic display formats and rich styles | ❌ | ❌ | ❌ | Outside the focused Number/Percentage/Currency/Scientific/Fraction/Text/Date & Time/Custom operations above, no general package getter or formatting transaction is exposed. Duration has strict type-268 codec/projection groundwork and native marker-shape provenance, but remains unsupported at this owner boundary; rich-style families remain unsupported as well. The Custom owner is limited to the document-scoped existing-cell registry transaction above and does not establish generic style or package authoring. |
 | Cell comments/replies | 🟡 | 🟡 | 🟡 | Text-only, strict rooted/co-located ownership; no broad threads, authors, mentions, or attachments; current integration tests are red |
 | Charts/shapes/text boxes/media | ❌ | ❌ | ❌ | No focused semantic/package owner |
 | Filters/categories/groups/pivots | ❌ | ❌ | ❌ | Detection/refusal or schema presence only; no semantic CRUD |
@@ -214,7 +247,13 @@ The following capability exists broadly in `litchi-iwa`, but must be labeled **l
 | Table cells/formulas/rich formatting/topology | Broad | Broad except physical `Sort Now` | Broad |
 | Focused-owner replacement complete | No | No | No |
 
-“Broad” here is an inventory statement, not a completeness or native-acceptance grade. The host exposes native/raw identities, includes compatibility fallbacks, and is governed by the 11 ordered debts (orders `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`) in the deletion ledger ([host policy](../crates/litchi-iwa/README.md#legacy-editing), [ADR 0028](adr/0028-iwa-monolith-exit.md)). The authoritative topology is 64 workspace packages, 238 internal dependency declarations, 227 canonical edges, 11 development-only edges, 11 ordered migration debts, and one migration host.
+“Broad” here is an inventory statement, not a completeness or native-acceptance grade. The host exposes native/raw identities, includes compatibility fallbacks, and is governed by the 11 ordered debts (orders `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`) in the deletion ledger ([host policy](../crates/litchi-iwa/README.md#legacy-editing), [ADR 0028](adr/0028-iwa-monolith-exit.md)). The dedicated raw-ID `NumbersEditor` Date & Time route is retired; generic source-built/cross-format `DataFormat::DateTime`, broad smart-field lifecycle, and attached Pages/Keynote table compatibility remain host-owned. The authoritative topology is 64 workspace packages, 238 internal dependency declarations, 227 canonical edges, 11 development-only edges, 11 ordered migration debts, and one migration host.
+This API-boundary retirement does not alter the workspace topology, ordered-debt count, migration-host count, or deletion-gate status.
+
+The focused Numbers Custom transaction does not retire the legacy host Custom
+surface. Generic/source-built Custom compatibility remains in `litchi-iwa`,
+and a focused-owner refusal is not a host fallback or a generic formatting
+claim.
 
 For Keynote specifically, physical `Sort Now` is focused-owner support rather
 than a broad host capability. The host may retain explicitly source-built

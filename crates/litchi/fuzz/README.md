@@ -328,6 +328,19 @@ and wire payloads stay below the fixture/adapter boundary. Recipes under
 `corpus/numbers_table_cell_date_time_format/` are compact command bytes, not
 native package copies.
 
+`numbers_table_cell_custom_format` is the focused selector-first Custom
+display-format lifecycle target. It replays bounded commands against
+document-scoped Custom Number, Text, and Date & Time registries, covering
+selector reads, no-op/set/clear/reset, exact apply/inverse and stale conflicts,
+candidate readback, shared-format copy-on-write, registry UUID/refcount
+ownership, locked and malformed registry refusal, constructor name/pattern/
+threshold/rule boundaries, redacted errors, and bounded ingress, semantic, and
+output limits. Rejected operations are checked for deterministic source-byte
+atomicity. The target crosses the package API only with archive-free Custom
+values and selectors; its corpus under
+`corpus/numbers_table_cell_custom_format/` contains compact command bytes, not
+native package copies.
+
 `numbers_table_cell_control` is the unified selector-first cell-control
 lifecycle target. It drives Checkbox, StarRating, Slider, Stepper, and
 Pop-Up Menu values through `Package::{table_cell_control_format,
@@ -877,6 +890,15 @@ seeds:
 ```sh
 cargo +nightly fuzz run numbers_table_cell_date_time_format \
   corpus/numbers_table_cell_date_time_format -- \
+  -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
+Run the focused Numbers table-cell Custom-format target with its command
+seeds:
+
+```sh
+cargo +nightly fuzz run numbers_table_cell_custom_format \
+  corpus/numbers_table_cell_custom_format -- \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 
