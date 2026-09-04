@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "kind": "managed XLSX budget-schema correctness",
+  "claim_authorized": false,
+  "performance_claim": "none",
+  "revision": "2de94ea3fd72e6b64f6085732a2ec8ba5d022c7e",
+  "source_sha256": {
+    "tools/perf_compare.py": "faa828f9da69af9c3a41f5ac9ab6b1fa801fffb9f6cafc3e4a028c2f2c4bb6d8",
+    "tools/test_perf_compare.py": "dfb10900d516b86794b1e568557597fc57d6d9b83d876265c4a80f72537c8fa0",
+    "tools/perf-baseline/src/lib.rs": "d9c70a25bf4680fd207f3f3ba75e20ef599552519394841097f6c1f73a42054d"
+  },
+  "commands": [
+    "python3 -m unittest discover -s tools -p test_perf_compare.py",
+    "RUSTUP_TOOLCHAIN=1.98.1 tools/perf-baseline/target/release/litchi-perf-baseline --case xlsx_source_backed_managed_cell_values_one_edit_save --xlsx-cell-crud-shape medium --warmup 0 --samples 3 --json /tmp/litchi-goal-managed-headroom.json"
+  ],
+  "tests": "81 passed",
+  "smoke": {
+    "rows": 1,
+    "samples": 3,
+    "budget_schema_validation": "passed",
+    "parallel_metrics_validation": "passed"
+  },
+  "notes": "Diagnostic schema smoke only. Same harness binary as0406; subsequent changes are documentation and Python validation only. Toolchain, source revision, and binary hash are retained in the report."
+}
