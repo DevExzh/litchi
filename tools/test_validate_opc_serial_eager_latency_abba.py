@@ -442,6 +442,15 @@ class NormalLatencyValidatorTests(unittest.TestCase):
         projection = self._validate()
         self.assertEqual(projection["validation"]["report_count"], 4)
         self.assertTrue(projection["validation"]["elapsed_statistics_recomputed"])
+        self.assertEqual(
+            projection["protocol"]["configuration_cache_states"],
+            validator.GLOBAL_CACHE_STATES,
+        )
+        self.assertEqual(projection["protocol"]["cache_state"], validator.CACHE_STATE)
+        self.assertEqual(
+            projection["protocol"]["cache_claim_scope"],
+            validator.CACHE_CLAIM_SCOPE,
+        )
         self.assertFalse(projection["validation"]["pooled_claim"])
         self.assertEqual(projection["rows"][0]["elapsed_ns"]["accepted_statistics"], list(validator.STATISTICS))
         self.assertEqual(projection["rows"][0]["elapsed_ns"]["rejected_statistics"], {})
@@ -451,6 +460,63 @@ class NormalLatencyValidatorTests(unittest.TestCase):
         self.assertFalse(projection["claimability"]["logical_io"]["claimable"])
         self.assertFalse(projection["claimability"]["physical_io"]["claimable"])
         self.assertFalse(projection["claimability"]["allocator"]["claimable"])
+
+    def test_accepts_explicit_warm_global_cache_selector(self) -> None:
+        reports = copy.deepcopy(self.reports)
+        for report in reports.values():
+            report["configuration"]["filesystem_cache_states"] = ["warm"]
+        projection = self._validate(reports=reports)
+        self.assertEqual(projection["protocol"]["configuration_cache_states"], ["warm"])
+        self.assertEqual(projection["protocol"]["cache_state"], "warm")
+        self.assertIn("global cold-requested configuration does not constitute cold execution/evidence", projection["protocol"]["cache_claim_scope"])
+
+    def test_rejects_mixed_global_cache_selector_between_legs(self) -> None:
+        reports = copy.deepcopy(self.reports)
+        reports["B1"]["configuration"]["filesystem_cache_states"] = ["warm"]
+        with self.assertRaisesRegex(validator.ValidationError, "filesystem cache selector identity"):
+            self._validate(reports=reports)
+
+    def test_rejects_reversed_extra_duplicate_and_malformed_global_cache_selectors(self) -> None:
+        invalid_values = (
+            ["cold-requested", "warm"],
+            ["warm", "cold-requested", "extra"],
+            ["warm", "warm"],
+            ["warm", "cold-requested", "warm"],
+            ["cold-requested"],
+            [],
+            ["warm", None],
+            "warm",
+            None,
+        )
+        for value in invalid_values:
+            with self.subTest(value=value):
+                reports = copy.deepcopy(self.reports)
+                reports["A1"]["configuration"]["filesystem_cache_states"] = value
+                with self.assertRaisesRegex(validator.ValidationError, "filesystem_cache_states"):
+                    self._validate(reports=reports)
+
+    def test_allows_absent_or_null_result_cache_state_but_rejects_cache_and_filesystem_evidence(self) -> None:
+        reports = copy.deepcopy(self.reports)
+        for report in reports.values():
+            for result in report["results"]:
+                result["cache_state"] = None
+        projection = self._validate(reports=reports)
+        self.assertEqual(projection["protocol"]["cache_state"], "warm")
+
+        reports = copy.deepcopy(self.reports)
+        reports["A1"]["results"][0]["cache_state"] = "warm"
+        with self.assertRaisesRegex(validator.ValidationError, "cache_state"):
+            self._validate(reports=reports)
+
+        reports = copy.deepcopy(self.reports)
+        reports["A1"]["results"][0]["filesystem_evidence"] = []
+        with self.assertRaisesRegex(validator.ValidationError, "filesystem_evidence"):
+            self._validate(reports=reports)
+
+        reports = copy.deepcopy(self.reports)
+        reports["A1"]["results"][0]["source"]["filesystem_evidence"] = []
+        with self.assertRaisesRegex(validator.ValidationError, "filesystem_evidence"):
+            self._validate(reports=reports)
 
     def test_classifies_rejected_and_adverse_rows(self) -> None:
         reports = {role: _report(role, starts={"A1": 1000, "B1": 1200, "B2": 1300, "A2": 1100}) for role in ROLES}
@@ -514,7 +580,7 @@ class NormalLatencyValidatorTests(unittest.TestCase):
         with self.assertRaisesRegex(validator.ValidationError, "allocation.status"):
             self._validate(reports=reports)
         reports = copy.deepcopy(self.reports)
-        reports["B2"]["configuration"]["filesystem_cache_states"] = ["warm", "cold-requested"]
+        reports["B2"]["configuration"]["filesystem_cache_states"] = ["cold-requested", "warm"]
         with self.assertRaisesRegex(validator.ValidationError, "filesystem_cache_states"):
             self._validate(reports=reports)
 

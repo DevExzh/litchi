@@ -529,6 +529,15 @@ class SerialEagerAllocatorValidatorTests(unittest.TestCase):
         projection = self._validate()
         self.assertEqual(projection["validation"]["report_count"], 4)
         self.assertEqual(projection["validation"]["matrix_rows"], 3)
+        self.assertEqual(
+            projection["protocol"]["configuration_cache_states"],
+            ["warm", "cold-requested"],
+        )
+        self.assertEqual(projection["protocol"]["cache_state"], "warm")
+        self.assertEqual(
+            projection["protocol"]["cache_claim_scope"],
+            "cache_state: warm; in-process constructor only; global cold-requested configuration does not constitute cold execution/evidence",
+        )
         self.assertTrue(projection["validation"]["exact_candidate_control_deltas_verified"])
         self.assertTrue(projection["validation"]["model_is_expected_not_observed"])
         self.assertFalse(projection["claimability"]["allocator_elapsed_ns"]["claimable"])
@@ -538,6 +547,62 @@ class SerialEagerAllocatorValidatorTests(unittest.TestCase):
         self.assertFalse(projection["provenance"]["binary_identity"]["file_rehashed"])
         self.assertEqual(projection["rows"][0]["predeclared_allocator_model"]["status"], "expected_not_observed")
         self.assertEqual(projection["model_vs_observation"]["observed_allocator_vectors"]["status"], "measured")
+
+    def test_accepts_explicit_warm_global_cache_selector(self) -> None:
+        reports = copy.deepcopy(self.reports)
+        for report in reports.values():
+            report["configuration"]["filesystem_cache_states"] = ["warm"]
+        projection = self._validate(reports=reports)
+        self.assertEqual(projection["protocol"]["configuration_cache_states"], ["warm"])
+        self.assertEqual(projection["protocol"]["cache_state"], "warm")
+
+    def test_rejects_mixed_global_cache_selector_between_legs(self) -> None:
+        reports = copy.deepcopy(self.reports)
+        reports["B1"]["configuration"]["filesystem_cache_states"] = ["warm"]
+        with self.assertRaisesRegex(ValidationError, "filesystem cache selector identity"):
+            self._validate(reports=reports)
+
+    def test_rejects_reversed_extra_duplicate_and_malformed_global_cache_selectors(self) -> None:
+        invalid_values = (
+            ["cold-requested", "warm"],
+            ["warm", "cold-requested", "extra"],
+            ["warm", "warm"],
+            ["warm", "cold-requested", "warm"],
+            ["cold-requested"],
+            [],
+            ["warm", None],
+            "warm",
+            None,
+        )
+        for value in invalid_values:
+            with self.subTest(value=value):
+                reports = copy.deepcopy(self.reports)
+                reports["A1"]["configuration"]["filesystem_cache_states"] = value
+                with self.assertRaisesRegex(ValidationError, "filesystem_cache_states"):
+                    self._validate(reports=reports)
+
+    def test_allows_absent_or_null_result_cache_state_but_rejects_cache_and_filesystem_evidence(self) -> None:
+        reports = copy.deepcopy(self.reports)
+        for report in reports.values():
+            for result in report["results"]:
+                result["cache_state"] = None
+        projection = self._validate(reports=reports)
+        self.assertEqual(projection["protocol"]["cache_state"], "warm")
+
+        reports = copy.deepcopy(self.reports)
+        reports["A1"]["results"][0]["cache_state"] = "warm"
+        with self.assertRaisesRegex(ValidationError, "cache_state"):
+            self._validate(reports=reports)
+
+        reports = copy.deepcopy(self.reports)
+        reports["A1"]["results"][0]["filesystem_evidence"] = []
+        with self.assertRaisesRegex(ValidationError, "filesystem_evidence"):
+            self._validate(reports=reports)
+
+        reports = copy.deepcopy(self.reports)
+        reports["A1"]["results"][0]["source"]["filesystem_evidence"] = []
+        with self.assertRaisesRegex(ValidationError, "filesystem_evidence"):
+            self._validate(reports=reports)
 
     def test_rejects_duplicate_keys_and_nonfinite_numbers(self) -> None:
         with tempfile.TemporaryDirectory(prefix="litchi-0403-serial-eager-validator-") as directory:
@@ -584,7 +649,7 @@ class SerialEagerAllocatorValidatorTests(unittest.TestCase):
             ("environment", "rustc_version", "rustc 1.95.0", "rustc_version"),
             ("environment", "cpu_affinity", "3", "cpu_affinity"),
             ("configuration", "execution_workers", [1, 2], "execution_workers"),
-            ("configuration", "filesystem_cache_states", ["warm", "cold-requested"], "filesystem_cache_states"),
+            ("configuration", "filesystem_cache_states", ["cold-requested", "warm"], "filesystem_cache_states"),
             ("configuration", "filesystem_fresh_child_per_sample", False, "filesystem_fresh_child_per_sample"),
         ):
             reports = copy.deepcopy(self.reports)

@@ -8,11 +8,17 @@ keeps every per-row accepted/rejected/adverse decision.  A statistic is
 accepted only when the candidate is strictly lower in both paired directions
 and both same-implementation drifts fit that statistic's ceiling.
 
-The selector is an in-process constructor measurement.  RSS, process and
-logical/physical I/O, cold-cache, fresh-child, and allocator evidence are
-explicitly unavailable or not applicable and never become claims here.  The
-fixed corpus identities and semantic vectors are independent constants; a
-contract cannot redefine them.  Only Python's standard library is used.
+The selector is an in-process constructor measurement.  Its global harness
+cache selector may be either the producer default ``["warm",
+"cold-requested"]`` or the explicit ``["warm"]`` form, but it is inert for
+this non-filesystem operation: every result has no cache state or filesystem
+evidence.  The selected claim is always ``cache_state: warm``; a global
+``cold-requested`` configuration does not constitute cold execution/evidence.
+RSS, process and logical/physical I/O, cold-cache, fresh-child, and allocator
+evidence are explicitly unavailable or not applicable and never become
+claims here.  The fixed corpus identities and semantic vectors are
+independent constants; a contract cannot redefine them.  Only Python's
+standard library is used.
 """
 
 from __future__ import annotations
@@ -32,6 +38,17 @@ SCHEMA_VERSION = 1
 VALIDATOR_NAME = "litchi-opc-serial-eager-latency-abba"
 CASE = "opc_serial_eager_open"
 CACHE_STATE = "warm"
+# ``filesystem_cache_states`` is a global harness selector envelope.  This
+# selector is intentionally inert for the in-process constructor case: the
+# only accepted producer configurations are the historical explicit-warm
+# form and the producer's default warm-plus-cold-requested form.  Neither
+# form supplies filesystem evidence for this validator.
+GLOBAL_CACHE_STATES = ["warm", "cold-requested"]
+ACCEPTED_GLOBAL_CACHE_STATES = (tuple([CACHE_STATE]), tuple(GLOBAL_CACHE_STATES))
+CACHE_CLAIM_SCOPE = (
+    "cache_state: warm; in-process constructor only; global cold-requested "
+    "configuration does not constitute cold execution/evidence"
+)
 SAMPLE_COUNT = 500
 WARMUP_COUNT = 20
 WORKERS = [1]
@@ -279,6 +296,7 @@ RESULT_KEYS = {
     "output_sha256",
     "operation_metrics",
 }
+OPTIONAL_NULL_RESULT_KEYS = {"cache_state"}
 CORPUS_REPORT_KEYS = {
     key
     for key in CONTRACT_CORPUS_KEYS
@@ -1160,7 +1178,20 @@ def _validate_corpus(value: Any, shape: str, context: str) -> dict[str, Any]:
 
 def _validate_result(value: Any, role: str, index: int) -> RowEvidence:
     context = f"{role}.results[{index}]"
-    result = _exact_keys(value, RESULT_KEYS, context)
+    result = _object(value, context)
+    if "filesystem_evidence" in result:
+        raise ValidationError(
+            f"{context}.filesystem_evidence is forbidden for the in-process selector"
+        )
+    actual_keys = set(result)
+    missing = RESULT_KEYS - actual_keys
+    extra = actual_keys - RESULT_KEYS - OPTIONAL_NULL_RESULT_KEYS
+    if missing or extra:
+        raise ValidationError(
+            f"{context} has unexpected keys (missing={sorted(missing)}, extra={sorted(extra)})"
+        )
+    if "cache_state" in result:
+        _expect(result["cache_state"], None, f"{context}.cache_state")
     _expect(result["case"], CASE, f"{context}.case")
     _expect(result["sink"], None, f"{context}.sink")
     corpus_obj = _object(result["corpus"], f"{context}.corpus")
@@ -1239,7 +1270,7 @@ def _expected_configuration() -> dict[str, Any]:
     return {
         "samples_per_case": SAMPLE_COUNT,
         "warmup_iterations_per_case": WARMUP_COUNT,
-        "filesystem_cache_states": [CACHE_STATE],
+        "filesystem_cache_states": list(GLOBAL_CACHE_STATES),
         "filesystem_fresh_child_per_sample": True,
         "filesystem_process_isolated": True,
         "filesystem_root_selected": False,
@@ -1265,7 +1296,19 @@ def _expected_configuration() -> dict[str, Any]:
 
 def _validate_configuration(value: Any, context: str) -> None:
     configuration = _exact_keys(value, CONFIGURATION_KEYS, context)
-    _expect(configuration, _expected_configuration(), context)
+    # This list belongs to the producer's global harness configuration, not
+    # to the selected in-process operation.  Keep the accepted envelopes
+    # closed: a caller cannot introduce a state, reorder states, or duplicate
+    # a state and have it disappear in the projection.
+    cache_states = _array(configuration["filesystem_cache_states"], f"{context}.filesystem_cache_states")
+    if tuple(cache_states) not in ACCEPTED_GLOBAL_CACHE_STATES:
+        raise ValidationError(
+            f"{context}.filesystem_cache_states must be exactly one of "
+            f"{[list(states) for states in ACCEPTED_GLOBAL_CACHE_STATES]!r}; got {cache_states!r}"
+        )
+    expected = _expected_configuration()
+    expected["filesystem_cache_states"] = cache_states
+    _expect(configuration, expected, context)
     _exact_keys(configuration["range_simulation"], RANGE_SIMULATION_KEYS, f"{context}.range_simulation")
     for key in RANGE_SIMULATION_KEYS:
         _integer(configuration["range_simulation"][key], f"{context}.range_simulation.{key}")
@@ -1309,9 +1352,15 @@ def _binary_identity(report: Mapping[str, Any]) -> dict[str, Any]:
 
 def _validate_cross_report(reports: Mapping[str, ValidatedReport]) -> None:
     first = reports["A1"]
+    first_cache_states = first.report["configuration"]["filesystem_cache_states"]
     for role in ROLES:
         if role == "A1":
             continue
+        _expect(
+            reports[role].report["configuration"]["filesystem_cache_states"],
+            first_cache_states,
+            f"{role}/A1 filesystem cache selector identity",
+        )
         _expect(
             _environment_identity(reports[role].report),
             _environment_identity(first.report),
@@ -1460,6 +1509,10 @@ def _validator_source_sha256() -> str:
 
 
 def _projection(reports: Mapping[str, ValidatedReport], contract: Contract) -> dict[str, Any]:
+    # The producer list is retained verbatim in the projection.  The selected
+    # claim remains the warm in-process constructor only, even when the global
+    # envelope names a cold-requested branch.
+    producer_cache_states = reports["A1"].report["configuration"]["filesystem_cache_states"]
     rows = []
     for shape in SHAPES:
         row_map = {role: reports[role].rows[shape] for role in ROLES}
@@ -1492,6 +1545,8 @@ def _projection(reports: Mapping[str, ValidatedReport], contract: Contract) -> d
             "samples_per_leg": SAMPLE_COUNT,
             "warmup_iterations_per_leg": WARMUP_COUNT,
             "cache_state": CACHE_STATE,
+            "configuration_cache_states": list(producer_cache_states),
+            "cache_claim_scope": CACHE_CLAIM_SCOPE,
             "execution_workers": WORKERS,
             "fixed_shapes": list(SHAPES),
             "operation_vector_alignment": ALIGNMENT,
@@ -1539,7 +1594,7 @@ def _projection(reports: Mapping[str, ValidatedReport], contract: Contract) -> d
         "claimability": {
             "normal_constructor_latency": {
                 "claimable": True,
-                "scope": "OpcPackage::from_bytes constructor only; fixed warm in-process rows",
+                "scope": CACHE_CLAIM_SCOPE,
             },
             "pooled_latency": {
                 "claimable": False,
@@ -1549,7 +1604,7 @@ def _projection(reports: Mapping[str, ValidatedReport], contract: Contract) -> d
             "process_counters": {"claimable": False, "reason": "operation process counters are unavailable"},
             "logical_io": {"claimable": False, "reason": "timed constructor has no logical ReadAt boundary"},
             "physical_io": {"claimable": False, "reason": "no physical-storage counters are collected"},
-            "cold_cache": {"claimable": False, "reason": "only warm in-process rows are selected"},
+            "cold_cache": {"claimable": False, "reason": CACHE_CLAIM_SCOPE},
             "fresh_child_per_sample": {"claimable": False, "reason": "operation metrics have no child-process identity"},
             "allocator_elapsed_ns": {"claimable": False, "reason": "allocator vectors are unavailable in the normal binary"},
             "live_bytes_before": {"claimable": False, "reason": "allocator vectors are unavailable in the normal binary"},
