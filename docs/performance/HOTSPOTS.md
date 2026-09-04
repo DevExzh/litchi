@@ -1,5 +1,36 @@
 # Performance hotspot inventory
 
+## Change 0399 update
+
+0399 adds a descriptive, opt-in selected-cell baseline through the existing
+unified XLSX facade; it does not accept a new hotspot ranking or production
+optimization. `xlsx_file_selected_cell` raises the selectable registry from
+**419** to **420**, while the default remains **36 cases / 198 rows**. The
+fixed corpus is the medium
+`litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1` shape with four
+48×48 worksheets, 9,216 numeric cells, 17 ZIP members, 4,226,429 bytes, and
+source SHA-256
+`dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036`.
+
+The fixed query uses non-first canonical `Bench01`/position `1`, prepared as
+`bEnCh01`, and reads non-first `M29` (zero-based `28 / 12`) with expected
+stored-number lexical value `1028012`. The dedicated selected-cell digest is
+`36e53d9002ae8c433ad918b400196fb886fa675f850076808ac51327d1f42ac1`.
+Open and query preparation are outside each fresh-child timer; only
+case-insensitive sheet selection and exact cell read are timed, with both
+selected handles retained through operation snapshots. Independent semantic,
+source, and eager typed-oracle checks are untimed. Logical source counters
+are `not_applicable_filesystem_xlsx`; no physical-I/O or locality claim
+follows. Cold-requested samples are advisory, and prepared-query
+`cold-verified` is explicitly ineligible.
+
+Stable 1.98.1 validation passed the harness check, focused registry/scope
+tests, all four XLSX filesystem integration tests, the **77/77** strict Python
+schema suite, normal warm and cold-requested CLI oracles, explicit
+cold-ineligibility, and an allocator warm oracle. `performance_claim: none`;
+`claim_authorized: false`; no A/B speedup, latency, allocation, RSS, cache,
+throughput, or generalization claim is accepted. See the [0399 change record](changes/0399-unified-xlsx-selected-cell-baseline.md).
+
 ## Change 0398 update
 
 0398 adds no measured performance result or accepted hotspot ranking. The

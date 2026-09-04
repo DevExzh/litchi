@@ -1,5 +1,12 @@
 # Performance CRUD coverage
 
+## 2026-09-04: change 0399 adds selected-cell baseline coverage
+
+- The opt-in `xlsx_file_selected_cell` selector exercises the existing unified XLSX read path: a prepared `litchi::Workbook::open(path)`, case-insensitive selection of canonical `Bench01`/position `1` through `bEnCh01`, and exact `M29` selection (zero-based row 28, column 12). Its typed oracle expects a stored number with lexical value `1028012` and dedicated digest `36e53d9002ae8c433ad918b400196fb886fa675f850076808ac51327d1f42ac1`.
+- The selector uses the pinned `litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1` medium corpus: four 48×48 worksheets, 9,216 numeric cells, 17 ZIP members, 4,226,429 bytes, SHA-256 `dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036`. The selectable registry rises from **419** to **420**; the default remains **36 cases / 198 rows**.
+- This is read-query benchmark coverage, not a new CRUD semantic operation or CRUD-completion evidence. Fresh-child operation-scoped allocation/process snapshots retain both selected handles; semantic/source and independent eager-oracle checks are untimed. Logical source counters are `not_applicable_filesystem_xlsx`, with no physical-I/O/locality claim. Cold-requested samples are advisory, and prepared query work makes `cold-verified` explicitly ineligible.
+- Stable 1.98.1 validation passed the harness check, focused registry/scope tests, all four XLSX filesystem integration tests, the **77/77** strict Python schema suite, normal warm and cold-requested CLI oracles, explicit cold-ineligibility, and an allocator warm oracle. `performance_claim: none`; `claim_authorized: false`; no A/B speedup, latency, allocation, RSS, cache, throughput, or generalization claim follows. See the [0399 change record](changes/0399-unified-xlsx-selected-cell-baseline.md).
+
 ## 2026-09-04: change 0398 adds unified XLSX selection coverage
 
 - The xlsx-gated `litchi::sheet::Workbook::sheet(name_or_zero_based_position)` returns `Result<Option<SelectedWorksheet>>`: names are case-insensitive, positions are zero-based, and missing/out-of-bounds selectors return `Ok(None)`. The lifetime-free `Clone + Send + Sync` handle exposes `name()` and `position()`.

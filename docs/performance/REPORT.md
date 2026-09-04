@@ -1,5 +1,37 @@
 # Performance program phase report
 
+## Change 0399: unified XLSX selected-cell filesystem baseline
+
+0399 adds exactly one opt-in filesystem selector,
+`xlsx_file_selected_cell`, for the existing unified XLSX facade. The
+selectable registry rises from **419** to **420** while the default remains
+**36 cases / 198 rows**. It uses the pinned medium
+`litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1` corpus: four
+48×48 worksheets (9,216 numeric cells), 17 ZIP members, 4,226,429 archive
+bytes, and SHA-256
+`dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036`.
+
+The fixed oracle selects canonical `Bench01` at zero-based position `1` using
+the prepared mixed-case query `bEnCh01`, then reads zero-based row 28,
+column 12 (`M29`), whose stored numeric lexical value is `1028012`. The
+dedicated selected-cell evidence digest is
+`36e53d9002ae8c433ad918b400196fb886fa675f850076808ac51327d1f42ac1`.
+
+Each sample uses a fresh child. Path open and query preparation occur before
+the timer; the timed scope is only case-insensitive sheet selection plus exact
+cell read, with both owned handles retained through elapsed, allocation, and
+process snapshots. Semantic/source hashes and an independent eager typed
+oracle are checked after timing. Logical source counters are
+`not_applicable_filesystem_xlsx`, with no physical-I/O or locality claim.
+Cold-requested samples are advisory, and the prepared-query shape is
+explicitly ineligible for `cold-verified`. Stable 1.98.1 validation passed the
+harness check, focused registry/scope tests, all four XLSX filesystem
+integration tests, the **77/77** strict Python schema suite, normal warm and
+cold-requested CLI oracles, explicit cold-ineligibility, and an allocator warm
+oracle. `performance_claim: none`; `claim_authorized: false`. This is a
+descriptive candidate baseline with no A/B speedup claim. See the [0399 change
+record](changes/0399-unified-xlsx-selected-cell-baseline.md).
+
 ## Change 0398: unified XLSX worksheet and cell selectors
 
 0398 accepts a correctness/API-unification surface only. With the `xlsx`

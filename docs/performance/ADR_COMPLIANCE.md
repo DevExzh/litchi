@@ -1,5 +1,37 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0399 compliance update
+
+0399 adds only the opt-in `xlsx_file_selected_cell` harness selector over the
+existing unified XLSX facade. It raises the selectable registry from **419**
+to **420** and leaves the default at **36 cases / 198 rows**. No public raw
+type, dependency edge, package identifier, archive/runtime handle, lock,
+unsafe path, CRUD mutation, or format-neutral promise is introduced.
+
+The selector uses the fixed medium
+`litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1` corpus (four
+48×48 worksheets, 9,216 numeric cells, 17 ZIP members, 4,226,429 bytes,
+source SHA-256
+`dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036`) and
+the independent target oracle `Bench01`/position `1`, `bEnCh01`, `M29`, and
+stored number `1028012`. Its dedicated selected-cell digest is
+`36e53d9002ae8c433ad918b400196fb886fa675f850076808ac51327d1f42ac1`.
+
+Fresh-child samples prepare `litchi::Workbook::open(path)` and query strings
+before timing; the timer contains only case-insensitive sheet selection and
+exact cell read. Both owned selected handles remain live through elapsed,
+allocation, and process snapshots. Semantic/source hashes and an independent
+eager typed oracle run after timing. Logical source counters are
+`not_applicable_filesystem_xlsx`; no physical-I/O or locality claim is made.
+Because the query is prepared, cold-requested samples are advisory and
+`cold-verified` is explicitly ineligible. Stable 1.98.1 validation passed the
+harness check, focused registry/scope tests, all four XLSX filesystem
+integration tests, the **77/77** strict Python schema suite, normal warm and
+cold-requested CLI oracles, explicit cold-ineligibility, and an allocator warm
+oracle. `performance_claim: none` and `claim_authorized: false`; no A/B
+speedup or broader latency, memory, cache, throughput, or generalization claim
+follows. See the [0399 change record](changes/0399-unified-xlsx-selected-cell-baseline.md).
+
 ## Change 0398 compliance update
 
 0398 adds a private unified XLSX selected-view wrapper behind the xlsx-gated
