@@ -1,5 +1,54 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0402 compliance update
+
+0402 remains a private `litchi-opc` implementation change inside
+`SourceBackedPackage::write_part_overlays_to_stream`. For unmanaged packages,
+selected source-Part validation now uses one operation-scoped indexed-read
+session and reuses its Deflate decoder across sequential reads. Stored entries
+bypass that decoder and cache hits remain cache-only. Managed packages retain
+the one-shot path so decoder workspace is not retained outside their memory
+reservation; managed cancellation and budget behavior are unchanged. Overlay
+limits, framing/CRC/declared-size checks, XML validation, freshness,
+cancellation, signatures, partial sinks, and raw preservation remain bounded
+as before. No public type/API, dependency, runtime handle, lock, unsafe path,
+executor, CRUD signature, or format-neutral promise changes.
+
+The measured control is `46ef44966d5be16f153b1f3375ac14401b7139ac` and the
+candidate is `51964019db3f6b0787645e3a56c2ecb83bdca65c`. The opt-in selector
+is `opc_source_overlay_multi_part_noop`, whose non-empty replacement plan is
+an equal-payload semantic no-op. Its fixed matrix is three OPC/ZIP shapes
+(`overlay-small`, `overlay-large`, and `overlay-media-incompressible`) at
+overlay counts 2, 8, and 32. The no-op output reopens semantically, preserves
+raw member order/untouched records, and has the source archive identity.
+
+Normal evidence uses stable Rust/Cargo/Rustdoc 1.98.1, CPU 2, one worker,
+20 warmups, and 500 retained in-process samples per leg in A1/B1/B2/A2
+order. The only summarized metric is
+`source.opc_source_overlay.publication_ns`; top-level elapsed is checked only
+as the phase-sum oracle
+`preparation_ns + open_ns + planning_ns + publication_ns`. The configured
+global cache envelope `["warm", "cold-requested"]` is not cold evidence, and
+no fresh-child/process-isolated semantics are claimed. Accepted publication
+statistics are partial: small/8 and small/32 accept p50/mean/p95/p99,
+large/32 accepts p50 only, and media-incompressible/2 accepts p50/mean/p95/p99;
+all other cells are withheld. This does not authorize an overall matrix
+improvement claim.
+
+The separate allocator observation records exact candidate-minus-control
+deltas per sample of `-2/-2/0/0/-80320/-80320` at count 2,
+`-14/-14/0/0/-562240/-562240` at count 8, and
+`-62/-62/0/0/-2489920/-2489920` at count 32, ordered as allocation calls,
+deallocation calls, reallocations, failed calls, allocated bytes, and
+deallocated bytes. Allocator elapsed time, live/peak/RSS, and total memory
+are excluded. The `litchi-opc` gate passed 289 library tests / 386 total test
+items; the dedicated publication and allocator validators passed 10/10 and
+22/22 tests. `performance_claim: none`; `claim_authorized: false`; the
+claim registry remains unchanged because it cannot represent this custom
+publication metric and partial cell adjudication. See the [0402 change
+record](changes/0402-opc-overlay-decoder-reuse.md) and retained [evidence
+bundle](results/change-0402/).
+
 ## Change 0401 compliance update
 
 0401 stays inside the existing `litchi-xlsx` raw worksheet selected scanner.
