@@ -1,0 +1,5450 @@
+{
+  "schema_version": 1,
+  "change": "0397",
+  "scope": "allocator-enabled operation_global_system_allocator metrics; exact per-sample vectors remain lossless in compressed raw allocator reports.",
+  "timing_status": "observational_only",
+  "sample_count": 30,
+  "metrics": [
+    "allocation_calls",
+    "deallocation_calls",
+    "reallocation_calls",
+    "failed_allocation_calls",
+    "allocated_bytes",
+    "deallocated_bytes",
+    "live_bytes_before",
+    "live_bytes_after",
+    "peak_live_bytes_before",
+    "peak_live_bytes_after"
+  ],
+  "vector_digest_algorithm": "sha256(compact-json UTF-8 array)",
+  "per_leg": {
+    "A1": {
+      "256": {
+        "parts": 256,
+        "case": "opc_casefold_owned_open",
+        "allocation": {
+          "allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "fdd2a8f150defbfc0116c0966c89fd5692088d2d5f5baef10c98c8a6eb2e216b",
+            "constant": true,
+            "unique_values": [
+              12419
+            ]
+          },
+          "deallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "13321efa97a3a548031e715f6e1fc4d459ad1934fbb23bcf14740daa01dd1a6d",
+            "constant": true,
+            "unique_values": [
+              8038
+            ]
+          },
+          "reallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "409e75674d6abf6cba605c2925d795275bf626f62350deb3d725324bbcfb335b",
+            "constant": true,
+            "unique_values": [
+              1551
+            ]
+          },
+          "failed_allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "constant": true,
+            "unique_values": [
+              0
+            ]
+          },
+          "allocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "d7412f016074c6e737df69f37c2f39ab17c8ada8a0601d1e9ef34ffaa77e23c8",
+            "constant": true,
+            "unique_values": [
+              1145033
+            ]
+          },
+          "deallocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "478fc2b0270ecaf7a9fa2664dec27b9700edb2dacfac0a7208176eaa8ba8c190",
+            "constant": true,
+            "unique_values": [
+              952911
+            ]
+          },
+          "live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "8123029d87978d67784cfdfc73546e23d1b9e785fa9a22c361931a2d08c2a915",
+            "constant": false,
+            "unique_values": [
+              155070,
+              156838,
+              157030,
+              157222,
+              157414,
+              159174,
+              159366,
+              159558,
+              159750,
+              163086,
+              163278,
+              163470,
+              163662,
+              163854,
+              164046,
+              164238,
+              164430,
+              170910,
+              171102,
+              171294,
+              171486,
+              171678,
+              171870,
+              172062,
+              172254,
+              172446,
+              172638,
+              172830,
+              173022,
+              173214
+            ]
+          },
+          "live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "dd23b0c062eb0b4e6eefcc3017b3b42bbc7eeeef6fca7e138ccb0610ef58e2de",
+            "constant": false,
+            "unique_values": [
+              347192,
+              348960,
+              349152,
+              349344,
+              349536,
+              351296,
+              351488,
+              351680,
+              351872,
+              355208,
+              355400,
+              355592,
+              355784,
+              355976,
+              356168,
+              356360,
+              356552,
+              363032,
+              363224,
+              363416,
+              363608,
+              363800,
+              363992,
+              364184,
+              364376,
+              364568,
+              364760,
+              364952,
+              365144,
+              365336
+            ]
+          },
+          "peak_live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "23893ae5c59574d7b784b4332f8ab902a707ad3f5549f2418fa9d90ecb31d50e",
+            "constant": true,
+            "unique_values": [
+              995332
+            ]
+          },
+          "peak_live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "23893ae5c59574d7b784b4332f8ab902a707ad3f5549f2418fa9d90ecb31d50e",
+            "constant": true,
+            "unique_values": [
+              995332
+            ]
+          },
+          "net_live_after_minus_before": {
+            "sample_count": 30,
+            "vector_sha256": "8f5f58b6ac16ddcd1d43109f4befe58147554b451681efcab2de498be7de0007",
+            "constant": true,
+            "unique_values": [
+              192122
+            ]
+          }
+        }
+      },
+      "2047": {
+        "parts": 2047,
+        "case": "opc_casefold_owned_open",
+        "allocation": {
+          "allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "254273eb814d1ead1a6bb23544656f0e8c3c6549b9756fc05580e1f5bbad0916",
+            "constant": true,
+            "unique_values": [
+              98387
+            ]
+          },
+          "deallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "f0841462be9caa6c5a74b6ed11f274b0b927192a0960a477dacdf06a77180a6a",
+            "constant": true,
+            "unique_values": [
+              63559
+            ]
+          },
+          "reallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "f3b125f2d43e50fecdb708fdad0c343a3f5136e823ff563b76cc29aae973cb36",
+            "constant": true,
+            "unique_values": [
+              12297
+            ]
+          },
+          "failed_allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "constant": true,
+            "unique_values": [
+              0
+            ]
+          },
+          "allocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "b29ca8f6534cf3fd6be92ad972a353d8b093f78d66b73c8da420a4337dc0da8e",
+            "constant": true,
+            "unique_values": [
+              8904931
+            ]
+          },
+          "deallocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "a571cbecf6fd088ff53a1149a648b3a8ffe84eeb433f423f2acecaa71a91fbd0",
+            "constant": true,
+            "unique_values": [
+              7378254
+            ]
+          },
+          "live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "9daebee0964adaf30f622c322ba0240fca32239c72c1d4cf2f66a06f98728f1d",
+            "constant": false,
+            "unique_values": [
+              1260834,
+              1262602,
+              1262794,
+              1262986,
+              1263178,
+              1264938,
+              1265130,
+              1265322,
+              1265514,
+              1268850,
+              1269042,
+              1269234,
+              1269426,
+              1269618,
+              1269810,
+              1270002,
+              1270194,
+              1276674,
+              1276866,
+              1277058,
+              1277250,
+              1277442,
+              1277634,
+              1277826,
+              1278018,
+              1278210,
+              1278402,
+              1278594,
+              1278786,
+              1278978
+            ]
+          },
+          "live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "56e7bd0944ab7e41243cd0a0b31c5c1ca030ae8442e2e0c4948003489397f7bd",
+            "constant": false,
+            "unique_values": [
+              2787511,
+              2789279,
+              2789471,
+              2789663,
+              2789855,
+              2791615,
+              2791807,
+              2791999,
+              2792191,
+              2795527,
+              2795719,
+              2795911,
+              2796103,
+              2796295,
+              2796487,
+              2796679,
+              2796871,
+              2803351,
+              2803543,
+              2803735,
+              2803927,
+              2804119,
+              2804311,
+              2804503,
+              2804695,
+              2804887,
+              2805079,
+              2805271,
+              2805463,
+              2805655
+            ]
+          },
+          "peak_live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "d8ff144dd6e5b109d435d7a9ea1c1fe96b345f1012380e212dd8769a9396ae4d",
+            "constant": true,
+            "unique_values": [
+              7963955
+            ]
+          },
+          "peak_live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "d8ff144dd6e5b109d435d7a9ea1c1fe96b345f1012380e212dd8769a9396ae4d",
+            "constant": true,
+            "unique_values": [
+              7963955
+            ]
+          },
+          "net_live_after_minus_before": {
+            "sample_count": 30,
+            "vector_sha256": "99dc305b82d487e842a176df057e6a03a9f0c46e939c649e5788dabe71794e07",
+            "constant": true,
+            "unique_values": [
+              1526677
+            ]
+          }
+        }
+      },
+      "2048": {
+        "parts": 2048,
+        "case": "opc_casefold_owned_open",
+        "allocation": {
+          "allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "fc7a1067852ac1d1e995af51fd958cabe8f8930a0070971e1ebf026704a664fe",
+            "constant": true,
+            "unique_values": [
+              98435
+            ]
+          },
+          "deallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "6e2fdabe735cdbf1895223c282708324e4c34ddad88051b7eb9154b4f1c93fd5",
+            "constant": true,
+            "unique_values": [
+              63590
+            ]
+          },
+          "reallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "41fa706682876ffa514d72718fcdad060c9387f6472b8fbed38c45bb64daaa9a",
+            "constant": true,
+            "unique_values": [
+              12303
+            ]
+          },
+          "failed_allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "constant": true,
+            "unique_values": [
+              0
+            ]
+          },
+          "allocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "f17a39aa5dd91335b8333576d0fea38a65a7c164d6ed4cf8f28cd23b590ceb01",
+            "constant": true,
+            "unique_values": [
+              8907977
+            ]
+          },
+          "deallocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "41e304dbf1a628fac7f3266d533cb7f5cb52115f9ea017b098bbd4e740732c2c",
+            "constant": true,
+            "unique_values": [
+              7380815
+            ]
+          },
+          "live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "a2ecd4d28bd30ae6aeeba86f4d7e18396afc2b4c7eb4ab47cf340b26916b9397",
+            "constant": false,
+            "unique_values": [
+              1302747,
+              1304515,
+              1304707,
+              1304899,
+              1305091,
+              1306851,
+              1307043,
+              1307235,
+              1307427,
+              1310763,
+              1310955,
+              1311147,
+              1311339,
+              1311531,
+              1311723,
+              1311915,
+              1312107,
+              1318587,
+              1318779,
+              1318971,
+              1319163,
+              1319355,
+              1319547,
+              1319739,
+              1319931,
+              1320123,
+              1320315,
+              1320507,
+              1320699,
+              1320891
+            ]
+          },
+          "live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "40de2e3941f416faca23a955dc867361af78bda00a337ff8d410a7bc30e472da",
+            "constant": false,
+            "unique_values": [
+              2829909,
+              2831677,
+              2831869,
+              2832061,
+              2832253,
+              2834013,
+              2834205,
+              2834397,
+              2834589,
+              2837925,
+              2838117,
+              2838309,
+              2838501,
+              2838693,
+              2838885,
+              2839077,
+              2839269,
+              2845749,
+              2845941,
+              2846133,
+              2846325,
+              2846517,
+              2846709,
+              2846901,
+              2847093,
+              2847285,
+              2847477,
+              2847669,
+              2847861,
+              2848053
+            ]
+          },
+          "peak_live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "53feb0cd419fbdae532178c3cc313c7730087b433725412262b45c69770e2863",
+            "constant": true,
+            "unique_values": [
+              8008225
+            ]
+          },
+          "peak_live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "53feb0cd419fbdae532178c3cc313c7730087b433725412262b45c69770e2863",
+            "constant": true,
+            "unique_values": [
+              8008225
+            ]
+          },
+          "net_live_after_minus_before": {
+            "sample_count": 30,
+            "vector_sha256": "60dc01eddbcaa970b5c01c7dc012f3061b3c924670bcdf8ddde266045a827a3a",
+            "constant": true,
+            "unique_values": [
+              1527162
+            ]
+          }
+        }
+      },
+      "16384": {
+        "parts": 16384,
+        "case": "opc_casefold_owned_open",
+        "allocation": {
+          "allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "d0c698ce993649b18079cb29911c88d006a4aec600f354f93e6b38f1aa409c44",
+            "constant": true,
+            "unique_values": [
+              786563
+            ]
+          },
+          "deallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "5a751cd23c0cd692ad416681fd408f6b1e638a1ea6d2b1453e20b4ebf59a59e8",
+            "constant": true,
+            "unique_values": [
+              508006
+            ]
+          },
+          "reallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "3d89987eff3f10f092a7b5639dc2fd5f9bc33b71527ef761897bf3aa50f899db",
+            "constant": true,
+            "unique_values": [
+              98319
+            ]
+          },
+          "failed_allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "constant": true,
+            "unique_values": [
+              0
+            ]
+          },
+          "allocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "c7816028be0c4950f7148df3cf666d8aee8516dec8458e702a9f8b0f4e7a350f",
+            "constant": true,
+            "unique_values": [
+              71011529
+            ]
+          },
+          "deallocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "10d850b584ee53291f2327f7e4299ebd1b4126763f219568e4f4ca26e05915b5",
+            "constant": true,
+            "unique_values": [
+              58804047
+            ]
+          },
+          "live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "0358ccb33e0a469897e4463d03c1d814c61548f14ed9fd21755c8ed433fce681",
+            "constant": false,
+            "unique_values": [
+              9864474,
+              9866242,
+              9866434,
+              9866626,
+              9866818,
+              9868578,
+              9868770,
+              9868962,
+              9869154,
+              9872490,
+              9872682,
+              9872874,
+              9873066,
+              9873258,
+              9873450,
+              9873642,
+              9873834,
+              9880314,
+              9880506,
+              9880698,
+              9880890,
+              9881082,
+              9881274,
+              9881466,
+              9881658,
+              9881850,
+              9882042,
+              9882234,
+              9882426,
+              9882618
+            ]
+          },
+          "live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "35da79d0b65172cf00012f8303b858d819b9541caff6f65941e40f45fef59e58",
+            "constant": false,
+            "unique_values": [
+              22071956,
+              22073724,
+              22073916,
+              22074108,
+              22074300,
+              22076060,
+              22076252,
+              22076444,
+              22076636,
+              22079972,
+              22080164,
+              22080356,
+              22080548,
+              22080740,
+              22080932,
+              22081124,
+              22081316,
+              22087796,
+              22087988,
+              22088180,
+              22088372,
+              22088564,
+              22088756,
+              22088948,
+              22089140,
+              22089332,
+              22089524,
+              22089716,
+              22089908,
+              22090100
+            ]
+          },
+          "peak_live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "27e1cb15ee8b7d12b0703a66b0f1e1417a03b7069bbac6d6197ae5544fedfa3a",
+            "constant": true,
+            "unique_values": [
+              63491680
+            ]
+          },
+          "peak_live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "27e1cb15ee8b7d12b0703a66b0f1e1417a03b7069bbac6d6197ae5544fedfa3a",
+            "constant": true,
+            "unique_values": [
+              63491680
+            ]
+          },
+          "net_live_after_minus_before": {
+            "sample_count": 30,
+            "vector_sha256": "eeba40374529f6618fc39ec786ba19d8485ec321b6399b1385a71ee6a94d143c",
+            "constant": true,
+            "unique_values": [
+              12207482
+            ]
+          }
+        }
+      }
+    },
+    "B1": {
+      "256": {
+        "parts": 256,
+        "case": "opc_casefold_owned_open",
+        "allocation": {
+          "allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "5465ef1d41584ed6b0c75fccc212bdafd15ab0f59f3d0c978ea5866401247b25",
+            "constant": true,
+            "unique_values": [
+              11381
+            ]
+          },
+          "deallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "cca4672b2d69c33007d27b6395058bc16363c9b886312877bd55a6d8f5d54ab0",
+            "constant": true,
+            "unique_values": [
+              7000
+            ]
+          },
+          "reallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "409e75674d6abf6cba605c2925d795275bf626f62350deb3d725324bbcfb335b",
+            "constant": true,
+            "unique_values": [
+              1551
+            ]
+          },
+          "failed_allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "constant": true,
+            "unique_values": [
+              0
+            ]
+          },
+          "allocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "f2dc8022b021f372eebcc851781245b4d6f6e1a09b0ac9bed12b374fc2f007a4",
+            "constant": true,
+            "unique_values": [
+              993009
+            ]
+          },
+          "deallocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "ca316f7a5b60cc1f37dba3f60b04b950c15550d14aa6c30218fb79a048325e7f",
+            "constant": true,
+            "unique_values": [
+              800887
+            ]
+          },
+          "live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "ed896c7d00d3b043662d4edb4cada080de4e861de04150f1c0696d769ea9978b",
+            "constant": false,
+            "unique_values": [
+              155074,
+              156842,
+              157034,
+              157226,
+              157418,
+              159178,
+              159370,
+              159562,
+              159754,
+              163090,
+              163282,
+              163474,
+              163666,
+              163858,
+              164050,
+              164242,
+              164434,
+              170914,
+              171106,
+              171298,
+              171490,
+              171682,
+              171874,
+              172066,
+              172258,
+              172450,
+              172642,
+              172834,
+              173026,
+              173218
+            ]
+          },
+          "live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "8ba9e07a6009061a75784ae1ba9ca4abc0bd6d71fb28747f496dede27ace4b90",
+            "constant": false,
+            "unique_values": [
+              347196,
+              348964,
+              349156,
+              349348,
+              349540,
+              351300,
+              351492,
+              351684,
+              351876,
+              355212,
+              355404,
+              355596,
+              355788,
+              355980,
+              356172,
+              356364,
+              356556,
+              363036,
+              363228,
+              363420,
+              363612,
+              363804,
+              363996,
+              364188,
+              364380,
+              364572,
+              364764,
+              364956,
+              365148,
+              365340
+            ]
+          },
+          "peak_live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "1baac413edd695b6ea515f67aeaea628933d2f4a28dbcdafc54f61553c2b94a2",
+            "constant": true,
+            "unique_values": [
+              995336
+            ]
+          },
+          "peak_live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "1baac413edd695b6ea515f67aeaea628933d2f4a28dbcdafc54f61553c2b94a2",
+            "constant": true,
+            "unique_values": [
+              995336
+            ]
+          },
+          "net_live_after_minus_before": {
+            "sample_count": 30,
+            "vector_sha256": "8f5f58b6ac16ddcd1d43109f4befe58147554b451681efcab2de498be7de0007",
+            "constant": true,
+            "unique_values": [
+              192122
+            ]
+          }
+        }
+      },
+      "2047": {
+        "parts": 2047,
+        "case": "opc_casefold_owned_open",
+        "allocation": {
+          "allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "80c8f623a4646dce9a4525c4001077efcb4713898cf8f9b6a27f1ce8cfbd0a12",
+            "constant": true,
+            "unique_values": [
+              90185
+            ]
+          },
+          "deallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "d771f6f80c46fafd7514d6f6533b7d4fe7eb3a66bddcbfea6b73799c15a0c4e8",
+            "constant": true,
+            "unique_values": [
+              55357
+            ]
+          },
+          "reallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "f3b125f2d43e50fecdb708fdad0c343a3f5136e823ff563b76cc29aae973cb36",
+            "constant": true,
+            "unique_values": [
+              12297
+            ]
+          },
+          "failed_allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "constant": true,
+            "unique_values": [
+              0
+            ]
+          },
+          "allocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "7b162cedd092249de094aced81d8a54915b6108c616ae0b8a20d04100b5bef67",
+            "constant": true,
+            "unique_values": [
+              7692311
+            ]
+          },
+          "deallocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "4c782b0b8e7fb466205f5d8be88d0c62dbd36a62afa9e59e28df5f63d69a7572",
+            "constant": true,
+            "unique_values": [
+              6165634
+            ]
+          },
+          "live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "20c1e4c4f80b4d451b139d2922bc6b1e6564cdb87641b35fe4d8bfe6dcedef2f",
+            "constant": false,
+            "unique_values": [
+              1260838,
+              1262606,
+              1262798,
+              1262990,
+              1263182,
+              1264942,
+              1265134,
+              1265326,
+              1265518,
+              1268854,
+              1269046,
+              1269238,
+              1269430,
+              1269622,
+              1269814,
+              1270006,
+              1270198,
+              1276678,
+              1276870,
+              1277062,
+              1277254,
+              1277446,
+              1277638,
+              1277830,
+              1278022,
+              1278214,
+              1278406,
+              1278598,
+              1278790,
+              1278982
+            ]
+          },
+          "live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "222b09fd63628c26964ae164bc68a7e30b46a8ed305d551d34068b9f70c49ced",
+            "constant": false,
+            "unique_values": [
+              2787515,
+              2789283,
+              2789475,
+              2789667,
+              2789859,
+              2791619,
+              2791811,
+              2792003,
+              2792195,
+              2795531,
+              2795723,
+              2795915,
+              2796107,
+              2796299,
+              2796491,
+              2796683,
+              2796875,
+              2803355,
+              2803547,
+              2803739,
+              2803931,
+              2804123,
+              2804315,
+              2804507,
+              2804699,
+              2804891,
+              2805083,
+              2805275,
+              2805467,
+              2805659
+            ]
+          },
+          "peak_live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "822553098bf04b5d87613a55b35c5164d20332e3a2eb62e82848e356489eed30",
+            "constant": true,
+            "unique_values": [
+              7963959
+            ]
+          },
+          "peak_live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "822553098bf04b5d87613a55b35c5164d20332e3a2eb62e82848e356489eed30",
+            "constant": true,
+            "unique_values": [
+              7963959
+            ]
+          },
+          "net_live_after_minus_before": {
+            "sample_count": 30,
+            "vector_sha256": "99dc305b82d487e842a176df057e6a03a9f0c46e939c649e5788dabe71794e07",
+            "constant": true,
+            "unique_values": [
+              1526677
+            ]
+          }
+        }
+      },
+      "2048": {
+        "parts": 2048,
+        "case": "opc_casefold_owned_open",
+        "allocation": {
+          "allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "8c5068d5b3336b2a979056438f97fdd9494996a3bd17822bc5e94df6fed7fd65",
+            "constant": true,
+            "unique_values": [
+              90229
+            ]
+          },
+          "deallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "bced8de8576168f1f306869cf7cbe05e0cc58358212d6f063cd23f900f5df6d3",
+            "constant": true,
+            "unique_values": [
+              55384
+            ]
+          },
+          "reallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "41fa706682876ffa514d72718fcdad060c9387f6472b8fbed38c45bb64daaa9a",
+            "constant": true,
+            "unique_values": [
+              12303
+            ]
+          },
+          "failed_allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "constant": true,
+            "unique_values": [
+              0
+            ]
+          },
+          "allocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "ba69fbd83d46b5e700641786f84269a64bf980d738d9997c11b0f90095c78e93",
+            "constant": true,
+            "unique_values": [
+              7695089
+            ]
+          },
+          "deallocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "187be07b14cccb689f2eb0b1f0841d25dea15913ceb1f653d9f24d9abdac0e87",
+            "constant": true,
+            "unique_values": [
+              6167927
+            ]
+          },
+          "live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "370b84474b74bc2431db81fe7e727b76b1da7f64742e4619174225b8f3c37d8b",
+            "constant": false,
+            "unique_values": [
+              1302751,
+              1304519,
+              1304711,
+              1304903,
+              1305095,
+              1306855,
+              1307047,
+              1307239,
+              1307431,
+              1310767,
+              1310959,
+              1311151,
+              1311343,
+              1311535,
+              1311727,
+              1311919,
+              1312111,
+              1318591,
+              1318783,
+              1318975,
+              1319167,
+              1319359,
+              1319551,
+              1319743,
+              1319935,
+              1320127,
+              1320319,
+              1320511,
+              1320703,
+              1320895
+            ]
+          },
+          "live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "7852a3f63a119ad6176955669aa2eee7226c2981eba6334768ddaee70bb7dece",
+            "constant": false,
+            "unique_values": [
+              2829913,
+              2831681,
+              2831873,
+              2832065,
+              2832257,
+              2834017,
+              2834209,
+              2834401,
+              2834593,
+              2837929,
+              2838121,
+              2838313,
+              2838505,
+              2838697,
+              2838889,
+              2839081,
+              2839273,
+              2845753,
+              2845945,
+              2846137,
+              2846329,
+              2846521,
+              2846713,
+              2846905,
+              2847097,
+              2847289,
+              2847481,
+              2847673,
+              2847865,
+              2848057
+            ]
+          },
+          "peak_live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "8ed02f9aa638d3a4e0aa36e7eacdd544e5c0221a4eb843bced7280ae5ecd4c52",
+            "constant": true,
+            "unique_values": [
+              8008229
+            ]
+          },
+          "peak_live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "8ed02f9aa638d3a4e0aa36e7eacdd544e5c0221a4eb843bced7280ae5ecd4c52",
+            "constant": true,
+            "unique_values": [
+              8008229
+            ]
+          },
+          "net_live_after_minus_before": {
+            "sample_count": 30,
+            "vector_sha256": "60dc01eddbcaa970b5c01c7dc012f3061b3c924670bcdf8ddde266045a827a3a",
+            "constant": true,
+            "unique_values": [
+              1527162
+            ]
+          }
+        }
+      },
+      "16384": {
+        "parts": 16384,
+        "case": "opc_casefold_owned_open",
+        "allocation": {
+          "allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "e7afb3a4de3402091469b648b7f97d74edc87aba068755af50082b54cefd524b",
+            "constant": true,
+            "unique_values": [
+              721013
+            ]
+          },
+          "deallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "0812cf0a4671cfe284f8d283e16cc3a63493ade6be92455f333f2441467d0ac5",
+            "constant": true,
+            "unique_values": [
+              442456
+            ]
+          },
+          "reallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "3d89987eff3f10f092a7b5639dc2fd5f9bc33b71527ef761897bf3aa50f899db",
+            "constant": true,
+            "unique_values": [
+              98319
+            ]
+          },
+          "failed_allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "constant": true,
+            "unique_values": [
+              0
+            ]
+          },
+          "allocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "2d3359fdf410589bbdd411380e4bacd548181ddfe396184272889d253f820505",
+            "constant": true,
+            "unique_values": [
+              61311729
+            ]
+          },
+          "deallocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "874e3876fc0e0f49546b25a1682733ab25188bcebc422dc55636b4173d677a4a",
+            "constant": true,
+            "unique_values": [
+              49104247
+            ]
+          },
+          "live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "b7b3eaf49998775fbb005ae4a552df229473e05eb55a5f072d7a2d8a8e0bc28c",
+            "constant": false,
+            "unique_values": [
+              9864478,
+              9866246,
+              9866438,
+              9866630,
+              9866822,
+              9868582,
+              9868774,
+              9868966,
+              9869158,
+              9872494,
+              9872686,
+              9872878,
+              9873070,
+              9873262,
+              9873454,
+              9873646,
+              9873838,
+              9880318,
+              9880510,
+              9880702,
+              9880894,
+              9881086,
+              9881278,
+              9881470,
+              9881662,
+              9881854,
+              9882046,
+              9882238,
+              9882430,
+              9882622
+            ]
+          },
+          "live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "5c8cf77f40f637ccd7de3a4de16aa5d0b89a198b70fee107a65dfa32aa9529b2",
+            "constant": false,
+            "unique_values": [
+              22071960,
+              22073728,
+              22073920,
+              22074112,
+              22074304,
+              22076064,
+              22076256,
+              22076448,
+              22076640,
+              22079976,
+              22080168,
+              22080360,
+              22080552,
+              22080744,
+              22080936,
+              22081128,
+              22081320,
+              22087800,
+              22087992,
+              22088184,
+              22088376,
+              22088568,
+              22088760,
+              22088952,
+              22089144,
+              22089336,
+              22089528,
+              22089720,
+              22089912,
+              22090104
+            ]
+          },
+          "peak_live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "a05de968ad4eb7f2e5b97ef238b5521dbdb4f4ed0e395fc79ba0ecfdbaf92c90",
+            "constant": true,
+            "unique_values": [
+              63491684
+            ]
+          },
+          "peak_live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "a05de968ad4eb7f2e5b97ef238b5521dbdb4f4ed0e395fc79ba0ecfdbaf92c90",
+            "constant": true,
+            "unique_values": [
+              63491684
+            ]
+          },
+          "net_live_after_minus_before": {
+            "sample_count": 30,
+            "vector_sha256": "eeba40374529f6618fc39ec786ba19d8485ec321b6399b1385a71ee6a94d143c",
+            "constant": true,
+            "unique_values": [
+              12207482
+            ]
+          }
+        }
+      }
+    },
+    "B2": {
+      "256": {
+        "parts": 256,
+        "case": "opc_casefold_owned_open",
+        "allocation": {
+          "allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "5465ef1d41584ed6b0c75fccc212bdafd15ab0f59f3d0c978ea5866401247b25",
+            "constant": true,
+            "unique_values": [
+              11381
+            ]
+          },
+          "deallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "cca4672b2d69c33007d27b6395058bc16363c9b886312877bd55a6d8f5d54ab0",
+            "constant": true,
+            "unique_values": [
+              7000
+            ]
+          },
+          "reallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "409e75674d6abf6cba605c2925d795275bf626f62350deb3d725324bbcfb335b",
+            "constant": true,
+            "unique_values": [
+              1551
+            ]
+          },
+          "failed_allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "constant": true,
+            "unique_values": [
+              0
+            ]
+          },
+          "allocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "f2dc8022b021f372eebcc851781245b4d6f6e1a09b0ac9bed12b374fc2f007a4",
+            "constant": true,
+            "unique_values": [
+              993009
+            ]
+          },
+          "deallocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "ca316f7a5b60cc1f37dba3f60b04b950c15550d14aa6c30218fb79a048325e7f",
+            "constant": true,
+            "unique_values": [
+              800887
+            ]
+          },
+          "live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "3ba801a9d6a1decb6538e49f9f44b008827fc560d64c511cc1ee9ad385312c4d",
+            "constant": false,
+            "unique_values": [
+              155074,
+              156842,
+              157034,
+              157226,
+              157418,
+              159178,
+              159370,
+              159562,
+              159754,
+              163090,
+              163282,
+              163474,
+              163666,
+              163858,
+              164050,
+              164242,
+              164434,
+              170914,
+              171106,
+              171298,
+              171490,
+              171682,
+              171874,
+              172066,
+              172258,
+              172450,
+              172642,
+              172834,
+              173026,
+              173218
+            ]
+          },
+          "live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "73f29fc49ca03b36ec1f40fbefb821b1d95b97d52e002d0a78dd79ef8763d100",
+            "constant": false,
+            "unique_values": [
+              347196,
+              348964,
+              349156,
+              349348,
+              349540,
+              351300,
+              351492,
+              351684,
+              351876,
+              355212,
+              355404,
+              355596,
+              355788,
+              355980,
+              356172,
+              356364,
+              356556,
+              363036,
+              363228,
+              363420,
+              363612,
+              363804,
+              363996,
+              364188,
+              364380,
+              364572,
+              364764,
+              364956,
+              365148,
+              365340
+            ]
+          },
+          "peak_live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "1baac413edd695b6ea515f67aeaea628933d2f4a28dbcdafc54f61553c2b94a2",
+            "constant": true,
+            "unique_values": [
+              995336
+            ]
+          },
+          "peak_live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "1baac413edd695b6ea515f67aeaea628933d2f4a28dbcdafc54f61553c2b94a2",
+            "constant": true,
+            "unique_values": [
+              995336
+            ]
+          },
+          "net_live_after_minus_before": {
+            "sample_count": 30,
+            "vector_sha256": "8f5f58b6ac16ddcd1d43109f4befe58147554b451681efcab2de498be7de0007",
+            "constant": true,
+            "unique_values": [
+              192122
+            ]
+          }
+        }
+      },
+      "2047": {
+        "parts": 2047,
+        "case": "opc_casefold_owned_open",
+        "allocation": {
+          "allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "80c8f623a4646dce9a4525c4001077efcb4713898cf8f9b6a27f1ce8cfbd0a12",
+            "constant": true,
+            "unique_values": [
+              90185
+            ]
+          },
+          "deallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "d771f6f80c46fafd7514d6f6533b7d4fe7eb3a66bddcbfea6b73799c15a0c4e8",
+            "constant": true,
+            "unique_values": [
+              55357
+            ]
+          },
+          "reallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "f3b125f2d43e50fecdb708fdad0c343a3f5136e823ff563b76cc29aae973cb36",
+            "constant": true,
+            "unique_values": [
+              12297
+            ]
+          },
+          "failed_allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "constant": true,
+            "unique_values": [
+              0
+            ]
+          },
+          "allocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "7b162cedd092249de094aced81d8a54915b6108c616ae0b8a20d04100b5bef67",
+            "constant": true,
+            "unique_values": [
+              7692311
+            ]
+          },
+          "deallocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "4c782b0b8e7fb466205f5d8be88d0c62dbd36a62afa9e59e28df5f63d69a7572",
+            "constant": true,
+            "unique_values": [
+              6165634
+            ]
+          },
+          "live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "6454e3dcd064f76cbd6db5416e5304e59864c16e3432cc716df80c1cda96e342",
+            "constant": false,
+            "unique_values": [
+              1260838,
+              1262606,
+              1262798,
+              1262990,
+              1263182,
+              1264942,
+              1265134,
+              1265326,
+              1265518,
+              1268854,
+              1269046,
+              1269238,
+              1269430,
+              1269622,
+              1269814,
+              1270006,
+              1270198,
+              1276678,
+              1276870,
+              1277062,
+              1277254,
+              1277446,
+              1277638,
+              1277830,
+              1278022,
+              1278214,
+              1278406,
+              1278598,
+              1278790,
+              1278982
+            ]
+          },
+          "live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "18d37dbe69fa639a691a3b9fe84944298c2017d32046fce4f3830c3ca8cc55f2",
+            "constant": false,
+            "unique_values": [
+              2787515,
+              2789283,
+              2789475,
+              2789667,
+              2789859,
+              2791619,
+              2791811,
+              2792003,
+              2792195,
+              2795531,
+              2795723,
+              2795915,
+              2796107,
+              2796299,
+              2796491,
+              2796683,
+              2796875,
+              2803355,
+              2803547,
+              2803739,
+              2803931,
+              2804123,
+              2804315,
+              2804507,
+              2804699,
+              2804891,
+              2805083,
+              2805275,
+              2805467,
+              2805659
+            ]
+          },
+          "peak_live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "822553098bf04b5d87613a55b35c5164d20332e3a2eb62e82848e356489eed30",
+            "constant": true,
+            "unique_values": [
+              7963959
+            ]
+          },
+          "peak_live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "822553098bf04b5d87613a55b35c5164d20332e3a2eb62e82848e356489eed30",
+            "constant": true,
+            "unique_values": [
+              7963959
+            ]
+          },
+          "net_live_after_minus_before": {
+            "sample_count": 30,
+            "vector_sha256": "99dc305b82d487e842a176df057e6a03a9f0c46e939c649e5788dabe71794e07",
+            "constant": true,
+            "unique_values": [
+              1526677
+            ]
+          }
+        }
+      },
+      "2048": {
+        "parts": 2048,
+        "case": "opc_casefold_owned_open",
+        "allocation": {
+          "allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "8c5068d5b3336b2a979056438f97fdd9494996a3bd17822bc5e94df6fed7fd65",
+            "constant": true,
+            "unique_values": [
+              90229
+            ]
+          },
+          "deallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "bced8de8576168f1f306869cf7cbe05e0cc58358212d6f063cd23f900f5df6d3",
+            "constant": true,
+            "unique_values": [
+              55384
+            ]
+          },
+          "reallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "41fa706682876ffa514d72718fcdad060c9387f6472b8fbed38c45bb64daaa9a",
+            "constant": true,
+            "unique_values": [
+              12303
+            ]
+          },
+          "failed_allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "constant": true,
+            "unique_values": [
+              0
+            ]
+          },
+          "allocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "ba69fbd83d46b5e700641786f84269a64bf980d738d9997c11b0f90095c78e93",
+            "constant": true,
+            "unique_values": [
+              7695089
+            ]
+          },
+          "deallocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "187be07b14cccb689f2eb0b1f0841d25dea15913ceb1f653d9f24d9abdac0e87",
+            "constant": true,
+            "unique_values": [
+              6167927
+            ]
+          },
+          "live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "3a276abf63dcbeffaa3ccd4c2c958a396605aa32c5bed47700ba76024755f0f8",
+            "constant": false,
+            "unique_values": [
+              1302751,
+              1304519,
+              1304711,
+              1304903,
+              1305095,
+              1306855,
+              1307047,
+              1307239,
+              1307431,
+              1310767,
+              1310959,
+              1311151,
+              1311343,
+              1311535,
+              1311727,
+              1311919,
+              1312111,
+              1318591,
+              1318783,
+              1318975,
+              1319167,
+              1319359,
+              1319551,
+              1319743,
+              1319935,
+              1320127,
+              1320319,
+              1320511,
+              1320703,
+              1320895
+            ]
+          },
+          "live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "020d87e48c1e57d5848190ae3da37a5d8c5fb672168051969b2940fcd846e7f2",
+            "constant": false,
+            "unique_values": [
+              2829913,
+              2831681,
+              2831873,
+              2832065,
+              2832257,
+              2834017,
+              2834209,
+              2834401,
+              2834593,
+              2837929,
+              2838121,
+              2838313,
+              2838505,
+              2838697,
+              2838889,
+              2839081,
+              2839273,
+              2845753,
+              2845945,
+              2846137,
+              2846329,
+              2846521,
+              2846713,
+              2846905,
+              2847097,
+              2847289,
+              2847481,
+              2847673,
+              2847865,
+              2848057
+            ]
+          },
+          "peak_live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "8ed02f9aa638d3a4e0aa36e7eacdd544e5c0221a4eb843bced7280ae5ecd4c52",
+            "constant": true,
+            "unique_values": [
+              8008229
+            ]
+          },
+          "peak_live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "8ed02f9aa638d3a4e0aa36e7eacdd544e5c0221a4eb843bced7280ae5ecd4c52",
+            "constant": true,
+            "unique_values": [
+              8008229
+            ]
+          },
+          "net_live_after_minus_before": {
+            "sample_count": 30,
+            "vector_sha256": "60dc01eddbcaa970b5c01c7dc012f3061b3c924670bcdf8ddde266045a827a3a",
+            "constant": true,
+            "unique_values": [
+              1527162
+            ]
+          }
+        }
+      },
+      "16384": {
+        "parts": 16384,
+        "case": "opc_casefold_owned_open",
+        "allocation": {
+          "allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "e7afb3a4de3402091469b648b7f97d74edc87aba068755af50082b54cefd524b",
+            "constant": true,
+            "unique_values": [
+              721013
+            ]
+          },
+          "deallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "0812cf0a4671cfe284f8d283e16cc3a63493ade6be92455f333f2441467d0ac5",
+            "constant": true,
+            "unique_values": [
+              442456
+            ]
+          },
+          "reallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "3d89987eff3f10f092a7b5639dc2fd5f9bc33b71527ef761897bf3aa50f899db",
+            "constant": true,
+            "unique_values": [
+              98319
+            ]
+          },
+          "failed_allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "constant": true,
+            "unique_values": [
+              0
+            ]
+          },
+          "allocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "2d3359fdf410589bbdd411380e4bacd548181ddfe396184272889d253f820505",
+            "constant": true,
+            "unique_values": [
+              61311729
+            ]
+          },
+          "deallocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "874e3876fc0e0f49546b25a1682733ab25188bcebc422dc55636b4173d677a4a",
+            "constant": true,
+            "unique_values": [
+              49104247
+            ]
+          },
+          "live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "f82e77a45124627261d5fca546557cb1d511a595bb5f55c2f07ebfab73c7d449",
+            "constant": false,
+            "unique_values": [
+              9864478,
+              9866246,
+              9866438,
+              9866630,
+              9866822,
+              9868582,
+              9868774,
+              9868966,
+              9869158,
+              9872494,
+              9872686,
+              9872878,
+              9873070,
+              9873262,
+              9873454,
+              9873646,
+              9873838,
+              9880318,
+              9880510,
+              9880702,
+              9880894,
+              9881086,
+              9881278,
+              9881470,
+              9881662,
+              9881854,
+              9882046,
+              9882238,
+              9882430,
+              9882622
+            ]
+          },
+          "live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "7b063ec9e5944fe6200d05693e7c737bd5894eeb734b6d170c48831349083417",
+            "constant": false,
+            "unique_values": [
+              22071960,
+              22073728,
+              22073920,
+              22074112,
+              22074304,
+              22076064,
+              22076256,
+              22076448,
+              22076640,
+              22079976,
+              22080168,
+              22080360,
+              22080552,
+              22080744,
+              22080936,
+              22081128,
+              22081320,
+              22087800,
+              22087992,
+              22088184,
+              22088376,
+              22088568,
+              22088760,
+              22088952,
+              22089144,
+              22089336,
+              22089528,
+              22089720,
+              22089912,
+              22090104
+            ]
+          },
+          "peak_live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "a05de968ad4eb7f2e5b97ef238b5521dbdb4f4ed0e395fc79ba0ecfdbaf92c90",
+            "constant": true,
+            "unique_values": [
+              63491684
+            ]
+          },
+          "peak_live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "a05de968ad4eb7f2e5b97ef238b5521dbdb4f4ed0e395fc79ba0ecfdbaf92c90",
+            "constant": true,
+            "unique_values": [
+              63491684
+            ]
+          },
+          "net_live_after_minus_before": {
+            "sample_count": 30,
+            "vector_sha256": "eeba40374529f6618fc39ec786ba19d8485ec321b6399b1385a71ee6a94d143c",
+            "constant": true,
+            "unique_values": [
+              12207482
+            ]
+          }
+        }
+      }
+    },
+    "A2": {
+      "256": {
+        "parts": 256,
+        "case": "opc_casefold_owned_open",
+        "allocation": {
+          "allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "fdd2a8f150defbfc0116c0966c89fd5692088d2d5f5baef10c98c8a6eb2e216b",
+            "constant": true,
+            "unique_values": [
+              12419
+            ]
+          },
+          "deallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "13321efa97a3a548031e715f6e1fc4d459ad1934fbb23bcf14740daa01dd1a6d",
+            "constant": true,
+            "unique_values": [
+              8038
+            ]
+          },
+          "reallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "409e75674d6abf6cba605c2925d795275bf626f62350deb3d725324bbcfb335b",
+            "constant": true,
+            "unique_values": [
+              1551
+            ]
+          },
+          "failed_allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "constant": true,
+            "unique_values": [
+              0
+            ]
+          },
+          "allocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "d7412f016074c6e737df69f37c2f39ab17c8ada8a0601d1e9ef34ffaa77e23c8",
+            "constant": true,
+            "unique_values": [
+              1145033
+            ]
+          },
+          "deallocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "478fc2b0270ecaf7a9fa2664dec27b9700edb2dacfac0a7208176eaa8ba8c190",
+            "constant": true,
+            "unique_values": [
+              952911
+            ]
+          },
+          "live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "04c20c111758c959dd8544734691906483f5353e4af7e6f06ae33927486c2cc7",
+            "constant": false,
+            "unique_values": [
+              155070,
+              156838,
+              157030,
+              157222,
+              157414,
+              159174,
+              159366,
+              159558,
+              159750,
+              163086,
+              163278,
+              163470,
+              163662,
+              163854,
+              164046,
+              164238,
+              164430,
+              170910,
+              171102,
+              171294,
+              171486,
+              171678,
+              171870,
+              172062,
+              172254,
+              172446,
+              172638,
+              172830,
+              173022,
+              173214
+            ]
+          },
+          "live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "1c4fcac682537f6e55930b49d069a9857fd0938ab6657b7598fa1aa7ba5adac2",
+            "constant": false,
+            "unique_values": [
+              347192,
+              348960,
+              349152,
+              349344,
+              349536,
+              351296,
+              351488,
+              351680,
+              351872,
+              355208,
+              355400,
+              355592,
+              355784,
+              355976,
+              356168,
+              356360,
+              356552,
+              363032,
+              363224,
+              363416,
+              363608,
+              363800,
+              363992,
+              364184,
+              364376,
+              364568,
+              364760,
+              364952,
+              365144,
+              365336
+            ]
+          },
+          "peak_live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "23893ae5c59574d7b784b4332f8ab902a707ad3f5549f2418fa9d90ecb31d50e",
+            "constant": true,
+            "unique_values": [
+              995332
+            ]
+          },
+          "peak_live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "23893ae5c59574d7b784b4332f8ab902a707ad3f5549f2418fa9d90ecb31d50e",
+            "constant": true,
+            "unique_values": [
+              995332
+            ]
+          },
+          "net_live_after_minus_before": {
+            "sample_count": 30,
+            "vector_sha256": "8f5f58b6ac16ddcd1d43109f4befe58147554b451681efcab2de498be7de0007",
+            "constant": true,
+            "unique_values": [
+              192122
+            ]
+          }
+        }
+      },
+      "2047": {
+        "parts": 2047,
+        "case": "opc_casefold_owned_open",
+        "allocation": {
+          "allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "254273eb814d1ead1a6bb23544656f0e8c3c6549b9756fc05580e1f5bbad0916",
+            "constant": true,
+            "unique_values": [
+              98387
+            ]
+          },
+          "deallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "f0841462be9caa6c5a74b6ed11f274b0b927192a0960a477dacdf06a77180a6a",
+            "constant": true,
+            "unique_values": [
+              63559
+            ]
+          },
+          "reallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "f3b125f2d43e50fecdb708fdad0c343a3f5136e823ff563b76cc29aae973cb36",
+            "constant": true,
+            "unique_values": [
+              12297
+            ]
+          },
+          "failed_allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "constant": true,
+            "unique_values": [
+              0
+            ]
+          },
+          "allocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "b29ca8f6534cf3fd6be92ad972a353d8b093f78d66b73c8da420a4337dc0da8e",
+            "constant": true,
+            "unique_values": [
+              8904931
+            ]
+          },
+          "deallocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "a571cbecf6fd088ff53a1149a648b3a8ffe84eeb433f423f2acecaa71a91fbd0",
+            "constant": true,
+            "unique_values": [
+              7378254
+            ]
+          },
+          "live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "cac9df9fb1d0ebf130abac1b1d077c3d7f93171dba8199c1a210616d78c4372b",
+            "constant": false,
+            "unique_values": [
+              1260834,
+              1262602,
+              1262794,
+              1262986,
+              1263178,
+              1264938,
+              1265130,
+              1265322,
+              1265514,
+              1268850,
+              1269042,
+              1269234,
+              1269426,
+              1269618,
+              1269810,
+              1270002,
+              1270194,
+              1276674,
+              1276866,
+              1277058,
+              1277250,
+              1277442,
+              1277634,
+              1277826,
+              1278018,
+              1278210,
+              1278402,
+              1278594,
+              1278786,
+              1278978
+            ]
+          },
+          "live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "4b106ac3f1fd53de83be019f54ef1ee303c83c21aae17439f9aa5c9faf96d1da",
+            "constant": false,
+            "unique_values": [
+              2787511,
+              2789279,
+              2789471,
+              2789663,
+              2789855,
+              2791615,
+              2791807,
+              2791999,
+              2792191,
+              2795527,
+              2795719,
+              2795911,
+              2796103,
+              2796295,
+              2796487,
+              2796679,
+              2796871,
+              2803351,
+              2803543,
+              2803735,
+              2803927,
+              2804119,
+              2804311,
+              2804503,
+              2804695,
+              2804887,
+              2805079,
+              2805271,
+              2805463,
+              2805655
+            ]
+          },
+          "peak_live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "d8ff144dd6e5b109d435d7a9ea1c1fe96b345f1012380e212dd8769a9396ae4d",
+            "constant": true,
+            "unique_values": [
+              7963955
+            ]
+          },
+          "peak_live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "d8ff144dd6e5b109d435d7a9ea1c1fe96b345f1012380e212dd8769a9396ae4d",
+            "constant": true,
+            "unique_values": [
+              7963955
+            ]
+          },
+          "net_live_after_minus_before": {
+            "sample_count": 30,
+            "vector_sha256": "99dc305b82d487e842a176df057e6a03a9f0c46e939c649e5788dabe71794e07",
+            "constant": true,
+            "unique_values": [
+              1526677
+            ]
+          }
+        }
+      },
+      "2048": {
+        "parts": 2048,
+        "case": "opc_casefold_owned_open",
+        "allocation": {
+          "allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "fc7a1067852ac1d1e995af51fd958cabe8f8930a0070971e1ebf026704a664fe",
+            "constant": true,
+            "unique_values": [
+              98435
+            ]
+          },
+          "deallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "6e2fdabe735cdbf1895223c282708324e4c34ddad88051b7eb9154b4f1c93fd5",
+            "constant": true,
+            "unique_values": [
+              63590
+            ]
+          },
+          "reallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "41fa706682876ffa514d72718fcdad060c9387f6472b8fbed38c45bb64daaa9a",
+            "constant": true,
+            "unique_values": [
+              12303
+            ]
+          },
+          "failed_allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "constant": true,
+            "unique_values": [
+              0
+            ]
+          },
+          "allocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "f17a39aa5dd91335b8333576d0fea38a65a7c164d6ed4cf8f28cd23b590ceb01",
+            "constant": true,
+            "unique_values": [
+              8907977
+            ]
+          },
+          "deallocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "41e304dbf1a628fac7f3266d533cb7f5cb52115f9ea017b098bbd4e740732c2c",
+            "constant": true,
+            "unique_values": [
+              7380815
+            ]
+          },
+          "live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "baaf61d3b6909fbf5e19aef72c4cf24a15003749002c034a28ec13d62d9a8f4b",
+            "constant": false,
+            "unique_values": [
+              1302747,
+              1304515,
+              1304707,
+              1304899,
+              1305091,
+              1306851,
+              1307043,
+              1307235,
+              1307427,
+              1310763,
+              1310955,
+              1311147,
+              1311339,
+              1311531,
+              1311723,
+              1311915,
+              1312107,
+              1318587,
+              1318779,
+              1318971,
+              1319163,
+              1319355,
+              1319547,
+              1319739,
+              1319931,
+              1320123,
+              1320315,
+              1320507,
+              1320699,
+              1320891
+            ]
+          },
+          "live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "fdbc547420d72fbfbca207158e87d85176fc9940436812a11836e4bc030c0c35",
+            "constant": false,
+            "unique_values": [
+              2829909,
+              2831677,
+              2831869,
+              2832061,
+              2832253,
+              2834013,
+              2834205,
+              2834397,
+              2834589,
+              2837925,
+              2838117,
+              2838309,
+              2838501,
+              2838693,
+              2838885,
+              2839077,
+              2839269,
+              2845749,
+              2845941,
+              2846133,
+              2846325,
+              2846517,
+              2846709,
+              2846901,
+              2847093,
+              2847285,
+              2847477,
+              2847669,
+              2847861,
+              2848053
+            ]
+          },
+          "peak_live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "53feb0cd419fbdae532178c3cc313c7730087b433725412262b45c69770e2863",
+            "constant": true,
+            "unique_values": [
+              8008225
+            ]
+          },
+          "peak_live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "53feb0cd419fbdae532178c3cc313c7730087b433725412262b45c69770e2863",
+            "constant": true,
+            "unique_values": [
+              8008225
+            ]
+          },
+          "net_live_after_minus_before": {
+            "sample_count": 30,
+            "vector_sha256": "60dc01eddbcaa970b5c01c7dc012f3061b3c924670bcdf8ddde266045a827a3a",
+            "constant": true,
+            "unique_values": [
+              1527162
+            ]
+          }
+        }
+      },
+      "16384": {
+        "parts": 16384,
+        "case": "opc_casefold_owned_open",
+        "allocation": {
+          "allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "d0c698ce993649b18079cb29911c88d006a4aec600f354f93e6b38f1aa409c44",
+            "constant": true,
+            "unique_values": [
+              786563
+            ]
+          },
+          "deallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "5a751cd23c0cd692ad416681fd408f6b1e638a1ea6d2b1453e20b4ebf59a59e8",
+            "constant": true,
+            "unique_values": [
+              508006
+            ]
+          },
+          "reallocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "3d89987eff3f10f092a7b5639dc2fd5f9bc33b71527ef761897bf3aa50f899db",
+            "constant": true,
+            "unique_values": [
+              98319
+            ]
+          },
+          "failed_allocation_calls": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "constant": true,
+            "unique_values": [
+              0
+            ]
+          },
+          "allocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "c7816028be0c4950f7148df3cf666d8aee8516dec8458e702a9f8b0f4e7a350f",
+            "constant": true,
+            "unique_values": [
+              71011529
+            ]
+          },
+          "deallocated_bytes": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "10d850b584ee53291f2327f7e4299ebd1b4126763f219568e4f4ca26e05915b5",
+            "constant": true,
+            "unique_values": [
+              58804047
+            ]
+          },
+          "live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "818532f5a36c3adfcf1b26eafdbb42695c5fe5e635b1af5e604fc3ac2b85ca75",
+            "constant": false,
+            "unique_values": [
+              9864474,
+              9866242,
+              9866434,
+              9866626,
+              9866818,
+              9868578,
+              9868770,
+              9868962,
+              9869154,
+              9872490,
+              9872682,
+              9872874,
+              9873066,
+              9873258,
+              9873450,
+              9873642,
+              9873834,
+              9880314,
+              9880506,
+              9880698,
+              9880890,
+              9881082,
+              9881274,
+              9881466,
+              9881658,
+              9881850,
+              9882042,
+              9882234,
+              9882426,
+              9882618
+            ]
+          },
+          "live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "af0a94fb5373ca8b7b089348be687e4e9143e8cbed237465749e5e738aa0c61d",
+            "constant": false,
+            "unique_values": [
+              22071956,
+              22073724,
+              22073916,
+              22074108,
+              22074300,
+              22076060,
+              22076252,
+              22076444,
+              22076636,
+              22079972,
+              22080164,
+              22080356,
+              22080548,
+              22080740,
+              22080932,
+              22081124,
+              22081316,
+              22087796,
+              22087988,
+              22088180,
+              22088372,
+              22088564,
+              22088756,
+              22088948,
+              22089140,
+              22089332,
+              22089524,
+              22089716,
+              22089908,
+              22090100
+            ]
+          },
+          "peak_live_bytes_before": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "27e1cb15ee8b7d12b0703a66b0f1e1417a03b7069bbac6d6197ae5544fedfa3a",
+            "constant": true,
+            "unique_values": [
+              63491680
+            ]
+          },
+          "peak_live_bytes_after": {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "sample_count": 30,
+            "vector_sha256": "27e1cb15ee8b7d12b0703a66b0f1e1417a03b7069bbac6d6197ae5544fedfa3a",
+            "constant": true,
+            "unique_values": [
+              63491680
+            ]
+          },
+          "net_live_after_minus_before": {
+            "sample_count": 30,
+            "vector_sha256": "eeba40374529f6618fc39ec786ba19d8485ec321b6399b1385a71ee6a94d143c",
+            "constant": true,
+            "unique_values": [
+              12207482
+            ]
+          }
+        }
+      }
+    }
+  },
+  "matched_deltas": {
+    "A1_to_B1": {
+      "256": {
+        "parts": 256,
+        "metrics": {
+          "allocation_calls": {
+            "control_unique_values": [
+              12419
+            ],
+            "candidate_unique_values": [
+              11381
+            ],
+            "candidate_minus_control_unique": [
+              -1038
+            ],
+            "delta_vector_sha256": "ddc28e7cf2f59490374587e7364bcd4927c23fd15ebbc652e166ccb91df4b638",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "deallocation_calls": {
+            "control_unique_values": [
+              8038
+            ],
+            "candidate_unique_values": [
+              7000
+            ],
+            "candidate_minus_control_unique": [
+              -1038
+            ],
+            "delta_vector_sha256": "ddc28e7cf2f59490374587e7364bcd4927c23fd15ebbc652e166ccb91df4b638",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "reallocation_calls": {
+            "control_unique_values": [
+              1551
+            ],
+            "candidate_unique_values": [
+              1551
+            ],
+            "candidate_minus_control_unique": [
+              0
+            ],
+            "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "failed_allocation_calls": {
+            "control_unique_values": [
+              0
+            ],
+            "candidate_unique_values": [
+              0
+            ],
+            "candidate_minus_control_unique": [
+              0
+            ],
+            "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "allocated_bytes": {
+            "control_unique_values": [
+              1145033
+            ],
+            "candidate_unique_values": [
+              993009
+            ],
+            "candidate_minus_control_unique": [
+              -152024
+            ],
+            "delta_vector_sha256": "2594eaecd9cfd39caf3918ff43270dc42cf712bc66202a71d514a65eaf28d431",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "deallocated_bytes": {
+            "control_unique_values": [
+              952911
+            ],
+            "candidate_unique_values": [
+              800887
+            ],
+            "candidate_minus_control_unique": [
+              -152024
+            ],
+            "delta_vector_sha256": "2594eaecd9cfd39caf3918ff43270dc42cf712bc66202a71d514a65eaf28d431",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "live_bytes_before": {
+            "control_unique_values": [
+              155070,
+              156838,
+              157030,
+              157222,
+              157414,
+              159174,
+              159366,
+              159558,
+              159750,
+              163086,
+              163278,
+              163470,
+              163662,
+              163854,
+              164046,
+              164238,
+              164430,
+              170910,
+              171102,
+              171294,
+              171486,
+              171678,
+              171870,
+              172062,
+              172254,
+              172446,
+              172638,
+              172830,
+              173022,
+              173214
+            ],
+            "candidate_unique_values": [
+              155074,
+              156842,
+              157034,
+              157226,
+              157418,
+              159178,
+              159370,
+              159562,
+              159754,
+              163090,
+              163282,
+              163474,
+              163666,
+              163858,
+              164050,
+              164242,
+              164434,
+              170914,
+              171106,
+              171298,
+              171490,
+              171682,
+              171874,
+              172066,
+              172258,
+              172450,
+              172642,
+              172834,
+              173026,
+              173218
+            ],
+            "candidate_minus_control_unique": [
+              -15220,
+              -14068,
+              -12500,
+              -11540,
+              -9356,
+              -8780,
+              -8588,
+              -7820,
+              -7204,
+              -2716,
+              -2340,
+              -764,
+              -572,
+              -188,
+              580,
+              772,
+              964,
+              2340,
+              4684,
+              7060,
+              8020,
+              8212,
+              9364,
+              11932,
+              14460,
+              15036,
+              18148
+            ],
+            "delta_vector_sha256": "f93c8d62d5b2ccb15ab9b8eab72b00e17953fcf5597c394882628f9200864fbe",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": false
+          },
+          "live_bytes_after": {
+            "control_unique_values": [
+              347192,
+              348960,
+              349152,
+              349344,
+              349536,
+              351296,
+              351488,
+              351680,
+              351872,
+              355208,
+              355400,
+              355592,
+              355784,
+              355976,
+              356168,
+              356360,
+              356552,
+              363032,
+              363224,
+              363416,
+              363608,
+              363800,
+              363992,
+              364184,
+              364376,
+              364568,
+              364760,
+              364952,
+              365144,
+              365336
+            ],
+            "candidate_unique_values": [
+              347196,
+              348964,
+              349156,
+              349348,
+              349540,
+              351300,
+              351492,
+              351684,
+              351876,
+              355212,
+              355404,
+              355596,
+              355788,
+              355980,
+              356172,
+              356364,
+              356556,
+              363036,
+              363228,
+              363420,
+              363612,
+              363804,
+              363996,
+              364188,
+              364380,
+              364572,
+              364764,
+              364956,
+              365148,
+              365340
+            ],
+            "candidate_minus_control_unique": [
+              -15220,
+              -14068,
+              -12500,
+              -11540,
+              -9356,
+              -8780,
+              -8588,
+              -7820,
+              -7204,
+              -2716,
+              -2340,
+              -764,
+              -572,
+              -188,
+              580,
+              772,
+              964,
+              2340,
+              4684,
+              7060,
+              8020,
+              8212,
+              9364,
+              11932,
+              14460,
+              15036,
+              18148
+            ],
+            "delta_vector_sha256": "f93c8d62d5b2ccb15ab9b8eab72b00e17953fcf5597c394882628f9200864fbe",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": false
+          },
+          "peak_live_bytes_before": {
+            "control_unique_values": [
+              995332
+            ],
+            "candidate_unique_values": [
+              995336
+            ],
+            "candidate_minus_control_unique": [
+              4
+            ],
+            "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "peak_live_bytes_after": {
+            "control_unique_values": [
+              995332
+            ],
+            "candidate_unique_values": [
+              995336
+            ],
+            "candidate_minus_control_unique": [
+              4
+            ],
+            "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          }
+        }
+      },
+      "2047": {
+        "parts": 2047,
+        "metrics": {
+          "allocation_calls": {
+            "control_unique_values": [
+              98387
+            ],
+            "candidate_unique_values": [
+              90185
+            ],
+            "candidate_minus_control_unique": [
+              -8202
+            ],
+            "delta_vector_sha256": "17c84c427a58ffea7f69d1ab179d8b23bc07dc3a86502c5f68932c0a41a20e92",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "deallocation_calls": {
+            "control_unique_values": [
+              63559
+            ],
+            "candidate_unique_values": [
+              55357
+            ],
+            "candidate_minus_control_unique": [
+              -8202
+            ],
+            "delta_vector_sha256": "17c84c427a58ffea7f69d1ab179d8b23bc07dc3a86502c5f68932c0a41a20e92",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "reallocation_calls": {
+            "control_unique_values": [
+              12297
+            ],
+            "candidate_unique_values": [
+              12297
+            ],
+            "candidate_minus_control_unique": [
+              0
+            ],
+            "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "failed_allocation_calls": {
+            "control_unique_values": [
+              0
+            ],
+            "candidate_unique_values": [
+              0
+            ],
+            "candidate_minus_control_unique": [
+              0
+            ],
+            "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "allocated_bytes": {
+            "control_unique_values": [
+              8904931
+            ],
+            "candidate_unique_values": [
+              7692311
+            ],
+            "candidate_minus_control_unique": [
+              -1212620
+            ],
+            "delta_vector_sha256": "51337ece3dcab71aee6629b4851d7866dd0c546bd3def3e981b6d8621b1c5962",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "deallocated_bytes": {
+            "control_unique_values": [
+              7378254
+            ],
+            "candidate_unique_values": [
+              6165634
+            ],
+            "candidate_minus_control_unique": [
+              -1212620
+            ],
+            "delta_vector_sha256": "51337ece3dcab71aee6629b4851d7866dd0c546bd3def3e981b6d8621b1c5962",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "live_bytes_before": {
+            "control_unique_values": [
+              1260834,
+              1262602,
+              1262794,
+              1262986,
+              1263178,
+              1264938,
+              1265130,
+              1265322,
+              1265514,
+              1268850,
+              1269042,
+              1269234,
+              1269426,
+              1269618,
+              1269810,
+              1270002,
+              1270194,
+              1276674,
+              1276866,
+              1277058,
+              1277250,
+              1277442,
+              1277634,
+              1277826,
+              1278018,
+              1278210,
+              1278402,
+              1278594,
+              1278786,
+              1278978
+            ],
+            "candidate_unique_values": [
+              1260838,
+              1262606,
+              1262798,
+              1262990,
+              1263182,
+              1264942,
+              1265134,
+              1265326,
+              1265518,
+              1268854,
+              1269046,
+              1269238,
+              1269430,
+              1269622,
+              1269814,
+              1270006,
+              1270198,
+              1276678,
+              1276870,
+              1277062,
+              1277254,
+              1277446,
+              1277638,
+              1277830,
+              1278022,
+              1278214,
+              1278406,
+              1278598,
+              1278790,
+              1278982
+            ],
+            "candidate_minus_control_unique": [
+              -15412,
+              -15220,
+              -15028,
+              -11924,
+              -11540,
+              -9164,
+              -8972,
+              -8780,
+              -6820,
+              -3908,
+              -764,
+              -188,
+              4,
+              580,
+              3916,
+              6060,
+              6484,
+              7060,
+              7212,
+              9940,
+              12124,
+              12892,
+              13084,
+              14844,
+              16188,
+              17380
+            ],
+            "delta_vector_sha256": "76e118d9bf7ef4446f6d9ee5a8c26d5e1adbbdf449642fe9b922cf649d0cc6ac",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": false
+          },
+          "live_bytes_after": {
+            "control_unique_values": [
+              2787511,
+              2789279,
+              2789471,
+              2789663,
+              2789855,
+              2791615,
+              2791807,
+              2791999,
+              2792191,
+              2795527,
+              2795719,
+              2795911,
+              2796103,
+              2796295,
+              2796487,
+              2796679,
+              2796871,
+              2803351,
+              2803543,
+              2803735,
+              2803927,
+              2804119,
+              2804311,
+              2804503,
+              2804695,
+              2804887,
+              2805079,
+              2805271,
+              2805463,
+              2805655
+            ],
+            "candidate_unique_values": [
+              2787515,
+              2789283,
+              2789475,
+              2789667,
+              2789859,
+              2791619,
+              2791811,
+              2792003,
+              2792195,
+              2795531,
+              2795723,
+              2795915,
+              2796107,
+              2796299,
+              2796491,
+              2796683,
+              2796875,
+              2803355,
+              2803547,
+              2803739,
+              2803931,
+              2804123,
+              2804315,
+              2804507,
+              2804699,
+              2804891,
+              2805083,
+              2805275,
+              2805467,
+              2805659
+            ],
+            "candidate_minus_control_unique": [
+              -15412,
+              -15220,
+              -15028,
+              -11924,
+              -11540,
+              -9164,
+              -8972,
+              -8780,
+              -6820,
+              -3908,
+              -764,
+              -188,
+              4,
+              580,
+              3916,
+              6060,
+              6484,
+              7060,
+              7212,
+              9940,
+              12124,
+              12892,
+              13084,
+              14844,
+              16188,
+              17380
+            ],
+            "delta_vector_sha256": "76e118d9bf7ef4446f6d9ee5a8c26d5e1adbbdf449642fe9b922cf649d0cc6ac",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": false
+          },
+          "peak_live_bytes_before": {
+            "control_unique_values": [
+              7963955
+            ],
+            "candidate_unique_values": [
+              7963959
+            ],
+            "candidate_minus_control_unique": [
+              4
+            ],
+            "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "peak_live_bytes_after": {
+            "control_unique_values": [
+              7963955
+            ],
+            "candidate_unique_values": [
+              7963959
+            ],
+            "candidate_minus_control_unique": [
+              4
+            ],
+            "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          }
+        }
+      },
+      "2048": {
+        "parts": 2048,
+        "metrics": {
+          "allocation_calls": {
+            "control_unique_values": [
+              98435
+            ],
+            "candidate_unique_values": [
+              90229
+            ],
+            "candidate_minus_control_unique": [
+              -8206
+            ],
+            "delta_vector_sha256": "1482b0df8f5f8085c94ed63a4270f80f294cd55b37546e835ebd815ba40edf02",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "deallocation_calls": {
+            "control_unique_values": [
+              63590
+            ],
+            "candidate_unique_values": [
+              55384
+            ],
+            "candidate_minus_control_unique": [
+              -8206
+            ],
+            "delta_vector_sha256": "1482b0df8f5f8085c94ed63a4270f80f294cd55b37546e835ebd815ba40edf02",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "reallocation_calls": {
+            "control_unique_values": [
+              12303
+            ],
+            "candidate_unique_values": [
+              12303
+            ],
+            "candidate_minus_control_unique": [
+              0
+            ],
+            "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "failed_allocation_calls": {
+            "control_unique_values": [
+              0
+            ],
+            "candidate_unique_values": [
+              0
+            ],
+            "candidate_minus_control_unique": [
+              0
+            ],
+            "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "allocated_bytes": {
+            "control_unique_values": [
+              8907977
+            ],
+            "candidate_unique_values": [
+              7695089
+            ],
+            "candidate_minus_control_unique": [
+              -1212888
+            ],
+            "delta_vector_sha256": "004a6a4a6cead10f0e442ea8e90675a86d0275ea4c7e13445b5515de7191ff3b",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "deallocated_bytes": {
+            "control_unique_values": [
+              7380815
+            ],
+            "candidate_unique_values": [
+              6167927
+            ],
+            "candidate_minus_control_unique": [
+              -1212888
+            ],
+            "delta_vector_sha256": "004a6a4a6cead10f0e442ea8e90675a86d0275ea4c7e13445b5515de7191ff3b",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "live_bytes_before": {
+            "control_unique_values": [
+              1302747,
+              1304515,
+              1304707,
+              1304899,
+              1305091,
+              1306851,
+              1307043,
+              1307235,
+              1307427,
+              1310763,
+              1310955,
+              1311147,
+              1311339,
+              1311531,
+              1311723,
+              1311915,
+              1312107,
+              1318587,
+              1318779,
+              1318971,
+              1319163,
+              1319355,
+              1319547,
+              1319739,
+              1319931,
+              1320123,
+              1320315,
+              1320507,
+              1320699,
+              1320891
+            ],
+            "candidate_unique_values": [
+              1302751,
+              1304519,
+              1304711,
+              1304903,
+              1305095,
+              1306855,
+              1307047,
+              1307239,
+              1307431,
+              1310767,
+              1310959,
+              1311151,
+              1311343,
+              1311535,
+              1311727,
+              1311919,
+              1312111,
+              1318591,
+              1318783,
+              1318975,
+              1319167,
+              1319359,
+              1319551,
+              1319743,
+              1319935,
+              1320127,
+              1320319,
+              1320511,
+              1320703,
+              1320895
+            ],
+            "candidate_minus_control_unique": [
+              -15220,
+              -13844,
+              -12308,
+              -8780,
+              -8396,
+              -8204,
+              -7820,
+              -7052,
+              -6628,
+              -4676,
+              -2332,
+              -1532,
+              -380,
+              -188,
+              4,
+              580,
+              772,
+              1348,
+              2724,
+              3724,
+              3916,
+              7828,
+              8212,
+              8980,
+              12508,
+              14268,
+              15612,
+              16804
+            ],
+            "delta_vector_sha256": "9a6b70080f4b279f0f6894fd6cb5df4efdff19fa1bba181c370bd4bc2a212c4d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": false
+          },
+          "live_bytes_after": {
+            "control_unique_values": [
+              2829909,
+              2831677,
+              2831869,
+              2832061,
+              2832253,
+              2834013,
+              2834205,
+              2834397,
+              2834589,
+              2837925,
+              2838117,
+              2838309,
+              2838501,
+              2838693,
+              2838885,
+              2839077,
+              2839269,
+              2845749,
+              2845941,
+              2846133,
+              2846325,
+              2846517,
+              2846709,
+              2846901,
+              2847093,
+              2847285,
+              2847477,
+              2847669,
+              2847861,
+              2848053
+            ],
+            "candidate_unique_values": [
+              2829913,
+              2831681,
+              2831873,
+              2832065,
+              2832257,
+              2834017,
+              2834209,
+              2834401,
+              2834593,
+              2837929,
+              2838121,
+              2838313,
+              2838505,
+              2838697,
+              2838889,
+              2839081,
+              2839273,
+              2845753,
+              2845945,
+              2846137,
+              2846329,
+              2846521,
+              2846713,
+              2846905,
+              2847097,
+              2847289,
+              2847481,
+              2847673,
+              2847865,
+              2848057
+            ],
+            "candidate_minus_control_unique": [
+              -15220,
+              -13844,
+              -12308,
+              -8780,
+              -8396,
+              -8204,
+              -7820,
+              -7052,
+              -6628,
+              -4676,
+              -2332,
+              -1532,
+              -380,
+              -188,
+              4,
+              580,
+              772,
+              1348,
+              2724,
+              3724,
+              3916,
+              7828,
+              8212,
+              8980,
+              12508,
+              14268,
+              15612,
+              16804
+            ],
+            "delta_vector_sha256": "9a6b70080f4b279f0f6894fd6cb5df4efdff19fa1bba181c370bd4bc2a212c4d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": false
+          },
+          "peak_live_bytes_before": {
+            "control_unique_values": [
+              8008225
+            ],
+            "candidate_unique_values": [
+              8008229
+            ],
+            "candidate_minus_control_unique": [
+              4
+            ],
+            "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "peak_live_bytes_after": {
+            "control_unique_values": [
+              8008225
+            ],
+            "candidate_unique_values": [
+              8008229
+            ],
+            "candidate_minus_control_unique": [
+              4
+            ],
+            "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          }
+        }
+      },
+      "16384": {
+        "parts": 16384,
+        "metrics": {
+          "allocation_calls": {
+            "control_unique_values": [
+              786563
+            ],
+            "candidate_unique_values": [
+              721013
+            ],
+            "candidate_minus_control_unique": [
+              -65550
+            ],
+            "delta_vector_sha256": "417d2a92031187be1238f59af20a11d05c8debd2a73fdb63e3627bc4a65ee91f",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "deallocation_calls": {
+            "control_unique_values": [
+              508006
+            ],
+            "candidate_unique_values": [
+              442456
+            ],
+            "candidate_minus_control_unique": [
+              -65550
+            ],
+            "delta_vector_sha256": "417d2a92031187be1238f59af20a11d05c8debd2a73fdb63e3627bc4a65ee91f",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "reallocation_calls": {
+            "control_unique_values": [
+              98319
+            ],
+            "candidate_unique_values": [
+              98319
+            ],
+            "candidate_minus_control_unique": [
+              0
+            ],
+            "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "failed_allocation_calls": {
+            "control_unique_values": [
+              0
+            ],
+            "candidate_unique_values": [
+              0
+            ],
+            "candidate_minus_control_unique": [
+              0
+            ],
+            "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "allocated_bytes": {
+            "control_unique_values": [
+              71011529
+            ],
+            "candidate_unique_values": [
+              61311729
+            ],
+            "candidate_minus_control_unique": [
+              -9699800
+            ],
+            "delta_vector_sha256": "38aa61f1f3a4d5ee10996cbb7c5ede6c4b14299d06729545e3e5ed084b005dd6",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "deallocated_bytes": {
+            "control_unique_values": [
+              58804047
+            ],
+            "candidate_unique_values": [
+              49104247
+            ],
+            "candidate_minus_control_unique": [
+              -9699800
+            ],
+            "delta_vector_sha256": "38aa61f1f3a4d5ee10996cbb7c5ede6c4b14299d06729545e3e5ed084b005dd6",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "live_bytes_before": {
+            "control_unique_values": [
+              9864474,
+              9866242,
+              9866434,
+              9866626,
+              9866818,
+              9868578,
+              9868770,
+              9868962,
+              9869154,
+              9872490,
+              9872682,
+              9872874,
+              9873066,
+              9873258,
+              9873450,
+              9873642,
+              9873834,
+              9880314,
+              9880506,
+              9880698,
+              9880890,
+              9881082,
+              9881274,
+              9881466,
+              9881658,
+              9881850,
+              9882042,
+              9882234,
+              9882426,
+              9882618
+            ],
+            "candidate_unique_values": [
+              9864478,
+              9866246,
+              9866438,
+              9866630,
+              9866822,
+              9868582,
+              9868774,
+              9868966,
+              9869158,
+              9872494,
+              9872686,
+              9872878,
+              9873070,
+              9873262,
+              9873454,
+              9873646,
+              9873838,
+              9880318,
+              9880510,
+              9880702,
+              9880894,
+              9881086,
+              9881278,
+              9881470,
+              9881662,
+              9881854,
+              9882046,
+              9882238,
+              9882430,
+              9882622
+            ],
+            "candidate_minus_control_unique": [
+              -16796,
+              -13876,
+              -9164,
+              -7396,
+              -7244,
+              -7204,
+              -7052,
+              -6820,
+              -4292,
+              -3716,
+              -2108,
+              -1148,
+              -572,
+              -188,
+              4,
+              196,
+              580,
+              1348,
+              1956,
+              2916,
+              3532,
+              7020,
+              7828,
+              9172,
+              11932,
+              12316,
+              13468,
+              14844
+            ],
+            "delta_vector_sha256": "4ddd3021f809602f78fd14145d1cf03532866e199ab26166dc9921943fcffb6f",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": false
+          },
+          "live_bytes_after": {
+            "control_unique_values": [
+              22071956,
+              22073724,
+              22073916,
+              22074108,
+              22074300,
+              22076060,
+              22076252,
+              22076444,
+              22076636,
+              22079972,
+              22080164,
+              22080356,
+              22080548,
+              22080740,
+              22080932,
+              22081124,
+              22081316,
+              22087796,
+              22087988,
+              22088180,
+              22088372,
+              22088564,
+              22088756,
+              22088948,
+              22089140,
+              22089332,
+              22089524,
+              22089716,
+              22089908,
+              22090100
+            ],
+            "candidate_unique_values": [
+              22071960,
+              22073728,
+              22073920,
+              22074112,
+              22074304,
+              22076064,
+              22076256,
+              22076448,
+              22076640,
+              22079976,
+              22080168,
+              22080360,
+              22080552,
+              22080744,
+              22080936,
+              22081128,
+              22081320,
+              22087800,
+              22087992,
+              22088184,
+              22088376,
+              22088568,
+              22088760,
+              22088952,
+              22089144,
+              22089336,
+              22089528,
+              22089720,
+              22089912,
+              22090104
+            ],
+            "candidate_minus_control_unique": [
+              -16796,
+              -13876,
+              -9164,
+              -7396,
+              -7244,
+              -7204,
+              -7052,
+              -6820,
+              -4292,
+              -3716,
+              -2108,
+              -1148,
+              -572,
+              -188,
+              4,
+              196,
+              580,
+              1348,
+              1956,
+              2916,
+              3532,
+              7020,
+              7828,
+              9172,
+              11932,
+              12316,
+              13468,
+              14844
+            ],
+            "delta_vector_sha256": "4ddd3021f809602f78fd14145d1cf03532866e199ab26166dc9921943fcffb6f",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": false
+          },
+          "peak_live_bytes_before": {
+            "control_unique_values": [
+              63491680
+            ],
+            "candidate_unique_values": [
+              63491684
+            ],
+            "candidate_minus_control_unique": [
+              4
+            ],
+            "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "peak_live_bytes_after": {
+            "control_unique_values": [
+              63491680
+            ],
+            "candidate_unique_values": [
+              63491684
+            ],
+            "candidate_minus_control_unique": [
+              4
+            ],
+            "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          }
+        }
+      }
+    },
+    "A2_to_B2": {
+      "256": {
+        "parts": 256,
+        "metrics": {
+          "allocation_calls": {
+            "control_unique_values": [
+              12419
+            ],
+            "candidate_unique_values": [
+              11381
+            ],
+            "candidate_minus_control_unique": [
+              -1038
+            ],
+            "delta_vector_sha256": "ddc28e7cf2f59490374587e7364bcd4927c23fd15ebbc652e166ccb91df4b638",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "deallocation_calls": {
+            "control_unique_values": [
+              8038
+            ],
+            "candidate_unique_values": [
+              7000
+            ],
+            "candidate_minus_control_unique": [
+              -1038
+            ],
+            "delta_vector_sha256": "ddc28e7cf2f59490374587e7364bcd4927c23fd15ebbc652e166ccb91df4b638",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "reallocation_calls": {
+            "control_unique_values": [
+              1551
+            ],
+            "candidate_unique_values": [
+              1551
+            ],
+            "candidate_minus_control_unique": [
+              0
+            ],
+            "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "failed_allocation_calls": {
+            "control_unique_values": [
+              0
+            ],
+            "candidate_unique_values": [
+              0
+            ],
+            "candidate_minus_control_unique": [
+              0
+            ],
+            "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "allocated_bytes": {
+            "control_unique_values": [
+              1145033
+            ],
+            "candidate_unique_values": [
+              993009
+            ],
+            "candidate_minus_control_unique": [
+              -152024
+            ],
+            "delta_vector_sha256": "2594eaecd9cfd39caf3918ff43270dc42cf712bc66202a71d514a65eaf28d431",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "deallocated_bytes": {
+            "control_unique_values": [
+              952911
+            ],
+            "candidate_unique_values": [
+              800887
+            ],
+            "candidate_minus_control_unique": [
+              -152024
+            ],
+            "delta_vector_sha256": "2594eaecd9cfd39caf3918ff43270dc42cf712bc66202a71d514a65eaf28d431",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "live_bytes_before": {
+            "control_unique_values": [
+              155070,
+              156838,
+              157030,
+              157222,
+              157414,
+              159174,
+              159366,
+              159558,
+              159750,
+              163086,
+              163278,
+              163470,
+              163662,
+              163854,
+              164046,
+              164238,
+              164430,
+              170910,
+              171102,
+              171294,
+              171486,
+              171678,
+              171870,
+              172062,
+              172254,
+              172446,
+              172638,
+              172830,
+              173022,
+              173214
+            ],
+            "candidate_unique_values": [
+              155074,
+              156842,
+              157034,
+              157226,
+              157418,
+              159178,
+              159370,
+              159562,
+              159754,
+              163090,
+              163282,
+              163474,
+              163666,
+              163858,
+              164050,
+              164242,
+              164434,
+              170914,
+              171106,
+              171298,
+              171490,
+              171682,
+              171874,
+              172066,
+              172258,
+              172450,
+              172642,
+              172834,
+              173026,
+              173218
+            ],
+            "candidate_minus_control_unique": [
+              -16220,
+              -15604,
+              -12500,
+              -10124,
+              -8780,
+              -8588,
+              -6820,
+              -5060,
+              -4100,
+              -2716,
+              -1756,
+              -572,
+              -380,
+              -188,
+              388,
+              580,
+              964,
+              1540,
+              1732,
+              2340,
+              5068,
+              6444,
+              7828,
+              8020,
+              8212,
+              8980,
+              11164,
+              14460,
+              15420
+            ],
+            "delta_vector_sha256": "3018ba6a6c0c77761df77860e814c168ffcbdc5fe289ff7ab4ad41d30b87a58a",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": false
+          },
+          "live_bytes_after": {
+            "control_unique_values": [
+              347192,
+              348960,
+              349152,
+              349344,
+              349536,
+              351296,
+              351488,
+              351680,
+              351872,
+              355208,
+              355400,
+              355592,
+              355784,
+              355976,
+              356168,
+              356360,
+              356552,
+              363032,
+              363224,
+              363416,
+              363608,
+              363800,
+              363992,
+              364184,
+              364376,
+              364568,
+              364760,
+              364952,
+              365144,
+              365336
+            ],
+            "candidate_unique_values": [
+              347196,
+              348964,
+              349156,
+              349348,
+              349540,
+              351300,
+              351492,
+              351684,
+              351876,
+              355212,
+              355404,
+              355596,
+              355788,
+              355980,
+              356172,
+              356364,
+              356556,
+              363036,
+              363228,
+              363420,
+              363612,
+              363804,
+              363996,
+              364188,
+              364380,
+              364572,
+              364764,
+              364956,
+              365148,
+              365340
+            ],
+            "candidate_minus_control_unique": [
+              -16220,
+              -15604,
+              -12500,
+              -10124,
+              -8780,
+              -8588,
+              -6820,
+              -5060,
+              -4100,
+              -2716,
+              -1756,
+              -572,
+              -380,
+              -188,
+              388,
+              580,
+              964,
+              1540,
+              1732,
+              2340,
+              5068,
+              6444,
+              7828,
+              8020,
+              8212,
+              8980,
+              11164,
+              14460,
+              15420
+            ],
+            "delta_vector_sha256": "3018ba6a6c0c77761df77860e814c168ffcbdc5fe289ff7ab4ad41d30b87a58a",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": false
+          },
+          "peak_live_bytes_before": {
+            "control_unique_values": [
+              995332
+            ],
+            "candidate_unique_values": [
+              995336
+            ],
+            "candidate_minus_control_unique": [
+              4
+            ],
+            "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "peak_live_bytes_after": {
+            "control_unique_values": [
+              995332
+            ],
+            "candidate_unique_values": [
+              995336
+            ],
+            "candidate_minus_control_unique": [
+              4
+            ],
+            "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          }
+        }
+      },
+      "2047": {
+        "parts": 2047,
+        "metrics": {
+          "allocation_calls": {
+            "control_unique_values": [
+              98387
+            ],
+            "candidate_unique_values": [
+              90185
+            ],
+            "candidate_minus_control_unique": [
+              -8202
+            ],
+            "delta_vector_sha256": "17c84c427a58ffea7f69d1ab179d8b23bc07dc3a86502c5f68932c0a41a20e92",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "deallocation_calls": {
+            "control_unique_values": [
+              63559
+            ],
+            "candidate_unique_values": [
+              55357
+            ],
+            "candidate_minus_control_unique": [
+              -8202
+            ],
+            "delta_vector_sha256": "17c84c427a58ffea7f69d1ab179d8b23bc07dc3a86502c5f68932c0a41a20e92",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "reallocation_calls": {
+            "control_unique_values": [
+              12297
+            ],
+            "candidate_unique_values": [
+              12297
+            ],
+            "candidate_minus_control_unique": [
+              0
+            ],
+            "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "failed_allocation_calls": {
+            "control_unique_values": [
+              0
+            ],
+            "candidate_unique_values": [
+              0
+            ],
+            "candidate_minus_control_unique": [
+              0
+            ],
+            "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "allocated_bytes": {
+            "control_unique_values": [
+              8904931
+            ],
+            "candidate_unique_values": [
+              7692311
+            ],
+            "candidate_minus_control_unique": [
+              -1212620
+            ],
+            "delta_vector_sha256": "51337ece3dcab71aee6629b4851d7866dd0c546bd3def3e981b6d8621b1c5962",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "deallocated_bytes": {
+            "control_unique_values": [
+              7378254
+            ],
+            "candidate_unique_values": [
+              6165634
+            ],
+            "candidate_minus_control_unique": [
+              -1212620
+            ],
+            "delta_vector_sha256": "51337ece3dcab71aee6629b4851d7866dd0c546bd3def3e981b6d8621b1c5962",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "live_bytes_before": {
+            "control_unique_values": [
+              1260834,
+              1262602,
+              1262794,
+              1262986,
+              1263178,
+              1264938,
+              1265130,
+              1265322,
+              1265514,
+              1268850,
+              1269042,
+              1269234,
+              1269426,
+              1269618,
+              1269810,
+              1270002,
+              1270194,
+              1276674,
+              1276866,
+              1277058,
+              1277250,
+              1277442,
+              1277634,
+              1277826,
+              1278018,
+              1278210,
+              1278402,
+              1278594,
+              1278786,
+              1278978
+            ],
+            "candidate_unique_values": [
+              1260838,
+              1262606,
+              1262798,
+              1262990,
+              1263182,
+              1264942,
+              1265134,
+              1265326,
+              1265518,
+              1268854,
+              1269046,
+              1269238,
+              1269430,
+              1269622,
+              1269814,
+              1270006,
+              1270198,
+              1276678,
+              1276870,
+              1277062,
+              1277254,
+              1277446,
+              1277638,
+              1277830,
+              1278022,
+              1278214,
+              1278406,
+              1278598,
+              1278790,
+              1278982
+            ],
+            "candidate_minus_control_unique": [
+              -16412,
+              -15412,
+              -9356,
+              -7436,
+              -7244,
+              -7012,
+              -4100,
+              -3332,
+              -2524,
+              -1340,
+              -572,
+              -380,
+              -188,
+              196,
+              388,
+              580,
+              772,
+              964,
+              3724,
+              4300,
+              6252,
+              6636,
+              6676,
+              7828,
+              8596,
+              9172,
+              12892
+            ],
+            "delta_vector_sha256": "de6aed54c1ad1c22388fb275a0688e9d008d1d4aba5826da360ed3e460986cfb",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": false
+          },
+          "live_bytes_after": {
+            "control_unique_values": [
+              2787511,
+              2789279,
+              2789471,
+              2789663,
+              2789855,
+              2791615,
+              2791807,
+              2791999,
+              2792191,
+              2795527,
+              2795719,
+              2795911,
+              2796103,
+              2796295,
+              2796487,
+              2796679,
+              2796871,
+              2803351,
+              2803543,
+              2803735,
+              2803927,
+              2804119,
+              2804311,
+              2804503,
+              2804695,
+              2804887,
+              2805079,
+              2805271,
+              2805463,
+              2805655
+            ],
+            "candidate_unique_values": [
+              2787515,
+              2789283,
+              2789475,
+              2789667,
+              2789859,
+              2791619,
+              2791811,
+              2792003,
+              2792195,
+              2795531,
+              2795723,
+              2795915,
+              2796107,
+              2796299,
+              2796491,
+              2796683,
+              2796875,
+              2803355,
+              2803547,
+              2803739,
+              2803931,
+              2804123,
+              2804315,
+              2804507,
+              2804699,
+              2804891,
+              2805083,
+              2805275,
+              2805467,
+              2805659
+            ],
+            "candidate_minus_control_unique": [
+              -16412,
+              -15412,
+              -9356,
+              -7436,
+              -7244,
+              -7012,
+              -4100,
+              -3332,
+              -2524,
+              -1340,
+              -572,
+              -380,
+              -188,
+              196,
+              388,
+              580,
+              772,
+              964,
+              3724,
+              4300,
+              6252,
+              6636,
+              6676,
+              7828,
+              8596,
+              9172,
+              12892
+            ],
+            "delta_vector_sha256": "de6aed54c1ad1c22388fb275a0688e9d008d1d4aba5826da360ed3e460986cfb",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": false
+          },
+          "peak_live_bytes_before": {
+            "control_unique_values": [
+              7963955
+            ],
+            "candidate_unique_values": [
+              7963959
+            ],
+            "candidate_minus_control_unique": [
+              4
+            ],
+            "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "peak_live_bytes_after": {
+            "control_unique_values": [
+              7963955
+            ],
+            "candidate_unique_values": [
+              7963959
+            ],
+            "candidate_minus_control_unique": [
+              4
+            ],
+            "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          }
+        }
+      },
+      "2048": {
+        "parts": 2048,
+        "metrics": {
+          "allocation_calls": {
+            "control_unique_values": [
+              98435
+            ],
+            "candidate_unique_values": [
+              90229
+            ],
+            "candidate_minus_control_unique": [
+              -8206
+            ],
+            "delta_vector_sha256": "1482b0df8f5f8085c94ed63a4270f80f294cd55b37546e835ebd815ba40edf02",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "deallocation_calls": {
+            "control_unique_values": [
+              63590
+            ],
+            "candidate_unique_values": [
+              55384
+            ],
+            "candidate_minus_control_unique": [
+              -8206
+            ],
+            "delta_vector_sha256": "1482b0df8f5f8085c94ed63a4270f80f294cd55b37546e835ebd815ba40edf02",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "reallocation_calls": {
+            "control_unique_values": [
+              12303
+            ],
+            "candidate_unique_values": [
+              12303
+            ],
+            "candidate_minus_control_unique": [
+              0
+            ],
+            "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "failed_allocation_calls": {
+            "control_unique_values": [
+              0
+            ],
+            "candidate_unique_values": [
+              0
+            ],
+            "candidate_minus_control_unique": [
+              0
+            ],
+            "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "allocated_bytes": {
+            "control_unique_values": [
+              8907977
+            ],
+            "candidate_unique_values": [
+              7695089
+            ],
+            "candidate_minus_control_unique": [
+              -1212888
+            ],
+            "delta_vector_sha256": "004a6a4a6cead10f0e442ea8e90675a86d0275ea4c7e13445b5515de7191ff3b",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "deallocated_bytes": {
+            "control_unique_values": [
+              7380815
+            ],
+            "candidate_unique_values": [
+              6167927
+            ],
+            "candidate_minus_control_unique": [
+              -1212888
+            ],
+            "delta_vector_sha256": "004a6a4a6cead10f0e442ea8e90675a86d0275ea4c7e13445b5515de7191ff3b",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "live_bytes_before": {
+            "control_unique_values": [
+              1302747,
+              1304515,
+              1304707,
+              1304899,
+              1305091,
+              1306851,
+              1307043,
+              1307235,
+              1307427,
+              1310763,
+              1310955,
+              1311147,
+              1311339,
+              1311531,
+              1311723,
+              1311915,
+              1312107,
+              1318587,
+              1318779,
+              1318971,
+              1319163,
+              1319355,
+              1319547,
+              1319739,
+              1319931,
+              1320123,
+              1320315,
+              1320507,
+              1320699,
+              1320891
+            ],
+            "candidate_unique_values": [
+              1302751,
+              1304519,
+              1304711,
+              1304903,
+              1305095,
+              1306855,
+              1307047,
+              1307239,
+              1307431,
+              1310767,
+              1310959,
+              1311151,
+              1311343,
+              1311535,
+              1311727,
+              1311919,
+              1312111,
+              1318591,
+              1318783,
+              1318975,
+              1319167,
+              1319359,
+              1319551,
+              1319743,
+              1319935,
+              1320127,
+              1320319,
+              1320511,
+              1320703,
+              1320895
+            ],
+            "candidate_minus_control_unique": [
+              -14644,
+              -14068,
+              -13460,
+              -12692,
+              -11924,
+              -9164,
+              -8588,
+              -8204,
+              -7052,
+              -6820,
+              -4484,
+              -2148,
+              -188,
+              4,
+              388,
+              3532,
+              8212,
+              8404,
+              8788,
+              10132,
+              11932,
+              12316,
+              13276,
+              13884,
+              15420,
+              16036
+            ],
+            "delta_vector_sha256": "344a647626cf8a94dd763fe108edab59cd708dcf75e2a6a6330c36d00c2eff90",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": false
+          },
+          "live_bytes_after": {
+            "control_unique_values": [
+              2829909,
+              2831677,
+              2831869,
+              2832061,
+              2832253,
+              2834013,
+              2834205,
+              2834397,
+              2834589,
+              2837925,
+              2838117,
+              2838309,
+              2838501,
+              2838693,
+              2838885,
+              2839077,
+              2839269,
+              2845749,
+              2845941,
+              2846133,
+              2846325,
+              2846517,
+              2846709,
+              2846901,
+              2847093,
+              2847285,
+              2847477,
+              2847669,
+              2847861,
+              2848053
+            ],
+            "candidate_unique_values": [
+              2829913,
+              2831681,
+              2831873,
+              2832065,
+              2832257,
+              2834017,
+              2834209,
+              2834401,
+              2834593,
+              2837929,
+              2838121,
+              2838313,
+              2838505,
+              2838697,
+              2838889,
+              2839081,
+              2839273,
+              2845753,
+              2845945,
+              2846137,
+              2846329,
+              2846521,
+              2846713,
+              2846905,
+              2847097,
+              2847289,
+              2847481,
+              2847673,
+              2847865,
+              2848057
+            ],
+            "candidate_minus_control_unique": [
+              -14644,
+              -14068,
+              -13460,
+              -12692,
+              -11924,
+              -9164,
+              -8588,
+              -8204,
+              -7052,
+              -6820,
+              -4484,
+              -2148,
+              -188,
+              4,
+              388,
+              3532,
+              8212,
+              8404,
+              8788,
+              10132,
+              11932,
+              12316,
+              13276,
+              13884,
+              15420,
+              16036
+            ],
+            "delta_vector_sha256": "344a647626cf8a94dd763fe108edab59cd708dcf75e2a6a6330c36d00c2eff90",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": false
+          },
+          "peak_live_bytes_before": {
+            "control_unique_values": [
+              8008225
+            ],
+            "candidate_unique_values": [
+              8008229
+            ],
+            "candidate_minus_control_unique": [
+              4
+            ],
+            "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "peak_live_bytes_after": {
+            "control_unique_values": [
+              8008225
+            ],
+            "candidate_unique_values": [
+              8008229
+            ],
+            "candidate_minus_control_unique": [
+              4
+            ],
+            "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          }
+        }
+      },
+      "16384": {
+        "parts": 16384,
+        "metrics": {
+          "allocation_calls": {
+            "control_unique_values": [
+              786563
+            ],
+            "candidate_unique_values": [
+              721013
+            ],
+            "candidate_minus_control_unique": [
+              -65550
+            ],
+            "delta_vector_sha256": "417d2a92031187be1238f59af20a11d05c8debd2a73fdb63e3627bc4a65ee91f",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "deallocation_calls": {
+            "control_unique_values": [
+              508006
+            ],
+            "candidate_unique_values": [
+              442456
+            ],
+            "candidate_minus_control_unique": [
+              -65550
+            ],
+            "delta_vector_sha256": "417d2a92031187be1238f59af20a11d05c8debd2a73fdb63e3627bc4a65ee91f",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "reallocation_calls": {
+            "control_unique_values": [
+              98319
+            ],
+            "candidate_unique_values": [
+              98319
+            ],
+            "candidate_minus_control_unique": [
+              0
+            ],
+            "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "failed_allocation_calls": {
+            "control_unique_values": [
+              0
+            ],
+            "candidate_unique_values": [
+              0
+            ],
+            "candidate_minus_control_unique": [
+              0
+            ],
+            "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "allocated_bytes": {
+            "control_unique_values": [
+              71011529
+            ],
+            "candidate_unique_values": [
+              61311729
+            ],
+            "candidate_minus_control_unique": [
+              -9699800
+            ],
+            "delta_vector_sha256": "38aa61f1f3a4d5ee10996cbb7c5ede6c4b14299d06729545e3e5ed084b005dd6",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "deallocated_bytes": {
+            "control_unique_values": [
+              58804047
+            ],
+            "candidate_unique_values": [
+              49104247
+            ],
+            "candidate_minus_control_unique": [
+              -9699800
+            ],
+            "delta_vector_sha256": "38aa61f1f3a4d5ee10996cbb7c5ede6c4b14299d06729545e3e5ed084b005dd6",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "live_bytes_before": {
+            "control_unique_values": [
+              9864474,
+              9866242,
+              9866434,
+              9866626,
+              9866818,
+              9868578,
+              9868770,
+              9868962,
+              9869154,
+              9872490,
+              9872682,
+              9872874,
+              9873066,
+              9873258,
+              9873450,
+              9873642,
+              9873834,
+              9880314,
+              9880506,
+              9880698,
+              9880890,
+              9881082,
+              9881274,
+              9881466,
+              9881658,
+              9881850,
+              9882042,
+              9882234,
+              9882426,
+              9882618
+            ],
+            "candidate_unique_values": [
+              9864478,
+              9866246,
+              9866438,
+              9866630,
+              9866822,
+              9868582,
+              9868774,
+              9868966,
+              9869158,
+              9872494,
+              9872686,
+              9872878,
+              9873070,
+              9873262,
+              9873454,
+              9873646,
+              9873838,
+              9880318,
+              9880510,
+              9880702,
+              9880894,
+              9881086,
+              9881278,
+              9881470,
+              9881662,
+              9881854,
+              9882046,
+              9882238,
+              9882430,
+              9882622
+            ],
+            "candidate_minus_control_unique": [
+              -13460,
+              -11348,
+              -9548,
+              -8204,
+              -8012,
+              -7628,
+              -4292,
+              -3716,
+              -2332,
+              -2140,
+              -1724,
+              -1340,
+              -956,
+              -572,
+              -380,
+              -188,
+              196,
+              580,
+              772,
+              1348,
+              1540,
+              3916,
+              8404,
+              11356,
+              14076,
+              15996,
+              17956
+            ],
+            "delta_vector_sha256": "092c356b733718a9fd53cc4fd4489ed320ebd413d37162a88b90b6d864b04b0f",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": false
+          },
+          "live_bytes_after": {
+            "control_unique_values": [
+              22071956,
+              22073724,
+              22073916,
+              22074108,
+              22074300,
+              22076060,
+              22076252,
+              22076444,
+              22076636,
+              22079972,
+              22080164,
+              22080356,
+              22080548,
+              22080740,
+              22080932,
+              22081124,
+              22081316,
+              22087796,
+              22087988,
+              22088180,
+              22088372,
+              22088564,
+              22088756,
+              22088948,
+              22089140,
+              22089332,
+              22089524,
+              22089716,
+              22089908,
+              22090100
+            ],
+            "candidate_unique_values": [
+              22071960,
+              22073728,
+              22073920,
+              22074112,
+              22074304,
+              22076064,
+              22076256,
+              22076448,
+              22076640,
+              22079976,
+              22080168,
+              22080360,
+              22080552,
+              22080744,
+              22080936,
+              22081128,
+              22081320,
+              22087800,
+              22087992,
+              22088184,
+              22088376,
+              22088568,
+              22088760,
+              22088952,
+              22089144,
+              22089336,
+              22089528,
+              22089720,
+              22089912,
+              22090104
+            ],
+            "candidate_minus_control_unique": [
+              -13460,
+              -11348,
+              -9548,
+              -8204,
+              -8012,
+              -7628,
+              -4292,
+              -3716,
+              -2332,
+              -2140,
+              -1724,
+              -1340,
+              -956,
+              -572,
+              -380,
+              -188,
+              196,
+              580,
+              772,
+              1348,
+              1540,
+              3916,
+              8404,
+              11356,
+              14076,
+              15996,
+              17956
+            ],
+            "delta_vector_sha256": "092c356b733718a9fd53cc4fd4489ed320ebd413d37162a88b90b6d864b04b0f",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": false
+          },
+          "peak_live_bytes_before": {
+            "control_unique_values": [
+              63491680
+            ],
+            "candidate_unique_values": [
+              63491684
+            ],
+            "candidate_minus_control_unique": [
+              4
+            ],
+            "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          },
+          "peak_live_bytes_after": {
+            "control_unique_values": [
+              63491680
+            ],
+            "candidate_unique_values": [
+              63491684
+            ],
+            "candidate_minus_control_unique": [
+              4
+            ],
+            "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+            "pairwise_sample_count": 30,
+            "pairwise_delta_constant": true
+          }
+        }
+      }
+    }
+  },
+  "net_live": {
+    "256": {
+      "parts": 256,
+      "per_leg": [
+        {
+          "leg": "A1",
+          "vector_sha256": "8f5f58b6ac16ddcd1d43109f4befe58147554b451681efcab2de498be7de0007",
+          "unique_values": [
+            192122
+          ]
+        },
+        {
+          "leg": "B1",
+          "vector_sha256": "8f5f58b6ac16ddcd1d43109f4befe58147554b451681efcab2de498be7de0007",
+          "unique_values": [
+            192122
+          ]
+        },
+        {
+          "leg": "B2",
+          "vector_sha256": "8f5f58b6ac16ddcd1d43109f4befe58147554b451681efcab2de498be7de0007",
+          "unique_values": [
+            192122
+          ]
+        },
+        {
+          "leg": "A2",
+          "vector_sha256": "8f5f58b6ac16ddcd1d43109f4befe58147554b451681efcab2de498be7de0007",
+          "unique_values": [
+            192122
+          ]
+        }
+      ],
+      "per_sample_after_minus_before_unique": [
+        192122
+      ],
+      "all_legs_same_net_live_vector": true,
+      "raw_global_live_baselines_cross_run_comparable": false
+    },
+    "2047": {
+      "parts": 2047,
+      "per_leg": [
+        {
+          "leg": "A1",
+          "vector_sha256": "99dc305b82d487e842a176df057e6a03a9f0c46e939c649e5788dabe71794e07",
+          "unique_values": [
+            1526677
+          ]
+        },
+        {
+          "leg": "B1",
+          "vector_sha256": "99dc305b82d487e842a176df057e6a03a9f0c46e939c649e5788dabe71794e07",
+          "unique_values": [
+            1526677
+          ]
+        },
+        {
+          "leg": "B2",
+          "vector_sha256": "99dc305b82d487e842a176df057e6a03a9f0c46e939c649e5788dabe71794e07",
+          "unique_values": [
+            1526677
+          ]
+        },
+        {
+          "leg": "A2",
+          "vector_sha256": "99dc305b82d487e842a176df057e6a03a9f0c46e939c649e5788dabe71794e07",
+          "unique_values": [
+            1526677
+          ]
+        }
+      ],
+      "per_sample_after_minus_before_unique": [
+        1526677
+      ],
+      "all_legs_same_net_live_vector": true,
+      "raw_global_live_baselines_cross_run_comparable": false
+    },
+    "2048": {
+      "parts": 2048,
+      "per_leg": [
+        {
+          "leg": "A1",
+          "vector_sha256": "60dc01eddbcaa970b5c01c7dc012f3061b3c924670bcdf8ddde266045a827a3a",
+          "unique_values": [
+            1527162
+          ]
+        },
+        {
+          "leg": "B1",
+          "vector_sha256": "60dc01eddbcaa970b5c01c7dc012f3061b3c924670bcdf8ddde266045a827a3a",
+          "unique_values": [
+            1527162
+          ]
+        },
+        {
+          "leg": "B2",
+          "vector_sha256": "60dc01eddbcaa970b5c01c7dc012f3061b3c924670bcdf8ddde266045a827a3a",
+          "unique_values": [
+            1527162
+          ]
+        },
+        {
+          "leg": "A2",
+          "vector_sha256": "60dc01eddbcaa970b5c01c7dc012f3061b3c924670bcdf8ddde266045a827a3a",
+          "unique_values": [
+            1527162
+          ]
+        }
+      ],
+      "per_sample_after_minus_before_unique": [
+        1527162
+      ],
+      "all_legs_same_net_live_vector": true,
+      "raw_global_live_baselines_cross_run_comparable": false
+    },
+    "16384": {
+      "parts": 16384,
+      "per_leg": [
+        {
+          "leg": "A1",
+          "vector_sha256": "eeba40374529f6618fc39ec786ba19d8485ec321b6399b1385a71ee6a94d143c",
+          "unique_values": [
+            12207482
+          ]
+        },
+        {
+          "leg": "B1",
+          "vector_sha256": "eeba40374529f6618fc39ec786ba19d8485ec321b6399b1385a71ee6a94d143c",
+          "unique_values": [
+            12207482
+          ]
+        },
+        {
+          "leg": "B2",
+          "vector_sha256": "eeba40374529f6618fc39ec786ba19d8485ec321b6399b1385a71ee6a94d143c",
+          "unique_values": [
+            12207482
+          ]
+        },
+        {
+          "leg": "A2",
+          "vector_sha256": "eeba40374529f6618fc39ec786ba19d8485ec321b6399b1385a71ee6a94d143c",
+          "unique_values": [
+            12207482
+          ]
+        }
+      ],
+      "per_sample_after_minus_before_unique": [
+        12207482
+      ],
+      "all_legs_same_net_live_vector": true,
+      "raw_global_live_baselines_cross_run_comparable": false
+    }
+  }
+}

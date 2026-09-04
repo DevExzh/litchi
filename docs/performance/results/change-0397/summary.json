@@ -1,0 +1,4198 @@
+{
+  "schema_version": 1,
+  "change": "0397",
+  "outcome": "accepted_scoped_production_change",
+  "claim_authorized": true,
+  "decision": "accept_normal_owned_open_p50_only",
+  "description": "Lossless ABBA evidence and recomputed projections for the accepted Change 0397 owning OPC open path.",
+  "source_root": "/tmp/litchi-0397-VYmAwG/results",
+  "scope": {
+    "case": "opc_casefold_owned_open",
+    "implementation": "OpcPackage",
+    "operation": "owned_open",
+    "constructor": "OpcPackage::from_vec(owned)",
+    "accepted_latency_profile": "normal (non-allocator) release binary",
+    "accepted_metric": "p50 elapsed_ns",
+    "positive_delta_definition": "(control - candidate) / control * 100; positive means faster",
+    "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+    "corpus_scope": "fixed stored OPC corpora with 32-byte ordinary payloads at 256, 2047, 2048, and 16384 parts",
+    "claim_boundary": "elimination of one redundant eager validation/index pass; not a claim that only one ZIP index exists overall",
+    "correctness_only": "path/from_reader/session and validation constructor coverage are correctness-tested but not separately timed"
+  },
+  "provenance": {
+    "production_commit": "f275d45660de15711edd04b8d0205eaf4e620e68",
+    "production_commit_short": "f275d4566",
+    "control_revision": "6e98db9ece29c1e50241cf3e84c9410ce71dd748",
+    "candidate_revision": "f20d3f417edc3f3da07bf515676b8e71285ad76f",
+    "source_sha256": {
+      "crates/litchi-opc/src/execution.rs": "239d969195eb30ed9832d59df54aefd4bfff8e0020dc49fa32d6162fec6be519",
+      "crates/litchi-opc/src/package.rs": "e2e5794b79e66aa4aef2212b9eeeda7e6012eb33da43aa0a3137cba93539f81a",
+      "crates/litchi-opc/src/phys_pkg.rs": "228498510d9346ca7c57d7b5d30939e2aa9349aed38346e71d2c36141e7780e8"
+    },
+    "rejected_captures": "Earlier rustc 1.95 captures and one busy-CPU normal run were deleted and are not evidence.",
+    "production_tree_oid": "0b3187f9f85373e4ec72042ca2fff472ae581f23",
+    "production_parent_control": "6e98db9ece29c1e50241cf3e84c9410ce71dd748"
+  },
+  "protocol": {
+    "abba_order": [
+      "A1_control",
+      "B1_candidate",
+      "B2_candidate",
+      "A2_control"
+    ],
+    "samples_per_case": 30,
+    "warmup_iterations_per_case": 5,
+    "logical_cpus_available": 1,
+    "cpu_affinity": "2",
+    "execution_workers": [
+      1
+    ],
+    "lookup_count": 0,
+    "query_metadata": "shared 9 classes x 16 repetitions oracle metadata; not executed by owned-open",
+    "report_schema_version": 1,
+    "tool": {
+      "name": "litchi-perf-baseline",
+      "version": "0.1.0",
+      "binary": "litchi-perf-baseline",
+      "profile": "release",
+      "target_os": "linux",
+      "target_arch": "x86_64",
+      "instrumentation": "none"
+    },
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "percentiles": "p50 = Rust u64 floor midpoint; p95/p99 = integer nearest-rank",
+    "dispersion": "sample standard deviation via Rust Welford update",
+    "statistics_recomputed_from_samples": true
+  },
+  "corpus_binding": {
+    "catalog_id": "litchi-perf-corpus-v2",
+    "content_set_sha256": "a7f63920c0fb28718efeb19e6a1be759268c0e856492085bff2db28b1ea7c9f3",
+    "corpora": [
+      {
+        "name": "opc-casefold-parts_256",
+        "generator": "litchi-opc-casefold-lookup-v1",
+        "package_format": "OPC/ZIP",
+        "archive_member_count": 258,
+        "archive_bytes": 42217,
+        "archive_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+        "target_entry": "casefold/ordinary-00000.bin",
+        "target_payload_bytes": 32,
+        "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+        "owned_payload_sha256": "4d29aa5866bfbd4bfbf1856078b7bb1e47364cd4b7c295847cc10fbaa4d6f357",
+        "owned_exact_source_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+        "canonical_name_oracle_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+        "output_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+        "parts": 256,
+        "shape": "parts_256"
+      },
+      {
+        "name": "opc-casefold-parts_2047",
+        "generator": "litchi-opc-casefold-lookup-v1",
+        "package_format": "OPC/ZIP",
+        "archive_member_count": 2049,
+        "archive_bytes": 332359,
+        "archive_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+        "target_entry": "casefold/ordinary-00000.bin",
+        "target_payload_bytes": 32,
+        "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+        "owned_payload_sha256": "e627ffd5e402a6e2217aeedb5def6fbc319264a0925d4d25cba29912dbb7b264",
+        "owned_exact_source_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+        "canonical_name_oracle_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+        "output_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+        "parts": 2047,
+        "shape": "parts_2047"
+      },
+      {
+        "name": "opc-casefold-parts_2048",
+        "generator": "litchi-opc-casefold-lookup-v1",
+        "package_format": "OPC/ZIP",
+        "archive_member_count": 2050,
+        "archive_bytes": 332521,
+        "archive_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+        "target_entry": "casefold/ordinary-00000.bin",
+        "target_payload_bytes": 32,
+        "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+        "owned_payload_sha256": "fb513dea41b071a231935465dfcec61d6c1fe3c9b9510d15b04e8ca267d65761",
+        "owned_exact_source_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+        "canonical_name_oracle_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+        "output_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+        "parts": 2048,
+        "shape": "parts_2048"
+      },
+      {
+        "name": "opc-casefold-parts_16384",
+        "generator": "litchi-opc-casefold-lookup-v1",
+        "package_format": "OPC/ZIP",
+        "archive_member_count": 16386,
+        "archive_bytes": 2654953,
+        "archive_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+        "target_entry": "casefold/ordinary-00000.bin",
+        "target_payload_bytes": 32,
+        "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+        "owned_payload_sha256": "b613ccd8ee7ff1e9b7aebdb4319ced1abf72c721b7aaf18044a14a82470aeeb8",
+        "owned_exact_source_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+        "canonical_name_oracle_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+        "output_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+        "parts": 16384,
+        "shape": "parts_16384"
+      }
+    ],
+    "binding_validator": "python3 tools/validate_perf_corpus_binding.py --report REPORT --catalog CATALOG",
+    "named_flags": true,
+    "all_eight_pairs_validated_before_compression": true,
+    "validation_failures": 0
+  },
+  "identity_verification": {
+    "configuration_identical_across_all_eight_reports": true,
+    "environment_recorded_per_leg": true,
+    "source_oracles_verified_all_32_rows": true,
+    "corpus_identity_verified_across_profiles_legs": true,
+    "output_oracles_verified_all_32_rows": true,
+    "owned_vectors_verified_all_32_rows": true,
+    "malformed_equivalent_name_gate_verified_all_32_rows": true,
+    "allocation_vectors_verified_all_16_allocator_rows": true,
+    "configuration": {
+      "samples_per_case": 30,
+      "warmup_iterations_per_case": 5,
+      "filesystem_cache_states": [
+        "warm",
+        "cold-requested"
+      ],
+      "filesystem_fresh_child_per_sample": true,
+      "filesystem_process_isolated": true,
+      "filesystem_root_selected": false,
+      "cases": [
+        "opc_casefold_owned_open"
+      ],
+      "corpus_shapes": [
+        "tiny",
+        "many-small",
+        "few-large",
+        "wide-root"
+      ],
+      "payload_kinds": [
+        "compressible",
+        "incompressible"
+      ],
+      "writer_shapes": [
+        "tiny",
+        "large",
+        "payload-heavy"
+      ],
+      "xlsx_shapes": [
+        "tiny",
+        "medium",
+        "dense-wide"
+      ],
+      "xlsb_shapes": [
+        "tiny",
+        "medium",
+        "large",
+        "sparse"
+      ],
+      "xlsx_cell_crud_shapes": [
+        "medium",
+        "dense-sparse"
+      ],
+      "xlsx_row_visibility_shapes": [
+        "medium",
+        "large"
+      ],
+      "semantic_shapes": [
+        "tiny",
+        "medium",
+        "large"
+      ],
+      "rtf_variants": [
+        "plain"
+      ],
+      "range_simulation": {
+        "fixed_latency_us": 100,
+        "request_overhead_us": 25,
+        "bandwidth_bytes_per_second": 52428800,
+        "max_physical_range_bytes": 4096
+      },
+      "execution_workers": [
+        1
+      ]
+    },
+    "environments": {
+      "normal/A1": {
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "git_revision": "6e98db9ece29c1e50241cf3e84c9410ce71dd748",
+        "git_worktree_dirty": false,
+        "logical_cpus_available": 1,
+        "allocator": "Rust system allocator",
+        "rustflags": null,
+        "cargo_build_target": null,
+        "perf_event_paranoid": "1",
+        "os": "linux",
+        "kernel": "Linux 7.0.0-1011-aws",
+        "cpu_model": "AMD EPYC 9R45",
+        "total_memory_bytes": 132553797632,
+        "page_size_bytes": 4096,
+        "filesystem_type": null,
+        "source_destination_same_device": null,
+        "cpu_affinity": "2",
+        "storage_identifier": null
+      },
+      "normal/B1": {
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "git_revision": "f20d3f417edc3f3da07bf515676b8e71285ad76f",
+        "git_worktree_dirty": false,
+        "logical_cpus_available": 1,
+        "allocator": "Rust system allocator",
+        "rustflags": null,
+        "cargo_build_target": null,
+        "perf_event_paranoid": "1",
+        "os": "linux",
+        "kernel": "Linux 7.0.0-1011-aws",
+        "cpu_model": "AMD EPYC 9R45",
+        "total_memory_bytes": 132553797632,
+        "page_size_bytes": 4096,
+        "filesystem_type": null,
+        "source_destination_same_device": null,
+        "cpu_affinity": "2",
+        "storage_identifier": null
+      },
+      "normal/B2": {
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "git_revision": "f20d3f417edc3f3da07bf515676b8e71285ad76f",
+        "git_worktree_dirty": false,
+        "logical_cpus_available": 1,
+        "allocator": "Rust system allocator",
+        "rustflags": null,
+        "cargo_build_target": null,
+        "perf_event_paranoid": "1",
+        "os": "linux",
+        "kernel": "Linux 7.0.0-1011-aws",
+        "cpu_model": "AMD EPYC 9R45",
+        "total_memory_bytes": 132553797632,
+        "page_size_bytes": 4096,
+        "filesystem_type": null,
+        "source_destination_same_device": null,
+        "cpu_affinity": "2",
+        "storage_identifier": null
+      },
+      "normal/A2": {
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "git_revision": "6e98db9ece29c1e50241cf3e84c9410ce71dd748",
+        "git_worktree_dirty": false,
+        "logical_cpus_available": 1,
+        "allocator": "Rust system allocator",
+        "rustflags": null,
+        "cargo_build_target": null,
+        "perf_event_paranoid": "1",
+        "os": "linux",
+        "kernel": "Linux 7.0.0-1011-aws",
+        "cpu_model": "AMD EPYC 9R45",
+        "total_memory_bytes": 132553797632,
+        "page_size_bytes": 4096,
+        "filesystem_type": null,
+        "source_destination_same_device": null,
+        "cpu_affinity": "2",
+        "storage_identifier": null
+      },
+      "allocator/A1": {
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "git_revision": "6e98db9ece29c1e50241cf3e84c9410ce71dd748",
+        "git_worktree_dirty": false,
+        "logical_cpus_available": 1,
+        "allocator": "CountingSystemAllocator(std::alloc::System)",
+        "rustflags": null,
+        "cargo_build_target": null,
+        "perf_event_paranoid": "1",
+        "os": "linux",
+        "kernel": "Linux 7.0.0-1011-aws",
+        "cpu_model": "AMD EPYC 9R45",
+        "total_memory_bytes": 132553797632,
+        "page_size_bytes": 4096,
+        "filesystem_type": null,
+        "source_destination_same_device": null,
+        "cpu_affinity": "2",
+        "storage_identifier": null
+      },
+      "allocator/B1": {
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "git_revision": "f20d3f417edc3f3da07bf515676b8e71285ad76f",
+        "git_worktree_dirty": false,
+        "logical_cpus_available": 1,
+        "allocator": "CountingSystemAllocator(std::alloc::System)",
+        "rustflags": null,
+        "cargo_build_target": null,
+        "perf_event_paranoid": "1",
+        "os": "linux",
+        "kernel": "Linux 7.0.0-1011-aws",
+        "cpu_model": "AMD EPYC 9R45",
+        "total_memory_bytes": 132553797632,
+        "page_size_bytes": 4096,
+        "filesystem_type": null,
+        "source_destination_same_device": null,
+        "cpu_affinity": "2",
+        "storage_identifier": null
+      },
+      "allocator/B2": {
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "git_revision": "f20d3f417edc3f3da07bf515676b8e71285ad76f",
+        "git_worktree_dirty": false,
+        "logical_cpus_available": 1,
+        "allocator": "CountingSystemAllocator(std::alloc::System)",
+        "rustflags": null,
+        "cargo_build_target": null,
+        "perf_event_paranoid": "1",
+        "os": "linux",
+        "kernel": "Linux 7.0.0-1011-aws",
+        "cpu_model": "AMD EPYC 9R45",
+        "total_memory_bytes": 132553797632,
+        "page_size_bytes": 4096,
+        "filesystem_type": null,
+        "source_destination_same_device": null,
+        "cpu_affinity": "2",
+        "storage_identifier": null
+      },
+      "allocator/A2": {
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "git_revision": "6e98db9ece29c1e50241cf3e84c9410ce71dd748",
+        "git_worktree_dirty": false,
+        "logical_cpus_available": 1,
+        "allocator": "CountingSystemAllocator(std::alloc::System)",
+        "rustflags": null,
+        "cargo_build_target": null,
+        "perf_event_paranoid": "1",
+        "os": "linux",
+        "kernel": "Linux 7.0.0-1011-aws",
+        "cpu_model": "AMD EPYC 9R45",
+        "total_memory_bytes": 132553797632,
+        "page_size_bytes": 4096,
+        "filesystem_type": null,
+        "source_destination_same_device": null,
+        "cpu_affinity": "2",
+        "storage_identifier": null
+      }
+    }
+  },
+  "results": {
+    "normal": {
+      "A1": {
+        "report": "raw/normal/a1-control.json.zst",
+        "catalog": "raw/normal/a1-control.catalog.json.zst",
+        "source_report": "/tmp/litchi-0397-VYmAwG/results/normal/a1-control.json",
+        "source_catalog": "/tmp/litchi-0397-VYmAwG/results/normal/a1-control.catalog.json",
+        "report_raw_sha256": "a1fa4eee199aad143d2e79dfac65a73f5d3b83be1bba9fd6de2e21b95e1d6d1d",
+        "report_raw_bytes": 97014,
+        "catalog_raw_sha256": "144508746bd96ff79b47e3575634cb895832b993add383618d2681ebc30e39e6",
+        "catalog_raw_bytes": 17179,
+        "revision": "6e98db9ece29c1e50241cf3e84c9410ce71dd748",
+        "binary_identity": {
+          "path": "/tmp/litchi-0397-VYmAwG/control-target/release/litchi-perf-baseline",
+          "binary_sha256": "1a0678b271b4d9e5d8929613bc3fea8a8fc36073a8a5e2c66eb31f28d84db03d",
+          "binary_bytes": 54732752,
+          "mode_bits": 509,
+          "executable": true,
+          "profile": "release"
+        },
+        "environment": {
+          "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+          "git_revision": "6e98db9ece29c1e50241cf3e84c9410ce71dd748",
+          "git_worktree_dirty": false,
+          "logical_cpus_available": 1,
+          "allocator": "Rust system allocator",
+          "rustflags": null,
+          "cargo_build_target": null,
+          "perf_event_paranoid": "1",
+          "os": "linux",
+          "kernel": "Linux 7.0.0-1011-aws",
+          "cpu_model": "AMD EPYC 9R45",
+          "total_memory_bytes": 132553797632,
+          "page_size_bytes": 4096,
+          "filesystem_type": null,
+          "source_destination_same_device": null,
+          "cpu_affinity": "2",
+          "storage_identifier": null
+        },
+        "rows": [
+          {
+            "parts": 256,
+            "shape": "parts_256",
+            "corpus": {
+              "name": "opc-casefold-parts_256",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 258,
+              "archive_bytes": 42217,
+              "archive_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "4d29aa5866bfbd4bfbf1856078b7bb1e47364cd4b7c295847cc10fbaa4d6f357",
+              "owned_exact_source_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+              "canonical_name_oracle_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+              "output_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 612313,
+              "p50": 623823,
+              "mean": 623839.1333333334,
+              "p95": 632663,
+              "p99": 633283,
+              "max": 633283,
+              "standard_deviation": 6267.210063625501,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 621499.181398819,
+                "upper": 626179.0852678479
+              },
+              "sample_vector_sha256": "0a6e9ac890397fa67ff070582bed45887fce836cdad5c6380c214c5229a91417"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                128,
+                255,
+                0,
+                128,
+                255,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+              "observed_output_sha256_unique": [
+                "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "4d29aa5866bfbd4bfbf1856078b7bb1e47364cd4b7c295847cc10fbaa4d6f357"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            }
+          },
+          {
+            "parts": 2047,
+            "shape": "parts_2047",
+            "corpus": {
+              "name": "opc-casefold-parts_2047",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 2049,
+              "archive_bytes": 332359,
+              "archive_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "e627ffd5e402a6e2217aeedb5def6fbc319264a0925d4d25cba29912dbb7b264",
+              "owned_exact_source_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+              "canonical_name_oracle_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+              "output_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 5026182,
+              "p50": 5053063,
+              "mean": 5055866.500000001,
+              "p95": 5085822,
+              "p99": 5133833,
+              "max": 5133833,
+              "standard_deviation": 19166.59321400184,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 5048710.380065638,
+                "upper": 5063022.619934364
+              },
+              "sample_vector_sha256": "06d02363f4f9469f34105d384886dd07691e0f9bf3edd97ca2eecf68f52fc71b"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                1023,
+                2046,
+                0,
+                1023,
+                2046,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+              "observed_output_sha256_unique": [
+                "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "e627ffd5e402a6e2217aeedb5def6fbc319264a0925d4d25cba29912dbb7b264"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            }
+          },
+          {
+            "parts": 2048,
+            "shape": "parts_2048",
+            "corpus": {
+              "name": "opc-casefold-parts_2048",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 2050,
+              "archive_bytes": 332521,
+              "archive_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "fb513dea41b071a231935465dfcec61d6c1fe3c9b9510d15b04e8ca267d65761",
+              "owned_exact_source_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+              "canonical_name_oracle_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+              "output_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 5052653,
+              "p50": 5093122,
+              "mean": 5094425.033333333,
+              "p95": 5129043,
+              "p99": 5133613,
+              "max": 5133613,
+              "standard_deviation": 20379.424550237836,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 5086816.085585213,
+                "upper": 5102033.981081453
+              },
+              "sample_vector_sha256": "777fd9ce6e4734ca3c3d3153a74a8920b1892581d8c096479a9d67daff40cd53"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                1024,
+                2047,
+                0,
+                1024,
+                2047,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+              "observed_output_sha256_unique": [
+                "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "fb513dea41b071a231935465dfcec61d6c1fe3c9b9510d15b04e8ca267d65761"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            }
+          },
+          {
+            "parts": 16384,
+            "shape": "parts_16384",
+            "corpus": {
+              "name": "opc-casefold-parts_16384",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 16386,
+              "archive_bytes": 2654953,
+              "archive_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "b613ccd8ee7ff1e9b7aebdb4319ced1abf72c721b7aaf18044a14a82470aeeb8",
+              "owned_exact_source_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+              "canonical_name_oracle_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+              "output_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 48427136,
+              "p50": 49497996,
+              "mean": 49554187.03333333,
+              "p95": 50543515,
+              "p99": 50968087,
+              "max": 50968087,
+              "standard_deviation": 564193.5872827666,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 49343537.34031199,
+                "upper": 49764836.72635467
+              },
+              "sample_vector_sha256": "ef3f11344d13c1a22f04e0b11020e7879e613abb9e0645f2199c832c066bb3ed"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                8192,
+                16383,
+                0,
+                8192,
+                16383,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+              "observed_output_sha256_unique": [
+                "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "b613ccd8ee7ff1e9b7aebdb4319ced1abf72c721b7aaf18044a14a82470aeeb8"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            }
+          }
+        ],
+        "catalog_identity": {
+          "catalog_id": "litchi-perf-corpus-v2",
+          "manifest_version": 2,
+          "catalog_sha256": "4200b1f01f01be7960eb35bc19d1c585476c47304153d03108252bbf891ea0be",
+          "content_set_sha256": "a7f63920c0fb28718efeb19e6a1be759268c0e856492085bff2db28b1ea7c9f3",
+          "case_binding_count": 4
+        }
+      },
+      "B1": {
+        "report": "raw/normal/b1-candidate.json.zst",
+        "catalog": "raw/normal/b1-candidate.catalog.json.zst",
+        "source_report": "/tmp/litchi-0397-VYmAwG/results/normal/b1-candidate.json",
+        "source_catalog": "/tmp/litchi-0397-VYmAwG/results/normal/b1-candidate.catalog.json",
+        "report_raw_sha256": "48757a745de2dd4225e275e5acd33253eacfc0e7519839f2e2d208c2ae89ddb6",
+        "report_raw_bytes": 97012,
+        "catalog_raw_sha256": "7dcb409ff87772e19230258f122d088a98561320b23a01528bcf9314a6f2000f",
+        "catalog_raw_bytes": 17179,
+        "revision": "f20d3f417edc3f3da07bf515676b8e71285ad76f",
+        "binary_identity": {
+          "path": "/tmp/litchi-0397-VYmAwG/candidate-target/release/litchi-perf-baseline",
+          "binary_sha256": "8e39be4cfd6baf2a7c4cb553e21b4e4f5475a905a695d39918521f7197a69df8",
+          "binary_bytes": 54745280,
+          "mode_bits": 509,
+          "executable": true,
+          "profile": "release"
+        },
+        "environment": {
+          "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+          "git_revision": "f20d3f417edc3f3da07bf515676b8e71285ad76f",
+          "git_worktree_dirty": false,
+          "logical_cpus_available": 1,
+          "allocator": "Rust system allocator",
+          "rustflags": null,
+          "cargo_build_target": null,
+          "perf_event_paranoid": "1",
+          "os": "linux",
+          "kernel": "Linux 7.0.0-1011-aws",
+          "cpu_model": "AMD EPYC 9R45",
+          "total_memory_bytes": 132553797632,
+          "page_size_bytes": 4096,
+          "filesystem_type": null,
+          "source_destination_same_device": null,
+          "cpu_affinity": "2",
+          "storage_identifier": null
+        },
+        "rows": [
+          {
+            "parts": 256,
+            "shape": "parts_256",
+            "corpus": {
+              "name": "opc-casefold-parts_256",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 258,
+              "archive_bytes": 42217,
+              "archive_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "4d29aa5866bfbd4bfbf1856078b7bb1e47364cd4b7c295847cc10fbaa4d6f357",
+              "owned_exact_source_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+              "canonical_name_oracle_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+              "output_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 558883,
+              "p50": 570063,
+              "mean": 569307.6666666666,
+              "p95": 577283,
+              "p99": 592603,
+              "max": 592603,
+              "standard_deviation": 7084.369820042315,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 566662.6165252271,
+                "upper": 571952.7168081062
+              },
+              "sample_vector_sha256": "434665bd32ae83d41a7cafff503a6a05703224026bf39e409afdbbf69e1c9b75"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                128,
+                255,
+                0,
+                128,
+                255,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+              "observed_output_sha256_unique": [
+                "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "4d29aa5866bfbd4bfbf1856078b7bb1e47364cd4b7c295847cc10fbaa4d6f357"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            }
+          },
+          {
+            "parts": 2047,
+            "shape": "parts_2047",
+            "corpus": {
+              "name": "opc-casefold-parts_2047",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 2049,
+              "archive_bytes": 332359,
+              "archive_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "e627ffd5e402a6e2217aeedb5def6fbc319264a0925d4d25cba29912dbb7b264",
+              "owned_exact_source_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+              "canonical_name_oracle_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+              "output_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 4604141,
+              "p50": 4633726,
+              "mean": 4637499.366666667,
+              "p95": 4669570,
+              "p99": 4688211,
+              "max": 4688211,
+              "standard_deviation": 18728.101427208578,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 4630506.963871885,
+                "upper": 4644491.769461449
+              },
+              "sample_vector_sha256": "9e515af1df190df115bfee0183aba9eb53fae05ab197323a626f267a7558e2d1"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                1023,
+                2046,
+                0,
+                1023,
+                2046,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+              "observed_output_sha256_unique": [
+                "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "e627ffd5e402a6e2217aeedb5def6fbc319264a0925d4d25cba29912dbb7b264"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            }
+          },
+          {
+            "parts": 2048,
+            "shape": "parts_2048",
+            "corpus": {
+              "name": "opc-casefold-parts_2048",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 2050,
+              "archive_bytes": 332521,
+              "archive_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "fb513dea41b071a231935465dfcec61d6c1fe3c9b9510d15b04e8ca267d65761",
+              "owned_exact_source_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+              "canonical_name_oracle_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+              "output_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 4609630,
+              "p50": 4637521,
+              "mean": 4638207.366666668,
+              "p95": 4664681,
+              "p99": 4672831,
+              "max": 4672831,
+              "standard_deviation": 15472.70846825662,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 4632430.411092351,
+                "upper": 4643984.322240985
+              },
+              "sample_vector_sha256": "61148db91f869b013e8165cae71a30308ae4160042f400006c84a4fca3b8b3bd"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                1024,
+                2047,
+                0,
+                1024,
+                2047,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+              "observed_output_sha256_unique": [
+                "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "fb513dea41b071a231935465dfcec61d6c1fe3c9b9510d15b04e8ca267d65761"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            }
+          },
+          {
+            "parts": 16384,
+            "shape": "parts_16384",
+            "corpus": {
+              "name": "opc-casefold-parts_16384",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 16386,
+              "archive_bytes": 2654953,
+              "archive_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "b613ccd8ee7ff1e9b7aebdb4319ced1abf72c721b7aaf18044a14a82470aeeb8",
+              "owned_exact_source_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+              "canonical_name_oracle_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+              "output_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 45228681,
+              "p50": 47197005,
+              "mean": 47530656.3,
+              "p95": 50130894,
+              "p99": 51015528,
+              "max": 51015528,
+              "standard_deviation": 1365757.1929489041,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 47020731.444558166,
+                "upper": 48040581.15544183
+              },
+              "sample_vector_sha256": "40eb3d526da059824ca7561b9392b95b7ec4cdf3e14142ba34d19231e1de0919"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                8192,
+                16383,
+                0,
+                8192,
+                16383,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+              "observed_output_sha256_unique": [
+                "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "b613ccd8ee7ff1e9b7aebdb4319ced1abf72c721b7aaf18044a14a82470aeeb8"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            }
+          }
+        ],
+        "catalog_identity": {
+          "catalog_id": "litchi-perf-corpus-v2",
+          "manifest_version": 2,
+          "catalog_sha256": "a4b4a4da1632071e6a30e7bfacf9f5fea235cf7c7c620949264ab3adff7a8809",
+          "content_set_sha256": "a7f63920c0fb28718efeb19e6a1be759268c0e856492085bff2db28b1ea7c9f3",
+          "case_binding_count": 4
+        }
+      },
+      "B2": {
+        "report": "raw/normal/b2-candidate.json.zst",
+        "catalog": "raw/normal/b2-candidate.catalog.json.zst",
+        "source_report": "/tmp/litchi-0397-VYmAwG/results/normal/b2-candidate.json",
+        "source_catalog": "/tmp/litchi-0397-VYmAwG/results/normal/b2-candidate.catalog.json",
+        "report_raw_sha256": "c98afce4648c02b045b3c16ca7deeb560e6e5b6444b2663e61d79d3a3915ee93",
+        "report_raw_bytes": 97008,
+        "catalog_raw_sha256": "7dcb409ff87772e19230258f122d088a98561320b23a01528bcf9314a6f2000f",
+        "catalog_raw_bytes": 17179,
+        "revision": "f20d3f417edc3f3da07bf515676b8e71285ad76f",
+        "binary_identity": {
+          "path": "/tmp/litchi-0397-VYmAwG/candidate-target/release/litchi-perf-baseline",
+          "binary_sha256": "8e39be4cfd6baf2a7c4cb553e21b4e4f5475a905a695d39918521f7197a69df8",
+          "binary_bytes": 54745280,
+          "mode_bits": 509,
+          "executable": true,
+          "profile": "release"
+        },
+        "environment": {
+          "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+          "git_revision": "f20d3f417edc3f3da07bf515676b8e71285ad76f",
+          "git_worktree_dirty": false,
+          "logical_cpus_available": 1,
+          "allocator": "Rust system allocator",
+          "rustflags": null,
+          "cargo_build_target": null,
+          "perf_event_paranoid": "1",
+          "os": "linux",
+          "kernel": "Linux 7.0.0-1011-aws",
+          "cpu_model": "AMD EPYC 9R45",
+          "total_memory_bytes": 132553797632,
+          "page_size_bytes": 4096,
+          "filesystem_type": null,
+          "source_destination_same_device": null,
+          "cpu_affinity": "2",
+          "storage_identifier": null
+        },
+        "rows": [
+          {
+            "parts": 256,
+            "shape": "parts_256",
+            "corpus": {
+              "name": "opc-casefold-parts_256",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 258,
+              "archive_bytes": 42217,
+              "archive_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "4d29aa5866bfbd4bfbf1856078b7bb1e47364cd4b7c295847cc10fbaa4d6f357",
+              "owned_exact_source_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+              "canonical_name_oracle_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+              "output_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 565572,
+              "p50": 576202,
+              "mean": 575746.7,
+              "p95": 582063,
+              "p99": 604552,
+              "max": 604552,
+              "standard_deviation": 7262.511150920272,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 573035.138261283,
+                "upper": 578458.2617387169
+              },
+              "sample_vector_sha256": "eb0bd1d93d8a4dffcb3dfc9b22005bbe96c0d3145936eac2832b31785e170fc4"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                128,
+                255,
+                0,
+                128,
+                255,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+              "observed_output_sha256_unique": [
+                "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "4d29aa5866bfbd4bfbf1856078b7bb1e47364cd4b7c295847cc10fbaa4d6f357"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            }
+          },
+          {
+            "parts": 2047,
+            "shape": "parts_2047",
+            "corpus": {
+              "name": "opc-casefold-parts_2047",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 2049,
+              "archive_bytes": 332359,
+              "archive_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "e627ffd5e402a6e2217aeedb5def6fbc319264a0925d4d25cba29912dbb7b264",
+              "owned_exact_source_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+              "canonical_name_oracle_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+              "output_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 4652400,
+              "p50": 4676796,
+              "mean": 4677859.533333334,
+              "p95": 4704121,
+              "p99": 4711571,
+              "max": 4711571,
+              "standard_deviation": 13756.059178395511,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 4672723.51316503,
+                "upper": 4682995.553501639
+              },
+              "sample_vector_sha256": "513277010859f3d67cc4e458ecd08eb646a451da6cb223910013f0b9635ab5d9"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                1023,
+                2046,
+                0,
+                1023,
+                2046,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+              "observed_output_sha256_unique": [
+                "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "e627ffd5e402a6e2217aeedb5def6fbc319264a0925d4d25cba29912dbb7b264"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            }
+          },
+          {
+            "parts": 2048,
+            "shape": "parts_2048",
+            "corpus": {
+              "name": "opc-casefold-parts_2048",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 2050,
+              "archive_bytes": 332521,
+              "archive_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "fb513dea41b071a231935465dfcec61d6c1fe3c9b9510d15b04e8ca267d65761",
+              "owned_exact_source_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+              "canonical_name_oracle_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+              "output_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 4652881,
+              "p50": 4677486,
+              "mean": 4678021.533333335,
+              "p95": 4700091,
+              "p99": 4704501,
+              "max": 4704501,
+              "standard_deviation": 11938.174375919698,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 4673564.246288237,
+                "upper": 4682478.820378433
+              },
+              "sample_vector_sha256": "c258d304b4362879b6ded7d00acabddd51f639dde3cec2c97ad7b188b4e09b0e"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                1024,
+                2047,
+                0,
+                1024,
+                2047,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+              "observed_output_sha256_unique": [
+                "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "fb513dea41b071a231935465dfcec61d6c1fe3c9b9510d15b04e8ca267d65761"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            }
+          },
+          {
+            "parts": 16384,
+            "shape": "parts_16384",
+            "corpus": {
+              "name": "opc-casefold-parts_16384",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 16386,
+              "archive_bytes": 2654953,
+              "archive_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "b613ccd8ee7ff1e9b7aebdb4319ced1abf72c721b7aaf18044a14a82470aeeb8",
+              "owned_exact_source_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+              "canonical_name_oracle_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+              "output_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 45859145,
+              "p50": 47016854,
+              "mean": 47512731.20000002,
+              "p95": 49164939,
+              "p99": 50339485,
+              "max": 50339485,
+              "standard_deviation": 1178042.1891337237,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 47072892.40866893,
+                "upper": 47952569.99133111
+              },
+              "sample_vector_sha256": "475f562c60a2f03cb2da37309d61fa86e9da0555e6bf0992d576dd1fc61ad028"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                8192,
+                16383,
+                0,
+                8192,
+                16383,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+              "observed_output_sha256_unique": [
+                "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "b613ccd8ee7ff1e9b7aebdb4319ced1abf72c721b7aaf18044a14a82470aeeb8"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            }
+          }
+        ],
+        "catalog_identity": {
+          "catalog_id": "litchi-perf-corpus-v2",
+          "manifest_version": 2,
+          "catalog_sha256": "a4b4a4da1632071e6a30e7bfacf9f5fea235cf7c7c620949264ab3adff7a8809",
+          "content_set_sha256": "a7f63920c0fb28718efeb19e6a1be759268c0e856492085bff2db28b1ea7c9f3",
+          "case_binding_count": 4
+        }
+      },
+      "A2": {
+        "report": "raw/normal/a2-control.json.zst",
+        "catalog": "raw/normal/a2-control.catalog.json.zst",
+        "source_report": "/tmp/litchi-0397-VYmAwG/results/normal/a2-control.json",
+        "source_catalog": "/tmp/litchi-0397-VYmAwG/results/normal/a2-control.catalog.json",
+        "report_raw_sha256": "11eb88340e3d6f5c3fe245b8fb5393f6e685a91abf7fef56f267e31165ae428a",
+        "report_raw_bytes": 97015,
+        "catalog_raw_sha256": "144508746bd96ff79b47e3575634cb895832b993add383618d2681ebc30e39e6",
+        "catalog_raw_bytes": 17179,
+        "revision": "6e98db9ece29c1e50241cf3e84c9410ce71dd748",
+        "binary_identity": {
+          "path": "/tmp/litchi-0397-VYmAwG/control-target/release/litchi-perf-baseline",
+          "binary_sha256": "1a0678b271b4d9e5d8929613bc3fea8a8fc36073a8a5e2c66eb31f28d84db03d",
+          "binary_bytes": 54732752,
+          "mode_bits": 509,
+          "executable": true,
+          "profile": "release"
+        },
+        "environment": {
+          "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+          "git_revision": "6e98db9ece29c1e50241cf3e84c9410ce71dd748",
+          "git_worktree_dirty": false,
+          "logical_cpus_available": 1,
+          "allocator": "Rust system allocator",
+          "rustflags": null,
+          "cargo_build_target": null,
+          "perf_event_paranoid": "1",
+          "os": "linux",
+          "kernel": "Linux 7.0.0-1011-aws",
+          "cpu_model": "AMD EPYC 9R45",
+          "total_memory_bytes": 132553797632,
+          "page_size_bytes": 4096,
+          "filesystem_type": null,
+          "source_destination_same_device": null,
+          "cpu_affinity": "2",
+          "storage_identifier": null
+        },
+        "rows": [
+          {
+            "parts": 256,
+            "shape": "parts_256",
+            "corpus": {
+              "name": "opc-casefold-parts_256",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 258,
+              "archive_bytes": 42217,
+              "archive_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "4d29aa5866bfbd4bfbf1856078b7bb1e47364cd4b7c295847cc10fbaa4d6f357",
+              "owned_exact_source_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+              "canonical_name_oracle_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+              "output_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 615163,
+              "p50": 627703,
+              "mean": 628148.0999999999,
+              "p95": 641983,
+              "p99": 657933,
+              "max": 657933,
+              "standard_deviation": 8346.019754845833,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 625031.9949273147,
+                "upper": 631264.205072685
+              },
+              "sample_vector_sha256": "2bd68ea72e2bc5910349f9532a89ea05b986741939536a85a76e95a74da822f0"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                128,
+                255,
+                0,
+                128,
+                255,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+              "observed_output_sha256_unique": [
+                "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "4d29aa5866bfbd4bfbf1856078b7bb1e47364cd4b7c295847cc10fbaa4d6f357"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            }
+          },
+          {
+            "parts": 2047,
+            "shape": "parts_2047",
+            "corpus": {
+              "name": "opc-casefold-parts_2047",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 2049,
+              "archive_bytes": 332359,
+              "archive_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "e627ffd5e402a6e2217aeedb5def6fbc319264a0925d4d25cba29912dbb7b264",
+              "owned_exact_source_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+              "canonical_name_oracle_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+              "output_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 5085843,
+              "p50": 5123542,
+              "mean": 5119932.833333333,
+              "p95": 5143403,
+              "p99": 5145623,
+              "max": 5145623,
+              "standard_deviation": 17412.360774170775,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 5113431.681008081,
+                "upper": 5126433.985658585
+              },
+              "sample_vector_sha256": "8bd12f3e2b3f0f464413ec3ba8cf17ed73bbd04f3633532447314f4a81850be7"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                1023,
+                2046,
+                0,
+                1023,
+                2046,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+              "observed_output_sha256_unique": [
+                "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "e627ffd5e402a6e2217aeedb5def6fbc319264a0925d4d25cba29912dbb7b264"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            }
+          },
+          {
+            "parts": 2048,
+            "shape": "parts_2048",
+            "corpus": {
+              "name": "opc-casefold-parts_2048",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 2050,
+              "archive_bytes": 332521,
+              "archive_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "fb513dea41b071a231935465dfcec61d6c1fe3c9b9510d15b04e8ca267d65761",
+              "owned_exact_source_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+              "canonical_name_oracle_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+              "output_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 5055872,
+              "p50": 5099093,
+              "mean": 5097318.433333333,
+              "p95": 5130223,
+              "p99": 5172584,
+              "max": 5172584,
+              "standard_deviation": 24547.70477603326,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 5088153.198931513,
+                "upper": 5106483.667735152
+              },
+              "sample_vector_sha256": "253e6b7a5e5b59022181088b3f94e5818fc10206a0b2853561f07edfbced5061"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                1024,
+                2047,
+                0,
+                1024,
+                2047,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+              "observed_output_sha256_unique": [
+                "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "fb513dea41b071a231935465dfcec61d6c1fe3c9b9510d15b04e8ca267d65761"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            }
+          },
+          {
+            "parts": 16384,
+            "shape": "parts_16384",
+            "corpus": {
+              "name": "opc-casefold-parts_16384",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 16386,
+              "archive_bytes": 2654953,
+              "archive_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "b613ccd8ee7ff1e9b7aebdb4319ced1abf72c721b7aaf18044a14a82470aeeb8",
+              "owned_exact_source_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+              "canonical_name_oracle_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+              "output_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 48315275,
+              "p50": 49154189,
+              "mean": 49413111.999999985,
+              "p95": 50947137,
+              "p99": 51273368,
+              "max": 51273368,
+              "standard_deviation": 888946.7349062164,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 49081211.10456059,
+                "upper": 49745012.89543938
+              },
+              "sample_vector_sha256": "7431ab49acc10f5447ba2a48e4968cd61fc5fbe7ab6340b6568018c922ed14d5"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                8192,
+                16383,
+                0,
+                8192,
+                16383,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+              "observed_output_sha256_unique": [
+                "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "b613ccd8ee7ff1e9b7aebdb4319ced1abf72c721b7aaf18044a14a82470aeeb8"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            }
+          }
+        ],
+        "catalog_identity": {
+          "catalog_id": "litchi-perf-corpus-v2",
+          "manifest_version": 2,
+          "catalog_sha256": "4200b1f01f01be7960eb35bc19d1c585476c47304153d03108252bbf891ea0be",
+          "content_set_sha256": "a7f63920c0fb28718efeb19e6a1be759268c0e856492085bff2db28b1ea7c9f3",
+          "case_binding_count": 4
+        }
+      }
+    },
+    "allocator": {
+      "A1": {
+        "report": "raw/allocator/a1-control.json.zst",
+        "catalog": "raw/allocator/a1-control.catalog.json.zst",
+        "source_report": "/tmp/litchi-0397-VYmAwG/results/allocator/a1-control.json",
+        "source_catalog": "/tmp/litchi-0397-VYmAwG/results/allocator/a1-control.catalog.json",
+        "report_raw_sha256": "5de76679f5f785dbfba9e93de8927f1fc54cfd0ed03e93d56a890737093bcd70",
+        "report_raw_bytes": 130781,
+        "catalog_raw_sha256": "144508746bd96ff79b47e3575634cb895832b993add383618d2681ebc30e39e6",
+        "catalog_raw_bytes": 17179,
+        "revision": "6e98db9ece29c1e50241cf3e84c9410ce71dd748",
+        "binary_identity": {
+          "path": "/tmp/litchi-0397-VYmAwG/control-target/release/litchi-perf-baseline-alloc",
+          "binary_sha256": "6fb6aa7ccc0a07ed61d16d87886b153afa1d4ea1d3bb4b1cfa7ed0b5c7eeb9fa",
+          "binary_bytes": 54734560,
+          "mode_bits": 509,
+          "executable": true,
+          "profile": "release"
+        },
+        "environment": {
+          "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+          "git_revision": "6e98db9ece29c1e50241cf3e84c9410ce71dd748",
+          "git_worktree_dirty": false,
+          "logical_cpus_available": 1,
+          "allocator": "CountingSystemAllocator(std::alloc::System)",
+          "rustflags": null,
+          "cargo_build_target": null,
+          "perf_event_paranoid": "1",
+          "os": "linux",
+          "kernel": "Linux 7.0.0-1011-aws",
+          "cpu_model": "AMD EPYC 9R45",
+          "total_memory_bytes": 132553797632,
+          "page_size_bytes": 4096,
+          "filesystem_type": null,
+          "source_destination_same_device": null,
+          "cpu_affinity": "2",
+          "storage_identifier": null
+        },
+        "rows": [
+          {
+            "parts": 256,
+            "shape": "parts_256",
+            "corpus": {
+              "name": "opc-casefold-parts_256",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 258,
+              "archive_bytes": 42217,
+              "archive_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "4d29aa5866bfbd4bfbf1856078b7bb1e47364cd4b7c295847cc10fbaa4d6f357",
+              "owned_exact_source_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+              "canonical_name_oracle_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+              "output_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 851704,
+              "p50": 854509,
+              "mean": 855474.1666666667,
+              "p95": 859434,
+              "p99": 876284,
+              "max": 876284,
+              "standard_deviation": 4453.566351490286,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 853811.3643840144,
+                "upper": 857136.9689493191
+              },
+              "sample_vector_sha256": "bcec05f6de1dad44f3367f56cae2e5a37f1106052276cb977a3faa073c7de5de"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                128,
+                255,
+                0,
+                128,
+                255,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+              "observed_output_sha256_unique": [
+                "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "4d29aa5866bfbd4bfbf1856078b7bb1e47364cd4b7c295847cc10fbaa4d6f357"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            },
+            "allocation_vector_digests": {
+              "allocation_calls": "fdd2a8f150defbfc0116c0966c89fd5692088d2d5f5baef10c98c8a6eb2e216b",
+              "deallocation_calls": "13321efa97a3a548031e715f6e1fc4d459ad1934fbb23bcf14740daa01dd1a6d",
+              "reallocation_calls": "409e75674d6abf6cba605c2925d795275bf626f62350deb3d725324bbcfb335b",
+              "failed_allocation_calls": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+              "allocated_bytes": "d7412f016074c6e737df69f37c2f39ab17c8ada8a0601d1e9ef34ffaa77e23c8",
+              "deallocated_bytes": "478fc2b0270ecaf7a9fa2664dec27b9700edb2dacfac0a7208176eaa8ba8c190",
+              "live_bytes_before": "8123029d87978d67784cfdfc73546e23d1b9e785fa9a22c361931a2d08c2a915",
+              "live_bytes_after": "dd23b0c062eb0b4e6eefcc3017b3b42bbc7eeeef6fca7e138ccb0610ef58e2de",
+              "peak_live_bytes_before": "23893ae5c59574d7b784b4332f8ab902a707ad3f5549f2418fa9d90ecb31d50e",
+              "peak_live_bytes_after": "23893ae5c59574d7b784b4332f8ab902a707ad3f5549f2418fa9d90ecb31d50e"
+            }
+          },
+          {
+            "parts": 2047,
+            "shape": "parts_2047",
+            "corpus": {
+              "name": "opc-casefold-parts_2047",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 2049,
+              "archive_bytes": 332359,
+              "archive_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "e627ffd5e402a6e2217aeedb5def6fbc319264a0925d4d25cba29912dbb7b264",
+              "owned_exact_source_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+              "canonical_name_oracle_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+              "output_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 6818961,
+              "p50": 6852130,
+              "mean": 6850868.900000001,
+              "p95": 6874270,
+              "p99": 6881631,
+              "max": 6881631,
+              "standard_deviation": 14144.151564247313,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 6845587.980024634,
+                "upper": 6856149.819975369
+              },
+              "sample_vector_sha256": "3742bffc23ccb33b93a0af573bf143e39e830d284617e91aa478925aefdba5ea"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                1023,
+                2046,
+                0,
+                1023,
+                2046,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+              "observed_output_sha256_unique": [
+                "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "e627ffd5e402a6e2217aeedb5def6fbc319264a0925d4d25cba29912dbb7b264"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            },
+            "allocation_vector_digests": {
+              "allocation_calls": "254273eb814d1ead1a6bb23544656f0e8c3c6549b9756fc05580e1f5bbad0916",
+              "deallocation_calls": "f0841462be9caa6c5a74b6ed11f274b0b927192a0960a477dacdf06a77180a6a",
+              "reallocation_calls": "f3b125f2d43e50fecdb708fdad0c343a3f5136e823ff563b76cc29aae973cb36",
+              "failed_allocation_calls": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+              "allocated_bytes": "b29ca8f6534cf3fd6be92ad972a353d8b093f78d66b73c8da420a4337dc0da8e",
+              "deallocated_bytes": "a571cbecf6fd088ff53a1149a648b3a8ffe84eeb433f423f2acecaa71a91fbd0",
+              "live_bytes_before": "9daebee0964adaf30f622c322ba0240fca32239c72c1d4cf2f66a06f98728f1d",
+              "live_bytes_after": "56e7bd0944ab7e41243cd0a0b31c5c1ca030ae8442e2e0c4948003489397f7bd",
+              "peak_live_bytes_before": "d8ff144dd6e5b109d435d7a9ea1c1fe96b345f1012380e212dd8769a9396ae4d",
+              "peak_live_bytes_after": "d8ff144dd6e5b109d435d7a9ea1c1fe96b345f1012380e212dd8769a9396ae4d"
+            }
+          },
+          {
+            "parts": 2048,
+            "shape": "parts_2048",
+            "corpus": {
+              "name": "opc-casefold-parts_2048",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 2050,
+              "archive_bytes": 332521,
+              "archive_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "fb513dea41b071a231935465dfcec61d6c1fe3c9b9510d15b04e8ca267d65761",
+              "owned_exact_source_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+              "canonical_name_oracle_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+              "output_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 6814870,
+              "p50": 6851265,
+              "mean": 6852767.433333332,
+              "p95": 6885140,
+              "p99": 6922131,
+              "max": 6922131,
+              "standard_deviation": 19895.210925529038,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 6845339.273622688,
+                "upper": 6860195.5930439755
+              },
+              "sample_vector_sha256": "f276a242dc3c76c3cbf8d87ebb3402dd415a30d64b74b356aa611e94aa2ce5f5"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                1024,
+                2047,
+                0,
+                1024,
+                2047,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+              "observed_output_sha256_unique": [
+                "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "fb513dea41b071a231935465dfcec61d6c1fe3c9b9510d15b04e8ca267d65761"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            },
+            "allocation_vector_digests": {
+              "allocation_calls": "fc7a1067852ac1d1e995af51fd958cabe8f8930a0070971e1ebf026704a664fe",
+              "deallocation_calls": "6e2fdabe735cdbf1895223c282708324e4c34ddad88051b7eb9154b4f1c93fd5",
+              "reallocation_calls": "41fa706682876ffa514d72718fcdad060c9387f6472b8fbed38c45bb64daaa9a",
+              "failed_allocation_calls": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+              "allocated_bytes": "f17a39aa5dd91335b8333576d0fea38a65a7c164d6ed4cf8f28cd23b590ceb01",
+              "deallocated_bytes": "41e304dbf1a628fac7f3266d533cb7f5cb52115f9ea017b098bbd4e740732c2c",
+              "live_bytes_before": "a2ecd4d28bd30ae6aeeba86f4d7e18396afc2b4c7eb4ab47cf340b26916b9397",
+              "live_bytes_after": "40de2e3941f416faca23a955dc867361af78bda00a337ff8d410a7bc30e472da",
+              "peak_live_bytes_before": "53feb0cd419fbdae532178c3cc313c7730087b433725412262b45c69770e2863",
+              "peak_live_bytes_after": "53feb0cd419fbdae532178c3cc313c7730087b433725412262b45c69770e2863"
+            }
+          },
+          {
+            "parts": 16384,
+            "shape": "parts_16384",
+            "corpus": {
+              "name": "opc-casefold-parts_16384",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 16386,
+              "archive_bytes": 2654953,
+              "archive_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "b613ccd8ee7ff1e9b7aebdb4319ced1abf72c721b7aaf18044a14a82470aeeb8",
+              "owned_exact_source_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+              "canonical_name_oracle_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+              "output_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 63270822,
+              "p50": 64552043,
+              "mean": 65056710.233333334,
+              "p95": 66330866,
+              "p99": 74243811,
+              "max": 74243811,
+              "standard_deviation": 1930428.017195037,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 64335957.50166834,
+                "upper": 65777462.96499833
+              },
+              "sample_vector_sha256": "3929ae8220d4a4907bfd383b592563ee9f9ad1843da03c0554a2fcb07f1c6117"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                8192,
+                16383,
+                0,
+                8192,
+                16383,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+              "observed_output_sha256_unique": [
+                "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "b613ccd8ee7ff1e9b7aebdb4319ced1abf72c721b7aaf18044a14a82470aeeb8"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            },
+            "allocation_vector_digests": {
+              "allocation_calls": "d0c698ce993649b18079cb29911c88d006a4aec600f354f93e6b38f1aa409c44",
+              "deallocation_calls": "5a751cd23c0cd692ad416681fd408f6b1e638a1ea6d2b1453e20b4ebf59a59e8",
+              "reallocation_calls": "3d89987eff3f10f092a7b5639dc2fd5f9bc33b71527ef761897bf3aa50f899db",
+              "failed_allocation_calls": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+              "allocated_bytes": "c7816028be0c4950f7148df3cf666d8aee8516dec8458e702a9f8b0f4e7a350f",
+              "deallocated_bytes": "10d850b584ee53291f2327f7e4299ebd1b4126763f219568e4f4ca26e05915b5",
+              "live_bytes_before": "0358ccb33e0a469897e4463d03c1d814c61548f14ed9fd21755c8ed433fce681",
+              "live_bytes_after": "35da79d0b65172cf00012f8303b858d819b9541caff6f65941e40f45fef59e58",
+              "peak_live_bytes_before": "27e1cb15ee8b7d12b0703a66b0f1e1417a03b7069bbac6d6197ae5544fedfa3a",
+              "peak_live_bytes_after": "27e1cb15ee8b7d12b0703a66b0f1e1417a03b7069bbac6d6197ae5544fedfa3a"
+            }
+          }
+        ],
+        "catalog_identity": {
+          "catalog_id": "litchi-perf-corpus-v2",
+          "manifest_version": 2,
+          "catalog_sha256": "4200b1f01f01be7960eb35bc19d1c585476c47304153d03108252bbf891ea0be",
+          "content_set_sha256": "a7f63920c0fb28718efeb19e6a1be759268c0e856492085bff2db28b1ea7c9f3",
+          "case_binding_count": 4
+        }
+      },
+      "B1": {
+        "report": "raw/allocator/b1-candidate.json.zst",
+        "catalog": "raw/allocator/b1-candidate.catalog.json.zst",
+        "source_report": "/tmp/litchi-0397-VYmAwG/results/allocator/b1-candidate.json",
+        "source_catalog": "/tmp/litchi-0397-VYmAwG/results/allocator/b1-candidate.catalog.json",
+        "report_raw_sha256": "22b6278edab03bd36b57fad31050e372952fe28393cb1c0cecffd55fe5804e38",
+        "report_raw_bytes": 130742,
+        "catalog_raw_sha256": "7dcb409ff87772e19230258f122d088a98561320b23a01528bcf9314a6f2000f",
+        "catalog_raw_bytes": 17179,
+        "revision": "f20d3f417edc3f3da07bf515676b8e71285ad76f",
+        "binary_identity": {
+          "path": "/tmp/litchi-0397-VYmAwG/candidate-target/release/litchi-perf-baseline-alloc",
+          "binary_sha256": "595bc9ea0e0925bb67ec1e611140fe5a8b82b1d263ed55aae4fe674c3648820f",
+          "binary_bytes": 54745880,
+          "mode_bits": 509,
+          "executable": true,
+          "profile": "release"
+        },
+        "environment": {
+          "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+          "git_revision": "f20d3f417edc3f3da07bf515676b8e71285ad76f",
+          "git_worktree_dirty": false,
+          "logical_cpus_available": 1,
+          "allocator": "CountingSystemAllocator(std::alloc::System)",
+          "rustflags": null,
+          "cargo_build_target": null,
+          "perf_event_paranoid": "1",
+          "os": "linux",
+          "kernel": "Linux 7.0.0-1011-aws",
+          "cpu_model": "AMD EPYC 9R45",
+          "total_memory_bytes": 132553797632,
+          "page_size_bytes": 4096,
+          "filesystem_type": null,
+          "source_destination_same_device": null,
+          "cpu_affinity": "2",
+          "storage_identifier": null
+        },
+        "rows": [
+          {
+            "parts": 256,
+            "shape": "parts_256",
+            "corpus": {
+              "name": "opc-casefold-parts_256",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 258,
+              "archive_bytes": 42217,
+              "archive_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "4d29aa5866bfbd4bfbf1856078b7bb1e47364cd4b7c295847cc10fbaa4d6f357",
+              "owned_exact_source_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+              "canonical_name_oracle_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+              "output_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 790993,
+              "p50": 798428,
+              "mean": 798650.8333333335,
+              "p95": 805013,
+              "p99": 818704,
+              "max": 818704,
+              "standard_deviation": 4670.875994657845,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 796906.8954074275,
+                "upper": 800394.7712592395
+              },
+              "sample_vector_sha256": "f32fb98001e2c25ff02da346e5275a02f6574bc5e4a94fea487d6c12dcd7f4ff"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                128,
+                255,
+                0,
+                128,
+                255,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+              "observed_output_sha256_unique": [
+                "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "4d29aa5866bfbd4bfbf1856078b7bb1e47364cd4b7c295847cc10fbaa4d6f357"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            },
+            "allocation_vector_digests": {
+              "allocation_calls": "5465ef1d41584ed6b0c75fccc212bdafd15ab0f59f3d0c978ea5866401247b25",
+              "deallocation_calls": "cca4672b2d69c33007d27b6395058bc16363c9b886312877bd55a6d8f5d54ab0",
+              "reallocation_calls": "409e75674d6abf6cba605c2925d795275bf626f62350deb3d725324bbcfb335b",
+              "failed_allocation_calls": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+              "allocated_bytes": "f2dc8022b021f372eebcc851781245b4d6f6e1a09b0ac9bed12b374fc2f007a4",
+              "deallocated_bytes": "ca316f7a5b60cc1f37dba3f60b04b950c15550d14aa6c30218fb79a048325e7f",
+              "live_bytes_before": "ed896c7d00d3b043662d4edb4cada080de4e861de04150f1c0696d769ea9978b",
+              "live_bytes_after": "8ba9e07a6009061a75784ae1ba9ca4abc0bd6d71fb28747f496dede27ace4b90",
+              "peak_live_bytes_before": "1baac413edd695b6ea515f67aeaea628933d2f4a28dbcdafc54f61553c2b94a2",
+              "peak_live_bytes_after": "1baac413edd695b6ea515f67aeaea628933d2f4a28dbcdafc54f61553c2b94a2"
+            }
+          },
+          {
+            "parts": 2047,
+            "shape": "parts_2047",
+            "corpus": {
+              "name": "opc-casefold-parts_2047",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 2049,
+              "archive_bytes": 332359,
+              "archive_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "e627ffd5e402a6e2217aeedb5def6fbc319264a0925d4d25cba29912dbb7b264",
+              "owned_exact_source_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+              "canonical_name_oracle_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+              "output_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 6397099,
+              "p50": 6421464,
+              "mean": 6420677.8,
+              "p95": 6439349,
+              "p99": 6455389,
+              "max": 6455389,
+              "standard_deviation": 13276.057556160233,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 6415720.995258195,
+                "upper": 6425634.604741804
+              },
+              "sample_vector_sha256": "f6f758a01eaed2e978ab0366325cb2d198bd6bf41ae9417c8f5731ffc814f9b0"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                1023,
+                2046,
+                0,
+                1023,
+                2046,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+              "observed_output_sha256_unique": [
+                "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "e627ffd5e402a6e2217aeedb5def6fbc319264a0925d4d25cba29912dbb7b264"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            },
+            "allocation_vector_digests": {
+              "allocation_calls": "80c8f623a4646dce9a4525c4001077efcb4713898cf8f9b6a27f1ce8cfbd0a12",
+              "deallocation_calls": "d771f6f80c46fafd7514d6f6533b7d4fe7eb3a66bddcbfea6b73799c15a0c4e8",
+              "reallocation_calls": "f3b125f2d43e50fecdb708fdad0c343a3f5136e823ff563b76cc29aae973cb36",
+              "failed_allocation_calls": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+              "allocated_bytes": "7b162cedd092249de094aced81d8a54915b6108c616ae0b8a20d04100b5bef67",
+              "deallocated_bytes": "4c782b0b8e7fb466205f5d8be88d0c62dbd36a62afa9e59e28df5f63d69a7572",
+              "live_bytes_before": "20c1e4c4f80b4d451b139d2922bc6b1e6564cdb87641b35fe4d8bfe6dcedef2f",
+              "live_bytes_after": "222b09fd63628c26964ae164bc68a7e30b46a8ed305d551d34068b9f70c49ced",
+              "peak_live_bytes_before": "822553098bf04b5d87613a55b35c5164d20332e3a2eb62e82848e356489eed30",
+              "peak_live_bytes_after": "822553098bf04b5d87613a55b35c5164d20332e3a2eb62e82848e356489eed30"
+            }
+          },
+          {
+            "parts": 2048,
+            "shape": "parts_2048",
+            "corpus": {
+              "name": "opc-casefold-parts_2048",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 2050,
+              "archive_bytes": 332521,
+              "archive_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "fb513dea41b071a231935465dfcec61d6c1fe3c9b9510d15b04e8ca267d65761",
+              "owned_exact_source_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+              "canonical_name_oracle_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+              "output_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 6408898,
+              "p50": 6424353,
+              "mean": 6424881.933333332,
+              "p95": 6443479,
+              "p99": 6446789,
+              "max": 6446789,
+              "standard_deviation": 9549.24978794964,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 6421316.585229849,
+                "upper": 6428447.281436814
+              },
+              "sample_vector_sha256": "33cc4df44cbf91dac5b0fc4127334aa4b7d1e6cb4cf4d091a2857b8303e2d369"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                1024,
+                2047,
+                0,
+                1024,
+                2047,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+              "observed_output_sha256_unique": [
+                "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "fb513dea41b071a231935465dfcec61d6c1fe3c9b9510d15b04e8ca267d65761"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            },
+            "allocation_vector_digests": {
+              "allocation_calls": "8c5068d5b3336b2a979056438f97fdd9494996a3bd17822bc5e94df6fed7fd65",
+              "deallocation_calls": "bced8de8576168f1f306869cf7cbe05e0cc58358212d6f063cd23f900f5df6d3",
+              "reallocation_calls": "41fa706682876ffa514d72718fcdad060c9387f6472b8fbed38c45bb64daaa9a",
+              "failed_allocation_calls": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+              "allocated_bytes": "ba69fbd83d46b5e700641786f84269a64bf980d738d9997c11b0f90095c78e93",
+              "deallocated_bytes": "187be07b14cccb689f2eb0b1f0841d25dea15913ceb1f653d9f24d9abdac0e87",
+              "live_bytes_before": "370b84474b74bc2431db81fe7e727b76b1da7f64742e4619174225b8f3c37d8b",
+              "live_bytes_after": "7852a3f63a119ad6176955669aa2eee7226c2981eba6334768ddaee70bb7dece",
+              "peak_live_bytes_before": "8ed02f9aa638d3a4e0aa36e7eacdd544e5c0221a4eb843bced7280ae5ecd4c52",
+              "peak_live_bytes_after": "8ed02f9aa638d3a4e0aa36e7eacdd544e5c0221a4eb843bced7280ae5ecd4c52"
+            }
+          },
+          {
+            "parts": 16384,
+            "shape": "parts_16384",
+            "corpus": {
+              "name": "opc-casefold-parts_16384",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 16386,
+              "archive_bytes": 2654953,
+              "archive_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "b613ccd8ee7ff1e9b7aebdb4319ced1abf72c721b7aaf18044a14a82470aeeb8",
+              "owned_exact_source_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+              "canonical_name_oracle_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+              "output_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 59486195,
+              "p50": 60431200,
+              "mean": 60521447.76666666,
+              "p95": 61508675,
+              "p99": 61917586,
+              "max": 61917586,
+              "standard_deviation": 644141.1534189655,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 60280948.51377084,
+                "upper": 60761947.019562475
+              },
+              "sample_vector_sha256": "b53ef73d7a17b24f4250ca5b074c63d825eb972fb109ef9a07fd9dbfe241e60e"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                8192,
+                16383,
+                0,
+                8192,
+                16383,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+              "observed_output_sha256_unique": [
+                "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "b613ccd8ee7ff1e9b7aebdb4319ced1abf72c721b7aaf18044a14a82470aeeb8"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            },
+            "allocation_vector_digests": {
+              "allocation_calls": "e7afb3a4de3402091469b648b7f97d74edc87aba068755af50082b54cefd524b",
+              "deallocation_calls": "0812cf0a4671cfe284f8d283e16cc3a63493ade6be92455f333f2441467d0ac5",
+              "reallocation_calls": "3d89987eff3f10f092a7b5639dc2fd5f9bc33b71527ef761897bf3aa50f899db",
+              "failed_allocation_calls": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+              "allocated_bytes": "2d3359fdf410589bbdd411380e4bacd548181ddfe396184272889d253f820505",
+              "deallocated_bytes": "874e3876fc0e0f49546b25a1682733ab25188bcebc422dc55636b4173d677a4a",
+              "live_bytes_before": "b7b3eaf49998775fbb005ae4a552df229473e05eb55a5f072d7a2d8a8e0bc28c",
+              "live_bytes_after": "5c8cf77f40f637ccd7de3a4de16aa5d0b89a198b70fee107a65dfa32aa9529b2",
+              "peak_live_bytes_before": "a05de968ad4eb7f2e5b97ef238b5521dbdb4f4ed0e395fc79ba0ecfdbaf92c90",
+              "peak_live_bytes_after": "a05de968ad4eb7f2e5b97ef238b5521dbdb4f4ed0e395fc79ba0ecfdbaf92c90"
+            }
+          }
+        ],
+        "catalog_identity": {
+          "catalog_id": "litchi-perf-corpus-v2",
+          "manifest_version": 2,
+          "catalog_sha256": "a4b4a4da1632071e6a30e7bfacf9f5fea235cf7c7c620949264ab3adff7a8809",
+          "content_set_sha256": "a7f63920c0fb28718efeb19e6a1be759268c0e856492085bff2db28b1ea7c9f3",
+          "case_binding_count": 4
+        }
+      },
+      "B2": {
+        "report": "raw/allocator/b2-candidate.json.zst",
+        "catalog": "raw/allocator/b2-candidate.catalog.json.zst",
+        "source_report": "/tmp/litchi-0397-VYmAwG/results/allocator/b2-candidate.json",
+        "source_catalog": "/tmp/litchi-0397-VYmAwG/results/allocator/b2-candidate.catalog.json",
+        "report_raw_sha256": "8f4ab5245894ce4c175b2471a9e9ef2919d0e760eb144f7810f86e4f763b3059",
+        "report_raw_bytes": 130753,
+        "catalog_raw_sha256": "7dcb409ff87772e19230258f122d088a98561320b23a01528bcf9314a6f2000f",
+        "catalog_raw_bytes": 17179,
+        "revision": "f20d3f417edc3f3da07bf515676b8e71285ad76f",
+        "binary_identity": {
+          "path": "/tmp/litchi-0397-VYmAwG/candidate-target/release/litchi-perf-baseline-alloc",
+          "binary_sha256": "595bc9ea0e0925bb67ec1e611140fe5a8b82b1d263ed55aae4fe674c3648820f",
+          "binary_bytes": 54745880,
+          "mode_bits": 509,
+          "executable": true,
+          "profile": "release"
+        },
+        "environment": {
+          "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+          "git_revision": "f20d3f417edc3f3da07bf515676b8e71285ad76f",
+          "git_worktree_dirty": false,
+          "logical_cpus_available": 1,
+          "allocator": "CountingSystemAllocator(std::alloc::System)",
+          "rustflags": null,
+          "cargo_build_target": null,
+          "perf_event_paranoid": "1",
+          "os": "linux",
+          "kernel": "Linux 7.0.0-1011-aws",
+          "cpu_model": "AMD EPYC 9R45",
+          "total_memory_bytes": 132553797632,
+          "page_size_bytes": 4096,
+          "filesystem_type": null,
+          "source_destination_same_device": null,
+          "cpu_affinity": "2",
+          "storage_identifier": null
+        },
+        "rows": [
+          {
+            "parts": 256,
+            "shape": "parts_256",
+            "corpus": {
+              "name": "opc-casefold-parts_256",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 258,
+              "archive_bytes": 42217,
+              "archive_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "4d29aa5866bfbd4bfbf1856078b7bb1e47364cd4b7c295847cc10fbaa4d6f357",
+              "owned_exact_source_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+              "canonical_name_oracle_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+              "output_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 786954,
+              "p50": 796208,
+              "mean": 796281.9333333333,
+              "p95": 802534,
+              "p99": 810834,
+              "max": 810834,
+              "standard_deviation": 4392.637114876218,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 794641.8798469773,
+                "upper": 797921.9868196894
+              },
+              "sample_vector_sha256": "20b9adb988085277e0a4847e087a628bf5c4cd93642d77195bfdc772b9889dd7"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                128,
+                255,
+                0,
+                128,
+                255,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+              "observed_output_sha256_unique": [
+                "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "4d29aa5866bfbd4bfbf1856078b7bb1e47364cd4b7c295847cc10fbaa4d6f357"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            },
+            "allocation_vector_digests": {
+              "allocation_calls": "5465ef1d41584ed6b0c75fccc212bdafd15ab0f59f3d0c978ea5866401247b25",
+              "deallocation_calls": "cca4672b2d69c33007d27b6395058bc16363c9b886312877bd55a6d8f5d54ab0",
+              "reallocation_calls": "409e75674d6abf6cba605c2925d795275bf626f62350deb3d725324bbcfb335b",
+              "failed_allocation_calls": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+              "allocated_bytes": "f2dc8022b021f372eebcc851781245b4d6f6e1a09b0ac9bed12b374fc2f007a4",
+              "deallocated_bytes": "ca316f7a5b60cc1f37dba3f60b04b950c15550d14aa6c30218fb79a048325e7f",
+              "live_bytes_before": "3ba801a9d6a1decb6538e49f9f44b008827fc560d64c511cc1ee9ad385312c4d",
+              "live_bytes_after": "73f29fc49ca03b36ec1f40fbefb821b1d95b97d52e002d0a78dd79ef8763d100",
+              "peak_live_bytes_before": "1baac413edd695b6ea515f67aeaea628933d2f4a28dbcdafc54f61553c2b94a2",
+              "peak_live_bytes_after": "1baac413edd695b6ea515f67aeaea628933d2f4a28dbcdafc54f61553c2b94a2"
+            }
+          },
+          {
+            "parts": 2047,
+            "shape": "parts_2047",
+            "corpus": {
+              "name": "opc-casefold-parts_2047",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 2049,
+              "archive_bytes": 332359,
+              "archive_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "e627ffd5e402a6e2217aeedb5def6fbc319264a0925d4d25cba29912dbb7b264",
+              "owned_exact_source_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+              "canonical_name_oracle_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+              "output_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 6388868,
+              "p50": 6407713,
+              "mean": 6408419.133333334,
+              "p95": 6426259,
+              "p99": 6437559,
+              "max": 6437559,
+              "standard_deviation": 11189.545529377869,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 6404241.357506133,
+                "upper": 6412596.909160535
+              },
+              "sample_vector_sha256": "6060f5873d881665a727c1caf5de6bbe86754c801b0bc97cba42e72d0e92b2e2"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                1023,
+                2046,
+                0,
+                1023,
+                2046,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+              "observed_output_sha256_unique": [
+                "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "e627ffd5e402a6e2217aeedb5def6fbc319264a0925d4d25cba29912dbb7b264"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            },
+            "allocation_vector_digests": {
+              "allocation_calls": "80c8f623a4646dce9a4525c4001077efcb4713898cf8f9b6a27f1ce8cfbd0a12",
+              "deallocation_calls": "d771f6f80c46fafd7514d6f6533b7d4fe7eb3a66bddcbfea6b73799c15a0c4e8",
+              "reallocation_calls": "f3b125f2d43e50fecdb708fdad0c343a3f5136e823ff563b76cc29aae973cb36",
+              "failed_allocation_calls": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+              "allocated_bytes": "7b162cedd092249de094aced81d8a54915b6108c616ae0b8a20d04100b5bef67",
+              "deallocated_bytes": "4c782b0b8e7fb466205f5d8be88d0c62dbd36a62afa9e59e28df5f63d69a7572",
+              "live_bytes_before": "6454e3dcd064f76cbd6db5416e5304e59864c16e3432cc716df80c1cda96e342",
+              "live_bytes_after": "18d37dbe69fa639a691a3b9fe84944298c2017d32046fce4f3830c3ca8cc55f2",
+              "peak_live_bytes_before": "822553098bf04b5d87613a55b35c5164d20332e3a2eb62e82848e356489eed30",
+              "peak_live_bytes_after": "822553098bf04b5d87613a55b35c5164d20332e3a2eb62e82848e356489eed30"
+            }
+          },
+          {
+            "parts": 2048,
+            "shape": "parts_2048",
+            "corpus": {
+              "name": "opc-casefold-parts_2048",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 2050,
+              "archive_bytes": 332521,
+              "archive_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "fb513dea41b071a231935465dfcec61d6c1fe3c9b9510d15b04e8ca267d65761",
+              "owned_exact_source_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+              "canonical_name_oracle_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+              "output_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 6381798,
+              "p50": 6405729,
+              "mean": 6406768.333333333,
+              "p95": 6422479,
+              "p99": 6429409,
+              "max": 6429409,
+              "standard_deviation": 11056.023473992485,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 6402640.409862863,
+                "upper": 6410896.256803803
+              },
+              "sample_vector_sha256": "57fccf83679db21d1883ed59bd9b497c70f07e8178d727672e48f1160db1c053"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                1024,
+                2047,
+                0,
+                1024,
+                2047,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+              "observed_output_sha256_unique": [
+                "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "fb513dea41b071a231935465dfcec61d6c1fe3c9b9510d15b04e8ca267d65761"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            },
+            "allocation_vector_digests": {
+              "allocation_calls": "8c5068d5b3336b2a979056438f97fdd9494996a3bd17822bc5e94df6fed7fd65",
+              "deallocation_calls": "bced8de8576168f1f306869cf7cbe05e0cc58358212d6f063cd23f900f5df6d3",
+              "reallocation_calls": "41fa706682876ffa514d72718fcdad060c9387f6472b8fbed38c45bb64daaa9a",
+              "failed_allocation_calls": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+              "allocated_bytes": "ba69fbd83d46b5e700641786f84269a64bf980d738d9997c11b0f90095c78e93",
+              "deallocated_bytes": "187be07b14cccb689f2eb0b1f0841d25dea15913ceb1f653d9f24d9abdac0e87",
+              "live_bytes_before": "3a276abf63dcbeffaa3ccd4c2c958a396605aa32c5bed47700ba76024755f0f8",
+              "live_bytes_after": "020d87e48c1e57d5848190ae3da37a5d8c5fb672168051969b2940fcd846e7f2",
+              "peak_live_bytes_before": "8ed02f9aa638d3a4e0aa36e7eacdd544e5c0221a4eb843bced7280ae5ecd4c52",
+              "peak_live_bytes_after": "8ed02f9aa638d3a4e0aa36e7eacdd544e5c0221a4eb843bced7280ae5ecd4c52"
+            }
+          },
+          {
+            "parts": 16384,
+            "shape": "parts_16384",
+            "corpus": {
+              "name": "opc-casefold-parts_16384",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 16386,
+              "archive_bytes": 2654953,
+              "archive_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "b613ccd8ee7ff1e9b7aebdb4319ced1abf72c721b7aaf18044a14a82470aeeb8",
+              "owned_exact_source_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+              "canonical_name_oracle_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+              "output_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 59608426,
+              "p50": 61167690,
+              "mean": 61318558.13333333,
+              "p95": 63259300,
+              "p99": 63444772,
+              "max": 63444772,
+              "standard_deviation": 1019079.3984370485,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 60938070.358775295,
+                "upper": 61699045.90789137
+              },
+              "sample_vector_sha256": "b39815bd4d7360aa8602ba665cdbccfdd53c462d2fc0725047650b40144dbe5d"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                8192,
+                16383,
+                0,
+                8192,
+                16383,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+              "observed_output_sha256_unique": [
+                "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "b613ccd8ee7ff1e9b7aebdb4319ced1abf72c721b7aaf18044a14a82470aeeb8"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            },
+            "allocation_vector_digests": {
+              "allocation_calls": "e7afb3a4de3402091469b648b7f97d74edc87aba068755af50082b54cefd524b",
+              "deallocation_calls": "0812cf0a4671cfe284f8d283e16cc3a63493ade6be92455f333f2441467d0ac5",
+              "reallocation_calls": "3d89987eff3f10f092a7b5639dc2fd5f9bc33b71527ef761897bf3aa50f899db",
+              "failed_allocation_calls": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+              "allocated_bytes": "2d3359fdf410589bbdd411380e4bacd548181ddfe396184272889d253f820505",
+              "deallocated_bytes": "874e3876fc0e0f49546b25a1682733ab25188bcebc422dc55636b4173d677a4a",
+              "live_bytes_before": "f82e77a45124627261d5fca546557cb1d511a595bb5f55c2f07ebfab73c7d449",
+              "live_bytes_after": "7b063ec9e5944fe6200d05693e7c737bd5894eeb734b6d170c48831349083417",
+              "peak_live_bytes_before": "a05de968ad4eb7f2e5b97ef238b5521dbdb4f4ed0e395fc79ba0ecfdbaf92c90",
+              "peak_live_bytes_after": "a05de968ad4eb7f2e5b97ef238b5521dbdb4f4ed0e395fc79ba0ecfdbaf92c90"
+            }
+          }
+        ],
+        "catalog_identity": {
+          "catalog_id": "litchi-perf-corpus-v2",
+          "manifest_version": 2,
+          "catalog_sha256": "a4b4a4da1632071e6a30e7bfacf9f5fea235cf7c7c620949264ab3adff7a8809",
+          "content_set_sha256": "a7f63920c0fb28718efeb19e6a1be759268c0e856492085bff2db28b1ea7c9f3",
+          "case_binding_count": 4
+        }
+      },
+      "A2": {
+        "report": "raw/allocator/a2-control.json.zst",
+        "catalog": "raw/allocator/a2-control.catalog.json.zst",
+        "source_report": "/tmp/litchi-0397-VYmAwG/results/allocator/a2-control.json",
+        "source_catalog": "/tmp/litchi-0397-VYmAwG/results/allocator/a2-control.catalog.json",
+        "report_raw_sha256": "57f1d6a0a5cf5f9dfaf4a2afcbebb3a0387988f93c8a834711bb5ca6ba94d511",
+        "report_raw_bytes": 130770,
+        "catalog_raw_sha256": "144508746bd96ff79b47e3575634cb895832b993add383618d2681ebc30e39e6",
+        "catalog_raw_bytes": 17179,
+        "revision": "6e98db9ece29c1e50241cf3e84c9410ce71dd748",
+        "binary_identity": {
+          "path": "/tmp/litchi-0397-VYmAwG/control-target/release/litchi-perf-baseline-alloc",
+          "binary_sha256": "6fb6aa7ccc0a07ed61d16d87886b153afa1d4ea1d3bb4b1cfa7ed0b5c7eeb9fa",
+          "binary_bytes": 54734560,
+          "mode_bits": 509,
+          "executable": true,
+          "profile": "release"
+        },
+        "environment": {
+          "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+          "git_revision": "6e98db9ece29c1e50241cf3e84c9410ce71dd748",
+          "git_worktree_dirty": false,
+          "logical_cpus_available": 1,
+          "allocator": "CountingSystemAllocator(std::alloc::System)",
+          "rustflags": null,
+          "cargo_build_target": null,
+          "perf_event_paranoid": "1",
+          "os": "linux",
+          "kernel": "Linux 7.0.0-1011-aws",
+          "cpu_model": "AMD EPYC 9R45",
+          "total_memory_bytes": 132553797632,
+          "page_size_bytes": 4096,
+          "filesystem_type": null,
+          "source_destination_same_device": null,
+          "cpu_affinity": "2",
+          "storage_identifier": null
+        },
+        "rows": [
+          {
+            "parts": 256,
+            "shape": "parts_256",
+            "corpus": {
+              "name": "opc-casefold-parts_256",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 258,
+              "archive_bytes": 42217,
+              "archive_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "4d29aa5866bfbd4bfbf1856078b7bb1e47364cd4b7c295847cc10fbaa4d6f357",
+              "owned_exact_source_sha256": "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324",
+              "canonical_name_oracle_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+              "output_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 851884,
+              "p50": 855324,
+              "mean": 855350.4666666663,
+              "p95": 858454,
+              "p99": 861254,
+              "max": 861254,
+              "standard_deviation": 2005.943680808417,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 854601.5190889112,
+                "upper": 856099.4142444214
+              },
+              "sample_vector_sha256": "ec04af335fa2da94bb8ffb96ea4575af15a159d0aaae17dd2816ea25e76811b5"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                128,
+                255,
+                0,
+                128,
+                255,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9",
+              "observed_output_sha256_unique": [
+                "68bfa39a97c9d837c91a8667892bd3c0230d295c5327a84f7520b8ab02cd08b9"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "4d29aa5866bfbd4bfbf1856078b7bb1e47364cd4b7c295847cc10fbaa4d6f357"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "fd32addf3bc8e02da4e0c848844a194fc16e7fc14c3296b0f07fab7c7a6b5324"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            },
+            "allocation_vector_digests": {
+              "allocation_calls": "fdd2a8f150defbfc0116c0966c89fd5692088d2d5f5baef10c98c8a6eb2e216b",
+              "deallocation_calls": "13321efa97a3a548031e715f6e1fc4d459ad1934fbb23bcf14740daa01dd1a6d",
+              "reallocation_calls": "409e75674d6abf6cba605c2925d795275bf626f62350deb3d725324bbcfb335b",
+              "failed_allocation_calls": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+              "allocated_bytes": "d7412f016074c6e737df69f37c2f39ab17c8ada8a0601d1e9ef34ffaa77e23c8",
+              "deallocated_bytes": "478fc2b0270ecaf7a9fa2664dec27b9700edb2dacfac0a7208176eaa8ba8c190",
+              "live_bytes_before": "04c20c111758c959dd8544734691906483f5353e4af7e6f06ae33927486c2cc7",
+              "live_bytes_after": "1c4fcac682537f6e55930b49d069a9857fd0938ab6657b7598fa1aa7ba5adac2",
+              "peak_live_bytes_before": "23893ae5c59574d7b784b4332f8ab902a707ad3f5549f2418fa9d90ecb31d50e",
+              "peak_live_bytes_after": "23893ae5c59574d7b784b4332f8ab902a707ad3f5549f2418fa9d90ecb31d50e"
+            }
+          },
+          {
+            "parts": 2047,
+            "shape": "parts_2047",
+            "corpus": {
+              "name": "opc-casefold-parts_2047",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 2049,
+              "archive_bytes": 332359,
+              "archive_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "e627ffd5e402a6e2217aeedb5def6fbc319264a0925d4d25cba29912dbb7b264",
+              "owned_exact_source_sha256": "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a",
+              "canonical_name_oracle_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+              "output_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 6832260,
+              "p50": 6854265,
+              "mean": 6867971.033333335,
+              "p95": 6953751,
+              "p99": 6999131,
+              "max": 6999131,
+              "standard_deviation": 36840.02794888544,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 6854216.285400617,
+                "upper": 6881725.781266053
+              },
+              "sample_vector_sha256": "0e81434f259e9eee3c1e4943b3561e6781e62ced831862133be0f3996fc3dfbb"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                1023,
+                2046,
+                0,
+                1023,
+                2046,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f",
+              "observed_output_sha256_unique": [
+                "f96278805e54bdf67f62efc0d9b09782988ca60007c602153f2b0498c217016f"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "e627ffd5e402a6e2217aeedb5def6fbc319264a0925d4d25cba29912dbb7b264"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "3e8bdc575465ff95a1fa851d85e45b098629030ffb6960cc135eb5599317622a"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            },
+            "allocation_vector_digests": {
+              "allocation_calls": "254273eb814d1ead1a6bb23544656f0e8c3c6549b9756fc05580e1f5bbad0916",
+              "deallocation_calls": "f0841462be9caa6c5a74b6ed11f274b0b927192a0960a477dacdf06a77180a6a",
+              "reallocation_calls": "f3b125f2d43e50fecdb708fdad0c343a3f5136e823ff563b76cc29aae973cb36",
+              "failed_allocation_calls": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+              "allocated_bytes": "b29ca8f6534cf3fd6be92ad972a353d8b093f78d66b73c8da420a4337dc0da8e",
+              "deallocated_bytes": "a571cbecf6fd088ff53a1149a648b3a8ffe84eeb433f423f2acecaa71a91fbd0",
+              "live_bytes_before": "cac9df9fb1d0ebf130abac1b1d077c3d7f93171dba8199c1a210616d78c4372b",
+              "live_bytes_after": "4b106ac3f1fd53de83be019f54ef1ee303c83c21aae17439f9aa5c9faf96d1da",
+              "peak_live_bytes_before": "d8ff144dd6e5b109d435d7a9ea1c1fe96b345f1012380e212dd8769a9396ae4d",
+              "peak_live_bytes_after": "d8ff144dd6e5b109d435d7a9ea1c1fe96b345f1012380e212dd8769a9396ae4d"
+            }
+          },
+          {
+            "parts": 2048,
+            "shape": "parts_2048",
+            "corpus": {
+              "name": "opc-casefold-parts_2048",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 2050,
+              "archive_bytes": 332521,
+              "archive_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "fb513dea41b071a231935465dfcec61d6c1fe3c9b9510d15b04e8ca267d65761",
+              "owned_exact_source_sha256": "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9",
+              "canonical_name_oracle_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+              "output_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 6878581,
+              "p50": 6898130,
+              "mean": 6898034.1,
+              "p95": 6914871,
+              "p99": 6922210,
+              "max": 6922210,
+              "standard_deviation": 10146.285559003416,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 6894245.840107496,
+                "upper": 6901822.359892503
+              },
+              "sample_vector_sha256": "cca3acbb01f97242311c9808c345e7f09026ad1b3c97ff03218fe82772504140"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                1024,
+                2047,
+                0,
+                1024,
+                2047,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298",
+              "observed_output_sha256_unique": [
+                "3449d32aa6d80e9cc12fbb1da1e6f5855177af1524250efda687b1ee99391298"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "fb513dea41b071a231935465dfcec61d6c1fe3c9b9510d15b04e8ca267d65761"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "e028fb55caffc98e6795f5c605cc142feeb410c60a7b2d97d43f693642d0b9d9"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            },
+            "allocation_vector_digests": {
+              "allocation_calls": "fc7a1067852ac1d1e995af51fd958cabe8f8930a0070971e1ebf026704a664fe",
+              "deallocation_calls": "6e2fdabe735cdbf1895223c282708324e4c34ddad88051b7eb9154b4f1c93fd5",
+              "reallocation_calls": "41fa706682876ffa514d72718fcdad060c9387f6472b8fbed38c45bb64daaa9a",
+              "failed_allocation_calls": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+              "allocated_bytes": "f17a39aa5dd91335b8333576d0fea38a65a7c164d6ed4cf8f28cd23b590ceb01",
+              "deallocated_bytes": "41e304dbf1a628fac7f3266d533cb7f5cb52115f9ea017b098bbd4e740732c2c",
+              "live_bytes_before": "baaf61d3b6909fbf5e19aef72c4cf24a15003749002c034a28ec13d62d9a8f4b",
+              "live_bytes_after": "fdbc547420d72fbfbca207158e87d85176fc9940436812a11836e4bc030c0c35",
+              "peak_live_bytes_before": "53feb0cd419fbdae532178c3cc313c7730087b433725412262b45c69770e2863",
+              "peak_live_bytes_after": "53feb0cd419fbdae532178c3cc313c7730087b433725412262b45c69770e2863"
+            }
+          },
+          {
+            "parts": 16384,
+            "shape": "parts_16384",
+            "corpus": {
+              "name": "opc-casefold-parts_16384",
+              "generator": "litchi-opc-casefold-lookup-v1",
+              "package_format": "OPC/ZIP",
+              "archive_member_count": 16386,
+              "archive_bytes": 2654953,
+              "archive_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+              "target_entry": "casefold/ordinary-00000.bin",
+              "target_payload_bytes": 32,
+              "target_payload_sha256": "1d955489bd0bccecb2946ab9507b080efc15325dcfd9ea4b03711141081592bb",
+              "owned_payload_sha256": "b613ccd8ee7ff1e9b7aebdb4319ced1abf72c721b7aaf18044a14a82470aeeb8",
+              "owned_exact_source_sha256": "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f",
+              "canonical_name_oracle_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+              "output_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd"
+            },
+            "stats": {
+              "sample_count": 30,
+              "min": 63389121,
+              "p50": 64181644,
+              "mean": 64343518.29999999,
+              "p95": 65740221,
+              "p99": 65826961,
+              "max": 65826961,
+              "standard_deviation": 727028.5126399099,
+              "confidence_interval_95": {
+                "method": "two-sided Student's t interval for the mean",
+                "lower": 64072071.87370695,
+                "upper": 64614964.72629303
+              },
+              "sample_vector_sha256": "3c31c2e81fd46867c312cc7aba147bd6603cc5927fed308bb40d32003abb341b"
+            },
+            "oracles": {
+              "implementation": "OpcPackage",
+              "operation": "owned_open",
+              "timing_scope": "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded",
+              "performance_claim": "none",
+              "query_count": 9,
+              "query_repetitions": 16,
+              "query_classes": [
+                "exact_first",
+                "exact_middle",
+                "exact_last",
+                "case_alias_first",
+                "case_alias_middle",
+                "case_alias_last",
+                "miss_first",
+                "miss_middle",
+                "miss_last"
+              ],
+              "query_positions": [
+                0,
+                8192,
+                16383,
+                0,
+                8192,
+                16383,
+                null,
+                null,
+                null
+              ],
+              "query_expected_found": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false
+              ],
+              "lookup_count": 0,
+              "expected_output_sha256": "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd",
+              "observed_output_sha256_unique": [
+                "86fd877006855b5dd7ee889c0f6ec00c20645ec243d628ae77080d7a416e8cdd"
+              ],
+              "owned_part_count_verified": true,
+              "owned_part_count_sample_count": 30,
+              "owned_payload_sha256_unique": [
+                "b613ccd8ee7ff1e9b7aebdb4319ced1abf72c721b7aaf18044a14a82470aeeb8"
+              ],
+              "owned_exact_source_sha256_unique": [
+                "30fbae2b555faacbb1c5a4fd0308d4874a4c4d74ad506f3aaf884fe1ae03c40f"
+              ],
+              "equivalent_name_corpus_generator": "litchi-opc-casefold-equivalent-name-gate-v1",
+              "equivalent_name_error": "EquivalentPartNames",
+              "malformed_equivalent_name_gate_verified": true,
+              "source_counter_scope": "not_applicable_immutable_owned_slice",
+              "source_read_calls_unique": [],
+              "source_read_bytes_unique": [],
+              "source_version_calls_unique": [],
+              "source_payload_read_calls_unique": [],
+              "source_payload_read_bytes_unique": [],
+              "source_max_in_flight_reads_unique": []
+            },
+            "allocation_vector_digests": {
+              "allocation_calls": "d0c698ce993649b18079cb29911c88d006a4aec600f354f93e6b38f1aa409c44",
+              "deallocation_calls": "5a751cd23c0cd692ad416681fd408f6b1e638a1ea6d2b1453e20b4ebf59a59e8",
+              "reallocation_calls": "3d89987eff3f10f092a7b5639dc2fd5f9bc33b71527ef761897bf3aa50f899db",
+              "failed_allocation_calls": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+              "allocated_bytes": "c7816028be0c4950f7148df3cf666d8aee8516dec8458e702a9f8b0f4e7a350f",
+              "deallocated_bytes": "10d850b584ee53291f2327f7e4299ebd1b4126763f219568e4f4ca26e05915b5",
+              "live_bytes_before": "818532f5a36c3adfcf1b26eafdbb42695c5fe5e635b1af5e604fc3ac2b85ca75",
+              "live_bytes_after": "af0a94fb5373ca8b7b089348be687e4e9143e8cbed237465749e5e738aa0c61d",
+              "peak_live_bytes_before": "27e1cb15ee8b7d12b0703a66b0f1e1417a03b7069bbac6d6197ae5544fedfa3a",
+              "peak_live_bytes_after": "27e1cb15ee8b7d12b0703a66b0f1e1417a03b7069bbac6d6197ae5544fedfa3a"
+            }
+          }
+        ],
+        "catalog_identity": {
+          "catalog_id": "litchi-perf-corpus-v2",
+          "manifest_version": 2,
+          "catalog_sha256": "4200b1f01f01be7960eb35bc19d1c585476c47304153d03108252bbf891ea0be",
+          "content_set_sha256": "a7f63920c0fb28718efeb19e6a1be759268c0e856492085bff2db28b1ea7c9f3",
+          "case_binding_count": 4
+        }
+      }
+    }
+  },
+  "abba_math": {
+    "normal_p50_improvement_percent": {
+      "256": {
+        "A1_to_B1_percent": 8.617829095753123,
+        "A2_to_B2_percent": 8.204676415438511
+      },
+      "2047": {
+        "A1_to_B1_percent": 8.298669539643578,
+        "A2_to_B2_percent": 8.719475706454636
+      },
+      "2048": {
+        "A1_to_B1_percent": 8.945416976070867,
+        "A2_to_B2_percent": 8.268274377423593
+      },
+      "16384": {
+        "A1_to_B1_percent": 4.6486548667546055,
+        "A2_to_B2_percent": 4.348225539841579
+      }
+    },
+    "normal_pooled_p50": {
+      "256": {
+        "control_p50_ns": 625167,
+        "candidate_p50_ns": 572322,
+        "improvement_percent": 8.45294137406485,
+        "sample_count_per_side": 60
+      },
+      "2047": {
+        "control_p50_ns": 5087378,
+        "candidate_p50_ns": 4662241,
+        "improvement_percent": 8.35670162508074,
+        "sample_count_per_side": 60
+      },
+      "2048": {
+        "control_p50_ns": 5095678,
+        "candidate_p50_ns": 4663005,
+        "improvement_percent": 8.490980003053568,
+        "sample_count_per_side": 60
+      },
+      "16384": {
+        "control_p50_ns": 49408900,
+        "candidate_p50_ns": 47113630,
+        "improvement_percent": 4.645458611707607,
+        "sample_count_per_side": 60
+      }
+    },
+    "allocator_p50_observation_percent": {
+      "256": {
+        "A1_to_B1_percent": 6.562950185428123,
+        "A2_to_B2_percent": 6.911532939564423
+      },
+      "2047": {
+        "A1_to_B1_percent": 6.285140532943771,
+        "A2_to_B2_percent": 6.51495091012676
+      },
+      "2048": {
+        "A1_to_B1_percent": 6.231141256395717,
+        "A2_to_B2_percent": 7.138180927294789
+      },
+      "16384": {
+        "A1_to_B1_percent": 6.383753028544735,
+        "A2_to_B2_percent": 4.69597506726378
+      }
+    },
+    "same_implementation_drift_max_percent_as_calculated": {
+      "p50": 1.395,
+      "mean": 1.267,
+      "p95": 1.927,
+      "p99": 3.893,
+      "claim_status": "drift diagnostic only; p99 is withheld"
+    },
+    "formula": "per-leg normal p50 uses A1->B1 and A2->B2; pooled p50 sorts concatenated 60 control/candidate samples per corpus"
+  },
+  "withheld_claims": [
+    "allocator elapsed latency",
+    "p99 latency",
+    "mean or p95 as production acceptance metrics",
+    "validation-constructor timing",
+    "path/from_reader/session timing",
+    "public OwnedPhysPkgReader timing",
+    "RSS/peak operation memory/physical IO/cold-cache/throughput",
+    "other formats/facades or workload generalization"
+  ]
+}

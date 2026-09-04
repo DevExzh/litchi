@@ -1,5 +1,12 @@
 # Performance CRUD coverage
 
+## 2026-09-04: change 0397 adds OPC owned-open evidence
+
+- The opt-in `opc_casefold_owned_open` selector measures only the normal `OpcPackage::from_vec(owned)` constructor over fixed stored corpora with 256, 2,047, 2,048, and 16,384 ordinary 32-byte Parts. It raises the selectable registry from **418** to **419**; the default remains **36 cases / 198 rows**. This is open-path benchmark coverage, not a new CRUD semantic operation or a generalized format/facade claim.
+- CPU-2 A1/B1/B2/A2 ABBA uses one worker, five warmups, and 30 samples under rustc/Cargo/Rustdoc 1.98.1 because pinned 1.95 lacks Cargo. Normal, non-allocator release-binary p50 speedups are positive-faster A1→B1 / A2→B2; the accepted claim is p50 only and allocator-enabled elapsed time is observational. Path, `from_reader`, and session constructor coverage is correctness-only and not separately timed.
+- Exact allocation/deallocation call reductions are `-1,038 / -8,202 / -8,206 / -65,550`, and allocated/deallocated-byte reductions are `-152,024 / -1,212,620 / -1,212,888 / -9,699,800`, in 256 / 2,047 / 2,048 / 16,384 order on each matched leg. Per-sample net-live after-before bytes and reallocations are unchanged; these are allocator vectors, not RSS or peak operation-memory evidence. `performance_claim: scoped`; `claim_authorized: true` only for `OpcPackage::from_vec(owned)` under the stated protocol.
+- Production commit `f275d4566`, candidate `f20d3f417edc3f3da07bf515676b8e71285ad76f`, control `6e98db9ece29c1e50241cf3e84c9410ce71dd748`, exact source hashes, preservation/error-order tests, and rejected invalid captures are recorded in the [0397 change record](changes/0397-opc-owned-open-validation-index.md) and [evidence bundle](results/change-0397/). No p99, RSS, peak operation-memory, physical-I/O, cold/cache, throughput, or generalized constructor claim follows.
+
 ## 2026-09-04: change 0396 expands OPC case-fold benchmark coverage
 
 - The existing four opt-in OPC case-fold selectors expand to seven: change 0396 adds three class-isolated source selectors for exact, ASCII-case-alias, and genuine-miss lookup. It also adds a 2,047-Part corpus to the prior 256-, 2,048-, and 16,384-Part deterministic stored OPC corpora; 2,047 is immediately below the 2,048 source case-fold threshold. The combined and class-specific lookup vectors each contain 144 fixed queries with canonical-position, found/missing, output, source-counter, and equivalent-name oracles.

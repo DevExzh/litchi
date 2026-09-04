@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "change": "0397",
+  "outcome": "ACCEPTED_SCOPED",
+  "decision": "Accept the normal, non-allocator p50 result for the owning OPC constructor on the stated fixed corpus and ABBA protocol.",
+  "claim_authorized": true,
+  "accepted_claim": {
+    "selector": "opc_casefold_owned_open",
+    "metric": "p50 elapsed_ns",
+    "profile": "normal",
+    "operation": "OpcPackage::from_vec(owned)",
+    "scope": "normal unmanaged owning constructor only; archive clone and post-open package/name/count/payload/exact-source oracles are excluded from elapsed time",
+    "interpretation": "positive percentages mean candidate faster; this supports elimination of one redundant eager ZIP validation/index pass, not a claim that only one ZIP index exists overall",
+    "corpus_parts": [
+      256,
+      2047,
+      2048,
+      16384
+    ],
+    "a1_to_b1_improvement_percent": {
+      "256": 8.617829,
+      "2047": 8.298670,
+      "2048": 8.945417,
+      "16384": 4.648655
+    },
+    "a2_to_b2_improvement_percent": {
+      "256": 8.204676,
+      "2047": 8.719476,
+      "2048": 8.268274,
+      "16384": 4.348226
+    },
+    "pooled_improvement_percent": {
+      "256": 8.452941,
+      "2047": 8.356702,
+      "2048": 8.490980,
+      "16384": 4.645459
+    },
+    "sample_count_per_leg": 30,
+    "warmup_iterations_per_case": 5,
+    "source": "summary.json and latency-metrics.tsv; all values recomputed from retained samples"
+  },
+  "allocation_observation": {
+    "profile": "allocator",
+    "status": "observational_only",
+    "scope": "CountingSystemAllocator(std::alloc::System) operation metrics; exact vectors remain in raw/allocator reports",
+    "delta_definition": "candidate minus matched control, pairwise for each of 30 samples",
+    "corpus_parts": [
+      256,
+      2047,
+      2048,
+      16384
+    ],
+    "allocation_calls_delta": {
+      "256": -1038,
+      "2047": -8202,
+      "2048": -8206,
+      "16384": -65550
+    },
+    "deallocation_calls_delta": {
+      "256": -1038,
+      "2047": -8202,
+      "2048": -8206,
+      "16384": -65550
+    },
+    "allocated_bytes_delta": {
+      "256": -152024,
+      "2047": -1212620,
+      "2048": -1212888,
+      "16384": -9699800
+    },
+    "deallocated_bytes_delta": {
+      "256": -152024,
+      "2047": -1212620,
+      "2048": -1212888,
+      "16384": -9699800
+    },
+    "reallocation_calls_unchanged": true,
+    "per_sample_net_live_after_minus_before_bytes": {
+      "256": 192122,
+      "2047": 1526677,
+      "2048": 1527162,
+      "16384": 12207482
+    },
+    "net_live_vector_unchanged_exactly": true,
+    "raw_global_live_before_after_baselines_cross_run_comparable": false,
+    "evidence": "allocation-metrics.json and compressed raw/allocator reports"
+  },
+  "protocol": {
+    "abba_order": [
+      "A1_control",
+      "B1_candidate",
+      "B2_candidate",
+      "A2_control"
+    ],
+    "samples_per_case": 30,
+    "warmups_per_case": 5,
+    "cpu_affinity": "2",
+    "logical_cpus_available": 1,
+    "execution_workers": [
+      1
+    ],
+    "lookup_count": 0,
+    "query_metadata": "shared 9 classes x 16 repetitions oracle metadata; not executed by owned-open",
+    "corpora": "stored OPC, ordinary 32-byte payloads, 256/2047/2048/16384 parts",
+    "toolchain": "rustc 1.98.1 (48a229cea 2026-09-01)"
+  },
+  "verification": {
+    "report_catalog_pairs": 8,
+    "catalog_bindings_per_pair": 4,
+    "binding_validator": "python3 tools/validate_perf_corpus_binding.py --report REPORT --catalog CATALOG",
+    "named_flags": true,
+    "raw_pairs_validated_before_compression": true,
+    "binding_failures": 0,
+    "statistics_recomputed_from_samples": true,
+    "report_stats_verified": true,
+    "configuration_identity_verified": true,
+    "environment_identity_recorded_per_leg": true,
+    "source_identity_and_owned_vectors_verified": true,
+    "corpus_identity_and_output_oracles_verified": true,
+    "malformed_equivalent_name_gate_verified": true,
+    "allocation_vectors_verified": true
+  },
+  "provenance": {
+    "production_commit": "f275d45660de15711edd04b8d0205eaf4e620e68",
+    "measured_candidate_revision": "f20d3f417edc3f3da07bf515676b8e71285ad76f",
+    "control_revision": "6e98db9ece29c1e50241cf3e84c9410ce71dd748",
+    "shared_production_candidate_tree_oid": "0b3187f9f85373e4ec72042ca2fff472ae581f23",
+    "source_sha256": {
+      "crates/litchi-opc/src/execution.rs": "239d969195eb30ed9832d59df54aefd4bfff8e0020dc49fa32d6162fec6be519",
+      "crates/litchi-opc/src/package.rs": "e2e5794b79e66aa4aef2212b9eeeda7e6012eb33da43aa0a3137cba93539f81a",
+      "crates/litchi-opc/src/phys_pkg.rs": "228498510d9346ca7c57d7b5d30939e2aa9349aed38346e71d2c36141e7780e8"
+    },
+    "rejected_captures": "Earlier captures made with runtime rustc 1.95 and one busy-CPU normal run were deleted and are not evidence."
+  },
+  "same_implementation_drift_diagnostic_percent_max": {
+    "p50": 1.395,
+    "mean": 1.267,
+    "p95": 1.927,
+    "p99": 3.893,
+    "status": "diagnostic only; no p99 claim is authorized"
+  },
+  "withheld_claims": [
+    "allocator elapsed latency",
+    "p99 latency",
+    "mean or p95 as production acceptance metrics",
+    "validation-constructor timing",
+    "path/from_reader/session timing",
+    "public OwnedPhysPkgReader timing",
+    "RSS, peak operation memory, physical IO, cold-cache behavior, throughput, or broad workload generalization",
+    "other formats or facades"
+  ]
+}
