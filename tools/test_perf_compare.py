@@ -753,6 +753,52 @@ def descriptive_parallel_report(value=100, revision="baseline"):
     return measured
 
 
+def descriptive_parallel_lock_report(revision="baseline"):
+    measured = descriptive_parallel_report(revision=revision)
+    configuration = measured["configuration"]
+    configuration["opc_cache_lock_diagnostics"] = True
+    source = measured["results"][0]["source"]
+    source["opc_cache"] = {
+        "worker_count": 2,
+        "persistent_worker_teams_created": 1,
+        "lock_diagnostics": {
+            "scope": (
+                "opc_cache_direct_mutex_lock_acquisition_including_"
+                "observer_timer_overhead"
+            ),
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": (
+                "all_worker_part_data_requests_including_pre_admission_"
+                "rendezvous"
+            ),
+            "cache_lock_acquisitions": [1, 2, 1, 2, 1],
+            "cache_lock_wait_ns": [2, 1, 2, 3, 5],
+            "flight_lock_acquisitions": [2, 1, 3, 1, 2],
+            "flight_lock_wait_ns": [7, 2, 3, 4, 6],
+            "total_lock_acquisitions": [3, 3, 4, 3, 3],
+            "total_lock_wait_ns": [9, 3, 5, 7, 11],
+        },
+    }
+    case = measured["parallel_metrics"]["cases"][0]
+    case["observed_local_worker_count"] = {
+        "status": "measured",
+        "value": 2,
+        "scope": (
+            "result.source.opc_cache.worker_count_with_one_"
+            "created_local_worker_team"
+        ),
+    }
+    case["lock_wait_ns"] = {
+        "status": "measured",
+        "value": 7,
+        "scope": (
+            "result.source.opc_cache.lock_diagnostics."
+            "total_lock_wait_ns.p50"
+        ),
+    }
+    return measured
+
+
 class PerfCompareTests(unittest.TestCase):
     def operation_metrics_policy(self):
         comparison_policy = policy()
@@ -2171,6 +2217,89 @@ class PerfCompareTests(unittest.TestCase):
         self.assertEqual(result["status"], "pass")
         self.assertEqual(result["summary"]["compared_metrics"], 7)
 
+    def test_parallel_lock_diagnostics_expose_direct_mutex_p50(self):
+        baseline = descriptive_parallel_lock_report()
+        current = descriptive_parallel_lock_report(revision="current")
+        perf_compare.validate_parallel_metrics(baseline)
+        result = perf_compare.compare_reports(baseline, current, policy())
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(
+            baseline["parallel_metrics"]["cases"][0]["lock_wait_ns"]["value"],
+            7,
+        )
+
+    def test_parallel_lock_diagnostics_cross_checks_scalar_and_totals(self):
+        current = descriptive_parallel_lock_report(revision="current")
+        current["parallel_metrics"]["cases"][0]["lock_wait_ns"]["value"] = 6
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "lock_wait_ns.value does not match",
+        ):
+            perf_compare.validate_parallel_metrics(current)
+
+        current = descriptive_parallel_lock_report(revision="current")
+        current["results"][0]["source"]["opc_cache"]["lock_diagnostics"][
+            "total_lock_wait_ns"
+        ][0] = 10
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "total_lock_wait_ns does not equal cache plus flight",
+        ):
+            perf_compare.validate_parallel_metrics(current)
+
+        current = descriptive_parallel_lock_report(revision="current")
+        current["results"][0]["case"] = "opc_source_cache_control_contention"
+        current["parallel_metrics"]["cases"][0]["case"] = (
+            "opc_source_cache_control_contention"
+        )
+        diagnostics = current["results"][0]["source"]["opc_cache"][
+            "lock_diagnostics"
+        ]
+        diagnostics["cache_lock_acquisitions"][0] = 0
+        diagnostics["flight_lock_acquisitions"][0] = 0
+        diagnostics["total_lock_acquisitions"][0] = 0
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "total_lock_acquisitions must be positive",
+        ):
+            perf_compare.validate_parallel_metrics(current)
+
+    def test_parallel_lock_diagnostics_are_required_for_instrumented_contention_rows(self):
+        current = descriptive_parallel_lock_report(revision="current")
+        current["results"][0]["case"] = "opc_source_cache_control_contention"
+        current["parallel_metrics"]["cases"][0]["case"] = (
+            "opc_source_cache_control_contention"
+        )
+        del current["results"][0]["source"]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            r"source\.opc_cache is required",
+        ):
+            perf_compare.validate_parallel_metrics(current)
+
+        current = descriptive_parallel_lock_report(revision="current")
+        current["results"][0]["case"] = "opc_source_cache_control_contention"
+        current["parallel_metrics"]["cases"][0]["case"] = (
+            "opc_source_cache_control_contention"
+        )
+        del current["results"][0]["source"]["opc_cache"]["lock_diagnostics"]
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "lock_diagnostics is required",
+        ):
+            perf_compare.validate_parallel_metrics(current)
+
+    def test_parallel_lock_diagnostics_reject_boolean_worker_team_count(self):
+        current = descriptive_parallel_lock_report(revision="current")
+        current["results"][0]["source"]["opc_cache"][
+            "persistent_worker_teams_created"
+        ] = True
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "persistent_worker_teams_created must be a non-negative",
+        ):
+            perf_compare.validate_parallel_metrics(current)
+
     def test_parallel_envelope_coexists_with_strict_operation_metrics(self):
         baseline = descriptive_parallel_report()
         current = descriptive_parallel_report(revision="current")
@@ -3385,6 +3514,29 @@ class PerfCompareTests(unittest.TestCase):
         baseline["configuration"]["execution_workers"] = [1]
         current["configuration"]["execution_workers"] = [1]
         with self.assertRaisesRegex(perf_compare.ComparisonInputError, "derived default"):
+            perf_compare.compare_reports(baseline, current, policy())
+
+        baseline = report()
+        current = report(revision="current")
+        current["configuration"]["opc_cache_lock_diagnostics"] = False
+        self.assertEqual(
+            perf_compare.compare_reports(baseline, current, policy())["status"],
+            "pass",
+        )
+        current["configuration"]["opc_cache_lock_diagnostics"] = True
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "benchmark configuration mismatch"
+        ):
+            perf_compare.compare_reports(baseline, current, policy())
+
+        baseline = report()
+        current = report(revision="current")
+        current["configuration"][
+            "xlsx_cell_values_managed_planning_memory_headroom"
+        ] = 64 * 1024
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "benchmark configuration mismatch"
+        ):
             perf_compare.compare_reports(baseline, current, policy())
 
     def test_unapproved_corpus_manifest_fails_closed(self):

@@ -36,7 +36,7 @@ litchi-ods = { path = "../../crates/litchi-ods" }
 litchi-odt = { path = "../../crates/litchi-odt" }
 litchi-ole-common = { path = "../../crates/litchi-ole-common" }
 litchi-ooxml-common = { path = "../../crates/litchi-ooxml-common" }
-litchi-opc = { path = "../../crates/litchi-opc", features = ["sign"] }
+litchi-opc = { path = "../../crates/litchi-opc", features = ["sign", "performance-diagnostics"] }
 litchi = { path = "../../crates/litchi", features = ["docx", "ods", "odt", "odp", "pptx", "rtf", "xlsx"] }
 litchi-ppt = { path = "../../crates/litchi-ppt" }
 litchi-pptx = { path = "../../crates/litchi-pptx" }

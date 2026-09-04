@@ -1288,16 +1288,20 @@ cold-I/O or decompression claim is attached to that result.
 
 [Change 0150](../../docs/performance/changes/0150-xlsx-managed-cell-values-budget-evidence.md)'s
 managed tranche has no controlled release ABBA comparison and therefore makes
-no speedup or throughput claim. Its Budget covers only retained
-and in-flight OPC `PartData` payload reservations plus the managed publisher's
-accepted `OutputBytes`; parsed stores, metadata, staging, rewritten
-candidates, and output buffers are outside that accounting. The current
-tranche also performs one untimed one-byte-under first-publication-request
-replay per managed selector: the typed `OutputBytes` refusal accepts zero
-output and preserves the source version. Declared `Work` remains separate
-from decompressed/read bytes. The tranche does not claim allocations, RSS/
-peak memory, hardware/CPU pinning, cold I/O, decompression, or real-producer
-breadth.
+no speedup or throughput claim. Its cache capacity remains the retained and
+in-flight OPC `PartData` payload budget. The managed execution `Memory` limit
+adds a fixed 64 KiB publication-planning allowance for bounded topology
+metadata; the report records the payload limit, planning allowance, and
+resulting total separately. Parsed stores, staging, rewritten candidates, and
+output buffers remain outside that accounting. The current tranche also
+performs one untimed one-byte-under first-publication-request replay per
+managed selector: the typed `OutputBytes` refusal accepts zero output and
+preserves the source version. Declared `Work` remains separate from
+decompressed/read bytes. The tranche does not claim allocations, RSS/peak
+memory, hardware/CPU pinning, cold I/O, decompression, or real-producer
+breadth. Reports that select managed controls include the planning allowance
+in configuration identity, so payload-only historical reports cannot be
+silently compared with this context.
 
 Measure the matched one-cell XLSX clear/remove lifecycle controls on the same
 media-rich four-sheet corpora:
@@ -1360,6 +1364,17 @@ use after handle/package drop, request throughput, and an Amdahl classification
 only for the fixed-request disjoint cells. Same-Part widths change request
 count, so they are explicitly throughput-only and do not receive a speedup or
 serial-fraction estimate.
+
+The contention command keeps latency timings uninstrumented by default. Add
+`--opc-cache-lock-diagnostics` when the report should include the opt-in
+`source.opc_cache.lock_diagnostics` vectors. Those vectors count cache and
+same-Part flight direct `Mutex::lock` acquisitions and report elapsed
+nanoseconds around each acquisition, including the observer's timer overhead.
+They cover every worker `PartData` request, including requests admitted before
+the timed source release, so they are not lock intervals nested inside
+`elapsed_ns`. Condition-variable wait durations and mutex reacquisition are
+excluded. The flag is recorded in `configuration` and reports with different
+flag values are not comparable.
 
 These deterministic delays and classifications are correctness and contention
 evidence, not production-latency results. Do not make a performance claim from
@@ -3764,10 +3779,16 @@ selective path reports the `read` phase only, and CFB `open_stream` sums its
 `per_operation` phases only; both deliberately exclude the timed-open phase.
 Other results leave `deterministic_chunk_count` unavailable rather than infer
 it from bytes.
-`lock_wait_ns` is unavailable because waiter counts are not lock-time
-measurements. The envelope never reads process-global thread lists, converts
-CPU utilization or waiter counts into worker/lock metrics, or infers chunks
-from bytes. Every unavailable value carries a scope and reason. The comparator
+`lock_wait_ns` remains unavailable when no exact producer boundary is present.
+For an OPC contention report created with
+`--opc-cache-lock-diagnostics`, it is a descriptive p50 derived from
+`source.opc_cache.lock_diagnostics.total_lock_wait_ns`; the nested vectors also
+retain cache/flight acquisition counts and wait totals per elapsed sample.
+The scope says direct mutex acquisition including observer timer overhead, and
+the producer explicitly names condition-variable waiting and reacquisition as
+excluded. The envelope never reads process-global thread lists, converts CPU
+utilization or waiter counts into worker/lock metrics, or infers chunks from
+bytes. Every unavailable value carries a scope and reason. The comparator
 cross-checks measured scalar and sample-vector values against their result and
 configuration fields, including cache-state identity and the exact sorted
 `sample_order`; the ABBA summary and package tools apply the same validation

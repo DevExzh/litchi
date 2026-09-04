@@ -8,10 +8,11 @@
 //!
 //! In particular, this module deliberately does *not* read `/proc`, inspect a
 //! process thread list, infer a worker count from CPU utilization, or convert
-//! waiter counts into lock time.  The process may contain unrelated runtime,
-//! profiler, or harness threads.  A process-wide thread count and lock wait
-//! therefore remain unavailable until an exact instrumented boundary is added
-//! to the producer schema.
+//! waiter counts into lock time.  The OPC contention producer has one exact,
+//! opt-in direct-mutex boundary; all other results keep lock wait unavailable.
+//! Its lock vectors cover complete worker `PartData` requests, including the
+//! pre-admission rendezvous, so they are descriptive counters rather than
+//! intervals nested inside the post-admission elapsed sample.
 
 use std::{error::Error, fmt};
 
@@ -37,6 +38,8 @@ const CFB_OPEN_STREAM_CHUNK_SCOPE: &str =
     "result.source.cfb_open_stream.simulation.samples.per_operation.physical_request_count_sum";
 const PROCESS_THREAD_SCOPE: &str = "process_thread_count";
 const LOCK_WAIT_SCOPE: &str = "lock_wait_ns";
+const LOCK_WAIT_MEASURED_SCOPE: &str =
+    "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50";
 
 /// Why a metric is present in the report.
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
@@ -164,6 +167,7 @@ struct CaseInput {
     opc_cache_worker_count: Option<usize>,
     persistent_worker_teams_created: Option<usize>,
     chunk_evidence: ChunkEvidence,
+    opc_cache_lock_wait_ns: Option<Vec<u64>>,
     elapsed_sample_count: usize,
     elapsed_sample_order: Vec<usize>,
 }
@@ -213,6 +217,10 @@ fn case_input(result: &CaseResult) -> Result<CaseInput, InputError> {
             )
         })
         .unwrap_or((None, None));
+    let opc_cache_lock_wait_ns = source
+        .and_then(|source| source.opc_cache.as_ref())
+        .and_then(|opc_cache| opc_cache.lock_diagnostics.as_ref())
+        .map(|diagnostics| diagnostics.total_lock_wait_ns.clone());
     Ok(CaseInput {
         case: result.case.to_owned(),
         cache_state: result.cache_state.map(str::to_owned),
@@ -223,6 +231,7 @@ fn case_input(result: &CaseResult) -> Result<CaseInput, InputError> {
         opc_cache_worker_count,
         persistent_worker_teams_created,
         chunk_evidence: source_chunk_evidence(source.map(Box::as_ref))?,
+        opc_cache_lock_wait_ns,
         elapsed_sample_count: result.elapsed_ns.samples.len(),
         elapsed_sample_order: result.elapsed_ns.sample_order.clone(),
     })
@@ -333,6 +342,7 @@ fn case_metrics(
         ),
     };
     let deterministic_chunk_count = deterministic_chunk_count(&input, &location)?;
+    let lock_wait_ns = lock_wait_metric(&input, &location)?;
     Ok(CaseMetrics {
         case: input.case,
         cache_state: input.cache_state,
@@ -341,11 +351,38 @@ fn case_metrics(
         observed_local_worker_count,
         deterministic_task_count,
         deterministic_chunk_count,
-        lock_wait_ns: Metric::unavailable(
+        lock_wait_ns,
+    })
+}
+
+fn lock_wait_metric(input: &CaseInput, location: &str) -> Result<Metric, InputError> {
+    let Some(values) = input.opc_cache_lock_wait_ns.as_ref() else {
+        return Ok(Metric::unavailable(
             LOCK_WAIT_SCOPE,
             "no exact instrumented lock boundary is present; waiter counts are not timed",
-        ),
-    })
+        ));
+    };
+    if values.is_empty() {
+        return Err(InputError(format!(
+            "{location}.source.opc_cache.lock_diagnostics.total_lock_wait_ns has no retained samples"
+        )));
+    }
+    let values = reorder_to_elapsed_samples(values, &input.elapsed_sample_order, location)?;
+    if values.len() != input.elapsed_sample_count {
+        return Err(InputError(format!(
+            "{location}.source.opc_cache.lock_diagnostics.total_lock_wait_ns has {} values but elapsed_ns.samples has {}",
+            values.len(),
+            input.elapsed_sample_count
+        )));
+    }
+    let mut ordered = values;
+    ordered.sort_unstable();
+    let left = ordered[(ordered.len() - 1) / 2];
+    let right = ordered[ordered.len() / 2];
+    Ok(Metric::measured_u64(
+        super::midpoint(left, right),
+        LOCK_WAIT_MEASURED_SCOPE,
+    ))
 }
 
 fn configured_worker_count(input: &CaseInput, location: &str) -> Result<Metric, InputError> {
@@ -538,6 +575,8 @@ mod tests {
             rtf_variants: Vec::new(),
             range_simulation: super::super::RangeSimulationConfig::default(),
             execution_workers: vec![1, 2, 4],
+            opc_cache_lock_diagnostics: false,
+            xlsx_cell_values_managed_planning_memory_headroom: None,
         }
     }
 
@@ -597,6 +636,7 @@ mod tests {
             opc_cache_worker_count: None,
             persistent_worker_teams_created: None,
             chunk_evidence: ChunkEvidence::None,
+            opc_cache_lock_wait_ns: None,
             elapsed_sample_count: 0,
             elapsed_sample_order: Vec::new(),
         }
@@ -674,6 +714,32 @@ mod tests {
             Some(serde_json::json!(4))
         );
         assert_eq!(case.lock_wait_ns.status, MetricStatus::Unavailable);
+    }
+
+    #[test]
+    fn records_opc_direct_lock_wait_p50_when_producer_exposes_it() {
+        let mut input = input();
+        input.opc_cache_worker_count = Some(2);
+        input.persistent_worker_teams_created = Some(1);
+        input.elapsed_sample_count = 2;
+        input.elapsed_sample_order = vec![1, 0];
+        input.opc_cache_lock_wait_ns = Some(vec![9, 3]);
+        let case = case_metrics(input, 0, &[1, 2, 4]).expect("valid lock evidence");
+        assert_eq!(case.lock_wait_ns.status, MetricStatus::Measured);
+        assert_eq!(case.lock_wait_ns.value, Some(serde_json::json!(6)));
+        assert_eq!(
+            case.lock_wait_ns.scope,
+            "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        );
+    }
+
+    #[test]
+    fn rejects_opc_lock_wait_vector_with_wrong_sample_count() {
+        let mut input = input();
+        input.elapsed_sample_count = 2;
+        input.elapsed_sample_order = vec![0, 1];
+        input.opc_cache_lock_wait_ns = Some(vec![3]);
+        assert!(case_metrics(input, 0, &[1, 2, 4]).is_err());
     }
 
     #[test]
