@@ -1,0 +1,9 @@
+l1-dcache-loads=ABSENT
+l1-dcache-load-misses=ABSENT
+l1-icache-loads=ABSENT
+l1-icache-load-misses=ABSENT
+cache-references=event=0x60,umask=0xff
+cache-misses=event=0x64,umask=0x09
+cycles=ABSENT
+instructions=event=0xc0
+ref-cycles=event=0x120,umask=0x01

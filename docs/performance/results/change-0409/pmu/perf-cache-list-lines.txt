@@ -1,0 +1,20 @@
+526:  l2_cache_req_stat.all
+529:  l2_cache_req_stat.dc_access_in_l2
+532:  l2_cache_req_stat.dc_hit_in_l2
+535:  l2_cache_req_stat.ic_access_in_l2
+538:  l2_cache_req_stat.ic_dc_hit_in_l2
+541:  l2_cache_req_stat.ic_dc_miss_in_l2
+544:  l2_cache_req_stat.ic_fill_hit_s
+547:  l2_cache_req_stat.ic_fill_hit_x
+550:  l2_cache_req_stat.ic_fill_miss
+553:  l2_cache_req_stat.ic_hit_in_l2
+556:  l2_cache_req_stat.ls_rd_blk_c
+559:  l2_cache_req_stat.ls_rd_blk_cs
+562:  l2_cache_req_stat.ls_rd_blk_l_hit_s
+565:  l2_cache_req_stat.ls_rd_blk_l_hit_x
+568:  l2_cache_req_stat.ls_rd_blk_x
+688:  cache-misses
+693:  cache-references
+1272:l1_dcache:
+1341:  l3_cache_accesses
+1343:  l3_misses

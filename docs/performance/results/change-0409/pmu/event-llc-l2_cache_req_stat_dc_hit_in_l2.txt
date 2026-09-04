@@ -1,0 +1,2 @@
+cpu=3 bytes=268435456 passes=8 lines=4194304 sink=4278190080
+10227288,,l2_cache_req_stat.dc_hit_in_l2,101930521,100.00,,

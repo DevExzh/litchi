@@ -1,0 +1,13 @@
+.....................................................................................
+----------------------------------------------------------------------
+Ran 85 tests in 0.387s
+
+OK
+PASS: 1 matched results, 7 metrics, 0 regressions
+Worst latency movement: opc_open elapsed_ns.p50 +4.00% (limit +5.00%)
+REGRESSION: 1 matched results, 7 metrics, 3 regressions
+REGRESSION opc_open[tiny] elapsed_ns.p50: 100 -> 120 (+20.00%; limit +5.00%)
+REGRESSION opc_open[tiny] elapsed_ns.p95: 100 -> 120 (+20.00%; limit +8.00%)
+REGRESSION opc_open[tiny] elapsed_ns.p99: 100 -> 120 (+20.00%; limit +12.00%)
+INVALID: 0 matched results, 0 metrics, 0 regressions
+ERROR: cannot read /tmp/tmprqp2roh8/current.json: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)

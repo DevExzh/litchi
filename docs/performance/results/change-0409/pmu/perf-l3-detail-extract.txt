@@ -1,0 +1,20 @@
+2017-       [l2_cache_req_stat.ic_fill_miss / instructions]
+2018-  l2_cache_misses_from_l2_hwpf_pti
+2019-       [L2 cache misses from L2 cache hardware prefetcher per thousand
+2020-        instructions]
+2021-       [(l2_pf_miss_l2_hit_l3.l1_dc_l2_hwpf + l2_pf_miss_l2_l3.l1_dc_l2_hwpf)
+2022-        / instructions]
+2023-
+2024-l3_cache:
+2025:  l3_cache_accesses
+2026-       [L3 cache accesses]
+2027-       [l3_lookup_state.all_coherent_accesses_to_l3]
+2028:  l3_misses
+2029-       [L3 misses (including cacheline state change requests)]
+2030-       [l3_lookup_state.l3_miss]
+2031-  l3_read_miss_latency
+2032-       [Average L3 read miss latency (in core clocks)]
+2033-       [l3_xi_sampled_latency.all * 10 / l3_xi_sampled_latency_requests.all]
+2034-  l3_read_miss_latency_for_local_dram
+2035-       [Average L3 read miss latency (in core clocks) for local DRAM]
+2036-       [l3_xi_sampled_latency.dram_near * 10 /

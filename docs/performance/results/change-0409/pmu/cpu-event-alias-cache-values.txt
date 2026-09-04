@@ -1,0 +1,7 @@
+cache-misses=event=0x64,umask=0x09
+cpu-cycles=event=0x76
+stalled-cycles-frontend=event=0xa9
+ref-cycles=event=0x120,umask=0x01
+instructions=event=0xc0
+cache-references=event=0x60,umask=0xff
+branch-instructions=event=0xc2

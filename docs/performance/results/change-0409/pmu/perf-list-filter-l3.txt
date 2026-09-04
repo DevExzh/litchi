@@ -1,0 +1,70 @@
+
+l2 cache:
+  l2_pf_miss_l2_hit_l3.l1_dc_hwpf
+       [L2 prefetches accepted by the L2 pipeline which miss the L2 cache but
+        hit in the L3 cache and are generated from L1 data hardware
+        prefetchers. Unit: cpu]
+        cpu/event=0x71,umask=0xe0/
+  l2_pf_miss_l2_hit_l3.l1_dc_l2_hwpf
+       [L2 prefetches accepted by the L2 pipeline which miss the L2 cache but
+        hit in the L3 cache and are generated from L1 data and L2 hardware
+        prefetchers. Unit: cpu]
+        cpu/event=0x71,umask=0xff/
+  l2_pf_miss_l2_hit_l3.l2_hwpf
+       [L2 prefetches accepted by the L2 pipeline which miss the L2 cache but
+        hit in the L3 cache and are generated from L2 hardware prefetchers.
+        Unit: cpu]
+        cpu/event=0x71,umask=0x1f/
+  l2_pf_miss_l2_l3.l1_dc_hwpf
+       [L2 prefetches accepted by the L2 pipeline which miss the L2 as well as
+        the L3 caches and are generated from L1 data hardware prefetchers.
+        Unit: cpu]
+        cpu/event=0x72,umask=0xe0/
+  l2_pf_miss_l2_l3.l1_dc_l2_hwpf
+       [L2 prefetches accepted by the L2 pipeline which miss the L2 as well as
+        the L3 caches and are generated from L1 data and L2 hardware
+        prefetchers. Unit: cpu]
+        cpu/event=0x72,umask=0xff/
+  l2_pf_miss_l2_l3.l2_hwpf
+       [L2 prefetches accepted by the L2 pipeline which miss the L2 as well as
+        the L3 caches and are generated from L2 hardware prefetchers. Unit:
+        cpu]
+        cpu/event=0x72,umask=0x1f/
+
+Metric Groups:
+
+l3_cache:
+  l3_cache_accesses
+       [L3 cache accesses]
+       [l3_lookup_state.all_coherent_accesses_to_l3]
+  l3_misses
+       [L3 misses (including cacheline state change requests)]
+       [l3_lookup_state.l3_miss]
+  l3_read_miss_latency
+       [Average L3 read miss latency (in core clocks)]
+       [l3_xi_sampled_latency.all * 10 / l3_xi_sampled_latency_requests.all]
+  l3_read_miss_latency_for_local_dram
+       [Average L3 read miss latency (in core clocks) for local DRAM]
+       [l3_xi_sampled_latency.dram_near * 10 /
+        l3_xi_sampled_latency_requests.dram_near]
+  l3_read_miss_latency_for_remote_dram
+       [Average L3 read miss latency (in core clocks) for remote DRAM]
+       [l3_xi_sampled_latency.dram_far * 10 /
+        l3_xi_sampled_latency_requests.dram_far]
+
+lpm_l3: [L3 cache breakdown per CCX]
+  lpm_l3_accesses
+       [L3 victim cache accesses]
+       [d_ratio(max(l3_lookup_state.all_coherent_accesses_to_l3,
+        l3_lookup_state.l3_miss),duration_time)]
+  lpm_l3_hits
+       [L3 victim cache hit rate]
+       [d_ratio(max(l3_lookup_state.all_coherent_accesses_to_l3,
+        l3_lookup_state.l3_miss) - l3_lookup_state.l3_miss,
+        max(l3_lookup_state.all_coherent_accesses_to_l3,
+        l3_lookup_state.l3_miss))]
+  lpm_l3_miss
+       [L3 victim cache miss rate]
+       [d_ratio(l3_lookup_state.l3_miss,
+        max(l3_lookup_state.all_coherent_accesses_to_l3,
+        l3_lookup_state.l3_miss))]

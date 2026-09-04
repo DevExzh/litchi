@@ -1,0 +1,52 @@
+Batch0409 PMU probe
+===================
+
+Host and toolchain
+------------------
+* Linux 7.0.0-1011-aws, perf 7.0.12, AMD EPYC 9R45 (family 26/model 2), KVM guest.
+* 32 CPUs (0-31), CPU 3 was isolated with taskset and sched_setaffinity in the probe.
+* /proc/sys/kernel/perf_event_paranoid = 1.
+
+Local PMU inventory
+-------------------
+/sys/bus/event_source/devices/cpu/events contains:
+* cache-misses = event=0x64,umask=0x09
+* cache-references = event=0x60,umask=0xff
+* cpu-cycles = event=0x76
+* instructions = event=0xc0
+* ref-cycles = event=0x120,umask=0x01
+There are no l1-dcache-loads or l1-dcache-load-misses aliases in that sysfs directory.
+`perf list --details` documents these native events:
+* l2_cache_req_stat.dc_access_in_l2 = cpu/event=0x64,umask=0xf8/
+* l2_cache_req_stat.dc_hit_in_l2 = cpu/event=0x64,umask=0xf0/
+* l2_cache_req_stat.ls_rd_blk_c = cpu/event=0x64,umask=8/
+It lists l3_cache_accesses and l3_misses only as metric expressions over l3_lookup_state; no direct l3_lookup_state event was listed.
+
+Controlled workload
+-------------------
+`cache_touch.c` pins to CPU 3, initializes a 64-byte-stride array, and reports a sink.
+* l1_hot: 32768 bytes, 10000000 passes (512 lines/pass).
+* llc_stream: 268435456 bytes, 8 passes (4194304 lines/pass; larger than the reported 128 MiB LLC).
+The exact compile command is in cache_touch-compile.txt. Exact perf commands are in event-matrix-commands.txt and each command's full output is in event-*.txt.
+
+Results (all successful counters ran at 100.00% scheduling)
+-------------------------------------------------------------
+Event                              l1_hot       llc_stream
+cpu-cycles                         5671565912   477198901
+instructions                       35942384505  603183420
+cache-misses                       72328        700060
+cache-references                   0            0
+l1-dcache-loads                    0            0
+l1-dcache-load-misses              0            0
+l2_cache_req_stat.dc_access_in_l2  748392       10344434
+l2_cache_req_stat.dc_hit_in_l2     715936       10227288
+l2_cache_req_stat.ls_rd_blk_c      34283        566375
+l3_cache_accesses                  bad event    bad event
+l3_misses                          bad event    bad event
+
+Interpretation
+--------------
+* Native L2 events are locally documented, open successfully, and return nonzero values for both contrasting workloads. They are the usable native cache counters from this guest. The exact event descriptions/encodings remain in perf-list-details.txt.
+* Generic cache-misses opens and returns nonzero values, but perf describes it as a usual LLC indicator while this PMU maps it to event 0x64/umask 0x09 (the native L2 request-status miss encoding). Treat it as a broad kernel alias, not an exact independently verified LLC counter.
+* Generic cache-references and both generic L1 load aliases open with 100% scheduling yet return zero for both workloads; they are unusable on this guest and should remain marked unavailable/zero rather than interpreted as measurements.
+* l3_cache_accesses/l3_misses are perf metric names, not valid `-e` event selectors here, and direct `perf stat -e` rejects them. No direct local L3 event was exposed, so no exact LLC native counter was established.

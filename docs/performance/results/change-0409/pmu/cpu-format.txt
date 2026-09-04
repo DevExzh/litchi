@@ -1,0 +1,5 @@
+event=config:0-7,32-35
+edge=config:18
+inv=config:23
+umask=config:8-15
+cmask=config:24-31

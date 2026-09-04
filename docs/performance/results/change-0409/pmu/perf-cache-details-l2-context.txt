@@ -1,0 +1,116 @@
+       [Fetches tagged by Fetch IBS. Not all tagged fetches result in a valid
+        sample and an IBS interrupt. Unit: cpu]
+        cpu/event=0x188,umask=2/
+  ic_fetch_ibs_events.sample_discarded
+       [Fetches discarded after being tagged by Fetch IBS due to reasons other
+        than IBS filtering. Unit: cpu]
+        cpu/event=0x188,umask=4/
+  ic_fetch_ibs_events.sample_filtered
+       [Fetches discarded after being tagged by Fetch IBS due to IBS
+        filtering. Unit: cpu]
+        cpu/event=0x188,umask=8/
+  ic_fetch_ibs_events.sample_valid
+       [Fetches tagged by Fetch IBS that result in a valid sample and an IBS
+        interrupt. Unit: cpu]
+        cpu/event=0x188,umask=0x10/
+  ic_tag_hit_miss.all_instruction_cache_accesses
+       [Instruction cache accesses of all types. Unit: cpu]
+        cpu/event=0x18e,umask=0x1f/
+  ic_tag_hit_miss.instruction_cache_hit
+       [Instruction cache hits. Unit: cpu]
+        cpu/event=0x18e,umask=7/
+  ic_tag_hit_miss.instruction_cache_miss
+       [Instruction cache misses. Unit: cpu]
+        cpu/event=0x18e,umask=0x18/
+  op_cache_hit_miss.all_op_cache_accesses
+       [Op cache accesses of all types. Unit: cpu]
+        cpu/event=0x28f,umask=7/
+  op_cache_hit_miss.op_cache_hit
+       [Op cache hits. Unit: cpu]
+        cpu/event=0x28f,umask=3/
+  op_cache_hit_miss.op_cache_miss
+       [Op cache misses. Unit: cpu]
+        cpu/event=0x28f,umask=4/
+
+l2 cache:
+  l2_cache_req_stat.all
+       [Core to L2 cache requests (not including L2 prefetch) for data and
+        instruction cache access. Unit: cpu]
+        cpu/event=0x64,umask=0xff/
+  l2_cache_req_stat.dc_access_in_l2
+       [Core to L2 cache requests (not including L2 prefetch) for data cache
+        access. Unit: cpu]
+        cpu/event=0x64,umask=0xf8/
+  l2_cache_req_stat.dc_hit_in_l2
+       [Core to L2 cache requests (not including L2 prefetch) for data cache
+        hits. Unit: cpu]
+        cpu/event=0x64,umask=0xf0/
+  l2_cache_req_stat.ic_access_in_l2
+       [Core to L2 cache requests (not including L2 prefetch) for instruction
+        cache access. Unit: cpu]
+        cpu/event=0x64,umask=7/
+  l2_cache_req_stat.ic_dc_hit_in_l2
+       [Core to L2 cache requests (not including L2 prefetch) for data and
+        instruction cache hits. Unit: cpu]
+        cpu/event=0x64,umask=0xf6/
+  l2_cache_req_stat.ic_dc_miss_in_l2
+       [Core to L2 cache requests (not including L2 prefetch) for data and
+        instruction cache misses. Unit: cpu]
+        cpu/event=0x64,umask=9/
+  l2_cache_req_stat.ic_fill_hit_s
+       [Core to L2 cache requests (not including L2 prefetch) with status:
+        instruction cache hit non-modifiable line in L2. Unit: cpu]
+        cpu/event=0x64,umask=2/
+  l2_cache_req_stat.ic_fill_hit_x
+       [Core to L2 cache requests (not including L2 prefetch) with status:
+        instruction cache hit modifiable line in L2. Unit: cpu]
+        cpu/event=0x64,umask=4/
+  l2_cache_req_stat.ic_fill_miss
+       [Core to L2 cache requests (not including L2 prefetch) with status:
+        instruction cache request miss in L2. Unit: cpu]
+        cpu/event=0x64,umask=1/
+  l2_cache_req_stat.ic_hit_in_l2
+       [Core to L2 cache requests (not including L2 prefetch) for instruction
+        cache hits. Unit: cpu]
+        cpu/event=0x64,umask=6/
+  l2_cache_req_stat.ls_rd_blk_c
+       [Core to L2 cache requests (not including L2 prefetch) with status:
+        data cache request miss in L2. Unit: cpu]
+        cpu/event=0x64,umask=8/
+  l2_cache_req_stat.ls_rd_blk_cs
+       [Core to L2 cache requests (not including L2 prefetch) with status:
+        data cache shared read hit in L2. Unit: cpu]
+        cpu/event=0x64,umask=0x80/
+  l2_cache_req_stat.ls_rd_blk_l_hit_s
+       [Core to L2 cache requests (not including L2 prefetch) with status:
+        data cache read hit non-modifiable line in L2. Unit: cpu]
+        cpu/event=0x64,umask=0x20/
+  l2_cache_req_stat.ls_rd_blk_l_hit_x
+       [Core to L2 cache requests (not including L2 prefetch) with status:
+        data cache read hit modifiable line in L2. Unit: cpu]
+        cpu/event=0x64,umask=0x40/
+  l2_cache_req_stat.ls_rd_blk_x
+       [Core to L2 cache requests (not including L2 prefetch) with status:
+        data cache store or state change hit in L2. Unit: cpu]
+        cpu/event=0x64,umask=0x10/
+  l2_fill_rsp_src.all
+       [L2 cache fills from all types of data sources. Unit: cpu]
+        cpu/event=0x165,umask=0xde/
+  l2_fill_rsp_src.alternate_memories
+       [L2 cache fills from extension memory. Unit: cpu]
+        cpu/event=0x165,umask=0x80/
+  l2_fill_rsp_src.dram_io_far
+       [L2 cache fills from either DRAM or MMIO in a different NUMA node (same
+        or different socket). Unit: cpu]
+        cpu/event=0x165,umask=0x40/
+  l2_fill_rsp_src.dram_io_near
+       [L2 cache fills from either DRAM or MMIO in the same NUMA node. Unit:
+        cpu]
+        cpu/event=0x165,umask=8/
+  l2_fill_rsp_src.far_cache
+       [L2 cache fills from cache of another CCX when the address was in a
+        different NUMA node. Unit: cpu]
+        cpu/event=0x165,umask=0x10/
+  l2_fill_rsp_src.local_ccx
+       [L2 cache fills from L3 cache or different L2 cache in the same CCX.
+        Unit: cpu]

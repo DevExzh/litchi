@@ -1,5 +1,24 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0409: XLSX semantic query and edit/save evidence
+
+[0409](changes/0409-xlsx-profile-and-range-accounting.md) captures a medium four-sheet, 9,216-cell corpus with
+4 MiB of media. The selected-cell timer covers worksheet selection and M29
+read after workbook preparation: normal p50/p95/p99 are
+3.528/3.586/3.635 ms over 500 fresh children. A separate 30-sample allocator
+run records 81,918 allocations and 10,690,444 allocated bytes per query.
+Source and eager one-cell save runs retain matched output and preservation
+checks. Corrected source-member attribution is versioned because historical
+zeroes came from unconfigured ranges; the record includes a committed-source
+500-sample recapture. These observations establish no production speedup.
+
+Whole-process CPU is dominated by surrounding compression and verification.
+The selected-cell ancestor isolates useful library samples: expanded-name
+cloning is a measured candidate for ownership review. Native L2 request events
+are usable on this host; generic L1 zeroes are untrustworthy and exact LLC
+events are unavailable in the guest. See the [artifact bundle](results/change-0409/)
+for raw reports, CPU data, scripts, hashes and validation logs.
+
 ## Change 0408: attributable materialization baseline
 
 [0408](changes/0408-opc-materialization-evidence.md) prepares verifier expectations

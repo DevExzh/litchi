@@ -1,0 +1,9 @@
+event syntax error: 'l3_cache_accesses'
+                     \___ Bad event name
+
+Unable to find event on a PMU of 'l3_cache_accesses'
+Run 'perf list' for a list of valid events
+
+ Usage: perf stat [<options>] [<command>]
+
+    -e, --event <event>   event selector. use 'perf list' to list available events

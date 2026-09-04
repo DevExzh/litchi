@@ -1,0 +1,124 @@
+=== /tmp/litchi-goal-0409-pmu/event-l1-cache_misses.txt
+cpu=3 bytes=32768 passes=10000000 lines=512 sink=652800000000
+72328,,cache-misses,1262299404,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-l1-cache_references.txt
+cpu=3 bytes=32768 passes=10000000 lines=512 sink=652800000000
+0,,cache-references,1262452834,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-l1-cpu_cycles.txt
+cpu=3 bytes=32768 passes=10000000 lines=512 sink=652800000000
+5671565912,,cpu-cycles,1288212664,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-l1-instructions.txt
+cpu=3 bytes=32768 passes=10000000 lines=512 sink=652800000000
+35942384505,,instructions,1262149634,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-l1-l1_dcache_load_misses.txt
+cpu=3 bytes=32768 passes=10000000 lines=512 sink=652800000000
+0,,l1-dcache-load-misses,1262051044,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-l1-l1_dcache_loads.txt
+cpu=3 bytes=32768 passes=10000000 lines=512 sink=652800000000
+0,,l1-dcache-loads,1261748624,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-l1-l2_cache_req_stat_dc_access_in_l2.txt
+cpu=3 bytes=32768 passes=10000000 lines=512 sink=652800000000
+748392,,l2_cache_req_stat.dc_access_in_l2,1261807405,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-l1-l2_cache_req_stat_dc_hit_in_l2.txt
+cpu=3 bytes=32768 passes=10000000 lines=512 sink=652800000000
+715936,,l2_cache_req_stat.dc_hit_in_l2,1261436245,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-l1-l2_cache_req_stat_ls_rd_blk_c.txt
+cpu=3 bytes=32768 passes=10000000 lines=512 sink=652800000000
+34283,,l2_cache_req_stat.ls_rd_blk_c,1261698424,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-llc-cache_misses.txt
+cpu=3 bytes=268435456 passes=8 lines=4194304 sink=4278190080
+700060,,cache-misses,101658290,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-llc-cache_references.txt
+cpu=3 bytes=268435456 passes=8 lines=4194304 sink=4278190080
+0,,cache-references,100882031,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-llc-cpu_cycles.txt
+cpu=3 bytes=268435456 passes=8 lines=4194304 sink=4278190080
+477198901,,cpu-cycles,106341009,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-llc-instructions.txt
+cpu=3 bytes=268435456 passes=8 lines=4194304 sink=4278190080
+603183420,,instructions,101323151,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-llc-l1_dcache_load_misses.txt
+cpu=3 bytes=268435456 passes=8 lines=4194304 sink=4278190080
+0,,l1-dcache-load-misses,100482432,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-llc-l1_dcache_loads.txt
+cpu=3 bytes=268435456 passes=8 lines=4194304 sink=4278190080
+0,,l1-dcache-loads,100798421,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-llc-l2_cache_req_stat_dc_access_in_l2.txt
+cpu=3 bytes=268435456 passes=8 lines=4194304 sink=4278190080
+10344434,,l2_cache_req_stat.dc_access_in_l2,102996800,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-llc-l2_cache_req_stat_dc_hit_in_l2.txt
+cpu=3 bytes=268435456 passes=8 lines=4194304 sink=4278190080
+10227288,,l2_cache_req_stat.dc_hit_in_l2,101930521,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-llc-l2_cache_req_stat_ls_rd_blk_c.txt
+cpu=3 bytes=268435456 passes=8 lines=4194304 sink=4278190080
+566375,,l2_cache_req_stat.ls_rd_blk_c,103098780,100.00,,
+=== /tmp/litchi-goal-0409-pmu/event-llc-l3_cache_accesses.txt
+event syntax error: 'l3_cache_accesses'
+                     \___ Bad event name
+
+Unable to find event on a PMU of 'l3_cache_accesses'
+Run 'perf list' for a list of valid events
+
+ Usage: perf stat [<options>] [<command>]
+
+    -e, --event <event>   event selector. use 'perf list' to list available events
+=== /tmp/litchi-goal-0409-pmu/event-llc-l3_misses.txt
+event syntax error: 'l3_misses'
+                     \___ Bad event name
+
+Unable to find event on a PMU of 'l3_misses'
+Run 'perf list' for a list of valid events
+
+ Usage: perf stat [<options>] [<command>]
+
+    -e, --event <event>   event selector. use 'perf list' to list available events
+=== /tmp/litchi-goal-0409-pmu/event-matrix-commands.txt
+perf stat --no-big-num -x, -e cpu-cycles -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 32768 10000000
+perf stat --no-big-num -x, -e instructions -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 32768 10000000
+perf stat --no-big-num -x, -e cache-references -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 32768 10000000
+perf stat --no-big-num -x, -e cache-misses -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 32768 10000000
+perf stat --no-big-num -x, -e l1-dcache-loads -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 32768 10000000
+perf stat --no-big-num -x, -e l1-dcache-load-misses -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 32768 10000000
+perf stat --no-big-num -x, -e l2_cache_req_stat.dc_access_in_l2 -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 32768 10000000
+perf stat --no-big-num -x, -e l2_cache_req_stat.dc_hit_in_l2 -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 32768 10000000
+perf stat --no-big-num -x, -e l2_cache_req_stat.ls_rd_blk_c -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 32768 10000000
+perf stat --no-big-num -x, -e cpu-cycles -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 268435456 8
+perf stat --no-big-num -x, -e instructions -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 268435456 8
+perf stat --no-big-num -x, -e cache-references -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 268435456 8
+perf stat --no-big-num -x, -e cache-misses -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 268435456 8
+perf stat --no-big-num -x, -e l1-dcache-loads -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 268435456 8
+perf stat --no-big-num -x, -e l1-dcache-load-misses -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 268435456 8
+perf stat --no-big-num -x, -e l2_cache_req_stat.dc_access_in_l2 -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 268435456 8
+perf stat --no-big-num -x, -e l2_cache_req_stat.dc_hit_in_l2 -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 268435456 8
+perf stat --no-big-num -x, -e l2_cache_req_stat.ls_rd_blk_c -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 268435456 8
+perf stat --no-big-num -x, -e l3_cache_accesses -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 268435456 8
+perf stat --no-big-num -x, -e l3_misses -- taskset -c 3 /tmp/litchi-goal-0409-pmu/cache_touch 3 268435456 8
+=== /tmp/litchi-goal-0409-pmu/event-matrix-results.txt
+event=cpu-cycles workload_bytes=32768 workload_passes=10000000 exit=0 output=/tmp/litchi-goal-0409-pmu/event-l1-cpu_cycles.txt
+event=instructions workload_bytes=32768 workload_passes=10000000 exit=0 output=/tmp/litchi-goal-0409-pmu/event-l1-instructions.txt
+event=cache-references workload_bytes=32768 workload_passes=10000000 exit=0 output=/tmp/litchi-goal-0409-pmu/event-l1-cache_references.txt
+event=cache-misses workload_bytes=32768 workload_passes=10000000 exit=0 output=/tmp/litchi-goal-0409-pmu/event-l1-cache_misses.txt
+event=l1-dcache-loads workload_bytes=32768 workload_passes=10000000 exit=0 output=/tmp/litchi-goal-0409-pmu/event-l1-l1_dcache_loads.txt
+event=l1-dcache-load-misses workload_bytes=32768 workload_passes=10000000 exit=0 output=/tmp/litchi-goal-0409-pmu/event-l1-l1_dcache_load_misses.txt
+event=l2_cache_req_stat.dc_access_in_l2 workload_bytes=32768 workload_passes=10000000 exit=0 output=/tmp/litchi-goal-0409-pmu/event-l1-l2_cache_req_stat_dc_access_in_l2.txt
+event=l2_cache_req_stat.dc_hit_in_l2 workload_bytes=32768 workload_passes=10000000 exit=0 output=/tmp/litchi-goal-0409-pmu/event-l1-l2_cache_req_stat_dc_hit_in_l2.txt
+event=l2_cache_req_stat.ls_rd_blk_c workload_bytes=32768 workload_passes=10000000 exit=0 output=/tmp/litchi-goal-0409-pmu/event-l1-l2_cache_req_stat_ls_rd_blk_c.txt
+event=cpu-cycles workload_bytes=268435456 workload_passes=8 exit=0 output=/tmp/litchi-goal-0409-pmu/event-llc-cpu_cycles.txt
+event=instructions workload_bytes=268435456 workload_passes=8 exit=0 output=/tmp/litchi-goal-0409-pmu/event-llc-instructions.txt
+event=cache-references workload_bytes=268435456 workload_passes=8 exit=0 output=/tmp/litchi-goal-0409-pmu/event-llc-cache_references.txt
+event=cache-misses workload_bytes=268435456 workload_passes=8 exit=0 output=/tmp/litchi-goal-0409-pmu/event-llc-cache_misses.txt
+event=l1-dcache-loads workload_bytes=268435456 workload_passes=8 exit=0 output=/tmp/litchi-goal-0409-pmu/event-llc-l1_dcache_loads.txt
+event=l1-dcache-load-misses workload_bytes=268435456 workload_passes=8 exit=0 output=/tmp/litchi-goal-0409-pmu/event-llc-l1_dcache_load_misses.txt
+event=l2_cache_req_stat.dc_access_in_l2 workload_bytes=268435456 workload_passes=8 exit=0 output=/tmp/litchi-goal-0409-pmu/event-llc-l2_cache_req_stat_dc_access_in_l2.txt
+event=l2_cache_req_stat.dc_hit_in_l2 workload_bytes=268435456 workload_passes=8 exit=0 output=/tmp/litchi-goal-0409-pmu/event-llc-l2_cache_req_stat_dc_hit_in_l2.txt
+event=l2_cache_req_stat.ls_rd_blk_c workload_bytes=268435456 workload_passes=8 exit=0 output=/tmp/litchi-goal-0409-pmu/event-llc-l2_cache_req_stat_ls_rd_blk_c.txt
+event=l3_cache_accesses workload_bytes=268435456 workload_passes=8 exit=129 output=/tmp/litchi-goal-0409-pmu/event-llc-l3_cache_accesses.txt
+event=l3_misses workload_bytes=268435456 workload_passes=8 exit=129 output=/tmp/litchi-goal-0409-pmu/event-llc-l3_misses.txt
+=== /tmp/litchi-goal-0409-pmu/event-source-devices.txt
+breakpoint
+cpu
+kprobe
+msr
+software
+tracepoint
+uprobe

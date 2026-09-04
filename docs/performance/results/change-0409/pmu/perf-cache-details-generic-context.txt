@@ -1,0 +1,191 @@
+  packed_int_op_type.int128_add
+       [Retired 128-bit packed integer add ops. Unit: cpu]
+        cpu/event=0xd,umask=1/
+  packed_int_op_type.int128_aes
+       [Retired 128-bit packed integer AES ops. Unit: cpu]
+        cpu/event=0xd,umask=5/
+  packed_int_op_type.int128_all
+       [Retired 128-bit packed integer ops of all types. Unit: cpu]
+        cpu/event=0xd,umask=0xf/
+  packed_int_op_type.int128_clm
+       [Retired 128-bit packed integer CLM ops. Unit: cpu]
+        cpu/event=0xd,umask=8/
+  packed_int_op_type.int128_cmp
+       [Retired 128-bit packed integer compare ops. Unit: cpu]
+        cpu/event=0xd,umask=7/
+  packed_int_op_type.int128_logical
+       [Retired 128-bit packed integer logical ops. Unit: cpu]
+        cpu/event=0xd,umask=0xd/
+  packed_int_op_type.int128_mac
+       [Retired 128-bit packed integer multiply-accumulate ops. Unit: cpu]
+        cpu/event=0xd,umask=4/
+  packed_int_op_type.int128_mov
+       [Retired 128-bit packed integer MOV ops. Unit: cpu]
+        cpu/event=0xd,umask=0xa/
+  packed_int_op_type.int128_mul
+       [Retired 128-bit packed integer multiply ops. Unit: cpu]
+        cpu/event=0xd,umask=3/
+  packed_int_op_type.int128_other
+       [Retired 128-bit packed integer ops of other types. Unit: cpu]
+        cpu/event=0xd,umask=0xe/
+  packed_int_op_type.int128_pack
+       [Retired 128-bit packed integer pack ops. Unit: cpu]
+        cpu/event=0xd,umask=0xc/
+  packed_int_op_type.int128_sha
+       [Retired 128-bit packed integer SHA ops. Unit: cpu]
+        cpu/event=0xd,umask=6/
+  packed_int_op_type.int128_shift
+       [Retired 128-bit packed integer shift ops. Unit: cpu]
+        cpu/event=0xd,umask=9/
+  packed_int_op_type.int128_shuffle
+       [Retired 128-bit packed integer shuffle ops (may include instructions
+        not necessarily thought of as including shuffles e.g. horizontal add,
+        dot product,and certain MOV instructions). Unit: cpu]
+        cpu/event=0xd,umask=0xb/
+  packed_int_op_type.int128_sub
+       [Retired 128-bit packed integer subtract ops. Unit: cpu]
+        cpu/event=0xd,umask=2/
+  packed_int_op_type.int256_add
+       [Retired 256-bit packed integer add ops. Unit: cpu]
+        cpu/event=0xd,umask=0x10/
+  packed_int_op_type.int256_all
+       [Retired 256-bit packed integer ops of all types. Unit: cpu]
+        cpu/event=0xd,umask=0xf0/
+  packed_int_op_type.int256_cmp
+       [Retired 256-bit packed integer compare ops. Unit: cpu]
+        cpu/event=0xd,umask=0x70/
+  packed_int_op_type.int256_logical
+       [Retired 256-bit packed integer logical ops. Unit: cpu]
+        cpu/event=0xd,umask=0xd0/
+  packed_int_op_type.int256_mac
+       [Retired 256-bit packed integer multiply-accumulate ops. Unit: cpu]
+        cpu/event=0xd,umask=0x40/
+  packed_int_op_type.int256_mov
+       [Retired 256-bit packed integer MOV ops. Unit: cpu]
+        cpu/event=0xd,umask=0xa0/
+  packed_int_op_type.int256_mul
+       [Retired 256-bit packed integer multiply ops. Unit: cpu]
+        cpu/event=0xd,umask=0x30/
+  packed_int_op_type.int256_other
+       [Retired 256-bit packed integer ops of other types. Unit: cpu]
+        cpu/event=0xd,umask=0xe0/
+  packed_int_op_type.int256_pack
+       [Retired 256-bit packed integer pack ops. Unit: cpu]
+        cpu/event=0xd,umask=0xc0/
+  packed_int_op_type.int256_shift
+       [Retired 256-bit packed integer shift ops. Unit: cpu]
+        cpu/event=0xd,umask=0x90/
+  packed_int_op_type.int256_shuffle
+       [Retired 256-bit packed integer shuffle ops (may include instructions
+        not necessarily thought of as including shuffles e.g. horizontal add,
+        dot product,and certain MOV instructions). Unit: cpu]
+        cpu/event=0xd,umask=0xb0/
+  packed_int_op_type.int256_sub
+       [Retired 256-bit packed integer subtract ops. Unit: cpu]
+        cpu/event=0xd,umask=0x20/
+  sse_avx_ops_retired.all
+       [Retired SSE,AVX and MMX integer ops of all types. Unit: cpu]
+        cpu/event=0xb,umask=0xff/
+  sse_avx_ops_retired.mmx_add
+       [Retired MMX integer add. Unit: cpu]
+        cpu/event=0xb,umask=1/
+  sse_avx_ops_retired.mmx_all
+       [Retired MMX integer ops of all types. Unit: cpu]
+        cpu/event=0xb,umask=0xf/
+  sse_avx_ops_retired.mmx_cmp
+       [Retired MMX integer compare ops. Unit: cpu]
+        cpu/event=0xb,umask=7/
+  sse_avx_ops_retired.mmx_logical
+       [Retired MMX integer logical ops. Unit: cpu]
+        cpu/event=0xb,umask=0xd/
+  sse_avx_ops_retired.mmx_mac
+       [Retired MMX integer multiply-accumulate ops. Unit: cpu]
+        cpu/event=0xb,umask=4/
+  sse_avx_ops_retired.mmx_mov
+       [Retired MMX integer MOV ops. Unit: cpu]
+        cpu/event=0xb,umask=0xa/
+  sse_avx_ops_retired.mmx_mul
+       [Retired MMX integer multiply ops. Unit: cpu]
+        cpu/event=0xb,umask=3/
+  sse_avx_ops_retired.mmx_other
+       [Retired MMX integer multiply ops of other types. Unit: cpu]
+        cpu/event=0xb,umask=0xe/
+  sse_avx_ops_retired.mmx_pack
+       [Retired MMX integer pack ops. Unit: cpu]
+        cpu/event=0xb,umask=0xc/
+  sse_avx_ops_retired.mmx_shift
+       [Retired MMX integer shift ops. Unit: cpu]
+        cpu/event=0xb,umask=9/
+  sse_avx_ops_retired.mmx_shuffle
+       [Retired MMX integer shuffle ops (may include instructions not
+        necessarily thought of as including shuffles e.g. horizontal add,dot
+        product,and certain MOV instructions). Unit: cpu]
+        cpu/event=0xb,umask=0xb/
+  sse_avx_ops_retired.mmx_sub
+       [Retired MMX integer subtract ops. Unit: cpu]
+        cpu/event=0xb,umask=2/
+  sse_avx_ops_retired.sse_avx_add
+       [Retired SSE and AVX integer add ops. Unit: cpu]
+        cpu/event=0xb,umask=0x10/
+  sse_avx_ops_retired.sse_avx_aes
+       [Retired SSE and AVX integer AES ops. Unit: cpu]
+        cpu/event=0xb,umask=0x50/
+  sse_avx_ops_retired.sse_avx_all
+       [Retired SSE and AVX integer ops of all types. Unit: cpu]
+        cpu/event=0xb,umask=0xf0/
+  sse_avx_ops_retired.sse_avx_clm
+       [Retired SSE and AVX integer CLM ops. Unit: cpu]
+        cpu/event=0xb,umask=0x80/
+  sse_avx_ops_retired.sse_avx_cmp
+       [Retired SSE and AVX integer compare ops. Unit: cpu]
+        cpu/event=0xb,umask=0x70/
+  sse_avx_ops_retired.sse_avx_logical
+       [Retired SSE and AVX integer logical ops. Unit: cpu]
+        cpu/event=0xb,umask=0xd0/
+  sse_avx_ops_retired.sse_avx_mac
+       [Retired SSE and AVX integer multiply-accumulate ops. Unit: cpu]
+        cpu/event=0xb,umask=0x40/
+  sse_avx_ops_retired.sse_avx_mov
+       [Retired SSE and AVX integer MOV ops. Unit: cpu]
+        cpu/event=0xb,umask=0xa0/
+  sse_avx_ops_retired.sse_avx_mul
+       [Retired SSE and AVX integer multiply ops. Unit: cpu]
+        cpu/event=0xb,umask=0x30/
+  sse_avx_ops_retired.sse_avx_other
+       [Retired SSE and AVX integer ops of other types. Unit: cpu]
+        cpu/event=0xb,umask=0xe0/
+  sse_avx_ops_retired.sse_avx_pack
+       [Retired SSE and AVX integer pack ops. Unit: cpu]
+        cpu/event=0xb,umask=0xc0/
+  sse_avx_ops_retired.sse_avx_sha
+       [Retired SSE and AVX integer SHA ops. Unit: cpu]
+        cpu/event=0xb,umask=0x60/
+  sse_avx_ops_retired.sse_avx_shift
+       [Retired SSE and AVX integer shift ops. Unit: cpu]
+        cpu/event=0xb,umask=0x90/
+  sse_avx_ops_retired.sse_avx_shuffle
+       [Retired SSE and AVX integer shuffle ops (may include instructions not
+        necessarily thought of as including shuffles e.g. horizontal add,dot
+        product,and certain MOV instructions). Unit: cpu]
+        cpu/event=0xb,umask=0xb0/
+  sse_avx_ops_retired.sse_avx_sub
+       [Retired SSE and AVX integer subtract ops. Unit: cpu]
+        cpu/event=0xb,umask=0x20/
+
+hwmon:
+  temp_composite OR temp1
+       [Temperature in unit nvme named Composite. alarm=0'C,max=69.85'C,
+        min=69.85'C. Unit: hwmon_nvme]
+        hwmon_nvme/config=0xa0001/
+
+inst cache:
+  ic_cache_fill_l2
+       [Instruction cache lines (64 bytes) fulfilled from the L2 cache. Unit:
+        cpu]
+        cpu/event=0x82/
+  ic_cache_fill_sys
+       [Instruction cache lines (64 bytes) fulfilled from system memory or
+        another cache. Unit: cpu]
+        cpu/event=0x83/
+  ic_fetch_ibs_events.fetch_tagged
+       [Fetches tagged by Fetch IBS. Not all tagged fetches result in a valid

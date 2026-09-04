@@ -39,6 +39,26 @@ profiling work should extend important CRUD scenarios and validate native cache
 PMU events; the L1 aliases returned unvalidated zeroes and LLC aliases were
 unsupported. No production speedup is claimed by this batch.
 
+[Change 0409](changes/0409-xlsx-profile-and-range-accounting.md) extends the profile to the XLSX
+selected-cell path. Normal query p50 is 3.528 ms, with 81,918 allocations and
+10,690,444 allocated bytes in the separate counting-allocator run. The exact
+`SelectedWorksheet::cell` ancestor contains 2,528 sampled stack blocks;
+`clone_bounded_name_part` is 16.22% of their period-weighted leaf attribution.
+Most of that helper's cost comes through expanded-name cloning (75.50%) and
+namespace expansion (24.26%). `parse_element` is 23.31% inclusive but only
+6.08% self in the selected subset. These overlapping sampled CPU percentages
+are not wall-clock phase measurements.
+
+Lexical borrowed `ElementData` is a plausible narrow experiment, but lexical
+copy helper attribution does not establish it as the main bottleneck. Review
+expanded-name/frame ownership before broader changes and retain bounds,
+normalization, HRTB callback lifetime, recovery and namespace semantics.
+Native L2 request counters are now validated locally; exact LLC events remain
+unavailable in this guest and all-zero generic L1 aliases are unusable. The
+source edit/save harness also fixes previously unconfigured member ranges;
+corrected compressed overlap includes untouched raw publication and must not
+be read as semantic decoding. No speedup is claimed by 0409.
+
 ## Change 0402 update
 
 The selected-source validation loop in

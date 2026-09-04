@@ -1,0 +1,118 @@
+{
+  "source_after": {
+    "revision": "193ca7b4297ec35d07e5cdd5f64d144b822c5be9",
+    "status": "?? docs/GOAL.md",
+    "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+  },
+  "reports": [
+    {
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "samples": 500,
+      "warmup": 20,
+      "selected_worksheet_count": 1,
+      "status": "passed",
+      "compressed_overlap": {
+        "workbook_read_calls": [
+          1
+        ],
+        "workbook_read_bytes": [
+          226
+        ],
+        "selected_worksheet_read_calls": [
+          1
+        ],
+        "selected_worksheet_read_bytes": [
+          6816
+        ],
+        "unselected_worksheet_read_calls": [
+          3
+        ],
+        "unselected_worksheet_read_bytes": [
+          20330
+        ]
+      }
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_multi_sheet_edit_save",
+      "samples": 3,
+      "warmup": 1,
+      "selected_worksheet_count": 2,
+      "status": "passed",
+      "compressed_overlap": {
+        "workbook_read_calls": [
+          1
+        ],
+        "workbook_read_bytes": [
+          226
+        ],
+        "selected_worksheet_read_calls": [
+          2
+        ],
+        "selected_worksheet_read_bytes": [
+          13593
+        ],
+        "unselected_worksheet_read_calls": [
+          2
+        ],
+        "unselected_worksheet_read_bytes": [
+          13553
+        ]
+      }
+    },
+    {
+      "case": "xlsx_source_backed_cell_values_batch_edit_save",
+      "samples": 3,
+      "warmup": 1,
+      "selected_worksheet_count": 4,
+      "status": "passed",
+      "compressed_overlap": {
+        "workbook_read_calls": [
+          1
+        ],
+        "workbook_read_bytes": [
+          226
+        ],
+        "selected_worksheet_read_calls": [
+          4
+        ],
+        "selected_worksheet_read_bytes": [
+          27146
+        ],
+        "unselected_worksheet_read_calls": [
+          0
+        ],
+        "unselected_worksheet_read_bytes": [
+          0
+        ]
+      }
+    },
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_edit_save",
+      "samples": 3,
+      "warmup": 1,
+      "selected_worksheet_count": 1,
+      "status": "passed",
+      "compressed_overlap": {
+        "workbook_read_calls": [
+          1
+        ],
+        "workbook_read_bytes": [
+          226
+        ],
+        "selected_worksheet_read_calls": [
+          1
+        ],
+        "selected_worksheet_read_bytes": [
+          6816
+        ],
+        "unselected_worksheet_read_calls": [
+          3
+        ],
+        "unselected_worksheet_read_bytes": [
+          20330
+        ]
+      }
+    }
+  ],
+  "performance_claim": "none"
+}

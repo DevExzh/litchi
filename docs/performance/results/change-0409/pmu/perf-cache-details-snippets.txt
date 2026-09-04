@@ -1,0 +1,141 @@
+741-       [Op cache misses. Unit: cpu]
+742-        cpu/event=0x28f,umask=4/
+743-
+744-l2 cache:
+745:  l2_cache_req_stat.all
+746-       [Core to L2 cache requests (not including L2 prefetch) for data and
+747-        instruction cache access. Unit: cpu]
+748-        cpu/event=0x64,umask=0xff/
+749:  l2_cache_req_stat.dc_access_in_l2
+750-       [Core to L2 cache requests (not including L2 prefetch) for data cache
+751-        access. Unit: cpu]
+752-        cpu/event=0x64,umask=0xf8/
+753:  l2_cache_req_stat.dc_hit_in_l2
+754-       [Core to L2 cache requests (not including L2 prefetch) for data cache
+755-        hits. Unit: cpu]
+756-        cpu/event=0x64,umask=0xf0/
+757:  l2_cache_req_stat.ic_access_in_l2
+758-       [Core to L2 cache requests (not including L2 prefetch) for instruction
+759-        cache access. Unit: cpu]
+760-        cpu/event=0x64,umask=7/
+761:  l2_cache_req_stat.ic_dc_hit_in_l2
+762-       [Core to L2 cache requests (not including L2 prefetch) for data and
+763-        instruction cache hits. Unit: cpu]
+764-        cpu/event=0x64,umask=0xf6/
+765:  l2_cache_req_stat.ic_dc_miss_in_l2
+766-       [Core to L2 cache requests (not including L2 prefetch) for data and
+767-        instruction cache misses. Unit: cpu]
+768-        cpu/event=0x64,umask=9/
+769:  l2_cache_req_stat.ic_fill_hit_s
+770-       [Core to L2 cache requests (not including L2 prefetch) with status:
+771-        instruction cache hit non-modifiable line in L2. Unit: cpu]
+772-        cpu/event=0x64,umask=2/
+773:  l2_cache_req_stat.ic_fill_hit_x
+774-       [Core to L2 cache requests (not including L2 prefetch) with status:
+775-        instruction cache hit modifiable line in L2. Unit: cpu]
+776-        cpu/event=0x64,umask=4/
+777:  l2_cache_req_stat.ic_fill_miss
+778-       [Core to L2 cache requests (not including L2 prefetch) with status:
+779-        instruction cache request miss in L2. Unit: cpu]
+780-        cpu/event=0x64,umask=1/
+781:  l2_cache_req_stat.ic_hit_in_l2
+782-       [Core to L2 cache requests (not including L2 prefetch) for instruction
+783-        cache hits. Unit: cpu]
+784-        cpu/event=0x64,umask=6/
+785:  l2_cache_req_stat.ls_rd_blk_c
+786-       [Core to L2 cache requests (not including L2 prefetch) with status:
+787-        data cache request miss in L2. Unit: cpu]
+788-        cpu/event=0x64,umask=8/
+789:  l2_cache_req_stat.ls_rd_blk_cs
+790-       [Core to L2 cache requests (not including L2 prefetch) with status:
+791-        data cache shared read hit in L2. Unit: cpu]
+792-        cpu/event=0x64,umask=0x80/
+793:  l2_cache_req_stat.ls_rd_blk_l_hit_s
+794-       [Core to L2 cache requests (not including L2 prefetch) with status:
+795-        data cache read hit non-modifiable line in L2. Unit: cpu]
+796-        cpu/event=0x64,umask=0x20/
+797:  l2_cache_req_stat.ls_rd_blk_l_hit_x
+798-       [Core to L2 cache requests (not including L2 prefetch) with status:
+799-        data cache read hit modifiable line in L2. Unit: cpu]
+800-        cpu/event=0x64,umask=0x40/
+801:  l2_cache_req_stat.ls_rd_blk_x
+802-       [Core to L2 cache requests (not including L2 prefetch) with status:
+803-        data cache store or state change hit in L2. Unit: cpu]
+804-        cpu/event=0x64,umask=0x10/
+805-  l2_fill_rsp_src.all
+--
+961-  branches
+962-       [Retired branch instructions [This event is an alias of
+963-        branch-instructions]. Unit: cpu]
+964-        cpu/legacy-hardware-config=4/
+965:  cache-misses
+966-       [Cache misses. Usually this indicates Last Level Cache misses; this is
+967-        intended to be used in conjunction with the
+968-        PERF_COUNT_HW_CACHE_REFERENCES event to calculate cache miss rates.
+969-        Unit: cpu]
+970-        cpu/event=0x64,umask=0x09/
+971:  cache-references
+972-       [Cache accesses. Usually this indicates Last Level Cache accesses but
+973-        this may vary depending on your CPU. This may include prefetches and
+974-        coherency messages; again this depends on the design of your CPU.
+975-        Unit: cpu]
+--
+1922-        miss will not be counted by this metric if it is an OC hit]
+1923-       [d_ratio(ic_tag_hit_miss.instruction_cache_miss,
+1924-        ic_tag_hit_miss.all_instruction_cache_accesses)]
+1925-
+1926:l1_dcache:
+1927-  all_data_cache_accesses_pti
+1928-       [All data cache accesses per thousand instructions]
+1929-       [ls_dispatch.all / instructions]
+1930-  all_l1_data_cache_fills_pti
+--
+1977-        l2_pf_miss_l2_hit_l3.l2_hwpf + l2_pf_miss_l2_l3.l2_hwpf) /
+1978-        instructions]
+1979-  all_l2_cache_hits_pti
+1980-       [All L2 cache hits per thousand instructions]
+1981:       [(l2_cache_req_stat.ic_dc_hit_in_l2 + l2_pf_hit_l2.l2_hwpf) /
+1982-        instructions]
+1983-  all_l2_cache_misses_pti
+1984-       [All L2 cache misses per thousand instructions]
+1985:       [(l2_cache_req_stat.ic_dc_miss_in_l2 + l2_pf_miss_l2_hit_l3.l2_hwpf +
+1986-        l2_pf_miss_l2_l3.l2_hwpf) / instructions]
+1987-  l2_cache_accesses_from_l1_dc_misses_pti
+1988-       [L2 cache accesses from L1 data cache misses (including prefetch) per
+1989-        thousand instructions]
+--
+1998-       [(l2_pf_hit_l2.l1_dc_l2_hwpf + l2_pf_miss_l2_hit_l3.l1_dc_l2_hwpf +
+1999-        l2_pf_miss_l2_l3.l1_dc_l2_hwpf) / instructions]
+2000-  l2_cache_hits_from_l1_dc_miss_pti
+2001-       [L2 cache hits from L1 data cache misses per thousand instructions]
+2002:       [l2_cache_req_stat.dc_hit_in_l2 / instructions]
+2003-  l2_cache_hits_from_l1_ic_miss_pti
+2004-       [L2 cache hits from L1 instruction cache misses per thousand
+2005-        instructions]
+2006:       [l2_cache_req_stat.ic_hit_in_l2 / instructions]
+2007-  l2_cache_hits_from_l2_hwpf_pti
+2008-       [L2 cache hits from L2 cache hardware prefetcher per thousand
+2009-        instructions]
+2010-       [l2_pf_hit_l2.l1_dc_l2_hwpf / instructions]
+2011-  l2_cache_misses_from_l1_dc_miss_pti
+2012-       [L2 cache misses from L1 data cache misses per thousand instructions]
+2013:       [l2_cache_req_stat.ls_rd_blk_c / instructions]
+2014-  l2_cache_misses_from_l1_ic_miss_pti
+2015-       [L2 cache misses from L1 instruction cache misses per thousand
+2016-        instructions]
+2017:       [l2_cache_req_stat.ic_fill_miss / instructions]
+2018-  l2_cache_misses_from_l2_hwpf_pti
+2019-       [L2 cache misses from L2 cache hardware prefetcher per thousand
+2020-        instructions]
+2021-       [(l2_pf_miss_l2_hit_l3.l1_dc_l2_hwpf + l2_pf_miss_l2_l3.l1_dc_l2_hwpf)
+2022-        / instructions]
+2023-
+2024-l3_cache:
+2025:  l3_cache_accesses
+2026-       [L3 cache accesses]
+2027-       [l3_lookup_state.all_coherent_accesses_to_l3]
+2028:  l3_misses
+2029-       [L3 misses (including cacheline state change requests)]
+2030-       [l3_lookup_state.l3_miss]
+2031-  l3_read_miss_latency
+2032-       [Average L3 read miss latency (in core clocks)]

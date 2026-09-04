@@ -1,0 +1,1 @@
+/sys/bus/event_source/devices/cpu
