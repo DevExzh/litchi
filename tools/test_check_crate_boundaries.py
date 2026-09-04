@@ -1437,6 +1437,137 @@ def add_numbers_table_cell_date_time_format_canonical_scaffold(root: Path) -> No
     )
 
 
+def add_numbers_table_cell_duration_format_canonical_scaffold(root: Path) -> None:
+    """Create the complete selector-first Duration owner and codec seam."""
+
+    semantic = root / boundaries.NUMBERS_TABLE_CELL_DURATION_FORMAT_SEMANTIC_SOURCE
+    semantic.parent.mkdir(parents=True, exist_ok=True)
+    semantic.write_text(
+        "pub mod transaction {\n"
+        "    pub use crate::package::table_cell_duration_format::{"
+        + ", ".join(boundaries.NUMBERS_TABLE_CELL_DURATION_FORMAT_TRANSACTION_TYPES)
+        + "};\n"
+        "}\n"
+        "pub struct Duration;\n"
+        "pub enum Style { Colon, Abbreviated, FullNames }\n"
+        "pub enum Unit { Weeks, Days, Hours, Minutes, Seconds, Milliseconds }\n"
+        "pub struct UnitRange;\n"
+        "pub enum Units { Automatic(UnitRange), Custom(UnitRange) }\n",
+        encoding="utf-8",
+    )
+
+    owner = root / boundaries.NUMBERS_TABLE_CELL_DURATION_FORMAT_OWNER_SOURCE
+    owner.parent.mkdir(parents=True, exist_ok=True)
+    owner.write_text(
+        "pub enum Path { Package, Cell }\n"
+        "pub enum LimitKind { WireBytes }\n"
+        "pub struct Edit;\n"
+        "pub struct Patch;\n"
+        "pub struct Commit;\n"
+        "pub struct Diagnostics;\n"
+        "pub struct Error;\n"
+        "fn source_bound_transaction() {\n"
+        "    source_is_exact; __source_owner; OwnedExactArtifacts; authorizes_owner;\n"
+        "    resolve_cell; TransactionBudget; preflight_reassembly; charge_output;\n"
+        "    display_native; read_duration_format; rewrite_duration_format;\n"
+        "    candidate; reopen; charge_candidate_reopen; readback; verify_duration_package_locality;\n"
+        "}\n"
+        "impl Package {\n"
+        "pub fn table_cell_duration_format<'sheet, 'table>(&self, "
+        "sheet: impl Into<SheetSelector<'sheet>>, "
+        "table: impl Into<TableSelector<'table>>, position: CellPosition) "
+        "-> Result<Option<Duration>, Error> {}\n"
+        "pub fn edit_table_cell_duration_format<'sheet, 'table>(&self, "
+        "sheet: impl Into<SheetSelector<'sheet>>, "
+        "table: impl Into<TableSelector<'table>>, position: CellPosition) "
+        "-> Result<Edit, Error> {}\n"
+        "pub fn apply_table_cell_duration_format(&self, patch: &Patch) "
+        "-> Result<Commit, Error> {}\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    lib = root / (boundaries.NUMBERS_SOURCE_ROOT / "lib.rs")
+    lib.parent.mkdir(parents=True, exist_ok=True)
+    lib.write_text("pub mod cell;\n", encoding="utf-8")
+    data_format = root / (boundaries.NUMBERS_SOURCE_ROOT / "cell" / "data_format.rs")
+    data_format.parent.mkdir(parents=True, exist_ok=True)
+    data_format.write_text(
+        "pub mod duration;\npub use duration::Duration;\n", encoding="utf-8"
+    )
+    package = root / Path("crates/litchi-numbers/src/package.rs")
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_text(
+        "pub(crate) mod table_cell_duration_format;\n", encoding="utf-8"
+    )
+
+    codec = root / boundaries.NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_SOURCE
+    codec.parent.mkdir(parents=True, exist_ok=True)
+    codec.write_text(
+        "use crate::numbers_table_cell_pop_up_menu_codec as core;\n"
+        "use buffa::DecodeOptions;\n"
+        "pub const NATIVE_DURATION_FORMAT_TYPE: u32 = 268;\n"
+        "pub enum DurationStyle { Colon, Abbreviated, FullNames }\n"
+        "pub enum DurationUnit { Weeks, Days, Hours, Minutes, Seconds, Milliseconds }\n"
+        "pub struct DurationFormatSnapshot;\n"
+        "pub struct DurationFormatWrite;\n"
+        "pub struct PreparedDurationFormatRewrite;\n"
+        "pub struct PreparedDurationFormatWrite;\n"
+        "pub struct RewriteOutput;\n"
+        "pub struct RewriteExecutionRequirements;\n"
+        "pub struct RewriteExecutionLimits;\n"
+        "pub fn decode_duration_format() { core::decode_duration_format(); }\n"
+        "pub fn decode_duration_format_with_report() { core::decode_duration_format_with_report(); }\n"
+        "pub fn prepare_duration_format_rewrite() { core::prepare_duration_format_rewrite(); }\n"
+        "pub fn prepare_duration_format_write() { core::prepare_duration_format_write(); }\n"
+        "pub fn canonical_duration_format() { core::canonical_duration_format(); }\n"
+        "pub fn rewrite_duration_format() { core::rewrite_duration_format(); }\n"
+        "#[cfg(test)]\n"
+        "mod tests { #[test] fn duration_round_trip_and_hostile_wire() {} }\n",
+        encoding="utf-8",
+    )
+    shared = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_SOURCE
+    shared.parent.mkdir(parents=True, exist_ok=True)
+    shared.write_text(
+        "pub struct RewriteOutput;\n"
+        "pub struct RewriteExecutionRequirements;\n"
+        "pub struct RewriteExecutionLimits;\n"
+        "pub fn decode_duration_format() {\n"
+        "    Budget::new; preflight; scan_duration_format;\n"
+        "    decode_lazy_view; unknown; extend_from_slice; buffa_duration_format_parity;\n"
+        "}\n"
+        "pub fn decode_duration_format_with_report() { decode_duration_format(); }\n"
+        "pub fn prepare_duration_format_rewrite() { execution_requirements; }\n"
+        "pub fn prepare_duration_format_write() { execution_requirements; }\n"
+        "pub fn canonical_duration_format() { execute; }\n"
+        "pub fn rewrite_duration_format() { execute; }\n",
+        encoding="utf-8",
+    )
+    public = root / boundaries.NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_PUBLIC_SOURCE
+    public.parent.mkdir(parents=True, exist_ok=True)
+    public.write_text(
+        "#[doc(hidden)]\n"
+        f"pub mod {boundaries.NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_MODULE};\n"
+        "#[doc(hidden)]\n"
+        f"mod {boundaries.NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_GENERATED_MODULE} {{\n"
+        "    include!(concat!(env!(\"OUT_DIR\"), "
+        "\"/buffa-numbers-table-cell-duration-format/generated.rs\"));\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_DURATION_FORMAT_SOURCE[0]
+    host.parent.mkdir(parents=True, exist_ok=True)
+    host.write_text(
+        "fn generic_duration_format_route() {\n"
+        "    cell_duration_format(); set_cell_duration_format();\n"
+        "    reset_cell_duration_format(); table_cell_data_format();\n"
+        "    set_table_cell_data_format();\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+
 def add_numbers_table_cell_custom_format_canonical_scaffold(root: Path) -> None:
     """Create the complete focused Custom owner and private codec seam."""
 
@@ -35125,6 +35256,314 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
+    def test_numbers_table_cell_duration_format_boundary_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_duration_format_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_duration_format_codec_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_duration_format_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_duration_format_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_duration_format_rejects_raw_transaction_exports_and_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_duration_format_canonical_scaffold(root)
+
+            semantic = root / boundaries.NUMBERS_TABLE_CELL_DURATION_FORMAT_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub mod transaction {\n"
+                "    pub use crate::package::table_cell_duration_format::{Edit, Patch, Commit, Diagnostics, Error, LimitKind};\n"
+                "}\n"
+                "pub struct Duration;\n"
+                "pub fn leak(bytes: &[u8], format_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_duration_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing canonical export Path" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("raw byte slice" in item for item in violations), violations
+            )
+            self.assertTrue(
+                any("raw parameter" in item for item in violations), violations
+            )
+
+            owner = root / boundaries.NUMBERS_TABLE_CELL_DURATION_FORMAT_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn generated_projection() -> GeneratedDuration { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_duration_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("generated type" in item for item in violations), violations
+            )
+
+            codec = root / boundaries.NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8")
+                + "pub fn prost_escape() { prost::Message::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_duration_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("Prost production path" in item for item in violations), violations
+            )
+
+    def test_numbers_table_cell_duration_format_codec_masks_cfg_comments_strings_and_bad_projection(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_duration_format_canonical_scaffold(root)
+            codec = root / boundaries.NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_SOURCE
+            complete_codec = codec.read_text(encoding="utf-8")
+            codec.write_text(
+                re.sub(
+                    r"#\[cfg\(test\)\][\s\S]*$",
+                    "// #[cfg(test)] mod tests { #[test] fn hostile_wire() {} }\n"
+                    'const NOTE: &str = "prost decode_lazy_view Budget::new";\n',
+                    complete_codec,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_duration_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing its cfg(test) hostile-wire harness" in item for item in violations),
+                violations,
+            )
+
+            public = root / boundaries.NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_PUBLIC_SOURCE
+            generated = boundaries.NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_GENERATED_MODULE
+            public.write_text(
+                "#[doc(hidden)]\n"
+                f"pub mod {boundaries.NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_MODULE};\n"
+                f"pub mod {generated};\n"
+                f"pub(crate) use crate::{generated} as projection;\n",
+                encoding="utf-8",
+            )
+            codec.write_text(complete_codec, encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_duration_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("generated projection must remain private" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("public API reexports its Buffa generated projection" in item for item in violations),
+                violations,
+            )
+
+            public.write_text(
+                "#[cfg(all(test, feature = \"oracle\"))]\n"
+                "#[doc(hidden)]\n"
+                f"pub mod {boundaries.NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_MODULE};\n"
+                "#[cfg(all(test, feature = \"oracle\"))]\n"
+                f"mod {generated};\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_duration_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("missing hidden codec module" in item for item in violations), violations)
+            self.assertTrue(
+                any("missing a private Buffa generated projection" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_numbers_table_cell_duration_format_retires_raw_id_routes_and_preserves_compatibility(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_duration_format_canonical_scaffold(root)
+            host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_DURATION_FORMAT_SOURCE[0]
+
+            # Generic DataFormat compatibility remains valid, and attached
+            # Pages/Keynote table routes are deliberately outside this audit.
+            pages = root / "crates/litchi-iwa/src/pages/editor/tables/semantic.rs"
+            pages.parent.mkdir(parents=True, exist_ok=True)
+            pages.write_text(
+                "impl PagesEditor {\n"
+                "    pub fn table_cell_duration_format(&self) {}\n"
+                "    pub fn set_table_cell_duration_format(&mut self) {}\n"
+                "    pub fn reset_table_cell_duration_format(&mut self) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            keynote = root / "crates/litchi-iwa/src/keynote/editor/slide_tables.rs"
+            keynote.parent.mkdir(parents=True, exist_ok=True)
+            keynote.write_text(
+                "impl KeynoteEditor {\n"
+                "    pub fn slide_table_cell_duration_format(&self) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_duration_format_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            host.write_text(
+                "impl NumbersEditor {\n"
+                + "\n".join(
+                    f"pub fn {method}(&self) {{}}"
+                    for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_DURATION_FORMAT_METHODS
+                )
+                + "\n}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_duration_format_source_topology(
+                root
+            )
+            for method in boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_DURATION_FORMAT_METHODS:
+                self.assertTrue(
+                    any(f"raw-ID method returned {method}" in item for item in violations),
+                    (method, violations),
+                )
+
+            # Comments, literals, and test-only cfg expressions do not revive
+            # the retired route; generic DataFormat names stay compatible.
+            host.write_text(
+                "// table_cell_duration_format(); set_table_cell_duration_format();\n"
+                'const NOTE: &str = "reset_table_cell_duration_format(";\n'
+                "#[cfg(all(test, feature = \"oracle\"))]\n"
+                "fn hidden_all() { editor.table_cell_duration_format(); }\n"
+                "#[cfg(any(all(test, feature = \"oracle\"), all(test, unix)))]\n"
+                "fn hidden_nested() { editor.set_table_cell_duration_format(); }\n"
+                "fn generic_duration_route() {\n"
+                "    cell_duration_format(); set_cell_duration_format();\n"
+                "    reset_cell_duration_format(); table_cell_data_format();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_duration_format_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            # A focused receiver is exempt only in its lexical binding scope;
+            # a generic shadow and an editor receiver remain visible.
+            host.write_text(
+                "use litchi_numbers::Package as FocusedNumbersPackage;\n"
+                "fn scoped_routes() {\n"
+                "    let package = FocusedNumbersPackage::from_bytes(bytes);\n"
+                "    {\n"
+                "        let package = GenericPackage::new();\n"
+                "        package.table_cell_duration_format();\n"
+                "    }\n"
+                "    package.table_cell_duration_format();\n"
+                "    {\n"
+                "        let package = FocusedNumbersPackage::from_bytes(bytes);\n"
+                "        package.set_table_cell_duration_format();\n"
+                "    }\n"
+                "    litchi_numbers::Package::from_bytes(bytes)?.reset_table_cell_duration_format();\n"
+                "    editor.table_cell_duration_format();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_duration_format_source_topology(
+                root
+            )
+            production_calls = [
+                item for item in violations if "raw-ID production call" in item
+            ]
+            self.assertEqual(len(production_calls), 2, violations)
+            self.assertTrue(
+                any("table_cell_duration_format" in item for item in production_calls),
+                violations,
+            )
+            self.assertEqual(
+                sum("table_cell_duration_format" in item for item in production_calls),
+                2,
+                violations,
+            )
+            self.assertFalse(
+                any("set_table_cell_duration_format" in item for item in production_calls),
+                violations,
+            )
+            self.assertFalse(
+                any("reset_table_cell_duration_format" in item for item in production_calls),
+                violations,
+            )
+
+    def test_numbers_table_cell_duration_format_owner_gate_masks_test_decoys(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_DURATION_FORMAT_OWNER_SOURCE
+            semantic = root / boundaries.NUMBERS_TABLE_CELL_DURATION_FORMAT_SEMANTIC_SOURCE
+            package = root / Path("crates/litchi-numbers/src/package.rs")
+            for path, source in (
+                (
+                    owner,
+                    "#[cfg(all(test, feature = \"oracle\"))]\n"
+                    "pub fn fake_owner() { table_cell_duration_format(); }\n",
+                ),
+                (
+                    semantic,
+                    "#[cfg(any(all(test, feature = \"oracle\"), all(test, unix)))]\n"
+                    "pub struct Duration;\n",
+                ),
+                (
+                    package,
+                    "#[cfg(all(test, feature = \"oracle\"))]\n"
+                    "pub(crate) mod table_cell_duration_format;\n",
+                ),
+            ):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(source, encoding="utf-8")
+            host = root / boundaries.RETIRED_IWA_NUMBERS_TABLE_CELL_DURATION_FORMAT_SOURCE[0]
+            host.parent.mkdir(parents=True, exist_ok=True)
+            host.write_text(
+                "fn bypass() { editor.table_cell_duration_format(); }\n",
+                encoding="utf-8",
+            )
+
+            self.assertFalse(
+                boundaries._numbers_table_cell_duration_format_owner_present(root)
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_duration_format_source_topology(
+                    root
+                ),
+                [],
+            )
+
     def test_numbers_table_cell_custom_format_boundary_contract(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -37185,6 +37624,9 @@ fn rewrite_movie_title_operation(
             "audit_numbers_table_cell_date_time_format_codec_source_topology",
             "audit_numbers_table_cell_date_time_format_facade_source_topology",
             "audit_iwa_numbers_table_cell_date_time_format_source_topology",
+            "audit_numbers_table_cell_duration_format_codec_source_topology",
+            "audit_numbers_table_cell_duration_format_facade_source_topology",
+            "audit_iwa_numbers_table_cell_duration_format_source_topology",
             "audit_iwa_numbers_table_cell_text_format_source_topology",
             "audit_numbers_table_cell_custom_format_codec_source_topology",
             "audit_numbers_table_cell_custom_format_facade_source_topology",
@@ -37218,6 +37660,9 @@ fn rewrite_movie_title_operation(
             "audit_numbers_table_cell_date_time_format_codec_source_topology",
             "audit_numbers_table_cell_date_time_format_facade_source_topology",
             "audit_iwa_numbers_table_cell_date_time_format_source_topology",
+            "audit_numbers_table_cell_duration_format_codec_source_topology",
+            "audit_numbers_table_cell_duration_format_facade_source_topology",
+            "audit_iwa_numbers_table_cell_duration_format_source_topology",
             "audit_iwa_numbers_table_cell_text_format_source_topology",
             "audit_numbers_table_cell_custom_format_codec_source_topology",
             "audit_numbers_table_cell_custom_format_facade_source_topology",

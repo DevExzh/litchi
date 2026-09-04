@@ -1230,25 +1230,29 @@ candidate SHA-256 to 496,491 bytes with SHA-256
 The canonical source, candidate, and inverse remained untouched. No native
 mutation, save, reopen acceptance, or byte-exact native UI-save claim follows.
 
-Numbers scalar cell writes are selector-first `litchi-numbers` package
-transactions, not `NumbersEditor` raw-ID calls. They stage a complete batch
-before publication, so any rejected coordinate, dependency, or cache update
-leaves the package unchanged:
+Focused Numbers scalar-cell operations are selector-first `litchi-numbers`
+package transactions, not `NumbersEditor` raw-ID convenience calls. Generic
+source-built or cross-format `DataFormat` compatibility remains a
+migration-host surface. Focused transactions stage a complete batch before
+publication, so any rejected coordinate, dependency, or cache update leaves
+the package unchanged:
 
-Existing-cell Number, Percentage, Currency, Scientific, Fraction, Text, and
-Date & Time format transactions follow the same focused-package rule. The
-former `NumbersEditor` raw-ID convenience methods are retired for Number,
-Percentage, Currency, Scientific, Fraction, and Date & Time; their dedicated
-Number/Percentage/Currency/Scientific/Fraction bridge and fallback helpers are
-retired as well. There is no dedicated host raw-ID Text
+Existing-cell Number, Percentage, Currency, Scientific, Fraction, Text, Date
+& Time, and Duration format transactions follow the same focused-package rule.
+The former `NumbersEditor` raw-ID convenience methods are retired for Number,
+Percentage, Currency, Scientific, Fraction, Date & Time, and Duration; their
+dedicated `NumbersEditor` Number/Percentage/Currency/Scientific/Fraction bridge and fallback
+entry points are retired as well; private attached Pages/Keynote adapters remain. There is no
+dedicated host raw-ID Text
 route; the focused Text owner handles that existing-cell operation. Generic
-source-built or cross-format `DataFormat` compatibility helpers, source-built
-`DataFormat::Text` and `DataFormat::DateTime`, the broad `TextDateTimeField`
-smart-field lifecycle, and attached Pages/Keynote table callers remain
+source-built or cross-format `DataFormat` compatibility helpers, including
+`DataFormat::Duration`, source-built `DataFormat::Text` and
+`DataFormat::DateTime`, the broad `TextDateTimeField` smart-field lifecycle,
+and attached Pages/Keynote table callers remain
 migration-host-only compatibility surfaces. The dedicated `NumbersEditor`
-semantic/table Date & Time get/set/reset methods are retired; attached
-PagesEditor and KeynoteEditor table wrappers remain available for their
-compatibility surfaces.
+semantic/table Date & Time and Duration get/set/reset methods are retired;
+private Date & Time and Duration bridge helpers remain only behind attached
+PagesEditor and KeynoteEditor table compatibility wrappers.
 
 The focused `litchi-numbers` Text-format owner handles existing-cell Text
 through its selector-first package API. For source-built Numbers compatibility,
@@ -1265,6 +1269,24 @@ identity-bearing path remains available for compatibility, as do the Pages and
 Keynote wrappers. Native evidence for the focused owner is limited to the one
 recorded Numbers type-9 cell/pattern and its operation-specific save/close/
 reopen cycle; it is not a suite-wide DateTime or host-exit claim.
+
+The focused `litchi-numbers` Duration owner likewise handles one existing cell
+through selector-first `Package` APIs, with strict native type-268 admission
+and explicit marker `0x0004`/`0x0005` shapes. Only a true
+marker/kind/reference-free absence reads as `None`; marker-zero tuples that
+retain Duration kind/reference metadata are ambiguous inherited state and fail
+closed. An automated AppleScript-driven Numbers 14.4 open/save/close/reopen
+probe successfully round-tripped both admitted marker forms with no reported
+error or repair/conversion indication; no GUI repair-dialog inspection was
+performed. Strict semantic no-op rereads, exact inverse restoration, and recorded
+candidate/native-resaved and Duration Tile/DataList member hashes matched (see
+[ADR 0008](../../docs/adr/0008-migration-and-verification.md#2026-09-04-amendment-numbers-existing-cell-duration-owner-and-raw-id-host-route-retirement)).
+This is disposable, operation-specific E3/E4 evidence only: the Apple-authored
+source/probe artifacts are provenance, not a checked-in E2 fixture, and the
+record does not claim broad native acceptance, package parity, or a suite-wide
+host-exit result. Generic source-built/cross-format `DataFormat::Duration` and
+the attached Pages/Keynote table wrappers remain host-owned compatibility
+surfaces.
 
 The focused `litchi-numbers` Custom owner handles one existing rooted cell's
 document-scoped Number, Text, or Date & Time custom format through selector-first

@@ -4157,3 +4157,47 @@ No workspace package, dependency edge, ordered debt, migration host, or ADR
 packages, 238 internal dependency declarations, 227 canonical edges, 11
 development-only edges, 11 ordered migration debts with IDs `[1, 2, 4, 8, 10,
 12, 13, 14, 15, 16, 17]`, and one migration host.
+
+## 2026-09-04 amendment: Numbers existing-cell Duration owner and raw-ID route retirement
+
+The current Numbers topology now includes a focused selector-first owner for
+one existing rooted cell's Duration display metadata. The archive-free
+`litchi_numbers::Package` API is
+`Package::{table_cell_duration_format, edit_table_cell_duration_format,
+apply_table_cell_duration_format}`; it keeps native type-268 format records,
+BNC kind-4 metadata, list keys, and IWA object identifiers private. The
+admitted native payload uses fields 1, 7, 15, 16, and 40, with styles `0/1/2`
+and unit bits `1/2/4/8/16/32`. BNC markers `0x0004` (primary-only) and
+`0x0005` (retained generic Number secondary) are distinguished; marker-zero
+inherited tuples are refused by this owner. The transaction is
+metadata-only and preserves values/formulas/caches, unknown and unselected
+bytes, copy-on-write/refcounts, locality, and exact inverse/source checks.
+
+The deterministic package/codec fixtures provide E1 synthetic/self-round-trip
+evidence. No checked-in Apple-authored fixture provides E2 parse/no-op
+evidence. A disposable Numbers 14.4 probe opened, saved, closed, and
+reopened both Litchi-mutated candidates without error: the primary-only
+candidate `c62fb9ca6e1b86e8a60abde6ebbcdf31edaefd88a09cbc2a65684e4be27372e2`
+became native `c8a009d99a6d079f6feff38c73f658e502098c105db3027246f79801fcd1f43e`
+with marker `0x0004`, Duration ID 5, type 268, style 1, custom units 1
+through 32, and scalar `316310400`; the retained-secondary candidate
+`c3a797dc63eb99926c88130318211511e43c6ba979626f77d89f0c1a7765c48e` became
+native `04208a942693f19ead2020d1ac1449dce00e9de7df865d88cc8e46847b02714b`
+with marker `0x0005`, Duration ID 3, generic Number ID 1, and scalar `86400`.
+Strict post-native rereads reported no-op and exact inverse results for both;
+the Duration Tile/DataList members remained byte-identical and only unrelated
+members normalized across the 43-member packages. This is operation-specific
+E3/E4 evidence for the two existing-cell marker shapes only, not broad native
+acceptance or package parity. The Apple-authored starting packages are
+disposable provenance, not checked-in E2 fixtures and not GUI/Computer Use
+evidence. The dedicated raw-ID `NumbersEditor` Duration read/set/reset routes
+are retired, but generic source-built or cross-format `DataFormat::Duration`
+and attached Pages/Keynote compatibility remain in the migration host;
+focused refusals are terminal.
+
+This is an ownership/API-boundary change within the existing graph. It adds no
+workspace package, manifest dependency, canonical edge, ordered debt
+retirement, migration-host removal, or deletion-gate closure. The authoritative
+topology remains 64 workspace packages, 238 internal dependency declarations,
+227 canonical edges, 11 development-only edges, 11 ordered migration debts
+with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.

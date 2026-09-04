@@ -2229,10 +2229,10 @@ mod tests {
         )
         .unwrap();
         editor
-            .set_table_cell_duration_format(table_id, 1, 1, duration)
+            .set_table_cell_data_format(table_id, 1, 1, DataFormat::Duration(duration))
             .unwrap();
         editor
-            .set_table_cell_duration_format(table_id, 1, 2, duration)
+            .set_table_cell_data_format(table_id, 1, 2, DataFormat::Duration(duration))
             .unwrap();
 
         let location = model::locate_attached_cell(editor.package(), table_id, 1, 1).unwrap();
@@ -2242,28 +2242,24 @@ mod tests {
 
         let mut reopened = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
         assert_eq!(
-            reopened.table_cell_duration_format(table_id, 1, 1).unwrap(),
-            Some(duration)
+            reopened.table_cell_data_format(table_id, 1, 1).unwrap(),
+            DataFormat::Duration(duration)
         );
         let document = compatibility_document_from_bytes(&reopened.to_bytes().unwrap()).unwrap();
         assert_eq!(
             document.sheets()[0].tables().next().unwrap().get_cell(1, 2),
             Some(&CellValue::duration(129_600.0).expect("finite test duration"))
         );
-        assert!(
-            reopened
-                .reset_table_cell_duration_format(table_id, 1, 1)
-                .unwrap()
-        );
+        reopened
+            .set_table_cell_data_format(table_id, 1, 1, DataFormat::Automatic)
+            .unwrap();
         assert_eq!(
-            reopened.table_cell_duration_format(table_id, 1, 2).unwrap(),
-            Some(duration)
+            reopened.table_cell_data_format(table_id, 1, 2).unwrap(),
+            DataFormat::Duration(duration)
         );
-        assert!(
-            reopened
-                .reset_table_cell_duration_format(table_id, 1, 2)
-                .unwrap()
-        );
+        reopened
+            .set_table_cell_data_format(table_id, 1, 2, DataFormat::Automatic)
+            .unwrap();
         let location = model::locate_attached_cell(reopened.package(), table_id, 1, 2).unwrap();
         assert!(
             resolve_format_table(reopened.package(), &location)

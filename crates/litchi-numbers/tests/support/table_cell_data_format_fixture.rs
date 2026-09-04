@@ -22,7 +22,7 @@ use litchi_iwa_core::{
     Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{tn, tsd, tsk, tsp, tst};
-use litchi_numbers_wire::{BncCell, CellDataFormatKind};
+use litchi_numbers_wire::{BncCell, CellDataFormatKind, StoredValue};
 use prost::Message as _;
 
 /// A fixture operation result that keeps helper errors out of production
@@ -167,6 +167,7 @@ pub(crate) enum FormatFamily {
     Percentage,
     Scientific,
     Fraction,
+    Duration,
     DateTime,
     Text,
 }
@@ -180,6 +181,7 @@ impl FormatFamily {
             Self::Percentage => NATIVE_PERCENTAGE_FORMAT_TYPE,
             Self::Scientific => NATIVE_SCIENTIFIC_FORMAT_TYPE,
             Self::Fraction => NATIVE_FRACTION_FORMAT_TYPE,
+            Self::Duration => NATIVE_DURATION_FORMAT_TYPE,
             Self::DateTime => NATIVE_DATE_TIME_FORMAT_TYPE,
             Self::Text => NATIVE_TEXT_FORMAT_TYPE,
         }
@@ -196,6 +198,8 @@ pub(crate) const NATIVE_PERCENTAGE_FORMAT_TYPE: u32 = 258;
 pub(crate) const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
 /// Native Fraction format-list discriminator.
 pub(crate) const NATIVE_FRACTION_FORMAT_TYPE: u32 = 262;
+/// Native Duration format-list discriminator.
+pub(crate) const NATIVE_DURATION_FORMAT_TYPE: u32 = 268;
 /// Native Date & Time format-list discriminator.
 pub(crate) const NATIVE_DATE_TIME_FORMAT_TYPE: u32 = 261;
 /// Native Text format-list discriminator.
@@ -271,9 +275,9 @@ pub(crate) enum Corruption {
 /// extensions, preview bytes, and the unrelated member are all fixed.  `Shared`
 /// gives both cells a Number format with key one and refcount two;
 /// [`synthetic_package_for`] selects the corresponding Currency, Percentage,
-/// Scientific, Fraction, or Text family.  `Unshared` gives the second cell a
-/// Percentage format with key two and two refcount-one entries, except for
-/// Text where both entries remain native type-260 Text records.
+/// Scientific, Fraction, Duration, or Text family.  `Unshared` gives the
+/// second cell a Percentage format with key two and two refcount-one entries,
+/// except for Text where both entries remain native type-260 Text records.
 pub(crate) fn synthetic_package(sharing: FormatSharing) -> FixtureResult<Vec<u8>> {
     synthetic_package_for(FormatFamily::Number, sharing)
 }
@@ -1075,6 +1079,7 @@ fn tile_payload(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<t
         | FormatFamily::Percentage
         | FormatFamily::Scientific
         | FormatFamily::Fraction => CellDataFormatKind::NumberOrPercentage,
+        FormatFamily::Duration => CellDataFormatKind::Duration,
         FormatFamily::DateTime => CellDataFormatKind::DateTime,
         FormatFamily::Text => CellDataFormatKind::Text,
     };
@@ -1082,6 +1087,8 @@ fn tile_payload(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<t
         formatted_text_cell(FIRST_FORMAT_KEY, 1)?
     } else if matches!(family, FormatFamily::DateTime) {
         formatted_date_time_cell(FIRST_FORMAT_KEY, 45200.5)?
+    } else if matches!(family, FormatFamily::Duration) {
+        formatted_duration_cell(FIRST_FORMAT_KEY, 1234.5)?
     } else {
         formatted_cell(FIRST_FORMAT_KEY, first_kind, 1234.5)?
     };
@@ -1092,6 +1099,7 @@ fn tile_payload(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<t
     let second_kind = match (family, sharing) {
         (FormatFamily::Currency, FormatSharing::Shared) => CellDataFormatKind::Currency,
         (FormatFamily::DateTime, _) => CellDataFormatKind::DateTime,
+        (FormatFamily::Duration, _) => CellDataFormatKind::Duration,
         (FormatFamily::Text, _) => CellDataFormatKind::Text,
         (_, FormatSharing::Shared) => CellDataFormatKind::NumberOrPercentage,
         (_, FormatSharing::Unshared) => CellDataFormatKind::NumberOrPercentage,
@@ -1100,6 +1108,8 @@ fn tile_payload(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<t
         formatted_text_cell(second_key, 2)?
     } else if matches!(family, FormatFamily::DateTime) {
         formatted_date_time_cell(second_key, 45201.25)?
+    } else if matches!(family, FormatFamily::Duration) {
+        formatted_duration_cell(second_key, 0.25)?
     } else {
         formatted_cell(second_key, second_kind, 0.25)?
     };
@@ -1146,6 +1156,161 @@ fn formatted_date_time_cell(format_key: u32, value: f64) -> FixtureResult<Vec<u8
     Ok(cell.encode())
 }
 
+fn formatted_duration_cell(format_key: u32, value: f64) -> FixtureResult<Vec<u8>> {
+    duration_cell_bytes(format_key, value, None)
+}
+
+/// Build a three-cell Duration/Number graph sharing one generic Number entry.
+///
+/// The first and third cells are Duration primaries that retain Number key two
+/// as their secondary edge.  The middle cell is a plain Number primary using
+/// that same key.  This lets owner integration tests prove that each Duration
+/// clear removes only its own secondary edge and that the generic Number entry
+/// survives until its independent primary is cleared.
+pub(crate) fn duration_cross_owner_secondary_package() -> FixtureResult<Vec<u8>> {
+    let source = synthetic_package_for(FormatFamily::Duration, FormatSharing::Shared)?;
+    let source = rewrite_tables(&source, |archive| {
+        let model = archive
+            .object_mut(TABLE_MODEL_ID)
+            .ok_or_else(|| io::Error::other("format fixture model is missing"))?;
+        let message = model
+            .messages
+            .first_mut()
+            .ok_or_else(|| io::Error::other("format fixture model payload is missing"))?;
+        let mut model_payload = tst::TableModelArchive::decode(message.data.as_slice())?;
+        model_payload.number_of_columns = 3;
+        message.data = model_payload.encode_to_vec();
+
+        let tile = archive
+            .object_mut(TILE_ID)
+            .ok_or_else(|| io::Error::other("format fixture tile is missing"))?;
+        let message = tile
+            .messages
+            .first_mut()
+            .ok_or_else(|| io::Error::other("format fixture tile payload is missing"))?;
+        let mut tile_payload = tst::Tile::decode(message.data.as_slice())?;
+        let row = tile_payload
+            .row_infos
+            .first_mut()
+            .ok_or_else(|| io::Error::other("format fixture row is missing"))?;
+        let mut cells = unpack_row(row)?;
+        if cells.len() != 2 {
+            return Err(io::Error::other("format fixture row is not two cells").into());
+        }
+
+        cells[0] = duration_cell_with_number_format(FIRST_FORMAT_KEY, 1234.5, SECOND_FORMAT_KEY)?;
+
+        let mut number = BncCell::parse(&cells[1])?;
+        number.set_plain_number(0.25)?;
+        number
+            .set_number_or_percentage_format_identifier_preserving_value(Some(SECOND_FORMAT_KEY))?;
+        cells[1] = number.encode();
+
+        cells.push(duration_cell_with_number_format(
+            FIRST_FORMAT_KEY,
+            7.5,
+            SECOND_FORMAT_KEY,
+        )?);
+        let (storage, offsets) = pack_row(&cells)?;
+        row.cell_count = 3;
+        row.cell_storage_buffer_pre_bnc = storage.clone();
+        row.cell_offsets_pre_bnc = offsets.clone();
+        row.cell_storage_buffer = Some(storage);
+        row.cell_offsets = Some(offsets);
+        tile_payload.max_column = 2;
+        tile_payload.num_cells = 3;
+        message.data = tile_payload.encode_to_vec();
+        Ok(())
+    })?;
+    rewrite_format_list_payload_for_test(&source, |list| {
+        list.entries.push(format_entry(
+            SECOND_FORMAT_KEY,
+            3,
+            NATIVE_NUMBER_FORMAT_TYPE,
+            2,
+            0,
+            true,
+        ));
+        Ok(())
+    })
+}
+
+/// Wrap the Duration fixture in the legacy outer Numbers bundle shape.
+///
+/// The semantic reader can still project this source, but its physical
+/// catalog is normalized from `legacy.numbers/Index.zip` and therefore cannot
+/// authorize an exact preserve-mode owner edit.
+pub(crate) fn duration_non_exact_package() -> FixtureResult<Vec<u8>> {
+    let flat = synthetic_package_for(FormatFamily::Duration, FormatSharing::Shared)?;
+    let catalog = Catalog::from_bytes(&flat)?;
+    let inner_entries = catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+        .map(|entry| (entry.name(), entry.data()))
+        .collect::<Vec<_>>();
+    let inner =
+        litchi_iwa_archive::package::to_bytes(inner_entries.iter().copied(), Limits::default())?;
+    Ok(litchi_iwa_archive::package::to_bytes(
+        [
+            ("legacy.numbers/Index.zip", inner.as_slice()),
+            (
+                "legacy.numbers/Data/sentinel.bin",
+                b"legacy Duration outer sentinel".as_slice(),
+            ),
+        ],
+        Limits::default(),
+    )?)
+}
+
+/// Build a native type-7 Duration cell from literal marker/field bytes.
+///
+/// The fixture intentionally does not call the production Duration metadata
+/// setter here: the integration owner must prove that it understands native
+/// marker `0x0004` (primary-only) and marker `0x0005` (with a generic Number
+/// secondary reference), rather than learning those values from its own
+/// writer.
+pub(crate) fn duration_cell_with_number_format(
+    format_key: u32,
+    value: f64,
+    secondary_key: u32,
+) -> FixtureResult<Vec<u8>> {
+    duration_cell_bytes(format_key, value, Some(secondary_key))
+}
+
+fn duration_cell_bytes(
+    format_key: u32,
+    value: f64,
+    secondary_key: Option<u32>,
+) -> FixtureResult<Vec<u8>> {
+    let marker = if secondary_key.is_some() {
+        0x0005_u16
+    } else {
+        0x0004
+    };
+    let flags = 0x0001_1002_u32 | secondary_key.map_or(0, |_| 0x0000_2000);
+    let mut bytes = Vec::with_capacity(if secondary_key.is_some() { 32 } else { 28 });
+    bytes.extend_from_slice(&[5, 7, 0, 0, 0, 0]);
+    bytes.extend_from_slice(&marker.to_le_bytes());
+    bytes.extend_from_slice(&flags.to_le_bytes());
+    bytes.extend_from_slice(&value.to_le_bytes());
+    bytes.extend_from_slice(&4_u32.to_le_bytes());
+    if let Some(secondary_key) = secondary_key {
+        bytes.extend_from_slice(&secondary_key.to_le_bytes());
+    }
+    bytes.extend_from_slice(&format_key.to_le_bytes());
+    let cell = BncCell::parse(&bytes)
+        .map_err(|error| io::Error::other(format!("invalid literal Duration cell: {error}")))?;
+    if cell.explicit_format_flags() != marker
+        || cell.cell_format_kind() != Some(4)
+        || cell.format_identifier() != Some(format_key)
+        || cell.secondary_format_identifier() != secondary_key
+        || cell.stored_value() != StoredValue::Duration
+    {
+        return Err(io::Error::other("literal Duration cell metadata is invalid").into());
+    }
+    Ok(bytes)
+}
+
 fn sidecar_object(family: FormatFamily, sharing: FormatSharing) -> FixtureResult<ArchiveObject> {
     let format_entries = match (family, sharing) {
         (FormatFamily::Currency, FormatSharing::Shared) => vec![currency_format_entry(
@@ -1163,6 +1328,13 @@ fn sidecar_object(family: FormatFamily, sharing: FormatSharing) -> FixtureResult
         (FormatFamily::Fraction, FormatSharing::Shared) => {
             vec![fraction_format_entry(FIRST_FORMAT_KEY, 2, 8)]
         },
+        (FormatFamily::Duration, FormatSharing::Shared) => {
+            vec![duration_format_entry(FIRST_FORMAT_KEY, 2, 1, 4, 32, true)]
+        },
+        (FormatFamily::Duration, FormatSharing::Unshared) => vec![
+            duration_format_entry(FIRST_FORMAT_KEY, 1, 1, 4, 32, true),
+            duration_format_entry(SECOND_FORMAT_KEY, 1, 2, 2, 16, false),
+        ],
         (FormatFamily::DateTime, FormatSharing::Shared) => {
             vec![date_time_format_entry(
                 FIRST_FORMAT_KEY,
@@ -1315,6 +1487,29 @@ fn fraction_format_entry(
         format: Some(tsk::FormatStructArchive {
             format_type: Some(NATIVE_FRACTION_FORMAT_TYPE),
             fraction_accuracy: Some(accuracy),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+fn duration_format_entry(
+    key: u32,
+    refcount: u32,
+    style: u32,
+    largest_unit: u32,
+    smallest_unit: u32,
+    automatic_units: bool,
+) -> tst::table_data_list::ListEntry {
+    tst::table_data_list::ListEntry {
+        key,
+        refcount,
+        format: Some(tsk::FormatStructArchive {
+            format_type: Some(NATIVE_DURATION_FORMAT_TYPE),
+            duration_style: Some(style),
+            duration_unit_largest: Some(largest_unit),
+            duration_unit_smallest: Some(smallest_unit),
+            use_automatic_duration_units: Some(automatic_units),
             ..Default::default()
         }),
         ..Default::default()

@@ -1,9 +1,10 @@
 //! Private native owner for focused display-format transactions.
 //!
 //! Number, Percentage, Scientific, and Fraction cells use the same BNC decimal
-//! cell kind and the same format-list graph. This module keeps that graph
-//! surgery in one route while retaining a typed family boundary at every
-//! codec and semantic conversion.
+//! cell kind and the same format-list graph. Duration, Currency, Date/Time,
+//! and Text use their nominal native families while sharing the same
+//! format-list graph. This module keeps that graph surgery in one route while
+//! retaining a typed family boundary at every codec and semantic conversion.
 //! It intentionally exposes no native identifiers or arbitrary format-type
 //! input to the package API.
 
@@ -14,6 +15,7 @@ use litchi_iwa_protos::{
     numbers_table_cell_control_codec as control_codec,
     numbers_table_cell_currency_format_codec as currency_codec,
     numbers_table_cell_date_time_format_codec as date_time_codec,
+    numbers_table_cell_duration_format_codec as duration_codec,
     numbers_table_cell_fraction_format_codec as fraction_codec,
     numbers_table_cell_number_format_codec as number_codec,
     numbers_table_cell_percentage_format_codec as percentage_codec,
@@ -34,6 +36,9 @@ use crate::cell::data_format::custom::{
     Condition, ConditionValue, Custom, DateTime as CustomDateTime, DateTimePattern, MAX_NAME_BYTES,
     MAX_PATTERN_BYTES, Name, Number as CustomNumber, NumberPattern, NumberRule, Text as CustomText,
 };
+use crate::cell::data_format::duration::{
+    Duration, Style as DurationStyle, Unit as DurationUnit, UnitRange, Units as DurationUnits,
+};
 use crate::cell::data_format::number::{
     DecimalPlaces, FixedDecimalPlaces, Fraction, FractionAccuracy, NegativeStyle, Number,
     Percentage, Scientific, ThousandsSeparator,
@@ -46,6 +51,7 @@ const PERCENTAGE_FORMAT_TYPE: u32 = percentage_codec::NATIVE_PERCENTAGE_FORMAT_T
 const SCIENTIFIC_FORMAT_TYPE: u32 = scientific_codec::NATIVE_SCIENTIFIC_FORMAT_TYPE;
 const FRACTION_FORMAT_TYPE: u32 = fraction_codec::NATIVE_FRACTION_FORMAT_TYPE;
 const DATE_TIME_FORMAT_TYPE: u32 = date_time_codec::NATIVE_DATE_TIME_FORMAT_TYPE;
+const DURATION_FORMAT_TYPE: u32 = duration_codec::NATIVE_DURATION_FORMAT_TYPE;
 // Numbers stores the plain Text display format in the same
 // `FormatStructArchive` family as the scalar formats.  The strict control
 // codec accepts this native discriminator while this private owner keeps it
@@ -116,6 +122,7 @@ pub(super) enum DisplayFormatFamily {
     Scientific,
     Fraction,
     DateTime,
+    Duration,
     Text,
 }
 
@@ -128,6 +135,7 @@ impl DisplayFormatFamily {
             Self::Scientific => SCIENTIFIC_FORMAT_TYPE,
             Self::Fraction => FRACTION_FORMAT_TYPE,
             Self::DateTime => DATE_TIME_FORMAT_TYPE,
+            Self::Duration => DURATION_FORMAT_TYPE,
             Self::Text => TEXT_FORMAT_TYPE,
         }
     }
@@ -223,6 +231,19 @@ impl From<Error> for DateTimeFormatReadError {
     }
 }
 
+/// Typed native failure returned to the Duration package facade.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum DurationFormatReadError {
+    WrongFormatFamily,
+    Native(Error),
+}
+
+impl From<Error> for DurationFormatReadError {
+    fn from(error: Error) -> Self {
+        Self::Native(error)
+    }
+}
+
 /// Typed native failure returned to the Text package facade.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum TextFormatReadError {
@@ -244,6 +265,7 @@ enum NativeDisplayValue {
     Scientific(Scientific),
     Fraction(Fraction),
     DateTime(DateTime),
+    Duration(Duration),
     Text(Text),
 }
 
@@ -256,6 +278,7 @@ impl NativeDisplayValue {
             Self::Scientific(_) => DisplayFormatFamily::Scientific,
             Self::Fraction(_) => DisplayFormatFamily::Fraction,
             Self::DateTime(_) => DisplayFormatFamily::DateTime,
+            Self::Duration(_) => DisplayFormatFamily::Duration,
             Self::Text(_) => DisplayFormatFamily::Text,
         }
     }
@@ -335,6 +358,7 @@ impl NativeDisplayValue {
             },
             DisplayFormatFamily::Fraction => return Err(Error::InvalidSource { path }),
             DisplayFormatFamily::DateTime => return Err(Error::InvalidSource { path }),
+            DisplayFormatFamily::Duration => return Err(Error::InvalidSource { path }),
             DisplayFormatFamily::Text => return Err(Error::InvalidSource { path }),
         };
         Ok(value)
@@ -523,6 +547,100 @@ fn verify_date_time_cell_metadata(
             != desired_identifier.map(|_| litchi_numbers_wire::DATE_TIME_CELL_FORMAT_KIND)
         || candidate_cell.format_identifier() != desired_identifier
         || candidate_cell.secondary_format_identifier().is_some()
+        || candidate_cell.control_cell_spec_identifier().is_some()
+    {
+        return Err(Error::Verification);
+    }
+    Ok(())
+}
+
+fn rewrite_duration_cell_metadata(
+    source: &[u8],
+    desired_identifier: Option<u32>,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<u8>, Error> {
+    let output_limit = source
+        .len()
+        .checked_add(12)
+        .ok_or(Error::InvalidSource { path })?;
+    let owned_cell_bytes = source
+        .len()
+        .checked_add(output_limit)
+        .ok_or(Error::InvalidSource { path })?;
+    let work = output_limit
+        .checked_mul(2)
+        .and_then(|amount| amount.checked_add(source.len()))
+        .ok_or(Error::InvalidSource { path })?;
+    let allocations = litchi_numbers_wire::MAX_OWNED_BNC_PARSE_ALLOCATIONS
+        .checked_mul(2)
+        // One encoded output plus the three small format-field buffers that
+        // the Duration mutation can materialize.
+        .and_then(|amount| amount.checked_add(4))
+        .ok_or(Error::InvalidSource { path })?;
+    budget.charge_allocations(allocations, path)?;
+    budget.charge_scratch_bytes(owned_cell_bytes, path)?;
+    budget.charge_retained_bytes(output_limit, path)?;
+    budget.charge_transaction_work(work, path)?;
+
+    let mut cell = BncCell::parse(source).map_err(|_| Error::InvalidSource { path })?;
+    let source_value = cell.stored_value();
+    let source_cache = cell
+        .cached_scalar()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let source_secondary = cell.secondary_format_identifier();
+    if !cell.is_duration_format_compatible() || !cell.has_only_duration_format_metadata() {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    cell.set_duration_format_identifier_preserving_value(desired_identifier)
+        .map_err(|_| Error::InvalidSource { path })?;
+    let output = cell
+        .try_encode_with_limit(output_limit)
+        .map_err(|error| match error {
+            litchi_numbers_wire::Error::Allocation { requested } => Error::Allocation {
+                amount: requested,
+                path,
+            },
+            litchi_numbers_wire::Error::InvalidFormat(_)
+            | litchi_numbers_wire::Error::ParseError(_)
+            | litchi_numbers_wire::Error::OutputLimitExceeded { .. } => {
+                Error::InvalidSource { path }
+            },
+        })?;
+    let candidate_cell = BncCell::parse(&output).map_err(|_| Error::Verification)?;
+    verify_duration_cell_metadata(
+        source_value,
+        source_cache,
+        source_secondary,
+        &candidate_cell,
+        desired_identifier,
+    )?;
+    Ok(output)
+}
+
+fn verify_duration_cell_metadata(
+    source_value: litchi_numbers_wire::StoredValue,
+    source_cache: Option<litchi_numbers_wire::CachedScalar>,
+    source_secondary: Option<u32>,
+    candidate_cell: &BncCell,
+    desired_identifier: Option<u32>,
+) -> Result<(), Error> {
+    let expected_secondary = desired_identifier.and(source_secondary);
+    let expected_explicit = desired_identifier.map_or(0, |_| {
+        litchi_numbers_wire::explicit_duration_format_flags(expected_secondary.is_some())
+    });
+    if source_value != candidate_cell.stored_value()
+        || candidate_cell.cached_scalar().ok() != Some(source_cache)
+        || !candidate_cell.is_duration_format_compatible()
+        || !candidate_cell.has_only_duration_format_metadata()
+    {
+        return Err(Error::Verification);
+    }
+    if candidate_cell.explicit_format_flags() != expected_explicit
+        || candidate_cell.cell_format_kind()
+            != desired_identifier.map(|_| litchi_numbers_wire::DURATION_CELL_FORMAT_KIND)
+        || candidate_cell.format_identifier() != desired_identifier
+        || candidate_cell.secondary_format_identifier() != expected_secondary
         || candidate_cell.control_cell_spec_identifier().is_some()
     {
         return Err(Error::Verification);
@@ -793,28 +911,6 @@ fn validate_text_cell_metadata(
     Ok(metadata)
 }
 
-/// Return the generic format-table reference retained by a converted Text
-/// cell for the native reference census.
-///
-/// The value is intentionally kept behind the package-native seam. It is a
-/// graph edge used to validate list refcounts, not part of the public Text
-/// semantic value or transaction API.
-pub(super) fn text_secondary_identifier_for_census(
-    source: &[u8],
-    cell: &BncCell,
-    path: Path,
-) -> Result<Option<u32>, Error> {
-    if cell.cell_format_kind() != Some(litchi_numbers_wire::TEXT_CELL_FORMAT_KIND) {
-        return Ok(None);
-    }
-    let metadata = validate_text_cell_metadata(source, cell, path)?;
-    if cell.explicit_format_flags() == litchi_numbers_wire::EXPLICIT_CONVERTED_TEXT_FORMAT {
-        Ok(metadata.generic_identifier)
-    } else {
-        Ok(None)
-    }
-}
-
 fn rewrite_text_cell_metadata(
     source: &[u8],
     desired_identifier: Option<u32>,
@@ -974,6 +1070,7 @@ pub(super) fn read_number_format_with_budget(
         | Ok(Some(NativeDisplayValue::Scientific(_)))
         | Ok(Some(NativeDisplayValue::Fraction(_)))
         | Ok(Some(NativeDisplayValue::DateTime(_)))
+        | Ok(Some(NativeDisplayValue::Duration(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
         | Err(DisplayReadError::WrongFormatFamily) => Err(NumberFormatReadError::WrongFormatFamily),
         Err(DisplayReadError::Native(error)) => Err(NumberFormatReadError::Native(error)),
@@ -1012,6 +1109,7 @@ pub(super) fn read_currency_format_with_budget(
         | Ok(Some(NativeDisplayValue::Scientific(_)))
         | Ok(Some(NativeDisplayValue::Fraction(_)))
         | Ok(Some(NativeDisplayValue::DateTime(_)))
+        | Ok(Some(NativeDisplayValue::Duration(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(CurrencyFormatReadError::WrongFormatFamily)
@@ -1052,6 +1150,7 @@ pub(super) fn read_percentage_format_with_budget(
         | Ok(Some(NativeDisplayValue::Scientific(_)))
         | Ok(Some(NativeDisplayValue::Fraction(_)))
         | Ok(Some(NativeDisplayValue::DateTime(_)))
+        | Ok(Some(NativeDisplayValue::Duration(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(PercentageFormatReadError::WrongFormatFamily)
@@ -1092,6 +1191,7 @@ pub(super) fn read_scientific_format_with_budget(
         | Ok(Some(NativeDisplayValue::Percentage(_)))
         | Ok(Some(NativeDisplayValue::Fraction(_)))
         | Ok(Some(NativeDisplayValue::DateTime(_)))
+        | Ok(Some(NativeDisplayValue::Duration(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(ScientificFormatReadError::WrongFormatFamily)
@@ -1132,6 +1232,7 @@ pub(super) fn read_fraction_format_with_budget(
         | Ok(Some(NativeDisplayValue::Percentage(_)))
         | Ok(Some(NativeDisplayValue::Scientific(_)))
         | Ok(Some(NativeDisplayValue::DateTime(_)))
+        | Ok(Some(NativeDisplayValue::Duration(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(FractionFormatReadError::WrongFormatFamily)
@@ -1172,11 +1273,53 @@ pub(super) fn read_date_time_format_with_budget(
         | Ok(Some(NativeDisplayValue::Percentage(_)))
         | Ok(Some(NativeDisplayValue::Scientific(_)))
         | Ok(Some(NativeDisplayValue::Fraction(_)))
+        | Ok(Some(NativeDisplayValue::Duration(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(DateTimeFormatReadError::WrongFormatFamily)
         },
         Err(DisplayReadError::Native(error)) => Err(DateTimeFormatReadError::Native(error)),
+    }
+}
+
+/// Read one existing Duration format with a fresh transaction ledger.
+pub(super) fn read_duration_format(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+) -> Result<Option<Duration>, DurationFormatReadError> {
+    let mut budget = TransactionBudget::for_cell_control(source);
+    read_duration_format_with_budget(source, target, path, &mut budget)
+}
+
+/// Read one existing Duration format against a caller-owned transaction
+/// ledger.
+pub(super) fn read_duration_format_with_budget(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Option<Duration>, DurationFormatReadError> {
+    match read_display_format_with_budget(
+        DisplayFormatFamily::Duration,
+        source,
+        target,
+        path,
+        budget,
+    ) {
+        Ok(None) => Ok(None),
+        Ok(Some(NativeDisplayValue::Duration(value))) => Ok(Some(value)),
+        Ok(Some(NativeDisplayValue::Number(_)))
+        | Ok(Some(NativeDisplayValue::Currency(_)))
+        | Ok(Some(NativeDisplayValue::Percentage(_)))
+        | Ok(Some(NativeDisplayValue::Scientific(_)))
+        | Ok(Some(NativeDisplayValue::Fraction(_)))
+        | Ok(Some(NativeDisplayValue::DateTime(_)))
+        | Ok(Some(NativeDisplayValue::Text(_)))
+        | Err(DisplayReadError::WrongFormatFamily) => {
+            Err(DurationFormatReadError::WrongFormatFamily)
+        },
+        Err(DisplayReadError::Native(error)) => Err(DurationFormatReadError::Native(error)),
     }
 }
 
@@ -1206,6 +1349,7 @@ pub(super) fn read_text_format_with_budget(
         | Ok(Some(NativeDisplayValue::Scientific(_)))
         | Ok(Some(NativeDisplayValue::Fraction(_)))
         | Ok(Some(NativeDisplayValue::DateTime(_)))
+        | Ok(Some(NativeDisplayValue::Duration(_)))
         | Err(DisplayReadError::WrongFormatFamily) => Err(TextFormatReadError::WrongFormatFamily),
         Err(DisplayReadError::Native(error)) => Err(TextFormatReadError::Native(error)),
     }
@@ -1329,6 +1473,27 @@ pub(super) fn rewrite_date_time_format(
         target,
         before.cloned().map(NativeDisplayValue::DateTime),
         after.cloned().map(NativeDisplayValue::DateTime),
+        path,
+        budget,
+    )
+}
+
+/// Rewrite one ordinary Duration cell without changing its stored value or
+/// formula cache.
+pub(super) fn rewrite_duration_format(
+    source: &Package,
+    target: CellTarget,
+    before: Option<&Duration>,
+    after: Option<&Duration>,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<native::NativeControlOutput, Error> {
+    rewrite_display_format(
+        DisplayFormatFamily::Duration,
+        source,
+        target,
+        before.copied().map(NativeDisplayValue::Duration),
+        after.copied().map(NativeDisplayValue::Duration),
         path,
         budget,
     )
@@ -1484,6 +1649,17 @@ fn read_display_format_with_budget(
                 return Err(DisplayReadError::WrongFormatFamily);
             }
         },
+        (DisplayFormatFamily::Duration, Some(litchi_numbers_wire::DURATION_CELL_FORMAT_KIND)) => {
+            let expected_explicit =
+                litchi_numbers_wire::explicit_duration_format_flags(secondary_identifier.is_some());
+            if explicit_flags != expected_explicit
+                || secondary_identifier.is_some_and(|identifier| identifier == 0)
+                || !cell.has_only_duration_format_metadata()
+                || !cell.is_duration_format_compatible()
+            {
+                return Err(DisplayReadError::WrongFormatFamily);
+            }
+        },
         (DisplayFormatFamily::Currency, Some(litchi_numbers_wire::CURRENCY_CELL_FORMAT_KIND)) => {
             let expected_explicit =
                 litchi_numbers_wire::explicit_currency_format_flags(secondary_identifier.is_some());
@@ -1517,6 +1693,9 @@ fn read_display_format_with_budget(
             return Err(DisplayReadError::WrongFormatFamily);
         },
         (DisplayFormatFamily::DateTime, None) if !cell.is_date_time_format_compatible() => {
+            return Err(DisplayReadError::WrongFormatFamily);
+        },
+        (DisplayFormatFamily::Duration, None) if !cell.is_duration_format_compatible() => {
             return Err(DisplayReadError::WrongFormatFamily);
         },
         (_, None) => return Ok(None),
@@ -1788,6 +1967,19 @@ fn rewrite_display_format(
                 return Err(Error::UnsupportedDependency { path });
             }
         },
+        (DisplayFormatFamily::Duration, Some(identifier), Some(kind))
+            if identifier != 0 && kind == litchi_numbers_wire::DURATION_CELL_FORMAT_KIND =>
+        {
+            let expected_explicit =
+                litchi_numbers_wire::explicit_duration_format_flags(old_secondary.is_some());
+            if old_secondary.is_some_and(|identifier| identifier == 0)
+                || !cell.has_only_duration_format_metadata()
+                || explicit_flags != expected_explicit
+                || !cell.is_duration_format_compatible()
+            {
+                return Err(Error::UnsupportedDependency { path });
+            }
+        },
         (DisplayFormatFamily::Currency, Some(identifier), Some(kind))
             if identifier != 0 && kind == litchi_numbers_wire::CURRENCY_CELL_FORMAT_KIND =>
         {
@@ -1831,7 +2023,9 @@ fn rewrite_display_format(
                             | litchi_numbers_wire::StoredValue::Text(_)
                     ))
                 && (family != DisplayFormatFamily::DateTime
-                    || cell.is_date_time_format_compatible()) => {},
+                    || cell.is_date_time_format_compatible())
+                && (family != DisplayFormatFamily::Duration
+                    || cell.is_duration_format_compatible()) => {},
         _ => return Err(Error::UnsupportedDependency { path }),
     }
     let format_table_identifier = store
@@ -1913,7 +2107,7 @@ fn rewrite_display_format(
 
     if matches!(
         family,
-        DisplayFormatFamily::Currency | DisplayFormatFamily::Text
+        DisplayFormatFamily::Currency | DisplayFormatFamily::Duration | DisplayFormatFamily::Text
     ) {
         if let Some(secondary_identifier) = old_secondary {
             let secondary_entry = format_facts
@@ -1956,6 +2150,9 @@ fn rewrite_display_format(
             | DisplayFormatFamily::Scientific
             | DisplayFormatFamily::Fraction => litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT,
             DisplayFormatFamily::DateTime => litchi_numbers_wire::EXPLICIT_DATE_TIME_FORMAT,
+            DisplayFormatFamily::Duration => {
+                litchi_numbers_wire::explicit_duration_format_flags(old_secondary.is_some())
+            },
             DisplayFormatFamily::Text => {
                 if old_secondary.is_some() {
                     litchi_numbers_wire::EXPLICIT_CONVERTED_TEXT_FORMAT
@@ -2011,7 +2208,7 @@ fn rewrite_display_format(
     )?;
     if matches!(
         family,
-        DisplayFormatFamily::Currency | DisplayFormatFamily::Text
+        DisplayFormatFamily::Currency | DisplayFormatFamily::Duration | DisplayFormatFamily::Text
     ) && after_is_none
     {
         if let Some(secondary_identifier) = old_secondary {
@@ -2031,6 +2228,8 @@ fn rewrite_display_format(
             rewrite_currency_cell_metadata(cell_source, Some(key), path, budget)?
         } else if family == DisplayFormatFamily::DateTime {
             rewrite_date_time_cell_metadata(cell_source, Some(key), path, budget)?
+        } else if family == DisplayFormatFamily::Duration {
+            rewrite_duration_cell_metadata(cell_source, Some(key), path, budget)?
         } else if family == DisplayFormatFamily::Text {
             rewrite_text_cell_metadata(cell_source, Some(key), path, budget)?
         } else {
@@ -2041,6 +2240,8 @@ fn rewrite_display_format(
             rewrite_currency_cell_metadata(cell_source, None, path, budget)?
         } else if family == DisplayFormatFamily::DateTime {
             rewrite_date_time_cell_metadata(cell_source, None, path, budget)?
+        } else if family == DisplayFormatFamily::Duration {
+            rewrite_duration_cell_metadata(cell_source, None, path, budget)?
         } else if family == DisplayFormatFamily::Text {
             rewrite_text_cell_metadata(cell_source, None, path, budget)?
         } else {
@@ -3363,7 +3564,7 @@ fn custom_fixed64_field_len(field: u32) -> usize {
     litchi_iwa_common::varint::encoded_len((u64::from(field) << 3) | 1) + 8
 }
 
-fn custom_pattern_encoded_len(format_type: u32, pattern_len: usize) -> Result<usize, Error> {
+fn custom_pattern_encoded_len(format_type: u32, pattern: &str) -> Result<usize, Error> {
     let mut length = 0usize;
     // All constant pattern fields are emitted canonically as varints. Their
     // values are included here (rather than using a blanket overhead) so the
@@ -3372,7 +3573,7 @@ fn custom_pattern_encoded_len(format_type: u32, pattern_len: usize) -> Result<us
         (CUSTOM_PATTERN_TYPE_FIELD, u64::from(format_type)),
         (
             5,
-            u64::from(format_type == CUSTOM_NUMBER_FORMAT_TYPE && pattern_len != 0),
+            u64::from(format_type == CUSTOM_NUMBER_FORMAT_TYPE && pattern.contains(',')),
         ),
         (6, 0),
         (11, u64::from(CUSTOM_FRACTION_SENTINEL)),
@@ -3387,7 +3588,12 @@ fn custom_pattern_encoded_len(format_type: u32, pattern_len: usize) -> Result<us
         (36, 0),
         (
             37,
-            u64::from(format_type == CUSTOM_NUMBER_FORMAT_TYPE && pattern_len != 0),
+            u64::from(
+                format_type == CUSTOM_NUMBER_FORMAT_TYPE
+                    && pattern
+                        .chars()
+                        .any(|character| matches!(character, '#' | '0')),
+            ),
         ),
     ] {
         length = length
@@ -3396,7 +3602,7 @@ fn custom_pattern_encoded_len(format_type: u32, pattern_len: usize) -> Result<us
                 path: Path::Package,
             })?;
     }
-    let pattern_field_len = custom_bytes_field_len(CUSTOM_PATTERN_STRING_FIELD, pattern_len)?;
+    let pattern_field_len = custom_bytes_field_len(CUSTOM_PATTERN_STRING_FIELD, pattern.len())?;
     length = length
         .checked_add(pattern_field_len)
         .and_then(|length| length.checked_add(custom_fixed64_field_len(19)))
@@ -3406,8 +3612,8 @@ fn custom_pattern_encoded_len(format_type: u32, pattern_len: usize) -> Result<us
     Ok(length)
 }
 
-fn custom_condition_encoded_len(format_type: u32, pattern_len: usize) -> Result<usize, Error> {
-    let pattern_len = custom_pattern_encoded_len(format_type, pattern_len)?;
+fn custom_condition_encoded_len(format_type: u32, pattern: &str) -> Result<usize, Error> {
+    let pattern_len = custom_pattern_encoded_len(format_type, pattern)?;
     let condition_format_len = custom_bytes_field_len(CUSTOM_CONDITION_FORMAT_FIELD, pattern_len)?;
     custom_varint_field_len(CUSTOM_CONDITION_TYPE_FIELD, 0)
         .checked_add(custom_fixed64_field_len(CUSTOM_CONDITION_DOUBLE_FIELD))
@@ -3420,10 +3626,10 @@ fn custom_condition_encoded_len(format_type: u32, pattern_len: usize) -> Result<
 fn custom_archive_encoded_len(
     name_len: usize,
     format_type: u32,
-    default_pattern_len: usize,
+    default_pattern: &str,
     rules: Option<&[NumberRule]>,
 ) -> Result<usize, Error> {
-    let default_pattern_len = custom_pattern_encoded_len(format_type, default_pattern_len)?;
+    let default_pattern_len = custom_pattern_encoded_len(format_type, default_pattern)?;
     let name_field_len = custom_bytes_field_len(CUSTOM_FORMAT_NAME_FIELD, name_len)?;
     let default_field_len =
         custom_bytes_field_len(CUSTOM_FORMAT_DEFAULT_FIELD, default_pattern_len)?;
@@ -3438,8 +3644,7 @@ fn custom_archive_encoded_len(
         })?;
     if let Some(rules) = rules {
         for rule in rules {
-            let condition_len =
-                custom_condition_encoded_len(format_type, rule.pattern().as_str().len())?;
+            let condition_len = custom_condition_encoded_len(format_type, rule.pattern().as_str())?;
             length = length
                 .checked_add(custom_bytes_field_len(
                     CUSTOM_FORMAT_CONDITION_FIELD,
@@ -3527,7 +3732,7 @@ fn encode_custom_archive(
         ),
     };
     let output_len =
-        custom_archive_encoded_len(name.len(), format_type, default_pattern.len(), rules)?;
+        custom_archive_encoded_len(name.len(), format_type, default_pattern.as_ref(), rules)?;
     budget.charge_allocations(1, path)?;
     let mut output = Vec::new();
     output
@@ -3569,7 +3774,7 @@ fn encode_custom_pattern(
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<Vec<u8>, Error> {
-    let output_len = custom_pattern_encoded_len(format_type, pattern.len())?;
+    let output_len = custom_pattern_encoded_len(format_type, pattern)?;
     budget.charge_allocations(1, path)?;
     let mut output = Vec::new();
     output
@@ -3622,7 +3827,7 @@ fn encode_custom_condition(
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<Vec<u8>, Error> {
-    let output_len = custom_condition_encoded_len(format_type, rule.pattern().as_str().len())?;
+    let output_len = custom_condition_encoded_len(format_type, rule.pattern().as_str())?;
     budget.charge_allocations(1, path)?;
     let mut output = Vec::new();
     output
@@ -4155,6 +4360,20 @@ fn decode_display_payload(
             let value = DateTime::new(pattern).map_err(|_| Error::InvalidSource { path })?;
             Ok(NativeDisplayValue::DateTime(value))
         },
+        DisplayFormatFamily::Duration => {
+            let (snapshot, report) =
+                match duration_codec::decode_duration_format_with_report(source, options) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return Err(classify_duration_decode_failure(
+                            source, budget, path, error,
+                        ));
+                    },
+                };
+            native::charge_control_decode_report(budget, report, path)?;
+            let value = duration_from_native(snapshot, path)?;
+            Ok(NativeDisplayValue::Duration(value))
+        },
         DisplayFormatFamily::Text => {
             let (snapshot, report) = text_codec::decode_text_format_with_report(source, options)
                 .map_err(|error| native::map_control_error(error, path))?;
@@ -4211,6 +4430,28 @@ fn classify_date_time_decode_failure(
         return DisplayReadError::Native(native_error);
     }
     if broad.format_type() != DATE_TIME_FORMAT_TYPE {
+        DisplayReadError::WrongFormatFamily
+    } else {
+        DisplayReadError::Native(native::map_control_error(error, path))
+    }
+}
+
+fn classify_duration_decode_failure(
+    source: &[u8],
+    budget: &mut TransactionBudget,
+    path: Path,
+    error: duration_codec::DecodeError,
+) -> DisplayReadError {
+    let Ok((broad, report)) = control_codec::decode_control_format_with_report(
+        source,
+        native::control_codec_options(source.len(), budget),
+    ) else {
+        return DisplayReadError::Native(native::map_control_error(error, path));
+    };
+    if let Err(native_error) = native::charge_control_decode_report(budget, report, path) {
+        return DisplayReadError::Native(native_error);
+    }
+    if broad.format_type() != DURATION_FORMAT_TYPE {
         DisplayReadError::WrongFormatFamily
     } else {
         DisplayReadError::Native(native::map_control_error(error, path))
@@ -4316,6 +4557,18 @@ fn prepare_display_rewrite(
             )
             .map_err(|error| native::map_control_error(error, path))?;
             execute_date_time_rewrite(prepared, budget, path)
+        },
+        DisplayFormatFamily::Duration => {
+            let NativeDisplayValue::Duration(value) = value else {
+                return Err(Error::UnsupportedDependency { path });
+            };
+            let prepared = duration_codec::prepare_duration_format_rewrite(
+                source,
+                duration_format_write(value),
+                options,
+            )
+            .map_err(|error| native::map_control_error(error, path))?;
+            execute_duration_rewrite(prepared, budget, path)
         },
         DisplayFormatFamily::Text => {
             let NativeDisplayValue::Text(_) = value else {
@@ -4426,6 +4679,17 @@ fn prepare_display_append(
             .map_err(|error| native::map_control_error(error, path))?;
             execute_date_time_append(prepared, budget, path)
         },
+        DisplayFormatFamily::Duration => {
+            let NativeDisplayValue::Duration(value) = value else {
+                return Err(Error::UnsupportedDependency { path });
+            };
+            let prepared = duration_codec::prepare_duration_format_write(
+                duration_format_write(value),
+                options,
+            )
+            .map_err(|error| native::map_control_error(error, path))?;
+            execute_duration_append(prepared, budget, path)
+        },
         DisplayFormatFamily::Text => {
             let NativeDisplayValue::Text(_) = value else {
                 return Err(Error::UnsupportedDependency { path });
@@ -4442,6 +4706,68 @@ fn native_decimal_places(value: DecimalPlaces) -> u32 {
     match value {
         DecimalPlaces::Automatic => 253,
         DecimalPlaces::Fixed(value) => u32::from(value.value()),
+    }
+}
+
+fn duration_format_write(value: Duration) -> duration_codec::DurationFormatWrite {
+    let range = value.units().range();
+    duration_codec::DurationFormatWrite::from_parts(
+        native_duration_style(value.style()),
+        native_duration_unit(range.largest()),
+        native_duration_unit(range.smallest()),
+        value.units().is_automatic(),
+    )
+}
+
+const fn native_duration_style(value: DurationStyle) -> duration_codec::DurationStyle {
+    match value {
+        DurationStyle::Colon => duration_codec::DurationStyle::Colon,
+        DurationStyle::Abbreviated => duration_codec::DurationStyle::Abbreviated,
+        DurationStyle::FullNames => duration_codec::DurationStyle::FullNames,
+    }
+}
+
+const fn native_duration_unit(value: DurationUnit) -> duration_codec::DurationUnit {
+    match value {
+        DurationUnit::Weeks => duration_codec::DurationUnit::Weeks,
+        DurationUnit::Days => duration_codec::DurationUnit::Days,
+        DurationUnit::Hours => duration_codec::DurationUnit::Hours,
+        DurationUnit::Minutes => duration_codec::DurationUnit::Minutes,
+        DurationUnit::Seconds => duration_codec::DurationUnit::Seconds,
+        DurationUnit::Milliseconds => duration_codec::DurationUnit::Milliseconds,
+    }
+}
+
+fn duration_from_native(
+    snapshot: duration_codec::DurationFormatSnapshot<'_>,
+    path: Path,
+) -> Result<Duration, Error> {
+    let style = match snapshot.duration_style() {
+        duration_codec::NATIVE_DURATION_STYLE_COLON => DurationStyle::Colon,
+        duration_codec::NATIVE_DURATION_STYLE_ABBREVIATED => DurationStyle::Abbreviated,
+        duration_codec::NATIVE_DURATION_STYLE_FULL_NAMES => DurationStyle::FullNames,
+        _ => return Err(Error::InvalidSource { path }),
+    };
+    let largest = duration_unit_from_native(snapshot.duration_unit_largest(), path)?;
+    let smallest = duration_unit_from_native(snapshot.duration_unit_smallest(), path)?;
+    let range = UnitRange::new(largest, smallest).map_err(|_| Error::InvalidSource { path })?;
+    let units = if snapshot.use_automatic_duration_units() {
+        DurationUnits::Automatic(range)
+    } else {
+        DurationUnits::Custom(range)
+    };
+    Ok(Duration::new(style, units))
+}
+
+fn duration_unit_from_native(value: u32, path: Path) -> Result<DurationUnit, Error> {
+    match value {
+        duration_codec::NATIVE_DURATION_UNIT_WEEKS => Ok(DurationUnit::Weeks),
+        duration_codec::NATIVE_DURATION_UNIT_DAYS => Ok(DurationUnit::Days),
+        duration_codec::NATIVE_DURATION_UNIT_HOURS => Ok(DurationUnit::Hours),
+        duration_codec::NATIVE_DURATION_UNIT_MINUTES => Ok(DurationUnit::Minutes),
+        duration_codec::NATIVE_DURATION_UNIT_SECONDS => Ok(DurationUnit::Seconds),
+        duration_codec::NATIVE_DURATION_UNIT_MILLISECONDS => Ok(DurationUnit::Milliseconds),
+        _ => Err(Error::InvalidSource { path }),
     }
 }
 
@@ -4558,6 +4884,20 @@ fn execute_date_time_rewrite(
     Ok(output.into_bytes())
 }
 
+fn execute_duration_rewrite(
+    prepared: duration_codec::PreparedDurationFormatRewrite<'_>,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let requirements = prepared.execution_requirements();
+    native::charge_control_requirements(budget, requirements, path)?;
+    let output = prepared
+        .execute(duration_codec::RewriteExecutionLimits::exact(requirements))
+        .map_err(|error| native::map_control_error(error, path))?;
+    native::verify_control_report(output.report(), requirements, path)?;
+    Ok(output.into_bytes())
+}
+
 fn execute_currency_rewrite(
     prepared: currency_codec::PreparedCurrencyFormatRewrite<'_>,
     budget: &mut TransactionBudget,
@@ -4641,6 +4981,20 @@ fn execute_date_time_append(
     native::charge_control_requirements(budget, requirements, path)?;
     let output = prepared
         .execute(date_time_codec::RewriteExecutionLimits::exact(requirements))
+        .map_err(|error| native::map_control_error(error, path))?;
+    native::verify_control_report(output.report(), requirements, path)?;
+    Ok(output.into_bytes())
+}
+
+fn execute_duration_append(
+    prepared: duration_codec::PreparedDurationFormatWrite,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let requirements = prepared.execution_requirements();
+    native::charge_control_requirements(budget, requirements, path)?;
+    let output = prepared
+        .execute(duration_codec::RewriteExecutionLimits::exact(requirements))
         .map_err(|error| native::map_control_error(error, path))?;
     native::verify_control_report(output.report(), requirements, path)?;
     Ok(output.into_bytes())
@@ -5234,10 +5588,74 @@ pub(super) fn rewrite_custom_format(
 #[cfg(test)]
 mod tests {
     use super::{
-        CUSTOM_REGISTRY_REFERENCE_FIELD, DOCUMENT_LEGACY_SUPER_FIELD, Path,
-        validate_text_cell_metadata,
+        CUSTOM_CONDITION_DOUBLE_FIELD, CUSTOM_CONDITION_FORMAT_FIELD, CUSTOM_CONDITION_TYPE_FIELD,
+        CUSTOM_FRACTION_SENTINEL, CUSTOM_NUMBER_FORMAT_TYPE, CUSTOM_PATTERN_STRING_FIELD,
+        CUSTOM_PATTERN_TYPE_FIELD, CUSTOM_REGISTRY_REFERENCE_FIELD, DOCUMENT_LEGACY_SUPER_FIELD,
+        Path, append_custom_bytes, append_custom_fixed64, append_custom_varint,
+        custom_condition_encoded_len, custom_pattern_encoded_len, validate_text_cell_metadata,
     };
     use litchi_numbers_wire::BncCell;
+
+    fn encoded_custom_pattern(format_type: u32, pattern: &str) -> Vec<u8> {
+        let path = Path::Package;
+        let mut output = Vec::new();
+        append_custom_varint(
+            &mut output,
+            CUSTOM_PATTERN_TYPE_FIELD,
+            u64::from(format_type),
+            path,
+        )
+        .expect("pattern type");
+        append_custom_varint(
+            &mut output,
+            5,
+            u64::from(format_type == CUSTOM_NUMBER_FORMAT_TYPE && pattern.contains(',')),
+            path,
+        )
+        .expect("thousands separator");
+        append_custom_varint(&mut output, 6, 0, path).expect("field 6");
+        append_custom_varint(&mut output, 11, u64::from(CUSTOM_FRACTION_SENTINEL), path)
+            .expect("fraction sentinel");
+        append_custom_bytes(
+            &mut output,
+            CUSTOM_PATTERN_STRING_FIELD,
+            pattern.as_bytes(),
+            path,
+        )
+        .expect("pattern string");
+        append_custom_fixed64(&mut output, 19, 1.0_f64.to_bits(), path).expect("default double");
+        append_custom_varint(&mut output, 20, 0, path).expect("field 20");
+        for field in [27_u32, 28, 29, 30, 31, 34, 35] {
+            append_custom_varint(&mut output, field, 0, path).expect("default field");
+        }
+        append_custom_varint(&mut output, 36, 0, path).expect("field 36");
+        append_custom_varint(
+            &mut output,
+            37,
+            u64::from(
+                format_type == CUSTOM_NUMBER_FORMAT_TYPE
+                    && pattern
+                        .chars()
+                        .any(|character| matches!(character, '#' | '0')),
+            ),
+            path,
+        )
+        .expect("integer placeholder");
+        output
+    }
+
+    fn encoded_custom_condition(format_type: u32, pattern: &str) -> Vec<u8> {
+        let path = Path::Package;
+        let nested = encoded_custom_pattern(format_type, pattern);
+        let mut output = Vec::new();
+        append_custom_varint(&mut output, CUSTOM_CONDITION_TYPE_FIELD, 0, path)
+            .expect("condition type");
+        append_custom_fixed64(&mut output, CUSTOM_CONDITION_DOUBLE_FIELD, 0, path)
+            .expect("condition threshold");
+        append_custom_bytes(&mut output, CUSTOM_CONDITION_FORMAT_FIELD, &nested, path)
+            .expect("condition format");
+        output
+    }
 
     fn hex(value: &str) -> Vec<u8> {
         value
@@ -5284,5 +5702,29 @@ mod tests {
         assert_eq!(CUSTOM_REGISTRY_REFERENCE_FIELD, 9);
         assert_eq!(DOCUMENT_LEGACY_SUPER_FIELD, 8);
         assert_ne!(CUSTOM_REGISTRY_REFERENCE_FIELD, DOCUMENT_LEGACY_SUPER_FIELD);
+    }
+
+    #[test]
+    fn custom_pattern_preflight_matches_number_pattern_content() {
+        for pattern in ["0", "#0", "0.00", "#,##0"] {
+            let expected = encoded_custom_pattern(CUSTOM_NUMBER_FORMAT_TYPE, pattern).len();
+            assert_eq!(
+                custom_pattern_encoded_len(CUSTOM_NUMBER_FORMAT_TYPE, pattern).unwrap(),
+                expected,
+                "pattern {pattern:?} must have an exact preflight length",
+            );
+        }
+    }
+
+    #[test]
+    fn custom_condition_preflight_matches_comma_free_and_grouped_patterns() {
+        for pattern in ["0", "#0", "#,##0"] {
+            let expected = encoded_custom_condition(CUSTOM_NUMBER_FORMAT_TYPE, pattern).len();
+            assert_eq!(
+                custom_condition_encoded_len(CUSTOM_NUMBER_FORMAT_TYPE, pattern).unwrap(),
+                expected,
+                "condition pattern {pattern:?} must have an exact preflight length",
+            );
+        }
     }
 }

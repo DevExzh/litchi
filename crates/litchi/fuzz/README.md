@@ -902,6 +902,30 @@ cargo +nightly fuzz run numbers_table_cell_custom_format \
   -max_len=1024 -timeout=10 -rss_limit_mb=2048
 ```
 
+`numbers_table_cell_duration_format` is the focused selector-first Duration
+format lifecycle target.  It replays bounded command bytes against a
+source-built Duration table and covers all presentation styles, every
+ordered unit range, automatic/custom unit policies, set/clear/reset/no-op,
+exact-source patch conflicts and inverse restoration, shared format
+copy-on-write/refcounts, the optional generic Number secondary reference,
+malformed value/metadata shapes, lock refusal, and finite package, semantic,
+output, and transaction budgets. Its command corpus contains no native
+package bytes. In the checked-in seeds, the first five ASCII digits select the primary operation
+(`0` no-op, `1` set, `2` clear, `3` reset), style modulo three, largest unit
+modulo six, smallest-unit offset, and automatic/custom policy parity;
+trailing bytes vary selector coordinates. Arbitrary fuzz inputs remain raw bytes. Every
+deterministic safety branch is entered by the target: input-dependent checks run for each input,
+while expensive exhaustive sweeps run once per process. Filenames such as `locked` and
+`limits-atomic` label retained coverage rather than embedded text commands.
+
+Run it with the checked-in command seeds:
+
+```sh
+cargo +nightly fuzz run numbers_table_cell_duration_format \
+  corpus/numbers_table_cell_duration_format -- \
+  -max_len=1024 -timeout=10 -rss_limit_mb=2048
+```
+
 Run the unified Numbers cell-control target with its command seeds:
 
 ```sh
