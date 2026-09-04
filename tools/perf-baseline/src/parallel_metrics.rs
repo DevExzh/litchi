@@ -576,6 +576,7 @@ mod tests {
             range_simulation: super::super::RangeSimulationConfig::default(),
             execution_workers: vec![1, 2, 4],
             opc_cache_lock_diagnostics: false,
+            xlsx_cell_values_range_accounting: None,
             xlsx_cell_values_managed_planning_memory_headroom: None,
             opc_source_materialize_oracle: None,
         }

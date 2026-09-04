@@ -278,6 +278,7 @@ const XLSX_CALC_MEDIA_ENTRY_COUNT: usize = 8;
 const XLSX_CALC_MEDIA_ENTRY_BYTES: usize = 2 * 1024 * 1024;
 const XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT: usize = 8;
 const XLSX_CELL_VALUES_MEDIA_ENTRY_BYTES: usize = 512 * 1024;
+const XLSX_CELL_VALUES_RANGE_ACCOUNTING_VERSION: &str = "compressed-member-intersections-v1";
 const XLSX_VENDOR_EXTENSION_XML_PART: &str = "/xl/vendor/litchi-extension.xml";
 const XLSX_VENDOR_EXTENSION_BIN_PART: &str = "/xl/vendor/litchi-extension.bin";
 const XLSX_VENDOR_EXTENSION_XML_CONTENT_TYPE: &str = "application/vnd.litchi.vendor-extension+xml";
@@ -3562,6 +3563,11 @@ struct Configuration {
     range_simulation: RangeSimulationConfig,
     execution_workers: Vec<usize>,
     opc_cache_lock_diagnostics: bool,
+    /// Configuration identity for source-backed XLSX cell-values compressed
+    /// member range classification. Omitted when no source-backed cell-values
+    /// selector is selected so unrelated historical reports retain identity.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    xlsx_cell_values_range_accounting: Option<&'static str>,
     /// Configuration identity for the managed XLSX publication planning
     /// allowance. Omitted when no managed XLSX cell-values case is selected so
     /// unrelated historical reports retain their existing identity.
@@ -10462,6 +10468,9 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         range_simulation: options.range_simulation,
         execution_workers: options.execution_workers,
         opc_cache_lock_diagnostics: options.opc_cache_lock_diagnostics,
+        xlsx_cell_values_range_accounting: xlsx_cell_values_range_accounting_version(
+            &options.cases,
+        ),
         xlsx_cell_values_managed_planning_memory_headroom: options
             .cases
             .iter()
@@ -19678,6 +19687,13 @@ fn xlsx_update_sheet_selectors(updates: &[XlsxCoordinate]) -> Vec<litchi_xlsx::S
         .into_iter()
         .map(litchi_xlsx::Selector::from)
         .collect()
+}
+
+fn xlsx_cell_values_range_accounting_version(cases: &[Case]) -> Option<&'static str> {
+    cases
+        .iter()
+        .any(|case| case.is_xlsx_cell_values_source_backed())
+        .then_some(XLSX_CELL_VALUES_RANGE_ACCOUNTING_VERSION)
 }
 
 fn verify_xlsx_cell_crud_output(
@@ -39638,6 +39654,9 @@ fn run_xlsx_cell_values_edit_save(
     let payload_ranges = source_backed
         .then(|| xlsx_cell_crud_payload_ranges(corpus))
         .transpose()?;
+    let tracked_ranges = source_backed
+        .then(|| xlsx_cell_values_tracked_ranges(corpus, &updates))
+        .transpose()?;
     let payload_budget = source_backed
         .then(|| xlsx_cell_values_payload_budget(corpus, &updates))
         .transpose()?;
@@ -39699,11 +39718,14 @@ fn run_xlsx_cell_values_edit_save(
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
         let backing = source_backed.then(|| {
-            Arc::new(InstrumentedSource::new(
+            Arc::new(InstrumentedSource::new_xlsx(
                 corpus.archive.clone(),
                 payload_ranges
                     .clone()
                     .expect("source CRUD ranges are present"),
+                tracked_ranges
+                    .clone()
+                    .expect("source CRUD tracked ranges are present"),
             ))
         });
         let eager_source = (!source_backed).then(|| corpus.archive.clone());
@@ -41476,6 +41498,22 @@ fn xlsx_source_layout(
     bytes: &[u8],
     expected_sheet_count: usize,
 ) -> Result<(XlsxTrackedRanges, XlsxSourceMembersManifest), Box<dyn Error>> {
+    let selected_sheets = BTreeSet::from([0]);
+    xlsx_source_layout_for_selected_sheets(bytes, expected_sheet_count, &selected_sheets)
+}
+
+fn xlsx_source_layout_for_selected_sheets(
+    bytes: &[u8],
+    expected_sheet_count: usize,
+    selected_sheets: &BTreeSet<usize>,
+) -> Result<(XlsxTrackedRanges, XlsxSourceMembersManifest), Box<dyn Error>> {
+    if selected_sheets.is_empty()
+        || selected_sheets
+            .iter()
+            .any(|&sheet| sheet >= expected_sheet_count)
+    {
+        return Err("XLSX selected worksheet set is outside the corpus specification".into());
+    }
     let members = zip_member_ranges(bytes)?;
     let mut ranges = XlsxTrackedRanges::default();
     let mut workbook = None;
@@ -41497,13 +41535,18 @@ fn xlsx_source_layout(
                 styles = Some(name);
                 ranges.styles.push(range);
             },
-            "xl/worksheets/sheet1.xml" => {
-                worksheets.push(name);
-                ranges.selected_worksheet.push(range);
-            },
             _ if name.starts_with("xl/worksheets/") && name.ends_with(".xml") => {
+                let sheet_index = name
+                    .strip_prefix("xl/worksheets/sheet")
+                    .and_then(|suffix| suffix.strip_suffix(".xml"))
+                    .and_then(|index| index.parse::<usize>().ok())
+                    .and_then(|index| index.checked_sub(1));
                 worksheets.push(name);
-                ranges.unselected_worksheets.push(range);
+                if sheet_index.is_some_and(|index| selected_sheets.contains(&index)) {
+                    ranges.selected_worksheet.push(range);
+                } else {
+                    ranges.unselected_worksheets.push(range);
+                }
             },
             _ => {},
         }
@@ -41512,7 +41555,9 @@ fn xlsx_source_layout(
     if ranges.workbook.len() != 1 {
         return Err("XLSX archive does not contain exactly one workbook member".into());
     }
-    if ranges.selected_worksheet.len() != 1 || worksheets.len() != expected_sheet_count {
+    if ranges.selected_worksheet.len() != selected_sheets.len()
+        || worksheets.len() != expected_sheet_count
+    {
         return Err("XLSX worksheet member count differs from corpus specification".into());
     }
 
@@ -41541,6 +41586,23 @@ fn xlsx_instrumented_source(corpus: &Corpus) -> Result<Arc<InstrumentedSource>, 
         ordinary,
         ranges,
     )))
+}
+
+fn xlsx_cell_values_tracked_ranges(
+    corpus: &Corpus,
+    updates: &[XlsxCoordinate],
+) -> Result<XlsxTrackedRanges, Box<dyn Error>> {
+    let spec = xlsx_spec(corpus)?;
+    let selected_sheets = updates
+        .iter()
+        .map(|coordinate| coordinate.sheet)
+        .collect::<BTreeSet<_>>();
+    let (ranges, _manifest) = xlsx_source_layout_for_selected_sheets(
+        &corpus.archive,
+        spec.sheet_count,
+        &selected_sheets,
+    )?;
+    Ok(ranges)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -62063,6 +62125,31 @@ mod tests {
         assert_eq!(xlsx_cell_count(spec).unwrap(), 9_216);
         assert_eq!(spec.one_percent_updates.len(), 93);
         assert_eq!(XlsxCellCrudShape::ALL.len(), 2);
+        let one_edit_ranges = super::xlsx_cell_values_tracked_ranges(
+            &first,
+            &super::xlsx_cell_crud_updates_for_case(
+                Case::XlsxSourceBackedCellValuesOneEditSave,
+                spec,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(one_edit_ranges.selected_worksheet.len(), 1);
+        assert_eq!(
+            one_edit_ranges.unselected_worksheets.len(),
+            spec.sheet_count - 1
+        );
+        let batch_ranges = super::xlsx_cell_values_tracked_ranges(
+            &first,
+            &super::xlsx_cell_crud_updates_for_case(
+                Case::XlsxSourceBackedCellValuesBatchEditSave,
+                spec,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(batch_ranges.selected_worksheet.len(), spec.sheet_count);
+        assert!(batch_ranges.unselected_worksheets.is_empty());
         let mut semantic_hashes = BTreeMap::new();
 
         for case in [
@@ -62337,6 +62424,30 @@ mod tests {
                 assert_eq!(evidence.output_sha256.len(), 1);
                 assert_eq!(evidence.semantic_sha256.len(), 1);
                 assert_eq!(evidence.source_read_bytes.len(), 1);
+                assert!(evidence.workbook_read_bytes[0] > 0, "{}", case.name());
+                assert!(
+                    evidence.selected_worksheet_read_bytes[0] > 0,
+                    "{}",
+                    case.name()
+                );
+                // These vectors are compressed source-member intersections.
+                // Unselected worksheet bytes here come from raw publication of
+                // untouched members and do not claim semantic/decompressed
+                // worksheet reads.
+                if evidence.selected_worksheet_count == spec.sheet_count {
+                    assert_eq!(
+                        evidence.unselected_worksheet_read_bytes[0],
+                        0,
+                        "{}",
+                        case.name()
+                    );
+                } else {
+                    assert!(
+                        evidence.unselected_worksheet_read_bytes[0] > 0,
+                        "{}",
+                        case.name()
+                    );
+                }
                 let key = (evidence.update_count, evidence.selected_worksheet_count);
                 let semantic = evidence.semantic_sha256[0].clone();
                 if let Some(previous) = semantic_hashes.insert(key, semantic.clone()) {
@@ -62355,6 +62466,36 @@ mod tests {
         assert_eq!(xlsx_cell_count(dense_spec).unwrap(), 17_792);
         assert_eq!(dense_spec.one_percent_updates.len(), 178);
         assert!(dense_first.manifest.archive_member_count >= XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT);
+    }
+
+    #[test]
+    fn xlsx_cell_values_range_accounting_identity_is_source_backed_only() {
+        assert_eq!(
+            super::xlsx_cell_values_range_accounting_version(&[
+                Case::XlsxSourceBackedCellValuesOneEditSave,
+            ]),
+            Some(super::XLSX_CELL_VALUES_RANGE_ACCOUNTING_VERSION)
+        );
+        assert_eq!(
+            super::xlsx_cell_values_range_accounting_version(&[
+                Case::XlsxSourceBackedManagedCellValuesBatchEditSave,
+            ]),
+            Some(super::XLSX_CELL_VALUES_RANGE_ACCOUNTING_VERSION)
+        );
+        assert_eq!(
+            super::xlsx_cell_values_range_accounting_version(&[
+                Case::XlsxEagerCellValuesOneEditSave,
+                Case::XlsxEagerCellValuesBatchEditSave,
+            ]),
+            None
+        );
+        assert_eq!(
+            super::xlsx_cell_values_range_accounting_version(&[
+                Case::XlsxSourceBackedCellClearEditSave,
+                Case::XlsxSourceBackedCellRemoveEditSave,
+            ]),
+            None
+        );
     }
 
     #[test]

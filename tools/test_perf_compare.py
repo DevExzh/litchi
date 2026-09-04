@@ -2833,6 +2833,52 @@ class PerfCompareTests(unittest.TestCase):
         ):
             perf_compare.compare_reports(baseline, invalid_legacy, comparison_policy)
 
+    def test_xlsx_cell_values_range_accounting_configuration_identity(self):
+        baseline, current, comparison_policy = managed_xlsx_reports()
+        field = perf_compare.XLSX_CELL_VALUES_RANGE_ACCOUNTING_CONFIG_FIELD
+        version = perf_compare.XLSX_CELL_VALUES_RANGE_ACCOUNTING_VERSION
+        self.assertEqual(
+            perf_compare.compare_reports(baseline, current, comparison_policy)["status"],
+            "pass",
+        )
+        current["configuration"][field] = version
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError, "benchmark configuration mismatch"
+        ):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
+        baseline["configuration"][field] = version
+        self.assertEqual(
+            perf_compare.compare_reports(baseline, current, comparison_policy)["status"],
+            "pass",
+        )
+        for invalid in (None, False, 1, "", "future-accounting"):
+            with self.subTest(invalid=invalid):
+                malformed = copy.deepcopy(current)
+                malformed["configuration"][field] = invalid
+                with self.assertRaisesRegex(
+                    perf_compare.ComparisonInputError,
+                    "configuration.xlsx_cell_values_range_accounting must be",
+                ):
+                    perf_compare.compare_reports(baseline, malformed, comparison_policy)
+
+    def test_xlsx_cell_values_range_accounting_is_bound_to_source_selectors(self):
+        field = perf_compare.XLSX_CELL_VALUES_RANGE_ACCOUNTING_CONFIG_FIELD
+        version = perf_compare.XLSX_CELL_VALUES_RANGE_ACCOUNTING_VERSION
+        for cases in ([], ["opc_open"], ["xlsx_eager_cell_values_one_edit_save"],
+                      ["xlsx_source_backed_cell_clear_edit_save"], [None], None):
+            with self.subTest(cases=cases):
+                with self.assertRaisesRegex(
+                    perf_compare.ComparisonInputError,
+                    "requires a source-backed XLSX scalar cell-values edit/save case",
+                ):
+                    perf_compare._validate_xlsx_cell_values_range_accounting(
+                        {field: version, "cases": cases}, "current"
+                    )
+        for case in perf_compare.XLSX_CELL_VALUES_RANGE_ACCOUNTING_CASES:
+            perf_compare._validate_xlsx_cell_values_range_accounting(
+                {field: version, "cases": ["opc_open", case]}, "current"
+            )
+
     def test_opc_source_materialization_scope_and_claim_are_evidence_only(self):
         baseline, current, comparison_policy = opc_source_materialize_report_pair(
             comparison_policy=self.operation_metrics_policy()
