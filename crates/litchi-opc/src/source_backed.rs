@@ -4358,6 +4358,30 @@ impl SourceBackedPackage {
     /// graph retains borrowed-ingress policy and must be explicitly stripped
     /// or resigned before ordinary publication.
     pub fn into_opc_package(self) -> Result<OpcPackage> {
+        self.into_opc_package_inner(None)
+    }
+
+    /// Fully materialize this immutable view while recording cold Part reads
+    /// in a caller-owned report.
+    ///
+    /// The consuming conversion uses the same serial read session as
+    /// [`Self::into_opc_package`]. Stored and Deflate payload work from cold
+    /// Parts is merged into `accounting`; cache hits contribute no counters.
+    /// The report is updated before a later source, ZIP, or materialization
+    /// error is returned, so a failed conversion can retain partial cold-read
+    /// progress. Managed packages are refused before any payload read and
+    /// leave the report unchanged.
+    pub fn into_opc_package_with_accounting(
+        self,
+        accounting: &mut OpcOperationAccounting,
+    ) -> Result<OpcPackage> {
+        self.into_opc_package_inner(Some(accounting))
+    }
+
+    fn into_opc_package_inner(
+        self,
+        accounting: Option<&mut OpcOperationAccounting>,
+    ) -> Result<OpcPackage> {
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
         if self.cache.is_managed() {
@@ -4365,7 +4389,7 @@ impl SourceBackedPackage {
         }
         let mut package = self;
         let non_part_members = std::mem::take(&mut package.non_part_members);
-        let result = package.materialize_opc_package(non_part_members);
+        let result = package.materialize_opc_package_with_accounting(non_part_members, accounting);
         package.finish_stage(result)
     }
 
@@ -4387,13 +4411,35 @@ impl SourceBackedPackage {
     /// observed before, during, or after materialization rejects the result.
     /// A signed borrowed graph remains policy-gated after materialization.
     pub fn to_opc_package(&self) -> Result<OpcPackage> {
+        self.to_opc_package_inner(None)
+    }
+
+    /// Materialize this immutable view without consuming it while recording
+    /// cold Part reads in a caller-owned report.
+    ///
+    /// This borrowed conversion has the same source, managed-package, cache,
+    /// decoder-session, and partial-error behavior as
+    /// [`Self::into_opc_package_with_accounting`]. A cache hit contributes no
+    /// counters. The source-backed package remains usable after a successful
+    /// conversion.
+    pub fn to_opc_package_with_accounting(
+        &self,
+        accounting: &mut OpcOperationAccounting,
+    ) -> Result<OpcPackage> {
+        self.to_opc_package_inner(Some(accounting))
+    }
+
+    fn to_opc_package_inner(
+        &self,
+        accounting: Option<&mut OpcOperationAccounting>,
+    ) -> Result<OpcPackage> {
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
         if self.cache.is_managed() {
             return Err(OpcError::ManagedPackageMaterialization);
         }
         let non_part_members = self.finish_stage(self.cloned_non_part_members())?;
-        let result = self.materialize_opc_package(non_part_members);
+        let result = self.materialize_opc_package_with_accounting(non_part_members, accounting);
         self.finish_stage(result)
     }
 
@@ -4413,7 +4459,11 @@ impl SourceBackedPackage {
         Ok(members)
     }
 
-    fn materialize_opc_package(&self, non_part_members: Vec<NonPartMember>) -> Result<OpcPackage> {
+    fn materialize_opc_package_with_accounting(
+        &self,
+        non_part_members: Vec<NonPartMember>,
+        mut accounting: Option<&mut OpcOperationAccounting>,
+    ) -> Result<OpcPackage> {
         self.source.ensure_current()?;
         self.cache.check_context().map_err(map_execution_error)?;
         let mut package = OpcPackage::new();
@@ -4421,7 +4471,11 @@ impl SourceBackedPackage {
         self.finish_stage(result)?;
         let mut read_session = self.archive.read_session();
         for index in 0..self.parts.len() {
-            let bytes = self.finish_stage(self.read_part_with_session(index, &mut read_session))?;
+            let bytes = self.finish_stage(self.read_part_with_session(
+                index,
+                &mut read_session,
+                accounting.as_deref_mut(),
+            ))?;
             let catalog_part = &self.parts[index];
             let part_result = PartFactory::load_shared(
                 catalog_part.partname.clone(),
@@ -6032,7 +6086,7 @@ impl SourceBackedPackage {
                 // Reading every selected closure proves its local framing,
                 // compression, declared size, and CRC before output.
                 let original = match read_session.as_mut() {
-                    Some(session) => self.read_part_with_session(overlay.target, session)?,
+                    Some(session) => self.read_part_with_session(overlay.target, session, None)?,
                     None => self.read_part(overlay.target)?,
                 };
                 if original.as_bytes() != overlay.replacement.as_slice() {
@@ -7221,9 +7275,10 @@ impl SourceBackedPackage {
         &self,
         index: usize,
         session: &mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>,
+        accounting: Option<&mut OpcOperationAccounting>,
     ) -> Result<PartData> {
         let mut observer = NoopDiagnosticObserver;
-        self.read_part_with_observer(index, None, Some(session), &mut observer)
+        self.read_part_with_observer(index, accounting, Some(session), &mut observer)
     }
 
     fn read_part_with_accounting(
@@ -12876,6 +12931,153 @@ mod tests {
             source.reads.load(Ordering::SeqCst),
             reads_after_materialization
         );
+    }
+
+    #[test]
+    fn consuming_materialization_with_accounting_reports_mixed_cold_payload_work() {
+        const DEFLATED_DOCUMENT: &[u8] = b"<document>deflated source payload</document>";
+        const DEFLATED_SECOND: &[u8] = b"<second>deflated source payload</second>";
+        const STORED_ORPHAN: &[u8] = b"<orphan>stored source payload</orphan>";
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            mixed_compression_archive(),
+        )))
+        .unwrap();
+        let mut accounting = OpcOperationAccounting::default();
+
+        let owned = package
+            .into_opc_package_with_accounting(&mut accounting)
+            .unwrap();
+
+        assert_eq!(
+            owned
+                .get_part(&PackURI::new("/word/document.xml").unwrap())
+                .unwrap()
+                .blob(),
+            DEFLATED_DOCUMENT
+        );
+        assert_eq!(
+            owned
+                .get_part(&PackURI::new("/custom/second.xml").unwrap())
+                .unwrap()
+                .blob(),
+            DEFLATED_SECOND
+        );
+        assert_eq!(
+            owned
+                .get_part(&PackURI::new("/custom/orphan.xml").unwrap())
+                .unwrap()
+                .blob(),
+            STORED_ORPHAN
+        );
+        assert_eq!(
+            accounting.stored_payload_bytes_read(),
+            STORED_ORPHAN.len() as u64
+        );
+        assert_eq!(
+            accounting.stored_payload_bytes_accepted(),
+            STORED_ORPHAN.len() as u64
+        );
+        assert!(accounting.compressed_deflate_payload_bytes_read() > 0);
+        assert_eq!(
+            accounting.deflate_bytes_produced(),
+            (DEFLATED_DOCUMENT.len() + DEFLATED_SECOND.len()) as u64
+        );
+        assert_eq!(
+            accounting.deflate_bytes_accepted(),
+            accounting.deflate_bytes_produced()
+        );
+        assert_eq!(accounting.output_bytes_accepted(), 0);
+        assert_eq!(accounting.generated_deflate_payload_bytes_emitted(), 0);
+        assert_eq!(accounting.stored_payload_bytes_emitted(), 0);
+        assert_eq!(accounting.precompressed_payload_bytes_emitted(), 0);
+        assert_eq!(accounting.raw_unchanged_source_bytes_accepted(), 0);
+    }
+
+    #[test]
+    fn borrowed_materialization_with_accounting_does_not_charge_preloaded_cache_hits() {
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            mixed_compression_archive(),
+        )))
+        .unwrap();
+        for part in package.iter_parts() {
+            part.data().unwrap();
+        }
+
+        let mut accounting = OpcOperationAccounting::default();
+        let owned = package
+            .to_opc_package_with_accounting(&mut accounting)
+            .unwrap();
+
+        assert_eq!(accounting, OpcOperationAccounting::default());
+        assert_eq!(owned.part_count(), package.iter_parts().count());
+    }
+
+    #[test]
+    fn consuming_materialization_with_accounting_refuses_managed_package_before_reads() {
+        let source = Arc::new(CountingSource::new(archive_bytes(
+            root_relationships(),
+            b"managed consuming document",
+            true,
+        )));
+        let (budget, context) = managed_context(4096);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source.clone(),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let reads_before = source.reads.load(Ordering::SeqCst);
+        let read_bytes_before = source.read_bytes.load(Ordering::SeqCst);
+        let mut accounting = OpcOperationAccounting::default();
+
+        assert!(matches!(
+            package.into_opc_package_with_accounting(&mut accounting),
+            Err(OpcError::ManagedPackageMaterialization)
+        ));
+        assert_eq!(accounting, OpcOperationAccounting::default());
+        assert_eq!(source.reads.load(Ordering::SeqCst), reads_before);
+        assert_eq!(source.read_bytes.load(Ordering::SeqCst), read_bytes_before);
+        assert_eq!(budget.used(Resource::Objects), 0);
+    }
+
+    #[test]
+    fn consuming_materialization_with_accounting_keeps_malformed_read_progress() {
+        const DOCUMENT: &[u8] = b"payload whose CRC is invalid for accounting";
+        let mut bytes = archive_bytes(root_relationships(), DOCUMENT, false);
+        let payload_offset = bytes
+            .windows(DOCUMENT.len())
+            .position(|window| window == DOCUMENT)
+            .unwrap();
+        bytes[payload_offset] ^= 0xff;
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
+        let mut accounting = OpcOperationAccounting::default();
+
+        assert!(matches!(
+            package.into_opc_package_with_accounting(&mut accounting),
+            Err(OpcError::ZipError(_))
+        ));
+        assert!(accounting.stored_payload_bytes_read() > 0);
+    }
+
+    #[test]
+    fn consuming_materialization_with_accounting_keeps_source_change_read_progress() {
+        const DOCUMENT: &[u8] = b"document changes during accounted materialization";
+        let bytes = archive_bytes(root_relationships(), DOCUMENT, true);
+        let payload_offset = bytes
+            .windows(DOCUMENT.len())
+            .position(|window| window == DOCUMENT)
+            .unwrap();
+        let source = Arc::new(ChangeDuringPayloadSource::new(bytes, payload_offset));
+        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        source.armed.store(true, Ordering::SeqCst);
+        let mut accounting = OpcOperationAccounting::default();
+
+        assert!(matches!(
+            package.into_opc_package_with_accounting(&mut accounting),
+            Err(OpcError::SourceChanged { .. })
+        ));
+        assert!(accounting.stored_payload_bytes_read() > 0);
     }
 
     #[test]
