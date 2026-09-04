@@ -13,6 +13,12 @@ closes a capability gap rather than establishing a latency improvement.
 Generated ZIP64 output promotion and representative large-file measurements
 remain separate work.
 
+[Change 0405](changes/0405-opc-cache-lock-observation.md) adds opt-in direct
+cache/flight mutex acquisition observations to the contention harness. These
+include observer overhead and pre-admission work, and exclude condition-variable
+wait/reacquire time. The validated smoke establishes instrumentation coverage;
+it does not establish a latency or contention improvement.
+
 ## Change 0402 update
 
 The selected-source validation loop in
