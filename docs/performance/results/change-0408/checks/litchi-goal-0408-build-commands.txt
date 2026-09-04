@@ -1,0 +1,21 @@
+Toolchain: Rust/Cargo 1.98.1
+Working directory: /home/zhuhe/code/litchi
+Profiling build environment:
+CARGO_TARGET_DIR=/tmp/litchi-goal-fp-target
+CARGO_BUILD_JOBS=4
+CARGO_INCREMENTAL=0
+CARGO_PROFILE_RELEASE_DEBUG=1
+RUSTFLAGS=-C force-frame-pointers=yes -C force-unwind-tables=yes
+
+cargo +1.98.1 test --locked --manifest-path tools/perf-baseline/Cargo.toml --release --features allocator-metrics --lib
+
+cargo +1.98.1 build --locked --manifest-path tools/perf-baseline/Cargo.toml --release --features allocator-metrics --bin litchi-perf-baseline --bin litchi-perf-baseline-alloc
+
+cargo +1.98.1 test --locked --manifest-path tools/perf-baseline/Cargo.toml --release --features allocator-metrics --lib --bin litchi-perf-baseline-alloc
+
+Initial full library test: 256 passed, 1 failed, 1 ignored. Failure was a stale selector count (421 vs 422). Corrected the expected count and removed an unused test import before final tests.
+
+The final allocator-bin tests used the same build environment:
+cargo +1.98.1 test --locked --manifest-path tools/perf-baseline/Cargo.toml --release --features allocator-metrics --bin litchi-perf-baseline-alloc -- --test-threads=1
+
+Final binary build repeated the two-bin command above after the test-only fixes; build-final.log records success.

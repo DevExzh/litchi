@@ -1,0 +1,197 @@
+{
+  "source_revision": "eba1f302eb1e04519925d1791a2f9d299e908d89",
+  "performance_claim": "none",
+  "reports": {
+    "normal": {
+      "elapsed_ns": {
+        "unit": "ns",
+        "min": 2141628,
+        "p50": 2183708,
+        "p95": 2213238,
+        "p99": 2222408,
+        "max": 2255188,
+        "mean": 2184756.711999998,
+        "standard_deviation": 16516.160992220033,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 2183305.5134115024,
+          "upper": 2186207.9105884936
+        }
+      },
+      "counter_ranges": {
+        "source": {
+          "logical_read_calls": {
+            "min": 532,
+            "max": 532
+          },
+          "logical_read_returned_bytes": {
+            "min": 16782540,
+            "max": 16782540
+          },
+          "max_concurrent_reads": {
+            "min": 1,
+            "max": 1
+          }
+        },
+        "allocation": {}
+      }
+    },
+    "allocator": {
+      "elapsed_ns": {
+        "unit": "ns",
+        "min": 2144408,
+        "p50": 2192383,
+        "p95": 2224038,
+        "p99": 2245128,
+        "max": 2288319,
+        "mean": 2193340.3100000005,
+        "standard_deviation": 18820.02911969007,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 2191686.681187179,
+          "upper": 2194993.938812822
+        }
+      },
+      "counter_ranges": {
+        "source": {
+          "logical_read_calls": {
+            "min": 532,
+            "max": 532
+          },
+          "logical_read_returned_bytes": {
+            "min": 16782540,
+            "max": 16782540
+          },
+          "max_concurrent_reads": {
+            "min": 1,
+            "max": 1
+          }
+        },
+        "allocation": {
+          "allocation_calls": {
+            "min": 55,
+            "max": 55
+          },
+          "deallocation_calls": {
+            "min": 71,
+            "max": 71
+          },
+          "reallocation_calls": {
+            "min": 0,
+            "max": 0
+          },
+          "failed_allocation_calls": {
+            "min": 0,
+            "max": 0
+          },
+          "allocated_bytes": {
+            "min": 16861253,
+            "max": 16861253
+          },
+          "deallocated_bytes": {
+            "min": 86122,
+            "max": 86122
+          },
+          "live_bytes_before": {
+            "min": 38255545,
+            "max": 38280121
+          },
+          "live_bytes_after": {
+            "min": 55030676,
+            "max": 55055252
+          },
+          "peak_live_bytes_before": {
+            "min": 55115982,
+            "max": 55140558
+          },
+          "peak_live_bytes_after": {
+            "min": 55115982,
+            "max": 55140558
+          }
+        }
+      }
+    },
+    "accounted": {
+      "elapsed_ns": {
+        "unit": "ns",
+        "min": 2100897,
+        "p50": 2144518,
+        "p95": 2172648,
+        "p99": 2187548,
+        "max": 2270259,
+        "mean": 2146424.244,
+        "standard_deviation": 16774.570763900676,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 2144950.3401414305,
+          "upper": 2147898.1478585694
+        }
+      },
+      "counter_ranges": {
+        "source": {
+          "logical_read_calls": {
+            "min": 532,
+            "max": 532
+          },
+          "logical_read_returned_bytes": {
+            "min": 16782540,
+            "max": 16782540
+          },
+          "max_concurrent_reads": {
+            "min": 1,
+            "max": 1
+          }
+        },
+        "allocation": {},
+        "opc_zip": {
+          "compressed_deflate_payload_bytes_read": {
+            "min": 16782356,
+            "max": 16782356
+          },
+          "stored_payload_bytes_read": {
+            "min": 0,
+            "max": 0
+          },
+          "stored_payload_bytes_accepted": {
+            "min": 0,
+            "max": 0
+          },
+          "deflate_bytes_produced": {
+            "min": 16777216,
+            "max": 16777216
+          },
+          "deflate_bytes_accepted": {
+            "min": 16777216,
+            "max": 16777216
+          },
+          "generated_deflate_payload_bytes_emitted": {
+            "min": 0,
+            "max": 0
+          },
+          "stored_payload_bytes_emitted": {
+            "min": 0,
+            "max": 0
+          },
+          "precompressed_payload_bytes_emitted": {
+            "min": 0,
+            "max": 0
+          },
+          "raw_unchanged_source_bytes_accepted": {
+            "min": 0,
+            "max": 0
+          },
+          "output_bytes_accepted": {
+            "min": 0,
+            "max": 0
+          }
+        }
+      }
+    }
+  },
+  "cache_events": {
+    "L1-dcache-loads": "zero returned; viability unvalidated",
+    "L1-dcache-load-misses": "zero returned; viability unvalidated",
+    "LLC-loads": "not supported",
+    "LLC-load-misses": "not supported"
+  }
+}

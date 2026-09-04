@@ -1,0 +1,180 @@
+{
+  "source_after": {
+    "revision": "eba1f302eb1e04519925d1791a2f9d299e908d89",
+    "status": "?? docs/GOAL.md",
+    "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+  },
+  "reports": [
+    {
+      "name": "normal",
+      "corpus": {
+        "name": "few-large-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777216,
+        "archive_bytes": 16783632,
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098",
+        "xlsx": null
+      },
+      "validation": "passed"
+    },
+    {
+      "name": "allocator",
+      "corpus": {
+        "name": "few-large-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777216,
+        "archive_bytes": 16783632,
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098",
+        "xlsx": null
+      },
+      "validation": "passed"
+    },
+    {
+      "name": "accounted",
+      "corpus": {
+        "name": "few-large-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777216,
+        "archive_bytes": 16783632,
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098",
+        "xlsx": null
+      },
+      "validation": "passed"
+    },
+    {
+      "name": "perf-stat",
+      "corpus": {
+        "name": "few-large-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777216,
+        "archive_bytes": 16783632,
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098",
+        "xlsx": null
+      },
+      "validation": "passed"
+    },
+    {
+      "name": "perf-cache",
+      "corpus": {
+        "name": "few-large-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777216,
+        "archive_bytes": 16783632,
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098",
+        "xlsx": null
+      },
+      "validation": "passed"
+    },
+    {
+      "name": "perf-record",
+      "corpus": {
+        "name": "few-large-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 4,
+        "archive_member_count": 6,
+        "entry_bytes": 4194304,
+        "uncompressed_payload_bytes": 16777216,
+        "archive_bytes": 16783632,
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4194304,
+        "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098",
+        "xlsx": null
+      },
+      "validation": "passed"
+    }
+  ],
+  "performance_claim": "none",
+  "required_commands_succeeded": true,
+  "optional_counter_status": [
+    {
+      "label": "perf-cache",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "perf",
+        "stat",
+        "-x,",
+        "-o",
+        "/tmp/litchi-goal-0408/perf-cache.csv",
+        "-e",
+        "L1-dcache-loads,L1-dcache-load-misses,LLC-loads,LLC-load-misses",
+        "--",
+        "/tmp/litchi-goal-fp-target/release/litchi-perf-baseline",
+        "--case",
+        "opc_source_materialize",
+        "--shape",
+        "few-large",
+        "--payload",
+        "incompressible",
+        "--warmup",
+        "20",
+        "--samples",
+        "500",
+        "--json",
+        "/tmp/litchi-goal-0408/perf-cache.json",
+        "--corpus-manifest",
+        "/tmp/litchi-goal-0408/perf-cache.catalog.json"
+      ],
+      "started_utc": "2026-09-04T22:11:38.781350+00:00",
+      "wall_seconds": 7.039588461993844,
+      "exit_code": 0
+    }
+  ],
+  "note": "Counter support and caller-unwind quality still require inspection; no performance comparison is authorized."
+}

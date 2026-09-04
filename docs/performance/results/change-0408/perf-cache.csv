@@ -1,0 +1,6 @@
+# started on Fri Sep  4 22:11:38 2026
+
+0,,L1-dcache-loads,7018879699,100.00,,
+0,,L1-dcache-load-misses,7018879699,100.00,,
+<not supported>,,LLC-loads,0,100.00,,
+<not supported>,,LLC-load-misses,0,100.00,,

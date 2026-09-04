@@ -1,0 +1,436 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 7K of event 'cycles:u'
+# Event count (approx.): 30868896461
+#
+# Overhead  Command          Shared Object                       Symbol                                                                                                                                                                                                                                                                                                                                                    
+# ........  ...............  ..................................  ..........................................................................................................................................................................................................................................................................................................................................................
+#
+    74.49%  litchi-perf-bas  litchi-perf-baseline                [.] sha2::sha256::x86_sha::compress
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+               |--71.45%--branch<litchi_perf_baseline::CaseResult, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               |          run_opc_source_materialize_variant (inlined)
+               |          |          
+               |           --71.35%--verify_opc_materialized_package (inlined)
+               |                     ne<alloc::string::String, alloc::string::String> (inlined)
+               |                     eq (inlined)
+               |                     eq<u8, u8, alloc::alloc::Global, alloc::alloc::Global> (inlined)
+               |                     index<u8, core::ops::range::RangeFull, alloc::alloc::Global> (inlined)
+               |                     deref<u8, alloc::alloc::Global> (inlined)
+               |                     as_slice<u8, alloc::alloc::Global> (inlined)
+               |                     sha256_hex (inlined)
+               |                     digest<sha2::Sha256, &[u8]> (inlined)
+               |                     update (inlined)
+               |                     digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, block_buffer::Eager, sha2::{impl#5}::update::{closure_env#0}> (inlined)
+               |                     compress (inlined)
+               |                     |          
+               |                     |--26.79%--schedule (inlined)
+               |                     |          |          
+               |                     |          |--9.46%--_mm_sha256msg1_epu32 (inlined)
+               |                     |          |          
+               |                     |          |--9.18%--_mm_alignr_epi8<4> (inlined)
+               |                     |          |          
+               |                     |          |--6.54%--_mm_add_epi32 (inlined)
+               |                     |          |          
+               |                     |           --1.61%--_mm_sha256msg2_epu32 (inlined)
+               |                     |          
+               |                     |--16.86%--_mm_shuffle_epi32<14> (inlined)
+               |                     |          
+               |                     |--16.17%--_mm_add_epi32 (inlined)
+               |                     |          
+               |                     |--10.09%--_mm_sha256rnds2_epu32 (inlined)
+               |                     |          
+               |                      --1.44%--_mm_shuffle_epi8 (inlined)
+               |          
+                --2.89%--branch<litchi_perf_baseline::BinaryIdentity, core::io::error::Error> (inlined)
+                          current_executable_identity (inlined)
+                          update<sha2::Sha256, &[u8]> (inlined)
+                          update (inlined)
+                          digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, block_buffer::Eager, sha2::{impl#5}::update::{closure_env#0}> (inlined)
+                          compress (inlined)
+                          |          
+                          |--1.04%--schedule (inlined)
+                          |          
+                          |--0.74%--_mm_add_epi32 (inlined)
+                          |          
+                           --0.70%--_mm_shuffle_epi32<14> (inlined)
+
+    10.00%  litchi-perf-bas  libc.so.6                           [.] __memmove_avx512_unaligned_erms
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --9.97%--branch<litchi_perf_baseline::CaseResult, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_opc_source_materialize_variant (inlined)
+                          |          
+                          |--6.19%--into_opc_package (inlined)
+                          |          into_opc_package_inner (inlined)
+                          |          materialize_opc_package_with_accounting (inlined)
+                          |          finish_stage<litchi_opc::source_backed::PartData> (inlined)
+                          |          ensure_current (inlined)
+                          |          deref<dyn litchi_core::source::ReadAt, alloc::alloc::Global> (inlined)
+                          |          inner<dyn litchi_core::source::ReadAt, alloc::alloc::Global> (inlined)
+                          |          as_ref<alloc::sync::ArcInner<dyn litchi_core::source::ReadAt>> (inlined)
+                          |          read_part_with_observer<litchi_opc::source_backed::NoopDiagnosticObserver> (inlined)
+                          |          load_part_with_accounting<litchi_opc::source_backed::NoopDiagnosticObserver> (inlined)
+                          |          {closure#0}<litchi_opc::source_backed::NoopDiagnosticObserver> (inlined)
+                          |          read_entry<litchi_opc::source_backed::SourceReader> (inlined)
+                          |          read_entry_with_accounting<litchi_opc::source_backed::SourceReader> (inlined)
+                          |          read_to_end<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>>> (inlined)
+                          |          default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>>> (inlined)
+                          |          read_buf<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>> (inlined)
+                          |          read_buf<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>> (inlined)
+                          |          default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>>> (inlined)
+                          |          {closure#0}<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>> (inlined)
+                          |          read<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader> (inlined)
+                          |          read<soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>> (inlined)
+                          |          read<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>> (inlined)
+                          |          read<flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>> (inlined)
+                          |          read<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>> (inlined)
+                          |          read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>> (inlined)
+                          |          read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>, flate2::mem::Decompress> (inlined)
+                          |          |          
+                          |          |--4.04%--fill_buf<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>> (inlined)
+                          |          |          read<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>> (inlined)
+                          |          |          read<&litchi_opc::source_backed::SourceReader> (inlined)
+                          |          |          read<&litchi_opc::source_backed::SourceReader> (inlined)
+                          |          |          read_at<litchi_opc::source_backed::SourceReader> (inlined)
+                          |          |          read_at (inlined)
+                          |          |          read_source_at_with_context (inlined)
+                          |          |          __memmove_avx512_unaligned_erms
+                          |          |          
+                          |           --2.14%--run (inlined)
+                          |                     decompress (inlined)
+                          |                     decompress (inlined)
+                          |                     decompress (inlined)
+                          |                     decompress_uninit (inlined)
+                          |                     |          
+                          |                     |--1.08%--__memmove_avx512_unaligned_erms
+                          |                     |          
+                          |                      --1.07%--inflate (inlined)
+                          |                                __memmove_avx512_unaligned_erms
+                          |          
+                           --3.74%--branch<(alloc::sync::Arc<litchi_perf_baseline::InstrumentedSource, alloc::alloc::Global>, core::ops::range::Range<u64>), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                                     __memmove_avx512_unaligned_erms
+
+     7.30%  litchi-perf-bas  litchi-perf-baseline                [.] crc32fast::specialized::pclmulqdq::calculate
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --7.29%--branch<litchi_perf_baseline::CaseResult, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_opc_source_materialize_variant (inlined)
+                          into_opc_package (inlined)
+                          into_opc_package_inner (inlined)
+                          materialize_opc_package_with_accounting (inlined)
+                          finish_stage<litchi_opc::source_backed::PartData> (inlined)
+                          ensure_current (inlined)
+                          deref<dyn litchi_core::source::ReadAt, alloc::alloc::Global> (inlined)
+                          inner<dyn litchi_core::source::ReadAt, alloc::alloc::Global> (inlined)
+                          as_ref<alloc::sync::ArcInner<dyn litchi_core::source::ReadAt>> (inlined)
+                          read_part_with_observer<litchi_opc::source_backed::NoopDiagnosticObserver> (inlined)
+                          load_part_with_accounting<litchi_opc::source_backed::NoopDiagnosticObserver> (inlined)
+                          {closure#0}<litchi_opc::source_backed::NoopDiagnosticObserver> (inlined)
+                          read_entry<litchi_opc::source_backed::SourceReader> (inlined)
+                          read_entry_with_accounting<litchi_opc::source_backed::SourceReader> (inlined)
+                          read_to_end<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>>> (inlined)
+                          default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>>> (inlined)
+                          read_buf<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>> (inlined)
+                          read_buf<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>> (inlined)
+                          default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>>> (inlined)
+                          {closure#0}<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>> (inlined)
+                          read<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader> (inlined)
+                          crc32_chunk (inlined)
+                          update (inlined)
+                          update (inlined)
+                          calculate (inlined)
+                          |          
+                          |--5.70%--reduce128 (inlined)
+                          |          |          
+                          |          |--2.44%--_mm_xor_si128 (inlined)
+                          |          |          
+                          |          |--2.08%--_mm_clmulepi64_si128<17> (inlined)
+                          |          |          
+                          |           --1.18%--_mm_clmulepi64_si128<0> (inlined)
+                          |          
+                           --1.55%--get (inlined)
+                                     |          
+                                     |--1.02%--_mm_loadu_si128 (inlined)
+                                     |          copy_nonoverlapping<u8> (inlined)
+                                     |          
+                                      --0.53%--index<u8, core::ops::range::RangeFrom<usize>> (inlined)
+                                                index<u8> (inlined)
+                                                get_offset_len_noubcheck<u8> (inlined)
+
+     2.28%  litchi-perf-bas  litchi-perf-baseline                [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               then<core::result::Result<litchi_perf_baseline::Corpus, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, litchi_perf_baseline::run::{closure_env#9}> (inlined)
+               build_opc_corpus (inlined)
+               branch<alloc::vec::Vec<u8, alloc::alloc::Global>, litchi_opc::error::OpcError> (inlined)
+               to_bytes (inlined)
+               write<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+               branch<(), litchi_opc::error::OpcError> (inlined)
+               write<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+               map_err<(), soapberry_zip::errors::Error, litchi_opc::error::OpcError, litchi_opc::phys_pkg::{impl#6}::write::{closure_env#0}<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>> (inlined)
+               write_deflated_with_accounting<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+               {closure#0}<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+               |          
+                --2.26%--write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>>>> (inlined)
+                          write<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>>> (inlined)
+                          write<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>> (inlined)
+                          write<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress> (inlined)
+                          map<(usize, flate2::mem::Status), core::io::error::Error, usize, flate2::zio::{impl#5}::write::{closure_env#0}<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress>> (inlined)
+                          write_with_status<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress> (inlined)
+                          run_vec (inlined)
+                          compress_vec (inlined)
+                          write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status, flate2::mem::CompressError>, flate2::mem::{impl#1}::compress_vec::{closure_env#0}> (inlined)
+                          {closure#0} (inlined)
+                          compress_uninit (inlined)
+                          compress_uninit<flate2::ffi::zlib_rs::Deflate> (inlined)
+                          compress (inlined)
+                          compress_uninit (inlined)
+                          into<zlib_rs::ReturnCode, core::result::Result<zlib_rs::stable::Status, zlib_rs::stable::DeflateError>> (inlined)
+                          from (inlined)
+                          deflate (inlined)
+                          deflate_medium (inlined)
+                          |          
+                           --0.61%--quick_insert_string (inlined)
+                                     |          
+                                      --0.51%--quick_insert_value (inlined)
+
+     1.79%  litchi-perf-bas  libc.so.6                           [.] __memset_avx512_unaligned_erms
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               branch<litchi_perf_baseline::CaseResult, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               run_opc_source_materialize_variant (inlined)
+               |          
+                --1.77%--into_opc_package (inlined)
+                          into_opc_package_inner (inlined)
+                          materialize_opc_package_with_accounting (inlined)
+                          finish_stage<litchi_opc::source_backed::PartData> (inlined)
+                          ensure_current (inlined)
+                          deref<dyn litchi_core::source::ReadAt, alloc::alloc::Global> (inlined)
+                          inner<dyn litchi_core::source::ReadAt, alloc::alloc::Global> (inlined)
+                          as_ref<alloc::sync::ArcInner<dyn litchi_core::source::ReadAt>> (inlined)
+                          read_part_with_observer<litchi_opc::source_backed::NoopDiagnosticObserver> (inlined)
+                          load_part_with_accounting<litchi_opc::source_backed::NoopDiagnosticObserver> (inlined)
+                          {closure#0}<litchi_opc::source_backed::NoopDiagnosticObserver> (inlined)
+                          read_entry<litchi_opc::source_backed::SourceReader> (inlined)
+                          read_entry_with_accounting<litchi_opc::source_backed::SourceReader> (inlined)
+                          read_to_end<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>>> (inlined)
+                          default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>>> (inlined)
+                          __memset_avx512_unaligned_erms
+
+     0.79%  litchi-perf-bas  litchi-perf-baseline                [.] zlib_rs::deflate::longest_match::longest_match
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               then<core::result::Result<litchi_perf_baseline::Corpus, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, litchi_perf_baseline::run::{closure_env#9}> (inlined)
+               build_opc_corpus (inlined)
+               branch<alloc::vec::Vec<u8, alloc::alloc::Global>, litchi_opc::error::OpcError> (inlined)
+               to_bytes (inlined)
+               write<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+               branch<(), litchi_opc::error::OpcError> (inlined)
+               write<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+               map_err<(), soapberry_zip::errors::Error, litchi_opc::error::OpcError, litchi_opc::phys_pkg::{impl#6}::write::{closure_env#0}<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>> (inlined)
+               write_deflated_with_accounting<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+               {closure#0}<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+               |          
+                --0.77%--write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>>>> (inlined)
+                          write<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>>> (inlined)
+                          write<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>> (inlined)
+                          write<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress> (inlined)
+                          map<(usize, flate2::mem::Status), core::io::error::Error, usize, flate2::zio::{impl#5}::write::{closure_env#0}<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress>> (inlined)
+                          write_with_status<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress> (inlined)
+                          run_vec (inlined)
+                          compress_vec (inlined)
+                          write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status, flate2::mem::CompressError>, flate2::mem::{impl#1}::compress_vec::{closure_env#0}> (inlined)
+                          {closure#0} (inlined)
+                          compress_uninit (inlined)
+                          compress_uninit<flate2::ffi::zlib_rs::Deflate> (inlined)
+                          compress (inlined)
+                          compress_uninit (inlined)
+                          into<zlib_rs::ReturnCode, core::result::Result<zlib_rs::stable::Status, zlib_rs::stable::DeflateError>> (inlined)
+                          from (inlined)
+                          deflate (inlined)
+                          |          
+                           --0.75%--deflate_medium (inlined)
+                                     longest_match (inlined)
+                                     |          
+                                      --0.71%--longest_match_help<false> (inlined)
+
+     0.77%  litchi-perf-bas  litchi-perf-baseline                [.] <litchi_perf_baseline::InstrumentedSource as litchi_core::source::ReadAt>::read_at
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               branch<litchi_perf_baseline::CaseResult, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               run_opc_source_materialize_variant (inlined)
+               |          
+                --0.74%--into_opc_package (inlined)
+                          into_opc_package_inner (inlined)
+                          materialize_opc_package_with_accounting (inlined)
+                          finish_stage<litchi_opc::source_backed::PartData> (inlined)
+                          ensure_current (inlined)
+                          deref<dyn litchi_core::source::ReadAt, alloc::alloc::Global> (inlined)
+                          inner<dyn litchi_core::source::ReadAt, alloc::alloc::Global> (inlined)
+                          as_ref<alloc::sync::ArcInner<dyn litchi_core::source::ReadAt>> (inlined)
+                          read_part_with_observer<litchi_opc::source_backed::NoopDiagnosticObserver> (inlined)
+                          load_part_with_accounting<litchi_opc::source_backed::NoopDiagnosticObserver> (inlined)
+                          {closure#0}<litchi_opc::source_backed::NoopDiagnosticObserver> (inlined)
+                          read_entry<litchi_opc::source_backed::SourceReader> (inlined)
+                          read_entry_with_accounting<litchi_opc::source_backed::SourceReader> (inlined)
+                          read_to_end<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>>> (inlined)
+                          default_read_to_end<core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>>> (inlined)
+                          read_buf<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>> (inlined)
+                          read_buf<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>> (inlined)
+                          default_read_buf<std::io::Read::read_buf::{closure_env#0}<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>>> (inlined)
+                          {closure#0}<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>> (inlined)
+                          read<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader> (inlined)
+                          read<soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>> (inlined)
+                          read<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>> (inlined)
+                          read<flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>> (inlined)
+                          read<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>> (inlined)
+                          read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>> (inlined)
+                          read<flate2::bufreader::BufReader<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>, flate2::mem::Decompress> (inlined)
+                          fill_buf<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>> (inlined)
+                          read<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>> (inlined)
+                          read<&litchi_opc::source_backed::SourceReader> (inlined)
+                          read<&litchi_opc::source_backed::SourceReader> (inlined)
+                          read_at<litchi_opc::source_backed::SourceReader> (inlined)
+                          read_at (inlined)
+                          |          
+                           --0.72%--read_source_at_with_context (inlined)
+                                     read_at (inlined)
+
+     0.66%  litchi-perf-bas  litchi-perf-baseline                [.] litchi_perf_baseline::payload_bytes
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+
+     0.61%  litchi-perf-bas  [unknown]                           [k] 0xffffffff8c800ef0
+            |          
+             --0.53%--_start
+                       __libc_start_main_impl (inlined)
+                       call_init (inlined)
+                       __libc_start_call_main
+                       main
+                       lang_start_internal (inlined)
+                       catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+                       catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+                       do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+                       {closure#0} (inlined)
+                       {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+                       report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                       __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+                       run (inlined)
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#
