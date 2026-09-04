@@ -3721,5 +3721,16 @@ mod tests {
             );
             assert_fallback_parity(&general_reference, None, &decoded, &["A1"]);
         }
+
+        #[test]
+        fn numeric_value_scratch_0400_preserves_late_fallback_parity() {
+            let numeric_with_late_date = worksheet_xml(
+                r#"<sheetData><row r="1"><c r="A1"><v>-0.000</v></c><c r="B1" t="d"><v>2026-07-31T12:34:56.250-07:00</v></c></row></sheetData>"#,
+            );
+            let eager_numeric = worksheet_xml(
+                r#"<sheetData><row r="1"><c r="A1"><v>-0.000</v></c></row></sheetData>"#,
+            );
+            assert_fallback_parity(&numeric_with_late_date, None, &eager_numeric, &["A1"]);
+        }
     }
 }
