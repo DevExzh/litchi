@@ -294,7 +294,7 @@ mod streaming_0410_name_ownership_tests {
 }
 
 #[cfg(test)]
-mod tests {
+mod codec_tests {
     use super::*;
 
     fn source_offset(xml: &[u8], needle: &[u8]) -> u32 {
