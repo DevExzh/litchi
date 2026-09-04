@@ -99,17 +99,7 @@ impl OwnedPhysPkgReader {
     /// Returns an error if the file does not exist, cannot be read, exceeds the
     /// input-byte limit, or is not a valid ZIP archive.
     pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: ReadLimits) -> Result<Self> {
-        let path_ref = path.as_ref();
-
-        if !path_ref.exists() {
-            return Err(OpcError::PackageNotFound(path_ref.display().to_string()));
-        }
-
-        let metadata = std::fs::metadata(path_ref)?;
-        if metadata.is_file() {
-            limits.check_input_bytes(metadata.len())?;
-        }
-        let data = read_limited(std::fs::File::open(path_ref)?, limits)?;
+        let data = read_owned_path_with_limits(path, limits)?;
         Self::from_bytes_with_limits(data, limits)
     }
 
@@ -1382,6 +1372,26 @@ pub(crate) fn read_limited<R: Read>(mut reader: R, limits: ReadLimits) -> Result
     }
 }
 
+/// Read an owned package source from a filesystem path under the bounded
+/// ingress policy. ZIP validation remains the caller's responsibility so an
+/// owning package constructor can build its one physical reader directly.
+pub(crate) fn read_owned_path_with_limits<P: AsRef<Path>>(
+    path: P,
+    limits: ReadLimits,
+) -> Result<Vec<u8>> {
+    let path_ref = path.as_ref();
+
+    if !path_ref.exists() {
+        return Err(OpcError::PackageNotFound(path_ref.display().to_string()));
+    }
+
+    let metadata = std::fs::metadata(path_ref)?;
+    if metadata.is_file() {
+        limits.check_input_bytes(metadata.len())?;
+    }
+    read_limited(std::fs::File::open(path_ref)?, limits)
+}
+
 fn map_streaming_failure(failure: soapberry_zip::office::StreamingArchiveFailure) -> OpcError {
     let written = failure.progress().output_bytes();
     let source = OpcError::from(failure.into_error());
@@ -1870,6 +1880,18 @@ mod tests {
                 actual: 4,
                 maximum: 3,
             })
+        ));
+    }
+
+    #[test]
+    fn public_owned_reader_still_validates_zip_at_construction() {
+        assert!(matches!(
+            OwnedPhysPkgReader::from_bytes(b"not an OPC ZIP".to_vec()),
+            Err(OpcError::ZipError(_))
+        ));
+        assert!(matches!(
+            OwnedPhysPkgReader::from_reader(Cursor::new(b"not an OPC ZIP")),
+            Err(OpcError::ZipError(_))
         ));
     }
 

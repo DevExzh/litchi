@@ -11,7 +11,7 @@ use crate::limits::ReadLimits;
 use crate::members::NonPartMember;
 use crate::packuri::{PACKAGE_URI, PackURI, PartNameConflict};
 use crate::part::{Part, PartFactory};
-use crate::phys_pkg::{OwnedPhysPkgReader, PhysPkgReader};
+use crate::phys_pkg::{PhysPkgReader, read_limited, read_owned_path_with_limits};
 use crate::pkgreader::PackageReader;
 use crate::rel::Relationships;
 use std::collections::{HashMap, HashSet};
@@ -275,8 +275,8 @@ impl OpcPackage {
     /// Returns an error if the file cannot be read, violates `limits`, or is not
     /// a valid OPC package.
     pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: ReadLimits) -> Result<Self> {
-        let owned_reader = OwnedPhysPkgReader::open_with_limits(path, limits)?;
-        Self::from_owned_phys_reader(owned_reader)
+        let data = read_owned_path_with_limits(path, limits)?;
+        Self::from_owned_bytes_with_limits(data, limits)
     }
 
     /// Load an OPC package from a reader.
@@ -296,8 +296,8 @@ impl OpcPackage {
     /// Returns an error if the archive cannot be read, violates `limits`, or is
     /// not a valid OPC package.
     pub fn from_reader_with_limits<R: Read>(reader: R, limits: ReadLimits) -> Result<Self> {
-        let owned_reader = OwnedPhysPkgReader::from_reader_with_limits(reader, limits)?;
-        Self::from_owned_phys_reader(owned_reader)
+        let data = read_limited(reader, limits)?;
+        Self::from_owned_bytes_with_limits(data, limits)
     }
 
     /// Move an owned ZIP archive into the package reader.
@@ -315,8 +315,7 @@ impl OpcPackage {
     /// # Errors
     /// Returns an error if the archive violates `limits` or is not a valid OPC package.
     pub fn from_vec_with_limits(data: Vec<u8>, limits: ReadLimits) -> Result<Self> {
-        let owned_reader = OwnedPhysPkgReader::from_bytes_with_limits(data, limits)?;
-        Self::from_owned_phys_reader(owned_reader)
+        Self::from_owned_bytes_with_limits(data, limits)
     }
 
     /// Moves an owned ZIP archive into an explicitly scheduled eager open.
@@ -1115,13 +1114,13 @@ impl OpcPackage {
         }
     }
 
-    fn from_owned_phys_reader(owned_reader: OwnedPhysPkgReader) -> Result<Self> {
+    fn from_owned_bytes_with_limits(data: Vec<u8>, limits: ReadLimits) -> Result<Self> {
         let mut package = {
-            let phys_reader = owned_reader.reader()?;
+            let phys_reader = PhysPkgReader::new_with_limits(&data, limits)?;
             let pkg_reader = PackageReader::from_phys_reader(&phys_reader)?;
             Self::unmarshal(pkg_reader)?
         };
-        package.authorize_owned_source(owned_reader.into_inner());
+        package.authorize_owned_source(data);
         Ok(package)
     }
 
@@ -1144,14 +1143,13 @@ impl OpcPackage {
     ) -> Result<Self> {
         session.check()?;
         let input_bytes = data.len() as u64;
-        let owned_reader = OwnedPhysPkgReader::from_bytes_with_limits(data, limits)?;
-        session.charge_input(input_bytes)?;
         let mut package = {
-            let phys_reader = owned_reader.reader()?;
+            let phys_reader = PhysPkgReader::new_with_limits(&data, limits)?;
+            session.charge_input(input_bytes)?;
             let pkg_reader = PackageReader::from_phys_reader_with_session(&phys_reader, session)?;
             Self::unmarshal(pkg_reader)?
         };
-        package.authorize_owned_source(owned_reader.into_inner());
+        package.authorize_owned_source(data);
         Ok(package)
     }
 
@@ -1417,10 +1415,20 @@ mod tests {
     use super::*;
     use crate::part::BlobPart;
     use soapberry_zip::office::StreamingArchiveWriter;
+    use std::fs;
     use std::io::Cursor;
     use std::sync::Arc;
+    use tempfile::NamedTempFile;
 
     fn create_minimal_docx() -> Vec<u8> {
+        create_minimal_docx_with_stored_document(false)
+    }
+
+    fn create_mixed_minimal_docx() -> Vec<u8> {
+        create_minimal_docx_with_stored_document(true)
+    }
+
+    fn create_minimal_docx_with_stored_document(stored_document: bool) -> Vec<u8> {
         let mut writer = StreamingArchiveWriter::new();
 
         // Add [Content_Types].xml
@@ -1448,15 +1456,17 @@ mod tests {
             .unwrap();
 
         // Add word/document.xml
-        writer
-            .write_deflated(
-                "word/document.xml",
-                br#"<?xml version="1.0"?>
+        let document = br#"<?xml version="1.0"?>
 <document xmlns="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
     <body><p><t>Test</t></p></body>
-</document>"#,
-            )
-            .unwrap();
+</document>"#;
+        if stored_document {
+            writer.write_stored("word/document.xml", document).unwrap();
+        } else {
+            writer
+                .write_deflated("word/document.xml", document)
+                .unwrap();
+        }
 
         writer.finish_to_bytes().unwrap()
     }
@@ -1515,6 +1525,66 @@ mod tests {
     fn moves_owned_archive_into_package_reader() {
         let pkg = OpcPackage::from_vec(create_minimal_docx()).unwrap();
         assert!(pkg.part_count() > 0);
+    }
+
+    #[test]
+    fn owned_constructors_preserve_mixed_storage_and_exact_source() {
+        let source = with_eocd_comment(create_mixed_minimal_docx(), b"mixed storage");
+        let file = NamedTempFile::new().unwrap();
+        fs::write(file.path(), &source).unwrap();
+
+        let from_vec = OpcPackage::from_vec(source.clone()).unwrap();
+        let from_reader = OpcPackage::from_reader(Cursor::new(source.clone())).unwrap();
+        let from_path = OpcPackage::open(file.path()).unwrap();
+        let partname = PackURI::new("/word/document.xml").unwrap();
+
+        for package in [&from_vec, &from_reader, &from_path] {
+            assert_eq!(package.get_part(&partname).unwrap().blob(),
+                       b"<?xml version=\"1.0\"?>\n<document xmlns=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">\n    <body><p><t>Test</t></p></body>\n</document>");
+            assert_eq!(crate::PackageWriter::to_bytes(package).unwrap(), source);
+        }
+    }
+
+    #[test]
+    fn owned_constructors_check_input_limit_before_zip_validation() {
+        let source = b"four".to_vec();
+        let file = NamedTempFile::new().unwrap();
+        fs::write(file.path(), &source).unwrap();
+        let limits = ReadLimits::builder()
+            .max_input_bytes(3)
+            .unwrap()
+            .build()
+            .unwrap();
+
+        for result in [
+            OpcPackage::from_vec_with_limits(source.clone(), limits),
+            OpcPackage::from_reader_with_limits(Cursor::new(source.clone()), limits),
+            OpcPackage::open_with_limits(file.path(), limits),
+        ] {
+            assert!(matches!(
+                result,
+                Err(OpcError::ReadLimit {
+                    resource: crate::ReadResource::InputBytes,
+                    actual: 4,
+                    maximum: 3,
+                })
+            ));
+        }
+    }
+
+    #[test]
+    fn owned_constructors_report_malformed_zip_after_bounded_read() {
+        let source = b"not an OPC ZIP".to_vec();
+        let file = NamedTempFile::new().unwrap();
+        fs::write(file.path(), &source).unwrap();
+
+        for result in [
+            OpcPackage::from_vec(source.clone()),
+            OpcPackage::from_reader(Cursor::new(source.clone())),
+            OpcPackage::open(file.path()),
+        ] {
+            assert!(matches!(result, Err(OpcError::ZipError(_))));
+        }
     }
 
     #[test]
