@@ -43318,12 +43318,13 @@ fn run_opc_source_overlay_multi_part(
     let max_write = 64 * 1024_u64;
     let cache_limits = opc_source_cache_limits(corpus)?;
     let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
     let mut sink_summaries = Vec::with_capacity(samples);
     let mut source_summary = SourceSummary::default();
     let mut measured_digests = Vec::with_capacity(samples);
     let mut overlay_summary = OpcSourceOverlaySummary {
         implementation: "SourceBackedPackage::write_part_overlays_to_stream",
-        timing_scope: "elapsed_ns is explicitly the sum of preparation_ns, open_ns, planning_ns, and publication_ns; structural setup belongs to those named phases, while interstitial checks and eager artifact, reopen/digest/preservation, source/cache evidence, configured cache/sink ceilings, and semantic oracles are excluded from the aggregate",
+        timing_scope: "elapsed_ns is explicitly the sum of preparation_ns, open_ns, planning_ns, and publication_ns; operation_metrics.allocation covers only the write_part_overlays_to_stream publication call; structural setup belongs to those named phases, while interstitial checks and eager artifact, reopen/digest/preservation, source/cache evidence, configured cache/sink ceilings, and semantic oracles are excluded from the aggregate",
         performance_claim: "none",
         overlay_mode: mode.name(),
         replacement_semantics: opc_overlay_replacement_semantics(mode),
@@ -43388,9 +43389,16 @@ fn run_opc_source_overlay_multi_part(
         let cache_before_publication = source_package.cache_diagnostics();
         let planning_duration = planning_started.elapsed();
 
+        let allocation_region = allocation_metrics::begin();
         let publication_started = Instant::now();
-        source_package.write_part_overlays_to_stream(&mut sink, planned_replacements)?;
+        let write_result =
+            source_package.write_part_overlays_to_stream(&mut sink, planned_replacements);
         let publication_duration = publication_started.elapsed();
+        let allocation_metrics = match allocation_region.finish() {
+            Some(sample) => Some(sample),
+            None => Some(allocation_metrics::unavailable_sample()),
+        };
+        write_result?;
         let total_duration = preparation_duration
             .saturating_add(open_duration)
             .saturating_add(planning_duration)
@@ -43399,18 +43407,17 @@ fn run_opc_source_overlay_multi_part(
         let open_ns = elapsed_ns(open_duration)?;
         let planning_ns = elapsed_ns(planning_duration)?;
         let publication_ns = elapsed_ns(publication_duration)?;
+        let total_ns = elapsed_ns(total_duration)?;
         let phase_total_ns = preparation_ns
             .checked_add(open_ns)
             .and_then(|value| value.checked_add(planning_ns))
             .and_then(|value| value.checked_add(publication_ns))
             .ok_or("multi-Part OPC overlay phase sum overflows u64")?;
-        if phase_total_ns != elapsed_ns(total_duration)? {
+        if phase_total_ns != total_ns {
             return Err(
                 "multi-Part OPC overlay elapsed_ns does not equal its named phase sum".into(),
             );
         }
-        record_elapsed(&mut elapsed, iteration, warmup_iterations, total_duration)?;
-
         let metrics = source.snapshot();
         if metrics.read_calls == 0
             || metrics.read_bytes == 0
@@ -43471,6 +43478,12 @@ fn run_opc_source_overlay_multi_part(
             return Err("multi-Part OPC overlay produced an empty digest".into());
         }
         if iteration >= warmup_iterations {
+            elapsed.push(total_ns);
+            observations.push(operation_metrics::InProcessObservation {
+                elapsed_ns: total_ns,
+                process_metrics: None,
+                allocation_metrics,
+            });
             source_summary.record(metrics);
             sink_summaries.push(sink.summary());
             measured_digests.push(digest.clone());
@@ -43625,6 +43638,19 @@ fn run_opc_source_overlay_multi_part(
     )?;
     reorder_sample_vector(&mut overlay_summary.observed_output_sha256, &sample_order)?;
     source_summary.opc_source_overlay = Some(overlay_summary);
+    let sink_observation = operation_metrics::SinkObservation {
+        accepted_bytes: sink.accepted_bytes,
+        write_calls: sink.write_calls,
+        largest_write: sink.largest_write,
+        bytes_0: sink.write_size_buckets.bytes_0,
+        bytes_1_to_512: sink.write_size_buckets.bytes_1_to_512,
+        bytes_513_to_4096: sink.write_size_buckets.bytes_513_to_4096,
+        bytes_4097_to_16384: sink.write_size_buckets.bytes_4097_to_16384,
+        bytes_16385_to_65536: sink.write_size_buckets.bytes_16385_to_65536,
+        bytes_over_65536: sink.write_size_buckets.bytes_over_65536,
+    };
+    let operation_metrics =
+        operation_metrics::from_in_process_observations(&observations, sink_observation)?;
     let mut result_corpus = corpus.manifest.clone();
     result_corpus.name = format!("{}-count-{overlay_count}", result_corpus.name);
     Ok(CaseResult {
@@ -43636,7 +43662,7 @@ fn run_opc_source_overlay_multi_part(
         source: boxed_source(source_summary),
         execution: None,
         output_sha256: Some(output_sha256),
-        operation_metrics: None,
+        operation_metrics: Some(operation_metrics),
     })
 }
 
@@ -56452,6 +56478,21 @@ mod tests {
                     assert_eq!(overlay.source_shape, shape.name());
                     assert_eq!(measured.elapsed_ns.samples.len(), sample_count);
                     assert_eq!(measured.elapsed_ns.sample_order.len(), sample_count);
+                    let operation = measured
+                        .operation_metrics
+                        .as_ref()
+                        .expect("multi-Part overlay emits operation metrics");
+                    assert_eq!(operation.sample_count, sample_count);
+                    assert_eq!(operation.sample_indices, measured.elapsed_ns.sample_order);
+                    let allocation = operation
+                        .allocation
+                        .as_ref()
+                        .expect("normal target publishes allocator unavailability");
+                    assert_eq!(
+                        allocation.status,
+                        super::operation_metrics::MetricStatus::Unavailable
+                    );
+                    assert!(allocation.allocation_calls.values.is_none());
                     let mut sample_order = measured.elapsed_ns.sample_order.clone();
                     sample_order.sort_unstable();
                     assert_eq!(sample_order, (0..sample_count).collect::<Vec<_>>());
@@ -56549,6 +56590,31 @@ mod tests {
             )
             .is_ok()
         );
+
+        let warmed =
+            super::run_opc_source_overlay_multi_part(super::OpcOverlayMode::Noop, &first, 2, 1, 2)
+                .unwrap();
+        assert_eq!(warmed.elapsed_ns.samples.len(), 2);
+        assert_eq!(warmed.elapsed_ns.sample_order.len(), 2);
+        let operation = warmed
+            .operation_metrics
+            .as_ref()
+            .expect("warmup overlay emits operation metrics");
+        assert_eq!(operation.sample_count, 2);
+        assert_eq!(operation.sample_indices, warmed.elapsed_ns.sample_order);
+        assert_eq!(
+            operation.allocation.as_ref().unwrap().status,
+            super::operation_metrics::MetricStatus::Unavailable
+        );
+        let overlay = warmed
+            .source
+            .as_ref()
+            .and_then(|source| source.opc_source_overlay.as_ref())
+            .expect("warmup overlay evidence");
+        assert_eq!(overlay.preparation_ns.len(), 2);
+        assert_eq!(overlay.open_ns.len(), 2);
+        assert_eq!(overlay.planning_ns.len(), 2);
+        assert_eq!(overlay.publication_ns.len(), 2);
     }
 
     #[test]
