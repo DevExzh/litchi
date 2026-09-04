@@ -1,0 +1,173 @@
+{
+  "binary": {
+    "bytes": 55025640,
+    "mode_bits": 509,
+    "path": "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+    "sha256": "cc090aa6493a9686d8e9617c9577be06545f1fb5b2049ffa8320c51382a4cb0d"
+  },
+  "captured_utc": "2026-09-04T21:20:28.280436+00:00",
+  "cpu_argument": "2",
+  "expected_revision": "9eff696b6421e6182e5a96418268a2d8016f0af9",
+  "kernel": "7.0.0-1011-aws",
+  "perf_event_paranoid": "1",
+  "protocol": {
+    "allocation_scope": "Heaptrack process totals at 20 warmups and 100 measured samples; includes source construction/open/verification and Heaptrack overhead; not operation-local allocation attribution",
+    "claim": "descriptive current-state baseline only; no speedup, regression, throughput, RSS, or operation-local allocation claim",
+    "clean_abba_claim_eligible": false,
+    "clean_abba_claim_reason": "the run retains intentionally untracked docs/GOAL.md",
+    "external_scope": "whole process: executable startup, deterministic corpus construction, source-backed open, warmups, measured iterations, verification, and profiler instrumentation where applicable",
+    "harness_scope": "the harness elapsed_ns and operation_metrics rows; opc_source_materialize starts its operation timer after source-backed open and reset, then verifies each materialized package after timing",
+    "heaptrack_record_mode": "heaptrack --record-only records and interprets the capture; heaptrack 1.5.0 has no separate --interpret command",
+    "heaptrack_samples": 100,
+    "heaptrack_symbolized_trace": "heaptrack_print -F writes the symbolized allocation stacks; the uncompressed intermediate is gzip-compressed and pruned",
+    "heaptrack_warmup_iterations": 20,
+    "payload": "incompressible",
+    "perf_storage": "perf.data is retained for standard report reruns; raw perf script is gzip-compressed and its uncompressed intermediate is pruned",
+    "profiler_runs_sequential": true,
+    "samples": 500,
+    "selector": "opc_source_materialize",
+    "shape": "few-large",
+    "warmup_iterations": 20
+  },
+  "python_affinity": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+  ],
+  "repo": "/home/zhuhe/code/litchi",
+  "resume": {
+    "commands_reconstructed": true,
+    "commands_source": "reconstructed from retained artifacts because the first driver exited before commands.json",
+    "debuginfod_override": {
+      "DEBUGINFOD_URLS": ""
+    },
+    "driver": "resume-driver.py",
+    "recovery": "resume-recovery.json",
+    "resume_from": "perf-report-inclusive",
+    "resumed_utc": "2026-09-04T21:31:28.664929+00:00",
+    "workload_rerun": false
+  },
+  "rustup_toolchain": "1.98.1",
+  "source_before": {
+    "allowed_untracked": {
+      "bytes": 35839,
+      "path": "docs/GOAL.md",
+      "sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+    },
+    "dirty": true,
+    "head": "9eff696b6421e6182e5a96418268a2d8016f0af9",
+    "status_entries": [
+      {
+        "code": "??",
+        "path": "docs/GOAL.md"
+      }
+    ],
+    "status_porcelain": "?? docs/GOAL.md\n",
+    "status_sha256": "b499df4a77a048818b3de3ff52108d54815f3f4941b4628d4233b590c8b7f1cd",
+    "status_z_sha256": "c3ce57888a5efbc494204abf76836d5a23cb154877db55a0efef9db13e2666ee",
+    "tree": "8aa6541cfedac248138f100cbdf1202ea495ea9a"
+  },
+  "tools": {
+    "fincore": "/usr/bin/fincore",
+    "gzip": "/usr/bin/gzip",
+    "heaptrack": "/usr/bin/heaptrack",
+    "heaptrack_print": "/usr/bin/heaptrack_print",
+    "perf": "/usr/bin/perf",
+    "readelf": "/usr/bin/x86_64-linux-gnu-readelf",
+    "strace": "/usr/bin/strace",
+    "taskset": "/usr/bin/taskset",
+    "time": "/usr/bin/time",
+    "zstd": "/usr/bin/zstd"
+  },
+  "versions": {
+    "cargo": {
+      "command_index": 10,
+      "stderr": "",
+      "stdout": "cargo 1.98.1 (797e8a9bc 2026-08-05)\nrelease: 1.98.1\ncommit-hash: 797e8a9bca276c1c9f9f738d2a20f484fa4eea9d\ncommit-date: 2026-08-05\nhost: x86_64-unknown-linux-gnu\nlibgit2: 1.9.4 (sys:0.21.0 vendored)\nlibcurl: 8.21.0-DEV (sys:0.4.90+curl-8.21.0 vendored ssl:OpenSSL/3.6.3)\nssl: OpenSSL 3.6.3 9 Jun 2026\nos: Ubuntu 26.4.0 (resolute) [64-bit]\n"
+    },
+    "fincore": {
+      "command_index": 15,
+      "stderr": "",
+      "stdout": "fincore from util-linux 2.41.3\n"
+    },
+    "gzip": {
+      "command_index": 18,
+      "stderr": "",
+      "stdout": "gzip 1.14\nCopyright (C) 2025 Free Software Foundation, Inc.\nCopyright (C) 1993 Jean-loup Gailly.\nThis is free software.  You may redistribute copies of it under the terms of\nthe GNU General Public License <https://www.gnu.org/licenses/gpl.html>.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by Jean-loup Gailly.\n"
+    },
+    "heaptrack": {
+      "command_index": 12,
+      "stderr": "",
+      "stdout": "heaptrack 1.5.0\n"
+    },
+    "heaptrack_print": {
+      "command_index": 13,
+      "stderr": "",
+      "stdout": "heaptrack_print 1.5.0\n"
+    },
+    "perf": {
+      "command_index": 11,
+      "stderr": "",
+      "stdout": "perf version 7.0.12\n"
+    },
+    "python3": {
+      "command_index": 20,
+      "stderr": "",
+      "stdout": "Python 3.14.4\n"
+    },
+    "rustc": {
+      "command_index": 9,
+      "stderr": "",
+      "stdout": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1\nLLVM version: 22.1.8\n"
+    },
+    "strace": {
+      "command_index": 14,
+      "stderr": "",
+      "stdout": "strace -- version 6.19\nCopyright (c) 1991-2026 The strace developers <https://strace.io>.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\nOptional features enabled: stack-trace=libunwind stack-demangle m32-mpers mx32-mpers\n"
+    },
+    "taskset": {
+      "command_index": 16,
+      "stderr": "",
+      "stdout": "taskset from util-linux 2.41.3\n"
+    },
+    "time": {
+      "command_index": 17,
+      "stderr": "",
+      "stdout": "time (GNU Time) UNKNOWN\nCopyright (C) 2018 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by David Keppel, David MacKenzie, and Assaf Gordon.\n"
+    },
+    "zstd": {
+      "command_index": 19,
+      "stderr": "",
+      "stdout": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***\n"
+    }
+  }
+}

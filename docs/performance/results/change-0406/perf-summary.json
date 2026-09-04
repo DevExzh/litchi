@@ -1,0 +1,97 @@
+{
+  "events": [
+    "cycles",
+    "instructions",
+    "branches",
+    "branch-misses",
+    "cache-misses",
+    "page-faults"
+  ],
+  "rows": [
+    {
+      "event": "cycles",
+      "raw_fields": [
+        "118636236819",
+        "",
+        "cycles",
+        "26442968220",
+        "100.00",
+        "",
+        ""
+      ],
+      "unit": "",
+      "value": "118636236819"
+    },
+    {
+      "event": "instructions",
+      "raw_fields": [
+        "274141602384",
+        "",
+        "instructions",
+        "26442968220",
+        "100.00",
+        "",
+        ""
+      ],
+      "unit": "",
+      "value": "274141602384"
+    },
+    {
+      "event": "branches",
+      "raw_fields": [
+        "23350087395",
+        "",
+        "branches",
+        "26442968220",
+        "100.00",
+        "",
+        ""
+      ],
+      "unit": "",
+      "value": "23350087395"
+    },
+    {
+      "event": "branch-misses",
+      "raw_fields": [
+        "15290075",
+        "",
+        "branch-misses",
+        "26442968220",
+        "100.00",
+        "",
+        ""
+      ],
+      "unit": "",
+      "value": "15290075"
+    },
+    {
+      "event": "cache-misses",
+      "raw_fields": [
+        "86407324",
+        "",
+        "cache-misses",
+        "26442968220",
+        "100.00",
+        "",
+        ""
+      ],
+      "unit": "",
+      "value": "86407324"
+    },
+    {
+      "event": "page-faults",
+      "raw_fields": [
+        "50778",
+        "",
+        "page-faults",
+        "26442968220",
+        "100.00",
+        "",
+        ""
+      ],
+      "unit": "",
+      "value": "50778"
+    }
+  ],
+  "scope": "whole process under perf stat, including corpus construction, source open, warmups, measured iterations, and verification"
+}

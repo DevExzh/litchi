@@ -1,0 +1,44 @@
+{
+  "commands_reconstructed": true,
+  "commands_source": "reconstructed from retained artifacts because the first driver exited before commands.json",
+  "completed_workloads_reused": [
+    "baseline",
+    "fincore-before",
+    "perf-record",
+    "perf-report-self",
+    "perf-stat",
+    "time"
+  ],
+  "debuginfod_override": {
+    "DEBUGINFOD_URLS": ""
+  },
+  "failed_report_preserved": {
+    "perf-report-inclusive.stderr.txt": "perf-report-inclusive.stderr.failed-before-resume.txt",
+    "perf-report-inclusive.txt": "perf-report-inclusive.failed-before-resume.txt"
+  },
+  "failure_artifact": "failure.json",
+  "immutable_driver": {
+    "bytes": 41718,
+    "path": "/tmp/litchi-goal-profile-output/capture-driver.py",
+    "sha256": "1b701508e85610496a49dbfba95cf26cfad948feb3e8d9e2eb7bfdc7b7740c84"
+  },
+  "prior_command_count": 28,
+  "resume_driver": {
+    "bytes": 24188,
+    "path": "resume-driver.py",
+    "sha256": "7040fcb3dd8c98513e9e559fdc1d1928f3de9aa4257e8478e534ff36828642d5"
+  },
+  "resume_from": "perf-report-inclusive",
+  "resumed_utc": "2026-09-04T21:31:28.664929+00:00",
+  "schema_version": 1,
+  "source_and_binary_binding": {
+    "binary": {
+      "bytes": 55025640,
+      "mode_bits": 509,
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+      "sha256": "cc090aa6493a9686d8e9617c9577be06545f1fb5b2049ffa8320c51382a4cb0d"
+    },
+    "expected_revision": "9eff696b6421e6182e5a96418268a2d8016f0af9"
+  },
+  "workload_rerun": false
+}

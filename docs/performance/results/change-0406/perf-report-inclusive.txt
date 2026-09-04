@@ -1,0 +1,34 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 2K of event 'cycles:u'
+# Event count (approx.): 117776856820
+#
+# Children      Self  Command          Shared Object         Symbol                                                                                                                                                                                                                                                                                                                                                  
+# ........  ........  ...............  ....................  ........................................................................................................................................................................................................................................................................................................................................................
+#
+    66.03%    65.50%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_perf_baseline::payload_bytes
+    26.49%    26.20%  litchi-perf-bas  litchi-perf-baseline  [.] sha2::sha256::x86_sha::compress
+    14.15%     0.00%  litchi-perf-bas  [unknown]             [.] 0x000000000000003f
+     3.16%     0.00%  litchi-perf-bas  [unknown]             [.] 0x0000000000000019
+     2.63%     2.63%  litchi-perf-bas  litchi-perf-baseline  [.] crc32fast::specialized::pclmulqdq::calculate
+     2.55%     2.55%  litchi-perf-bas  libc.so.6             [.] __memmove_avx512_unaligned_erms
+     2.25%     0.00%  litchi-perf-bas  [unknown]             [.] 0x00000000fffeffff
+     1.90%     0.00%  litchi-perf-bas  [unknown]             [.] 0x000000000000001d
+     1.79%     0.27%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_perf_baseline::InstrumentedSource as litchi_core::source::ReadAt>::read_at
+     1.75%     0.04%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_opc::source_backed::read_source_at_with_context
+     1.75%     0.00%  litchi-perf-bas  [unknown]             [.] 0x0000000000000006
+     1.07%     0.00%  litchi-perf-bas  [unknown]             [.] 0x0000000000007fff
+     0.91%     0.91%  litchi-perf-bas  libc.so.6             [.] __memset_avx512_unaligned_erms
+     0.91%     0.00%  litchi-perf-bas  litchi-perf-baseline  [.] <core::io::util::Take<soapberry_zip::archive::ZipVerifier<&mut soapberry_zip::accounting::CountingReader<&mut flate2::deflate::read::DeflateDecoder<soapberry_zip::accounting::CountingReader<soapberry_zip::archive::ZipReader<&litchi_opc::source_backed::SourceReader>>>>, &litchi_opc::source_backed::SourceReader>> as std::io::Read>::read_buf
+     0.86%     0.86%  litchi-perf-bas  [unknown]             [k] 0xffffffff8c800ef0
+     0.78%     0.78%  litchi-perf-bas  litchi-perf-baseline  [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+     0.76%     0.00%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_perf_baseline::sha256_hex
+     0.53%     0.00%  litchi-perf-bas  [unknown]             [.] 0x0000000000000001
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

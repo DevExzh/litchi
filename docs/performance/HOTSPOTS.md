@@ -19,6 +19,15 @@ include observer overhead and pre-admission work, and exclude condition-variable
 wait/reacquire time. The validated smoke establishes instrumentation coverage;
 it does not establish a latency or contention improvement.
 
+[Change 0406](changes/0406-current-hardware-profile.md) captures current
+OPC materialization on the available hardware: p50 2.215 ms for four 4 MiB
+synthetic Parts. Whole-process samples spend 65.50% in deterministic payload
+generation and 26.20% in SHA-256. These surrounding harness costs must be
+reduced or separated before using process profiles to select library work.
+The normal run lacks operation-local allocator counters and the CPU call
+chains contain unresolved frames; no speedup or complete phase attribution
+is claimed.
+
 ## Change 0402 update
 
 The selected-source validation loop in

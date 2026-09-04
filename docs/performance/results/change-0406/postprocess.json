@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "kind": "offline derived profile artifacts",
+  "performance_claim": "none",
+  "claim_authorized": false,
+  "original_manifest_sha256": "3efcacb94cd7b8cebc246f83941fb4ff991ba1c05e1ad7708e15c98d5b6df328",
+  "command": [
+    "/home/zhuhe/.cargo/bin/flamegraph",
+    "--perfdata",
+    "perf.data",
+    "--no-inline",
+    "--deterministic",
+    "--title",
+    "OPC materialization: whole-process samples",
+    "--subtitle",
+    "Includes fixture generation and verification; incomplete caller unwinding",
+    "--output",
+    "cpu-flamegraph.svg"
+  ],
+  "environment": {
+    "DEBUGINFOD_URLS": ""
+  },
+  "working_directory": "docs/performance/results/change-0406",
+  "exit_code": 0,
+  "tool_version": "flamegraph 0.6.14",
+  "original_artifacts_verified": 104,
+  "report_corpus_and_revision_consistency": "all six reports match; five have 500 samples and Heaptrack has 100",
+  "artifacts": [
+    {
+      "path": "cpu-flamegraph.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "cpu-flamegraph.stdout.txt",
+      "bytes": 43,
+      "sha256": "0afdf7e33ceb96dcf7a20cbfe603fc259ca608a825bc589a9d3a4523b471b8e3"
+    },
+    {
+      "path": "cpu-flamegraph.svg",
+      "bytes": 28582,
+      "sha256": "bb586b84cbaa30bebabd809764a4bf092fd4aebdfb85314ca7c3eb55d2dee9e1"
+    },
+    {
+      "path": "profile-build.log.gz",
+      "bytes": 82,
+      "sha256": "71a783d28ecd90e0f7a5e063598582d74ff29fd348c27e77cf9c47be1942cc71"
+    }
+  ]
+}

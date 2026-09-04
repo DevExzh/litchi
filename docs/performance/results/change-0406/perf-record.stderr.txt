@@ -1,0 +1,2 @@
+[ perf record: Woken up 85 times to write data ]
+[ perf record: Captured and wrote 21.243 MB /tmp/litchi-goal-profile-output/perf.data (2636 samples) ]
