@@ -1,5 +1,43 @@
 # Performance hotspot inventory
 
+## Change 0395 update
+
+The measured OPC hotspot was the bounded linear `eq_ignore_ascii_case` scan
+after an exact `PackURI` hash miss in `SourceBackedPackage::part_index`. The
+optimization retains an immutable position order sorted by an
+allocation-free ASCII-fold comparator and binary-searches it only for
+unmanaged catalogs with at least 2,048 ordinary Parts. Small catalogs and
+managed opens retain the linear path; the index is fallibly reserved and
+stores no folded names. It preserves source iteration order and all existing
+freshness, ownership, resource, and public-API boundaries.
+
+The initial unthresholded probe rejected indexing 256 Parts: normal,
+non-allocator `from_read_at` lookup p50 was `+31.31%`/`+33.45%` in the
+matched directions, despite improvements of
+`-74.50%`/`-74.81%` at 2,048 and `-96.50%`/`-96.62%` at 16,384. The final
+thresholded normal, non-allocator `from_read_at` run measured source-lookup
+p50 deltas of
+`-74.23%`/`-74.37%` and `-96.60%`/`-96.45%` at the two indexed sizes. Open
+p50 overhead stayed below 5% (`+4.50%` maximum) in that normal binary, with
+exact allocator and retained-vector footprint growth of one call and
+`8 * parts` bytes for indexed opens. Allocator-enabled latency is observational
+only. Eager lookup timings are not decision-quality because randomized
+`HashMap` traversal caused large control/candidate drift; no eager hotspot
+claim is made.
+
+The fixed vector, source-counter replay, CPU-2 ABBA protocol, stable 1.98.1
+provenance, exact binary/source/patch hashes, 282/282 library tests, focused
+managed fallback/cancellation tests, and independent SAFE/pass reviews are
+recorded in the [0395 change record](changes/0395-opc-source-casefold-index.md)
+and [evidence bundle](results/change-0395/). `performance_claim: scoped`;
+only normal, non-allocator unmanaged packages opened through
+`SourceBackedPackage::from_read_at`, with source-lookup p50 at 2,048 and
+16,384 Parts, is authorized. Validation-constructor coverage is
+correctness-only, and allocator-enabled latency is observational only. Means,
+tails, source-open latency, eager/managed/mutable/default/general behavior,
+RSS, physical I/O, decompression, cold cache, throughput, and scaling remain
+withheld.
+
 ## Change 0393 update
 
 The selected-picture metadata hotspot was one full descriptor vector per

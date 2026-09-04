@@ -1,0 +1,532 @@
+{
+  "accepted_claims": [
+    {
+      "comparisons": {
+        "normal": {
+          "16384": {
+            "A1_to_B1_delta_pct": {
+              "delta_pct": -96.597531,
+              "from": 1414561,
+              "to": 48130
+            },
+            "A2_to_B2_delta_pct": {
+              "delta_pct": -96.451784,
+              "from": 1351806,
+              "to": 47965
+            }
+          },
+          "2048": {
+            "A1_to_B1_delta_pct": {
+              "delta_pct": -74.226697,
+              "from": 144801,
+              "to": 37320
+            },
+            "A2_to_B2_delta_pct": {
+              "delta_pct": -74.366071,
+              "from": 144535,
+              "to": 37050
+            }
+          }
+        }
+      },
+      "corpus_parts": [
+        2048,
+        16384
+      ],
+      "metric": "p50 elapsed_ns",
+      "profiles": [
+        "normal"
+      ],
+      "reason": "Both matched legs improve materially at the two measured corpus sizes where the thresholded index is built.",
+      "scope": "unmanaged SourceBackedPackage constructed by the benchmarked normal constructor",
+      "selector": "opc_casefold_source_lookup"
+    },
+    {
+      "accepted_observations": {
+        "equivalent_name_gate": "EquivalentPartNames verified",
+        "lookup_count": 144,
+        "source_payload_read_bytes": 0,
+        "source_payload_read_calls": 0,
+        "source_read_bytes": 0,
+        "source_read_calls": 0,
+        "source_version_calls": 144
+      },
+      "corpus_parts": [
+        256,
+        2048,
+        16384
+      ],
+      "reason": "Lookup work is metadata-only; the source replay counters and output oracle remain unchanged.",
+      "scope": "instrumented replay oracle (untimed)",
+      "selector": "opc_casefold_source_lookup"
+    },
+    {
+      "claim_type": "guard_observation_only",
+      "corpus_parts": [
+        256,
+        2048,
+        16384
+      ],
+      "observation": "Final p50 and mean overhead remains below 5% for each profile/size pair; source read counters remain unchanged.",
+      "scope": "unmanaged SourceBackedPackage open guard",
+      "selector": "opc_casefold_source_open"
+    }
+  ],
+  "allocation_tradeoff": {
+    "derived_index_delta_for_source_open": {
+      "16384": {
+        "allocated_bytes": 131072,
+        "allocation_calls": 1
+      },
+      "2048": {
+        "allocated_bytes": 16384,
+        "allocation_calls": 1
+      },
+      "256": {
+        "allocated_bytes": 0,
+        "allocation_calls": 0
+      }
+    },
+    "scope": "allocator-enabled operation metrics; exact vectors retained in allocation-metrics.json",
+    "source_lookup": {
+      "16384": {
+        "allocation_calls_control_candidate": {
+          "A1": {
+            "sample_count": 30,
+            "unique_values": [
+              48
+            ],
+            "value": 48
+          },
+          "A2": {
+            "sample_count": 30,
+            "unique_values": [
+              48
+            ],
+            "value": 48
+          },
+          "B1": {
+            "sample_count": 30,
+            "unique_values": [
+              48
+            ],
+            "value": 48
+          },
+          "B2": {
+            "sample_count": 30,
+            "unique_values": [
+              48
+            ],
+            "value": 48
+          }
+        },
+        "candidate_B1": {
+          "sample_count": 30,
+          "unique_values": [
+            1536
+          ],
+          "value": 1536
+        },
+        "candidate_B2": {
+          "sample_count": 30,
+          "unique_values": [
+            1536
+          ],
+          "value": 1536
+        },
+        "control_A1": {
+          "sample_count": 30,
+          "unique_values": [
+            1536
+          ],
+          "value": 1536
+        },
+        "control_A2": {
+          "sample_count": 30,
+          "unique_values": [
+            1536
+          ],
+          "value": 1536
+        }
+      },
+      "2048": {
+        "allocation_calls_control_candidate": {
+          "A1": {
+            "sample_count": 30,
+            "unique_values": [
+              48
+            ],
+            "value": 48
+          },
+          "A2": {
+            "sample_count": 30,
+            "unique_values": [
+              48
+            ],
+            "value": 48
+          },
+          "B1": {
+            "sample_count": 30,
+            "unique_values": [
+              48
+            ],
+            "value": 48
+          },
+          "B2": {
+            "sample_count": 30,
+            "unique_values": [
+              48
+            ],
+            "value": 48
+          }
+        },
+        "candidate_B1": {
+          "sample_count": 30,
+          "unique_values": [
+            1536
+          ],
+          "value": 1536
+        },
+        "candidate_B2": {
+          "sample_count": 30,
+          "unique_values": [
+            1536
+          ],
+          "value": 1536
+        },
+        "control_A1": {
+          "sample_count": 30,
+          "unique_values": [
+            1536
+          ],
+          "value": 1536
+        },
+        "control_A2": {
+          "sample_count": 30,
+          "unique_values": [
+            1536
+          ],
+          "value": 1536
+        }
+      },
+      "256": {
+        "allocation_calls_control_candidate": {
+          "A1": {
+            "sample_count": 30,
+            "unique_values": [
+              48
+            ],
+            "value": 48
+          },
+          "A2": {
+            "sample_count": 30,
+            "unique_values": [
+              48
+            ],
+            "value": 48
+          },
+          "B1": {
+            "sample_count": 30,
+            "unique_values": [
+              48
+            ],
+            "value": 48
+          },
+          "B2": {
+            "sample_count": 30,
+            "unique_values": [
+              48
+            ],
+            "value": 48
+          }
+        },
+        "candidate_B1": {
+          "sample_count": 30,
+          "unique_values": [
+            1536
+          ],
+          "value": 1536
+        },
+        "candidate_B2": {
+          "sample_count": 30,
+          "unique_values": [
+            1536
+          ],
+          "value": 1536
+        },
+        "control_A1": {
+          "sample_count": 30,
+          "unique_values": [
+            1536
+          ],
+          "value": 1536
+        },
+        "control_A2": {
+          "sample_count": 30,
+          "unique_values": [
+            1536
+          ],
+          "value": 1536
+        }
+      }
+    },
+    "source_open": {
+      "16384": {
+        "candidate_B1": {
+          "sample_count": 30,
+          "unique_values": [
+            41230691
+          ],
+          "value": 41230691
+        },
+        "candidate_B2": {
+          "sample_count": 30,
+          "unique_values": [
+            41230691
+          ],
+          "value": 41230691
+        },
+        "control_A1": {
+          "sample_count": 30,
+          "unique_values": [
+            41099619
+          ],
+          "value": 41099619
+        },
+        "control_A2": {
+          "sample_count": 30,
+          "unique_values": [
+            41099619
+          ],
+          "value": 41099619
+        }
+      },
+      "2048": {
+        "candidate_B1": {
+          "sample_count": 30,
+          "unique_values": [
+            5276003
+          ],
+          "value": 5276003
+        },
+        "candidate_B2": {
+          "sample_count": 30,
+          "unique_values": [
+            5276003
+          ],
+          "value": 5276003
+        },
+        "control_A1": {
+          "sample_count": 30,
+          "unique_values": [
+            5259619
+          ],
+          "value": 5259619
+        },
+        "control_A2": {
+          "sample_count": 30,
+          "unique_values": [
+            5259619
+          ],
+          "value": 5259619
+        }
+      },
+      "256": {
+        "candidate_B1": {
+          "sample_count": 30,
+          "unique_values": [
+            779619
+          ],
+          "value": 779619
+        },
+        "candidate_B2": {
+          "sample_count": 30,
+          "unique_values": [
+            779619
+          ],
+          "value": 779619
+        },
+        "control_A1": {
+          "sample_count": 30,
+          "unique_values": [
+            779619
+          ],
+          "value": 779619
+        },
+        "control_A2": {
+          "sample_count": 30,
+          "unique_values": [
+            779619
+          ],
+          "value": 779619
+        }
+      }
+    }
+  },
+  "allocator_timing_observation": {
+    "claim_type": "observational_only",
+    "corpus_parts": [
+      256,
+      2048,
+      16384
+    ],
+    "p50_abba_deltas": {
+      "16384": {
+        "A1_to_B1_delta_pct": {
+          "delta_pct": -96.558241,
+          "from": 1400156,
+          "to": 48190
+        },
+        "A2_to_B2_delta_pct": {
+          "delta_pct": -96.688978,
+          "from": 1446381,
+          "to": 47890
+        }
+      },
+      "2048": {
+        "A1_to_B1_delta_pct": {
+          "delta_pct": -75.595032,
+          "from": 155706,
+          "to": 38000
+        },
+        "A2_to_B2_delta_pct": {
+          "delta_pct": -75.609442,
+          "from": 155470,
+          "to": 37920
+        }
+      }
+    },
+    "profile": "allocator",
+    "reason": "Allocator-enabled legs are retained to bind exact allocation vectors and corroborate the trend; they are not part of the authorized latency claim.",
+    "selector": "opc_casefold_source_lookup"
+  },
+  "change": "0395",
+  "claim_authorized": true,
+  "decision": "keep_scoped_unmanaged_source_casefold_index",
+  "performance_claim": "scoped",
+  "protocol": {
+    "corpus_part_counts": [
+      256,
+      2048,
+      16384
+    ],
+    "cpu_affinity": "2",
+    "order": [
+      "A1",
+      "B1",
+      "B2",
+      "A2"
+    ],
+    "query_vector": "9 classes x 16 repetitions = 144 lookups per timed sample",
+    "samples": 30,
+    "warmups": 5,
+    "workers": 1
+  },
+  "rejected_probe": {
+    "candidate_patch_sha256": "c708daf06fdcc828a0bde7a25681d82d4ee151e6c62a677053c14ed81e57a1e2",
+    "candidate_source_sha256": "da424162c3b3ddbfa47cef5668df85d8c522dfe17e2ff50d692f087e25699b58",
+    "probe_source_open_max_observed": "p50 and mean overhead max +4.04% and +3.74%; open overhead did not explain the rejection.",
+    "reason": "Building the case-fold order for every corpus regressed the 256-part source lookup, so the unthresholded design was not accepted.",
+    "source_lookup_p50_delta_pct": {
+      "allocator": {
+        "16384": {
+          "A1_to_B1": {
+            "delta_pct": -96.552046,
+            "from": 1402716,
+            "to": 48365
+          },
+          "A2_to_B2": {
+            "delta_pct": -96.538857,
+            "from": 1379891,
+            "to": 47760
+          }
+        },
+        "2048": {
+          "A1_to_B1": {
+            "delta_pct": -75.366415,
+            "from": 154606,
+            "to": 38085
+          },
+          "A2_to_B2": {
+            "delta_pct": -75.442464,
+            "from": 154250,
+            "to": 37880
+          }
+        },
+        "256": {
+          "A1_to_B1": {
+            "delta_pct": 27.41652,
+            "from": 22760,
+            "to": 29000
+          },
+          "A2_to_B2": {
+            "delta_pct": 26.017853,
+            "from": 22965,
+            "to": 28940
+          }
+        }
+      },
+      "normal": {
+        "16384": {
+          "A1_to_B1": {
+            "delta_pct": -96.49552,
+            "from": 1341426,
+            "to": 47010
+          },
+          "A2_to_B2": {
+            "delta_pct": -96.623882,
+            "from": 1398796,
+            "to": 47225
+          }
+        },
+        "2048": {
+          "A1_to_B1": {
+            "delta_pct": -74.496314,
+            "from": 144336,
+            "to": 36811
+          },
+          "A2_to_B2": {
+            "delta_pct": -74.805921,
+            "from": 144915,
+            "to": 36510
+          }
+        },
+        "256": {
+          "A1_to_B1": {
+            "delta_pct": 31.305156,
+            "from": 21530,
+            "to": 28270
+          },
+          "A2_to_B2": {
+            "delta_pct": 33.45087,
+            "from": 21270,
+            "to": 28385
+          }
+        }
+      }
+    },
+    "status": "rejected_unthresholded_candidate",
+    "threshold_selected": 2048
+  },
+  "revisions": {
+    "base": "57c8ed4bd8c02938eb7ef21e0d713c05be062125",
+    "candidate_patch_sha256": "9f6fef3f8a64a3be76b7dd5653831b8dfdd50e4ad959c477047b124ed6a27f31",
+    "candidate_source_sha256": "af43eafe9f287a7581a5e08ef4240840f967dce4d7764c12a3cd3fe32e493417",
+    "probe_candidate_patch_sha256": "c708daf06fdcc828a0bde7a25681d82d4ee151e6c62a677053c14ed81e57a1e2",
+    "probe_candidate_source_sha256": "da424162c3b3ddbfa47cef5668df85d8c522dfe17e2ff50d692f087e25699b58"
+  },
+  "schema_version": 1,
+  "validation": {
+    "each_pair_result": "validated schema-2 corpus catalog: 3 corpora, 12 bindings",
+    "report_catalog_pairs": 16,
+    "validator": "python3 tools/validate_perf_corpus_binding.py --report REPORT --catalog CATALOG",
+    "zstd_integrity": "all compressed report and catalog frames pass zstd -t"
+  },
+  "withheld_claims": [
+    "eager OpcPackage lookup latency: HashMap traversal randomization produced non-decision-quality ABBA drift",
+    "allocator-harness latency: retained as observational evidence only; not authorized as a separate timing claim",
+    "256-part latency improvement: threshold intentionally retains the linear fallback and final result is neutral",
+    "managed ExecutionContext opens/lookups: the managed path deliberately retains the fallback and is covered by focused tests, not this harness",
+    "mutable OpcPackage behavior, typical OOXML/general workloads, RSS, physical I/O, decompression, cold-cache behavior, throughput, and broad scaling claims"
+  ]
+}
