@@ -32,18 +32,22 @@ fn order_from_native(sort: &codec::SortOrderSnapshot) -> Result<Option<Order>> {
         codec::SortScope::EntireTable => Scope::EntireTable,
         codec::SortScope::SelectedRows => Scope::SelectedRows,
     };
-    let rules = sort
-        .rules()
-        .iter()
-        .map(|rule| {
-            let direction = match rule.direction() {
-                codec::SortDirection::Ascending => Direction::Ascending,
-                codec::SortDirection::Descending => Direction::Descending,
-            };
-            let column = ColumnIndex::from_native(rule.column()).map_err(invalid_stored_sort)?;
-            Ok(Rule::new(column, direction))
-        })
-        .collect::<Result<Vec<_>>>()?;
+    let mut rules = Vec::new();
+    rules
+        .try_reserve_exact(sort.rules().len())
+        .map_err(|_allocation| {
+            invalid_stored_sort(sort::Error::Allocation {
+                amount: sort.rules().len(),
+            })
+        })?;
+    for rule in sort.rules() {
+        let direction = match rule.direction() {
+            codec::SortDirection::Ascending => Direction::Ascending,
+            codec::SortDirection::Descending => Direction::Descending,
+        };
+        let column = ColumnIndex::from_native(rule.column()).map_err(invalid_stored_sort)?;
+        rules.push(Rule::new(column, direction));
+    }
     Order::with_scope(scope, rules)
         .map(Some)
         .map_err(invalid_stored_sort)
@@ -212,6 +216,7 @@ fn focused_sort_error(error: litchi_numbers::table::sort::transaction::Error) ->
     ))
 }
 
+#[cfg(test)]
 fn focused_table_sort_source(
     editor: &NumbersEditor,
     table_id: u64,
@@ -234,8 +239,34 @@ fn focused_table_sort_order_for_apply(
     editor: &NumbersEditor,
     table_id: u64,
 ) -> Result<Option<Order>> {
-    let (source, sheet, table) = focused_table_sort_source(editor, table_id)?;
-    (FocusedNumbersPackage::table_sort_order)(&source, sheet, table).map_err(focused_sort_error)
+    let source_built = !editor.package.source_is_exact();
+    let (sheet, table) = super::selectors::focused_table_location(editor, table_id)?;
+    let bytes = editor.to_bytes()?;
+    match FocusedNumbersPackage::from_bytes(&bytes) {
+        Ok(source) => match (FocusedNumbersPackage::table_sort_order)(&source, sheet, table) {
+            Ok(order) => Ok(order),
+            Err(strict_error) if source_built => {
+                FocusedNumbersPackage::__table_sort_order_from_bytes_for_compatibility(
+                    &bytes, sheet, table,
+                )
+                .map_err(|_| focused_sort_error(strict_error))
+            },
+            Err(strict_error) => Err(focused_sort_error(strict_error)),
+        },
+        Err(strict_error) if source_built => {
+            FocusedNumbersPackage::__table_sort_order_from_bytes_for_compatibility(
+                &bytes, sheet, table,
+            )
+            .map_err(|_| {
+                Error::InvalidFormat(format!(
+                    "focused Numbers persisted-sort source validation failed: {strict_error}"
+                ))
+            })
+        },
+        Err(strict_error) => Err(Error::InvalidFormat(format!(
+            "focused Numbers persisted-sort source validation failed: {strict_error}"
+        ))),
+    }
 }
 
 #[cfg(test)]

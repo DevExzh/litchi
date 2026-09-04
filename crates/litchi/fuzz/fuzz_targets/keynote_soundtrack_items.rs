@@ -393,7 +393,9 @@ fn verify_commit(
         let reapplied = commit
             .package()
             .apply_soundtrack_items(&patch)
-            .unwrap_or_else(|error| panic!("no-op soundtrack patch must remain replayable: {error}"));
+            .unwrap_or_else(|error| {
+                panic!("no-op soundtrack patch must remain replayable: {error}")
+            });
         assert_eq!(package_bytes(reapplied.package()), source_bytes);
     } else {
         assert!(matches!(

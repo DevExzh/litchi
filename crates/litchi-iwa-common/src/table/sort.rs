@@ -4,13 +4,23 @@
 //! package transactions. This module owns only the checked values that make
 //! up a table sort order, independent of any concrete format crate.
 
-use std::collections::BTreeSet;
+use std::collections::HashSet;
 use std::fmt;
 
 const ENTIRE_TABLE: i32 = 0;
 const ROW_RANGE: i32 = 1;
 const ASCENDING: i32 = 0;
 const DESCENDING: i32 = 1;
+
+/// Maximum number of priority rules retained by one semantic sort order.
+///
+/// A native table cannot apply more useful sort priorities than it has
+/// columns.  The common value layer nevertheless needs its own fixed ceiling
+/// because its constructors accept arbitrary iterators, including iterators
+/// whose length cannot be known before they are consumed.  This bound matches
+/// the strict iWork table-sort construction budget and keeps both rule and
+/// duplicate-tracking storage finite before any package adapter is involved.
+pub const MAX_RULES: usize = 1_024;
 
 /// Failures returned while constructing a table sort value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +49,19 @@ pub enum Error {
     DuplicateColumn {
         /// The repeated physical column.
         column: usize,
+    },
+    /// A sort order contains more rules than the finite semantic budget.
+    TooManyRules {
+        /// Number of rules observed when the budget was exceeded.
+        actual: usize,
+        /// Maximum number of rules accepted by this semantic model.
+        maximum: usize,
+    },
+    /// Storage for a sort order or its duplicate tracker could not be
+    /// reserved.
+    Allocation {
+        /// Number of rule slots requested from the allocator.
+        amount: usize,
     },
     /// A native sort scope is not known to this semantic model.
     UnknownScope {
@@ -73,6 +96,14 @@ impl fmt::Display for Error {
             Self::DuplicateColumn { column } => write!(
                 formatter,
                 "iWork table sort order cannot contain column {column} more than once"
+            ),
+            Self::TooManyRules { actual, maximum } => write!(
+                formatter,
+                "iWork table sort order contains {actual} rules; maximum is {maximum}"
+            ),
+            Self::Allocation { amount } => write!(
+                formatter,
+                "iWork table sort order could not allocate {amount} rule slots"
             ),
             Self::UnknownScope { value } => {
                 write!(
@@ -311,7 +342,10 @@ impl Order {
     /// # Errors
     ///
     /// Returns [`Error::EmptyOrder`] for an empty rule sequence or
-    /// [`Error::DuplicateColumn`] when a column occurs more than once.
+    /// [`Error::DuplicateColumn`] when a column occurs more than once,
+    /// [`Error::TooManyRules`] when more than [`MAX_RULES`] rules are
+    /// supplied, or [`Error::Allocation`] when bounded storage cannot be
+    /// reserved.
     pub fn new(rules: impl IntoIterator<Item = Rule>) -> Result<Self> {
         Self::with_scope(Scope::EntireTable, rules)
     }
@@ -321,7 +355,10 @@ impl Order {
     /// # Errors
     ///
     /// Returns [`Error::EmptyOrder`] for an empty rule sequence or
-    /// [`Error::DuplicateColumn`] when a column occurs more than once.
+    /// [`Error::DuplicateColumn`] when a column occurs more than once,
+    /// [`Error::TooManyRules`] when more than [`MAX_RULES`] rules are
+    /// supplied, or [`Error::Allocation`] when bounded storage cannot be
+    /// reserved.
     pub fn selected_rows(rules: impl IntoIterator<Item = Rule>) -> Result<Self> {
         Self::with_scope(Scope::SelectedRows, rules)
     }
@@ -331,18 +368,54 @@ impl Order {
     /// # Errors
     ///
     /// Returns [`Error::EmptyOrder`] for an empty rule sequence or
-    /// [`Error::DuplicateColumn`] when a column occurs more than once.
+    /// [`Error::DuplicateColumn`] when a column occurs more than once,
+    /// [`Error::TooManyRules`] when more than [`MAX_RULES`] rules are
+    /// supplied, or [`Error::Allocation`] when bounded storage cannot be
+    /// reserved.  The iterator is consumed through at most
+    /// [`MAX_RULES`] + 1 items; its size hint is used only as a bounded
+    /// allocation hint and never as a semantic count.
     pub fn with_scope(scope: Scope, rule_iter: impl IntoIterator<Item = Rule>) -> Result<Self> {
-        let rules = rule_iter.into_iter().collect::<Vec<_>>();
-        if rules.is_empty() {
-            return Err(Error::EmptyOrder);
-        }
-        let mut columns = BTreeSet::new();
-        for rule in &rules {
+        let iterator = rule_iter.into_iter();
+        let initial_capacity = iterator.size_hint().0.min(MAX_RULES);
+        let mut rules = Vec::new();
+        reserve_rules(&mut rules, initial_capacity)?;
+
+        let mut columns = HashSet::new();
+        reserve_columns(&mut columns, initial_capacity)?;
+
+        for rule in iterator {
             let column = rule.column.get();
+            if rules.len() >= MAX_RULES {
+                // Preserve duplicate precedence even when the repeated rule
+                // is the first item beyond the semantic ceiling.
+                if columns.contains(&rule.column) {
+                    return Err(Error::DuplicateColumn { column });
+                }
+                return Err(Error::TooManyRules {
+                    actual: MAX_RULES.saturating_add(1),
+                    maximum: MAX_RULES,
+                });
+            }
+
+            if rules.len() == rules.capacity() {
+                let remaining = MAX_RULES - rules.len();
+                let additional = rules.capacity().max(1).min(remaining);
+                reserve_rules(&mut rules, additional)?;
+            }
+            if columns.len() == columns.capacity() {
+                let remaining = MAX_RULES - columns.len();
+                let additional = columns.capacity().max(1).min(remaining);
+                reserve_columns(&mut columns, additional)?;
+            }
+            // The fallible reserve immediately above guarantees that these
+            // inserts do not trigger an implicit infallible allocation.
             if !columns.insert(rule.column) {
                 return Err(Error::DuplicateColumn { column });
             }
+            rules.push(rule);
+        }
+        if rules.is_empty() {
+            return Err(Error::EmptyOrder);
         }
         Ok(Self { scope, rules })
     }
@@ -358,6 +431,24 @@ impl Order {
     pub fn rules(&self) -> &[Rule] {
         &self.rules
     }
+}
+
+fn reserve_rules(rules: &mut Vec<Rule>, additional: usize) -> Result<()> {
+    if additional == 0 {
+        return Ok(());
+    }
+    rules
+        .try_reserve_exact(additional)
+        .map_err(|_allocation| Error::Allocation { amount: additional })
+}
+
+fn reserve_columns(columns: &mut HashSet<ColumnIndex>, additional: usize) -> Result<()> {
+    if additional == 0 {
+        return Ok(());
+    }
+    columns
+        .try_reserve(additional)
+        .map_err(|_allocation| Error::Allocation { amount: additional })
 }
 
 /// Archive-free planning primitives used by concrete physical table owners.
@@ -657,6 +748,165 @@ mod tests {
         );
         let empty = RowRange { start: 2, end: 2 };
         assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn sort_rule_ceiling_accepts_the_boundary_and_rejects_the_next_rule() {
+        let boundary = Order::new((0..MAX_RULES).map(|column| {
+            Rule::new(
+                ColumnIndex::new(column).expect("test column fits native bounds"),
+                Direction::Ascending,
+            )
+        }))
+        .expect("the documented rule boundary should be accepted");
+        assert_eq!(boundary.rules().len(), MAX_RULES);
+
+        let exceeded = Order::new((0..=MAX_RULES).map(|column| {
+            Rule::new(
+                ColumnIndex::new(column).expect("test column fits native bounds"),
+                Direction::Ascending,
+            )
+        }))
+        .unwrap_err();
+        assert_eq!(
+            exceeded,
+            Error::TooManyRules {
+                actual: MAX_RULES + 1,
+                maximum: MAX_RULES,
+            }
+        );
+    }
+
+    #[test]
+    fn infinite_rule_iterators_stop_at_the_first_item_after_the_ceiling() {
+        let mut yielded = 0usize;
+        let error = Order::new(std::iter::from_fn(|| {
+            let column = yielded;
+            yielded += 1;
+            Some(Rule::new(
+                ColumnIndex::new(column).expect("test column fits native bounds"),
+                Direction::Ascending,
+            ))
+        }))
+        .unwrap_err();
+
+        assert_eq!(yielded, MAX_RULES + 1);
+        assert_eq!(
+            error,
+            Error::TooManyRules {
+                actual: MAX_RULES + 1,
+                maximum: MAX_RULES,
+            }
+        );
+    }
+
+    #[test]
+    fn malicious_size_hints_are_capped_without_changing_empty_or_valid_semantics() {
+        struct HugeHint {
+            yielded: bool,
+        }
+
+        impl Iterator for HugeHint {
+            type Item = Rule;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                if self.yielded {
+                    None
+                } else {
+                    self.yielded = true;
+                    Some(Rule::new(
+                        ColumnIndex::new(7).expect("test column fits native bounds"),
+                        Direction::Descending,
+                    ))
+                }
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                (usize::MAX, Some(usize::MAX))
+            }
+        }
+
+        let order = Order::new(HugeHint { yielded: false })
+            .expect("a huge hint must remain only a bounded allocation hint");
+        assert_eq!(order.rules().len(), 1);
+        assert_eq!(order.rules()[0].column().get(), 7);
+
+        struct EmptyHugeHint;
+
+        impl Iterator for EmptyHugeHint {
+            type Item = Rule;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                None
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                (usize::MAX, Some(usize::MAX))
+            }
+        }
+
+        assert_eq!(Order::selected_rows(EmptyHugeHint), Err(Error::EmptyOrder));
+    }
+
+    #[test]
+    fn duplicate_semantics_win_even_for_a_rule_after_the_ceiling() {
+        let mut rules = (0..MAX_RULES)
+            .map(|column| {
+                Rule::new(
+                    ColumnIndex::new(column).expect("test column fits native bounds"),
+                    Direction::Ascending,
+                )
+            })
+            .collect::<Vec<_>>();
+        rules.push(Rule::new(
+            ColumnIndex::new(0).expect("test column fits native bounds"),
+            Direction::Descending,
+        ));
+
+        assert_eq!(
+            Order::with_scope(Scope::EntireTable, rules),
+            Err(Error::DuplicateColumn { column: 0 })
+        );
+    }
+
+    #[test]
+    fn reservation_failures_are_typed_and_do_not_attempt_unbounded_storage() {
+        let mut rules = Vec::new();
+        assert_eq!(
+            reserve_rules(&mut rules, usize::MAX),
+            Err(Error::Allocation { amount: usize::MAX })
+        );
+
+        let mut columns = HashSet::new();
+        assert_eq!(
+            reserve_columns(&mut columns, usize::MAX),
+            Err(Error::Allocation { amount: usize::MAX })
+        );
+        assert!(rules.is_empty());
+        assert!(columns.is_empty());
+    }
+
+    #[test]
+    fn sort_errors_have_exhaustive_display_and_no_hidden_source() {
+        let errors = [
+            Error::ColumnIndexOverflow { index: 1 },
+            Error::NativeColumnIndexOverflow { index: 1 },
+            Error::InvalidRowRange { start: 1, end: 1 },
+            Error::EmptyOrder,
+            Error::DuplicateColumn { column: 1 },
+            Error::TooManyRules {
+                actual: MAX_RULES + 1,
+                maximum: MAX_RULES,
+            },
+            Error::Allocation { amount: 1 },
+            Error::UnknownScope { value: 9 },
+            Error::UnknownDirection { value: 9 },
+        ];
+
+        for error in errors {
+            assert!(!error.to_string().is_empty());
+            assert!(std::error::Error::source(&error).is_none());
+        }
     }
 
     #[test]

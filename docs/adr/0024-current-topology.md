@@ -4059,3 +4059,28 @@ manifest removal closes ADR 0028 deletion gate 1; topology, debt, and host
 counts remain unchanged. The separate 2026-09-03 amendment in
 [`ADR 0028`](0028-iwa-monolith-exit.md) records the gate accounting and
 remaining deletion work.
+
+## 2026-09-04 amendment: Numbers existing-cell Text-format owner
+
+`litchi-numbers` now owns the bounded semantic Text-format transaction for one
+existing Numbers cell. The selector-first package API exposes an archive-free
+`Text` marker and exact-source read/set/clear/reset/inverse behavior. Its
+private type-260 adapter owns native format-list/refcount admission, strict
+wire validation, lazy Buffa inspection, copy-on-write publication, candidate
+reopen/readback, and physical locality checks; native IDs, generated messages,
+archive members, and raw wire values remain private.
+
+Canonical explicit Text attachment uses marker `0x80`. An unchanged admitted
+converted-Text source with marker `0x81` and retained Number provenance remains
+source-authoritative; numeric-to-Text conversion is not implemented. Focused
+tests provide E1 evidence and the checked-in Apple fixture provides E2
+read/no-op evidence only. Native E3/E4 acceptance is not claimed.
+
+The dedicated raw-ID Numbers convenience routes for Number, Percentage,
+Currency, Scientific, and Fraction remain retired. Generic source-built and
+cross-format `DataFormat::Text` compatibility remains host-only, and a focused
+Text refusal is not a fallback trigger. This owner adds no package, dependency
+edge, debt retirement, migration-host removal, or monolith-deletion-gate
+closure; the current topology remains 64 workspace packages, 238 internal
+declarations, 227 canonical edges, 11 development-only edges, 11 ordered
+debts `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.

@@ -10,6 +10,7 @@
 use litchi_iwa_protos::{
     numbers_table_cell_control_codec as control_codec,
     numbers_table_cell_currency_format_codec as currency_codec,
+    numbers_table_cell_date_time_format_codec as date_time_codec,
     numbers_table_cell_fraction_format_codec as fraction_codec,
     numbers_table_cell_number_format_codec as number_codec,
     numbers_table_cell_percentage_format_codec as percentage_codec,
@@ -25,18 +26,19 @@ use super::{
     table_cell_pop_up_menu::{CellTarget, Error, Path, TransactionBudget},
     table_cell_pop_up_menu_native as popup_native,
 };
-use crate::cell::data_format::Text;
 use crate::cell::data_format::currency::{Currency, CurrencyCode, CurrencyStyle};
 use crate::cell::data_format::number::{
     DecimalPlaces, FixedDecimalPlaces, Fraction, FractionAccuracy, NegativeStyle, Number,
     Percentage, Scientific, ThousandsSeparator,
 };
+use crate::cell::data_format::{DateTime, Text};
 
 const NUMBER_FORMAT_TYPE: u32 = number_codec::NATIVE_NUMBER_FORMAT_TYPE;
 const CURRENCY_FORMAT_TYPE: u32 = currency_codec::NATIVE_CURRENCY_FORMAT_TYPE;
 const PERCENTAGE_FORMAT_TYPE: u32 = percentage_codec::NATIVE_PERCENTAGE_FORMAT_TYPE;
 const SCIENTIFIC_FORMAT_TYPE: u32 = scientific_codec::NATIVE_SCIENTIFIC_FORMAT_TYPE;
 const FRACTION_FORMAT_TYPE: u32 = fraction_codec::NATIVE_FRACTION_FORMAT_TYPE;
+const DATE_TIME_FORMAT_TYPE: u32 = date_time_codec::NATIVE_DATE_TIME_FORMAT_TYPE;
 // Numbers stores the plain Text display format in the same
 // `FormatStructArchive` family as the scalar formats.  The strict control
 // codec accepts this native discriminator while this private owner keeps it
@@ -106,6 +108,7 @@ pub(super) enum DisplayFormatFamily {
     Percentage,
     Scientific,
     Fraction,
+    DateTime,
     Text,
 }
 
@@ -117,6 +120,7 @@ impl DisplayFormatFamily {
             Self::Percentage => PERCENTAGE_FORMAT_TYPE,
             Self::Scientific => SCIENTIFIC_FORMAT_TYPE,
             Self::Fraction => FRACTION_FORMAT_TYPE,
+            Self::DateTime => DATE_TIME_FORMAT_TYPE,
             Self::Text => TEXT_FORMAT_TYPE,
         }
     }
@@ -199,6 +203,19 @@ impl From<Error> for FractionFormatReadError {
     }
 }
 
+/// Typed native failure returned to the Date & Time package facade.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum DateTimeFormatReadError {
+    WrongFormatFamily,
+    Native(Error),
+}
+
+impl From<Error> for DateTimeFormatReadError {
+    fn from(error: Error) -> Self {
+        Self::Native(error)
+    }
+}
+
 /// Typed native failure returned to the Text package facade.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum TextFormatReadError {
@@ -212,24 +229,26 @@ impl From<Error> for TextFormatReadError {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum NativeDisplayValue {
     Number(Number),
     Currency(Currency),
     Percentage(Percentage),
     Scientific(Scientific),
     Fraction(Fraction),
+    DateTime(DateTime),
     Text(Text),
 }
 
 impl NativeDisplayValue {
-    const fn family(self) -> DisplayFormatFamily {
+    const fn family(&self) -> DisplayFormatFamily {
         match self {
             Self::Number(_) => DisplayFormatFamily::Number,
             Self::Currency(_) => DisplayFormatFamily::Currency,
             Self::Percentage(_) => DisplayFormatFamily::Percentage,
             Self::Scientific(_) => DisplayFormatFamily::Scientific,
             Self::Fraction(_) => DisplayFormatFamily::Fraction,
+            Self::DateTime(_) => DisplayFormatFamily::DateTime,
             Self::Text(_) => DisplayFormatFamily::Text,
         }
     }
@@ -308,6 +327,7 @@ impl NativeDisplayValue {
                 NativeDisplayValue::Scientific(Scientific::new(decimal_places))
             },
             DisplayFormatFamily::Fraction => return Err(Error::InvalidSource { path }),
+            DisplayFormatFamily::DateTime => return Err(Error::InvalidSource { path }),
             DisplayFormatFamily::Text => return Err(Error::InvalidSource { path }),
         };
         Ok(value)
@@ -403,6 +423,97 @@ fn verify_display_cell_metadata(
         || candidate_cell.numeric_cell_type() != source_numeric_type
         || candidate_cell.cell_format_kind()
             != desired_identifier.map(|_| litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND)
+        || candidate_cell.format_identifier() != desired_identifier
+        || candidate_cell.secondary_format_identifier().is_some()
+        || candidate_cell.control_cell_spec_identifier().is_some()
+    {
+        return Err(Error::Verification);
+    }
+    Ok(())
+}
+
+fn rewrite_date_time_cell_metadata(
+    source: &[u8],
+    desired_identifier: Option<u32>,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<u8>, Error> {
+    let output_limit = source
+        .len()
+        .checked_add(8)
+        .ok_or(Error::InvalidSource { path })?;
+    let owned_cell_bytes = source
+        .len()
+        .checked_add(output_limit)
+        .ok_or(Error::InvalidSource { path })?;
+    let work = output_limit
+        .checked_mul(2)
+        .and_then(|amount| amount.checked_add(source.len()))
+        .ok_or(Error::InvalidSource { path })?;
+    let allocations = litchi_numbers_wire::MAX_OWNED_BNC_PARSE_ALLOCATIONS
+        .checked_mul(2)
+        .and_then(|amount| amount.checked_add(3))
+        .ok_or(Error::InvalidSource { path })?;
+    budget.charge_allocations(allocations, path)?;
+    budget.charge_scratch_bytes(owned_cell_bytes, path)?;
+    budget.charge_retained_bytes(output_limit, path)?;
+    budget.charge_transaction_work(work, path)?;
+
+    let mut cell = BncCell::parse(source).map_err(|_| Error::InvalidSource { path })?;
+    let source_value = cell.stored_value();
+    let source_cache = cell
+        .cached_scalar()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let source_numeric_type = cell.numeric_cell_type();
+    if !cell.is_date_time_format_compatible() {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    cell.set_date_time_format_identifier_preserving_value(desired_identifier)
+        .map_err(|_| Error::InvalidSource { path })?;
+    let output = cell
+        .try_encode_with_limit(output_limit)
+        .map_err(|error| match error {
+            litchi_numbers_wire::Error::Allocation { requested } => Error::Allocation {
+                amount: requested,
+                path,
+            },
+            litchi_numbers_wire::Error::InvalidFormat(_)
+            | litchi_numbers_wire::Error::ParseError(_)
+            | litchi_numbers_wire::Error::OutputLimitExceeded { .. } => {
+                Error::InvalidSource { path }
+            },
+        })?;
+    let candidate_cell = BncCell::parse(&output).map_err(|_| Error::Verification)?;
+    verify_date_time_cell_metadata(
+        source_value,
+        source_cache,
+        source_numeric_type,
+        &candidate_cell,
+        desired_identifier,
+    )?;
+    Ok(output)
+}
+
+fn verify_date_time_cell_metadata(
+    source_value: litchi_numbers_wire::StoredValue,
+    source_cache: Option<litchi_numbers_wire::CachedScalar>,
+    source_numeric_type: Option<NumericCellType>,
+    candidate_cell: &BncCell,
+    desired_identifier: Option<u32>,
+) -> Result<(), Error> {
+    let expected_explicit =
+        desired_identifier.map_or(0, |_| litchi_numbers_wire::EXPLICIT_DATE_TIME_FORMAT);
+    if source_value != candidate_cell.stored_value()
+        || candidate_cell.cached_scalar().ok() != Some(source_cache)
+        || candidate_cell.numeric_cell_type() != source_numeric_type
+        || !candidate_cell.is_date_time_format_compatible()
+        || !candidate_cell.has_only_date_time_format_metadata()
+    {
+        return Err(Error::Verification);
+    }
+    if candidate_cell.explicit_format_flags() != expected_explicit
+        || candidate_cell.cell_format_kind()
+            != desired_identifier.map(|_| litchi_numbers_wire::DATE_TIME_CELL_FORMAT_KIND)
         || candidate_cell.format_identifier() != desired_identifier
         || candidate_cell.secondary_format_identifier().is_some()
         || candidate_cell.control_cell_spec_identifier().is_some()
@@ -641,14 +752,6 @@ fn inspect_text_cell_metadata(
     })
 }
 
-fn bnc_has_reserved_known_field(source: &[u8]) -> bool {
-    source
-        .get(BNC_HEADER_LEN - 4..BNC_HEADER_LEN)
-        .and_then(|bytes| bytes.try_into().ok())
-        .map(u32::from_le_bytes)
-        .is_some_and(|flags| flags & BNC_RESERVED_KNOWN_FIELD_FLAG != 0)
-}
-
 fn validate_text_cell_metadata(
     source: &[u8],
     cell: &BncCell,
@@ -863,6 +966,7 @@ pub(super) fn read_number_format_with_budget(
         | Ok(Some(NativeDisplayValue::Percentage(_)))
         | Ok(Some(NativeDisplayValue::Scientific(_)))
         | Ok(Some(NativeDisplayValue::Fraction(_)))
+        | Ok(Some(NativeDisplayValue::DateTime(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
         | Err(DisplayReadError::WrongFormatFamily) => Err(NumberFormatReadError::WrongFormatFamily),
         Err(DisplayReadError::Native(error)) => Err(NumberFormatReadError::Native(error)),
@@ -900,6 +1004,7 @@ pub(super) fn read_currency_format_with_budget(
         | Ok(Some(NativeDisplayValue::Percentage(_)))
         | Ok(Some(NativeDisplayValue::Scientific(_)))
         | Ok(Some(NativeDisplayValue::Fraction(_)))
+        | Ok(Some(NativeDisplayValue::DateTime(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(CurrencyFormatReadError::WrongFormatFamily)
@@ -939,6 +1044,7 @@ pub(super) fn read_percentage_format_with_budget(
         | Ok(Some(NativeDisplayValue::Currency(_)))
         | Ok(Some(NativeDisplayValue::Scientific(_)))
         | Ok(Some(NativeDisplayValue::Fraction(_)))
+        | Ok(Some(NativeDisplayValue::DateTime(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(PercentageFormatReadError::WrongFormatFamily)
@@ -978,6 +1084,7 @@ pub(super) fn read_scientific_format_with_budget(
         | Ok(Some(NativeDisplayValue::Currency(_)))
         | Ok(Some(NativeDisplayValue::Percentage(_)))
         | Ok(Some(NativeDisplayValue::Fraction(_)))
+        | Ok(Some(NativeDisplayValue::DateTime(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(ScientificFormatReadError::WrongFormatFamily)
@@ -1017,11 +1124,52 @@ pub(super) fn read_fraction_format_with_budget(
         | Ok(Some(NativeDisplayValue::Currency(_)))
         | Ok(Some(NativeDisplayValue::Percentage(_)))
         | Ok(Some(NativeDisplayValue::Scientific(_)))
+        | Ok(Some(NativeDisplayValue::DateTime(_)))
         | Ok(Some(NativeDisplayValue::Text(_)))
         | Err(DisplayReadError::WrongFormatFamily) => {
             Err(FractionFormatReadError::WrongFormatFamily)
         },
         Err(DisplayReadError::Native(error)) => Err(FractionFormatReadError::Native(error)),
+    }
+}
+
+/// Read one existing Date & Time format with a fresh transaction ledger.
+pub(super) fn read_date_time_format(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+) -> Result<Option<DateTime>, DateTimeFormatReadError> {
+    let mut budget = TransactionBudget::for_cell_control(source);
+    read_date_time_format_with_budget(source, target, path, &mut budget)
+}
+
+/// Read one existing Date & Time format against a caller-owned transaction
+/// ledger.
+pub(super) fn read_date_time_format_with_budget(
+    source: &Package,
+    target: CellTarget,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Option<DateTime>, DateTimeFormatReadError> {
+    match read_display_format_with_budget(
+        DisplayFormatFamily::DateTime,
+        source,
+        target,
+        path,
+        budget,
+    ) {
+        Ok(None) => Ok(None),
+        Ok(Some(NativeDisplayValue::DateTime(value))) => Ok(Some(value)),
+        Ok(Some(NativeDisplayValue::Number(_)))
+        | Ok(Some(NativeDisplayValue::Currency(_)))
+        | Ok(Some(NativeDisplayValue::Percentage(_)))
+        | Ok(Some(NativeDisplayValue::Scientific(_)))
+        | Ok(Some(NativeDisplayValue::Fraction(_)))
+        | Ok(Some(NativeDisplayValue::Text(_)))
+        | Err(DisplayReadError::WrongFormatFamily) => {
+            Err(DateTimeFormatReadError::WrongFormatFamily)
+        },
+        Err(DisplayReadError::Native(error)) => Err(DateTimeFormatReadError::Native(error)),
     }
 }
 
@@ -1050,6 +1198,7 @@ pub(super) fn read_text_format_with_budget(
         | Ok(Some(NativeDisplayValue::Percentage(_)))
         | Ok(Some(NativeDisplayValue::Scientific(_)))
         | Ok(Some(NativeDisplayValue::Fraction(_)))
+        | Ok(Some(NativeDisplayValue::DateTime(_)))
         | Err(DisplayReadError::WrongFormatFamily) => Err(TextFormatReadError::WrongFormatFamily),
         Err(DisplayReadError::Native(error)) => Err(TextFormatReadError::Native(error)),
     }
@@ -1152,6 +1301,27 @@ pub(super) fn rewrite_fraction_format(
         target,
         before.copied().map(NativeDisplayValue::Fraction),
         after.copied().map(NativeDisplayValue::Fraction),
+        path,
+        budget,
+    )
+}
+
+/// Rewrite one Date & Time cell without converting its stored value or
+/// formula cache.
+pub(super) fn rewrite_date_time_format(
+    source: &Package,
+    target: CellTarget,
+    before: Option<&DateTime>,
+    after: Option<&DateTime>,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<native::NativeControlOutput, Error> {
+    rewrite_display_format(
+        DisplayFormatFamily::DateTime,
+        source,
+        target,
+        before.cloned().map(NativeDisplayValue::DateTime),
+        after.cloned().map(NativeDisplayValue::DateTime),
         path,
         budget,
     )
@@ -1264,9 +1434,7 @@ fn read_display_format_with_budget(
     .map_err(|_| Error::InvalidSource { path })?;
     charge_owned_bnc_parse(cell_source.len(), path, budget)?;
     let cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
-    if bnc_has_reserved_known_field(cell_source) {
-        return Err(Error::UnsupportedDependency { path }.into());
-    }
+    native::validate_bnc_format_metadata(cell_source, &cell, path)?;
     let format_identifier = cell.format_identifier();
     if cell.control_cell_spec_identifier().is_some() {
         return Err(DisplayReadError::WrongFormatFamily);
@@ -1300,6 +1468,15 @@ fn read_display_format_with_budget(
                 return Err(Error::InvalidSource { path }.into());
             }
         },
+        (DisplayFormatFamily::DateTime, Some(litchi_numbers_wire::DATE_TIME_CELL_FORMAT_KIND)) => {
+            if secondary_identifier.is_some()
+                || !cell.has_only_date_time_format_metadata()
+                || explicit_flags != litchi_numbers_wire::EXPLICIT_DATE_TIME_FORMAT
+                || !cell.is_date_time_format_compatible()
+            {
+                return Err(DisplayReadError::WrongFormatFamily);
+            }
+        },
         (DisplayFormatFamily::Currency, Some(litchi_numbers_wire::CURRENCY_CELL_FORMAT_KIND)) => {
             let expected_explicit =
                 litchi_numbers_wire::explicit_currency_format_flags(secondary_identifier.is_some());
@@ -1330,6 +1507,9 @@ fn read_display_format_with_budget(
         },
         (_, Some(_)) => return Err(DisplayReadError::WrongFormatFamily),
         (_, None) if format_identifier.is_some() || explicit_flags != 0 => {
+            return Err(DisplayReadError::WrongFormatFamily);
+        },
+        (DisplayFormatFamily::DateTime, None) if !cell.is_date_time_format_compatible() => {
             return Err(DisplayReadError::WrongFormatFamily);
         },
         (_, None) => return Ok(None),
@@ -1460,8 +1640,10 @@ fn rewrite_display_format(
     if target.locked {
         return Err(Error::TableLocked { path });
     }
-    if before.is_some_and(|value| value.family() != family)
-        || after.is_some_and(|value| value.family() != family)
+    if before
+        .as_ref()
+        .is_some_and(|value| value.family() != family)
+        || after.as_ref().is_some_and(|value| value.family() != family)
     {
         return Err(Error::UnsupportedDependency { path });
     }
@@ -1556,9 +1738,7 @@ fn rewrite_display_format(
     .map_err(|_| Error::InvalidSource { path })?;
     charge_owned_bnc_parse(cell_source.len(), path, budget)?;
     let cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
-    if bnc_has_reserved_known_field(cell_source) {
-        return Err(Error::UnsupportedDependency { path });
-    }
+    native::validate_bnc_format_metadata(cell_source, &cell, path)?;
     let old_format = cell.format_identifier();
     let old_secondary =
         if cell.cell_format_kind() == Some(litchi_numbers_wire::TEXT_CELL_FORMAT_KIND) {
@@ -1586,6 +1766,17 @@ fn rewrite_display_format(
                     && explicit_flags != litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT)
                 || (family == DisplayFormatFamily::Scientific
                     && !scientific_cell_type_matches_value(&cell))
+            {
+                return Err(Error::UnsupportedDependency { path });
+            }
+        },
+        (DisplayFormatFamily::DateTime, Some(identifier), Some(kind))
+            if identifier != 0 && kind == litchi_numbers_wire::DATE_TIME_CELL_FORMAT_KIND =>
+        {
+            if old_secondary.is_some()
+                || !cell.has_only_date_time_format_metadata()
+                || explicit_flags != litchi_numbers_wire::EXPLICIT_DATE_TIME_FORMAT
+                || !cell.is_date_time_format_compatible()
             {
                 return Err(Error::UnsupportedDependency { path });
             }
@@ -1631,7 +1822,9 @@ fn rewrite_display_format(
                         cell.stored_value(),
                         litchi_numbers_wire::StoredValue::Empty
                             | litchi_numbers_wire::StoredValue::Text(_)
-                    )) => {},
+                    ))
+                && (family != DisplayFormatFamily::DateTime
+                    || cell.is_date_time_format_compatible()) => {},
         _ => return Err(Error::UnsupportedDependency { path }),
     }
     let format_table_identifier = store
@@ -1755,6 +1948,7 @@ fn rewrite_display_format(
             | DisplayFormatFamily::Percentage
             | DisplayFormatFamily::Scientific
             | DisplayFormatFamily::Fraction => litchi_numbers_wire::EXPLICIT_DECIMAL_FORMAT,
+            DisplayFormatFamily::DateTime => litchi_numbers_wire::EXPLICIT_DATE_TIME_FORMAT,
             DisplayFormatFamily::Text => {
                 if old_secondary.is_some() {
                     litchi_numbers_wire::EXPLICIT_CONVERTED_TEXT_FORMAT
@@ -1774,6 +1968,8 @@ fn rewrite_display_format(
         return Err(Error::PatchConflict);
     }
 
+    let after_is_some = after.is_some();
+    let after_is_none = !after_is_some;
     let desired_payload = match (after, old_format) {
         (Some(value), Some(old_key)) => {
             let entry = format_facts
@@ -1809,7 +2005,7 @@ fn rewrite_display_format(
     if matches!(
         family,
         DisplayFormatFamily::Currency | DisplayFormatFamily::Text
-    ) && after.is_none()
+    ) && after_is_none
     {
         if let Some(secondary_identifier) = old_secondary {
             (new_format, _) = native::mutate_list(
@@ -1822,10 +2018,12 @@ fn rewrite_display_format(
             )?;
         }
     }
-    let replacement_cell = if after.is_some() {
+    let replacement_cell = if after_is_some {
         let key = new_format_key.ok_or(Error::InvalidSource { path })?;
         if family == DisplayFormatFamily::Currency {
             rewrite_currency_cell_metadata(cell_source, Some(key), path, budget)?
+        } else if family == DisplayFormatFamily::DateTime {
+            rewrite_date_time_cell_metadata(cell_source, Some(key), path, budget)?
         } else if family == DisplayFormatFamily::Text {
             rewrite_text_cell_metadata(cell_source, Some(key), path, budget)?
         } else {
@@ -1834,6 +2032,8 @@ fn rewrite_display_format(
     } else {
         if family == DisplayFormatFamily::Currency {
             rewrite_currency_cell_metadata(cell_source, None, path, budget)?
+        } else if family == DisplayFormatFamily::DateTime {
+            rewrite_date_time_cell_metadata(cell_source, None, path, budget)?
         } else if family == DisplayFormatFamily::Text {
             rewrite_text_cell_metadata(cell_source, None, path, budget)?
         } else {
@@ -2117,6 +2317,21 @@ fn decode_display_payload(
                 path,
             )?))
         },
+        DisplayFormatFamily::DateTime => {
+            let (snapshot, report) =
+                match date_time_codec::decode_date_time_format_with_report(source, options) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return Err(classify_date_time_decode_failure(
+                            source, budget, path, error,
+                        ));
+                    },
+                };
+            native::charge_control_decode_report(budget, report, path)?;
+            let pattern = snapshot.date_time_format();
+            let value = DateTime::new(pattern).map_err(|_| Error::InvalidSource { path })?;
+            Ok(NativeDisplayValue::DateTime(value))
+        },
         DisplayFormatFamily::Text => {
             let (snapshot, report) = text_codec::decode_text_format_with_report(source, options)
                 .map_err(|error| native::map_control_error(error, path))?;
@@ -2156,6 +2371,29 @@ fn classify_decode_failure(
         DisplayReadError::Native(native::map_control_error(error, path))
     }
 }
+
+fn classify_date_time_decode_failure(
+    source: &[u8],
+    budget: &mut TransactionBudget,
+    path: Path,
+    error: date_time_codec::DecodeError,
+) -> DisplayReadError {
+    let Ok((broad, report)) = control_codec::decode_control_format_with_report(
+        source,
+        native::control_codec_options(source.len(), budget),
+    ) else {
+        return DisplayReadError::Native(native::map_control_error(error, path));
+    };
+    if let Err(native_error) = native::charge_control_decode_report(budget, report, path) {
+        return DisplayReadError::Native(native_error);
+    }
+    if broad.format_type() != DATE_TIME_FORMAT_TYPE {
+        DisplayReadError::WrongFormatFamily
+    } else {
+        DisplayReadError::Native(native::map_control_error(error, path))
+    }
+}
+
 fn prepare_display_rewrite(
     family: DisplayFormatFamily,
     source: &[u8],
@@ -2243,6 +2481,18 @@ fn prepare_display_rewrite(
             )
             .map_err(|error| native::map_control_error(error, path))?;
             execute_fraction_rewrite(prepared, budget, path)
+        },
+        DisplayFormatFamily::DateTime => {
+            let NativeDisplayValue::DateTime(value) = value else {
+                return Err(Error::UnsupportedDependency { path });
+            };
+            let prepared = date_time_codec::prepare_date_time_format_rewrite(
+                source,
+                date_time_codec::DateTimeFormatWrite::new(value.pattern()),
+                options,
+            )
+            .map_err(|error| native::map_control_error(error, path))?;
+            execute_date_time_rewrite(prepared, budget, path)
         },
         DisplayFormatFamily::Text => {
             let NativeDisplayValue::Text(_) = value else {
@@ -2341,6 +2591,17 @@ fn prepare_display_append(
             )
             .map_err(|error| native::map_control_error(error, path))?;
             execute_fraction_append(prepared, budget, path)
+        },
+        DisplayFormatFamily::DateTime => {
+            let NativeDisplayValue::DateTime(value) = value else {
+                return Err(Error::UnsupportedDependency { path });
+            };
+            let prepared = date_time_codec::prepare_date_time_format_write(
+                date_time_codec::DateTimeFormatWrite::new(value.pattern()),
+                options,
+            )
+            .map_err(|error| native::map_control_error(error, path))?;
+            execute_date_time_append(prepared, budget, path)
         },
         DisplayFormatFamily::Text => {
             let NativeDisplayValue::Text(_) = value else {
@@ -2460,6 +2721,20 @@ fn execute_fraction_rewrite(
     Ok(output.into_bytes())
 }
 
+fn execute_date_time_rewrite(
+    prepared: date_time_codec::PreparedDateTimeFormatRewrite<'_>,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let requirements = prepared.execution_requirements();
+    native::charge_control_requirements(budget, requirements, path)?;
+    let output = prepared
+        .execute(date_time_codec::RewriteExecutionLimits::exact(requirements))
+        .map_err(|error| native::map_control_error(error, path))?;
+    native::verify_control_report(output.report(), requirements, path)?;
+    Ok(output.into_bytes())
+}
+
 fn execute_currency_rewrite(
     prepared: currency_codec::PreparedCurrencyFormatRewrite<'_>,
     budget: &mut TransactionBudget,
@@ -2529,6 +2804,20 @@ fn execute_fraction_append(
     native::charge_control_requirements(budget, requirements, path)?;
     let output = prepared
         .execute(fraction_codec::RewriteExecutionLimits::exact(requirements))
+        .map_err(|error| native::map_control_error(error, path))?;
+    native::verify_control_report(output.report(), requirements, path)?;
+    Ok(output.into_bytes())
+}
+
+fn execute_date_time_append(
+    prepared: date_time_codec::PreparedDateTimeFormatWrite<'_>,
+    budget: &mut TransactionBudget,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let requirements = prepared.execution_requirements();
+    native::charge_control_requirements(budget, requirements, path)?;
+    let output = prepared
+        .execute(date_time_codec::RewriteExecutionLimits::exact(requirements))
         .map_err(|error| native::map_control_error(error, path))?;
     native::verify_control_report(output.report(), requirements, path)?;
     Ok(output.into_bytes())

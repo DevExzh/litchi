@@ -3523,7 +3523,14 @@ fn duplicate_slide_tree_references_fail_transactionally() {
             Ok(())
         })
         .unwrap();
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
+    // Duplicate slide-tree references are rejected by the public admission
+    // boundary. Keep the malformed package only to exercise the operation's
+    // transactional failure path after admission has been bypassed in this
+    // focused fixture.
+    assert!(KeynoteEditor::from_package(package.clone()).is_err());
+    let mut editor = KeynoteEditor {
+        text: IWorkTextEditor::from_package(package),
+    };
     let before = editor.to_bytes().unwrap();
     assert!(editor.duplicate_slide(0).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);

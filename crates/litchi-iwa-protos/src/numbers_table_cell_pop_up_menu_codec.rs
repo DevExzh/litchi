@@ -21,6 +21,7 @@ use core::{fmt, str};
 use buffa::DecodeOptions as BuffaDecodeOptions;
 
 use crate::buffa_numbers_table_cell_currency_format_generated::LitchiIwaNumbersTableCellCurrencyFormatProjection as currency_projection;
+use crate::buffa_numbers_table_cell_date_time_format_generated::LitchiIwaNumbersTableCellDateTimeFormatProjection as date_time_projection;
 use crate::buffa_numbers_table_cell_pop_up_menu_generated::LitchiIwaNumbersTableCellPopUpMenuProjection as projection;
 use crate::buffa_numbers_table_cell_text_format_generated::LitchiIwaNumbersTableCellTextFormatProjection as text_projection;
 
@@ -724,6 +725,12 @@ pub const NATIVE_SCIENTIFIC_FORMAT_TYPE: u32 = 259;
 
 /// Native Numbers display-format discriminator for a Text cell.
 pub const NATIVE_TEXT_FORMAT_TYPE: u32 = 260;
+
+/// Native Numbers display-format discriminator for a date-and-time cell.
+pub const NATIVE_DATE_TIME_FORMAT_TYPE: u32 = 261;
+
+/// Maximum UTF-8 size of the native date-and-time pattern field.
+pub const MAX_DATE_TIME_PATTERN_BYTES: usize = 4 * 1_024;
 
 /// Native Numbers display-format discriminator for a fraction cell.
 pub const NATIVE_FRACTION_FORMAT_TYPE: u32 = 262;
@@ -3018,6 +3025,509 @@ fn verify_text_format_candidate(
         || report.work_bytes() != candidate_work
         || report.max_depth() != layout.max_depth
         || TextFormatWrite::from_snapshot(snapshot) != write
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(())
+}
+
+/// Borrowed semantic facts for one strict native DateTime
+/// `FormatStructArchive`.
+///
+/// The complete source payload remains authoritative. The selected pattern
+/// borrows its UTF-8 bytes directly from that source, while unknown extension
+/// fields and groups are preserved byte-for-byte by prepared rewrites.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DateTimeFormatSnapshot<'source> {
+    source: &'source [u8],
+    format_type: u32,
+    date_time_format: &'source str,
+}
+
+impl<'source> DateTimeFormatSnapshot<'source> {
+    pub(crate) const fn raw(self) -> &'source [u8] {
+        self.source
+    }
+
+    pub(crate) const fn format_type(self) -> u32 {
+        self.format_type
+    }
+
+    pub(crate) const fn date_time_format(self) -> &'source str {
+        self.date_time_format
+    }
+}
+
+/// Scalar values accepted by the strict native DateTime writer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DateTimeFormatWrite<'source> {
+    date_time_format: &'source str,
+}
+
+impl<'source> DateTimeFormatWrite<'source> {
+    pub(crate) const fn new(date_time_format: &'source str) -> Self {
+        Self { date_time_format }
+    }
+
+    pub(crate) const fn from_snapshot(snapshot: DateTimeFormatSnapshot<'source>) -> Self {
+        Self::new(snapshot.date_time_format)
+    }
+
+    pub(crate) const fn date_time_format(self) -> &'source str {
+        self.date_time_format
+    }
+}
+
+/// Prepared source-preserving native DateTime rewrite.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PreparedDateTimeFormatRewrite<'source> {
+    source: &'source [u8],
+    layout: DateTimeFormatLayout,
+    write: DateTimeFormatWrite<'source>,
+    requirements: RewriteExecutionRequirements,
+    candidate_work: usize,
+    verify_options: DecodeOptions,
+}
+
+impl PreparedDateTimeFormatRewrite<'_> {
+    pub(crate) const fn execution_requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    pub(crate) fn prepare_report(self) -> DecodeReport {
+        report_from_requirements(self.requirements)
+    }
+
+    pub(crate) fn execute(
+        self,
+        limits: RewriteExecutionLimits,
+    ) -> Result<RewriteOutput, DecodeError> {
+        check_requirements(self.requirements, limits)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.requirements.output_bytes)
+            .map_err(|_| {
+                DecodeError::limited(DecodeLimit::Allocation {
+                    requested: self.requirements.output_bytes,
+                })
+            })?;
+        emit_date_time_format_rewrite(&mut bytes, self.source, self.layout, self.write)?;
+        if bytes.len() != self.requirements.output_bytes {
+            return Err(DecodeError::invalid());
+        }
+        verify_date_time_format_candidate(
+            &bytes,
+            self.write,
+            self.verify_options,
+            self.layout,
+            self.requirements,
+            self.candidate_work,
+        )?;
+        Ok(RewriteOutput {
+            bytes,
+            report: report_from_requirements(self.requirements),
+        })
+    }
+}
+
+/// Prepared canonical native DateTime append.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PreparedDateTimeFormatWrite<'source> {
+    write: DateTimeFormatWrite<'source>,
+    requirements: RewriteExecutionRequirements,
+    verify_options: DecodeOptions,
+}
+
+impl PreparedDateTimeFormatWrite<'_> {
+    pub(crate) const fn execution_requirements(self) -> RewriteExecutionRequirements {
+        self.requirements
+    }
+
+    pub(crate) fn prepare_report(self) -> DecodeReport {
+        report_from_requirements(self.requirements)
+    }
+
+    pub(crate) fn execute(
+        self,
+        limits: RewriteExecutionLimits,
+    ) -> Result<RewriteOutput, DecodeError> {
+        check_requirements(self.requirements, limits)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.requirements.output_bytes)
+            .map_err(|_| {
+                DecodeError::limited(DecodeLimit::Allocation {
+                    requested: self.requirements.output_bytes,
+                })
+            })?;
+        emit_date_time_format_canonical(&mut bytes, self.write)?;
+        if bytes.len() != self.requirements.output_bytes {
+            return Err(DecodeError::invalid());
+        }
+        verify_date_time_format_candidate(
+            &bytes,
+            self.write,
+            self.verify_options,
+            DateTimeFormatLayout {
+                fields: 2,
+                max_depth: 0,
+                span: None,
+            },
+            self.requirements,
+            bytes
+                .len()
+                .checked_add(bytes.len())
+                .ok_or_else(DecodeError::invalid)?,
+        )?;
+        Ok(RewriteOutput {
+            bytes,
+            report: report_from_requirements(self.requirements),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DateTimeFieldSpan {
+    start: usize,
+    end: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DateTimeFormatLayout {
+    fields: usize,
+    max_depth: u32,
+    span: Option<DateTimeFieldSpan>,
+}
+
+/// Strictly decode one native DateTime `FormatStructArchive`.
+pub(crate) fn decode_date_time_format(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<DateTimeFormatSnapshot<'_>, DecodeError> {
+    Ok(decode_date_time_format_with_report(source, options)?.0)
+}
+
+/// Strictly decode one native DateTime format and return measured wire use.
+pub(crate) fn decode_date_time_format_with_report(
+    source: &[u8],
+    options: DecodeOptions,
+) -> Result<(DateTimeFormatSnapshot<'_>, DecodeReport), DecodeError> {
+    let (snapshot, _layout, report) = scan_date_time_format(source, options)?;
+    Ok((snapshot, report))
+}
+
+/// Prepare a source-preserving native DateTime format rewrite.
+pub(crate) fn prepare_date_time_format_rewrite<'source>(
+    source: &'source [u8],
+    write: DateTimeFormatWrite<'source>,
+    options: DecodeOptions,
+) -> Result<PreparedDateTimeFormatRewrite<'source>, DecodeError> {
+    validate_date_time_format_write(write, options.max_text_bytes)?;
+    let (snapshot, layout, source_report) = scan_date_time_format(source, options)?;
+    let output_bytes = date_time_format_rewrite_output_len(source, layout, write)?;
+    let old_selected_bytes = date_time_format_selected_source_len(layout)?;
+    let new_selected_bytes = date_time_format_field_len(write.date_time_format)?;
+    let source_parse_work = source_report
+        .work_bytes()
+        .checked_sub(source.len())
+        .ok_or_else(DecodeError::invalid)?;
+    let candidate_parse_work = source_parse_work
+        .checked_sub(old_selected_bytes)
+        .and_then(|work| work.checked_add(new_selected_bytes))
+        .ok_or_else(DecodeError::invalid)?;
+    let candidate_work = candidate_parse_work
+        .checked_add(output_bytes)
+        .ok_or_else(DecodeError::invalid)?;
+    let text_bytes = source_report
+        .text_bytes()
+        .checked_sub(snapshot.date_time_format().len())
+        .and_then(|text| text.checked_add(write.date_time_format().len()))
+        .ok_or_else(DecodeError::invalid)?;
+    let requirements = RewriteExecutionRequirements {
+        output_bytes,
+        fields: layout.fields,
+        work_bytes: source_report
+            .work_bytes()
+            .checked_add(output_bytes)
+            .and_then(|work| work.checked_add(candidate_work))
+            .ok_or_else(DecodeError::invalid)?,
+        max_depth: layout.max_depth,
+        references: 0,
+        items: 0,
+        text_bytes,
+        allocations: 1,
+        retained_bytes: source
+            .len()
+            .checked_add(output_bytes)
+            .ok_or_else(DecodeError::invalid)?,
+        scratch_bytes: 0,
+    };
+    check_options(requirements, options)?;
+    Ok(PreparedDateTimeFormatRewrite {
+        source,
+        layout,
+        write,
+        requirements,
+        candidate_work,
+        verify_options: options,
+    })
+}
+
+/// Rewrite one native DateTime format while preserving unknown source fields.
+pub(crate) fn rewrite_date_time_format(
+    source: &[u8],
+    write: DateTimeFormatWrite<'_>,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_date_time_format_rewrite(source, write, options)?;
+    prepared.execute(RewriteExecutionLimits::exact(
+        prepared.execution_requirements(),
+    ))
+}
+
+/// Prepare a canonical native DateTime format payload for a new list entry.
+pub(crate) fn prepare_date_time_format_write<'source>(
+    write: DateTimeFormatWrite<'source>,
+    options: DecodeOptions,
+) -> Result<PreparedDateTimeFormatWrite<'source>, DecodeError> {
+    validate_date_time_format_write(write, options.max_text_bytes)?;
+    let output_bytes = date_time_format_canonical_output_len(write)?;
+    let requirements = RewriteExecutionRequirements {
+        output_bytes,
+        fields: 2,
+        work_bytes: output_bytes
+            .checked_mul(3)
+            .ok_or_else(DecodeError::invalid)?,
+        max_depth: 0,
+        references: 0,
+        items: 0,
+        text_bytes: write.date_time_format().len(),
+        allocations: 1,
+        retained_bytes: output_bytes,
+        scratch_bytes: 0,
+    };
+    check_options(requirements, options)?;
+    Ok(PreparedDateTimeFormatWrite {
+        write,
+        requirements,
+        verify_options: options,
+    })
+}
+
+/// Encode a canonical native DateTime format payload for a new list entry.
+pub(crate) fn canonical_date_time_format(
+    write: DateTimeFormatWrite<'_>,
+    options: DecodeOptions,
+) -> Result<RewriteOutput, DecodeError> {
+    let prepared = prepare_date_time_format_write(write, options)?;
+    prepared.execute(RewriteExecutionLimits::exact(
+        prepared.execution_requirements(),
+    ))
+}
+
+fn scan_date_time_format<'source>(
+    source: &'source [u8],
+    options: DecodeOptions,
+) -> Result<
+    (
+        DateTimeFormatSnapshot<'source>,
+        DateTimeFormatLayout,
+        DecodeReport,
+    ),
+    DecodeError,
+> {
+    let mut budget = Budget::new(source, options)?;
+    let mut format_type = None;
+    let mut date_time_format = None;
+    let mut span = None;
+    let mut offset = 0usize;
+    while offset < source.len() {
+        let field = parse_one_field_limited(source, offset, 0, options.recursion_limit)?;
+        budget.field(field.raw.len(), 0)?;
+        budget.nested_fields(
+            field.nested_fields,
+            field.nested_work_bytes,
+            field.nested_max_depth,
+        )?;
+        match field.number {
+            FORMAT_TYPE_FIELD => {
+                if field.wire != 0 || format_type.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                format_type =
+                    Some(u32::try_from(field.known_varint()?).map_err(|_| DecodeError::invalid())?);
+            },
+            FORMAT_DATE_TIME_FORMAT_FIELD => {
+                if field.wire != 2 || date_time_format.is_some() {
+                    return Err(DecodeError::invalid());
+                }
+                let payload = field.payload.ok_or_else(DecodeError::invalid)?;
+                budget.text(payload.len())?;
+                let value = str::from_utf8(payload).map_err(|_| DecodeError::invalid())?;
+                validate_date_time_pattern(value)?;
+                date_time_format = Some(value);
+                span = Some(DateTimeFieldSpan {
+                    start: offset,
+                    end: field.end,
+                });
+            },
+            number if number <= NUMBER_FORMAT_MAX_KNOWN_FIELD => {
+                // Every other TSK.FormatStructArchive field belongs to a
+                // different display family. Treating one as opaque would let
+                // a caller publish another format through the DateTime route.
+                return Err(DecodeError::invalid());
+            },
+            _ => budget.mark_unknown(),
+        }
+        offset = field.end;
+    }
+    let format_type = format_type.ok_or_else(DecodeError::invalid)?;
+    if format_type != NATIVE_DATE_TIME_FORMAT_TYPE {
+        return Err(DecodeError::invalid());
+    }
+    let date_time_format = date_time_format.ok_or_else(DecodeError::invalid)?;
+    let snapshot = DateTimeFormatSnapshot {
+        source,
+        format_type,
+        date_time_format,
+    };
+    buffa_date_time_format_parity(source, snapshot, &mut budget)?;
+    let report = budget.finish(0);
+    let layout = DateTimeFormatLayout {
+        fields: report.fields(),
+        max_depth: report.max_depth(),
+        span,
+    };
+    Ok((snapshot, layout, report))
+}
+
+fn buffa_date_time_format_parity(
+    source: &[u8],
+    snapshot: DateTimeFormatSnapshot<'_>,
+    budget: &mut Budget,
+) -> Result<(), DecodeError> {
+    let options = budget.options;
+    let view: date_time_projection::FormatStructArchiveLazyView<'_> = BuffaDecodeOptions::new()
+        .with_max_message_size(options.max_message_bytes)
+        .with_unknown_field_limit(options.max_fields)
+        .with_element_memory_limit(0)
+        .with_recursion_limit(options.recursion_limit)
+        .decode_lazy_view(source)
+        .map_err(|_| DecodeError::invalid())?;
+    if view.format_type != Some(snapshot.format_type)
+        || view.date_time_format != Some(snapshot.date_time_format)
+    {
+        return Err(DecodeError::invalid());
+    }
+    budget.work(source.len())?;
+    Ok(())
+}
+
+fn validate_date_time_pattern(value: &str) -> Result<(), DecodeError> {
+    if value.trim().is_empty()
+        || value.len() > MAX_DATE_TIME_PATTERN_BYTES
+        || value.chars().any(char::is_control)
+    {
+        return Err(DecodeError::invalid());
+    }
+    Ok(())
+}
+
+fn validate_date_time_format_write(
+    write: DateTimeFormatWrite<'_>,
+    max_text_bytes: usize,
+) -> Result<(), DecodeError> {
+    if write.date_time_format().len() > max_text_bytes {
+        return Err(DecodeError::limited(DecodeLimit::Text {
+            observed: write.date_time_format().len(),
+            maximum: max_text_bytes,
+        }));
+    }
+    validate_date_time_pattern(write.date_time_format())
+}
+
+fn date_time_format_field_len(value: &str) -> Result<usize, DecodeError> {
+    length_field_len(FORMAT_DATE_TIME_FORMAT_FIELD, value.len())
+}
+
+fn date_time_format_canonical_output_len(
+    write: DateTimeFormatWrite<'_>,
+) -> Result<usize, DecodeError> {
+    number_format_field_len(FORMAT_TYPE_FIELD, u64::from(NATIVE_DATE_TIME_FORMAT_TYPE))?
+        .checked_add(date_time_format_field_len(write.date_time_format())?)
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn date_time_format_selected_source_len(
+    layout: DateTimeFormatLayout,
+) -> Result<usize, DecodeError> {
+    let span = layout.span.ok_or_else(DecodeError::invalid)?;
+    span.end
+        .checked_sub(span.start)
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn date_time_format_rewrite_output_len(
+    source: &[u8],
+    layout: DateTimeFormatLayout,
+    write: DateTimeFormatWrite<'_>,
+) -> Result<usize, DecodeError> {
+    let old = date_time_format_selected_source_len(layout)?;
+    let new = date_time_format_field_len(write.date_time_format())?;
+    source
+        .len()
+        .checked_sub(old)
+        .and_then(|length| length.checked_add(new))
+        .ok_or_else(DecodeError::invalid)
+}
+
+fn emit_date_time_format_canonical(
+    output: &mut Vec<u8>,
+    write: DateTimeFormatWrite<'_>,
+) -> Result<(), DecodeError> {
+    emit_varint_field(
+        output,
+        FORMAT_TYPE_FIELD,
+        u64::from(NATIVE_DATE_TIME_FORMAT_TYPE),
+    )?;
+    emit_len_field(
+        output,
+        FORMAT_DATE_TIME_FORMAT_FIELD,
+        write.date_time_format().as_bytes(),
+    )
+}
+
+fn emit_date_time_format_rewrite(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    layout: DateTimeFormatLayout,
+    write: DateTimeFormatWrite<'_>,
+) -> Result<(), DecodeError> {
+    let span = layout.span.ok_or_else(DecodeError::invalid)?;
+    output.extend_from_slice(source.get(..span.start).ok_or_else(DecodeError::invalid)?);
+    emit_len_field(
+        output,
+        FORMAT_DATE_TIME_FORMAT_FIELD,
+        write.date_time_format().as_bytes(),
+    )?;
+    output.extend_from_slice(source.get(span.end..).ok_or_else(DecodeError::invalid)?);
+    Ok(())
+}
+
+fn verify_date_time_format_candidate(
+    source: &[u8],
+    write: DateTimeFormatWrite<'_>,
+    options: DecodeOptions,
+    layout: DateTimeFormatLayout,
+    requirements: RewriteExecutionRequirements,
+    candidate_work: usize,
+) -> Result<(), DecodeError> {
+    let (snapshot, report) = decode_date_time_format_with_report(source, options)?;
+    if report.fields() != layout.fields
+        || report.work_bytes() != candidate_work
+        || report.max_depth() != layout.max_depth
+        || report.text_bytes() != requirements.text_bytes
+        || DateTimeFormatWrite::from_snapshot(snapshot) != write
     {
         return Err(DecodeError::invalid());
     }

@@ -472,19 +472,10 @@ impl Package {
         budget.charge_package_source(catalog, native_path(patch.path))?;
         budget.charge_output(target_owner.as_ref().len(), native_path(patch.path))?;
         budget.charge_allocations(2, native_path(patch.path))?;
-        let transaction_work = target_owner
-            .as_ref()
-            .len()
-            .checked_mul(2)
-            .and_then(|amount| {
-                catalog
-                    .package()
-                    .iter()
-                    .count()
-                    .checked_mul(1024)
-                    .and_then(|catalog_work| amount.checked_add(catalog_work))
-            })
-            .ok_or(Error::Verification)?;
+        let transaction_work = apply_transaction_work(
+            target_owner.as_ref().len(),
+            catalog.package().iter().count(),
+        )?;
         budget.charge_transaction_work(transaction_work, native_path(patch.path))?;
         budget
             .charge_candidate_input_bytes(target_owner.as_ref().len(), native_path(patch.path))?;
@@ -523,6 +514,26 @@ impl Package {
             },
         })
     }
+}
+
+/// Calculate the conservative work charged while applying an exact patch.
+///
+/// Applying a retained target owner scans/writes its bytes twice and also
+/// walks the source catalog.  Keep both products and their sum checked: a
+/// hostile in-memory package must fail closed rather than turn arithmetic
+/// overflow into an under-accounted transaction.  The apply path has no
+/// measured resource value from which to construct a more specific limit
+/// observation, so the existing verification failure is the contract used by
+/// the other checked publication-work calculations below.
+fn apply_transaction_work(target_bytes: usize, catalog_entries: usize) -> Result<usize, Error> {
+    target_bytes
+        .checked_mul(2)
+        .and_then(|target_work| {
+            catalog_entries
+                .checked_mul(1024)
+                .and_then(|catalog_work| target_work.checked_add(catalog_work))
+        })
+        .ok_or(Error::Verification)
 }
 
 fn no_op_commit(
@@ -1039,4 +1050,36 @@ fn changed_member_count(
                 .is_some_and(|candidate| candidate.data() != entry.data())
         })
         .count()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, apply_transaction_work};
+
+    #[test]
+    fn apply_transaction_work_rejects_checked_overflow() {
+        let half = usize::MAX / 2;
+
+        // The target-owner product must be checked independently.
+        assert_eq!(
+            apply_transaction_work(half + 1, 0),
+            Err(Error::Verification)
+        );
+
+        // The catalog-entry product must be checked independently.
+        assert_eq!(
+            apply_transaction_work(0, usize::MAX / 1024 + 1),
+            Err(Error::Verification)
+        );
+
+        // Each product can fit while their aggregate still overflows.
+        assert_eq!(apply_transaction_work(half, 1), Err(Error::Verification));
+    }
+
+    #[test]
+    fn apply_transaction_work_accepts_exact_boundary_without_saturation() {
+        let half = usize::MAX / 2;
+        let expected = half.checked_mul(2).expect("half of usize::MAX fits");
+        assert_eq!(apply_transaction_work(half, 0), Ok(expected));
+    }
 }

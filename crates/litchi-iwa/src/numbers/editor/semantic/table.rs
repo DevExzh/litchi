@@ -86,6 +86,33 @@ fn commit_focused_control_format(
     NumbersEditor::from_bytes(&bytes)
 }
 
+/// Apply the legacy native control writer to an editor-owned package.
+///
+/// Packages produced by `NumbersDocumentBuilder` intentionally do not carry
+/// an exact-source owner for the interactive-control graph yet. Keep the
+/// focused owner strict for exact packages, while allowing these in-memory
+/// compatibility packages to acquire the same canonical control/list state
+/// through the existing transactional writer.
+fn commit_compatibility_control_format(
+    editor: &mut NumbersEditor,
+    table_id: u64,
+    row: usize,
+    column: usize,
+    format: &DataFormat,
+) -> Result<()> {
+    let mut staged = editor.package.clone();
+    cell_data_format::set_cell_data_format(&mut staged, table_id, row, column, format)?;
+    staged.validate()?;
+    let verified = NumbersEditor::from_package(staged)?;
+    if cell_data_format::cell_data_format(&verified.package, table_id, row, column)? != *format {
+        return Err(Error::InvalidFormat(
+            "Numbers compatibility cell-control write failed package validation".to_owned(),
+        ));
+    }
+    *editor = verified;
+    Ok(())
+}
+
 enum FocusedCommentReplacement {
     Published(NumbersEditor),
     LegacyFallback,
@@ -104,23 +131,24 @@ fn replace_cell_comment_with_focused_owner(
     column: usize,
     text: &str,
 ) -> Result<FocusedCommentReplacement> {
+    // A package built by the legacy editor has no exact physical owner for
+    // this graph.  Select the compatibility host before probing the focused
+    // owner; once an exact source is admitted, every structural/ownership
+    // failure below remains fail-closed.
+    if !editor.package.source_is_exact() {
+        return Ok(FocusedCommentReplacement::LegacyFallback);
+    }
     let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
     let position =
         litchi_numbers::table::CellPosition::try_from_usize(row, column).map_err(|error| {
             Error::InvalidFormat(format!("invalid Numbers comment coordinate: {error}"))
         })?;
     let source_bytes = editor.to_bytes()?;
-    let source = match FocusedNumbersPackage::from_bytes(&source_bytes) {
-        Ok(source) => source,
-        Err(litchi_numbers::PackageError::InvalidFormat(_)) => {
-            return Ok(FocusedCommentReplacement::LegacyFallback);
-        },
-        Err(error) => {
-            return Err(Error::InvalidFormat(format!(
-                "focused Numbers comment source validation failed: {error}"
-            )));
-        },
-    };
+    let source = FocusedNumbersPackage::from_bytes(&source_bytes).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "focused Numbers comment source validation failed: {error}"
+        ))
+    })?;
     let commit = match source.set_table_cell_comment(sheet, table, position, text) {
         Ok(commit) => commit,
         Err(TableCellCommentError::CommentNotFound { .. })
@@ -152,15 +180,12 @@ fn replace_cell_comment_with_focused_owner(
     Ok(FocusedCommentReplacement::Published(verified))
 }
 
-enum FocusedCommentReplySource {
-    Ready {
-        source: FocusedNumbersPackage,
-        sheet: litchi_numbers::SheetSelector<'static>,
-        table: litchi_numbers::TableSelector<'static>,
-        position: litchi_numbers::table::CellPosition,
-        source_bytes: Vec<u8>,
-    },
-    LegacyFallback,
+struct FocusedCommentReplySource {
+    source: FocusedNumbersPackage,
+    sheet: litchi_numbers::SheetSelector<'static>,
+    table: litchi_numbers::TableSelector<'static>,
+    position: litchi_numbers::table::CellPosition,
+    source_bytes: Vec<u8>,
 }
 
 enum FocusedCommentReplyPublication {
@@ -192,18 +217,12 @@ fn focused_comment_reply_source(
             Error::InvalidFormat(format!("invalid Numbers comment-reply coordinate: {error}"))
         })?;
     let source_bytes = editor.to_bytes()?;
-    let source = match FocusedNumbersPackage::from_bytes(&source_bytes) {
-        Ok(source) => source,
-        Err(litchi_numbers::PackageError::InvalidFormat(_)) => {
-            return Ok(FocusedCommentReplySource::LegacyFallback);
-        },
-        Err(error) => {
-            return Err(Error::InvalidFormat(format!(
-                "focused Numbers comment-reply source validation failed: {error}"
-            )));
-        },
-    };
-    Ok(FocusedCommentReplySource::Ready {
+    let source = FocusedNumbersPackage::from_bytes(&source_bytes).map_err(|error| {
+        Error::InvalidFormat(format!(
+            "focused Numbers comment-reply source validation failed: {error}"
+        ))
+    })?;
+    Ok(FocusedCommentReplySource {
         source,
         sheet,
         table,
@@ -250,20 +269,20 @@ fn focused_add_cell_comment_reply(
     column: usize,
     text: &str,
 ) -> Result<FocusedCommentReplyPublication> {
-    let before = match cell_comment_replies_in_package(editor.package(), table_id, row, column) {
-        Ok(replies) => replies,
-        Err(_) => return Ok(FocusedCommentReplyPublication::LegacyFallback),
-    };
-    let FocusedCommentReplySource::Ready {
+    // Source-built editor packages are an explicitly supported compatibility
+    // category.  Route them before focused validation so an exact source's
+    // InvalidSource result can never be converted into a legacy write.
+    if !editor.package.source_is_exact() {
+        return Ok(FocusedCommentReplyPublication::LegacyFallback);
+    }
+    let before = cell_comment_replies_in_package(editor.package(), table_id, row, column)?;
+    let FocusedCommentReplySource {
         source,
         sheet,
         table,
         position,
         source_bytes,
-    } = focused_comment_reply_source(editor, table_id, row, column)?
-    else {
-        return Ok(FocusedCommentReplyPublication::LegacyFallback);
-    };
+    } = focused_comment_reply_source(editor, table_id, row, column)?;
     let commit = match source.add_table_cell_comment_reply(sheet, table, position, text) {
         Ok(commit) => commit,
         Err(error) if focused_comment_reply_can_fallback(error) => {
@@ -297,10 +316,10 @@ fn focused_set_cell_comment_reply(
     reply_storage_object_id: u64,
     text: &str,
 ) -> Result<FocusedCommentReplyPublication> {
-    let before = match cell_comment_replies_in_package(editor.package(), table_id, row, column) {
-        Ok(replies) => replies,
-        Err(_) => return Ok(FocusedCommentReplyPublication::LegacyFallback),
-    };
+    if !editor.package.source_is_exact() {
+        return Ok(FocusedCommentReplyPublication::LegacyFallback);
+    }
+    let before = cell_comment_replies_in_package(editor.package(), table_id, row, column)?;
     let Some(ordinal) = before
         .iter()
         .position(|reply| reply.storage_id.get() == reply_storage_object_id)
@@ -309,16 +328,13 @@ fn focused_set_cell_comment_reply(
     };
     let index = CommentReplyIndex::try_from_usize(ordinal)
         .map_err(|_| Error::InvalidFormat("Numbers comment-reply ordinal overflow".to_owned()))?;
-    let FocusedCommentReplySource::Ready {
+    let FocusedCommentReplySource {
         source,
         sheet,
         table,
         position,
         source_bytes,
-    } = focused_comment_reply_source(editor, table_id, row, column)?
-    else {
-        return Ok(FocusedCommentReplyPublication::LegacyFallback);
-    };
+    } = focused_comment_reply_source(editor, table_id, row, column)?;
     let commit = match source.set_table_cell_comment_reply(sheet, table, position, index, text) {
         Ok(commit) => commit,
         Err(error) if focused_comment_reply_can_fallback(error) => {
@@ -355,10 +371,10 @@ fn focused_remove_cell_comment_reply(
     column: usize,
     reply_storage_object_id: u64,
 ) -> Result<FocusedCommentReplyPublication> {
-    let before = match cell_comment_replies_in_package(editor.package(), table_id, row, column) {
-        Ok(replies) => replies,
-        Err(_) => return Ok(FocusedCommentReplyPublication::LegacyFallback),
-    };
+    if !editor.package.source_is_exact() {
+        return Ok(FocusedCommentReplyPublication::LegacyFallback);
+    }
+    let before = cell_comment_replies_in_package(editor.package(), table_id, row, column)?;
     let Some(ordinal) = before
         .iter()
         .position(|reply| reply.storage_id.get() == reply_storage_object_id)
@@ -367,16 +383,13 @@ fn focused_remove_cell_comment_reply(
     };
     let index = CommentReplyIndex::try_from_usize(ordinal)
         .map_err(|_| Error::InvalidFormat("Numbers comment-reply ordinal overflow".to_owned()))?;
-    let FocusedCommentReplySource::Ready {
+    let FocusedCommentReplySource {
         source,
         sheet,
         table,
         position,
         source_bytes,
-    } = focused_comment_reply_source(editor, table_id, row, column)?
-    else {
-        return Ok(FocusedCommentReplyPublication::LegacyFallback);
-    };
+    } = focused_comment_reply_source(editor, table_id, row, column)?;
     let commit = match source.remove_table_cell_comment_reply(sheet, table, position, index) {
         Ok(commit) => commit,
         Err(error) if focused_comment_reply_can_fallback(error) => {
@@ -467,10 +480,18 @@ impl NumbersEditor {
         let source_built = !self.package.source_is_exact();
         let current = cell_data_format::cell_data_format(&self.package, table_id, row, column)?;
         if let Ok(control) = CellControl::try_from(format.clone()) {
-            *self = commit_focused_control_format(self, table_id, row, column, Some(control))?;
+            if source_built {
+                commit_compatibility_control_format(self, table_id, row, column, &format)?;
+            } else {
+                *self = commit_focused_control_format(self, table_id, row, column, Some(control))?;
+            }
             return Ok(());
         }
         if CellControl::try_from(current).is_ok() {
+            if source_built {
+                commit_compatibility_control_format(self, table_id, row, column, &format)?;
+                return Ok(());
+            }
             let mut staged = commit_focused_control_format(self, table_id, row, column, None)?;
             cell_data_format::set_cell_data_format(
                 &mut staged.package,

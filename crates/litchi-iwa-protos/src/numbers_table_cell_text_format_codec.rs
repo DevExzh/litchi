@@ -252,8 +252,12 @@ mod tests {
     }
 
     fn field(number: u32, value: u32) -> Vec<u8> {
+        varint_field(number, u64::from(value))
+    }
+
+    fn varint_field(number: u32, value: u64) -> Vec<u8> {
         let mut output = key(number, 0);
-        push_varint(&mut output, u64::from(value));
+        push_varint(&mut output, value);
         output
     }
 
@@ -456,6 +460,294 @@ mod tests {
         ];
         for source in malformed {
             assert!(decode_text_format(&source, options()).is_err());
+        }
+    }
+
+    #[test]
+    fn text_format_accepts_every_unknown_wire_kind_and_high_field_numbers() {
+        const MAX_FIELD_NUMBER: u32 = 0x1fff_ffff;
+
+        let unknown_varint = varint_field(46, 7);
+        let unknown_fixed64 = fixed64_field(47, [0x89, 0xab, 0xcd, 0xef, 0x10, 0x32, 0x54, 0x76]);
+        let unknown_length = length_field(48, &[0x00, 0xff, 0x80]);
+        let unknown_group = group_field(49, &varint_field(50, 9));
+        let high_unknown = varint_field(MAX_FIELD_NUMBER, 1);
+
+        // Unknown records are valid only when their framing is structurally
+        // complete. Their order, wire kind, and high field number must not
+        // affect the selected Text discriminator.
+        let mut source = unknown_varint.clone();
+        source.extend_from_slice(&unknown_fixed64);
+        source.extend_from_slice(&unknown_length);
+        source.extend_from_slice(&native_text());
+        source.extend_from_slice(&unknown_group);
+        source.extend_from_slice(&high_unknown);
+
+        let (snapshot, report) =
+            decode_text_format_with_report(&source, options()).expect("unknown wire kinds");
+        assert_eq!(snapshot.raw(), source.as_slice());
+        assert_eq!(snapshot.format_type(), NATIVE_TEXT_FORMAT_TYPE);
+        assert_eq!(report.input_bytes(), source.len());
+        assert_eq!(report.fields(), 8);
+        assert_eq!(report.max_depth(), 1);
+        assert!(report.work_bytes() >= source.len() * 2);
+
+        let rewritten = rewrite_text_format(&source, TextFormatWrite::new(), options())
+            .expect("source-preserving unknown wire rewrite");
+        assert_eq!(rewritten.bytes(), source.as_slice());
+        for record in [
+            unknown_varint,
+            unknown_fixed64,
+            unknown_length,
+            unknown_group,
+            high_unknown,
+        ] {
+            assert!(
+                rewritten
+                    .bytes()
+                    .windows(record.len())
+                    .any(|window| window == record.as_slice()),
+                "unknown record was not retained"
+            );
+        }
+    }
+
+    #[test]
+    fn text_format_accepts_overlong_unknown_scalar_values_and_preserves_them() {
+        // The key is canonical, but the scalar value `1` uses two bytes. This
+        // is the deliberately opaque compatibility policy: unknown scalar
+        // values are accepted and source-authoritative, unlike selected field
+        // values, which must use canonical varints.
+        let unknown_root = [0xa0, 0x06, 0x81, 0x00];
+        let unknown_nested = [0xa3, 0x06, 0xa8, 0x06, 0x81, 0x00, 0xa4, 0x06];
+        let mut source = unknown_root.to_vec();
+        source.extend_from_slice(&native_text());
+        source.extend_from_slice(&unknown_nested);
+
+        let snapshot = decode_text_format(&source, options()).expect("overlong unknown values");
+        assert_eq!(snapshot.raw(), source.as_slice());
+        let rewritten =
+            rewrite_text_format(&source, TextFormatWrite::from_snapshot(snapshot), options())
+                .expect("preserve overlong unknown values");
+        assert_eq!(rewritten.bytes(), source.as_slice());
+        assert!(
+            rewritten
+                .bytes()
+                .windows(unknown_root.len())
+                .any(|window| window == unknown_root)
+        );
+        assert!(
+            rewritten
+                .bytes()
+                .windows(unknown_nested.len())
+                .any(|window| window == unknown_nested)
+        );
+    }
+
+    #[test]
+    fn text_format_rejects_noncanonical_unknown_keys_and_lengths() {
+        let malformed = [
+            // Field 100 key (`800`) with a redundant zero continuation byte.
+            vec![0xa0, 0x86, 0x00, 0x01],
+            // Field 102 length-delimited value with an overlong zero length.
+            vec![0xb2, 0x06, 0x80, 0x00],
+            // The same noncanonical length with one opaque payload byte.
+            vec![0xb2, 0x06, 0x81, 0x00, 0x7f],
+            // Noncanonical nested key inside an otherwise balanced group.
+            vec![0xa3, 0x06, 0xa8, 0x86, 0x00, 0x01, 0xa4, 0x06],
+            // Noncanonical nested length inside a balanced group.
+            vec![0xa3, 0x06, 0xb2, 0x06, 0x80, 0x00, 0xa4, 0x06],
+        ];
+        for unknown in malformed {
+            let mut source = unknown;
+            source.extend_from_slice(&native_text());
+            assert!(
+                decode_text_format(&source, options()).is_err(),
+                "noncanonical unknown framing was accepted: {source:02x?}"
+            );
+        }
+    }
+
+    #[test]
+    fn text_format_rejects_all_known_sibling_numbers_and_wire_kinds() {
+        for number in 2..=45 {
+            for extra in [
+                varint_field(number, 0),
+                fixed64_field(number, [0; 8]),
+                length_field(number, &[0]),
+                fixed32_field(number, [0; 4]),
+                group_field(number, &[]),
+            ] {
+                let mut source = native_text();
+                source.extend_from_slice(&extra);
+                assert!(
+                    decode_text_format(&source, options()).is_err(),
+                    "known sibling field {number} with wire {} was accepted",
+                    extra.first().copied().unwrap_or_default() & 7
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn text_format_rejects_every_invalid_wire_and_malformed_group_shape() {
+        let mut malformed = Vec::new();
+        // Wire types 6 and 7 are reserved/invalid, while a top-level end-group
+        // can never close a group owned by this message.
+        malformed.push(key(46, 4));
+        malformed.push(key(46, 6));
+        malformed.push(key(46, 7));
+
+        // Truncated fixed-width and length-delimited values.
+        malformed.push([key(46, 1), vec![0; 7]].concat());
+        malformed.push([key(46, 5), vec![0; 3]].concat());
+        malformed.push([key(46, 2), vec![2, 0]].concat());
+
+        // Missing, mismatched, and nested-mismatched group ends.
+        malformed.push([key(46, 3), varint_field(47, 1)].concat());
+        malformed.push([key(46, 3), varint_field(47, 1), key(48, 4)].concat());
+        malformed.push([key(46, 3), key(47, 3), key(46, 4), key(47, 4)].concat());
+        malformed.push([key(46, 3), key(47, 3), key(48, 4), key(47, 4)].concat());
+
+        for extra in malformed {
+            let mut source = native_text();
+            source.extend_from_slice(&extra);
+            assert!(
+                decode_text_format(&source, options()).is_err(),
+                "malformed group/wire shape was accepted: {source:02x?}"
+            );
+        }
+    }
+
+    #[test]
+    fn text_format_decode_and_rewrite_budgets_are_inclusive_and_tight() {
+        let unknown_group = group_field(49, &varint_field(50, 9));
+        let mut source = vec![0xa0, 0x06, 0x81, 0x00];
+        source.extend_from_slice(&native_text());
+        source.extend_from_slice(&unknown_group);
+
+        let (_, source_report) =
+            decode_text_format_with_report(&source, options()).expect("source report");
+        let source_options = DecodeOptions::new(
+            source.len(),
+            source.len(),
+            source_report.fields(),
+            source_report.work_bytes(),
+            source_report.max_depth().max(1),
+            0,
+            0,
+            0,
+        );
+        // Every decode ceiling is inclusive at the measured boundary.
+        decode_text_format(&source, source_options).expect("exact decode limits");
+        assert!(matches!(
+            decode_text_format(
+                &source,
+                DecodeOptions::new(
+                    source.len() - 1,
+                    source.len(),
+                    source_report.fields(),
+                    source_report.work_bytes(),
+                    source_report.max_depth().max(1),
+                    0,
+                    0,
+                    0,
+                )
+            )
+            .expect_err("input minus one")
+            .resource_limit(),
+            Some(DecodeLimit::InputBytes { .. })
+        ));
+        assert!(matches!(
+            decode_text_format(
+                &source,
+                DecodeOptions::new(
+                    source.len(),
+                    source.len(),
+                    source_report.fields() - 1,
+                    source_report.work_bytes(),
+                    source_report.max_depth().max(1),
+                    0,
+                    0,
+                    0,
+                )
+            )
+            .expect_err("fields minus one")
+            .resource_limit(),
+            Some(DecodeLimit::Fields { .. })
+        ));
+        assert!(matches!(
+            decode_text_format(
+                &source,
+                DecodeOptions::new(
+                    source.len(),
+                    source.len(),
+                    source_report.fields(),
+                    source_report.work_bytes() - 1,
+                    source_report.max_depth().max(1),
+                    0,
+                    0,
+                    0,
+                )
+            )
+            .expect_err("work minus one")
+            .resource_limit(),
+            Some(DecodeLimit::Work { .. })
+        ));
+        assert!(matches!(
+            decode_text_format(
+                &source,
+                DecodeOptions::new(
+                    source.len(),
+                    source.len(),
+                    source_report.fields(),
+                    source_report.work_bytes(),
+                    source_report.max_depth() - 1,
+                    0,
+                    0,
+                    0,
+                )
+            )
+            .expect_err("depth minus one")
+            .resource_limit(),
+            Some(DecodeLimit::Nesting { .. })
+        ));
+
+        let broad = DecodeOptions::new(
+            source.len(),
+            source.len(),
+            source_report.fields().checked_mul(2).expect("fields"),
+            source_report
+                .work_bytes()
+                .checked_mul(2)
+                .and_then(|work| work.checked_add(source.len()))
+                .expect("work"),
+            source_report.max_depth().max(1),
+            0,
+            0,
+            0,
+        );
+        let prepared = prepare_text_format_rewrite(&source, TextFormatWrite::new(), broad)
+            .expect("prepare exact rewrite limits");
+        let requirements = prepared.execution_requirements();
+        prepared
+            .execute(RewriteExecutionLimits::exact(requirements))
+            .expect("exact rewrite limits");
+
+        for limits in [
+            RewriteExecutionLimits::exact(requirements)
+                .with_output_bytes(requirements.output_bytes() - 1),
+            RewriteExecutionLimits::exact(requirements).with_fields(requirements.fields() - 1),
+            RewriteExecutionLimits::exact(requirements)
+                .with_work_bytes(requirements.work_bytes() - 1),
+            RewriteExecutionLimits::exact(requirements)
+                .with_retained_bytes(requirements.retained_bytes() - 1),
+            RewriteExecutionLimits::exact(requirements).with_allocations(0),
+        ] {
+            assert!(
+                prepared.execute(limits).is_err(),
+                "rewrite accepted one-below exact limits"
+            );
         }
     }
 

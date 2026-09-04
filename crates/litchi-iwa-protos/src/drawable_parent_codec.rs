@@ -736,7 +736,7 @@ mod tests {
 
     fn varint_field(field: u32, value: u64) -> Vec<u8> {
         let mut output = Vec::new();
-        push_varint(&mut output, (u64::from(field) << 3) | 0);
+        push_varint(&mut output, u64::from(field) << 3);
         push_varint(&mut output, value);
         output
     }

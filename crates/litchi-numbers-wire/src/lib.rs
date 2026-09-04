@@ -365,6 +365,40 @@ impl BncCell {
         }
     }
 
+    /// Reports whether this cell has one of the value shapes currently
+    /// admitted by the focused Date & Time display-format owner.
+    ///
+    /// The predicate intentionally distinguishes native type 9
+    /// (`rich-text-or-number`) from ordinary numeric type 2 and Currency's
+    /// alternate numeric type 10. Empty cells are admitted because they have
+    /// no value representation to convert. It is a wire-level admission
+    /// helper; the Numbers semantic crate still owns public policy and
+    /// transaction errors.
+    #[must_use]
+    pub fn is_date_time_format_compatible(&self) -> bool {
+        self.validate_date_time_value_shape().is_ok()
+    }
+
+    /// Reports whether all present BNC format metadata belongs to the
+    /// Date/Time family.
+    ///
+    /// Value-shape compatibility and metadata-family compatibility are kept
+    /// separate so callers can diagnose an unformatted value independently
+    /// from a cell that carries a generic secondary format reference. A
+    /// Date/Time cell may retain ordinary style/comment fields, but it cannot
+    /// carry a decimal, Currency, duration, text, control, or other format
+    /// identifier alongside its primary Date/Time reference.
+    #[must_use]
+    pub fn has_only_date_time_format_metadata(&self) -> bool {
+        self.fields.keys().all(|field| {
+            FORMAT_METADATA_FLAGS & *field == 0
+                || matches!(
+                    *field,
+                    CELL_FORMAT_KIND_FLAG | DATE_TIME_FORMAT_IDENTIFIER_FLAG
+                )
+        })
+    }
+
     /// Replaces the cell value with a number.
     ///
     /// # Errors
@@ -734,6 +768,216 @@ impl BncCell {
         };
         self.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
             .copy_from_slice(&explicit_flags.to_le_bytes());
+        Ok(())
+    }
+
+    /// Replaces only explicit Date/Time display metadata.
+    ///
+    /// Date/Time is a distinct native BNC family.  Unlike the compatibility
+    /// [`Self::set_data_format_identifier`] entry point, this operation never
+    /// converts the cell type or rewrites a scalar, formula, cache, or any
+    /// other field. It accepts the native value shapes owned by the Date/Time
+    /// adapter: Empty, a type-5 date, and a type-9 numeric cell (including a
+    /// numeric formula cache). Passing `None` removes the explicit Date/Time
+    /// marker, kind, and identifier while retaining the complete non-format
+    /// representation, including the original cell type and opaque tail.
+    ///
+    /// The operation is deliberately fail-closed.  An automatic Date/Time
+    /// tuple, a different format family, a secondary/control reference, a
+    /// reserved known field, an ambiguous value/cache shape, or a malformed
+    /// reference is rejected before any mutation.  The format identifier is
+    /// also required to be non-zero.
+    pub fn set_date_time_format_identifier_preserving_value(
+        &mut self,
+        identifier: Option<u32>,
+    ) -> Result<()> {
+        let current_identifier = self.validate_date_time_transition(identifier)?;
+        if current_identifier == identifier {
+            return Ok(());
+        }
+
+        self.fields.remove(&CELL_FORMAT_KIND_FLAG);
+        self.fields.remove(&DATE_TIME_FORMAT_IDENTIFIER_FLAG);
+        if let Some(identifier) = identifier {
+            self.fields.insert(
+                CELL_FORMAT_KIND_FLAG,
+                DATE_TIME_CELL_FORMAT_KIND.to_le_bytes().to_vec(),
+            );
+            self.fields.insert(
+                DATE_TIME_FORMAT_IDENTIFIER_FLAG,
+                identifier.to_le_bytes().to_vec(),
+            );
+        }
+        let explicit_flags = identifier.map_or(0, |_| EXPLICIT_DATE_TIME_FORMAT);
+        self.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
+            .copy_from_slice(&explicit_flags.to_le_bytes());
+        Ok(())
+    }
+
+    fn validate_date_time_transition(&self, identifier: Option<u32>) -> Result<Option<u32>> {
+        if identifier.is_some_and(|identifier| identifier == 0) {
+            return Err(Error::InvalidFormat(
+                "Date/Time format identifier must be non-zero".to_owned(),
+            ));
+        }
+        if self.prefix[0] != BNC_VERSION {
+            return Err(Error::InvalidFormat(
+                "Date/Time metadata requires a Numbers BNC v5 cell".to_owned(),
+            ));
+        }
+
+        for (&flag, bytes) in &self.fields {
+            let Some((_, expected_width)) = FIELD_LAYOUT
+                .iter()
+                .find(|(candidate, _)| *candidate == flag)
+            else {
+                return Err(Error::InvalidFormat(
+                    "Date/Time metadata encountered an unknown BNC field".to_owned(),
+                ));
+            };
+            if bytes.len() != *expected_width {
+                return Err(Error::InvalidFormat(
+                    "Date/Time metadata encountered a malformed BNC field".to_owned(),
+                ));
+            }
+        }
+
+        if self.fields.contains_key(&RESERVED_KNOWN_FIELD_FLAG) {
+            return Err(Error::InvalidFormat(
+                "Date/Time metadata cannot rewrite a reserved BNC field".to_owned(),
+            ));
+        }
+
+        // Date/Time has exactly one primary format reference.  In particular,
+        // the shared generic identifier is not a valid secondary reference,
+        // and interactive control metadata never accompanies this family.
+        if self.fields.keys().any(|flag| {
+            matches!(
+                *flag,
+                CONTROL_CELL_SPEC_FLAG
+                    | CELL_FORMAT_IDENTIFIER_FLAG
+                    | CURRENCY_FORMAT_IDENTIFIER_FLAG
+                    | DURATION_FORMAT_IDENTIFIER_FLAG
+                    | TEXT_FORMAT_IDENTIFIER_FLAG
+                    | CHECKBOX_FORMAT_IDENTIFIER_FLAG
+            )
+        }) {
+            return Err(Error::InvalidFormat(
+                "Date/Time metadata has an incompatible secondary or control reference".to_owned(),
+            ));
+        }
+
+        let marker = self.explicit_format_flags();
+        if marker != 0 && marker != EXPLICIT_DATE_TIME_FORMAT {
+            return Err(Error::InvalidFormat(
+                "Date/Time metadata has an incompatible explicit-format marker".to_owned(),
+            ));
+        }
+        let kind = self.u32_field(CELL_FORMAT_KIND_FLAG);
+        if kind.is_some_and(|kind| kind != DATE_TIME_CELL_FORMAT_KIND) {
+            return Err(Error::InvalidFormat(
+                "Date/Time metadata has an incompatible cell-format kind".to_owned(),
+            ));
+        }
+        let date_time_identifier = self.u32_field(DATE_TIME_FORMAT_IDENTIFIER_FLAG);
+        if date_time_identifier.is_some_and(|identifier| identifier == 0) {
+            return Err(Error::InvalidFormat(
+                "Date/Time format identifier must be non-zero".to_owned(),
+            ));
+        }
+        let current_identifier = match (marker, kind, date_time_identifier) {
+            (0, None, None) => None,
+            (EXPLICIT_DATE_TIME_FORMAT, Some(DATE_TIME_CELL_FORMAT_KIND), Some(identifier)) => {
+                Some(identifier)
+            },
+            // Marker zero is used by Numbers for automatic metadata.  The
+            // focused Date/Time owner has no proof that such a tuple is
+            // explicit, so it must not silently adopt or clear it.
+            (0, Some(DATE_TIME_CELL_FORMAT_KIND), Some(_)) => {
+                return Err(Error::InvalidFormat(
+                    "automatic Date/Time metadata is not owned by this transition".to_owned(),
+                ));
+            },
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "Date/Time metadata has an incomplete explicit tuple".to_owned(),
+                ));
+            },
+        };
+
+        self.validate_date_time_value_shape()?;
+        Ok(current_identifier)
+    }
+
+    fn validate_date_time_value_shape(&self) -> Result<()> {
+        let value_flags = self
+            .fields
+            .keys()
+            .fold(0, |flags, field| flags | (*field & VALUE_FLAGS));
+        match self.prefix[1] {
+            CELL_TYPE_EMPTY => {
+                if value_flags != 0 || self.cached_scalar()?.is_some() {
+                    return Err(Error::InvalidFormat(
+                        "Date/Time empty cell has an incompatible value shape".to_owned(),
+                    ));
+                }
+            },
+            CELL_TYPE_DATE => {
+                if value_flags != DATE_FLAG
+                    || !matches!(self.cached_scalar()?, Some(CachedScalar::Date(_)))
+                {
+                    return Err(Error::InvalidFormat(
+                        "Date/Time type-5 cell has an incompatible value shape".to_owned(),
+                    ));
+                }
+            },
+            CELL_TYPE_RICH_TEXT_OR_NUMBER => {
+                let numeric_flags = value_flags & (DECIMAL_FLAG | NUMBER_FLAG);
+                if numeric_flags != DECIMAL_FLAG && numeric_flags != NUMBER_FLAG
+                    || value_flags & (DATE_FLAG | RICH_TEXT_FLAG) != 0
+                    || self
+                        .cached_scalar()?
+                        .is_none_or(|scalar| !matches!(scalar, CachedScalar::Number(_)))
+                {
+                    return Err(Error::InvalidFormat(
+                        "Date/Time type-9 cell has an incompatible or ambiguous value shape"
+                            .to_owned(),
+                    ));
+                }
+
+                let formula_identifier = self.u32_field(FORMULA_FLAG);
+                if formula_identifier.is_some_and(|identifier| identifier == 0) {
+                    return Err(Error::InvalidFormat(
+                        "Date/Time formula identifier must be non-zero".to_owned(),
+                    ));
+                }
+                if formula_identifier.is_none()
+                    && (self.fields.contains_key(&STRING_FLAG)
+                        || self.fields.contains_key(&FORMULA_ERROR_FLAG))
+                {
+                    return Err(Error::InvalidFormat(
+                        "Date/Time type-9 cache has formula-only fields without a formula"
+                            .to_owned(),
+                    ));
+                }
+                for flag in [STRING_FLAG, FORMULA_ERROR_FLAG] {
+                    if self
+                        .u32_field(flag)
+                        .is_some_and(|identifier| identifier == 0)
+                    {
+                        return Err(Error::InvalidFormat(
+                            "Date/Time formula cache reference must be non-zero".to_owned(),
+                        ));
+                    }
+                }
+            },
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "Date/Time transition requires a native Empty cell, type-5 date, or type-9 numeric cell"
+                        .to_owned(),
+                ));
+            },
+        }
         Ok(())
     }
 
@@ -3720,6 +3964,349 @@ mod tests {
         assert_eq!(created.cell_format_kind(), Some(TEXT_CELL_FORMAT_KIND));
         assert_eq!(created.format_identifier(), Some(12));
         assert_eq!(created.control_cell_spec_identifier(), None);
+    }
+
+    #[test]
+    fn date_time_metadata_supports_empty_cells_and_exact_no_ops() {
+        let mut empty = BncCell::minimal();
+        empty.prefix[2..6].copy_from_slice(&[0x11, 0x22, 0x33, 0x44]);
+        empty.set_style_identifier(Some(7));
+        empty.set_comment_identifier(Some(11));
+        empty.tail.extend_from_slice(b"date-time-empty-tail");
+        let original = empty.encode();
+        let original_non_format = non_format_encoding(&empty);
+
+        assert!(empty.is_date_time_format_compatible());
+        empty
+            .set_date_time_format_identifier_preserving_value(None)
+            .unwrap();
+        assert_eq!(empty.encode(), original);
+
+        empty
+            .set_date_time_format_identifier_preserving_value(Some(13))
+            .unwrap();
+        let explicit = empty.encode();
+        assert_eq!(empty.explicit_format_flags(), EXPLICIT_DATE_TIME_FORMAT);
+        assert_eq!(empty.cell_format_kind(), Some(DATE_TIME_CELL_FORMAT_KIND));
+        assert_eq!(empty.format_identifier(), Some(13));
+        assert_eq!(empty.stored_value(), StoredValue::Empty);
+        assert_eq!(empty.cached_scalar().unwrap(), None);
+        assert_eq!(non_format_encoding(&empty), original_non_format);
+
+        empty
+            .set_date_time_format_identifier_preserving_value(Some(13))
+            .unwrap();
+        assert_eq!(empty.encode(), explicit);
+
+        empty
+            .set_date_time_format_identifier_preserving_value(None)
+            .unwrap();
+        assert_eq!(empty.encode(), original);
+        assert_eq!(non_format_encoding(&empty), original_non_format);
+    }
+
+    #[test]
+    fn date_time_metadata_preserves_type_five_date_value_and_tail() {
+        let mut date = BncCell::minimal();
+        date.prefix[2..6].copy_from_slice(&[0xa1, 0xb2, 0xc3, 0xd4]);
+        date.set_date(789_332_889.25).unwrap();
+        date.set_style_identifier(Some(17));
+        date.set_text_style_identifier(Some(19));
+        date.set_conditional_style(Some(23), Some(29));
+        date.set_comment_identifier(Some(31));
+        date.tail.extend_from_slice(b"date-time-date-tail");
+        let original_non_format = non_format_encoding(&date);
+        let original_value = value_fields(&date);
+        let original_cache = date.cached_scalar().unwrap();
+
+        assert_eq!(date.prefix[1], CELL_TYPE_DATE);
+        assert!(date.is_date_time_format_compatible());
+        date.set_date_time_format_identifier_preserving_value(Some(41))
+            .unwrap();
+        assert_eq!(date.prefix[1], CELL_TYPE_DATE);
+        assert_eq!(date.explicit_format_flags(), EXPLICIT_DATE_TIME_FORMAT);
+        assert_eq!(date.cell_format_kind(), Some(DATE_TIME_CELL_FORMAT_KIND));
+        assert_eq!(date.format_identifier(), Some(41));
+        assert_eq!(date.stored_value(), StoredValue::Date);
+        assert_eq!(date.cached_scalar().unwrap(), original_cache);
+        assert_eq!(value_fields(&date), original_value);
+        assert_eq!(non_format_encoding(&date), original_non_format);
+
+        let explicit = date.encode();
+        date.set_date_time_format_identifier_preserving_value(Some(41))
+            .unwrap();
+        assert_eq!(date.encode(), explicit);
+        date.set_date_time_format_identifier_preserving_value(Some(43))
+            .unwrap();
+        assert_eq!(date.format_identifier(), Some(43));
+        assert_eq!(date.prefix[1], CELL_TYPE_DATE);
+        assert_eq!(date.cached_scalar().unwrap(), original_cache);
+        assert_eq!(non_format_encoding(&date), original_non_format);
+
+        date.set_date_time_format_identifier_preserving_value(None)
+            .unwrap();
+        assert_eq!(date.explicit_format_flags(), 0);
+        assert_eq!(date.cell_format_kind(), None);
+        assert_eq!(date.format_identifier(), None);
+        assert_eq!(date.prefix[1], CELL_TYPE_DATE);
+        assert_eq!(date.stored_value(), StoredValue::Date);
+        assert_eq!(date.cached_scalar().unwrap(), original_cache);
+        assert_eq!(value_fields(&date), original_value);
+        assert_eq!(non_format_encoding(&date), original_non_format);
+    }
+
+    #[test]
+    fn date_time_metadata_preserves_type_nine_number_and_formula_cache() {
+        let mut number = BncCell::minimal();
+        number.prefix[2..6].copy_from_slice(&[0x91, 0xa2, 0xb3, 0xc4]);
+        number.set_number(-98.25).unwrap();
+        number.prefix[1] = CELL_TYPE_RICH_TEXT_OR_NUMBER;
+        number.set_style_identifier(Some(47));
+        number.set_comment_identifier(Some(53));
+        number.tail.extend_from_slice(b"date-time-number-tail");
+        let original_number_non_format = non_format_encoding(&number);
+        let original_number_value = value_fields(&number);
+        let original_number_cache = number.cached_scalar().unwrap();
+
+        assert_eq!(number.stored_value(), StoredValue::Number);
+        assert!(number.is_date_time_format_compatible());
+        number
+            .set_date_time_format_identifier_preserving_value(Some(59))
+            .unwrap();
+        assert_eq!(number.prefix[1], CELL_TYPE_RICH_TEXT_OR_NUMBER);
+        assert_eq!(number.stored_value(), StoredValue::Number);
+        assert_eq!(number.cached_scalar().unwrap(), original_number_cache);
+        assert_eq!(value_fields(&number), original_number_value);
+        assert_eq!(non_format_encoding(&number), original_number_non_format);
+
+        let mut formula = BncCell::minimal();
+        formula.prefix[2..6].copy_from_slice(&[0x61, 0x72, 0x83, 0x94]);
+        formula.set_number(12.5).unwrap();
+        formula.prefix[1] = CELL_TYPE_RICH_TEXT_OR_NUMBER;
+        formula.set_formula_reference(71);
+        formula
+            .fields
+            .insert(STRING_FLAG, 73u32.to_le_bytes().to_vec());
+        formula
+            .fields
+            .insert(FORMULA_ERROR_FLAG, 79u32.to_le_bytes().to_vec());
+        formula.set_style_identifier(Some(83));
+        formula.set_comment_identifier(Some(89));
+        formula.tail.extend_from_slice(b"date-time-formula-tail");
+        let original_formula_non_format = non_format_encoding(&formula);
+        let original_formula_value = value_fields(&formula);
+        let original_formula_cache = formula.cached_scalar().unwrap();
+
+        assert_eq!(formula.stored_value(), StoredValue::Formula(71));
+        assert_eq!(
+            original_formula_cache,
+            Some(CachedScalar::Number(finite(12.5)))
+        );
+        assert!(formula.is_date_time_format_compatible());
+        formula
+            .set_date_time_format_identifier_preserving_value(Some(97))
+            .unwrap();
+        assert_eq!(formula.prefix[1], CELL_TYPE_RICH_TEXT_OR_NUMBER);
+        assert_eq!(formula.stored_value(), StoredValue::Formula(71));
+        assert_eq!(formula.formula_error_identifier(), Some(79));
+        assert_eq!(formula.cached_scalar().unwrap(), original_formula_cache);
+        assert_eq!(value_fields(&formula), original_formula_value);
+        assert_eq!(non_format_encoding(&formula), original_formula_non_format);
+
+        formula
+            .set_date_time_format_identifier_preserving_value(None)
+            .unwrap();
+        assert_eq!(formula.explicit_format_flags(), 0);
+        assert_eq!(formula.cell_format_kind(), None);
+        assert_eq!(formula.format_identifier(), None);
+        assert_eq!(formula.prefix[1], CELL_TYPE_RICH_TEXT_OR_NUMBER);
+        assert_eq!(formula.stored_value(), StoredValue::Formula(71));
+        assert_eq!(formula.formula_error_identifier(), Some(79));
+        assert_eq!(formula.cached_scalar().unwrap(), original_formula_cache);
+        assert_eq!(value_fields(&formula), original_formula_value);
+        assert_eq!(non_format_encoding(&formula), original_formula_non_format);
+    }
+
+    #[test]
+    fn date_time_metadata_rejects_zero_ids_wrong_families_and_ambiguous_shapes() {
+        let mut dirty_empty = BncCell::minimal();
+        dirty_empty
+            .fields
+            .insert(DATE_FLAG, 7.0f64.to_le_bytes().to_vec());
+        assert!(!dirty_empty.is_date_time_format_compatible());
+        let before = dirty_empty.encode();
+        assert!(
+            dirty_empty
+                .set_date_time_format_identifier_preserving_value(Some(3))
+                .is_err()
+        );
+        assert_eq!(dirty_empty.encode(), before);
+
+        let mut zero = BncCell::minimal();
+        zero.set_date(7.0).unwrap();
+        let before = zero.encode();
+        assert!(
+            zero.set_date_time_format_identifier_preserving_value(Some(0))
+                .is_err()
+        );
+        assert_eq!(zero.encode(), before);
+
+        let mut ordinary_number = BncCell::minimal();
+        ordinary_number.set_number(7.0).unwrap();
+        let before = ordinary_number.encode();
+        assert!(!ordinary_number.is_date_time_format_compatible());
+        assert!(
+            ordinary_number
+                .set_date_time_format_identifier_preserving_value(Some(11))
+                .is_err()
+        );
+        assert_eq!(ordinary_number.encode(), before);
+
+        let mut wrong_family = BncCell::minimal();
+        wrong_family.set_date(7.0).unwrap();
+        wrong_family.fields.insert(
+            CELL_FORMAT_KIND_FLAG,
+            DECIMAL_CELL_FORMAT_KIND.to_le_bytes().to_vec(),
+        );
+        wrong_family
+            .fields
+            .insert(CELL_FORMAT_IDENTIFIER_FLAG, 13u32.to_le_bytes().to_vec());
+        wrong_family.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
+            .copy_from_slice(&EXPLICIT_DECIMAL_FORMAT.to_le_bytes());
+        let before = wrong_family.encode();
+        assert!(
+            wrong_family
+                .set_date_time_format_identifier_preserving_value(Some(17))
+                .is_err()
+        );
+        assert_eq!(wrong_family.encode(), before);
+
+        let mut control = BncCell::minimal();
+        control.set_date(7.0).unwrap();
+        control
+            .fields
+            .insert(CONTROL_CELL_SPEC_FLAG, 19u32.to_le_bytes().to_vec());
+        let before = control.encode();
+        assert!(
+            control
+                .set_date_time_format_identifier_preserving_value(Some(23))
+                .is_err()
+        );
+        assert_eq!(control.encode(), before);
+
+        let mut automatic = BncCell::minimal();
+        automatic.set_date(7.0).unwrap();
+        automatic.fields.insert(
+            CELL_FORMAT_KIND_FLAG,
+            DATE_TIME_CELL_FORMAT_KIND.to_le_bytes().to_vec(),
+        );
+        automatic.fields.insert(
+            DATE_TIME_FORMAT_IDENTIFIER_FLAG,
+            29u32.to_le_bytes().to_vec(),
+        );
+        let before = automatic.encode();
+        assert!(
+            automatic
+                .set_date_time_format_identifier_preserving_value(None)
+                .is_err()
+        );
+        assert_eq!(automatic.encode(), before);
+
+        let mut incomplete = BncCell::minimal();
+        incomplete.set_date(7.0).unwrap();
+        incomplete.fields.insert(
+            CELL_FORMAT_KIND_FLAG,
+            DATE_TIME_CELL_FORMAT_KIND.to_le_bytes().to_vec(),
+        );
+        incomplete.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
+            .copy_from_slice(&EXPLICIT_DATE_TIME_FORMAT.to_le_bytes());
+        let before = incomplete.encode();
+        assert!(
+            incomplete
+                .set_date_time_format_identifier_preserving_value(Some(31))
+                .is_err()
+        );
+        assert_eq!(incomplete.encode(), before);
+
+        let mut ambiguous_value = BncCell::minimal();
+        ambiguous_value.set_number(7.0).unwrap();
+        ambiguous_value.prefix[1] = CELL_TYPE_RICH_TEXT_OR_NUMBER;
+        ambiguous_value
+            .fields
+            .insert(NUMBER_FLAG, 7.0f64.to_le_bytes().to_vec());
+        let before = ambiguous_value.encode();
+        assert!(!ambiguous_value.is_date_time_format_compatible());
+        assert!(
+            ambiguous_value
+                .set_date_time_format_identifier_preserving_value(Some(37))
+                .is_err()
+        );
+        assert_eq!(ambiguous_value.encode(), before);
+
+        let mut reserved = BncCell::minimal();
+        reserved.set_date(7.0).unwrap();
+        reserved
+            .fields
+            .insert(RESERVED_KNOWN_FIELD_FLAG, 41u32.to_le_bytes().to_vec());
+        let before = reserved.encode();
+        assert!(
+            reserved
+                .set_date_time_format_identifier_preserving_value(Some(43))
+                .is_err()
+        );
+        assert_eq!(reserved.encode(), before);
+    }
+
+    #[test]
+    fn date_time_metadata_rejects_malformed_existing_explicit_state_atomically() {
+        let mut wrong_marker = BncCell::minimal();
+        wrong_marker.set_date(7.0).unwrap();
+        wrong_marker.fields.insert(
+            CELL_FORMAT_KIND_FLAG,
+            DATE_TIME_CELL_FORMAT_KIND.to_le_bytes().to_vec(),
+        );
+        wrong_marker.fields.insert(
+            DATE_TIME_FORMAT_IDENTIFIER_FLAG,
+            47u32.to_le_bytes().to_vec(),
+        );
+        wrong_marker.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
+            .copy_from_slice(&EXPLICIT_DECIMAL_FORMAT.to_le_bytes());
+        let before = wrong_marker.encode();
+        assert!(
+            wrong_marker
+                .set_date_time_format_identifier_preserving_value(None)
+                .is_err()
+        );
+        assert_eq!(wrong_marker.encode(), before);
+
+        let mut zero_existing = BncCell::minimal();
+        zero_existing.set_date(7.0).unwrap();
+        zero_existing.fields.insert(
+            CELL_FORMAT_KIND_FLAG,
+            DATE_TIME_CELL_FORMAT_KIND.to_le_bytes().to_vec(),
+        );
+        zero_existing.fields.insert(
+            DATE_TIME_FORMAT_IDENTIFIER_FLAG,
+            0u32.to_le_bytes().to_vec(),
+        );
+        zero_existing.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
+            .copy_from_slice(&EXPLICIT_DATE_TIME_FORMAT.to_le_bytes());
+        let before = zero_existing.encode();
+        assert!(
+            zero_existing
+                .set_date_time_format_identifier_preserving_value(None)
+                .is_err()
+        );
+        assert_eq!(zero_existing.encode(), before);
+    }
+
+    fn non_format_encoding(cell: &BncCell) -> Vec<u8> {
+        let mut non_format = cell.clone();
+        non_format.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END].fill(0);
+        non_format
+            .fields
+            .retain(|field, _| FORMAT_METADATA_FLAGS & field == 0);
+        non_format.encode()
     }
 
     fn hex(value: &str) -> Vec<u8> {

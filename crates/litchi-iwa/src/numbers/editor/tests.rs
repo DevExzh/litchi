@@ -15,14 +15,57 @@ use litchi_numbers::table::lock::State as FocusedTableLockState;
 use litchi_numbers::table::sort::Order as FocusedSortOrder;
 use litchi_numbers::{Package as FocusedNumbersPackage, SheetSelector, TableSelector};
 
+fn install_focused_compat_bytes(
+    editor: &mut NumbersEditor,
+    bytes: Vec<u8>,
+    source_built: bool,
+) -> crate::Result<()> {
+    if !source_built {
+        *editor = NumbersEditor::from_bytes(&bytes)?;
+        return Ok(());
+    }
+    let parsed = IWorkPackage::from_bytes(&bytes)?;
+    let mut package = IWorkPackage::new();
+    for name in parsed.entry_names() {
+        let data = parsed.entry(name).ok_or_else(|| {
+            Error::InvalidFormat("focused compatibility member disappeared".to_owned())
+        })?;
+        package.insert_entry(name.to_owned(), data.to_vec())?;
+    }
+    *editor = NumbersEditor::from_package(package)?;
+    Ok(())
+}
+
 fn focused_sort_order(
     editor: &NumbersEditor,
     table: TableSelector<'_>,
 ) -> crate::Result<Option<FocusedSortOrder>> {
-    let package = FocusedNumbersPackage::from_bytes(&editor.to_bytes()?)
-        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-    (FocusedNumbersPackage::table_sort_order)(&package, SheetSelector::index(0), table)
-        .map_err(|error| Error::InvalidFormat(error.to_string()))
+    let source_built = !editor.package().source_is_exact();
+    let bytes = editor.to_bytes()?;
+    let package = match FocusedNumbersPackage::from_bytes(&bytes) {
+        Ok(package) => package,
+        Err(_strict_error) if source_built => {
+            return FocusedNumbersPackage::__table_sort_order_from_bytes_for_compatibility(
+                &bytes,
+                SheetSelector::index(0),
+                table,
+            )
+            .map_err(|error| Error::InvalidFormat(error.to_string()));
+        },
+        Err(strict_error) => return Err(Error::InvalidFormat(strict_error.to_string())),
+    };
+    match (FocusedNumbersPackage::table_sort_order)(&package, SheetSelector::index(0), table) {
+        Ok(order) => Ok(order),
+        Err(_strict_error) if source_built => {
+            FocusedNumbersPackage::__table_sort_order_from_bytes_for_compatibility(
+                &bytes,
+                SheetSelector::index(0),
+                table,
+            )
+            .map_err(|error| Error::InvalidFormat(error.to_string()))
+        },
+        Err(strict_error) => Err(Error::InvalidFormat(strict_error.to_string())),
+    }
 }
 
 fn set_focused_sort_order(
@@ -30,14 +73,58 @@ fn set_focused_sort_order(
     table: TableSelector<'_>,
     order: FocusedSortOrder,
 ) -> crate::Result<()> {
-    let package = FocusedNumbersPackage::from_bytes(&editor.to_bytes()?)
-        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-    let commit =
-        (FocusedNumbersPackage::edit_table_sort_order)(&package, SheetSelector::index(0), table)
-            .map_err(|error| Error::InvalidFormat(error.to_string()))?
-            .set(order)
-            .commit()
-            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+    let source_built = !editor.package().source_is_exact();
+    let bytes = editor.to_bytes()?;
+    let package = match FocusedNumbersPackage::from_bytes(&bytes) {
+        Ok(package) => package,
+        Err(_strict_error) if source_built => {
+            let output =
+                FocusedNumbersPackage::__set_table_sort_order_from_bytes_for_compatibility(
+                    &bytes,
+                    SheetSelector::index(0),
+                    table,
+                    order,
+                )
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+            return install_focused_compat_bytes(editor, output, source_built);
+        },
+        Err(strict_error) => return Err(Error::InvalidFormat(strict_error.to_string())),
+    };
+    let requested = order.clone();
+    let edit = match (FocusedNumbersPackage::edit_table_sort_order)(
+        &package,
+        SheetSelector::index(0),
+        table,
+    ) {
+        Ok(edit) => edit,
+        Err(_strict_error) if source_built => {
+            let output =
+                FocusedNumbersPackage::__set_table_sort_order_from_bytes_for_compatibility(
+                    &bytes,
+                    SheetSelector::index(0),
+                    table,
+                    requested,
+                )
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+            return install_focused_compat_bytes(editor, output, source_built);
+        },
+        Err(strict_error) => return Err(Error::InvalidFormat(strict_error.to_string())),
+    };
+    let commit = match edit.set(order).commit() {
+        Ok(commit) => commit,
+        Err(_strict_error) if source_built => {
+            let output =
+                FocusedNumbersPackage::__set_table_sort_order_from_bytes_for_compatibility(
+                    &bytes,
+                    SheetSelector::index(0),
+                    table,
+                    requested,
+                )
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+            return install_focused_compat_bytes(editor, output, source_built);
+        },
+        Err(strict_error) => return Err(Error::InvalidFormat(strict_error.to_string())),
+    };
     let mut bytes = Vec::new();
     commit
         .package()
@@ -51,14 +138,54 @@ fn clear_focused_sort_order(
     editor: &mut NumbersEditor,
     table: TableSelector<'_>,
 ) -> crate::Result<()> {
-    let package = FocusedNumbersPackage::from_bytes(&editor.to_bytes()?)
-        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-    let commit =
-        (FocusedNumbersPackage::edit_table_sort_order)(&package, SheetSelector::index(0), table)
-            .map_err(|error| Error::InvalidFormat(error.to_string()))?
-            .clear()
-            .commit()
-            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+    let source_built = !editor.package().source_is_exact();
+    let bytes = editor.to_bytes()?;
+    let package = match FocusedNumbersPackage::from_bytes(&bytes) {
+        Ok(package) => package,
+        Err(_strict_error) if source_built => {
+            let output =
+                FocusedNumbersPackage::__clear_table_sort_order_from_bytes_for_compatibility(
+                    &bytes,
+                    SheetSelector::index(0),
+                    table,
+                )
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+            return install_focused_compat_bytes(editor, output, source_built);
+        },
+        Err(strict_error) => return Err(Error::InvalidFormat(strict_error.to_string())),
+    };
+    let edit = match (FocusedNumbersPackage::edit_table_sort_order)(
+        &package,
+        SheetSelector::index(0),
+        table,
+    ) {
+        Ok(edit) => edit,
+        Err(_strict_error) if source_built => {
+            let output =
+                FocusedNumbersPackage::__clear_table_sort_order_from_bytes_for_compatibility(
+                    &bytes,
+                    SheetSelector::index(0),
+                    table,
+                )
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+            return install_focused_compat_bytes(editor, output, source_built);
+        },
+        Err(strict_error) => return Err(Error::InvalidFormat(strict_error.to_string())),
+    };
+    let commit = match edit.clear().commit() {
+        Ok(commit) => commit,
+        Err(_strict_error) if source_built => {
+            let output =
+                FocusedNumbersPackage::__clear_table_sort_order_from_bytes_for_compatibility(
+                    &bytes,
+                    SheetSelector::index(0),
+                    table,
+                )
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+            return install_focused_compat_bytes(editor, output, source_built);
+        },
+        Err(strict_error) => return Err(Error::InvalidFormat(strict_error.to_string())),
+    };
     let mut bytes = Vec::new();
     commit
         .package()
@@ -66,6 +193,62 @@ fn clear_focused_sort_order(
         .map_err(|error| Error::Io(error.into_io_error()))?;
     *editor = NumbersEditor::from_bytes(&bytes)?;
     Ok(())
+}
+
+fn append_test_sort_order_payload(editor: &mut NumbersEditor, payload: &[u8]) {
+    editor
+        .package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(10).ok_or_else(|| {
+                Error::InvalidFormat("focused compatibility test table disappeared".to_owned())
+            })?;
+            let message = object.messages[0].clone();
+            let mut data = message.data;
+            crate::wire::append_length_delimited_field(&mut data, 44, payload)?;
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data,
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+}
+
+fn test_sort_order_payload(editor: &NumbersEditor) -> Vec<u8> {
+    let archive = editor.package().archive("Index/Document.iwa").unwrap();
+    crate::wire::repeated_length_delimited_payloads(
+        archive.object(10).unwrap().messages[0].data.as_slice(),
+        44,
+    )
+    .unwrap()
+    .pop()
+    .expect("focused compatibility test sort order")
+    .to_vec()
+}
+
+fn set_test_table_locked(editor: &mut NumbersEditor) {
+    editor
+        .package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(3).ok_or_else(|| {
+                Error::InvalidFormat("focused compatibility test table-info disappeared".to_owned())
+            })?;
+            let message = object.messages[0].clone();
+            let mut info = tst::TableInfoArchive::decode(message.data.as_slice())?;
+            info.super_.locked = Some(true);
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data: info.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
 }
 
 fn cell_number(value: f64) -> CellValue {
@@ -6307,8 +6490,22 @@ fn focused_package_sort_order_is_typed_transactional_and_native_clear_compatible
     );
     let changed = editor.to_bytes().unwrap();
     let reparsed = NumbersEditor::from_bytes(&changed).unwrap();
+    assert!(focused_sort_order(&reparsed, TableSelector::index(0)).is_err());
+    let exact_before = reparsed.to_bytes().unwrap();
+    let mut exact_edit = reparsed.clone();
+    assert!(
+        set_focused_sort_order(&mut exact_edit, TableSelector::index(0), order.clone()).is_err()
+    );
+    assert_eq!(exact_edit.to_bytes().unwrap(), exact_before);
+    assert!(clear_focused_sort_order(&mut exact_edit, TableSelector::index(0)).is_err());
+    assert_eq!(exact_edit.to_bytes().unwrap(), exact_before);
     assert_eq!(
-        focused_sort_order(&reparsed, TableSelector::index(0)).unwrap(),
+        FocusedNumbersPackage::__table_sort_order_from_bytes_for_compatibility(
+            &changed,
+            SheetSelector::index(0),
+            TableSelector::index(0),
+        )
+        .unwrap(),
         Some(order.clone())
     );
 
@@ -6336,7 +6533,7 @@ fn focused_package_sort_order_is_typed_transactional_and_native_clear_compatible
     assert!(sort_payload.ends_with(&sort_unknown));
     let sort_rules = crate::wire::repeated_length_delimited_payloads(sort_payload, 2).unwrap();
     assert_eq!(sort_rules.len(), 2);
-    assert!(sort_rules[0].ends_with(&rule_unknown));
+    assert!(sort_rules[1].ends_with(&rule_unknown));
     assert_eq!(
         crate::wire::repeated_length_delimited_payloads(
             archive.object(10).unwrap().messages[0].data.as_slice(),
@@ -6480,6 +6677,206 @@ fn focused_package_sort_order_rejects_malformed_nested_wire_transactionally() {
     assert!(set_focused_sort_order(&mut editor, TableSelector::index(0), order).is_err());
     assert!(clear_focused_sort_order(&mut editor, TableSelector::index(0)).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn focused_compat_sort_order_resolves_table_name_for_crud() {
+    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
+    let selector = TableSelector::name("Table 1");
+    let baseline = editor.to_bytes().unwrap();
+    assert_eq!(focused_sort_order(&editor, selector).unwrap(), None);
+
+    let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
+        NumbersTableSortColumnIndex::new(1).unwrap(),
+        NumbersTableSortDirection::Ascending,
+    )])
+    .unwrap();
+    set_focused_sort_order(&mut editor, selector, order.clone()).unwrap();
+    assert_eq!(
+        focused_sort_order(&editor, selector).unwrap(),
+        Some(order.clone())
+    );
+    assert_eq!(
+        focused_sort_order(&editor, TableSelector::index(0)).unwrap(),
+        Some(order)
+    );
+    let configured = editor.to_bytes().unwrap();
+    assert_ne!(configured, baseline);
+
+    clear_focused_sort_order(&mut editor, selector).unwrap();
+    assert_eq!(focused_sort_order(&editor, selector).unwrap(), None);
+    let cleared = editor.to_bytes().unwrap();
+    assert_ne!(cleared, baseline);
+    clear_focused_sort_order(&mut editor, selector).unwrap();
+    assert_eq!(editor.to_bytes().unwrap(), cleared);
+}
+
+#[test]
+fn focused_compat_sort_order_rejects_duplicate_table_names_transactionally() {
+    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
+    editor
+        .package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(2).ok_or_else(|| {
+                Error::InvalidFormat("focused compatibility test sheet disappeared".to_owned())
+            })?;
+            let message = object.messages[0].clone();
+            let mut sheet = tn::SheetArchive::decode(message.data.as_slice())?;
+            sheet.drawable_infos.push(Reference {
+                identifier: 3,
+                ..Default::default()
+            });
+            object.replace_message(
+                0,
+                RawMessage {
+                    type_: message.type_,
+                    data: sheet.encode_to_vec(),
+                },
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    let selector = TableSelector::name("Table 1");
+    let before = editor.to_bytes().unwrap();
+    assert!(focused_sort_order(&editor, selector).is_err());
+
+    let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
+        NumbersTableSortColumnIndex::new(1).unwrap(),
+        NumbersTableSortDirection::Ascending,
+    )])
+    .unwrap();
+    assert!(set_focused_sort_order(&mut editor, selector, order).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+    assert!(clear_focused_sort_order(&mut editor, selector).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn focused_compat_sort_order_preserves_balanced_unknown_groups_on_set_and_clear() {
+    let mut sort = tst::TableSortOrderArchive {
+        r#type: tst::table_sort_order_archive::SortType::EntireTable as i32,
+        rules: vec![tst::table_sort_order_archive::SortRuleArchive {
+            index: 1,
+            direction: tst::table_sort_order_archive::sort_rule_archive::Direction::Ascending
+                as i32,
+        }],
+    }
+    .encode_to_vec();
+    append_unknown_varint(&mut sort, 90, 0);
+    let mut unknown_group = Vec::new();
+    append_balanced_unknown_group(&mut unknown_group, 91);
+    sort.extend_from_slice(&unknown_group);
+
+    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
+    append_test_sort_order_payload(&mut editor, &sort);
+    assert_eq!(
+        focused_sort_order(&editor, TableSelector::name("Table 1"))
+            .unwrap()
+            .map(|order| order.rules().len()),
+        Some(1)
+    );
+
+    let replacement = NumbersTableSortOrder::new([
+        NumbersTableSortRule::new(
+            NumbersTableSortColumnIndex::new(2).unwrap(),
+            NumbersTableSortDirection::Descending,
+        ),
+        NumbersTableSortRule::new(
+            NumbersTableSortColumnIndex::new(1).unwrap(),
+            NumbersTableSortDirection::Ascending,
+        ),
+    ])
+    .unwrap();
+    set_focused_sort_order(&mut editor, TableSelector::name("Table 1"), replacement).unwrap();
+    let changed_sort = test_sort_order_payload(&editor);
+    assert!(
+        changed_sort
+            .windows(unknown_group.len())
+            .any(|window| window == unknown_group.as_slice())
+    );
+
+    clear_focused_sort_order(&mut editor, TableSelector::name("Table 1")).unwrap();
+    assert_eq!(
+        focused_sort_order(&editor, TableSelector::name("Table 1")).unwrap(),
+        None
+    );
+    let cleared_sort = test_sort_order_payload(&editor);
+    assert!(
+        cleared_sort
+            .windows(unknown_group.len())
+            .any(|window| window == unknown_group.as_slice())
+    );
+}
+
+#[test]
+fn focused_compat_sort_order_rejects_stale_ownership_metadata_transactionally() {
+    let mut editor = NumbersEditor::from_package(test_package()).unwrap();
+    editor
+        .package
+        .update_archive("Index/Document.iwa", |archive| {
+            let object = archive.object_mut(3).ok_or_else(|| {
+                Error::InvalidFormat("focused compatibility test table-info disappeared".to_owned())
+            })?;
+            let info = object
+                .archive_info
+                .message_infos
+                .get_mut(0)
+                .ok_or_else(|| Error::InvalidFormat("missing table-info metadata".to_owned()))?;
+            info.object_references = vec![999];
+            Ok(())
+        })
+        .unwrap();
+    let selector = TableSelector::name("Table 1");
+    let before = editor.to_bytes().unwrap();
+    assert!(focused_sort_order(&editor, selector).is_err());
+
+    let order = NumbersTableSortOrder::new([NumbersTableSortRule::new(
+        NumbersTableSortColumnIndex::new(1).unwrap(),
+        NumbersTableSortDirection::Ascending,
+    )])
+    .unwrap();
+    assert!(set_focused_sort_order(&mut editor, selector, order).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+    assert!(clear_focused_sort_order(&mut editor, selector).is_err());
+    assert_eq!(editor.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn focused_compat_sort_order_locked_idempotence_and_changed_refusal_are_exact() {
+    let initial = NumbersTableSortOrder::new([NumbersTableSortRule::new(
+        NumbersTableSortColumnIndex::new(1).unwrap(),
+        NumbersTableSortDirection::Ascending,
+    )])
+    .unwrap();
+    let selector = TableSelector::name("Table 1");
+    let mut locked = NumbersEditor::from_package(test_package()).unwrap();
+    set_focused_sort_order(&mut locked, selector, initial.clone()).unwrap();
+    set_test_table_locked(&mut locked);
+    let locked_bytes = locked.to_bytes().unwrap();
+    assert_eq!(
+        focused_sort_order(&locked, selector).unwrap(),
+        Some(initial.clone())
+    );
+
+    set_focused_sort_order(&mut locked, selector, initial).unwrap();
+    assert_eq!(locked.to_bytes().unwrap(), locked_bytes);
+
+    let changed = NumbersTableSortOrder::new([NumbersTableSortRule::new(
+        NumbersTableSortColumnIndex::new(2).unwrap(),
+        NumbersTableSortDirection::Descending,
+    )])
+    .unwrap();
+    let before_changed = locked.to_bytes().unwrap();
+    assert!(set_focused_sort_order(&mut locked, selector, changed).is_err());
+    assert_eq!(locked.to_bytes().unwrap(), before_changed);
+    assert!(clear_focused_sort_order(&mut locked, selector).is_err());
+    assert_eq!(locked.to_bytes().unwrap(), before_changed);
+
+    let mut empty_locked = NumbersEditor::from_package(test_package()).unwrap();
+    set_test_table_locked(&mut empty_locked);
+    let empty_locked_bytes = empty_locked.to_bytes().unwrap();
+    clear_focused_sort_order(&mut empty_locked, selector).unwrap();
+    assert_eq!(empty_locked.to_bytes().unwrap(), empty_locked_bytes);
 }
 
 #[test]
@@ -8757,6 +9154,13 @@ fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) {
     data.extend(litchi_iwa_common::varint::encode_varint(value));
 }
 
+fn append_balanced_unknown_group(data: &mut Vec<u8>, field_number: u32) {
+    let field = u64::from(field_number) << 3;
+    data.extend(litchi_iwa_common::varint::encode_varint(field | 3));
+    append_unknown_varint(data, 1, 1);
+    data.extend(litchi_iwa_common::varint::encode_varint(field | 4));
+}
+
 #[allow(deprecated)]
 fn test_package_with_text_box() -> IWorkPackage {
     let mut package = test_package();
@@ -9513,7 +9917,7 @@ fn test_package() -> IWorkPackage {
         )
         .unwrap()
     };
-    let archive = Archive {
+    let mut archive = Archive {
         objects: vec![
             object(
                 1,
@@ -9561,6 +9965,15 @@ fn test_package() -> IWorkPackage {
             object(42, 6004, row_headers.encode_to_vec()),
         ],
     };
+    for (object_index, field, reference) in [(0, 1, 2), (1, 2, 3), (2, 2, 10)] {
+        let info = &mut archive.objects[object_index].archive_info.message_infos[0];
+        info.object_references = vec![reference];
+        info.field_infos = vec![FieldInfo {
+            path: FieldPath { path: vec![field] },
+            object_references: vec![reference],
+            ..Default::default()
+        }];
+    }
     let mut package = IWorkPackage::new();
     package
         .replace_archive("Index/Document.iwa", &archive)
@@ -9789,6 +10202,9 @@ fn two_sheet_package() -> IWorkPackage {
                     data: document.encode_to_vec(),
                 },
             )?;
+            let info = &mut root.archive_info.message_infos[0];
+            info.object_references.push(50);
+            info.field_infos[0].object_references.push(50);
             archive.insert_object(ArchiveObject::new(
                 50,
                 vec![RawMessage {

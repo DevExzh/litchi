@@ -2342,6 +2342,10 @@ fn map_core_error(error: litchi_iwa_core::Error) -> SlideTableHeaderError {
 }
 
 #[cfg(test)]
+#[allow(
+    clippy::items_after_test_module,
+    reason = "the focused budget tests remain adjacent to the mapper they exercise"
+)]
 mod tests {
     use super::*;
 

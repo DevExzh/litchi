@@ -2,6 +2,14 @@
 
 use std::fmt;
 
+/// Selector-first exact-source transactions for one existing table cell's
+/// explicit Date & Time display format.
+pub mod transaction {
+    pub use crate::package::table_cell_date_time_format::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
+    };
+}
+
 /// Maximum UTF-8 size of one date-and-time pattern.
 pub const MAX_PATTERN_BYTES: usize = 4 * 1_024;
 
@@ -18,6 +26,8 @@ pub enum Error {
     TooLong { length: usize, maximum: usize },
     /// The pattern contains a NUL byte.
     ContainsNul,
+    /// The pattern contains a non-NUL control character.
+    ContainsControl { index: usize },
 }
 impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -30,6 +40,10 @@ impl fmt::Display for Error {
                 )
             },
             Self::ContainsNul => formatter.write_str("date-and-time pattern cannot contain NUL"),
+            Self::ContainsControl { index } => write!(
+                formatter,
+                "date-and-time pattern contains a control character at index {index}"
+            ),
         }
     }
 }
@@ -50,7 +64,7 @@ impl DateTime {
     ///
     /// # Errors
     ///
-    /// Returns a typed error for empty, oversized, or NUL-containing input.
+    /// Returns a typed error for empty, oversized, or control-containing input.
     pub fn new(pattern: &str) -> Result<Self> {
         validate(pattern)?;
         Ok(Self(pattern.into()))
@@ -60,7 +74,7 @@ impl DateTime {
     ///
     /// # Errors
     ///
-    /// Returns a typed error for empty, oversized, or NUL-containing input.
+    /// Returns a typed error for empty, oversized, or control-containing input.
     pub fn from_owned(pattern: String) -> Result<Self> {
         validate(&pattern)?;
         Ok(Self(pattern.into_boxed_str()))
@@ -70,7 +84,7 @@ impl DateTime {
     ///
     /// # Errors
     ///
-    /// Returns a typed error for empty, oversized, or NUL-containing input.
+    /// Returns a typed error for empty, oversized, or control-containing input.
     pub fn from_boxed(pattern: Box<str>) -> Result<Self> {
         validate(&pattern)?;
         Ok(Self(pattern))
@@ -144,6 +158,12 @@ fn validate(pattern: &str) -> Result<()> {
     if pattern.contains('\0') {
         return Err(Error::ContainsNul);
     }
+    if let Some((index, _)) = pattern
+        .char_indices()
+        .find(|(_, character)| character.is_control())
+    {
+        return Err(Error::ContainsControl { index });
+    }
     Ok(())
 }
 
@@ -155,6 +175,10 @@ mod tests {
     fn pattern_validation_rejects_malformed_values() {
         assert_eq!(DateTime::new("   "), Err(Error::Empty));
         assert_eq!(DateTime::new("yyyy\0MM"), Err(Error::ContainsNul));
+        assert!(matches!(
+            DateTime::new("yyyy\nMM"),
+            Err(Error::ContainsControl { .. })
+        ));
         assert!(matches!(
             DateTime::new(&"x".repeat(MAX_PATTERN_BYTES + 1)),
             Err(Error::TooLong { .. })

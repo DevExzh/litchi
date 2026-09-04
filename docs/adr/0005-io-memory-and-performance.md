@@ -2201,7 +2201,7 @@ authoritative.
 
 Focused owners receive the same locality treatment. Numbers comment metadata
 and reply validation use reserved ID/UUID/location indexes and one inbound
-census; the five scalar display-format owners and persisted sort share a
+census; the six scalar display-format owners and persisted sort share a
 duplicate-rejecting physical-entry index. Pages footnote validation borrows
 metadata until preflight, uses fallible visitor growth, and reuses one sorted
 package graph census. Keynote chart-caption, movie-playback, table-title,
@@ -2253,3 +2253,37 @@ build-order proof. The current topology is 64 workspace packages, 238 internal
 declarations, 227 canonical
 edges, 11 development-only edges, 11 ordered debts `[1, 2, 4, 8, 10, 12, 13,
 14, 15, 16, 17]`, and one migration host.
+
+## 2026-09-04 amendment: Numbers existing-cell Text-format resource record
+
+The focused Numbers Text-format transaction is a bounded, exact-source
+operation over one selected existing cell and its admitted format-list/refcount
+closure. Its archive-free value is a content-free `Text` marker; the private
+type-260 codec validates the native format envelope and constructs a borrowed
+lazy Buffa view only after strict preflight. Native IDs, generated messages,
+archive members, and raw wire values remain below the public boundary.
+
+The transaction charges package, entry, payload, wire, retained, scratch,
+allocation, compression, and work requirements before publication. Exact
+no-ops avoid candidate construction; changed edits use copy-on-write, preserve
+unknown and unselected bytes, reopen and reread the selected semantic value,
+and compare physical locality. Canonical explicit Text uses marker `0x80`;
+an unchanged admitted converted-Text marker `0x81` with retained Number
+provenance remains source-authoritative. Malformed, wrong-family, unsupported,
+over-budget, allocation, lock, candidate-verification, and locality failures
+leave the source unchanged.
+
+Focused tests provide E1 evidence and the checked-in Apple fixture provides
+E2 read/no-op evidence only. No native E3/E4 acceptance, numeric-to-Text
+conversion, package-wide performance/RSS, or general display-format ownership
+claim follows from this record. The existing topology and host/debt gate are
+unchanged.
+
+## 2026-09-04 amendment: current scalar-owner count
+
+The six-owner count in the preceding 2026-09-03 resource snapshot is
+historical. The current focused Numbers scalar display-format set has seven
+owners: Number, Percentage, Currency, Scientific, Fraction, Text, and Date &
+Time. This amendment updates the current count without rewriting that prior
+resource record; the shared physical-entry index and its bounded resource
+claims remain unchanged.

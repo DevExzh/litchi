@@ -575,13 +575,13 @@ mod tests {
         assert_eq!(show.title(), Some("Deck"));
         assert_eq!(show.slide_count(), 1);
         assert_eq!(show.try_all_text().unwrap(), show.all_text());
-        assert_eq!(show.slide(0).map(Slide::index), Some(0));
+        assert_eq!(show.slides().first().map(Slide::index), Some(0));
         assert_eq!(
             show.select_slide(SlideSelector::index(0))
                 .map(|slide| slide.map(Slide::index)),
             Ok(Some(0))
         );
-        assert!(show.slide(1).is_none());
+        assert!(show.slides().get(1).is_none());
         assert_eq!(show.select_slide(SlideSelector::index(1)), Ok(None));
     }
 

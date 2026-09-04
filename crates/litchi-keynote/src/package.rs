@@ -1169,6 +1169,9 @@ impl Package {
         let Some(selected) = selected else {
             return Ok(None);
         };
+        // Charge the show -> slide-node edge before resolving the selected
+        // object so a reference ceiling cannot be bypassed by a missing node.
+        budget.charge_references(1, SemanticPath::Slide { index })?;
         let node_identifier = selected.identifier();
         let node_object = self.required_object(node_identifier, "Keynote slide node")?;
         let node_payload = unique_payload(
@@ -1181,6 +1184,8 @@ impl Package {
             self.semantic_wire_limits()?,
             SemanticPath::Slide { index },
         )?;
+        // Charge the node -> slide edge after validating its payload so the
+        // selected record accounts for both graph edges.
         budget.charge_references(1, SemanticPath::Slide { index })?;
         Ok(Some(SlideRecord {
             node_identifier,
@@ -4764,6 +4769,51 @@ mod tests {
                 .load(Ordering::Relaxed),
             1
         );
+        Ok(())
+    }
+
+    #[test]
+    fn selected_slide_record_charges_every_traversed_reference()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let bytes = std::fs::read(native_fixture_path())?;
+        let semantic = SemanticLimits::new(
+            MAX_OBJECTS,
+            MAX_SLIDES,
+            2,
+            MAX_TEXT_STORAGES,
+            MAX_TEXT_FRAGMENTS,
+            MAX_TEXT_BYTES,
+        )?;
+        let package = Package::from_bytes_with_options(
+            &bytes,
+            ReadOptions::new(Limits::default(), semantic),
+        )?;
+        let Err(error) = package.slide_record_at(0) else {
+            panic!("the selected node-to-slide edge must count against the reference ceiling");
+        };
+        assert!(matches!(
+            error,
+            ReadError::SemanticLimit {
+                kind: SemanticLimitKind::References,
+                observed: 3,
+                maximum: 2,
+                path: SemanticPath::Slide { index: 0 },
+            }
+        ));
+
+        let semantic = SemanticLimits::new(
+            MAX_OBJECTS,
+            MAX_SLIDES,
+            3,
+            MAX_TEXT_STORAGES,
+            MAX_TEXT_FRAGMENTS,
+            MAX_TEXT_BYTES,
+        )?;
+        let package = Package::from_bytes_with_options(
+            &bytes,
+            ReadOptions::new(Limits::default(), semantic),
+        )?;
+        assert!(package.slide_record_at(0)?.is_some());
         Ok(())
     }
 

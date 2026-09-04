@@ -149,6 +149,30 @@ fn assert_rejected_or_owner(source: &[u8]) -> TestResult {
     Ok(())
 }
 
+/// Require a package-valid hostile source to reach the focused Text owner.
+/// This closes the vacuous path where ingress rejects a malformed envelope
+/// before the converted-text graph checks have a chance to run.
+fn assert_owner_rejects(source: &[u8]) -> TestResult {
+    let package = Package::from_bytes(source).map_err(|error| {
+        io::Error::other(format!(
+            "source was expected to reach the Text owner: {error}"
+        ))
+    })?;
+    let before = package.exact_bytes();
+    assert!(
+        package
+            .table_cell_text_format(0usize, 0usize, selected_position())
+            .is_err()
+    );
+    assert!(
+        package
+            .edit_table_cell_text_format(0usize, 0usize, selected_position())
+            .is_err()
+    );
+    assert_eq!(package.exact_bytes(), before);
+    Ok(())
+}
+
 fn assert_text_cell(source: &[u8], expected_flags: u16, expected_primary: u32) -> TestResult {
     let cell_bytes = fixture::tile_cells(source)?
         .into_iter()
@@ -501,6 +525,96 @@ fn text_converted_0x81_requires_and_preserves_generic_number_reference() -> Test
     );
     assert_eq!(fixture::format_entry_facts(&restored_bytes)?, vec![(1, 2)]);
     assert_non_format_bnc_bytes(&source, &restored_bytes)?;
+    Ok(())
+}
+
+#[test]
+fn text_converted_generic_reference_corruption_is_rejected_atomically() -> TestResult {
+    // Every source below is a package-valid IWA/ZIP envelope.  The focused
+    // owner must reject the malformed 0x81 dependency before publishing any
+    // candidate bytes.
+    for corruption in [
+        fixture::Corruption::ConvertedGenericWrong,
+        fixture::Corruption::ConvertedGenericMissing,
+        fixture::Corruption::ConvertedGenericZero,
+        fixture::Corruption::ConvertedGenericMissingEntry,
+        fixture::Corruption::ConvertedGenericWrongType,
+        fixture::Corruption::ConvertedGenericRefcountMismatch,
+    ] {
+        assert_owner_rejects(&fixture::corrupted_package_for(
+            fixture::FormatFamily::Text,
+            corruption,
+        )?)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn text_sibling_bnc_metadata_corruptions_are_rejected_atomically() -> TestResult {
+    // Each source keeps the selected first cell and its visible list edge
+    // valid. The malformed metadata exists only on the unselected sibling, so
+    // selected-cell validation cannot make these cases vacuously fail.
+    for corruption in [
+        fixture::Corruption::SiblingOrphanTextIdentifier,
+        fixture::Corruption::SiblingMismatchedTextIdentifier,
+        fixture::Corruption::SiblingReservedKnownField,
+        fixture::Corruption::NonselectedConvertedGenericWrongType,
+    ] {
+        assert_owner_rejects(&fixture::corrupted_package_for(
+            fixture::FormatFamily::Text,
+            corruption,
+        )?)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn text_zero_cell_row_storage_is_rejected_atomically() -> TestResult {
+    // The added row has no offsets or declared cells, but both current and
+    // pre-BNC storage buffers contain a full BNC row. A census must not skip
+    // that hidden payload merely because the row's cell count is zero.
+    assert_owner_rejects(&fixture::corrupted_package_for(
+        fixture::FormatFamily::Text,
+        fixture::Corruption::ZeroCellRowStorage,
+    )?)?;
+    Ok(())
+}
+
+#[test]
+fn text_converted_live_generic_number_payload_is_preserved_with_locality() -> TestResult {
+    // Both cells retain the generic Number edge so clearing the selected
+    // converted Text cell decrements, but does not cull, that list entry.
+    let source = fixture::text_converted_shared_generic_package()?;
+    assert_eq!(fixture::format_entry_facts(&source)?, vec![(1, 2), (2, 2)]);
+    assert_eq!(
+        converted_generic_identifier(&source)?,
+        fixture::SECOND_FORMAT_KEY
+    );
+
+    let mut generic_payload = fixture::format_payload_by_key(&source, fixture::SECOND_FORMAT_KEY)?;
+    append_varint_field(&mut generic_payload, 46, 0x80_03)?;
+    append_length_delimited_field(&mut generic_payload, 47, b"converted generic extension")?;
+    let hostile = fixture::rewrite_format_payload_by_key(
+        &source,
+        fixture::SECOND_FORMAT_KEY,
+        &generic_payload,
+    )?;
+
+    let target = Package::from_bytes(&hostile)?
+        .edit_table_cell_text_format(0usize, 0usize, selected_position())?
+        .clear()
+        .commit()?
+        .package()
+        .exact_bytes();
+    assert_eq!(fixture::format_keys(&target)?, vec![None, Some(1)]);
+    assert_eq!(fixture::format_entry_facts(&target)?, vec![(1, 1), (2, 1)]);
+    assert_eq!(
+        fixture::format_payload_by_key(&target, fixture::SECOND_FORMAT_KEY)?,
+        generic_payload,
+        "live converted-text generic Number payload was normalized or lost"
+    );
+    assert_exact_locality(&hostile, &target)?;
+    assert_non_format_bnc_bytes(&hostile, &target)?;
     Ok(())
 }
 

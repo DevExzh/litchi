@@ -2417,7 +2417,7 @@ mod tests {
         ];
         for source in malformed_groups {
             assert!(
-                decode(&source).is_err(),
+                decode(source).is_err(),
                 "malformed unknown group: {source:?}"
             );
         }

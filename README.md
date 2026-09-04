@@ -238,8 +238,8 @@ remain format-specific until their frozen-source adapter lands.
 - **[API Reference](https://docs.rs/litchi)** - Complete API documentation
 - **[OFFICE_API_GUIDE.md](docs/OFFICE_API_GUIDE.md)** - Comprehensive guide with examples
 - **[FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md)** - Feature comparison with Apache POI
-- **[Examples](examples/)** - Working code examples:
-  - `office_crud_demo.rs` - Complete CRUD operations demo
+- **[Examples](crates/litchi/examples/)** - Working code examples:
+  - [`office_crud_demo.rs`](crates/litchi/examples/office_crud_demo.rs) - Complete CRUD operations demo
 
 ## Current Status
 

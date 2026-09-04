@@ -80,3 +80,6 @@ coverage
 !/corpus/keynote_chart_value_axis/
 /corpus/keynote_chart_value_axis/*
 !/corpus/keynote_chart_value_axis/*.seed
+!/corpus/numbers_table_cell_date_time_format/
+/corpus/numbers_table_cell_date_time_format/*
+!/corpus/numbers_table_cell_date_time_format/*.seed

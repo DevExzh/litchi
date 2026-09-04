@@ -10,9 +10,9 @@ use std::error::Error as StdError;
 use std::sync::Arc;
 
 use litchi_iwa_archive::{Limits as ArchiveLimits, package::Catalog, package::EntryEdit};
-use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::tsce::ast_node_array_archive::{AstNodeArchive, AstNodeType};
-use litchi_iwa_protos::{tn, tsce, tsd, tsp, tst, tswp};
+use litchi_iwa_protos::{tn, tsce, tsd, tsk, tsp, tst, tswp};
 use litchi_numbers::cell::Value;
 use litchi_numbers::{
     CellPosition, Document, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits,
@@ -34,6 +34,8 @@ const TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE: u32 = 6_011;
 const RICH_TEXT_PAYLOAD_MESSAGE_TYPE: u32 = 6_218;
 const STORAGE_MESSAGE_TYPE: u32 = 2_001;
 const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
+const ANNOTATION_AUTHOR_MESSAGE_TYPE: u32 = 212;
+const METADATA_MESSAGE_TYPE: u32 = 11_006;
 const FORMULA_ERROR_FLAG: u32 = 0x0000_0800;
 
 const ROOT_ID: u64 = 1;
@@ -50,6 +52,8 @@ const SEGMENT_COMMENT_STORAGE_ID: u64 = 115;
 const COMMENT_REPLY_ID: u64 = 112;
 const COMMENT_REPLY_TWO_ID: u64 = 113;
 const COMMENT_AUTHOR_ID: u64 = 121;
+const METADATA_OBJECT_ID: u64 = 900;
+const METADATA_MEMBER: &str = "Index/Metadata.iwa";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Corruption {
@@ -123,6 +127,71 @@ fn object(identifier: u64, message_type: u32, data: Vec<u8>) -> TestResult<Archi
             type_: message_type,
             data,
         }],
+    )?)
+}
+
+fn set_message_info(
+    object: &mut ArchiveObject,
+    message_index: usize,
+    references: &[u64],
+) -> TestResult {
+    let info = object
+        .archive_info
+        .message_infos
+        .get_mut(message_index)
+        .ok_or_else(|| std::io::Error::other("synthetic object has no message info"))?;
+    info.object_references = references.to_vec();
+    for (field_index, reference) in references.iter().copied().enumerate() {
+        let mut field = FieldInfo::new(vec![u32::try_from(field_index.saturating_add(1))?]);
+        field.r#type = Some(FieldType::ObjectReference);
+        field.object_references.push(reference);
+        info.field_infos.push(field);
+    }
+    Ok(())
+}
+
+fn uuid_entry(identifier: u64) -> tsp::ObjectUuidMapEntry {
+    tsp::ObjectUuidMapEntry {
+        identifier,
+        uuid: tsp::Uuid {
+            lower: identifier,
+            upper: identifier.saturating_add(0x1000),
+        },
+    }
+}
+
+fn metadata_entry(object_ids: &[u64]) -> TestResult<Vec<u8>> {
+    let metadata = tsp::PackageMetadata {
+        last_object_identifier: METADATA_OBJECT_ID,
+        save_token: Some(10),
+        components: vec![tsp::ComponentInfo {
+            identifier: 100,
+            preferred_locator: "Document".to_owned(),
+            locator: Some("Document".to_owned()),
+            save_token: Some(9),
+            object_uuid_map_entries: object_ids.iter().copied().map(uuid_entry).collect(),
+            ..Default::default()
+        }],
+        versioned_components: vec![tsp::ComponentInfo {
+            identifier: 100,
+            preferred_locator: "Document".to_owned(),
+            locator: Some("Document".to_owned()),
+            save_token: Some(3),
+            object_uuid_map_entries: vec![uuid_entry(999)],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let metadata_object = object(
+        METADATA_OBJECT_ID,
+        METADATA_MESSAGE_TYPE,
+        metadata.encode_to_vec(),
+    )?;
+    Ok(SnappyStream::compress(
+        &Archive {
+            objects: vec![metadata_object],
+        }
+        .to_bytes()?,
     )?)
 }
 
@@ -217,14 +286,9 @@ fn segment_entries(
         tst::table_data_list::ListType::Formula => vec![formula_entry(key)],
         tst::table_data_list::ListType::FormulaError => vec![formula_error_entry(key)],
         tst::table_data_list::ListType::RichTextPayload => vec![rich_text_entry(key)],
-        tst::table_data_list::ListType::CommentStorage => vec![comment_entry_for_storage(
-            key,
-            if key == 12 {
-                SEGMENT_COMMENT_STORAGE_ID
-            } else {
-                COMMENT_STORAGE_ID
-            },
-        )],
+        tst::table_data_list::ListType::CommentStorage => {
+            vec![comment_entry_for_storage(key, SEGMENT_COMMENT_STORAGE_ID)]
+        },
         _ => Vec::new(),
     }
 }
@@ -309,7 +373,11 @@ fn segment_object(
             )?,
         )?);
     }
-    object(identifier, TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE, data)
+    let mut result = object(identifier, TABLE_DATA_LIST_SEGMENT_MESSAGE_TYPE, data)?;
+    if list_type == tst::table_data_list::ListType::CommentStorage {
+        set_message_info(&mut result, 0, &[SEGMENT_COMMENT_STORAGE_ID])?;
+    }
+    Ok(result)
 }
 
 fn string_segment_references(corruption: Corruption) -> Vec<tsp::Reference> {
@@ -414,7 +482,13 @@ fn sidecar_object_with_message_type(
         // the production strict list codec rejects this non-canonical wire.
         payloads[0].data.extend_from_slice(&[0x08, 0x01]);
     }
-    Ok(ArchiveObject::new(SIDECAR_ID, payloads)?)
+    let mut result = ArchiveObject::new(SIDECAR_ID, payloads)?;
+    set_message_info(
+        &mut result,
+        4,
+        &[ISOLATED_COMMENT_STORAGE_ID, COMMENT_STORAGE_ID, 92, 91],
+    )?;
+    Ok(result)
 }
 
 fn rich_text_payload_object() -> TestResult<ArchiveObject> {
@@ -498,6 +572,10 @@ fn comment_storage_object(corruption: Corruption) -> TestResult<ArchiveObject> {
         Corruption::CommentNestedReplyReference => vec![reference(COMMENT_REPLY_ID)],
         _ => vec![reference(COMMENT_REPLY_ID), reference(COMMENT_REPLY_TWO_ID)],
     };
+    let reply_identifiers = replies
+        .iter()
+        .map(|reply| reply.identifier)
+        .collect::<Vec<_>>();
     let comment = tsd::CommentStorageArchive {
         text: (!matches!(corruption, Corruption::CommentMissingText))
             .then(|| "Comment retained by Package".to_owned()),
@@ -549,7 +627,11 @@ fn comment_storage_object(corruption: Corruption) -> TestResult<ArchiveObject> {
             )?,
         )?);
     }
-    object(COMMENT_STORAGE_ID, COMMENT_STORAGE_MESSAGE_TYPE, data)
+    let mut result = object(COMMENT_STORAGE_ID, COMMENT_STORAGE_MESSAGE_TYPE, data)?;
+    let mut references = vec![COMMENT_AUTHOR_ID];
+    references.extend(reply_identifiers);
+    set_message_info(&mut result, 0, &references)?;
+    Ok(result)
 }
 
 fn isolated_comment_storage_object() -> TestResult<ArchiveObject> {
@@ -584,6 +666,19 @@ fn segmented_comment_storage_object() -> TestResult<ArchiveObject> {
     )
 }
 
+fn comment_author_object() -> TestResult<ArchiveObject> {
+    object(
+        COMMENT_AUTHOR_ID,
+        ANNOTATION_AUTHOR_MESSAGE_TYPE,
+        tsk::AnnotationAuthorArchive {
+            name: Some("Table-data-list fixture author".to_owned()),
+            public_id: Some("table-data-list-fixture-author".to_owned()),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )
+}
+
 fn comment_reply_storage_object(identifier: u64, text: &str) -> TestResult<ArchiveObject> {
     comment_reply_storage_object_with_replies(identifier, text, &[])
 }
@@ -593,7 +688,7 @@ fn comment_reply_storage_object_with_replies(
     text: &str,
     reply_ids: &[u64],
 ) -> TestResult<ArchiveObject> {
-    object(
+    let mut result = object(
         identifier,
         COMMENT_STORAGE_MESSAGE_TYPE,
         tsd::CommentStorageArchive {
@@ -606,7 +701,9 @@ fn comment_reply_storage_object_with_replies(
             ..Default::default()
         }
         .encode_to_vec(),
-    )
+    )?;
+    set_message_info(&mut result, 0, reply_ids)?;
+    Ok(result)
 }
 
 fn table_model() -> tst::TableModelArchive {
@@ -717,7 +814,7 @@ fn synthetic_table_data_list_package_with_message_type(
     table_data_list_message_type: u32,
 ) -> TestResult<Vec<u8>> {
     let mut objects = Vec::new();
-    objects.try_reserve(20)?;
+    objects.try_reserve(21)?;
     objects.push(object(
         ROOT_ID,
         DOCUMENT_MESSAGE_TYPE,
@@ -801,11 +898,20 @@ fn synthetic_table_data_list_package_with_message_type(
         COMMENT_REPLY_TWO_ID,
         "Second reply",
     )?);
+    objects.push(comment_author_object()?);
 
+    let object_ids = objects
+        .iter()
+        .filter_map(|object| object.archive_info.identifier)
+        .collect::<Vec<_>>();
     let archive = Archive { objects };
     let iwa = SnappyStream::compress(&archive.to_bytes()?)?;
+    let metadata = metadata_entry(&object_ids)?;
     Ok(litchi_iwa_archive::package::to_bytes(
-        [("Index/Document.iwa", iwa.as_slice())],
+        [
+            ("Index/Document.iwa", iwa.as_slice()),
+            (METADATA_MEMBER, metadata.as_slice()),
+        ],
         ArchiveLimits::default(),
     )?)
 }

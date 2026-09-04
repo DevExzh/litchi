@@ -393,7 +393,7 @@ where
     match result {
         Ok(value) => {
             black_box(value);
-        }
+        },
         Err(error) => observe_error(error),
     }
 }
