@@ -3233,6 +3233,23 @@ native-Office claim is made.
   documented in [Change 0400](../../docs/performance/changes/0400-xlsx-selected-dimension-streaming.md)
   and its [results](../../docs/performance/results/change-0400/); allocator
   elapsed-time, cold-cache, and broad XLSX claims remain excluded.
+  Change 0401 additionally validates unselected numeric/untyped lexical text
+  through a private borrowed `Number::validate_lexical` path and skips owned
+  numeric value construction only for unselected, non-formula, non-inline
+  cells. Selected values and formula caches retain ownership; unselected
+  inline strings retain normal validation. On the fixed `Bench01!M29` query,
+  the selected 48×48 sheet has 2,303 unselected numeric cells. Its 20/500
+  CPU-2 warm ABBA retains only mean/p95/p99 reductions of
+  `+0.099577940251% / +0.625379111895% / +1.170167332729%` and
+  `+0.026562239637% / +0.198122423529% / +0.045344544337%` in the two paired
+  directions; p50 is adverse (`-0.012690677428%` / `-0.035254218167%`) and
+  rejected, with no median claim. The separate 3/30 allocator ABBA records
+  −2,303 allocation calls, −2,303 deallocation calls, and −16,121 allocated
+  and deallocated bytes, with reallocations and failed allocations unchanged.
+  See [Change 0401](../../docs/performance/changes/0401-xlsx-selected-numeric-elision.md)
+  and its [results](../../docs/performance/results/change-0401/); allocator
+  elapsed-time, live/peak/RSS, physical-I/O, cold, throughput, other
+  cell/query/range/corpus, and general XLSX claims remain excluded.
 - `xlsx_bytes_open`: move a prepared owned XLSX allocation into
   `litchi::Workbook::from_bytes(Vec<u8>)`; the input clone and typed eager
   semantic/hash guards are outside timing, so the measured scope is exactly
