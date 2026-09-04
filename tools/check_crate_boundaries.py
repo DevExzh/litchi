@@ -97,13 +97,11 @@ LOCAL_CANONICAL_SHEET_VIEW_TYPE = re.compile(
 FACADE_PACKAGE = "litchi"
 FACADE_REQUIRED_NORMAL_DEPENDENCIES = frozenset({"litchi-core"})
 RETIRED_FACADE_DEPENDENCIES = frozenset({"litchi-iwa"})
-# Standalone migration-host support manifests are intentionally outside the
-# Cargo workspace, so cargo metadata cannot account for their dependency
-# edges.  Keep the exception path-specific and tied to the current host
-# policy; every other manifest must keep retired hosts out of its tables.
-MIGRATION_HOST_MANIFEST_ALLOWLIST = {
-    "litchi-iwa": frozenset({Path("crates/litchi-iwa/fuzz/Cargo.toml")}),
-}
+RETIRED_IWA_FUZZ_PATHS = (
+    Path("crates/litchi-iwa/fuzz/.gitignore"),
+    Path("crates/litchi-iwa/fuzz/Cargo.toml"),
+    Path("crates/litchi-iwa/fuzz/fuzz_targets/parse_iwa.rs"),
+)
 IWA_FACADE_SOURCE = Path("crates/litchi-iwa/src/lib.rs")
 IWA_RAW_MODULE_DECLARATION = re.compile(
     r"^[ \t]*pub(?:\([^()]*\))?[ \t\r\n]+mod[ \t\r\n]+(?:r#)?raw\b",
@@ -4376,6 +4374,27 @@ IWA_KEYNOTE_SOUNDTRACK_ORDER_CALL = re.compile(
 )
 IWA_KEYNOTE_SOUNDTRACK_ORDER_EXAMPLE = Path(
     "crates/litchi-iwa/examples/edit_keynote_soundtrack_items.rs"
+)
+
+# Build-order mutation is now owned by the selector-first Keynote package. The
+# migration host must not restore either raw-ID operation or teach callers a
+# host-side ``move`` command.
+RETIRED_IWA_KEYNOTE_BUILD_ORDER_METHODS = (
+    "move_slide_build",
+    "reorder_slide_builds",
+)
+RETIRED_IWA_KEYNOTE_BUILD_ORDER_METHOD_SET = frozenset(
+    RETIRED_IWA_KEYNOTE_BUILD_ORDER_METHODS
+)
+IWA_KEYNOTE_BUILD_ORDER_METHOD = re.compile(
+    r"(?<![A-Za-z0-9_#])fn[ \t\r\n]+"
+    r"(?:r#)?(?P<method>move_slide_build|reorder_slide_builds)\b"
+)
+IWA_KEYNOTE_BUILD_ORDER_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/edit_keynote_build.rs"
+)
+IWA_KEYNOTE_BUILD_ORDER_MOVE_OPERATION = re.compile(
+    r'(?m)(?:^|[,{])[ \t\r\n]*"move"[ \t\r\n]*=>'
 )
 IWA_KEYNOTE_SOUNDTRACK_SETTINGS_CALLS = (
     re.compile(
@@ -14647,6 +14666,88 @@ def _mask_rust_non_code(source: str) -> str:
     return "".join(masked)
 
 
+def _mask_rust_comments(source: str) -> str:
+    """Mask Rust comments while retaining ordinary string-token contents.
+
+    A small number of source ratchets need to inspect a command literal (for
+    example, an example's ``"move"`` operation) rather than only identifiers.
+    Reusing :func:`_mask_rust_non_code` would hide that literal, while scanning
+    the raw source would let comments or raw-string documentation satisfy the
+    ratchet.  Preserve ordinary quoted tokens, mask comments and raw strings,
+    and keep offsets/newlines stable for diagnostics.
+    """
+
+    masked = list(source)
+
+    def mask(start: int, end: int) -> None:
+        for offset in range(start, end):
+            if masked[offset] != "\n":
+                masked[offset] = " "
+
+    def raw_string_end(start: int) -> int | None:
+        cursor = start
+        if source.startswith(("br", "cr"), cursor):
+            cursor += 2
+        elif source.startswith("r", cursor):
+            cursor += 1
+        else:
+            return None
+        hashes_start = cursor
+        while cursor < len(source) and source[cursor] == "#":
+            cursor += 1
+        if cursor >= len(source) or source[cursor] != '"':
+            return None
+        terminator = '"' + source[hashes_start:cursor]
+        closing = source.find(terminator, cursor + 1)
+        return len(source) if closing < 0 else closing + len(terminator)
+
+    def quoted_string_end(start: int) -> int:
+        cursor = start + 1
+        while cursor < len(source):
+            if source[cursor] == "\\":
+                cursor += 2
+            elif source[cursor] == '"':
+                return cursor + 1
+            else:
+                cursor += 1
+        return len(source)
+
+    cursor = 0
+    while cursor < len(source):
+        if source.startswith("//", cursor):
+            end = source.find("\n", cursor + 2)
+            end = len(source) if end < 0 else end
+            mask(cursor, end)
+            cursor = end
+            continue
+        if source.startswith("/*", cursor):
+            depth = 1
+            end = cursor + 2
+            while end < len(source) and depth:
+                if source.startswith("/*", end):
+                    depth += 1
+                    end += 2
+                elif source.startswith("*/", end):
+                    depth -= 1
+                    end += 2
+                else:
+                    end += 1
+            mask(cursor, end)
+            cursor = end
+            continue
+        raw_end = raw_string_end(cursor)
+        if raw_end is not None:
+            mask(cursor, raw_end)
+            cursor = raw_end
+            continue
+        if source[cursor] == '"':
+            cursor = quoted_string_end(cursor)
+            continue
+        cursor += 1
+
+    return "".join(masked)
+
+
 RUST_CFG_TEST_ATTRIBUTE = re.compile(
     r"^[ \t]*#[ \t]*\[[ \t]*cfg[ \t]*\([ \t]*test[ \t]*\)[ \t]*\]",
     re.MULTILINE,
@@ -17317,6 +17418,43 @@ def audit_iwa_keynote_soundtrack_order_source_topology(
             violations.append(
                 "retired litchi-iwa Keynote soundtrack-order caller "
                 f"move_soundtrack_item: {path.relative_to(root)}:{line_number}"
+            )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_keynote_build_order_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep raw-ID build-order mutation out of the migration host.
+
+    The focused Keynote package owns the public selector-first build-order
+    operation. Neither raw-ID method may return, and the compatibility example
+    must not add a host-side ``move`` operation.
+    """
+
+    violations: list[str] = []
+    source_root = root / IWA_KEYNOTE_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            raw_source = path.read_text(encoding="utf-8")
+            source = _mask_rust_non_code(_mask_rust_cfg_test_items(raw_source))
+            for match in IWA_KEYNOTE_BUILD_ORDER_METHOD.finditer(source):
+                line_number = source.count("\n", 0, match.start()) + 1
+                violations.append(
+                    "retired litchi-iwa Keynote build-order raw-ID method "
+                    f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
+                )
+
+    example = root / IWA_KEYNOTE_BUILD_ORDER_EXAMPLE
+    if example.is_file():
+        raw_source = example.read_text(encoding="utf-8")
+        source = _mask_rust_comments(_mask_rust_cfg_test_items(raw_source))
+        for match in IWA_KEYNOTE_BUILD_ORDER_MOVE_OPERATION.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired litchi-iwa Keynote build-order move example operation: "
+                f"{IWA_KEYNOTE_BUILD_ORDER_EXAMPLE}:{line_number}"
             )
 
     return sorted(set(violations))
@@ -49319,18 +49457,6 @@ def _manifest_relative_path(path: Path, root: Path) -> str:
         return str(path)
 
 
-def _manifest_is_migration_host_allowlisted(
-    manifest: Path,
-    root: Path,
-    package_name: str,
-) -> bool:
-    try:
-        relative = manifest.resolve().relative_to(root.resolve())
-    except ValueError:
-        return False
-    return relative in MIGRATION_HOST_MANIFEST_ALLOWLIST.get(package_name, ())
-
-
 def audit_manifest_dependency_inventory(
     root: Path = ROOT,
     policy: Policy | None = None,
@@ -49375,10 +49501,6 @@ def audit_manifest_dependency_inventory(
                     & migration_hosts
                 )
                 for package_name in offending:
-                    if _manifest_is_migration_host_allowlisted(
-                        manifest, root, package_name
-                    ):
-                        continue
                     violations.append(
                         "retired migration-host manifest dependency outside policy: "
                         f"{_manifest_relative_path(manifest, root)} "
@@ -49386,6 +49508,16 @@ def audit_manifest_dependency_inventory(
                     )
 
     return sorted(set(violations))
+
+
+def audit_iwa_fuzz_exit(root: Path = ROOT) -> list[str]:
+    """Keep the retired migration-host fuzz package from returning."""
+
+    return [
+        f"retired litchi-iwa fuzz artifact returned: {path}"
+        for path in RETIRED_IWA_FUZZ_PATHS
+        if (root / path).exists()
+    ]
 
 
 def audit_manifest_inventory(snapshot: Snapshot) -> list[str]:
@@ -49753,6 +49885,7 @@ def main(argv: list[str] | None = None) -> int:
     violations = (
         audit_manifest_inventory(snapshot)
         + audit_manifest_dependency_inventory(policy=policy)
+        + audit_iwa_fuzz_exit()
         + audit_snapshot(snapshot, policy)
         + audit_litchi_facade_source_topology()
         + audit_iwa_raw_facade_source_topology()
@@ -49762,6 +49895,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_litchi_semantic_facade_source_topology()
         + audit_iwork_example_source_topology()
         + audit_iwa_keynote_source_topology()
+        + audit_iwa_keynote_build_order_source_topology()
         + audit_iwa_direct_core_path_source_topology()
         + audit_iwa_bundle_source_topology()
         + audit_iwa_legacy_method_deprecation_source_topology()

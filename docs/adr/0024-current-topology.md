@@ -4032,3 +4032,30 @@ The current inventory is 64 workspace packages, 238 internal declarations,
 `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. The root
 `litchi::iwork` facade remains host-free and bounded/read-only. No dependency,
 debt, migration host, or monolith-deletion gate closes.
+
+## 2026-09-03 amendment: reconciled iWork ownership and compatibility
+
+The dated soundtrack snapshot above is superseded for current ownership:
+rooted soundtrack-item CRUD is owned by `litchi-keynote::Package`, and the old
+`litchi-iwa` item implementation and public item API are absent. Soundtrack
+creation and broad media/slide-media compatibility remain host-owned. Public
+`NumbersEditor::move_table` is retired while a crate-private duplication bridge
+supports the remaining populated-sheet compatibility graphs. Public raw-ID
+Number, Percentage, Currency, Scientific, and Fraction convenience routes are
+retired; generic source-built/cross-format `DataFormat` compatibility remains.
+
+Host build-order `reorder_slide_builds`, `move_slide_build`, and their wire
+helper are removed, with add/update/timing/remove compatibility retained. The
+focused Keynote build projection reads the nested modern effect at `[4, 18, 2]`
+and its native Apple aliases before legacy fallbacks. This is an E1 semantic
+correction only and supplies no native build-order proof. Number/Percentage
+staging hardening is limited to allocation and budget safety and changes no
+ownership edge.
+
+The current topology is 64 workspace packages, 238 internal declarations, 227
+canonical edges, 11 development-only edges, 11 ordered debts `[1, 2, 4, 8,
+10, 12, 13, 14, 15, 16, 17]`, and one migration host. The nested host-fuzz
+manifest removal closes ADR 0028 deletion gate 1; topology, debt, and host
+counts remain unchanged. The separate 2026-09-03 amendment in
+[`ADR 0028`](0028-iwa-monolith-exit.md) records the gate accounting and
+remaining deletion work.

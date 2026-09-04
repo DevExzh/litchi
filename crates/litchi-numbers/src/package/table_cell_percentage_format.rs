@@ -582,12 +582,14 @@ fn rewrite(
         &mut budget,
     )
     .map_err(map_popup_error)?;
+    let member_count = native_output.members.len();
+    if !(1..=2).contains(&member_count) {
+        return Err(Error::Verification);
+    }
+    let mut maximum_compressed_bytes = 0usize;
+    let mut compression_allocations = 3usize;
     for member in &native_output.members {
-        if member.archive_bytes.len() > native_bound.archive_bytes
-            || SnappyStream::maximum_compressed_len(member.archive_bytes.len())
-                .map_err(|_| Error::Verification)?
-                > native_bound.compressed_bytes
-        {
+        if member.archive_bytes.len() > native_bound.archive_bytes {
             return Err(Error::LimitExceeded {
                 kind: LimitKind::PayloadBytes,
                 observed: u64::try_from(member.archive_bytes.len()).unwrap_or(u64::MAX),
@@ -597,45 +599,103 @@ fn rewrite(
         }
         let maximum_compressed = SnappyStream::maximum_compressed_len(member.archive_bytes.len())
             .map_err(|_| Error::Verification)?;
-        budget
-            .charge_compressed_bytes(maximum_compressed, native_path(path))
-            .map_err(map_popup_error)?;
+        if maximum_compressed > native_bound.compressed_bytes {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::CompressedBytes,
+                observed: u64::try_from(maximum_compressed).unwrap_or(u64::MAX),
+                maximum: u64::try_from(native_bound.compressed_bytes).unwrap_or(u64::MAX),
+                path,
+            });
+        }
+        maximum_compressed_bytes = maximum_compressed_bytes
+            .checked_add(maximum_compressed)
+            .ok_or(Error::Verification)?;
+        let frames = member
+            .archive_bytes
+            .len()
+            .checked_add(SnappyStream::WRITE_CHUNK_SIZE - 1)
+            .ok_or(Error::Verification)?
+            / SnappyStream::WRITE_CHUNK_SIZE;
+        compression_allocations = compression_allocations
+            .checked_add(frames)
+            .and_then(|amount| amount.checked_add(1))
+            .ok_or(Error::Verification)?;
     }
 
     // Percentage-format edits do not manufacture UUIDs, save tokens, or
     // previews. Only the tile and shared format-list members returned by the
     // native owner enter reassembly; metadata and every preview remain exact.
     budget
-        .charge_allocations(2, native_path(path))
+        .charge_compressed_bytes(maximum_compressed_bytes, native_path(path))
         .map_err(map_popup_error)?;
     budget
-        .charge_transaction_work(
-            source_catalog.source_bytes().len().saturating_mul(2),
-            native_path(path),
-        )
+        .charge_allocations(compression_allocations, native_path(path))
         .map_err(map_popup_error)?;
-    let compressed_members = native_output
-        .members
-        .iter()
-        .map(|member| {
-            SnappyStream::compress(&member.archive_bytes).map_err(|_| Error::Verification)
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    let changed_names = native_output
-        .members
-        .iter()
-        .map(|member| member.member_name.clone())
-        .collect::<Vec<_>>();
-    let edit_buffers = native_output
-        .members
-        .iter()
-        .zip(compressed_members)
-        .map(|(member, compressed)| (member.member_name.clone(), compressed))
-        .collect::<Vec<_>>();
-    let edits = edit_buffers
-        .iter()
-        .map(|(name, bytes)| EntryEdit::new(name, bytes))
-        .collect::<Vec<_>>();
+    budget
+        .charge_scratch_bytes(maximum_compressed_bytes, native_path(path))
+        .map_err(map_popup_error)?;
+    budget
+        .charge_retained_bytes(maximum_compressed_bytes, native_path(path))
+        .map_err(map_popup_error)?;
+    let compression_work = source_catalog
+        .source_bytes()
+        .len()
+        .checked_mul(2)
+        .and_then(|amount| amount.checked_add(maximum_compressed_bytes))
+        .ok_or(Error::Verification)?;
+    budget
+        .charge_transaction_work(compression_work, native_path(path))
+        .map_err(map_popup_error)?;
+    let mut compressed_members = Vec::new();
+    compressed_members
+        .try_reserve_exact(member_count)
+        .map_err(|_| Error::Allocation {
+            amount: member_count,
+            path,
+        })?;
+    for member in &native_output.members {
+        let compressed =
+            SnappyStream::compress(&member.archive_bytes).map_err(|_| Error::Verification)?;
+        let maximum = SnappyStream::maximum_compressed_len(member.archive_bytes.len())
+            .map_err(|_| Error::Verification)?;
+        if compressed.len() > maximum {
+            return Err(Error::Verification);
+        }
+        compressed_members.push(compressed);
+    }
+    let mut changed_names = Vec::new();
+    changed_names
+        .try_reserve_exact(member_count)
+        .map_err(|_| Error::Allocation {
+            amount: member_count,
+            path,
+        })?;
+    changed_names.extend(
+        native_output
+            .members
+            .iter()
+            .map(|member| member.member_name.as_str()),
+    );
+    let mut edits = Vec::new();
+    edits
+        .try_reserve_exact(member_count)
+        .map_err(|_| Error::Allocation {
+            amount: member_count,
+            path,
+        })?;
+    edits.extend(
+        native_output
+            .members
+            .iter()
+            .zip(&compressed_members)
+            .map(|(member, bytes)| EntryEdit::new(&member.member_name, bytes)),
+    );
+    // The reassembly planner owns two small edit-index collections. Debit
+    // them before entering the planner; its exact byte/work requirements are
+    // then checked before execution below.
+    budget
+        .charge_allocations(2, native_path(path))
+        .map_err(map_popup_error)?;
     let prepared = source_catalog
         .package()
         .prepare_reassembly_with_deletions(&edits, &[], source_catalog.limits())
@@ -644,17 +704,20 @@ fn rewrite(
     budget
         .preflight_reassembly(requirements, native_path(path))
         .map_err(map_popup_error)?;
+    let publication_work = requirements
+        .output_bytes()
+        .checked_mul(2)
+        .and_then(|amount| {
+            source_catalog
+                .package()
+                .iter()
+                .count()
+                .checked_mul(1024)
+                .and_then(|catalog_work| amount.checked_add(catalog_work))
+        })
+        .ok_or(Error::Verification)?;
     budget
-        .charge_allocations(2, native_path(path))
-        .map_err(map_popup_error)?;
-    budget
-        .charge_transaction_work(
-            requirements
-                .output_bytes()
-                .saturating_mul(2)
-                .saturating_add(source_catalog.package().iter().count().saturating_mul(1024)),
-            native_path(path),
-        )
+        .charge_transaction_work(publication_work, native_path(path))
         .map_err(map_popup_error)?;
     let limits = requirements.exact_limits();
     budget
@@ -836,7 +899,7 @@ fn verify_percentage_package_locality(
 fn verify_percentage_package_locality_with_members(
     source: &Package,
     candidate: &Package,
-    changed_members: &[String],
+    changed_members: &[&str],
 ) -> Result<usize, Error> {
     let source_catalog =
         super::table_headers::rewrite::physical_source(source).map_err(|_| Error::Verification)?;
@@ -858,7 +921,7 @@ fn verify_percentage_package_locality_with_members(
 fn verify_percentage_package_locality_with_indexes(
     source: &Package,
     candidate: &Package,
-    changed_members: &[String],
+    changed_members: &[&str],
     source_catalog: &litchi_iwa_archive::SourceCatalog,
     candidate_catalog: &litchi_iwa_archive::SourceCatalog,
     source_index: &PhysicalEntryIndex<'_>,
@@ -866,15 +929,11 @@ fn verify_percentage_package_locality_with_indexes(
 ) -> Result<usize, Error> {
     if changed_members
         .iter()
-        .any(|name| name == super::metadata::ENTRY_NAME || name.starts_with("preview"))
+        .any(|name| *name == super::metadata::ENTRY_NAME || name.starts_with("preview"))
     {
         return Err(Error::Verification);
     }
-    let native_members = changed_members
-        .iter()
-        .map(String::as_str)
-        .collect::<Vec<_>>();
-    popup::verify_package_locality_for_members(source, candidate, &native_members)
+    popup::verify_package_locality_for_members(source, candidate, changed_members)
         .map_err(|_| Error::Verification)?;
     for source_entry in source_catalog.package().iter().filter(|entry| {
         entry.name() == super::metadata::ENTRY_NAME || entry.name().starts_with("preview")
@@ -899,12 +958,17 @@ fn verify_percentage_package_locality_with_indexes(
     Ok(changed_member_count(source_catalog, candidate_index))
 }
 
-fn changed_member_names(
-    source: &litchi_iwa_archive::SourceCatalog,
-    candidate: &litchi_iwa_archive::SourceCatalog,
-    source_index: &PhysicalEntryIndex<'_>,
-    candidate_index: &PhysicalEntryIndex<'_>,
-) -> Result<Vec<String>, Error> {
+fn changed_member_names<'a>(
+    source: &'a litchi_iwa_archive::SourceCatalog,
+    candidate: &'a litchi_iwa_archive::SourceCatalog,
+    source_index: &PhysicalEntryIndex<'a>,
+    candidate_index: &PhysicalEntryIndex<'a>,
+) -> Result<Vec<&'a str>, Error> {
+    // At most one borrowed name is retained for each non-preview member in
+    // either catalog. Reserve that finite upper bound before the comparison
+    // walk so hostile package entry counts cannot trigger infallible Vec
+    // growth. The returned names borrow the immutable source/candidate
+    // catalogs and need no per-name String allocation.
     let capacity = source
         .package()
         .iter()
@@ -923,7 +987,7 @@ fn changed_member_names(
             .get(source_entry.name())
             .is_none_or(|entry| entry.data() != source_entry.data());
         if differs {
-            changed.push(source_entry.name().to_owned());
+            changed.push(source_entry.name());
         }
     }
     for candidate_entry in candidate.package().iter() {
@@ -931,7 +995,7 @@ fn changed_member_names(
             continue;
         }
         if source_index.get(candidate_entry.name()).is_none() {
-            changed.push(candidate_entry.name().to_owned());
+            changed.push(candidate_entry.name());
         }
     }
     changed.sort_unstable();

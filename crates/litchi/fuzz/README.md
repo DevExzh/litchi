@@ -1,11 +1,15 @@
 # Root iWork fuzzing
 
-`parse_iwork` owns fuzz coverage for the supported `litchi::iwork` byte
-coordinator. It exercises bounded package admission, format dispatch, all
-three semantic projections, and the archive-free snapshot facade. The fuzz
-package deliberately depends only on the root crate with the `iwork` feature;
-it must not acquire a dependency on the legacy `litchi-iwa` migration host or
-on an internal archive, protobuf, Buffa, or concrete-format crate.
+`parse_iwork` is the bounded root-coordinator replacement for the retired
+`litchi-iwa` host fuzz target. It owns fuzz coverage for the supported
+`litchi::iwork` byte coordinator, exercising bounded package admission, format
+dispatch, all three semantic projections, and the archive-free snapshot
+facade. This root target does not claim generic host media-asset coverage; any
+media behavior belongs to an explicit focused owner target. The fuzz package
+must not acquire a dependency on the legacy `litchi-iwa` migration host.
+`parse_iwork` itself exercises only the root `litchi` facade; the shared fuzz
+package also declares internal archive, wire, and schema dependencies used by
+other focused targets to construct bounded in-memory fixtures.
 
 `keynote_soundtrack_items` is the focused selector-first soundtrack media
 lifecycle target. It first offers arbitrary bytes to bounded Keynote ingress,

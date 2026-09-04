@@ -15708,3 +15708,33 @@ compatibility remain. The inventory is still 64 packages, 238 internal
 declarations, 227 canonical edges, 11 development-only edges, debts
 `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. No edge,
 debt, host, or deletion gate closes.
+
+## 2026-09-03 amendment: iWork ownership cutover and build-order semantics
+
+The focused `litchi-keynote::Package` soundtrack-item owner now owns rooted
+item CRUD (read, add, insert, replace, and remove); the legacy `litchi-iwa`
+item implementation and public item API are absent. Soundtrack creation and
+broad media/slide-media compatibility remain in the migration host. Public
+`NumbersEditor::move_table` is also retired; a crate-private duplication
+bridge remains for the host's still-supported populated-sheet compatibility
+graphs. The dedicated raw-ID Number, Percentage, Currency, Scientific, and
+Fraction convenience routes are retired; generic source-built/cross-format
+`DataFormat` compatibility remains.
+
+The host build-order surface is narrower: `reorder_slide_builds`,
+`move_slide_build`, and their wire helper are removed, and the build example no
+longer exposes a raw-ID `move` operation. Host add/update/timing/remove
+compatibility remains.
+The focused build reader now takes the modern nested effect at `[4, 18, 2]`,
+then the legacy database effect, with delivery as a last-resort fallback, and
+recognizes the native `apple:bc-appear` and `apple:bc-dissolve` identifiers.
+This corrects semantic projection only; the focused build-order owner remains
+E1 and has no native build-order proof or E3/E4 promotion.
+
+Number and Percentage staging now bounds member/compression requirements,
+charges scratch/retained/work budgets, and uses fallible staging with borrowed
+member names before reassembly. This is allocation and budget safety only; it
+adds no evidence-level, performance, or topology claim. The current inventory
+is 64 workspace packages, 238 internal declarations, 227 canonical edges, 11
+development-only edges, 11 ordered debts `[1, 2, 4, 8, 10, 12, 13, 14, 15,
+16, 17]`, and one migration host.

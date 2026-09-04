@@ -1,4 +1,4 @@
-//! Add, update, retime, move, or remove an all-at-once Keynote object build.
+//! Add, update, retime, or remove an all-at-once Keynote object build.
 
 use std::env;
 
@@ -328,11 +328,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             editor.set_slide_build(slide_index, object_id, settings)?;
             println!("updated build {object_id}");
         },
-        "move" => {
-            let target_index = arguments.next().ok_or(usage())?.parse()?;
-            editor.move_slide_build(slide_index, object_id, target_index)?;
-            println!("moved build {object_id} to index {target_index}");
-        },
         "timing" => {
             let start = match arguments.next().ok_or(usage())?.as_str() {
                 "on-click" => BuildStart::OnClick,
@@ -379,7 +374,7 @@ fn usage() -> &'static str {
      add-dissolve-in|add-dissolve-out|add-shimmer-in|add-shimmer-out|\
      add-skid-in|add-skid-out|\
      add-swoosh-in|add-swoosh-out|add-trace-in|add-trace-out|\
-     update|timing|move|remove> \
+     update|timing|remove> \
      <drawable-or-build-id> \
      [operation-specific arguments]\n\
      add-rotate arguments: <total-degrees> <clockwise|counterclockwise> \
