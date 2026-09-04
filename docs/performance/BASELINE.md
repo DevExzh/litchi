@@ -1,5 +1,49 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0402: unmanaged OPC overlay validation decoder reuse
+
+Candidate `51964019db3f6b0787645e3a56c2ecb83bdca65c` follows control
+`46ef44966d5be16f153b1f3375ac14401b7139ac`. The private
+`SourceBackedPackage::write_part_overlays_to_stream` validation path now uses
+one indexed-read session for unmanaged packages and reuses one Deflate decoder
+across the selected source-Part reads. Stored members bypass the decoder and
+cache hits remain cache-only. Managed packages retain one-shot reads to avoid
+unreserved decoder workspace. Existing limits, CRC/size/framing and XML
+validation, source freshness, cancellation, signatures, managed budgets,
+partial sinks, and raw preservation remain unchanged.
+
+The opt-in `opc_source_overlay_multi_part_noop` selector uses a fixed
+three-shape × three-overlay-count matrix: `overlay-small` (compressible 1 KiB
+entries, 7,451-byte archive), `overlay-large` (incompressible 64 KiB entries,
+2,103,195-byte archive), and `overlay-media-incompressible` (incompressible
+256 KiB entries, 8,396,580-byte archive), each at counts 2, 8, and 32. The
+non-empty replacement plan is an equal-payload semantic no-op; each output
+reopens with the expected eager semantics and preserves raw member order and
+untouched ZIP records.
+
+Normal evidence is stable Rust/Cargo/Rustdoc 1.98.1, CPU 2, one worker,
+20 warmups, and 500 retained in-process A1/B1/B2/A2 samples per leg. Only
+`source.opc_source_overlay.publication_ns` is summarized. Top-level elapsed is
+validated only as the preparation/open/planning/publication phase sum. The
+global `["warm", "cold-requested"]` cache setting is a configuration envelope,
+not cold evidence; fresh-child/process-isolated semantics are not claimed.
+Accepted publication cells are small/8 and small/32 at p50/mean/p95/p99,
+large/32 at p50 only, and media-incompressible/2 at p50/mean/p95/p99. The
+remaining cells are withheld, so no overall matrix improvement is recorded.
+
+Allocator-only candidate-minus-control deltas are exact per-sample vectors:
+count 2 `-2/-2/0/0/-80320/-80320`, count 8
+`-14/-14/0/0/-562240/-562240`, and count 32
+`-62/-62/0/0/-2489920/-2489920`, in allocation calls, deallocation calls,
+reallocations, failed calls, allocated bytes, and deallocated bytes order.
+Allocator elapsed, live/peak/RSS, physical I/O, cache, and total-memory claims
+are excluded. `litchi-opc` correctness passed 289 library tests / 386 total
+test items; publication and allocator validators passed 10/10 and 22/22.
+`performance_claim: none`; `claim_authorized: false`. The [0402 change
+record](changes/0402-opc-overlay-decoder-reuse.md) and retained [evidence
+bundle](results/change-0402/) retain the detailed matrix, raw reports, and
+validator bindings.
+
 ## Change 0401: XLSX selected numeric ownership elision
 
 Production commit `87f26d5ee02a1903e668bf7f60fa3ef954a0c3fb` follows control

@@ -1,5 +1,47 @@
 # Performance hotspot inventory
 
+## Change 0402 update
+
+The selected-source validation loop in
+`SourceBackedPackage::write_part_overlays_to_stream` was the decoder
+allocation hotspot. Candidate `51964019db3f6b0787645e3a56c2ecb83bdca65c` now
+creates one indexed-read session for unmanaged packages and reuses its Deflate
+decoder over the sequential selected-Part validation reads. Stored members
+bypass the decoder and cache hits remain cache-only; managed packages retain
+the one-shot path to keep decoder workspace within their existing budget
+boundary. Control is `46ef44966d5be16f153b1f3375ac14401b7139ac`.
+
+The opt-in `opc_source_overlay_multi_part_noop` selector uses equal-payload
+non-empty replacement plans over three fixed shapes at counts 2, 8, and 32.
+Normal stable-1.98.1 CPU-2 evidence uses one worker, 20 warmups, and 500
+retained in-process samples per A1/B1/B2/A2 leg. The validator summarizes only
+`source.opc_source_overlay.publication_ns`; top-level elapsed is checked only
+for the preparation + open + planning + publication phase-sum identity. The
+global `["warm", "cold-requested"]` setting does not establish cold evidence,
+and fresh-child/process-isolated semantics are not claimed.
+
+The accepted publication matrix is deliberately partial:
+
+| Shape/count | Accepted statistics |
+| --- | --- |
+| `overlay-small / 2` | none |
+| `overlay-small / 8` | p50, mean, p95, p99 |
+| `overlay-small / 32` | p50, mean, p95, p99 |
+| `overlay-large / 2` | none |
+| `overlay-large / 8` | none |
+| `overlay-large / 32` | p50 only |
+| `overlay-media-incompressible / 2` | p50, mean, p95, p99 |
+| `overlay-media-incompressible / 8` | none |
+| `overlay-media-incompressible / 32` | none |
+
+The exact allocator observation per count is −2/−2/0/0/−80,320/−80,320,
+−14/−14/0/0/−562,240/−562,240, and
+−62/−62/0/0/−2,489,920/−2,489,920, respectively, in calls/calls/reallocs/
+failed/allocated bytes/deallocated bytes order. No overall matrix, top-level
+latency, RSS/peak, cold, physical-I/O, throughput, or general OPC hotspot
+claim follows. See the [0402 change record](changes/0402-opc-overlay-decoder-reuse.md)
+and retained [evidence bundle](results/change-0402/).
+
 ## Change 0401 update
 
 The selected-cell scanner now borrows numeric lexical validation and avoids

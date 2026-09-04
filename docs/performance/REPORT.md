@@ -1,5 +1,64 @@
 # Performance program phase report
 
+## Change 0402: unmanaged OPC overlay validation decoder reuse
+
+Change 0402 compares candidate
+`51964019db3f6b0787645e3a56c2ecb83bdca65c` with control
+`46ef44966d5be16f153b1f3375ac14401b7139ac`. The private
+`SourceBackedPackage::write_part_overlays_to_stream` path now validates
+selected source Parts through one unmanaged indexed-read session, reusing one
+Deflate decoder across sequential reads. Stored entries bypass it and cache
+hits remain cache-only. Managed packages retain their one-shot reads so the
+decoder workspace remains within the existing managed memory policy. Overlay
+limits, framing/CRC/declared-size checks, XML validation, freshness,
+cancellation, signature, partial-sink, and raw-preservation boundaries are
+unchanged.
+
+The opt-in selector `opc_source_overlay_multi_part_noop` uses a non-empty
+equal-payload replacement plan over `overlay-small`, `overlay-large`, and
+`overlay-media-incompressible` corpora at overlay counts 2, 8, and 32. Every
+no-op output passes the eager semantic oracle and raw member/order checks.
+Normal evidence uses stable Rust/Cargo/Rustdoc 1.98.1, CPU 2, one worker,
+20 warmups, and 500 retained **in-process** samples per leg in strict
+A1(control)/B1(candidate)/B2(candidate)/A2(control) order.
+
+The normal validator summarizes only nested
+`source.opc_source_overlay.publication_ns`. It checks, but does not summarize,
+the top-level phase-sum oracle
+`elapsed_ns = preparation_ns + open_ns + planning_ns + publication_ns`.
+The global cache configuration is `["warm", "cold-requested"]`; this is not
+cold evidence, and no fresh-child/process-isolated semantics are claimed.
+Positive values below mean lower candidate publication phase:
+
+| Shape/count | Accepted statistics | A1 → B1 reductions | A2 → B2 reductions |
+| --- | --- | --- | --- |
+| `overlay-small / 2` | none | — | — |
+| `overlay-small / 8` | p50, mean, p95, p99 | 15.135453 / 14.915579 / 14.550562 / 9.750859% | 12.433393 / 12.919635 / 13.126761 / 5.805085% |
+| `overlay-small / 32` | p50, mean, p95, p99 | 22.344144 / 22.316386 / 27.338269 / 20.303797% | 21.426460 / 21.438222 / 23.738113 / 16.127923% |
+| `overlay-large / 2` | none | — | — |
+| `overlay-large / 8` | none | — | — |
+| `overlay-large / 32` | p50 only | 1.095149% | 2.088386% |
+| `overlay-media-incompressible / 2` | p50, mean, p95, p99 | 1.510196 / 1.927179 / 3.881384 / 5.553444% | 0.814482 / 1.216448 / 1.447249 / 3.045589% |
+| `overlay-media-incompressible / 8` | none | — | — |
+| `overlay-media-incompressible / 32` | none | — | — |
+
+Slash-separated values are p50 / mean / p95 / p99; a partial accepted cell
+does not imply acceptance of its other statistics. The withheld cells retain
+their adverse-direction and drift disclosures. No overall matrix improvement
+claim is made.
+
+The separate allocator observation records exact candidate-minus-control
+deltas per sample of `-2/-2/0/0/-80320/-80320` at count 2,
+`-14/-14/0/0/-562240/-562240` at count 8, and
+`-62/-62/0/0/-2489920/-2489920` at count 32, in calls/calls/reallocations/
+failed calls/allocated bytes/deallocated bytes order. Allocator elapsed,
+live/peak/RSS, physical I/O, cache, and total-memory values are not claim
+metrics. `litchi-opc` passed 289 library tests / 386 total test items; the
+dedicated publication and allocator validators passed 10/10 and 22/22.
+`performance_claim: none`; `claim_authorized: false`. See the [0402 change
+record](changes/0402-opc-overlay-decoder-reuse.md) and retained [evidence
+bundle](results/change-0402/).
+
 ## Change 0401: XLSX selected numeric ownership elision
 
 Change 0401 measures production candidate

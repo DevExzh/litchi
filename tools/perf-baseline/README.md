@@ -50,6 +50,45 @@ fails report generation rather than publishing unverifiable provenance.
 The tool is intentionally outside the root workspace and has no effect on
 production dependency graphs.
 
+## Change 0402 OPC overlay publication evidence
+
+The opt-in `opc_source_overlay_multi_part_noop` selector retains a fixed
+three-shape × count-2/8/32 matrix for the unmanaged
+`SourceBackedPackage::write_part_overlays_to_stream` path. Candidate
+`51964019db3f6b0787645e3a56c2ecb83bdca65c` reuses one indexed-read session and
+Deflate decoder while validating selected source Parts; control is
+`46ef44966d5be16f153b1f3375ac14401b7139ac`. Stored entries bypass the decoder,
+cache hits remain cache-only, and managed packages retain their one-shot
+budgeted path.
+
+Normal evidence uses Rust/Cargo/Rustdoc 1.98.1, CPU 2, one worker, 20 warmups,
+and 500 retained in-process A1/B1/B2/A2 samples per leg. The dedicated
+`tools/perf_opc_overlay_abba_summary.py` validator summarizes only nested
+`source.opc_source_overlay.publication_ns`; top-level elapsed is checked only
+as the preparation/open/planning/publication phase sum. The configured cache
+envelope `["warm", "cold-requested"]` is not cold evidence, and no fresh-child
+semantics are claimed. Accepted publication statistics are partial: small/8
+and small/32 accept p50/mean/p95/p99, large/32 accepts p50 only, and
+media-incompressible/2 accepts p50/mean/p95/p99. Other cells are withheld, so
+there is no overall matrix claim.
+
+The separate allocator observation records per-sample candidate-minus-control
+deltas `-2/-2/0/0/-80320/-80320`, `-14/-14/0/0/-562240/-562240`, and
+`-62/-62/0/0/-2489920/-2489920` for counts 2, 8, and 32, respectively, in
+allocation calls/deallocation calls/reallocations/failed calls/allocated
+bytes/deallocated bytes order. Allocator elapsed, RSS/peak/live, physical
+I/O, cache, and generalized OPC claims are excluded. The [Change 0402
+record](../../docs/performance/changes/0402-opc-overlay-decoder-reuse.md) and
+retained [evidence bundle](../../docs/performance/results/change-0402/) contain
+the full corpus identities, accepted-cell matrix, compressed reports,
+manifests, and validator bindings. The bundle is bound by evidence-manifest
+SHA-256 `0e748923f9da1e1173562a90014970173f3b8350de04b0de5144924118cec5e3`,
+package-manifest SHA-256 `beb4953f45617c0925c4e7d44b20e7a86c75c0ea95ed20c3829cb42a491da5b7`,
+and summary SHA-256
+`65e78362e712f15d73383102dd129ce96ba4f07b7073e41b91e1ed92c9cd4085`.
+This partial custom publication metric is intentionally not entered into
+`claim-registry-v1.json`.
+
 The non-iWork Phase-1 CRUD taxonomy is recorded in the machine-readable
 [`docs/performance/crud-coverage-index-v1.json`](../../docs/performance/crud-coverage-index-v1.json).
 It is a representative (not exhaustive) mapping: `measured` is reserved for
