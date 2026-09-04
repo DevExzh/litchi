@@ -28,6 +28,8 @@ pub const MAX_PATH_NODES: usize = 16 * 1024;
 
 const APPEAR_EFFECT: &str = "appear";
 const DISSOLVE_EFFECT: &str = "dissolve";
+const APPLE_APPEAR_EFFECT: &str = "apple:bc-appear";
+const APPLE_DISSOLVE_EFFECT: &str = "apple:bc-dissolve";
 const MOVE_IN_EFFECT: &str = "move";
 const SCALE_EFFECT: &str = "scale";
 const FADE_AND_SCALE_EFFECT: &str = "fade-scale";
@@ -149,9 +151,9 @@ impl Effect {
     /// constructors on this module.
     pub fn from_identifier(identifier: &str) -> Result<Self> {
         validate_text(identifier)?;
-        let effect = if identifier.eq_ignore_ascii_case(APPEAR_EFFECT) {
+        let effect = if is_appear_effect_identifier(identifier) {
             Self::Appear
-        } else if identifier.eq_ignore_ascii_case(DISSOLVE_EFFECT) {
+        } else if is_dissolve_effect_identifier(identifier) {
             Self::Dissolve
         } else if identifier.eq_ignore_ascii_case(MOVE_IN_EFFECT)
             || contains_ascii_case_insensitive(identifier, b"move")
@@ -1318,11 +1320,21 @@ impl Settings {
 }
 
 fn is_simple_effect_identifier(identifier: &str) -> bool {
-    identifier.eq_ignore_ascii_case(APPEAR_EFFECT)
-        || identifier.eq_ignore_ascii_case(DISSOLVE_EFFECT)
+    is_appear_effect_identifier(identifier)
+        || is_dissolve_effect_identifier(identifier)
         || identifier.eq_ignore_ascii_case(MOVE_IN_EFFECT)
         || identifier.eq_ignore_ascii_case(SCALE_EFFECT)
         || identifier.eq_ignore_ascii_case(FADE_AND_SCALE_EFFECT)
+}
+
+fn is_appear_effect_identifier(identifier: &str) -> bool {
+    identifier.eq_ignore_ascii_case(APPEAR_EFFECT)
+        || identifier.eq_ignore_ascii_case(APPLE_APPEAR_EFFECT)
+}
+
+fn is_dissolve_effect_identifier(identifier: &str) -> bool {
+    identifier.eq_ignore_ascii_case(DISSOLVE_EFFECT)
+        || identifier.eq_ignore_ascii_case(APPLE_DISSOLVE_EFFECT)
 }
 
 fn is_action_identifier(identifier: &str) -> bool {
@@ -1400,10 +1412,19 @@ mod tests {
     #[test]
     fn effects_preserve_unknown_identifiers_without_raw_fields() -> Result<()> {
         assert_eq!(Effect::from_identifier("APPEAR")?, Effect::Appear);
+        assert_eq!(Effect::from_identifier("apple:bc-appear")?, Effect::Appear);
+        assert_eq!(
+            Effect::from_identifier("APPLE:BC-DISSOLVE")?,
+            Effect::Dissolve
+        );
         let unknown = Effect::from_identifier("com.example.future")?;
         assert_eq!(unknown.identifier(), "com.example.future");
         assert_eq!(unknown, Effect::unknown("com.example.future")?);
         assert_eq!(Effect::unknown("appear"), Err(Error::NonCanonicalEffect));
+        assert_eq!(
+            Effect::unknown("apple:bc-dissolve"),
+            Err(Error::NonCanonicalEffect)
+        );
         Ok(())
     }
 

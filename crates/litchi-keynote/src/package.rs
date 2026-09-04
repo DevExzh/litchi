@@ -1334,7 +1334,7 @@ impl Package {
         let object = self.required_object(identifier, "Keynote build")?;
         let payload = unique_payload(&object.messages, &[BUILD_MESSAGE_TYPE], "Keynote build")?;
         let build = preflight_build(payload, self.semantic_wire_limits()?, budget, path)?;
-        let animation = AnimationType::from_identifier(build.delivery).map_err(|error| {
+        let animation = AnimationType::from_identifier(build.effect).map_err(|error| {
             ReadError::Decode(format!("invalid Keynote build identifier: {error}"))
         })?;
         let duration = Seconds::new(build.duration).map_err(|error| {
@@ -1544,7 +1544,7 @@ struct SlidePreflight<'source> {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct BuildPreflight<'source> {
-    delivery: &'source str,
+    effect: &'source str,
     duration: f64,
 }
 
@@ -2822,7 +2822,9 @@ fn preflight_build<'source>(
     let mut root_duration = None;
     let mut attribute_fields = 0usize;
     let mut animation_attribute_fields = 0usize;
+    let mut database_effect = None;
     let mut database_duration = None;
+    let mut animation_effect = None;
     let mut animation_duration = None;
     preflight_wire_tree_with_limits(payload, wire_limits, |visit| {
         let field = visit.field();
@@ -2843,6 +2845,10 @@ fn preflight_build<'source>(
                 )?;
                 Ok(WireDescent::Descend)
             },
+            ([4], 2) => {
+                set_unique_utf8(field, &mut database_effect, "Keynote build database effect")?;
+                Ok(WireDescent::Skip)
+            },
             ([4], 8) => {
                 set_unique_f64(
                     field,
@@ -2858,6 +2864,10 @@ fn preflight_build<'source>(
                     "Keynote build animation attributes",
                 )?;
                 Ok(WireDescent::Descend)
+            },
+            ([4, 18], 2) => {
+                set_unique_utf8(field, &mut animation_effect, "Keynote build effect")?;
+                Ok(WireDescent::Skip)
             },
             ([4, 18], 3) => {
                 set_unique_f64(
@@ -2879,9 +2889,14 @@ fn preflight_build<'source>(
             "Keynote build has no unique required attributes".to_owned(),
         ));
     }
-    budget.charge_text(delivery.len(), path)?;
+    // `delivery` is the required native text-delivery label (for example,
+    // "All at Once"), not the build effect. Modern Keynote stores the effect
+    // at [4, 18, 2]; retain the legacy database field and the old delivery
+    // fallback only for producers that omit both effect fields.
+    let effect = animation_effect.or(database_effect).unwrap_or(delivery);
+    budget.charge_text(effect.len(), path)?;
     Ok(BuildPreflight {
-        delivery,
+        effect,
         duration: animation_duration
             .or(database_duration)
             .or(root_duration)
@@ -4312,6 +4327,8 @@ mod tests {
     use std::thread;
 
     use super::*;
+    use litchi_iwa_protos::kn;
+    use prost::Message as _;
     use tempfile::NamedTempFile;
 
     struct FailingWriter {
@@ -4395,6 +4412,77 @@ mod tests {
                 maximum: actual_maximum,
             }) if *actual_observed == observed && *actual_maximum == maximum
         ));
+    }
+
+    #[allow(
+        deprecated,
+        reason = "synthetic build fixtures cover the legacy duration/effect fallback"
+    )]
+    fn synthetic_build_payload(
+        delivery: &str,
+        database_effect: Option<&str>,
+        animation_effect: Option<&str>,
+    ) -> Vec<u8> {
+        kn::BuildArchive {
+            delivery: delivery.to_owned(),
+            duration: Some(0.25),
+            attributes: kn::BuildAttributesArchive {
+                database_effect: database_effect.map(str::to_owned),
+                animation_attributes: Some(kn::AnimationAttributesArchive {
+                    effect: animation_effect.map(str::to_owned),
+                    duration: Some(0.75),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .encode_to_vec()
+    }
+
+    #[test]
+    fn build_preflight_reads_nested_effect_before_delivery()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let payload = synthetic_build_payload("All at Once", None, Some("apple:bc-appear"));
+        let mut budget = SemanticBudget::new(SemanticLimits::default());
+        let preflight = preflight_build(
+            &payload,
+            WireLimits::default(),
+            &mut budget,
+            SemanticPath::SlideBuild { slide: 0, index: 0 },
+        )?;
+
+        assert_eq!(preflight.effect, "apple:bc-appear");
+        assert_eq!(preflight.duration, 0.75);
+        assert_eq!(
+            AnimationType::from_identifier(preflight.effect)?,
+            AnimationType::Appear
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn build_preflight_uses_legacy_effect_then_delivery_fallback()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut budget = SemanticBudget::new(SemanticLimits::default());
+        let legacy = synthetic_build_payload("All at Once", Some("apple:bc-dissolve"), None);
+        let preflight = preflight_build(
+            &legacy,
+            WireLimits::default(),
+            &mut budget,
+            SemanticPath::SlideBuild { slide: 0, index: 0 },
+        )?;
+        assert_eq!(preflight.effect, "apple:bc-dissolve");
+
+        let delivery = synthetic_build_payload("legacy-effect", None, None);
+        let preflight = preflight_build(
+            &delivery,
+            WireLimits::default(),
+            &mut budget,
+            SemanticPath::SlideBuild { slide: 0, index: 1 },
+        )?;
+        assert_eq!(preflight.effect, "legacy-effect");
+        Ok(())
     }
 
     #[test]

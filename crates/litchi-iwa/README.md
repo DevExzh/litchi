@@ -1453,7 +1453,6 @@ if let Some(drawable) = keynote.slide_drawables(0)?.first() {
     build_settings.delay = 0.25;
     keynote.set_slide_build(0, build.object_id, build_settings)?;
     let _builds = keynote.slide_builds(0)?;
-    keynote.move_slide_build(0, build.object_id, 0)?;
     keynote.remove_slide_build(0, build.object_id)?;
 
     let build_out = keynote.add_slide_build(

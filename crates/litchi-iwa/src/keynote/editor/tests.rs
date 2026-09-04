@@ -1817,8 +1817,6 @@ fn slide_build_start_modes_map_to_native_chunks_and_guard_sequence_edges() {
     assert_eq!(builds[1].chunks[0].referent, Some(false));
 
     let before_invalid = editor.to_bytes().unwrap();
-    assert!(editor.move_slide_build(0, second.object_id, 0).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), before_invalid);
     assert!(editor.remove_slide_build(0, first.object_id).is_err());
     assert_eq!(editor.to_bytes().unwrap(), before_invalid);
 
@@ -1892,120 +1890,6 @@ fn slide_build_reader_rejects_automatic_first_event_without_transition_semantics
 
     let malformed = KeynoteEditor::from_package(package).unwrap();
     assert!(malformed.slide_builds(0).is_err());
-}
-
-#[test]
-fn slide_build_reorder_is_transactional_and_byte_exact_when_restored() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let first = editor
-        .add_slide_build(0, 5, KeynoteBuildSettings::appear_in())
-        .unwrap();
-    let second = editor
-        .add_slide_build(0, 6, KeynoteBuildSettings::appear_in())
-        .unwrap();
-    let baseline = editor.to_bytes().unwrap();
-
-    editor.move_slide_build(0, first.object_id, 1).unwrap();
-    assert_eq!(
-        editor
-            .slide_builds(0)
-            .unwrap()
-            .iter()
-            .map(|build| build.object_id)
-            .collect::<Vec<_>>(),
-        [second.object_id, first.object_id]
-    );
-    let graph = ObjectGraph::read(editor.package()).unwrap();
-    let slide: kn::SlideArchive = graph.decode(4, "KN.SlideArchive").unwrap();
-    assert_eq!(
-        slide
-            .build_chunks
-            .iter()
-            .map(|reference| reference.identifier)
-            .collect::<Vec<_>>(),
-        [second.chunks[0].object_id, first.chunks[0].object_id]
-    );
-
-    let reordered = editor.to_bytes().unwrap();
-    assert!(editor.move_slide_build(0, first.object_id, 2).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), reordered);
-    assert!(
-        editor
-            .reorder_slide_builds(0, &[second.object_id, second.object_id])
-            .is_err()
-    );
-    assert_eq!(editor.to_bytes().unwrap(), reordered);
-    assert!(editor.move_slide_build(1, first.object_id, 0).is_err());
-    assert_eq!(editor.to_bytes().unwrap(), reordered);
-
-    editor.move_slide_build(0, first.object_id, 0).unwrap();
-    assert_eq!(editor.to_bytes().unwrap(), baseline);
-}
-
-#[test]
-fn slide_build_reorder_preserves_unknown_reference_wire() {
-    let mut editor = KeynoteEditor::from_package(test_package()).unwrap();
-    let first = editor
-        .add_slide_build(0, 5, KeynoteBuildSettings::appear_in())
-        .unwrap();
-    let second = editor
-        .add_slide_build(0, 6, KeynoteBuildSettings::appear_in())
-        .unwrap();
-    let mut package = editor.into_package();
-    package
-        .update_archive("Index/Slide-4.iwa", |archive| {
-            let slide = archive.object_mut(4).unwrap();
-            let original = slide.messages[0].data.as_slice();
-            let mut data = original.to_vec();
-            for field in [2, 43] {
-                let replacements = repeated_length_delimited_payloads(&data, field)?
-                    .into_iter()
-                    .enumerate()
-                    .map(|(index, payload)| {
-                        let mut payload = payload.to_vec();
-                        append_unknown_varint(&mut payload, 99, 9_900 + index as u64);
-                        payload
-                    })
-                    .collect::<Vec<_>>();
-                data = rewrite_repeated_length_delimited_fields(&data, field, &replacements)?;
-            }
-            slide.replace_message(0, RawMessage { type_: 5, data })?;
-            Ok(())
-        })
-        .unwrap();
-    let before = package
-        .archive("Index/Slide-4.iwa")
-        .unwrap()
-        .object(4)
-        .unwrap()
-        .messages[0]
-        .data
-        .clone();
-    let before_builds = repeated_length_delimited_payloads(&before, 2)
-        .unwrap()
-        .into_iter()
-        .map(Vec::from)
-        .collect::<Vec<_>>();
-    let before_chunks = repeated_length_delimited_payloads(&before, 43)
-        .unwrap()
-        .into_iter()
-        .map(Vec::from)
-        .collect::<Vec<_>>();
-
-    let mut editor = KeynoteEditor::from_package(package).unwrap();
-    editor
-        .reorder_slide_builds(0, &[second.object_id, first.object_id])
-        .unwrap();
-    let graph = ObjectGraph::read(editor.package()).unwrap();
-    let slide = graph.objects.get(&4).unwrap()[0].data.as_slice();
-    assert_eq!(
-        repeated_length_delimited_payloads(slide, 2).unwrap(),
-        [before_builds[1].as_slice(), before_builds[0].as_slice()]
-    );
-    assert_eq!(
-        repeated_length_delimited_payloads(slide, 43).unwrap(),
-        [before_chunks[1].as_slice(), before_chunks[0].as_slice()]
-    );
 }
 
 #[test]

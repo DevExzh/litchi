@@ -2229,3 +2229,27 @@ topology remains 64 workspace packages, 238 internal declarations, 227
 canonical edges, 11 development-only edges, debts
 `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. No
 dependency, debt, host, or ADR 0028 deletion gate closes.
+
+## 2026-09-03 amendment: iWork staging and compatibility resource status
+
+The Number and Percentage existing-cell rewrites now preflight the bounded
+member count, maximum compressed bytes, compression-frame allocations, and
+checked work totals. They charge compressed, scratch, retained, allocation,
+and transaction-work budgets before reassembly; compressed members, edit lists,
+and changed-name lists use fallible reservations, and changed names borrow the
+immutable package catalogs. A refusal therefore occurs before publication and
+maps to the existing typed allocation/limit errors. This is allocation and
+budget safety only, not a measured allocation, RSS, latency, throughput, or
+zero-copy result.
+
+The related iWork ownership status is also current: focused Keynote owns
+soundtrack-item CRUD while host soundtrack creation and broad media remain;
+public `NumbersEditor::move_table` and the dedicated raw-ID Number, Percentage,
+Currency, Scientific, and Fraction routes are retired, with only the
+crate-private duplication bridge and generic `DataFormat` compatibility left.
+Host build-order reorder/move and its wire helper are removed, and
+nested-effect projection is an E1 semantic correction without native
+build-order proof. The current topology is 64 workspace packages, 238 internal
+declarations, 227 canonical
+edges, 11 development-only edges, 11 ordered debts `[1, 2, 4, 8, 10, 12, 13,
+14, 15, 16, 17]`, and one migration host.

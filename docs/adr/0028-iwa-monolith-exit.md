@@ -7717,3 +7717,52 @@ override the other failures. The inventory remains 64 workspace packages, 238
 internal declarations, 227 canonical edges, 11 development-only edges, debts
 `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. No edge,
 debt, host, or whole-monolith deletion gate closes.
+
+## 2026-09-03 amendment: bounded host-fuzz exit and focused build-order hardening
+
+The tracked nested `crates/litchi-iwa/fuzz` package is now removed. Its former
+`parse_iwa` target is replaced by the bounded root `crates/litchi/fuzz`
+`parse_iwork` coordinator target, which exercises root format admission and
+dispatch but makes no generic media-asset coverage claim. The recursive
+manifest audit consequently finds no workspace or published manifest that
+depends on `litchi-iwa`, so deletion gate 1 closes. Removing this nested
+manifest does not change Cargo workspace policy accounting: it was outside the
+workspace package inventory, and the root fuzz package already carried the
+bounded coordination policy. An exact retired-artifact ratchet prevents the
+deleted manifest, target, or package-local ignore file from returning.
+
+The migration host's raw-ID Keynote build-order routes `reorder_slide_builds`
+and `move_slide_build`, their wire helper, and their host-only regression tests
+are removed. The host `edit_keynote_build` example no longer exposes the raw-ID
+`move` operation; the remaining host build lifecycle, effect, timing, add,
+update, and remove paths remain available for compatibility while their focused
+owners advance. The boundary ratchet prevents either method or the removed
+example command from returning.
+
+Focused Keynote build reads now use the nested native effect identity at
+`[4, 18, 2]` as the primary animation source, with the legacy database effect
+field as the next fallback and the delivery label only as a final legacy
+fallback. Apple effect aliases such as `apple:bc-appear` and
+`apple:bc-dissolve` are admitted into the typed semantic vocabulary. This is
+an E1 build-order owner correction and has no native acceptance evidence; it
+does not claim general animation authoring or complete build-order parity.
+Numbers Number and Percentage staging now use bounded, fallible ownership and
+charge compressed, scratch, retained, allocation, and publication work before
+reassembly. These are allocation and budget safeguards only; they do not
+change the semantic or native evidence level of either format owner.
+
+The current Keynote feature-matrix narrative should therefore read the
+existing-cell Number-format transaction as E4 evidence (bounded to that
+operation), while the build-order row remains E1 and without native
+acceptance. No broader Keynote table-cell CRUD or package-wide native claim is
+implied.
+
+Deletion gates 2, 3, 4, and 6 remain open: focused ownership is incomplete,
+semantic parity and mutation/native coverage remain partial, and the
+migration-host boundary still has outstanding debts. Deletion gate 5 remains
+passing for the root facade. The current topology remains 64 workspace
+packages, 238 internal dependency declarations, 227 canonical edges, 11
+development-only edges, debts `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and
+one migration host. Closing deletion gate 1 by deleting the nested fuzz
+manifest removes no root workspace edge, debt item, or host; the monolithic
+`litchi-iwa` crate therefore remains until the other gates close.

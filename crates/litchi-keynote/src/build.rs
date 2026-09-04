@@ -155,9 +155,13 @@ impl AnimationType {
             return Err(Error::EmptyIdentifier);
         }
 
-        let effect = if identifier.eq_ignore_ascii_case("appear") {
+        let effect = if identifier.eq_ignore_ascii_case("appear")
+            || identifier.eq_ignore_ascii_case("apple:bc-appear")
+        {
             Self::Appear
-        } else if identifier.eq_ignore_ascii_case("dissolve") {
+        } else if identifier.eq_ignore_ascii_case("dissolve")
+            || identifier.eq_ignore_ascii_case("apple:bc-dissolve")
+        {
             Self::Dissolve
         } else if contains_ascii_case_insensitive(identifier, b"move") {
             Self::MoveIn
@@ -274,6 +278,14 @@ mod tests {
         );
         assert_eq!(
             AnimationType::from_identifier("Dissolve")?,
+            AnimationType::Dissolve
+        );
+        assert_eq!(
+            AnimationType::from_identifier("apple:bc-appear")?,
+            AnimationType::Appear
+        );
+        assert_eq!(
+            AnimationType::from_identifier("APPLE:BC-DISSOLVE")?,
             AnimationType::Dissolve
         );
         assert_eq!(

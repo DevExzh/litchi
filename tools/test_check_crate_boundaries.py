@@ -4989,7 +4989,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 violations,
             )
 
-    def test_manifest_dependency_inventory_allows_current_host_fuzz_support(self) -> None:
+    def test_manifest_dependency_inventory_rejects_current_host_fuzz_support(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             write_cargo_manifest_fixture(
@@ -5017,9 +5017,36 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "litchi-iwa = { package = \"litchi-iwa-archive\", version = \"0.1\" }\n",
             )
 
-            self.assertEqual(
-                boundaries.audit_manifest_dependency_inventory(root, self.policy), []
+            violations = boundaries.audit_manifest_dependency_inventory(root, self.policy)
+
+            self.assertEqual(len(violations), 1)
+            self.assertIn(
+                "crates/litchi-iwa/fuzz/Cargo.toml [dependencies] alias=litchi-iwa, "
+                "package=litchi-iwa",
+                violations[0],
             )
+
+    def test_iwa_fuzz_exit_rejects_every_retired_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in boundaries.RETIRED_IWA_FUZZ_PATHS:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("retired\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_fuzz_exit(root),
+                [
+                    f"retired litchi-iwa fuzz artifact returned: {path}"
+                    for path in boundaries.RETIRED_IWA_FUZZ_PATHS
+                ],
+            )
+
+    def test_iwa_fuzz_exit_is_in_main_dispatch(self) -> None:
+        self.assertIn(
+            "+ audit_iwa_fuzz_exit()",
+            inspect.getsource(boundaries.main),
+        )
 
     def test_manifest_dependency_inventory_is_in_main_dispatch(self) -> None:
         self.assertIn(
@@ -7462,6 +7489,87 @@ class BoundaryPolicyTests(unittest.TestCase):
                     "crates/litchi-iwa/src/keynote/editor/other.rs:5"
                 ],
             )
+
+    def test_iwa_keynote_build_order_policy_rejects_methods_and_move_operation(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "editor/build_order.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// pub fn move_slide_build() {}\n"
+                'const NOTE: &str = "pub fn reorder_slide_builds() {}";\n'
+                "pub(crate) fn move_slide_build() {}\n"
+                "pub(super) fn reorder_slide_builds() {}\n"
+                "pub fn move_slide_build(&mut self, id: u64) {}\n"
+                "pub\nfn reorder_slide_builds(&mut self, ids: &[u64]) {}\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.IWA_KEYNOTE_BUILD_ORDER_EXAMPLE
+            example.parent.mkdir(parents=True)
+            example.write_text(
+                "// \"move\" => {}\n"
+                'const NOTE: &str = "\\\"move\\\" =>";\n'
+                'const RAW: &str = r#"\n"move" =>\n"#;\n'
+                'match operation.as_str() {\n    "add-move" => {}\n    "move" => {}\n    _ => {}\n}\n',
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_build_order_source_topology(root),
+                sorted(
+                    [
+                        "retired litchi-iwa Keynote build-order raw-ID method "
+                        "move_slide_build: "
+                        "crates/litchi-iwa/src/keynote/editor/build_order.rs:3",
+                        "retired litchi-iwa Keynote build-order raw-ID method "
+                        "reorder_slide_builds: "
+                        "crates/litchi-iwa/src/keynote/editor/build_order.rs:4",
+                        "retired litchi-iwa Keynote build-order raw-ID method "
+                        "move_slide_build: "
+                        "crates/litchi-iwa/src/keynote/editor/build_order.rs:5",
+                        "retired litchi-iwa Keynote build-order raw-ID method "
+                        "reorder_slide_builds: "
+                        "crates/litchi-iwa/src/keynote/editor/build_order.rs:7",
+                        "retired litchi-iwa Keynote build-order move example operation: "
+                        "crates/litchi-iwa/examples/edit_keynote_build.rs:8",
+                    ]
+                ),
+            )
+
+    def test_iwa_keynote_build_order_policy_allows_only_near_operations(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_KEYNOTE_SOURCE_ROOT / "editor/build_order.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn move_slide_build_helper() {}\n"
+                "fn reorder_slide_builds_for_test_fixture() {}\n",
+                encoding="utf-8",
+            )
+            example = root / boundaries.IWA_KEYNOTE_BUILD_ORDER_EXAMPLE
+            example.parent.mkdir(parents=True)
+            example.write_text(
+                'match operation.as_str() {\n'
+                '    "add-move" => {}\n'
+                '    "add-move-bezier" => {}\n'
+                '    _ => {}\n'
+                '}\n',
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_build_order_source_topology(root), []
+            )
+
+    def test_iwa_keynote_build_order_policy_is_in_main_dispatch(self) -> None:
+        self.assertIn(
+            "+ audit_iwa_keynote_build_order_source_topology()",
+            inspect.getsource(boundaries.main),
+        )
 
     def test_focused_keynote_soundtrack_items_owner_scaffold_is_valid(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
