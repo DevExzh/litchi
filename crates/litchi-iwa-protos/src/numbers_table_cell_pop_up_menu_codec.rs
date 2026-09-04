@@ -3363,7 +3363,7 @@ pub(crate) fn canonical_date_time_format(
 /// The complete source payload remains available through [`Self::raw`].
 /// Unknown extension fields and groups are never decoded into owned storage
 /// and are copied byte-for-byte by [`rewrite_duration_format`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) struct DurationFormatSnapshot<'source> {
     source: &'source [u8],
     format_type: u32,
@@ -3371,6 +3371,23 @@ pub(crate) struct DurationFormatSnapshot<'source> {
     duration_unit_largest: u32,
     duration_unit_smallest: u32,
     use_automatic_duration_units: bool,
+}
+
+impl fmt::Debug for DurationFormatSnapshot<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("DurationFormatSnapshot")
+            .field("format_type", &self.format_type)
+            .field("duration_style", &self.duration_style)
+            .field("duration_unit_largest", &self.duration_unit_largest)
+            .field("duration_unit_smallest", &self.duration_unit_smallest)
+            .field(
+                "use_automatic_duration_units",
+                &self.use_automatic_duration_units,
+            )
+            .field("source_bytes", &self.source.len())
+            .finish()
+    }
 }
 
 impl<'source> DurationFormatSnapshot<'source> {
@@ -3478,7 +3495,7 @@ impl DurationFormatWrite {
 }
 
 /// Prepared source-preserving native Duration rewrite.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub(crate) struct PreparedDurationFormatRewrite<'source> {
     source: &'source [u8],
     layout: DurationFormatLayout,
@@ -3486,6 +3503,18 @@ pub(crate) struct PreparedDurationFormatRewrite<'source> {
     requirements: RewriteExecutionRequirements,
     candidate_work: usize,
     verify_options: DecodeOptions,
+}
+
+impl fmt::Debug for PreparedDurationFormatRewrite<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PreparedDurationFormatRewrite")
+            .field("source_bytes", &self.source.len())
+            .field("write", &self.write)
+            .field("requirements", &self.requirements)
+            .field("candidate_work", &self.candidate_work)
+            .finish()
+    }
 }
 
 impl PreparedDurationFormatRewrite<'_> {
@@ -3530,11 +3559,21 @@ impl PreparedDurationFormatRewrite<'_> {
 }
 
 /// Prepared canonical native Duration append.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub(crate) struct PreparedDurationFormatWrite {
     write: DurationFormatWrite,
     requirements: RewriteExecutionRequirements,
     verify_options: DecodeOptions,
+}
+
+impl fmt::Debug for PreparedDurationFormatWrite {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PreparedDurationFormatWrite")
+            .field("write", &self.write)
+            .field("requirements", &self.requirements)
+            .finish()
+    }
 }
 
 impl PreparedDurationFormatWrite {
@@ -3672,6 +3711,12 @@ pub(crate) fn prepare_duration_format_write(
     options: DecodeOptions,
 ) -> Result<PreparedDurationFormatWrite, DecodeError> {
     validate_duration_format_write(write)?;
+    // Canonical appends have no source payload to pass through the normal
+    // scanner, but they still use Buffa's generated parity view during
+    // execution. Validate the hard Buffa message and recursion ceilings at
+    // preparation time so an otherwise valid write cannot defer an invalid
+    // option until after output allocation.
+    let _ = Budget::new(&[], options)?;
     let output_bytes = duration_format_canonical_output_len(write)?;
     let requirements = RewriteExecutionRequirements {
         output_bytes,
@@ -4018,7 +4063,7 @@ fn scan_duration_format<'source>(
     let use_automatic_duration_units =
         use_automatic_duration_units.ok_or_else(DecodeError::invalid)?;
     if format_type != NATIVE_DURATION_FORMAT_TYPE
-        || duration_style > NATIVE_DURATION_STYLE_FULL_NAMES
+        || !valid_duration_style(duration_style)
         || !valid_duration_unit(duration_unit_largest)
         || !valid_duration_unit(duration_unit_smallest)
         || duration_unit_rank(duration_unit_largest) > duration_unit_rank(duration_unit_smallest)
@@ -4080,6 +4125,15 @@ const fn valid_duration_unit(value: u32) -> bool {
     )
 }
 
+const fn valid_duration_style(value: u32) -> bool {
+    matches!(
+        value,
+        NATIVE_DURATION_STYLE_COLON
+            | NATIVE_DURATION_STYLE_ABBREVIATED
+            | NATIVE_DURATION_STYLE_FULL_NAMES
+    )
+}
+
 const fn duration_unit_rank(value: u32) -> u8 {
     match value {
         NATIVE_DURATION_UNIT_WEEKS => 0,
@@ -4093,7 +4147,7 @@ const fn duration_unit_rank(value: u32) -> u8 {
 }
 
 fn validate_duration_format_write(write: DurationFormatWrite) -> Result<(), DecodeError> {
-    if write.duration_style > NATIVE_DURATION_STYLE_FULL_NAMES
+    if !valid_duration_style(write.duration_style)
         || !valid_duration_unit(write.duration_unit_largest)
         || !valid_duration_unit(write.duration_unit_smallest)
         || duration_unit_rank(write.duration_unit_largest)
@@ -6087,10 +6141,20 @@ impl RewriteExecutionLimits {
 
 /// Output of a prepared popup write. Candidates remain private to the package
 /// transaction until locality and reopen checks complete.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 pub struct RewriteOutput {
     bytes: Vec<u8>,
     report: DecodeReport,
+}
+
+impl fmt::Debug for RewriteOutput {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("RewriteOutput")
+            .field("output_bytes", &self.bytes.len())
+            .field("report", &self.report)
+            .finish()
+    }
 }
 
 impl RewriteOutput {
@@ -7922,6 +7986,183 @@ mod tests {
             .to_vec();
         invalid_checkbox.extend_from_slice(&[0x10, 0x01]);
         assert!(decode_control_format(&invalid_checkbox, options()).is_err());
+    }
+
+    fn native_duration_format(
+        style: u32,
+        largest_unit: u32,
+        smallest_unit: u32,
+        automatic_units: bool,
+    ) -> Vec<u8> {
+        let mut source = Vec::new();
+        for (number, value) in [
+            (FORMAT_TYPE_FIELD, u64::from(NATIVE_DURATION_FORMAT_TYPE)),
+            (FORMAT_DURATION_STYLE_FIELD, u64::from(style)),
+            (FORMAT_DURATION_UNIT_LARGEST_FIELD, u64::from(largest_unit)),
+            (
+                FORMAT_DURATION_UNIT_SMALLEST_FIELD,
+                u64::from(smallest_unit),
+            ),
+            (
+                FORMAT_USE_AUTOMATIC_DURATION_UNITS_FIELD,
+                u64::from(automatic_units),
+            ),
+        ] {
+            emit_varint_field(&mut source, number, value).expect("duration field");
+        }
+        source
+    }
+
+    #[test]
+    fn duration_canonical_prepare_validates_hard_buffa_options() {
+        let write = DurationFormatWrite::new(
+            NATIVE_DURATION_STYLE_COLON,
+            NATIVE_DURATION_UNIT_WEEKS,
+            NATIVE_DURATION_UNIT_SECONDS,
+            false,
+        );
+        let oversized_message = DecodeOptions::new(
+            usize::MAX,
+            16 * 1024,
+            16 * 1024,
+            64 * 1024,
+            64,
+            16,
+            64,
+            4096,
+        );
+        assert!(matches!(
+            prepare_duration_format_write(write, oversized_message)
+                .expect_err("oversized message ceiling must fail during prepare")
+                .resource_limit(),
+            Some(DecodeLimit::InputBytes { observed, .. }) if observed == usize::MAX
+        ));
+
+        for recursion_limit in [0, 65] {
+            let invalid_recursion = DecodeOptions::new(
+                16 * 1024,
+                16 * 1024,
+                16 * 1024,
+                64 * 1024,
+                recursion_limit,
+                16,
+                64,
+                4096,
+            );
+            assert!(matches!(
+                prepare_duration_format_write(write, invalid_recursion)
+                    .expect_err("recursion ceiling must fail during prepare")
+                    .resource_limit(),
+                Some(DecodeLimit::Nesting { .. })
+            ));
+        }
+    }
+
+    #[test]
+    fn duration_style_domain_is_explicit_for_decode_and_write() {
+        for style in [
+            NATIVE_DURATION_STYLE_COLON,
+            NATIVE_DURATION_STYLE_ABBREVIATED,
+            NATIVE_DURATION_STYLE_FULL_NAMES,
+        ] {
+            let source = native_duration_format(
+                style,
+                NATIVE_DURATION_UNIT_WEEKS,
+                NATIVE_DURATION_UNIT_SECONDS,
+                false,
+            );
+            assert!(decode_duration_format(&source, options()).is_ok());
+            assert!(
+                prepare_duration_format_write(
+                    DurationFormatWrite::new(
+                        style,
+                        NATIVE_DURATION_UNIT_WEEKS,
+                        NATIVE_DURATION_UNIT_SECONDS,
+                        false,
+                    ),
+                    options(),
+                )
+                .is_ok()
+            );
+        }
+        for style in [3, u32::MAX] {
+            let source = native_duration_format(
+                style,
+                NATIVE_DURATION_UNIT_WEEKS,
+                NATIVE_DURATION_UNIT_SECONDS,
+                false,
+            );
+            assert!(decode_duration_format(&source, options()).is_err());
+            assert!(
+                prepare_duration_format_write(
+                    DurationFormatWrite::new(
+                        style,
+                        NATIVE_DURATION_UNIT_WEEKS,
+                        NATIVE_DURATION_UNIT_SECONDS,
+                        false,
+                    ),
+                    options(),
+                )
+                .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn duration_debug_redacts_source_bytes_from_core_views() {
+        let sentinel = [241_u8, 199, 233, 211, 157, 179, 251];
+        let mut source = native_duration_format(
+            NATIVE_DURATION_STYLE_ABBREVIATED,
+            NATIVE_DURATION_UNIT_HOURS,
+            NATIVE_DURATION_UNIT_SECONDS,
+            true,
+        );
+        emit_len_field(&mut source, 46, &sentinel).expect("sentinel field");
+        let snapshot = decode_duration_format(&source, options()).expect("duration");
+        let snapshot_debug = format!("{snapshot:?}");
+        assert!(snapshot_debug.contains("source_bytes"));
+        assert!(!snapshot_debug.contains("241, 199, 233, 211, 157, 179, 251"));
+
+        let prepared = prepare_duration_format_rewrite(
+            &source,
+            DurationFormatWrite::new(
+                NATIVE_DURATION_STYLE_FULL_NAMES,
+                NATIVE_DURATION_UNIT_MINUTES,
+                NATIVE_DURATION_UNIT_SECONDS,
+                false,
+            ),
+            options(),
+        )
+        .expect("prepare rewrite");
+        let prepared_debug = format!("{prepared:?}");
+        assert!(prepared_debug.contains("source_bytes"));
+        assert!(prepared_debug.contains("requirements"));
+        assert!(!prepared_debug.contains("241, 199, 233, 211, 157, 179, 251"));
+    }
+
+    #[test]
+    fn rewrite_output_debug_redacts_output_bytes() {
+        let sentinel = [241_u8, 199, 233, 211, 157, 179, 251];
+        let output = RewriteOutput {
+            bytes: sentinel.to_vec(),
+            report: DecodeReport {
+                input_bytes: 0,
+                output_bytes: sentinel.len(),
+                fields: 0,
+                work_bytes: 0,
+                max_depth: 0,
+                references: 0,
+                items: 0,
+                text_bytes: 0,
+                allocations: 1,
+                retained_bytes: sentinel.len(),
+                scratch_bytes: 0,
+            },
+        };
+        let rendered = format!("{output:?}");
+        assert!(rendered.contains("output_bytes"));
+        assert!(rendered.contains("report"));
+        assert!(!rendered.contains("241, 199, 233, 211, 157, 179, 251"));
     }
 
     fn native_number_format(decimal_places: u32, negative_style: u32, show: bool) -> Vec<u8> {

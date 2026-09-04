@@ -33,6 +33,8 @@ pub enum Error {
     },
     /// A value contains a control character.
     ContainsControl { field: &'static str, index: usize },
+    /// A Text value contains the private native cell-text marker.
+    ContainsReservedMarker { field: &'static str, index: usize },
     /// A name has surrounding whitespace.
     SurroundingWhitespace { field: &'static str },
     /// A Number pattern has no digit placeholder.
@@ -64,6 +66,12 @@ impl fmt::Display for Error {
                 write!(
                     formatter,
                     "{field} contains a control character at index {index}"
+                )
+            },
+            Self::ContainsReservedMarker { field, index } => {
+                write!(
+                    formatter,
+                    "{field} contains a reserved Text marker at index {index}"
                 )
             },
             Self::SurroundingWhitespace { field } => {
@@ -690,8 +698,8 @@ impl Text {
     ///
     /// # Errors
     ///
-    /// Returns a typed error when either affix is too long or contains a
-    /// control character.
+    /// Returns a typed error when either affix is too long, contains a control
+    /// character, or contains the reserved native cell-text marker.
     pub fn try_new(
         name: Name,
         prefix: impl AsRef<str> + Into<String>,
@@ -704,8 +712,8 @@ impl Text {
     ///
     /// # Errors
     ///
-    /// Returns a typed error when the literal is empty, too long, or contains
-    /// a control character.
+    /// Returns a typed error when the literal is empty, too long, contains a
+    /// control character, or contains the reserved native cell-text marker.
     pub fn try_literal(name: Name, literal: impl AsRef<str> + Into<String>) -> Result<Self> {
         Self::try_with_cell_text(name, literal, String::new(), false)
     }
@@ -727,10 +735,15 @@ impl Text {
         let suffix_ref = suffix.as_ref();
         validate_affix(prefix_ref)?;
         validate_affix(suffix_ref)?;
+        let marker_bytes = if includes_cell {
+            TEXT_VALUE_TOKEN.len_utf8()
+        } else {
+            0
+        };
         let encoded_bytes = prefix_ref
             .len()
             .checked_add(suffix_ref.len())
-            .and_then(|length| length.checked_add(usize::from(includes_cell)))
+            .and_then(|length| length.checked_add(marker_bytes))
             .ok_or(Error::TooLong {
                 field: "custom Text pattern",
                 length: usize::MAX,
@@ -863,8 +876,24 @@ fn validate_visible(
 }
 
 fn validate_affix(value: &str) -> Result<()> {
-    validate_visible(value, "custom Text affix", MAX_PATTERN_BYTES, true)
+    validate_visible(value, "custom Text affix", MAX_PATTERN_BYTES, true)?;
+    if let Some((index, _)) = value
+        .chars()
+        .enumerate()
+        .find(|(_, character)| *character == TEXT_VALUE_TOKEN)
+    {
+        return Err(Error::ContainsReservedMarker {
+            field: "custom Text affix",
+            index,
+        });
+    }
+    Ok(())
 }
+
+/// The native Text archive uses this private marker to stand for cell text.
+/// Public semantic values reject it so literal and affix content remains
+/// unambiguous when encoded and reopened.
+const TEXT_VALUE_TOKEN: char = '\u{e421}';
 
 #[cfg(test)]
 mod tests {
@@ -952,6 +981,68 @@ mod tests {
         assert_eq!(text.prefix(), "ID: ");
         assert_eq!(text.suffix(), "");
         assert!(text.includes_cell_text());
+    }
+
+    #[test]
+    fn custom_text_marker_budget_uses_utf8_width() {
+        assert_eq!(TEXT_VALUE_TOKEN.len_utf8(), 3);
+        let name = Name::new("Text").unwrap();
+        let maximum_affix = "a".repeat(MAX_PATTERN_BYTES - TEXT_VALUE_TOKEN.len_utf8());
+        let text = Text::try_new(name.clone(), &maximum_affix, "").unwrap();
+        assert_eq!(
+            text.prefix().len() + text.suffix().len() + TEXT_VALUE_TOKEN.len_utf8(),
+            MAX_PATTERN_BYTES
+        );
+
+        let overflowing_affix = "a".repeat(MAX_PATTERN_BYTES - TEXT_VALUE_TOKEN.len_utf8() + 1);
+        assert_eq!(
+            Text::try_new(name, &overflowing_affix, ""),
+            Err(Error::TooLong {
+                field: "custom Text pattern",
+                length: MAX_PATTERN_BYTES + 1,
+                maximum: MAX_PATTERN_BYTES,
+            })
+        );
+    }
+
+    #[test]
+    fn custom_text_rejects_reserved_marker_without_content_leak() {
+        let name = Name::new("Text").unwrap();
+        let prefix = format!("pre{}", TEXT_VALUE_TOKEN);
+        let prefix_error =
+            Text::try_new(name.clone(), NoStringConversion(&prefix), "").unwrap_err();
+        assert_eq!(
+            prefix_error,
+            Error::ContainsReservedMarker {
+                field: "custom Text affix",
+                index: 3,
+            }
+        );
+
+        let suffix = format!("post{}", TEXT_VALUE_TOKEN);
+        let suffix_error = Text::try_new(name.clone(), "", &suffix).unwrap_err();
+        assert_eq!(
+            suffix_error,
+            Error::ContainsReservedMarker {
+                field: "custom Text affix",
+                index: 4,
+            }
+        );
+
+        let literal = format!("literal{}", TEXT_VALUE_TOKEN);
+        let literal_error = Text::try_literal(name, &literal).unwrap_err();
+        assert_eq!(
+            literal_error,
+            Error::ContainsReservedMarker {
+                field: "custom Text affix",
+                index: 7,
+            }
+        );
+
+        let debug = format!("{prefix_error:?} {suffix_error:?} {literal_error:?}");
+        let display = format!("{prefix_error} {suffix_error} {literal_error}");
+        assert!(!debug.contains(TEXT_VALUE_TOKEN));
+        assert!(!display.contains(TEXT_VALUE_TOKEN));
     }
 
     #[test]

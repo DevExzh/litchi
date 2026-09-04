@@ -285,6 +285,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "numbers_table_cell_duration_format"
+path = "fuzz_targets/numbers_table_cell_duration_format.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "numbers_table_cell_comment_reply"
 path = "fuzz_targets/numbers_table_cell_comment_reply.rs"
 test = false

@@ -55,6 +55,7 @@ pub(crate) mod table_cell_currency_format;
 pub(crate) mod table_cell_custom_format;
 pub(crate) mod table_cell_date_time_format;
 pub(crate) mod table_cell_display_format_native;
+pub(crate) mod table_cell_duration_format;
 pub(crate) mod table_cell_edit;
 pub(crate) mod table_cell_fraction_format;
 pub(crate) mod table_cell_number_format;

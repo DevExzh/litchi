@@ -15923,3 +15923,89 @@ debt, migration host, or ADR 0028 deletion gate changes. The current topology
 remains 64 workspace packages, 238 internal dependency declarations, 227
 canonical edges, 11 development-only edges, 11 ordered migration debts with
 IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
+
+## 2026-09-04 amendment: Numbers existing-cell Duration owner and raw-ID host-route retirement
+
+The focused `litchi_numbers::Package` now owns the bounded selector-first
+Duration-format transaction for one existing rooted Numbers cell. Its API is
+`Package::{table_cell_duration_format, edit_table_cell_duration_format,
+apply_table_cell_duration_format}` with `SheetSelector`, sheet-scoped
+`TableSelector`, and checked `CellPosition`. The archive-free `Duration` value
+keeps style (`Colon`, `Abbreviated`, or `FullNames`) and either automatic or
+custom unit ranges (`Weeks` through `Milliseconds`) above the package boundary.
+Reads return an explicit `Duration` when admitted or `None` when no explicit
+Duration metadata is present; inherited marker-zero tuples are refused. Edits
+stage `set`, `clear`, or `reset` and publish an exact-source patch with an
+exact inverse.
+
+The private native route is strict and metadata-only. It admits native
+`FormatStructArchive` type `268`, fields 1, 7, 15, 16, and 40, styles `0/1/2`,
+and unit bits `1/2/4/8/16/32`. The BNC cell has native Duration value type 7,
+format kind 4, and either marker `0x0004` for a primary-only Duration
+reference or `0x0005` when a shared generic Number reference is retained.
+Marker-zero/inherited tuples are outside this focused owner and are refused;
+an explicit write emits the marker matching whether that secondary reference
+is preserved. The
+owner rejects wrong families, control/reserved metadata, malformed or
+ambiguous shapes, zero references, and unsafe dependency graphs before any
+mutation. Candidate reopen/readback, copy-on-write/refcount closure, exact
+inverse and stale-source checks, physical locality, and preservation of the
+scalar, formula/cache, unknown, unselected, and opaque-tail bytes remain part
+of the transaction contract. Native identifiers, list keys, generated
+messages, IWA members, and raw wire objects remain private.
+
+The focused package and codec coverage uses deterministic synthetic
+source-built fixtures and remains E1 synthetic/self-round-trip evidence. No
+checked-in Apple-authored fixture has supplied an E2 parse/no-op record. The
+Apple-authored starting packages and native outputs in the probe are
+disposable provenance, not a checked-in E2 fixture and not GUI/Computer Use
+evidence.
+
+The native probe also exercised both explicit marker forms against Numbers
+14.4. The primary-only candidate
+`c62fb9ca6e1b86e8a60abde6ebbcdf31edaefd88a09cbc2a65684e4be27372e2` opened,
+saved, closed, and reopened without error; its native-resaved package was
+`c8a009d99a6d079f6feff38c73f658e502098c105db3027246f79801fcd1f43e`. Its
+Duration `Tile` member had SHA-256
+`0acaed29e5e4af1b5b2b4f4385833c95e4a9530af8673eed89c19fe1a2aa8e82` and its
+`DataList` member had SHA-256
+`28dc21528ba526c3aeb64d1109f6d7dd39e85ae9d3266cbc1d24f84a069b75ee`; both
+were byte-identical across the native cycle. The cell used marker `0x0004`,
+Duration ID 5, native type 268, style 1, custom units 1 through 32, and
+scalar `316310400`.
+
+The retained-secondary candidate
+`c3a797dc63eb99926c88130318211511e43c6ba979626f77d89f0c1a7765c48e` also
+opened, saved, closed, and reopened without error; its native-resaved package
+was `04208a942693f19ead2020d1ac1449dce00e9de7df865d88cc8e46847b02714b`.
+Its Duration `Tile` member had SHA-256
+`fea8c55c474f2c9432d030417ab6abf32488167d625b121ce590d777a879b1d1` and
+its `DataList` member had SHA-256
+`430865bcac80e8f447eaf63525c55e0752ebfaaeea6608212e95253562acff42`; both
+were byte-identical across the native cycle. The cell used marker `0x0005`,
+Duration ID 3, retained generic Number ID 1, and scalar `86400`.
+
+Each package contained 43 members; only unrelated members underwent native
+normalization. Strict post-native rereads reported no-op and exact inverse
+results for both candidates. The successful open is operation-specific E3
+evidence, and the native save/close/reopen plus strict reread is
+operation-specific E4 evidence for these two existing-cell marker shapes
+only. This does not generalize to every Duration producer, package-wide
+native parity, or broad app acceptance.
+
+The dedicated production `NumbersEditor` raw-ID Duration convenience routes
+(`table_cell_duration_format`, `set_table_cell_duration_format`, and
+`reset_table_cell_duration_format`) are retired. Generic source-built or
+cross-format `DataFormat::Duration` compatibility, plus the private attached
+Pages/Keynote table adapters, remain host-owned. A focused exact-source
+refusal is terminal and is not retried through a generic or legacy host
+writer. This narrows the production API boundary only; it does not claim
+generic Duration authoring, broad table/cell lifecycle ownership, or native
+parity beyond the admitted operation.
+
+No workspace package, manifest edge, ordered migration debt, migration host,
+or ADR 0028 deletion gate changes by this owner and route retirement. The
+current topology remains 64 workspace packages, 238 internal dependency
+declarations, 227 canonical edges, 11 development-only edges, 11 ordered
+migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
+migration host.

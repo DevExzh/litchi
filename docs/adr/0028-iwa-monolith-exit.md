@@ -8022,3 +8022,56 @@ migration-host item, or ADR 0028 deletion gate. The current topology remains
 64 workspace packages, 238 internal dependency declarations, 227 canonical
 edges, 11 development-only edges, 11 ordered migration debts with IDs `[1, 2,
 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
+
+## 2026-09-04 amendment: Numbers existing-cell Duration owner and remaining monolith gates
+
+The focused `litchi_numbers::Package` now owns one bounded existing-cell
+Duration-format operation through
+`Package::{table_cell_duration_format, edit_table_cell_duration_format,
+apply_table_cell_duration_format}`. The owner is selector-first and
+archive-free: native type-268 payloads use strict fields 1, 7, 15, 16, and
+40, BNC Duration value type 7 and kind 4, and the explicit marker split
+`0x0004` (primary-only) versus `0x0005` (retained generic Number secondary).
+Marker-zero/inherited tuples are refused; explicit writes preserve a valid
+secondary reference and metadata-only transactions preserve the scalar,
+formula/cache, opaque/unknown bytes, refcounts, locality, and exact inverse.
+Native IDs, list keys, generated messages, and IWA members remain private.
+
+This remains E1 synthetic/self-round-trip ownership evidence, with no
+checked-in Apple-authored fixture for E2 parse/no-op evidence. A disposable
+Numbers 14.4 probe opened, saved, closed, and reopened both Litchi-mutated
+candidates without error. The primary-only candidate
+`c62fb9ca6e1b86e8a60abde6ebbcdf31edaefd88a09cbc2a65684e4be27372e2` became
+native `c8a009d99a6d079f6feff38c73f658e502098c105db3027246f79801fcd1f43e`
+with marker `0x0004`, Duration ID 5, type 268, style 1, custom units 1
+through 32, and scalar `316310400`. The retained-secondary candidate
+`c3a797dc63eb99926c88130318211511e43c6ba979626f77d89f0c1a7765c48e` became
+native `04208a942693f19ead2020d1ac1449dce00e9de7df865d88cc8e46847b02714b`
+with marker `0x0005`, Duration ID 3, generic Number ID 1, and scalar `86400`.
+Strict post-native rereads reported no-op and exact inverse results for both;
+the Duration Tile/DataList members stayed byte-identical while only unrelated
+members normalized across the 43-member packages. This is operation-specific
+E3/E4 evidence for these two marker shapes only. The Apple-authored starting
+packages are disposable provenance, not checked-in E2 fixtures and not
+GUI/Computer Use evidence; no broad native app-acceptance or package-parity
+claim follows.
+
+The dedicated production `NumbersEditor` raw-ID Duration read/set/reset routes
+are retired. Generic source-built or cross-format `DataFormat::Duration`
+compatibility and the private Pages/Keynote attached-table adapters remain in
+the migration host, and focused-owner refusals remain terminal. This advances
+the Numbers focused-ownership subgate and one operation-specific native
+mutation subgate only. Deletion gate 1 remains closed and gate 5 remains
+passing; gates 2, 3, 4, and 6 remain open. Gate 2 still has unowned
+modules/examples/fuzz/generated-schema/build paths, gate 3 still lacks
+complete semantic parity across the remaining table and cell graphs, gate 4
+still lacks complete native open/save/close/reopen coverage across the
+remaining mutation paths, and gate 6 still contains migration-host/debt entry
+points. The monolithic `litchi-iwa` crate remains until those global gates
+close.
+
+No workspace package, manifest edge, ordered migration debt, or migration-host
+item is removed by this slice. The authoritative topology remains 64 workspace
+packages, 238 internal dependency declarations, 227 canonical edges, 11
+development-only edges, 11 ordered migration debts with IDs `[1, 2, 4, 8, 10,
+12, 13, 14, 15, 16, 17]`, and one migration host.

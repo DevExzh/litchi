@@ -13,12 +13,14 @@ use litchi_iwa_core::{
 };
 use litchi_iwa_protos::{
     numbers_table_cell_control_codec as control_codec,
+    numbers_table_cell_currency_format_codec as currency_format_codec,
+    numbers_table_cell_duration_format_codec as duration_format_codec,
     numbers_table_cell_number_format_codec as number_format_codec,
     numbers_table_cell_pop_up_menu_codec as popup_codec,
     numbers_table_cell_storage_codec as storage_codec,
     package_metadata_codec::RewriteOptions as MetadataRewriteOptions,
 };
-use litchi_numbers_wire::{BncCell, CellDataFormatKind};
+use litchi_numbers_wire::{BncCell, BncCellView, CellDataFormatKind};
 
 use super::table_cell_pop_up_menu_native::NativePopUpError;
 use super::{
@@ -40,6 +42,8 @@ use crate::cell::data_format::{
 // exposed through this seam.
 const BNC_FORMAT_FLAGS_START: usize = 8;
 const BNC_FORMAT_FLAGS_END: usize = 12;
+const BNC_CONTROL_CELL_SPEC_FLAG: u32 = 0x0000_0400;
+const BNC_CELL_FORMAT_KIND_FLAG: u32 = 0x0000_1000;
 const BNC_CELL_FORMAT_IDENTIFIER_FLAG: u32 = 0x0000_2000;
 const BNC_CURRENCY_FORMAT_IDENTIFIER_FLAG: u32 = 0x0000_4000;
 const BNC_DATE_TIME_FORMAT_IDENTIFIER_FLAG: u32 = 0x0000_8000;
@@ -47,6 +51,39 @@ const BNC_DURATION_FORMAT_IDENTIFIER_FLAG: u32 = 0x0001_0000;
 const BNC_TEXT_FORMAT_IDENTIFIER_FLAG: u32 = 0x0002_0000;
 const BNC_CHECKBOX_FORMAT_IDENTIFIER_FLAG: u32 = 0x0004_0000;
 const BNC_RESERVED_KNOWN_FIELD_FLAG: u32 = 0x0010_0000;
+const BNC_FORMAT_FLAGS: u32 = BNC_CONTROL_CELL_SPEC_FLAG
+    | BNC_CELL_FORMAT_KIND_FLAG
+    | BNC_CELL_FORMAT_IDENTIFIER_FLAG
+    | BNC_CURRENCY_FORMAT_IDENTIFIER_FLAG
+    | BNC_DATE_TIME_FORMAT_IDENTIFIER_FLAG
+    | BNC_DURATION_FORMAT_IDENTIFIER_FLAG
+    | BNC_TEXT_FORMAT_IDENTIFIER_FLAG
+    | BNC_CHECKBOX_FORMAT_IDENTIFIER_FLAG;
+const BNC_TEXT_ALLOWED_FORMAT_FLAGS: u32 =
+    BNC_CELL_FORMAT_KIND_FLAG | BNC_CELL_FORMAT_IDENTIFIER_FLAG | BNC_TEXT_FORMAT_IDENTIFIER_FLAG;
+const BNC_FIELD_LAYOUT: &[(u32, usize)] = &[
+    (0x0000_0001, 16),
+    (0x0000_0002, 8),
+    (0x0000_0004, 8),
+    (0x0000_0008, 4),
+    (0x0000_0010, 4),
+    (0x0000_0020, 4),
+    (0x0000_0040, 4),
+    (0x0000_0080, 4),
+    (0x0000_0100, 4),
+    (0x0000_0200, 4),
+    (BNC_CONTROL_CELL_SPEC_FLAG, 4),
+    (0x0000_0800, 4),
+    (BNC_CELL_FORMAT_KIND_FLAG, 4),
+    (BNC_CELL_FORMAT_IDENTIFIER_FLAG, 4),
+    (BNC_CURRENCY_FORMAT_IDENTIFIER_FLAG, 4),
+    (BNC_DATE_TIME_FORMAT_IDENTIFIER_FLAG, 4),
+    (BNC_DURATION_FORMAT_IDENTIFIER_FLAG, 4),
+    (BNC_TEXT_FORMAT_IDENTIFIER_FLAG, 4),
+    (BNC_CHECKBOX_FORMAT_IDENTIFIER_FLAG, 4),
+    (0x0008_0000, 4),
+    (BNC_RESERVED_KNOWN_FIELD_FLAG, 4),
+];
 
 /// Validate the BNC format-field/kind relationship before using any format
 /// identifier as a graph edge.
@@ -63,6 +100,14 @@ pub(super) fn validate_bnc_format_metadata(
     cell: &BncCell,
     path: Path,
 ) -> Result<(), Error> {
+    validate_bnc_format_metadata_kind(source, cell.cell_format_kind(), path)
+}
+
+fn validate_bnc_format_metadata_kind(
+    source: &[u8],
+    kind: Option<u32>,
+    path: Path,
+) -> Result<(), Error> {
     let flags = source
         .get(BNC_FORMAT_FLAGS_START..BNC_FORMAT_FLAGS_END)
         .and_then(|bytes| bytes.try_into().ok())
@@ -73,7 +118,6 @@ pub(super) fn validate_bnc_format_metadata(
         return Err(Error::UnsupportedDependency { path });
     }
 
-    let kind = cell.cell_format_kind();
     let family_kind = |flag: u32, expected: u32| flags & flag != 0 && kind != Some(expected);
     if family_kind(
         BNC_CURRENCY_FORMAT_IDENTIFIER_FLAG,
@@ -112,6 +156,149 @@ pub(super) fn validate_bnc_format_metadata(
     }
 
     Ok(())
+}
+
+/// Recover the generic Number edge retained by a converted Text cell without
+/// materializing an owned [`BncCell`].  The package-wide census visits cells
+/// that may carry arbitrary opaque tails; this fixed-width scan keeps that
+/// path allocation-free while preserving the same strict Text metadata rules
+/// as the focused Text owner.
+fn text_secondary_identifier_for_census_view(
+    source: &[u8],
+    cell: &BncCellView<'_>,
+    path: Path,
+) -> Result<Option<u32>, Error> {
+    if cell.cell_format_kind() != Some(litchi_numbers_wire::TEXT_CELL_FORMAT_KIND) {
+        return Ok(None);
+    }
+    let flags = source
+        .get(BNC_FORMAT_FLAGS_START..BNC_FORMAT_FLAGS_END)
+        .and_then(|bytes| bytes.try_into().ok())
+        .map(u32::from_le_bytes)
+        .ok_or(Error::InvalidSource { path })?;
+    if flags & BNC_RESERVED_KNOWN_FIELD_FLAG != 0
+        || flags & BNC_FORMAT_FLAGS & !BNC_TEXT_ALLOWED_FORMAT_FLAGS != 0
+    {
+        return Err(Error::UnsupportedDependency { path });
+    }
+
+    let mut offset = BNC_FORMAT_FLAGS_END;
+    let mut generic_identifier = None;
+    let mut text_identifier = None;
+    for &(flag, size) in BNC_FIELD_LAYOUT {
+        if flags & flag == 0 {
+            continue;
+        }
+        let end = offset
+            .checked_add(size)
+            .ok_or(Error::InvalidSource { path })?;
+        let bytes = source
+            .get(offset..end)
+            .ok_or(Error::InvalidSource { path })?;
+        if flag == BNC_CELL_FORMAT_IDENTIFIER_FLAG {
+            generic_identifier = Some(u32::from_le_bytes(
+                bytes
+                    .try_into()
+                    .map_err(|_| Error::InvalidSource { path })?,
+            ));
+        } else if flag == BNC_TEXT_FORMAT_IDENTIFIER_FLAG {
+            text_identifier = Some(u32::from_le_bytes(
+                bytes
+                    .try_into()
+                    .map_err(|_| Error::InvalidSource { path })?,
+            ));
+        }
+        offset = end;
+    }
+
+    let valid_value = matches!(
+        cell.stored_value(),
+        litchi_numbers_wire::StoredValue::Empty | litchi_numbers_wire::StoredValue::Text(_)
+    );
+    let valid_marker = match cell.explicit_format_flags() {
+        0 | litchi_numbers_wire::EXPLICIT_TEXT_FORMAT => generic_identifier.is_none(),
+        litchi_numbers_wire::EXPLICIT_CONVERTED_TEXT_FORMAT => {
+            generic_identifier.is_some_and(|identifier| identifier != 0)
+        },
+        _ => false,
+    };
+    if !valid_value
+        || !valid_marker
+        || cell.control_cell_spec_identifier().is_some()
+        || text_identifier.is_none_or(|identifier| identifier == 0)
+    {
+        return Err(Error::UnsupportedDependency { path });
+    }
+    if cell.explicit_format_flags() == litchi_numbers_wire::EXPLICIT_CONVERTED_TEXT_FORMAT {
+        Ok(generic_identifier)
+    } else {
+        Ok(None)
+    }
+}
+
+/// Validate the complete metadata/value tuple for a native Currency or
+/// Duration cell seen by the package-wide census.  The selected-cell routes
+/// perform these checks before decoding their primary format; siblings need
+/// the same admission so a later COW rewrite cannot strand an invalid tuple.
+fn validate_native_cell_metadata(
+    cell: &BncCellView<'_>,
+    path: Path,
+) -> Result<Option<(u32, NativePrimaryFormatKind)>, Error> {
+    match cell.cell_format_kind() {
+        Some(litchi_numbers_wire::CURRENCY_CELL_FORMAT_KIND) => {
+            let primary = cell
+                .format_identifier()
+                .filter(|identifier| *identifier != 0)
+                .ok_or(Error::InvalidSource { path })?;
+            let secondary = cell.secondary_format_identifier();
+            let expected_marker =
+                litchi_numbers_wire::explicit_currency_format_flags(secondary.is_some());
+            // Currency marker zero represents native inherited/default state
+            // only when no generic secondary edge is retained. Explicit
+            // Currency tuples use the shape-dependent native marker.
+            if (cell.explicit_format_flags() != 0
+                && cell.explicit_format_flags() != expected_marker)
+                || (cell.explicit_format_flags() == 0 && secondary.is_some())
+                || secondary.is_some_and(|identifier| identifier == 0)
+                || cell.control_cell_spec_identifier().is_some()
+                || !currency_cell_type_matches_view(cell)
+            {
+                return Err(Error::UnsupportedDependency { path });
+            }
+            Ok(Some((primary, NativePrimaryFormatKind::Currency)))
+        },
+        Some(litchi_numbers_wire::DURATION_CELL_FORMAT_KIND) => {
+            let primary = cell
+                .format_identifier()
+                .filter(|identifier| *identifier != 0)
+                .ok_or(Error::InvalidSource { path })?;
+            let secondary = cell.secondary_format_identifier();
+            let expected_marker =
+                litchi_numbers_wire::explicit_duration_format_flags(secondary.is_some());
+            if cell.explicit_format_flags() != expected_marker
+                || secondary.is_some_and(|identifier| identifier == 0)
+                || cell.control_cell_spec_identifier().is_some()
+                || !cell.has_only_duration_format_metadata()
+                || !cell.is_duration_format_compatible()
+            {
+                return Err(Error::UnsupportedDependency { path });
+            }
+            Ok(Some((primary, NativePrimaryFormatKind::Duration)))
+        },
+        _ => Ok(None),
+    }
+}
+
+fn currency_cell_type_matches_view(cell: &BncCellView<'_>) -> bool {
+    match cell.stored_value() {
+        // Numbers can attach display metadata to an otherwise empty cell.
+        // That shape has no numeric cell type and must remain empty through a
+        // metadata-only set or clear operation.
+        litchi_numbers_wire::StoredValue::Empty => cell.numeric_cell_type().is_none(),
+        _ => {
+            cell.numeric_cell_type() == Some(litchi_numbers_wire::NumericCellType::AlternateNumber)
+        },
+    }
 }
 
 /// Marker used by the generic owner to keep native failures content-free.
@@ -915,7 +1102,8 @@ impl storage_codec::StorageVisitor for TileReferenceCollector<'_> {
 
 struct BncReferenceCensus<'budget> {
     formats: Vec<(u32, usize)>,
-    converted_text_generics: Vec<u32>,
+    number_secondaries: Vec<u32>,
+    native_primary_formats: Vec<(u32, NativePrimaryFormatKind)>,
     controls: Vec<(u32, usize)>,
     invalid: bool,
     budget: &'budget mut TransactionBudget,
@@ -923,11 +1111,18 @@ struct BncReferenceCensus<'budget> {
     failure: Option<Error>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NativePrimaryFormatKind {
+    Currency,
+    Duration,
+}
+
 impl<'budget> BncReferenceCensus<'budget> {
     fn new(budget: &'budget mut TransactionBudget, path: Path) -> Self {
         Self {
             formats: Vec::new(),
-            converted_text_generics: Vec::new(),
+            number_secondaries: Vec::new(),
+            native_primary_formats: Vec::new(),
             controls: Vec::new(),
             invalid: false,
             budget,
@@ -962,12 +1157,25 @@ impl<'budget> BncReferenceCensus<'budget> {
         Ok(true)
     }
 
-    fn record_converted_text_generic(&mut self, identifier: u32) -> Result<(), Error> {
-        if self.converted_text_generics.contains(&identifier) {
+    fn record_number_secondary(&mut self, identifier: u32) -> Result<(), Error> {
+        if self.number_secondaries.contains(&identifier) {
             return Ok(());
         }
-        reserve_vec_slot(&mut self.converted_text_generics, self.budget, self.path)?;
-        self.converted_text_generics.push(identifier);
+        reserve_vec_slot(&mut self.number_secondaries, self.budget, self.path)?;
+        self.number_secondaries.push(identifier);
+        Ok(())
+    }
+
+    fn record_native_primary_format(
+        &mut self,
+        identifier: u32,
+        kind: NativePrimaryFormatKind,
+    ) -> Result<(), Error> {
+        if self.native_primary_formats.contains(&(identifier, kind)) {
+            return Ok(());
+        }
+        reserve_vec_slot(&mut self.native_primary_formats, self.budget, self.path)?;
+        self.native_primary_formats.push((identifier, kind));
         Ok(())
     }
 }
@@ -1087,12 +1295,16 @@ impl storage_codec::StorageVisitor for BncReferenceCensus<'_> {
 
 impl BncReferenceCensus<'_> {
     fn count_cell(&mut self, source: &[u8]) -> bool {
-        let Ok(cell) = BncCell::parse(source) else {
+        let Ok(cell) = BncCellView::parse(source) else {
             return false;
         };
-        if validate_bnc_format_metadata(source, &cell, self.path).is_err() {
+        if validate_bnc_format_metadata_kind(source, cell.cell_format_kind(), self.path).is_err() {
             return false;
         }
+        let native_primary = match validate_native_cell_metadata(&cell, self.path) {
+            Ok(value) => value,
+            Err(_) => return false,
+        };
         let format = cell.format_identifier();
         let control = cell.control_cell_spec_identifier();
         // Ordinary text/number cells legitimately own a format entry without
@@ -1113,6 +1325,10 @@ impl BncReferenceCensus<'_> {
             }
         }
         if let Some(identifier) = cell.secondary_format_identifier() {
+            if let Err(error) = self.record_number_secondary(identifier) {
+                self.failure = Some(error);
+                return false;
+            }
             match Self::increment(&mut self.formats, identifier, self.budget, self.path) {
                 Ok(true) => {},
                 Ok(false) => return false,
@@ -1130,14 +1346,12 @@ impl BncReferenceCensus<'_> {
             // expose it directly, in which case the branch above wins and
             // prevents double-counting.
             let Ok(identifier) =
-                super::table_cell_display_format_native::text_secondary_identifier_for_census(
-                    source, &cell, self.path,
-                )
+                text_secondary_identifier_for_census_view(source, &cell, self.path)
             else {
                 return false;
             };
             if let Some(identifier) = identifier {
-                if let Err(error) = self.record_converted_text_generic(identifier) {
+                if let Err(error) = self.record_number_secondary(identifier) {
                     self.failure = Some(error);
                     return false;
                 }
@@ -1149,6 +1363,12 @@ impl BncReferenceCensus<'_> {
                         return false;
                     },
                 }
+            }
+        }
+        if let Some((identifier, kind)) = native_primary {
+            if let Err(error) = self.record_native_primary_format(identifier, kind) {
+                self.failure = Some(error);
+                return false;
             }
         }
         if let Some(identifier) = control {
@@ -1164,33 +1384,92 @@ impl BncReferenceCensus<'_> {
         true
     }
 
-    fn validate_converted_text_generic_targets(
+    fn validate_number_format_target(
         &mut self,
         formats: &[ListEntry],
+        identifier: u32,
     ) -> Result<(), Error> {
-        // A converted Text cell carries a second edge in the shared generic
-        // identifier slot. Refcount equality alone cannot prove that the
-        // target entry is the required native Number format; validate every
-        // distinct target after the complete tile walk, including targets
-        // owned by nonselected cells.
-        for index in 0..self.converted_text_generics.len() {
-            let identifier = self.converted_text_generics[index];
-            let entry = formats
-                .iter()
-                .find(|entry| entry.key == identifier)
-                .ok_or(Error::InvalidSource { path: self.path })?;
-            if !entry.is_format || entry.payload.is_empty() {
-                return Err(Error::InvalidSource { path: self.path });
-            }
-            let (secondary, report) = number_format_codec::decode_number_format_with_report(
-                &entry.payload,
-                control_codec_options(entry.payload.len(), self.budget),
-            )
-            .map_err(|error| map_control_error(error, self.path))?;
-            charge_control_decode_report(self.budget, report, self.path)?;
-            if secondary.format_type() != number_format_codec::NATIVE_NUMBER_FORMAT_TYPE {
-                return Err(Error::InvalidSource { path: self.path });
-            }
+        let entry = formats
+            .iter()
+            .find(|entry| entry.key == identifier)
+            .ok_or(Error::InvalidSource { path: self.path })?;
+        // A secondary edge must point at a live format-list entry. `list_facts`
+        // rejects zero refcounts globally, but keep this invariant local to
+        // the edge validator as well so the target contract remains explicit.
+        if !entry.is_format || entry.ref_count == 0 || entry.payload.is_empty() {
+            return Err(Error::InvalidSource { path: self.path });
+        }
+        let (secondary, report) = number_format_codec::decode_number_format_with_report(
+            &entry.payload,
+            control_codec_options(entry.payload.len(), self.budget),
+        )
+        .map_err(|error| map_control_error(error, self.path))?;
+        charge_control_decode_report(self.budget, report, self.path)?;
+        if secondary.format_type() != number_format_codec::NATIVE_NUMBER_FORMAT_TYPE {
+            return Err(Error::InvalidSource { path: self.path });
+        }
+        Ok(())
+    }
+
+    fn validate_native_format_targets(&mut self, formats: &[ListEntry]) -> Result<(), Error> {
+        // Converted Text cells and native Currency/Duration cells carry a
+        // second edge in the shared generic identifier slot. Refcount
+        // equality alone cannot prove that the target entry is the required
+        // live native Number format; validate every distinct target after the
+        // complete tile walk, including targets owned by nonselected cells.
+        for index in 0..self.number_secondaries.len() {
+            let identifier = self.number_secondaries[index];
+            self.validate_number_format_target(formats, identifier)?;
+        }
+        // Currency and Duration primaries are family-specific strict payloads
+        // as well. A refcount match must not make a Number/Fraction payload
+        // usable as an unselected native Currency/Duration entry.
+        for index in 0..self.native_primary_formats.len() {
+            let (identifier, kind) = self.native_primary_formats[index];
+            self.validate_native_primary_format_target(formats, identifier, kind)?;
+        }
+        Ok(())
+    }
+
+    fn validate_native_primary_format_target(
+        &mut self,
+        formats: &[ListEntry],
+        identifier: u32,
+        kind: NativePrimaryFormatKind,
+    ) -> Result<(), Error> {
+        let entry = formats
+            .iter()
+            .find(|entry| entry.key == identifier)
+            .ok_or(Error::InvalidSource { path: self.path })?;
+        if !entry.is_format || entry.ref_count == 0 || entry.payload.is_empty() {
+            return Err(Error::InvalidSource { path: self.path });
+        }
+        let format_type = match kind {
+            NativePrimaryFormatKind::Currency => {
+                let (primary, report) = currency_format_codec::decode_currency_format_with_report(
+                    &entry.payload,
+                    control_codec_options(entry.payload.len(), self.budget),
+                )
+                .map_err(|error| map_control_error(error, self.path))?;
+                charge_control_decode_report(self.budget, report, self.path)?;
+                primary.format_type()
+            },
+            NativePrimaryFormatKind::Duration => {
+                let (primary, report) = duration_format_codec::decode_duration_format_with_report(
+                    &entry.payload,
+                    control_codec_options(entry.payload.len(), self.budget),
+                )
+                .map_err(|error| map_control_error(error, self.path))?;
+                charge_control_decode_report(self.budget, report, self.path)?;
+                primary.format_type()
+            },
+        };
+        let expected = match kind {
+            NativePrimaryFormatKind::Currency => currency_format_codec::NATIVE_CURRENCY_FORMAT_TYPE,
+            NativePrimaryFormatKind::Duration => duration_format_codec::NATIVE_DURATION_FORMAT_TYPE,
+        };
+        if format_type != expected {
+            return Err(Error::InvalidSource { path: self.path });
         }
         Ok(())
     }
@@ -1915,7 +2194,7 @@ pub(super) fn validate_format_refcounts(
             return Err(Error::InvalidSource { path });
         }
     }
-    census.validate_converted_text_generic_targets(formats)?;
+    census.validate_native_format_targets(formats)?;
     for entry in formats {
         let observed = census
             .formats
@@ -2272,7 +2551,7 @@ fn validate_refcounts(
             return Err(Error::InvalidSource { path });
         }
     }
-    census.validate_converted_text_generic_targets(formats)?;
+    census.validate_native_format_targets(formats)?;
 
     for entry in formats {
         let observed = census

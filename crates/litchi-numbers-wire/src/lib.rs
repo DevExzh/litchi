@@ -558,13 +558,19 @@ impl BncCell {
             return Ok(());
         }
 
-        let secondary_identifier = (self.cell_format_kind() == Some(DURATION_CELL_FORMAT_KIND))
-            .then(|| self.fields.get(&CELL_FORMAT_IDENTIFIER_FLAG).cloned())
-            .flatten();
-        let has_secondary_identifier = secondary_identifier.is_some();
-        self.fields.remove(&CELL_FORMAT_KIND_FLAG);
-        self.fields.remove(&CELL_FORMAT_IDENTIFIER_FLAG);
-        self.fields.remove(&DURATION_FORMAT_IDENTIFIER_FLAG);
+        let has_secondary_identifier = self.cell_format_kind() == Some(DURATION_CELL_FORMAT_KIND)
+            && self.fields.contains_key(&CELL_FORMAT_IDENTIFIER_FLAG);
+        // Keep an existing generic Number reference in its BTreeMap node when
+        // replacing the primary Duration ID.  Cloning the field here would
+        // add a transient allocation to the owned path (and clearing the
+        // metadata would allocate only to discard it).  Validation above has
+        // already proved that this is a four-byte, canonical secondary field.
+        self.fields.retain(|field, _| {
+            FORMAT_METADATA_FLAGS & *field == 0
+                || (identifier.is_some()
+                    && has_secondary_identifier
+                    && *field == CELL_FORMAT_IDENTIFIER_FLAG)
+        });
         if let Some(identifier) = identifier {
             self.fields.insert(
                 CELL_FORMAT_KIND_FLAG,
@@ -574,10 +580,6 @@ impl BncCell {
                 DURATION_FORMAT_IDENTIFIER_FLAG,
                 identifier.to_le_bytes().to_vec(),
             );
-            if let Some(secondary_identifier) = secondary_identifier {
-                self.fields
-                    .insert(CELL_FORMAT_IDENTIFIER_FLAG, secondary_identifier);
-            }
         }
         let explicit_flags = identifier.map_or(0, |_| {
             explicit_duration_format_flags(has_secondary_identifier)
@@ -651,9 +653,13 @@ impl BncCell {
     /// finite Numbers value.
     pub fn set_formula_cached_number(&mut self, value: f64) -> Result<()> {
         let formula = self.formula_identifier()?;
+        let formula_error = self.fields.get(&FORMULA_ERROR_FLAG).cloned();
         self.set_number(value)?;
         self.fields
             .insert(FORMULA_FLAG, formula.to_le_bytes().to_vec());
+        if let Some(formula_error) = formula_error {
+            self.fields.insert(FORMULA_ERROR_FLAG, formula_error);
+        }
         Ok(())
     }
 
@@ -664,9 +670,13 @@ impl BncCell {
     /// Returns an error when the cell has no formula.
     pub fn set_formula_cached_boolean(&mut self, value: bool) -> Result<()> {
         let formula = self.formula_identifier()?;
+        let formula_error = self.fields.get(&FORMULA_ERROR_FLAG).cloned();
         self.set_boolean(value);
         self.fields
             .insert(FORMULA_FLAG, formula.to_le_bytes().to_vec());
+        if let Some(formula_error) = formula_error {
+            self.fields.insert(FORMULA_ERROR_FLAG, formula_error);
+        }
         Ok(())
     }
 
@@ -768,18 +778,25 @@ impl BncCell {
     ///
     /// Returns an error when an interactive format has no control-cell
     /// identifier, when a non-interactive format has one, or when a text
-    /// format would discard a non-text scalar, or a required scalar conversion
-    /// is not finite. This compatibility entry point performs the same native
-    /// scalar conversions as Numbers; metadata-only application is kept as a
-    /// separate internal operation so extraction never infers semantic value
-    /// from display metadata.
+    /// format would discard a non-text scalar, when Duration is requested for
+    /// an incompatible value family or with a zero identifier, or when a
+    /// required scalar conversion is not finite. This compatibility entry
+    /// point performs the same native scalar conversions as Numbers;
+    /// metadata-only application is kept as a separate internal operation so
+    /// extraction never infers semantic value from display metadata. The
+    /// focused Duration owner preserves a valid existing generic Number
+    /// secondary and selects marker `0x0005`. This legacy compatibility entry
+    /// point canonicalizes every replacement to a primary-only Duration tuple
+    /// (marker `0x0004`), because its host reference bookkeeping owns the old
+    /// format edges and cannot safely retain that secondary during a generic
+    /// format change.
     pub fn set_data_format_identifier(
         &mut self,
         identifier: u32,
         kind: CellDataFormatKind,
         control_identifier: Option<u32>,
     ) -> Result<()> {
-        self.validate_data_format_request(kind, control_identifier)?;
+        self.validate_data_format_request(identifier, kind, control_identifier)?;
         self.convert_scalar_for_data_format(kind)?;
         self.set_data_format_metadata_identifier(identifier, kind, control_identifier)
     }
@@ -1154,22 +1171,99 @@ impl BncCell {
         )
     }
 
+    /// Validate the value families accepted by the generic Duration format
+    /// compatibility path. A generic numeric cell is interpreted as
+    /// spreadsheet days and converted to native type-7 seconds; an existing
+    /// native Duration is already in seconds and is retained as-is. Empty
+    /// cells are metadata-only and remain empty. Other value families are
+    /// rejected before conversion so attaching Duration metadata cannot
+    /// silently relabel text, dates, booleans, errors, or rich text.
+    fn validate_duration_data_format_value(&self) -> Result<()> {
+        validate_duration_field_storage(&self.fields)?;
+        let value_flags = self
+            .fields
+            .keys()
+            .fold(0, |flags, field| flags | (*field & VALUE_FLAGS));
+        match self.prefix[1] {
+            CELL_TYPE_EMPTY => {
+                if value_flags != 0 || self.cached_scalar()?.is_some() {
+                    return Err(Error::InvalidFormat(
+                        "Duration empty cell has an incompatible value shape".to_owned(),
+                    ));
+                }
+            },
+            CELL_TYPE_DURATION => self.validate_duration_value_shape()?,
+            CELL_TYPE_NUMBER | CELL_TYPE_ALTERNATE_NUMBER | CELL_TYPE_RICH_TEXT_OR_NUMBER => {
+                let numeric_flags = value_flags & (DECIMAL_FLAG | NUMBER_FLAG);
+                let allowed_flags =
+                    DECIMAL_FLAG | NUMBER_FLAG | FORMULA_FLAG | STRING_FLAG | FORMULA_ERROR_FLAG;
+                if value_flags & !allowed_flags != 0
+                    || (numeric_flags != DECIMAL_FLAG && numeric_flags != NUMBER_FLAG)
+                    || !matches!(self.cached_scalar()?, Some(CachedScalar::Number(_)))
+                {
+                    return Err(Error::InvalidFormat(
+                        "Duration format requires an unambiguous numeric value".to_owned(),
+                    ));
+                }
+
+                let formula_identifier = self.u32_field(FORMULA_FLAG);
+                if formula_identifier.is_some_and(|identifier| identifier == 0) {
+                    return Err(Error::InvalidFormat(
+                        "Duration formula identifier must be non-zero".to_owned(),
+                    ));
+                }
+                if formula_identifier.is_none()
+                    && (self.fields.contains_key(&STRING_FLAG)
+                        || self.fields.contains_key(&FORMULA_ERROR_FLAG))
+                {
+                    return Err(Error::InvalidFormat(
+                        "Duration numeric cache has formula-only fields without a formula"
+                            .to_owned(),
+                    ));
+                }
+                for flag in [STRING_FLAG, FORMULA_ERROR_FLAG] {
+                    if self
+                        .u32_field(flag)
+                        .is_some_and(|identifier| identifier == 0)
+                    {
+                        return Err(Error::InvalidFormat(
+                            "Duration formula cache reference must be non-zero".to_owned(),
+                        ));
+                    }
+                }
+            },
+            _ => {
+                return Err(Error::InvalidFormat(
+                    "Duration format requires an Empty, numeric, or native Duration cell"
+                        .to_owned(),
+                ));
+            },
+        }
+        Ok(())
+    }
+
     fn set_data_format_metadata_identifier(
         &mut self,
         identifier: u32,
         kind: CellDataFormatKind,
         control_identifier: Option<u32>,
     ) -> Result<()> {
-        self.validate_data_format_request(kind, control_identifier)?;
+        self.validate_data_format_request(identifier, kind, control_identifier)?;
         self.apply_data_format_identifier(identifier, kind, control_identifier);
         Ok(())
     }
 
     fn validate_data_format_request(
         &self,
+        identifier: u32,
         kind: CellDataFormatKind,
         control_identifier: Option<u32>,
     ) -> Result<()> {
+        if matches!(kind, CellDataFormatKind::Duration) && identifier == 0 {
+            return Err(Error::InvalidFormat(
+                "Duration format identifier must be non-zero".to_owned(),
+            ));
+        }
         match (kind, control_identifier) {
             (
                 CellDataFormatKind::Checkbox
@@ -1215,6 +1309,9 @@ impl BncCell {
             return Err(Error::InvalidFormat(
                 "Text-based format can only be applied safely to an empty or text cell".to_owned(),
             ));
+        }
+        if matches!(kind, CellDataFormatKind::Duration) {
+            self.validate_duration_data_format_value()?;
         }
         Ok(())
     }
@@ -1289,6 +1386,10 @@ impl BncCell {
                 (EXPLICIT_DATE_TIME_FORMAT, DATE_TIME_CELL_FORMAT_KIND)
             },
             CellDataFormatKind::Duration => {
+                // The compatibility host accounts for old generic references
+                // outside this cell mutation. Canonicalize this path to the
+                // primary-only marker; the focused Duration owner is the
+                // graph-aware path that may retain marker-5's secondary.
                 self.fields.remove(&CELL_FORMAT_IDENTIFIER_FLAG);
                 self.fields.remove(&CURRENCY_FORMAT_IDENTIFIER_FLAG);
                 self.fields.remove(&DATE_TIME_FORMAT_IDENTIFIER_FLAG);
@@ -1380,7 +1481,18 @@ impl BncCell {
     }
 
     fn convert_scalar_for_data_format(&mut self, kind: CellDataFormatKind) -> Result<()> {
-        let formula_identifier = self.u32_field(FORMULA_FLAG);
+        // Scalar replacement normally clears all value-bearing fields,
+        // including formula references and FormulaError metadata. The
+        // generic format path is different: it changes only the native cache
+        // representation while retaining the formula graph and its error
+        // display reference byte-for-byte.
+        let formula = self.fields.get(&FORMULA_FLAG).cloned();
+        let formula_text = formula
+            .as_ref()
+            .and_then(|_| self.fields.get(&STRING_FLAG).cloned());
+        let formula_error = formula
+            .as_ref()
+            .and_then(|_| self.fields.get(&FORMULA_ERROR_FLAG).cloned());
         match (kind, self.cached_scalar()?) {
             (
                 CellDataFormatKind::Checkbox,
@@ -1431,9 +1543,14 @@ impl BncCell {
             },
             _ => return Ok(()),
         }
-        if let Some(identifier) = formula_identifier {
-            self.fields
-                .insert(FORMULA_FLAG, identifier.to_le_bytes().to_vec());
+        if let Some(formula) = formula {
+            self.fields.insert(FORMULA_FLAG, formula);
+        }
+        if let Some(formula_text) = formula_text {
+            self.fields.insert(STRING_FLAG, formula_text);
+        }
+        if let Some(formula_error) = formula_error {
+            self.fields.insert(FORMULA_ERROR_FLAG, formula_error);
         }
         Ok(())
     }
@@ -3745,6 +3862,183 @@ mod tests {
     }
 
     #[test]
+    fn generic_duration_rejects_incompatible_value_families_atomically() {
+        let mut text = BncCell::minimal();
+        text.set_string(17);
+
+        let mut date = BncCell::minimal();
+        date.set_date(2.5).unwrap();
+
+        let mut boolean = BncCell::minimal();
+        boolean.set_boolean(true);
+
+        let mut error = BncCell::minimal();
+        error.prefix[1] = CELL_TYPE_ERROR;
+        error
+            .fields
+            .insert(FORMULA_ERROR_FLAG, 23u32.to_le_bytes().to_vec());
+
+        let mut rich_text = BncCell::minimal();
+        rich_text.set_rich_text(29);
+
+        for mut cell in [text, date, boolean, error, rich_text] {
+            let before = cell.encode();
+            assert!(
+                cell.set_data_format_identifier(41, CellDataFormatKind::Duration, None)
+                    .is_err()
+            );
+            assert_eq!(cell.encode(), before);
+        }
+
+        let mut unsupported = BncCell::minimal();
+        unsupported.prefix[1] = 42;
+        let before = unsupported.encode();
+        assert!(
+            unsupported
+                .set_data_format_identifier(41, CellDataFormatKind::Duration, None)
+                .is_err()
+        );
+        assert_eq!(unsupported.encode(), before);
+    }
+
+    #[test]
+    fn generic_duration_rejects_zero_identifier_atomically() {
+        let mut cell = BncCell::minimal();
+        cell.set_number(1.5).unwrap();
+        cell.set_style_identifier(Some(47));
+        cell.set_comment_identifier(Some(53));
+        cell.tail.extend_from_slice(b"duration-zero-id");
+        let before = cell.encode();
+
+        assert!(
+            cell.set_data_format_identifier(0, CellDataFormatKind::Duration, None)
+                .is_err()
+        );
+        assert_eq!(cell.encode(), before);
+    }
+
+    #[test]
+    fn generic_duration_accepts_empty_and_native_duration_values() {
+        let mut empty = BncCell::minimal();
+        empty.set_style_identifier(Some(101));
+        empty.set_comment_identifier(Some(103));
+        empty.tail.extend_from_slice(b"duration-empty");
+        empty
+            .set_data_format_identifier(107, CellDataFormatKind::Duration, None)
+            .unwrap();
+        assert_eq!(empty.stored_value(), StoredValue::Empty);
+        assert_eq!(empty.cached_scalar().unwrap(), None);
+        assert_eq!(empty.explicit_format_flags(), EXPLICIT_DURATION_FORMAT);
+        assert_eq!(empty.format_identifier(), Some(107));
+        assert_eq!(empty.style_identifier(), Some(101));
+        assert_eq!(empty.comment_identifier(), Some(103));
+        assert_eq!(empty.tail, b"duration-empty");
+
+        let mut native = BncCell::minimal();
+        native.set_duration(3_723.5).unwrap();
+        let original_value = value_fields(&native);
+        native
+            .set_data_format_identifier(109, CellDataFormatKind::Duration, None)
+            .unwrap();
+        assert_eq!(native.prefix[1], CELL_TYPE_DURATION);
+        assert_eq!(native.stored_value(), StoredValue::Duration);
+        assert_eq!(
+            native.cached_scalar().unwrap(),
+            Some(CachedScalar::Duration(finite(3_723.5)))
+        );
+        assert_eq!(value_fields(&native), original_value);
+        assert_eq!(native.explicit_format_flags(), EXPLICIT_DURATION_FORMAT);
+        assert_eq!(native.format_identifier(), Some(109));
+    }
+
+    #[test]
+    fn generic_duration_conversion_preserves_formula_error_and_canonicalizes_secondary() {
+        let mut number = BncCell::minimal();
+        number.prefix[2..6].copy_from_slice(&[0xa1, 0xb2, 0xc3, 0xd4]);
+        let original_prefix = number.prefix[2..6].to_vec();
+        number.set_number(1.5).unwrap();
+        number.set_formula_reference(61);
+        number
+            .fields
+            .insert(STRING_FLAG, 67u32.to_le_bytes().to_vec());
+        number
+            .fields
+            .insert(FORMULA_ERROR_FLAG, 71u32.to_le_bytes().to_vec());
+        number.set_style_identifier(Some(73));
+        number.set_text_style_identifier(Some(75));
+        number.set_conditional_style(Some(77), Some(78));
+        number.set_comment_identifier(Some(79));
+        number.tail.extend_from_slice(b"duration-formula-tail");
+
+        number
+            .set_data_format_identifier(83, CellDataFormatKind::Duration, None)
+            .unwrap();
+        assert_eq!(number.prefix[1], CELL_TYPE_DURATION);
+        assert_eq!(number.explicit_format_flags(), EXPLICIT_DURATION_FORMAT);
+        assert_eq!(number.cell_format_kind(), Some(DURATION_CELL_FORMAT_KIND));
+        assert_eq!(number.format_identifier(), Some(83));
+        assert_eq!(number.secondary_format_identifier(), None);
+        assert_eq!(number.stored_value(), StoredValue::Formula(61));
+        assert_eq!(number.u32_field(STRING_FLAG), Some(67));
+        assert_eq!(number.formula_error_identifier(), Some(71));
+        assert_eq!(
+            number.cached_scalar().unwrap(),
+            Some(CachedScalar::Duration(finite(129_600.0)))
+        );
+        assert_eq!(number.style_identifier(), Some(73));
+        assert_eq!(number.text_style_identifier(), Some(75));
+        assert_eq!(number.conditional_style_identifier(), Some(77));
+        assert_eq!(number.conditional_style_applied_rule(), Some(78));
+        assert_eq!(number.comment_identifier(), Some(79));
+        assert_eq!(number.tail, b"duration-formula-tail");
+        assert_eq!(&number.prefix[2..6], original_prefix.as_slice());
+
+        // The legacy generic compatibility setter canonicalizes a marker-5
+        // source to primary-only. The focused Duration owner is the path that
+        // retains this secondary; the generic host updates format references
+        // independently and must not leave a dangling edge here.
+        number
+            .fields
+            .insert(CELL_FORMAT_IDENTIFIER_FLAG, 89u32.to_le_bytes().to_vec());
+        number.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
+            .copy_from_slice(&EXPLICIT_DURATION_WITH_NUMBER_FORMAT.to_le_bytes());
+        let original_value = value_fields(&number);
+        number
+            .set_data_format_identifier(97, CellDataFormatKind::Duration, None)
+            .unwrap();
+        assert_eq!(number.explicit_format_flags(), EXPLICIT_DURATION_FORMAT);
+        assert_eq!(number.secondary_format_identifier(), None);
+        assert_eq!(number.stored_value(), StoredValue::Formula(61));
+        assert_eq!(number.u32_field(STRING_FLAG), Some(67));
+        assert_eq!(number.formula_error_identifier(), Some(71));
+        assert_eq!(
+            number.cached_scalar().unwrap(),
+            Some(CachedScalar::Duration(finite(129_600.0)))
+        );
+        assert_eq!(value_fields(&number), original_value);
+        assert_eq!(number.style_identifier(), Some(73));
+        assert_eq!(number.text_style_identifier(), Some(75));
+        assert_eq!(number.conditional_style_identifier(), Some(77));
+        assert_eq!(number.conditional_style_applied_rule(), Some(78));
+        assert_eq!(number.comment_identifier(), Some(79));
+        assert_eq!(number.tail, b"duration-formula-tail");
+        assert_eq!(&number.prefix[2..6], original_prefix.as_slice());
+
+        number
+            .set_data_format_identifier(101, CellDataFormatKind::NumberOrPercentage, None)
+            .unwrap();
+        assert_eq!(number.prefix[1], CELL_TYPE_NUMBER);
+        assert_eq!(number.explicit_format_flags(), EXPLICIT_DECIMAL_FORMAT);
+        assert_eq!(number.cell_format_kind(), Some(DECIMAL_CELL_FORMAT_KIND));
+        assert_eq!(number.formula_error_identifier(), Some(71));
+        assert_eq!(number.u32_field(STRING_FLAG), Some(67));
+        assert_eq!(
+            number.cached_scalar().unwrap(),
+            Some(CachedScalar::Number(finite(1.5)))
+        );
+    }
+
+    #[test]
     fn focused_duration_format_identifier_preserves_all_value_and_tail_bytes() {
         let mut duration = BncCell::minimal();
         duration.prefix[2..6].copy_from_slice(&[0xa1, 0xb2, 0xc3, 0xd4]);
@@ -3830,6 +4124,47 @@ mod tests {
         assert_eq!(duration.cached_scalar().unwrap(), original_cached_scalar);
         assert_eq!(value_fields(&duration), original_value_fields);
         assert_eq!(non_format_encoding(&duration), original_non_format);
+    }
+
+    #[test]
+    fn focused_duration_format_identifier_preserves_native_number_secondary() {
+        let source = hex("050700000000050002300100000000000f6e99c1040000000100000009000000");
+        let mut duration = BncCell::parse(&source).unwrap();
+        let original_value_fields = value_fields(&duration);
+        let original_cached_scalar = duration.cached_scalar().unwrap();
+
+        duration
+            .set_duration_format_identifier_preserving_value(Some(11))
+            .unwrap();
+        assert_eq!(
+            duration.explicit_format_flags(),
+            EXPLICIT_DURATION_WITH_NUMBER_FORMAT
+        );
+        assert_eq!(duration.cell_format_kind(), Some(DURATION_CELL_FORMAT_KIND));
+        assert_eq!(duration.format_identifier(), Some(11));
+        assert_eq!(duration.secondary_format_identifier(), Some(1));
+        assert_eq!(value_fields(&duration), original_value_fields);
+        assert_eq!(duration.cached_scalar().unwrap(), original_cached_scalar);
+
+        let rewritten = duration.encode();
+        let reparsed = BncCell::parse(&rewritten).unwrap();
+        assert_eq!(
+            reparsed.explicit_format_flags(),
+            EXPLICIT_DURATION_WITH_NUMBER_FORMAT
+        );
+        assert_eq!(reparsed.format_identifier(), Some(11));
+        assert_eq!(reparsed.secondary_format_identifier(), Some(1));
+        assert_eq!(reparsed.cached_scalar().unwrap(), original_cached_scalar);
+
+        duration
+            .set_duration_format_identifier_preserving_value(None)
+            .unwrap();
+        assert_eq!(duration.explicit_format_flags(), 0);
+        assert_eq!(duration.cell_format_kind(), None);
+        assert_eq!(duration.format_identifier(), None);
+        assert_eq!(duration.secondary_format_identifier(), None);
+        assert_eq!(value_fields(&duration), original_value_fields);
+        assert_eq!(duration.cached_scalar().unwrap(), original_cached_scalar);
     }
 
     #[test]

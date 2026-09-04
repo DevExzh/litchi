@@ -86,3 +86,6 @@ coverage
 !/corpus/numbers_table_cell_custom_format/
 /corpus/numbers_table_cell_custom_format/*
 !/corpus/numbers_table_cell_custom_format/*.seed
+!/corpus/numbers_table_cell_duration_format/
+/corpus/numbers_table_cell_duration_format/*
+!/corpus/numbers_table_cell_duration_format/*.seed

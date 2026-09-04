@@ -5041,6 +5041,32 @@ fn enforce_numbers_table_cell_duration_format_codec_provenance(
     proto_directory: &Path,
     projection_directory: &Path,
 ) -> Result<(), Box<dyn Error>> {
+    // Keep the public Duration seam tied to the shared popup-menu wire core.
+    // These markers intentionally cover declarations rather than line order:
+    // moving helpers or adding comments must not weaken the provenance check,
+    // while renaming or replacing one of the family-specific invariants must
+    // fail the build before a generated view is forced.
+    const CORE_MARKERS: [&str; 19] = [
+        "pub const NATIVE_DURATION_FORMAT_TYPE: u32 = 268;",
+        "pub const NATIVE_DURATION_STYLE_COLON: u32 = 0;",
+        "pub const NATIVE_DURATION_STYLE_ABBREVIATED: u32 = 1;",
+        "pub const NATIVE_DURATION_STYLE_FULL_NAMES: u32 = 2;",
+        "pub const NATIVE_DURATION_UNIT_WEEKS: u32 = 1;",
+        "pub const NATIVE_DURATION_UNIT_DAYS: u32 = 2;",
+        "pub const NATIVE_DURATION_UNIT_HOURS: u32 = 4;",
+        "pub const NATIVE_DURATION_UNIT_MINUTES: u32 = 8;",
+        "pub const NATIVE_DURATION_UNIT_SECONDS: u32 = 16;",
+        "pub const NATIVE_DURATION_UNIT_MILLISECONDS: u32 = 32;",
+        "pub(crate) fn decode_duration_format(",
+        "pub(crate) fn decode_duration_format_with_report(",
+        "fn scan_duration_format<'source>(",
+        "fn buffa_duration_format_parity(",
+        "pub(crate) fn prepare_duration_format_rewrite<'source>(",
+        "pub(crate) fn rewrite_duration_format(",
+        "pub(crate) fn prepare_duration_format_write(",
+        "pub(crate) fn canonical_duration_format(",
+        "fn verify_duration_format_candidate(",
+    ];
     const CODEC_MARKERS: [&str; 31] = [
         "use crate::numbers_table_cell_pop_up_menu_codec as core;",
         "pub use core::NATIVE_DURATION_FORMAT_TYPE;",
@@ -5095,7 +5121,10 @@ fn enforce_numbers_table_cell_duration_format_codec_provenance(
     let production_core_codec = production_codec_source(&core_codec);
     if !CODEC_MARKERS
         .iter()
-        .all(|marker| codec.matches(marker).count() == 1)
+        .all(|marker| rust_code_marker_count(&codec, marker) == 1)
+        || !CORE_MARKERS
+            .iter()
+            .all(|marker| rust_code_marker_count(&core_codec, marker) == 1)
         || !PROJECTION_MARKERS
             .iter()
             .all(|marker| projection.matches(marker).count() == 1)

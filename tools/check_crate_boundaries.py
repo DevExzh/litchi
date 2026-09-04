@@ -7561,6 +7561,234 @@ IWA_NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_LEGACY_CALL = re.compile(
     r"(?![A-Za-z0-9_])[ \t\r\n]*\("
 )
 
+# Duration is the next focused Numbers display-format owner.  Keep the
+# contract separate from Date & Time even though both formats use the shared
+# source-preserving display-format core: Duration has a typed style/unit
+# value, a native type-268 envelope, and a dedicated migration-host route that
+# must disappear once the selector-first owner is active.  The semantic leaf
+# and transaction exports remain archive-free; native IDs, raw payloads, and
+# generated views stay below the package/codec boundary.
+NUMBERS_TABLE_CELL_DURATION_FORMAT_SEMANTIC_SOURCE = Path(
+    "crates/litchi-numbers/src/cell/data_format/duration.rs"
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_TRANSACTION_SOURCE = Path(
+    "crates/litchi-numbers/src/cell/data_format/duration/transaction.rs"
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_OWNER_SOURCE = Path(
+    "crates/litchi-numbers/src/package/table_cell_duration_format.rs"
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/numbers_table_cell_duration_format_codec.rs"
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_MODULE = (
+    "numbers_table_cell_duration_format_codec"
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_GENERATED_MODULE = (
+    "buffa_numbers_table_cell_duration_format_generated"
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_IMPLEMENTATION_SOURCES = (
+    NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_SOURCE,
+    NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_SOURCE,
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_REQUIRED_APIS = (
+    "DurationStyle",
+    "DurationUnit",
+    "DurationFormatSnapshot",
+    "DurationFormatWrite",
+    "PreparedDurationFormatRewrite",
+    "PreparedDurationFormatWrite",
+    "RewriteOutput",
+    "RewriteExecutionRequirements",
+    "RewriteExecutionLimits",
+    "decode_duration_format",
+    "decode_duration_format_with_report",
+    "prepare_duration_format_rewrite",
+    "prepare_duration_format_write",
+    "canonical_duration_format",
+    "rewrite_duration_format",
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_OWNER_METHODS = (
+    "table_cell_duration_format",
+    "edit_table_cell_duration_format",
+    "apply_table_cell_duration_format",
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_TRANSACTION_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+    "Path",
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_SEMANTIC_TYPES = (
+    "Duration",
+    "Style",
+    "Unit",
+    "UnitRange",
+    "Units",
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_RAW_MARKERS = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "IWorkPackage",
+        "RawMessage",
+        "SourceCatalog",
+        "ObjectId",
+        "ObjectID",
+        "ModelId",
+        "ModelID",
+        "Identifier",
+        "UUID",
+        "Uuid",
+        "DurationFormatArchive",
+        "DurationFormatSnapshot",
+        "DurationFormatWrite",
+        "PreparedDurationFormatRewrite",
+    }
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "bnc", "tn", "tsp", "tst", "tswp"}
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "FormatStructArchive",
+        "IWorkPackage",
+        "PhysicalSource",
+        "RawMessage",
+        "Resolved",
+        "SnappyStream",
+        "SourceCatalog",
+    }
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeLimit",
+        "DecodeOptions",
+        "DecodeReport",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "RewriteExecutionLimits",
+        "RewriteExecutionRequirements",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_PUBLIC_RAW_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|native_id|object_id|model_id|"
+    r"table_id|format_id|format_key|registry_id|entry_id|component_id|member_id|"
+    r"archive_id|message_id|uuid|source_bytes|raw_bytes|wire_bytes|payload|bytes)"
+    r"[ \t\r\n]*:[ \t\r\n]*(?:u64|u32|usize|i64|i32|&\s*\[\s*u8\s*\])"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_PUBLIC_RAW_CONTAINER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:source_bytes|raw_bytes|wire_bytes|payload|bytes)"
+    r"[ \t\r\n]*:[ \t\r\n]*(?:Vec\s*<\s*u8\s*>|Box\s*<\s*\[\s*u8\s*\]\s*>|"
+    r"(?:std\s*::\s*borrow\s*::\s*)?Cow\s*<[^>]*\[\s*u8\s*\]|"
+    r"(?:std\s*::\s*sync\s*::\s*)?Arc\s*<\s*\[\s*u8\s*\]\s*>)"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_PUBLIC_SELECTOR_RAW_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:sheet|table|row|column|position|cell)"
+    r"[ \t\r\n]*:[ \t\r\n]*(?:u64|u32|usize|i64|i32|"
+    r"[A-Z][A-Za-z0-9_]*(?:Id|ID|Key|Identifier))\b"
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_TYPED_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|key|"
+    r"(?:cell|object|native|model|table|format|registry|entry|component|archive|"
+    r"message|storage|resource)_(?:id|identifier|key))"
+    r"[ \t\r\n]*:[ \t\r\n]*"
+    r"(?:[A-Z][A-Za-z0-9_]*(?:Id|ID|Key|Identifier)|"
+    r"(?:u64|u32|usize|i64|i32))\b"
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_HIDDEN_MODULE = re.compile(
+    rf"(?m)#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+    rf"pub\s+mod\s+{re.escape(NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_MODULE)}\b"
+)
+NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_PUBLIC_GENERATED_MODULE = re.compile(
+    rf"(?m)^\s*pub\s+mod\s+"
+    rf"{re.escape(NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_GENERATED_MODULE)}\b"
+)
+
+# These are deliberately production-code markers rather than prose checks.
+# They make the owner gate prove that the selector-first route is actually
+# source-bound, bounded, and candidate-verified; comments, literals, and
+# test-only decoys are removed before the markers are evaluated.
+NUMBERS_TABLE_CELL_DURATION_FORMAT_OWNER_REQUIRED_MARKERS = {
+    "exact-source admission": re.compile(
+        r"(?<![A-Za-z0-9_])source_is_exact(?![A-Za-z0-9_])"
+    ),
+    "source-owner identity": re.compile(
+        r"(?<![A-Za-z0-9_])__source_owner(?![A-Za-z0-9_])"
+    ),
+    "exact-artifact patch capability": re.compile(
+        r"(?<![A-Za-z0-9_])OwnedExactArtifacts(?![A-Za-z0-9_])"
+    ),
+    "patch-owner authorization": re.compile(
+        r"(?<![A-Za-z0-9_])authorizes_owner(?![A-Za-z0-9_])"
+    ),
+    "selector-first cell resolution": re.compile(
+        r"(?<![A-Za-z0-9_])resolve_cell(?![A-Za-z0-9_])"
+    ),
+    "strict Duration reader route": re.compile(
+        r"(?<![A-Za-z0-9_])read_duration_format(?![A-Za-z0-9_])"
+    ),
+    "strict Duration writer route": re.compile(
+        r"(?<![A-Za-z0-9_])rewrite_duration_format(?![A-Za-z0-9_])"
+    ),
+    "transaction budget": re.compile(
+        r"(?<![A-Za-z0-9_])TransactionBudget(?![A-Za-z0-9_])"
+    ),
+    "bounded reassembly preflight": re.compile(
+        r"(?<![A-Za-z0-9_])preflight_reassembly(?![A-Za-z0-9_])"
+    ),
+    "charged transaction resources": re.compile(
+        r"(?<![A-Za-z0-9_])charge_[A-Za-z0-9_]+(?![A-Za-z0-9_])"
+    ),
+    "candidate reopening": re.compile(
+        r"(?<![A-Za-z0-9_])(?:candidate_reopen|charge_candidate_reopen)"
+        r"(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+    "candidate locality verification": re.compile(
+        r"(?<![A-Za-z0-9_])verify_duration_package_locality(?![A-Za-z0-9_])",
+        re.IGNORECASE,
+    ),
+}
+
+# Only the dedicated NumbersEditor convenience methods are retired.  The
+# generic ``DataFormat`` helpers intentionally remain available to source-
+# built packages and to the attached Pages/Keynote table adapters.
+RETIRED_IWA_NUMBERS_TABLE_CELL_DURATION_FORMAT_METHODS = (
+    "table_cell_duration_format",
+    "set_table_cell_duration_format",
+    "reset_table_cell_duration_format",
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_DURATION_FORMAT_METHOD_SET = frozenset(
+    RETIRED_IWA_NUMBERS_TABLE_CELL_DURATION_FORMAT_METHODS
+)
+RETIRED_IWA_NUMBERS_TABLE_CELL_DURATION_FORMAT_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "table.rs",
+)
+IWA_NUMBERS_TABLE_CELL_DURATION_FORMAT_LEGACY_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?P<method>table_cell_duration_format|"
+    r"set_table_cell_duration_format|reset_table_cell_duration_format)"
+    r"(?![A-Za-z0-9_])[ \t\r\n]*\("
+)
+
 # Custom is the document-scoped Numbers display-format owner.  Unlike the
 # scalar format owners above, its semantic value is an enum backed by a
 # private UUID-indexed registry.  Keep the checker explicit about every
@@ -25393,6 +25621,583 @@ def audit_numbers_table_cell_date_time_format_facade_source_topology(
     return sorted(set(violations))
 
 
+def _numbers_table_cell_duration_format_owner_present(root: Path) -> bool:
+    """Return whether the focused Duration-format owner is wired at the root."""
+
+    owner_path = root / NUMBERS_TABLE_CELL_DURATION_FORMAT_OWNER_SOURCE
+    semantic_path = root / NUMBERS_TABLE_CELL_DURATION_FORMAT_SEMANTIC_SOURCE
+    package_path = root / Path("crates/litchi-numbers/src/package.rs")
+    owner_source = (
+        _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+        if owner_path.is_file()
+        else ""
+    )
+    semantic_source = (
+        _mask_rust_cfg_test_items(semantic_path.read_text(encoding="utf-8"))
+        if semantic_path.is_file()
+        else ""
+    )
+    package_source = (
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return (
+        owner_path.is_file()
+        and semantic_path.is_file()
+        and bool(_mask_rust_non_code(owner_source).strip())
+        and bool(_mask_rust_non_code(semantic_source).strip())
+        and bool(
+            _rust_root_level_matches(
+                package_source,
+                re.compile(
+                    r"(?m)^[ \t]*pub[ \t]*\([ \t]*crate[ \t]*\)[ \t]+mod"
+                    r"[ \t\r\n]+(?:r#)?table_cell_duration_format\b"
+                ),
+            )
+        )
+    )
+
+
+def _numbers_table_cell_duration_format_transaction_source(
+    root: Path, semantic_source: str
+) -> str:
+    """Return the root transaction module body or its explicit split source."""
+
+    declarations = _rust_root_level_module_declarations(
+        semantic_source, frozenset({"transaction"})
+    )
+    for name, visibility, shape, body, _line_number in declarations:
+        if name != "transaction" or visibility is None or not re.fullmatch(
+            r"pub[ \t\r\n]+", visibility
+        ):
+            continue
+        if shape == "inline":
+            return body
+        if shape == "external":
+            external = root / NUMBERS_TABLE_CELL_DURATION_FORMAT_TRANSACTION_SOURCE
+            if external.is_file():
+                return _mask_rust_cfg_test_items(external.read_text(encoding="utf-8"))
+    return ""
+
+
+def _numbers_table_cell_duration_format_public_leak(
+    identifier: str,
+) -> str | None:
+    """Classify native, archive, wire, generated, or host vocabulary."""
+
+    if identifier in NUMBERS_TABLE_CELL_DURATION_FORMAT_RAW_MARKERS:
+        return "raw identifier or archive type"
+    if identifier in NUMBERS_TABLE_CELL_DURATION_FORMAT_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in NUMBERS_TABLE_CELL_DURATION_FORMAT_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in NUMBERS_TABLE_CELL_DURATION_FORMAT_WIRE_TYPES:
+        return "wire type"
+    if identifier in {
+        "NumbersEditor",
+        "PagesEditor",
+        "KeynoteEditor",
+        "LitchiIwaPackage",
+    }:
+        return "monolithic host type"
+    if identifier in {"Projection", "LitchiIwaProjection"}:
+        return "generated type"
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"buffa", "prost"} for word in words):
+        return "protobuf type"
+    if "generated" in words:
+        return "generated type"
+    return _iwork_public_leak(identifier)
+
+
+def audit_numbers_table_cell_duration_format_codec_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the private strict Buffa/lazy Duration-format codec seam."""
+
+    if not _numbers_table_cell_duration_format_owner_present(root):
+        return []
+
+    violations: list[str] = []
+    codec_path = root / NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_SOURCE
+    shared_path = root / NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_SOURCE
+    codec_paths = tuple(
+        root / path
+        for path in NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    )
+    codec_raw = "\n".join(
+        path.read_text(encoding="utf-8") for path in codec_paths
+    )
+    codec_production = _mask_rust_cfg_test_items(codec_raw)
+    codec_code = _mask_rust_non_code(codec_production)
+    if not codec_path.is_file() or not _mask_rust_non_code(
+        _mask_rust_cfg_test_items(
+            codec_path.read_text(encoding="utf-8")
+            if codec_path.is_file()
+            else ""
+        )
+    ).strip():
+        violations.append(
+            "focused litchi-numbers Duration-format boundary is missing strict "
+            f"codec source: {NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_SOURCE}"
+        )
+    if not shared_path.is_file():
+        violations.append(
+            "focused litchi-numbers Duration-format boundary is missing its shared "
+            f"codec core: {NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_SOURCE}"
+        )
+
+    for api in NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_REQUIRED_APIS:
+        if _numbers_table_cell_number_format_api_present(codec_code, api):
+            continue
+        violations.append(
+            "focused litchi-numbers Duration-format hidden codec is missing "
+            f"strict API {api}: {NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_SOURCE}"
+        )
+
+    # The wrapper may expose the family-specific spelling, but the strict
+    # implementation must remain in the shared source-preserving walker.
+    shared_code = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(
+            shared_path.read_text(encoding="utf-8") if shared_path.is_file() else ""
+        )
+    )
+    for api in NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_REQUIRED_APIS:
+        if api in {
+            "DurationStyle",
+            "DurationUnit",
+            "DurationFormatSnapshot",
+            "DurationFormatWrite",
+            "PreparedDurationFormatRewrite",
+            "PreparedDurationFormatWrite",
+        }:
+            continue
+        if _numbers_table_cell_number_format_api_present(shared_code, api):
+            continue
+        violations.append(
+            "focused litchi-numbers Duration-format shared codec core is missing "
+            f"strict API {api}: {NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_SOURCE}"
+        )
+
+    for marker, description in (
+        ("buffa", "Buffa projection ingress"),
+        ("decode_lazy_view", "lazy Buffa view"),
+        ("Budget::new", "bounded wire preflight"),
+        ("unknown", "unknown-field preservation"),
+        ("extend_from_slice", "source-preserving rewrite"),
+        ("execution_requirements", "prepared bounded rewrite"),
+        ("execute", "prepared bounded execution"),
+        ("scan_duration_format", "strict Duration scanner"),
+        ("buffa_duration_format_parity", "Duration Buffa parity check"),
+    ):
+        if re.search(re.escape(marker), codec_code, re.IGNORECASE):
+            continue
+        violations.append(
+            "focused litchi-numbers Duration-format hidden codec is missing "
+            f"{description}: {NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_SOURCE}"
+        )
+
+    if re.search(
+        r"\b(?:NATIVE_DURATION_FORMAT_TYPE|DURATION_FORMAT_TYPE)\b"
+        r"\s*(?::\s*(?:u\d+\s*)?)?=\s*268\b",
+        codec_code,
+    ) is None:
+        violations.append(
+            "focused litchi-numbers Duration-format hidden codec must retain "
+            f"native type 268: {NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_SOURCE}"
+        )
+    if re.search(r"\b(?:prost|prost_types)\b", codec_code) is not None:
+        violations.append(
+            "focused litchi-numbers Duration-format hidden codec retains a "
+            f"Prost production path: {NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_SOURCE}"
+        )
+
+    # ``Budget::new`` is the shared scanner's preflight marker.  Require it to
+    # occur before the first lazy-view force so a wrapper cannot enter the
+    # generated view before applying the wire limits.
+    lazy = [
+        match.start()
+        for match in re.finditer(
+            r"\b(?:decode_lazy_view|decode_view|LazyView)\b", codec_code
+        )
+    ]
+    preflight = [
+        match.start()
+        for match in re.finditer(
+            r"\b(?:preflight|Budget\s*::\s*new|scan_duration_format)\b",
+            codec_code,
+            re.IGNORECASE,
+        )
+    ]
+    if lazy and (not preflight or min(preflight) > min(lazy)):
+        violations.append(
+            "focused litchi-numbers Duration-format hidden codec must preflight "
+            f"wire before forcing its lazy Buffa view: {NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_SOURCE}"
+        )
+
+    dedicated_code = _mask_rust_non_code(
+        _mask_rust_cfg_test_items(
+            codec_path.read_text(encoding="utf-8") if codec_path.is_file() else ""
+        )
+    )
+    if re.search(
+        r"\buse\s+crate\s*::\s*numbers_table_cell_pop_up_menu_codec\s+as\s+core\b",
+        dedicated_code,
+    ) is None:
+        violations.append(
+            "focused litchi-numbers Duration-format hidden codec must route through "
+            f"the shared core: {NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_SOURCE}"
+        )
+    if codec_path.is_file() and re.search(r"\bcore\s*::", dedicated_code) is None:
+        violations.append(
+            "focused litchi-numbers Duration-format hidden codec has no shared-core "
+            f"calls: {NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_SOURCE}"
+        )
+
+    public_path = root / NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_PUBLIC_SOURCE
+    public_raw = (
+        public_path.read_text(encoding="utf-8") if public_path.is_file() else ""
+    )
+    public_production = _mask_rust_cfg_test_items(public_raw)
+    if not _rust_root_level_matches(
+        public_production, NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_HIDDEN_MODULE
+    ):
+        violations.append(
+            "focused litchi-numbers Duration-format public API is missing hidden "
+            f"codec module {NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_MODULE}: "
+            f"{NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_PUBLIC_SOURCE}"
+        )
+    generated = _rust_root_level_module_declarations(
+        public_production,
+        frozenset({NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_GENERATED_MODULE}),
+    )
+    if not generated:
+        violations.append(
+            "focused litchi-numbers Duration-format public API is missing a "
+            f"private Buffa generated projection: {NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_PUBLIC_SOURCE}"
+        )
+    for _module, visibility, shape, body, line_number in generated:
+        if visibility is not None:
+            violations.append(
+                "focused litchi-numbers Duration-format generated projection "
+                f"must remain private: {NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
+            )
+        if shape == "invalid" or (
+            shape == "inline"
+            and (
+                not _rust_generated_module_include_is_valid(body)
+                or re.search(
+                    r"buffa[^\"\n]*duration[^\"\n]*|"
+                    r"duration[^\"\n]*buffa[^\"\n]*",
+                    _mask_rust_comments(body),
+                    re.IGNORECASE,
+                )
+                is None
+            )
+        ):
+            violations.append(
+                "focused litchi-numbers Duration-format generated projection "
+                f"module has invalid include shape: {NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_PUBLIC_SOURCE}:{line_number}"
+            )
+    if _rust_root_generated_public_leaks(
+        public_production,
+        frozenset({NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_GENERATED_MODULE}),
+    ):
+        violations.append(
+            "focused litchi-numbers Duration-format public API reexports its "
+            f"Buffa generated projection: {NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_PUBLIC_SOURCE}"
+        )
+
+    # The dedicated wrapper must carry an explicit hostile-wire test module;
+    # shared-core tests alone are not sufficient evidence for this family
+    # boundary.
+    if re.search(
+        r"#\s*\[\s*cfg\s*\(\s*test\s*\)\s*\][\s\S]{0,4096}"
+        r"#\s*\[\s*test\s*\]",
+        _mask_rust_non_code(
+            codec_path.read_text(encoding="utf-8") if codec_path.is_file() else ""
+        ),
+    ) is None:
+        violations.append(
+            "focused litchi-numbers Duration-format hidden codec is missing its "
+            f"cfg(test) hostile-wire harness: {NUMBERS_TABLE_CELL_DURATION_FORMAT_CODEC_SOURCE}"
+        )
+    return sorted(set(violations))
+
+
+def audit_numbers_table_cell_duration_format_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the archive-free, selector-first Duration semantic facade."""
+
+    if not (
+        (root / NUMBERS_SOURCE_ROOT).is_dir()
+        and _numbers_table_cell_duration_format_owner_present(root)
+    ):
+        return []
+
+    violations: list[str] = []
+    semantic_path = root / NUMBERS_TABLE_CELL_DURATION_FORMAT_SEMANTIC_SOURCE
+    semantic_source = _mask_rust_cfg_test_items(
+        semantic_path.read_text(encoding="utf-8")
+    )
+    if not _rust_root_level_matches(
+        semantic_source,
+        re.compile(r"(?m)^[ \t]*pub\s+struct\s+(?:r#)?Duration\b"),
+    ):
+        violations.append(
+            "focused litchi-numbers Duration-format public API is missing "
+            f"canonical cell::data_format::Duration: {NUMBERS_TABLE_CELL_DURATION_FORMAT_SEMANTIC_SOURCE}"
+        )
+    for semantic_type in NUMBERS_TABLE_CELL_DURATION_FORMAT_SEMANTIC_TYPES:
+        if _rust_root_level_matches(
+            semantic_source,
+            re.compile(
+                rf"(?m)^[ \t]*pub\s+(?:struct|enum|type)\s+(?:r#)?"
+                rf"{re.escape(semantic_type)}\b"
+            ),
+        ):
+            continue
+        violations.append(
+            "focused litchi-numbers Duration-format public API is missing "
+            f"semantic type {semantic_type}: {NUMBERS_TABLE_CELL_DURATION_FORMAT_SEMANTIC_SOURCE}"
+        )
+
+    transaction_declarations = _rust_root_level_module_declarations(
+        semantic_source, frozenset({"transaction"})
+    )
+    transaction_modules = [
+        declaration
+        for declaration in transaction_declarations
+        if declaration[1] is not None
+        and re.fullmatch(r"pub[ \t\r\n]+", declaration[1])
+    ]
+    if not transaction_modules:
+        violations.append(
+            "focused litchi-numbers Duration-format public API is missing its "
+            f"transaction namespace: {NUMBERS_TABLE_CELL_DURATION_FORMAT_SEMANTIC_SOURCE}"
+        )
+    transaction_source = _numbers_table_cell_duration_format_transaction_source(
+        root, semantic_source
+    )
+    transaction_code = _mask_rust_non_code(transaction_source)
+    transaction_exports = _rust_canonical_exports(
+        transaction_source,
+        frozenset(NUMBERS_TABLE_CELL_DURATION_FORMAT_TRANSACTION_TYPES),
+    )
+    for name in NUMBERS_TABLE_CELL_DURATION_FORMAT_TRANSACTION_TYPES:
+        if name in transaction_exports:
+            continue
+        violations.append(
+            "focused litchi-numbers Duration-format transaction namespace is missing "
+            f"canonical export {name}: {NUMBERS_TABLE_CELL_DURATION_FORMAT_SEMANTIC_SOURCE}"
+        )
+    if not re.search(
+        r"\bpub\s+use\s+crate\s*::\s*package\s*::\s*"
+        r"table_cell_duration_format\b",
+        transaction_code,
+    ):
+        violations.append(
+            "focused litchi-numbers Duration-format transaction namespace must be "
+            "source-bound to its private package owner: "
+            f"{NUMBERS_TABLE_CELL_DURATION_FORMAT_SEMANTIC_SOURCE}"
+        )
+
+    # Transaction types belong below the nested namespace; a root flat alias
+    # silently recreates the retired monolithic surface.
+    semantic_code = _mask_rust_non_code(semantic_source)
+    for use_match in _rust_root_level_matches(
+        semantic_source,
+        re.compile(r"(?m)^[ \t]*pub\s+use\b"),
+    ):
+        statement_end = _rust_statement_end(semantic_code, use_match.end())
+        declaration = semantic_code[use_match.start() : statement_end]
+        for name in NUMBERS_TABLE_CELL_DURATION_FORMAT_TRANSACTION_TYPES:
+            if not re.search(rf"\b{re.escape(name)}\b", declaration):
+                continue
+            violations.append(
+                "focused litchi-numbers Duration-format public API retains flat "
+                f"transaction export {name}: {NUMBERS_TABLE_CELL_DURATION_FORMAT_SEMANTIC_SOURCE}"
+            )
+
+    data_format_path = root / Path("crates/litchi-numbers/src/cell/data_format.rs")
+    data_format_source = (
+        _mask_rust_cfg_test_items(data_format_path.read_text(encoding="utf-8"))
+        if data_format_path.is_file()
+        else ""
+    )
+    if not _rust_root_level_matches(
+        data_format_source,
+        re.compile(
+            r"(?m)^[ \t]*pub\s+mod\s+(?:r#)?duration\b[ \t\r\n]*(?:;|\{)"
+        ),
+    ):
+        violations.append(
+            "focused litchi-numbers Duration-format public API is missing its "
+            f"canonical duration module: {data_format_path.relative_to(root)}"
+        )
+    if not _rust_root_level_matches(
+        data_format_source,
+        re.compile(
+            r"(?m)^[ \t]*pub\s+use\s+(?:r#)?duration\s*::\s*"
+            r"(?:r#)?Duration\b"
+        ),
+    ):
+        violations.append(
+            "focused litchi-numbers Duration-format public API is missing its "
+            f"canonical Duration reexport: {data_format_path.relative_to(root)}"
+        )
+
+    package_path = root / Path("crates/litchi-numbers/src/package.rs")
+    package_source = (
+        _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    private_module = re.compile(
+        r"(?m)^[ \t]*pub\s*\([ \t]*crate[ \t]*\)\s+mod\s+"
+        r"(?:r#)?table_cell_duration_format\b[ \t\r\n]*(?:;|\{)"
+    )
+    if not _rust_root_level_matches(package_source, private_module):
+        violations.append(
+            "focused litchi-numbers Duration-format public API is missing its "
+            f"private package owner module: {package_path.relative_to(root)}"
+        )
+    public_module = re.compile(
+        r"(?m)^[ \t]*pub\s+mod\s+(?:r#)?table_cell_duration_format\b"
+    )
+    public_matches = _rust_root_level_matches(package_source, public_module)
+    if public_matches:
+        line_number = package_source.count("\n", 0, public_matches[0].start()) + 1
+        violations.append(
+            "focused litchi-numbers Duration-format public API exposes its "
+            f"package owner module: {package_path.relative_to(root)}:{line_number}"
+        )
+    for declaration, line_number in _rust_public_declarations(package_source):
+        if re.search(
+            r"\bpub\s+use[^;]*\btable_cell_duration_format\b", declaration
+        ):
+            violations.append(
+                "focused litchi-numbers Duration-format public API exposes its "
+                f"package owner path: {package_path.relative_to(root)}:{line_number}"
+            )
+
+    owner_path = root / NUMBERS_TABLE_CELL_DURATION_FORMAT_OWNER_SOURCE
+    owner_source = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+    owner_code = _mask_rust_non_code(owner_source)
+    for label, marker in NUMBERS_TABLE_CELL_DURATION_FORMAT_OWNER_REQUIRED_MARKERS.items():
+        if marker.search(owner_code) is None:
+            violations.append(
+                "focused litchi-numbers Duration-format owner is missing "
+                f"{label} transaction marker: {owner_path.relative_to(root)}"
+            )
+
+    owner_methods = {
+        name: (declaration, line_number)
+        for name, declaration, line_number in _rust_public_methods_in_impl(
+            owner_source, "Package"
+        )
+    }
+    expected_signatures = {
+        "table_cell_duration_format": (r"Option\s*<\s*Duration\s*>", False),
+        "edit_table_cell_duration_format": (r"\bEdit\b", False),
+        "apply_table_cell_duration_format": (r"\bCommit\b", True),
+    }
+    for method in NUMBERS_TABLE_CELL_DURATION_FORMAT_OWNER_METHODS:
+        record = owner_methods.get(method)
+        if record is None:
+            violations.append(
+                "focused litchi-numbers Duration-format public API is missing "
+                f"Package method {method}: {owner_path.relative_to(root)}"
+            )
+            continue
+        declaration, line_number = record
+        signature, needs_commit = expected_signatures[method]
+        if not re.search(signature, declaration):
+            violations.append(
+                "focused litchi-numbers Duration-format Package method has an "
+                f"unexpected signature {method}: {owner_path.relative_to(root)}:{line_number}"
+            )
+        if method != "apply_table_cell_duration_format":
+            for selector in ("SheetSelector", "TableSelector", "CellPosition"):
+                if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
+                    violations.append(
+                        "focused litchi-numbers Duration-format Package method "
+                        f"{method} must accept selector-first {selector}: "
+                        f"{owner_path.relative_to(root)}:{line_number}"
+                    )
+        elif not re.search(r"&\s*Patch\b", declaration):
+            violations.append(
+                "focused litchi-numbers Duration-format apply must accept its "
+                f"source-bound Patch: {owner_path.relative_to(root)}:{line_number}"
+            )
+        if needs_commit and not re.search(r"\bCommit\b", declaration):
+            violations.append(
+                "focused litchi-numbers Duration-format apply must return Commit: "
+                f"{owner_path.relative_to(root)}:{line_number}"
+            )
+
+    # Scan only public declarations.  Private native implementation fields and
+    # imports are allowed; public values, transaction exports, and signatures
+    # must not expose archive IDs, raw payloads, wire records, or generated
+    # projection types.  Rust trivia is masked before every hostile check.
+    for path, source in (
+        (semantic_path, semantic_source),
+        (owner_path, owner_source),
+    ):
+        for declaration, line_number in _rust_public_declarations(source):
+            for identifier_match in RUST_IDENTIFIER.finditer(declaration):
+                identifier = identifier_match.group(1)
+                reason = _numbers_table_cell_duration_format_public_leak(identifier)
+                if reason is None:
+                    continue
+                identifier_line = line_number + declaration.count(
+                    "\n", 0, identifier_match.start(1)
+                )
+                violations.append(
+                    "focused litchi-numbers Duration-format public API exposes "
+                    f"{reason} {identifier}: {path.relative_to(root)}:{identifier_line}"
+                )
+            for pattern, label in (
+                (RUST_BYTE_SLICE, "raw byte slice"),
+                (
+                    NUMBERS_TABLE_CELL_DURATION_FORMAT_PUBLIC_RAW_PARAMETER,
+                    "raw parameter",
+                ),
+                (
+                    NUMBERS_TABLE_CELL_DURATION_FORMAT_PUBLIC_RAW_CONTAINER,
+                    "raw byte container",
+                ),
+                (
+                    NUMBERS_TABLE_CELL_DURATION_FORMAT_TYPED_RAW_ID_PARAMETER,
+                    "typed raw identifier parameter",
+                ),
+            ):
+                for match in pattern.finditer(declaration):
+                    value = re.sub(r"\s+", " ", match.group(0)).strip()
+                    violations.append(
+                        "focused litchi-numbers Duration-format public API exposes "
+                        f"{label} {value}: {path.relative_to(root)}:{line_number}"
+                    )
+            if re.match(
+                r"^[ \t]*pub(?:\s*\([^()]*\))?\s+(?:async\s+|const\s+|unsafe\s+)*fn\b",
+                declaration,
+            ):
+                for match in NUMBERS_TABLE_CELL_DURATION_FORMAT_PUBLIC_SELECTOR_RAW_PARAMETER.finditer(
+                    declaration
+                ):
+                    value = re.sub(r"\s+", " ", match.group(0)).strip()
+                    violations.append(
+                        "focused litchi-numbers Duration-format public API exposes "
+                        f"selector raw parameter {value}: {path.relative_to(root)}:{line_number}"
+                    )
+    return sorted(set(violations))
+
+
 def _numbers_table_cell_custom_format_owner_present(root: Path) -> bool:
     """Return whether the focused document-scoped Custom owner is active."""
 
@@ -30868,6 +31673,29 @@ def audit_iwa_numbers_table_cell_date_time_format_source_topology(
         root,
         label="Date & Time",
         methods=RETIRED_IWA_NUMBERS_TABLE_CELL_DATE_TIME_FORMAT_METHODS,
+        focused_helpers=frozenset(),
+        focused_tests=frozenset(),
+    )
+
+
+def audit_iwa_numbers_table_cell_duration_format_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire NumbersEditor Duration raw-ID methods after owner cutover.
+
+    Generic ``DataFormat`` helpers remain compatibility-only routes for
+    source-built Numbers packages and attached Pages/Keynote tables.  Once
+    the focused Duration owner is wired, only the dedicated NumbersEditor
+    methods are forbidden; focused ``litchi_numbers::Package`` calls remain
+    valid adapter ingress.
+    """
+
+    if not _numbers_table_cell_duration_format_owner_present(root):
+        return []
+    return _audit_iwa_numbers_table_cell_format_retirement(
+        root,
+        label="Duration",
+        methods=RETIRED_IWA_NUMBERS_TABLE_CELL_DURATION_FORMAT_METHODS,
         focused_helpers=frozenset(),
         focused_tests=frozenset(),
     )
@@ -53863,6 +54691,9 @@ def main(argv: list[str] | None = None) -> int:
         + audit_numbers_table_cell_date_time_format_codec_source_topology()
         + audit_numbers_table_cell_date_time_format_facade_source_topology()
         + audit_iwa_numbers_table_cell_date_time_format_source_topology()
+        + audit_numbers_table_cell_duration_format_codec_source_topology()
+        + audit_numbers_table_cell_duration_format_facade_source_topology()
+        + audit_iwa_numbers_table_cell_duration_format_source_topology()
         + audit_iwa_numbers_table_cell_text_format_source_topology()
         + audit_numbers_table_cell_custom_format_codec_source_topology()
         + audit_numbers_table_cell_custom_format_facade_source_topology()
