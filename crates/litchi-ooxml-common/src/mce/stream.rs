@@ -1719,7 +1719,7 @@ impl<'a> Processor<'a> {
             .raw_stack
             .last()
             .map_or_else(Namespaces::root, |frame| frame.ns.clone());
-        let data = self.parse_element(element, decoder, &raw_parent)?;
+        let mut data = self.parse_element(element, decoder, &raw_parent)?;
         if *raw_enabled {
             let raw = RawElement {
                 kind: if empty {
@@ -1771,10 +1771,11 @@ impl<'a> Processor<'a> {
             let mode = Mode::Emit;
             if parent_active && *active_enabled {
                 let event = SemanticEvent::from_element(
-                    &data,
+                    data.qualified_name.as_ref(),
+                    &data.expanded_name,
                     empty,
                     semantic_attrs(
-                        &data.attrs,
+                        &mut data.attrs,
                         &context,
                         self.capabilities,
                         false,
@@ -1944,10 +1945,11 @@ impl<'a> Processor<'a> {
 
         if parent_active && active && matches!(&mode, Mode::Emit) && *active_enabled {
             let event = SemanticEvent::from_element(
-                &data,
+                data.qualified_name.as_ref(),
+                &data.expanded_name,
                 empty,
                 semantic_attrs(
-                    &data.attrs,
+                    &mut data.attrs,
                     &context,
                     self.capabilities,
                     !is_extension,
@@ -2537,17 +2539,14 @@ fn validate_duplicate_attributes(
     attrs: &[RawAttribute<'_>],
     limits: &StreamLimits,
 ) -> Result<(), Error> {
-    let mut seen = HashSet::new();
+    let mut seen: HashSet<&Name> = HashSet::new();
     try_reserve_set(&mut seen, attrs.len(), "MCE stream attributes")?;
     for attribute in attrs {
         if is_namespace_attribute(attribute.qualified_name.as_ref()) {
             continue;
         }
-        if !seen.insert(clone_bounded_name(
-            &attribute.expanded_name,
-            limits,
-            "MCE stream duplicate attribute name",
-        )?) {
+        check_expanded_name(&attribute.expanded_name, limits)?;
+        if !seen.insert(&attribute.expanded_name) {
             return Err(bad("duplicate attribute"));
         }
     }
@@ -2556,15 +2555,16 @@ fn validate_duplicate_attributes(
 
 impl<'a> SemanticEvent<'a> {
     fn from_element(
-        data: &'a ElementData<'_>,
+        qualified_name: &'a [u8],
+        expanded_name: &Name,
         empty: bool,
         attrs: Vec<SemanticAttribute<'a>>,
         limits: &StreamLimits,
     ) -> Result<Self, Error> {
         let element = SemanticElement {
-            qualified_name: Cow::Borrowed(data.qualified_name.as_ref()),
+            qualified_name: Cow::Borrowed(qualified_name),
             expanded_name: clone_bounded_name(
-                &data.expanded_name,
+                expanded_name,
                 limits,
                 "MCE stream semantic expanded element name",
             )?,
@@ -2624,7 +2624,7 @@ fn clone_raw_attributes<'a>(
 }
 
 fn semantic_attrs<'a>(
-    attrs: &'a [RawAttribute<'_>],
+    attrs: &'a mut [RawAttribute<'_>],
     context: &Context,
     capabilities: &Capabilities,
     filter: bool,
@@ -2633,7 +2633,7 @@ fn semantic_attrs<'a>(
 ) -> Result<Vec<SemanticAttribute<'a>>, Error> {
     let mut output = Vec::new();
     reserve_vec(&mut output, attrs.len(), "MCE stream semantic attributes")?;
-    for attr in attrs {
+    for attr in attrs.iter_mut() {
         if is_namespace_attribute(attr.qualified_name.as_ref()) {
             continue;
         }
@@ -2667,13 +2667,17 @@ fn semantic_attrs<'a>(
                 .checked_add(1)
                 .ok_or_else(|| limit("stream report counters"))?;
         }
+        check_expanded_name(&attr.expanded_name, limits)?;
+        let expanded_name = std::mem::replace(
+            &mut attr.expanded_name,
+            Name {
+                namespace: String::new(),
+                local_name: String::new(),
+            },
+        );
         output.push(SemanticAttribute {
             qualified_name: Cow::Borrowed(attr.qualified_name.as_ref()),
-            expanded_name: clone_bounded_name(
-                &attr.expanded_name,
-                limits,
-                "MCE stream semantic expanded attribute name",
-            )?,
+            expanded_name,
             raw_value: Cow::Borrowed(attr.raw_value.as_ref()),
             decoded_value: Cow::Borrowed(attr.decoded_value.as_ref()),
         });

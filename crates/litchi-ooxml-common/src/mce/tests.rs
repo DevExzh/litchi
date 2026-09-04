@@ -127,6 +127,173 @@ mod preservation_tests {
 }
 
 #[cfg(test)]
+mod streaming_0410_name_ownership_tests {
+    use super::super::{
+        Capabilities, Error, Name,
+        stream::{
+            SemanticEvent, StreamError, StreamLimits,
+            process_markup_compatibility_stream_with_observers,
+        },
+    };
+    use std::io::Cursor;
+
+    const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+
+    #[test]
+    fn streaming_0410_owned_names_survive_raw_and_active_callbacks() {
+        let xml = format!(
+            r#"<r xmlns:mc="{MC}" xmlns:x="urn:x" xmlns:p="urn:p" mc:Ignorable="x" mc:PreserveAttributes="x:keep" x:keep="root"><p:item x:keep="child" plain="ok">payload</p:item></r>"#
+        );
+        let mut raw_element_names = Vec::new();
+        let mut raw_attribute_names = Vec::new();
+        let mut active_element_names = Vec::new();
+        let mut active_attribute_names = Vec::new();
+        let mut active_end_names = Vec::new();
+        let mut input = Cursor::new(xml.as_bytes());
+
+        process_markup_compatibility_stream_with_observers(
+            &mut input,
+            &Capabilities::new(),
+            &StreamLimits::default(),
+            |element| {
+                raw_element_names.push(element.expanded_name);
+                raw_attribute_names.extend(
+                    element
+                        .attributes
+                        .into_iter()
+                        .map(|attribute| attribute.expanded_name),
+                );
+                Ok::<(), &'static str>(())
+            },
+            |event| {
+                match event {
+                    SemanticEvent::Start(element) | SemanticEvent::Empty(element) => {
+                        active_element_names.push(element.expanded_name);
+                        active_attribute_names.push(
+                            element
+                                .attributes
+                                .into_iter()
+                                .map(|attribute| attribute.expanded_name)
+                                .collect::<Vec<_>>(),
+                        );
+                    },
+                    SemanticEvent::End(element) => active_end_names.push(element.expanded_name),
+                    SemanticEvent::Text(_)
+                    | SemanticEvent::CData(_)
+                    | SemanticEvent::Comment(_)
+                    | SemanticEvent::Decl(_)
+                    | SemanticEvent::GeneralRef(_) => {},
+                }
+                Ok::<(), &'static str>(())
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            raw_element_names,
+            vec![
+                Name {
+                    namespace: String::new(),
+                    local_name: "r".to_owned(),
+                },
+                Name {
+                    namespace: "urn:p".to_owned(),
+                    local_name: "item".to_owned(),
+                },
+            ]
+        );
+        assert!(
+            raw_attribute_names
+                .iter()
+                .any(|name| { name.namespace == "urn:x" && name.local_name == "keep" })
+        );
+        assert_eq!(
+            active_element_names,
+            vec![
+                Name {
+                    namespace: String::new(),
+                    local_name: "r".to_owned(),
+                },
+                Name {
+                    namespace: "urn:p".to_owned(),
+                    local_name: "item".to_owned(),
+                },
+            ]
+        );
+        assert_eq!(
+            active_attribute_names,
+            vec![
+                vec![Name {
+                    namespace: "urn:x".to_owned(),
+                    local_name: "keep".to_owned(),
+                }],
+                vec![
+                    Name {
+                        namespace: "urn:x".to_owned(),
+                        local_name: "keep".to_owned(),
+                    },
+                    Name {
+                        namespace: String::new(),
+                        local_name: "plain".to_owned(),
+                    },
+                ],
+            ]
+        );
+        assert_eq!(
+            active_end_names,
+            vec![
+                Name {
+                    namespace: "urn:p".to_owned(),
+                    local_name: "item".to_owned(),
+                },
+                Name {
+                    namespace: String::new(),
+                    local_name: "r".to_owned(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn streaming_0410_expanded_name_bound_remains_exact() {
+        let namespace = "urn:attribute-namespace-longer-than-xmlns";
+        let xml = format!(r#"<r xmlns:p="{namespace}" p:value="ok"/>"#);
+        let exact = StreamLimits {
+            max_name_bytes: namespace.len() + "value".len(),
+            ..StreamLimits::default()
+        };
+        let mut input = Cursor::new(xml.as_bytes());
+        process_markup_compatibility_stream_with_observers(
+            &mut input,
+            &Capabilities::new(),
+            &exact,
+            |_| Ok::<(), &'static str>(()),
+            |_| Ok::<(), &'static str>(()),
+        )
+        .unwrap();
+
+        let under = StreamLimits {
+            max_name_bytes: exact.max_name_bytes - 1,
+            ..exact
+        };
+        let mut input = Cursor::new(xml.as_bytes());
+        assert!(matches!(
+            process_markup_compatibility_stream_with_observers(
+                &mut input,
+                &Capabilities::new(),
+                &under,
+                |_| Ok::<(), &'static str>(()),
+                |_| Ok::<(), &'static str>(()),
+            ),
+            Err(StreamError::Mce {
+                error: Error::LimitExceeded(message),
+                ..
+            }) if message == "stream name bytes"
+        ));
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
