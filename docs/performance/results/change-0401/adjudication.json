@@ -1,0 +1,541 @@
+{
+  "schema_version": 1,
+  "change": "0401",
+  "outcome": "ACCEPTED_SCOPED",
+  "decision": "Accept only the warm, non-allocator release-binary mean/p95/p99 latency reductions for the fixed xlsx_file_selected_cell operation. Reject p50 because the candidate is not lower in both paired directions. Retain the allocator call/byte vectors as exact operation-scoped observations; do not treat allocator elapsed time or process snapshots as performance claims.",
+  "performance_claim": "scoped",
+  "claim_authorized": true,
+  "accepted_claim": {
+    "selector": "xlsx_file_selected_cell",
+    "profile": "normal",
+    "instrumentation": "none",
+    "metric": "elapsed_ns",
+    "statistics": [
+      "mean",
+      "p95",
+      "p99"
+    ],
+    "scope": "Case-insensitive selection of prepared bEnCh01 followed by the exact stored-number read at M29 through the public litchi::Workbook::open(path) path on the fixed medium filesystem XLSX corpus.",
+    "timer_scope": "Only case-insensitive worksheet selection and the exact M29 cell read are timed.",
+    "excluded_from_timer": [
+      "Workbook open",
+      "Query and selector preparation",
+      "Post-operation semantic, source, corpus, and selected-cell oracle checks"
+    ],
+    "interpretation": "Positive percentages mean the candidate is faster. This is an incremental comparison of numeric ownership elision against the Change 0400 control; it is not a broad XLSX or selector-family result.",
+    "sample_count_per_leg": 500,
+    "leg_statistics_ns": {
+      "a1": {
+        "sample_count": 500,
+        "min": 3486402,
+        "p50": 3545910,
+        "mean": 3553345.2400000016,
+        "p95": 3617006,
+        "p99": 3666826,
+        "max": 3698197,
+        "standard_deviation": 31247.093398619916,
+        "confidence_interval_95": {
+          "lower": 3550599.702592367,
+          "method": "two-sided Student's t interval for the mean",
+          "upper": 3556090.7774076364
+        }
+      },
+      "b1": {
+        "sample_count": 500,
+        "min": 3495856,
+        "p50": 3546360,
+        "mean": 3549806.8920000014,
+        "p95": 3594386,
+        "p99": 3623918,
+        "max": 3693008,
+        "standard_deviation": 23784.03938744378,
+        "confidence_interval_95": {
+          "lower": 3547717.0985907437,
+          "method": "two-sided Student's t interval for the mean",
+          "upper": 3551896.685409259
+        }
+      },
+      "b2": {
+        "sample_count": 500,
+        "min": 3498136,
+        "p50": 3546925,
+        "mean": 3551949.4499999997,
+        "p95": 3601226,
+        "p99": 3637156,
+        "max": 3748686,
+        "standard_deviation": 27125.528286489887,
+        "confidence_interval_95": {
+          "lower": 3549566.0554339085,
+          "method": "two-sided Student's t interval for the mean",
+          "upper": 3554332.844566091
+        }
+      },
+      "a2": {
+        "sample_count": 500,
+        "min": 3494735,
+        "p50": 3545675,
+        "mean": 3552893.1779999994,
+        "p95": 3608375,
+        "p99": 3638806,
+        "max": 3838117,
+        "standard_deviation": 32675.06379394267,
+        "confidence_interval_95": {
+          "lower": 3550022.1714459276,
+          "method": "two-sided Student's t interval for the mean",
+          "upper": 3555764.184554071
+        }
+      }
+    },
+    "paired_reductions_percent": {
+      "a1_to_b1": {
+        "mean": 0.09957794025103593,
+        "p50": -0.012690677428361125,
+        "p95": 0.6253791118953079,
+        "p99": 1.1701673327286324
+      },
+      "a2_to_b2": {
+        "mean": 0.02656223963735658,
+        "p50": -0.035254218167203706,
+        "p95": 0.19812242352859666,
+        "p99": 0.04534454433679619
+      }
+    },
+    "same_implementation_drift_percent": {
+      "candidate": {
+        "mean": 0.06035702969721797,
+        "p50": 0.015931828691954565,
+        "p95": 0.19029675722084383,
+        "p99": 0.3652952412278644
+      },
+      "control": {
+        "mean": -0.012722152492062553,
+        "p50": -0.006627353768144144,
+        "p95": -0.23862277253618047,
+        "p99": -0.7641486124512045
+      }
+    },
+    "drift_ceilings_percent": {
+      "mean": 5.0,
+      "p50": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "drift_within_ceiling": {
+      "candidate": {
+        "mean": true,
+        "p50": true,
+        "p95": true,
+        "p99": true
+      },
+      "control": {
+        "mean": true,
+        "p50": true,
+        "p95": true,
+        "p99": true
+      }
+    },
+    "accepted_reductions_percent": {
+      "a1_to_b1": {
+        "mean": 0.09957794025103593,
+        "p95": 0.6253791118953079,
+        "p99": 1.1701673327286324
+      },
+      "a2_to_b2": {
+        "mean": 0.02656223963735658,
+        "p95": 0.19812242352859666,
+        "p99": 0.04534454433679619
+      }
+    },
+    "rejected_statistics": {
+      "p50": {
+        "a1_to_b1": -0.012690677428361125,
+        "a2_to_b2": -0.035254218167203706,
+        "reason": "candidate is not lower in both paired directions"
+      }
+    }
+  },
+  "allocator_observation": {
+    "status": "observational_only",
+    "profile": "allocator",
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "scope": "Exact operation-scoped allocation/deallocation/reallocation/failed-call/byte deltas from fresh child processes for this warm filesystem selector and corpus. Absolute live/high-water snapshots are retained for audit alignment only.",
+    "sample_count_per_leg": 30,
+    "unique_child_process_ids": 120,
+    "control_vector": [
+      84221,
+      84206,
+      12,
+      0,
+      10706565,
+      10705182
+    ],
+    "candidate_vector": [
+      81918,
+      81903,
+      12,
+      0,
+      10690444,
+      10689061
+    ],
+    "candidate_minus_control": [
+      -2303,
+      -2303,
+      0,
+      0,
+      -16121,
+      -16121
+    ],
+    "metric_order": [
+      "allocation_calls",
+      "deallocation_calls",
+      "reallocation_calls",
+      "failed_allocation_calls",
+      "allocated_bytes",
+      "deallocated_bytes"
+    ],
+    "all_retained_vectors_constant": true,
+    "both_control_legs_equal": true,
+    "both_candidate_legs_equal": true,
+    "claimable_metrics": [
+      "allocation_calls",
+      "deallocation_calls",
+      "reallocation_calls",
+      "failed_allocation_calls",
+      "allocated_bytes",
+      "deallocated_bytes"
+    ],
+    "non_claimable_metrics": [
+      "allocator_elapsed_ns",
+      "live_bytes_before",
+      "live_bytes_after",
+      "peak_live_bytes_before",
+      "peak_live_bytes_after",
+      "rss"
+    ],
+    "derived_observation": "The fixed selected worksheet scan has one selected cell and 2,303 unselected numeric cells. The observed call delta is 2,303 in each direction and the observed byte delta is 16,121; these are exact operation observations, not a 7-byte-per-cell law or a generalization to other corpora.",
+    "latency_claim_authorized": false,
+    "peak_or_rss_claim_authorized": false
+  },
+  "protocol": {
+    "abba_order": [
+      "A1_control",
+      "B1_candidate",
+      "B2_candidate",
+      "A2_control"
+    ],
+    "normal": {
+      "warmup_iterations_per_leg": 20,
+      "retained_samples_per_leg": 500,
+      "filesystem_cache_state": "warm",
+      "fresh_child_per_sample": true,
+      "process_isolated": true,
+      "execution_workers": 1,
+      "cpu_affinity": "2",
+      "profile": "release",
+      "instrumentation": "none"
+    },
+    "allocator": {
+      "warmup_iterations_per_leg": 3,
+      "retained_samples_per_leg": 30,
+      "filesystem_cache_state": "warm",
+      "fresh_child_per_sample": true,
+      "process_isolated": true,
+      "execution_workers": 1,
+      "cpu_affinity": "2",
+      "profile": "release",
+      "instrumentation": "CountingSystemAllocator(std::alloc::System)",
+      "elapsed_time_used_for_acceptance": false
+    },
+    "environment": {
+      "os": "linux",
+      "kernel": "Linux 7.0.0-1011-aws",
+      "cpu_model": "AMD EPYC 9R45",
+      "logical_cpus_available": 1,
+      "filesystem_type": "tmpfs",
+      "source_destination_same_device": true,
+      "toolchain": "rustc 1.98.1 (48a229cea 2026-09-01)",
+      "rustflags": null,
+      "cargo_build_target": null
+    },
+    "acceptance": {
+      "normal_statistics": [
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "rejected_normal_statistics": {
+        "p50": "candidate is not lower in both paired directions"
+      },
+      "normal_same_implementation_drift_ceiling_percent": {
+        "mean": 5.0,
+        "p50": 5.0,
+        "p95": 10.0,
+        "p99": 15.0
+      },
+      "allocator_statistics": "exact operation-scoped call/byte vectors only"
+    }
+  },
+  "mechanism": {
+    "kind": "unselected_numeric_ownership_elision",
+    "behavior": "For unselected, non-formula, non-inline numeric/untyped worksheet cells, validate the borrowed lexical value without constructing an owned Number; selected cells and ownership-requiring paths retain their existing semantics.",
+    "validation_parity": "The borrowed validator shares the lexical finite-number validation with Number::new; malformed, non-finite, selected, formula-cache, and inline cases remain covered by focused regression tests.",
+    "fallback_boundary": "Inline, formula, shared-string, selected, and malformed paths retain their existing ownership or error behavior.",
+    "causal_attribution": "The accepted comparison isolates this numeric ownership-elision commit relative to the Change 0400 control."
+  },
+  "corpus": {
+    "name": "xlsx-cell-values-medium",
+    "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+    "package_format": "XLSX/OPC/ZIP",
+    "shape": "medium",
+    "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+    "compression": "deflate",
+    "sheet_count": 4,
+    "rows_per_sheet": 48,
+    "columns_per_sheet": 48,
+    "numeric_cell_count": 2304,
+    "total_workbook_cell_count": 9216,
+    "archive_member_count": 17,
+    "archive_bytes": 4226429,
+    "uncompressed_payload_bytes": 4231168,
+    "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+    "semantic_sha256": "020fdd140d2959ea4f480676a3d4d0bf840927e25251cb6cad37a043ab80627e",
+    "target_entry": "Sheet1!A1",
+    "target_payload_bytes": 1,
+    "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+  },
+  "oracles": {
+    "worksheet": {
+      "canonical_name": "Bench01",
+      "zero_based_position": 1,
+      "prepared_selector": "bEnCh01",
+      "case_insensitive": true
+    },
+    "cell": {
+      "a1": "M29",
+      "zero_based_row": 28,
+      "zero_based_column": 12,
+      "view": "Stored",
+      "value_kind": "Number",
+      "lexical_value": "1028012"
+    },
+    "selected_cell_evidence_sha256": "36e53d9002ae8c433ad918b400196fb886fa675f850076808ac51327d1f42ac1",
+    "semantic_workbook_sha256": "020fdd140d2959ea4f480676a3d4d0bf840927e25251cb6cad37a043ab80627e",
+    "all_normal_samples_exact_selected_oracle": true,
+    "all_normal_samples_exact_semantic_oracle": true,
+    "all_allocator_samples_exact_selected_oracle": true
+  },
+  "provenance": {
+    "control_revision": "0859063be5a67bd2aafb3531f2126020b2b5000d",
+    "candidate_revision": "87f26d5ee02a1903e668bf7f60fa3ef954a0c3fb",
+    "source_sha256": {
+      "hash_definition": "SHA-256 of each exact source file at the stated revision",
+      "control": {
+        "crates/litchi-xlsx/src/cell.rs": {
+          "bytes": 32071,
+          "sha256": "a8f874db61bc040aa25814ee320856adc103bc25c48a8cf88947b09b278136d0"
+        },
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs": {
+          "bytes": 53180,
+          "sha256": "9460b4c1f7acd9763071ad42463073ef4cb75bac91ea4c670352f82fd8327651"
+        },
+        "crates/litchi-xlsx/src/raw/worksheet/tests.rs": {
+          "bytes": 107891,
+          "sha256": "f0c842d14b0c7ce983c85a86556c9d9b977c1c24b7c44ca7df2acbe2aa16abf7"
+        }
+      },
+      "candidate": {
+        "crates/litchi-xlsx/src/cell.rs": {
+          "bytes": 33315,
+          "sha256": "26bd09c58eda4996e67b0999a7430bcd462fb51430cf2c8601cc0ecac044bd06"
+        },
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs": {
+          "bytes": 53558,
+          "sha256": "d3353047a918002a01972cb5de425e695a60e1964ec8cdcfa6d56ed80c2cfcbb"
+        },
+        "crates/litchi-xlsx/src/raw/worksheet/tests.rs": {
+          "bytes": 113053,
+          "sha256": "b6304ab044837de28bcdc2ecbefda6d03d922b4297aaddb028d23e7fbe6a376e"
+        }
+      }
+    },
+    "validator_sha256": {
+      "tools/perf_abba_summary.py": {
+        "bytes": 278201,
+        "sha256": "96720d73c26d80b1dfd19073a0630f87dfe9d6615b26f92095d4d4e48e3b35c5"
+      },
+      "tools/test_perf_abba_summary.py": {
+        "bytes": 175262,
+        "sha256": "e7635c3cbbbaaaa89cb167aa812f095860eaa5eb6ad0eb448cfc188665c01ffe"
+      },
+      "tools/validate_perf_allocator_abba_0401.py": {
+        "bytes": 39288,
+        "sha256": "ff9364d7f7172dfb9820d37f8ebbf393607431da4e2f372b01a2a7f65f731540"
+      },
+      "tools/test_validate_perf_allocator_abba_0401.py": {
+        "bytes": 11837,
+        "sha256": "5a20f573cea59a72bc3429896aa9b2620c9c9723446d85ae2f336740551c1830"
+      }
+    },
+    "binary_identities": {
+      "normal": {
+        "control": {
+          "sha256": "ffbbb641868c1f12a7fbb805565cc64bcf9e8a8be4d732f4ba72ec12f72cfa79",
+          "bytes": 54765200,
+          "profile": "release"
+        },
+        "candidate": {
+          "sha256": "5a660baeb69600b28422174616ee03e8c5e38948a4c513a42adb635372d2cd5e",
+          "bytes": 54755640,
+          "profile": "release"
+        }
+      },
+      "allocator": {
+        "control": {
+          "sha256": "2173aa6e718eb056f22c9187279e632fff659850c630438376ac29c577704f71",
+          "bytes": 54767312,
+          "profile": "release"
+        },
+        "candidate": {
+          "sha256": "068bef7e6be0824f8bde4a5494e61e02dc0feb40653e748d91c86a5058c40d66",
+          "bytes": 54758784,
+          "profile": "release"
+        }
+      }
+    },
+    "normal_package_manifest_source_sha256": "b0a3a57d74f31f62d15a12ddc8c754404497652ba1aaac4efa9bed9b04c6c015",
+    "evidence_artifacts": {
+      "summary": {
+        "path": "summary.json",
+        "bytes": 22238,
+        "sha256": "4703ba850063db6295bcc752b1616a6334509cb947821f2ab2dbce4c70275b0b",
+        "canonical_bytes": 17841,
+        "canonical_sha256": "2eba7abdb7eddd97b1379f3b9d594098a0a845d023294901568a5efee9865f1e"
+      },
+      "normal_reports": [
+        {
+          "path": "a1-normal.json.zst",
+          "bytes": 25381,
+          "sha256": "a6b8fc7c4af01201d7c74412337bf8c77c20ec93465964b5cb0e1dcddb8c1601",
+          "uncompressed_bytes": 1311556,
+          "uncompressed_sha256": "0df31b045aca035bd10c94c9a44463ccc1e96658e7a7d364e26a29719c05dde5",
+          "canonical_bytes": 789866,
+          "canonical_sha256": "da8e1e5d30e551f401bf4410eff6132fe2dcbd9d5e7baa75eed914e78e8df682"
+        },
+        {
+          "path": "b1-normal.json.zst",
+          "bytes": 25063,
+          "sha256": "f750c2cacab0adcaee3ed449957c2fa5087b5a4281f145e587c153ee6568fa12",
+          "uncompressed_bytes": 1311557,
+          "uncompressed_sha256": "6e603e3ff8afc7d9e76ee92ea3284bcc45bd875d414168f7cce44d90d447003c",
+          "canonical_bytes": 789867,
+          "canonical_sha256": "eca17f0b8a2f1eb39b5fc657ff3b25c4787d30a1013adc23f0f773e4f94dff82"
+        },
+        {
+          "path": "b2-normal.json.zst",
+          "bytes": 24861,
+          "sha256": "3c7b49aad43f424959949d62d47a2fb7370009f9538852e74ffead0555232648",
+          "uncompressed_bytes": 1311558,
+          "uncompressed_sha256": "ccf1d580f4ec584ac63494387a965724cef665e637b8eab4ea5abb35684b3df6",
+          "canonical_bytes": 789868,
+          "canonical_sha256": "3d7bab4d8af8e7898cb795d726e7f4aa26bd29325aea7125f4438d22aef40982"
+        },
+        {
+          "path": "a2-normal.json.zst",
+          "bytes": 25417,
+          "sha256": "2b8dc62fd552fea8d69e32dcbe59dd615324e815a8b798db002bf3eb38c605a3",
+          "uncompressed_bytes": 1311555,
+          "uncompressed_sha256": "7c71fa050e2bcded48db2873d1523eff90e6908cc073c0aab55dbe6322357896",
+          "canonical_bytes": 789865,
+          "canonical_sha256": "daff333036d2a4df56374f44cc204c8db1baa9eb2b51050bcfade38eb6688fc0"
+        }
+      ],
+      "allocator_reports": [
+        {
+          "path": "a1-allocator.json.zst",
+          "bytes": 5773,
+          "sha256": "f4912accd4e1554e5a7e476fe070e94b5ded42dcd299c8ec9ba440d4f4c9bf91",
+          "uncompressed_bytes": 119356,
+          "uncompressed_sha256": "f5500add997da772fd73895c34bf583ae8ad31fdfb1920805a8355f6d85db8b7",
+          "canonical_bytes": 71653,
+          "canonical_sha256": "f349e5f4ba128c467d26a6f0b3d9b0095df92e6e20be9ded7869438248e11ea5"
+        },
+        {
+          "path": "b1-allocator.json.zst",
+          "bytes": 5741,
+          "sha256": "e872d05a208b226111914d0bd5e8b3035146188ecdd840b1c22cf82afc01c067",
+          "uncompressed_bytes": 119358,
+          "uncompressed_sha256": "fec46059fb9f26c4269b0fddfa90c8a98550b1a1687c1d3135530e9324289468",
+          "canonical_bytes": 71655,
+          "canonical_sha256": "34fce07a720c1e06769e9432b8e331381129e38850ae64f74cc64b45ac5893b6"
+        },
+        {
+          "path": "b2-allocator.json.zst",
+          "bytes": 5710,
+          "sha256": "ed67fd38d63237fa104108ddd1c2c21d47030d09e4bdfa5eb4c8b924b91e0770",
+          "uncompressed_bytes": 119358,
+          "uncompressed_sha256": "cf4518f6edd204b7715cfda754ab5225a9ce184f3322566164e0f39de4926e98",
+          "canonical_bytes": 71655,
+          "canonical_sha256": "89439eb087097eed239e66d3ce59c7adcd0e47f7c5fcbf31cba8e3e0721b89e9"
+        },
+        {
+          "path": "a2-allocator.json.zst",
+          "bytes": 5698,
+          "sha256": "6f51c0c3bbe94bd1023d93b1102cfbc4db3a2790bd19baa55e05ad84389b8b5c",
+          "uncompressed_bytes": 119357,
+          "uncompressed_sha256": "39a476050ae3c8454f850f27c86249ac14c054bf80d521b9848c92a005f6170d",
+          "canonical_bytes": 71654,
+          "canonical_sha256": "ec33aabc28c2f0cc9cec3687529daf2dcc01692619a505fc7a007967c62f8a80"
+        }
+      ],
+      "allocator_projection": {
+        "path": "allocation-metrics.json",
+        "bytes": 35497,
+        "sha256": "a51d6b7fcebef93949cc3e9423420b2f6cc738cabcfc205912f63edbbeff56ff"
+      },
+      "latency_projection": {
+        "path": "latency-metrics.tsv",
+        "bytes": 1911,
+        "sha256": "75c532a6007788ccc56825454c88e6db3c3b5e3cdea53681ab4bbf28fd6e50fc"
+      },
+      "package_manifest": {
+        "path": "0401-xlsx-selected-numeric-elision-abba-manifest.json",
+        "bytes": 4232,
+        "sha256": "cd9b38445d0ce3f9502f69b7cc11e44ce291ae81358055608d56816ba2605513"
+      }
+    }
+  },
+  "validation": {
+    "normal_summary_recomputed": true,
+    "normal_summary_command": "python3 tools/perf_abba_summary.py --case xlsx_file_selected_cell A1 B1 B2 A2 --json-out OUTPUT",
+    "normal_samples_oracle": "2,000/2,000 retained samples exact selected-cell and semantic oracle",
+    "allocator_validator": "tools/validate_perf_allocator_abba_0401.py",
+    "allocator_validator_status": "passed",
+    "allocator_reports": 4,
+    "allocator_samples": 120,
+    "unique_child_process_ids": 120,
+    "exact_allocator_vectors": 40,
+    "allocator_elapsed_time_evaluated": false,
+    "focused_numeric_regressions": "4 streaming_0401 scanner tests passed; borrowed_number_validation_matches_owned_constructor_errors passed separately",
+    "full_litchi_xlsx_library_tests": "923 passed",
+    "cargo_check_litchi_xlsx": "passed under Rust 1.98.1",
+    "changed_file_rustfmt": "passed",
+    "git_diff_check": "passed",
+    "source_and_binary_identity_verified": true,
+    "all_zstd_frames_tested": true,
+    "all_zstd_raw_hashes_verified": true,
+    "manifest_self_exclusion_verified": true
+  },
+  "withheld_claims": [
+    "Normal p50 latency reduction; the p50 comparison is adverse in both paired directions.",
+    "Allocator-instrumented elapsed latency.",
+    "RSS, peak operation memory, total-memory behavior, or a memory-reduction claim.",
+    "Physical I/O, locality, or filesystem read-volume behavior.",
+    "Cold-cache, cold-verified, or cache-transition behavior.",
+    "Throughput, concurrency scaling, or worker-count scaling.",
+    "Workbook-open, query-preparation, or any other timer-excluded lifecycle timing.",
+    "A 7-byte-per-cell law, proportional saving, or any generalization from the fixed 2,303 unselected cells.",
+    "Other cells, worksheet selectors, corpus shapes, payloads, or XLSX workloads.",
+    "Broad XLSX, unified-facade, other-format, or cross-platform generalization.",
+    "Any claim based on non-retained, preflight, wrong-toolchain, or contaminated captures."
+  ]
+}

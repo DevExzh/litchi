@@ -1,0 +1,464 @@
+{
+  "environment": {
+    "legs": {
+      "a1": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9R45",
+        "filesystem_type": "tmpfs",
+        "git_revision": "0859063be5a67bd2aafb3531f2126020b2b5000d",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-1011-aws",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "1",
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "rustflags": null,
+        "source_destination_same_device": true,
+        "storage_identifier": null,
+        "total_memory_bytes": 132553797632
+      },
+      "a2": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9R45",
+        "filesystem_type": "tmpfs",
+        "git_revision": "0859063be5a67bd2aafb3531f2126020b2b5000d",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-1011-aws",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "1",
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "rustflags": null,
+        "source_destination_same_device": true,
+        "storage_identifier": null,
+        "total_memory_bytes": 132553797632
+      },
+      "b1": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9R45",
+        "filesystem_type": "tmpfs",
+        "git_revision": "87f26d5ee02a1903e668bf7f60fa3ef954a0c3fb",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-1011-aws",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "1",
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "rustflags": null,
+        "source_destination_same_device": true,
+        "storage_identifier": null,
+        "total_memory_bytes": 132553797632
+      },
+      "b2": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9R45",
+        "filesystem_type": "tmpfs",
+        "git_revision": "87f26d5ee02a1903e668bf7f60fa3ef954a0c3fb",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-1011-aws",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "1",
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "rustflags": null,
+        "source_destination_same_device": true,
+        "storage_identifier": null,
+        "total_memory_bytes": 132553797632
+      }
+    },
+    "stable": {
+      "allocator": "Rust system allocator",
+      "cargo_build_target": null,
+      "cpu_affinity": "2",
+      "cpu_model": "AMD EPYC 9R45",
+      "filesystem_type": "tmpfs",
+      "git_worktree_dirty": false,
+      "kernel": "Linux 7.0.0-1011-aws",
+      "logical_cpus_available": 1,
+      "os": "linux",
+      "page_size_bytes": 4096,
+      "perf_event_paranoid": "1",
+      "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+      "rustflags": null,
+      "source_destination_same_device": true,
+      "storage_identifier": null,
+      "total_memory_bytes": 132553797632
+    }
+  },
+  "harness_identity": {
+    "configuration": {
+      "cases": [
+        "xlsx_file_selected_cell"
+      ],
+      "corpus_shapes": [
+        "tiny",
+        "many-small",
+        "few-large",
+        "wide-root"
+      ],
+      "execution_workers": [
+        1
+      ],
+      "filesystem_cache_states": [
+        "warm"
+      ],
+      "filesystem_fresh_child_per_sample": true,
+      "filesystem_process_isolated": true,
+      "filesystem_root_selected": true,
+      "payload_kinds": [
+        "compressible",
+        "incompressible"
+      ],
+      "range_simulation": {
+        "bandwidth_bytes_per_second": 52428800,
+        "fixed_latency_us": 100,
+        "max_physical_range_bytes": 4096,
+        "request_overhead_us": 25
+      },
+      "rtf_variants": [
+        "plain"
+      ],
+      "samples_per_case": 500,
+      "semantic_shapes": [
+        "tiny",
+        "medium",
+        "large"
+      ],
+      "warmup_iterations_per_case": 20,
+      "writer_shapes": [
+        "tiny",
+        "large",
+        "payload-heavy"
+      ],
+      "xlsb_shapes": [
+        "tiny",
+        "medium",
+        "large",
+        "sparse"
+      ],
+      "xlsx_cell_crud_shapes": [
+        "medium",
+        "dense-sparse"
+      ],
+      "xlsx_row_visibility_shapes": [
+        "medium",
+        "large"
+      ],
+      "xlsx_shapes": [
+        "tiny",
+        "medium",
+        "dense-wide"
+      ]
+    },
+    "schema_version": 1,
+    "tool": {
+      "binary": "litchi-perf-baseline",
+      "instrumentation": "none",
+      "name": "litchi-perf-baseline",
+      "profile": "release",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "version": "0.1.0"
+    }
+  },
+  "implementation_identity": {
+    "candidate": {
+      "binary_identity": {
+        "binary_bytes": 54755640,
+        "binary_sha256": "5a660baeb69600b28422174616ee03e8c5e38948a4c513a42adb635372d2cd5e",
+        "executable": true,
+        "mode_bits": 509,
+        "path": "/tmp/litchi-0401-candidate.2CyLaw/target/release/litchi-perf-baseline",
+        "profile": "release"
+      },
+      "binary_sha256": "5a660baeb69600b28422174616ee03e8c5e38948a4c513a42adb635372d2cd5e",
+      "git_revision": "87f26d5ee02a1903e668bf7f60fa3ef954a0c3fb",
+      "legs": [
+        "b1",
+        "b2"
+      ]
+    },
+    "control": {
+      "binary_identity": {
+        "binary_bytes": 54765200,
+        "binary_sha256": "ffbbb641868c1f12a7fbb805565cc64bcf9e8a8be4d732f4ba72ec12f72cfa79",
+        "executable": true,
+        "mode_bits": 509,
+        "path": "/tmp/litchi-0401-control-target.drXqcW/release/litchi-perf-baseline",
+        "profile": "release"
+      },
+      "binary_sha256": "ffbbb641868c1f12a7fbb805565cc64bcf9e8a8be4d732f4ba72ec12f72cfa79",
+      "git_revision": "0859063be5a67bd2aafb3531f2126020b2b5000d",
+      "legs": [
+        "a1",
+        "a2"
+      ]
+    },
+    "distinct": true
+  },
+  "protocol": {
+    "dispersion": "sample standard deviation via Rust Welford update",
+    "drift_ceiling_percent": {
+      "mean": 5.0,
+      "p50": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "percentiles": "p50 = Rust u64 floor midpoint; p95/p99 = integer nearest-rank",
+    "statistics": [
+      "p50",
+      "mean",
+      "p95",
+      "p99"
+    ],
+    "uncertainty": "95% two-sided Student's t interval for the mean; embedded harness critical-value table with Cornish-Fisher tail"
+  },
+  "report_identity": {
+    "a1": {
+      "canonical_sha256": "da8e1e5d30e551f401bf4410eff6132fe2dcbd9d5e7baa75eed914e78e8df682"
+    },
+    "a2": {
+      "canonical_sha256": "daff333036d2a4df56374f44cc204c8db1baa9eb2b51050bcfade38eb6688fc0"
+    },
+    "b1": {
+      "canonical_sha256": "eca17f0b8a2f1eb39b5fc657ff3b25c4787d30a1013adc23f0f773e4f94dff82"
+    },
+    "b2": {
+      "canonical_sha256": "3d7bab4d8af8e7898cb795d726e7f4aa26bd29325aea7125f4438d22aef40982"
+    }
+  },
+  "results": [
+    {
+      "case": "xlsx_file_selected_cell",
+      "corpus": {
+        "archive_bytes": 4226429,
+        "archive_member_count": 17,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "compression": "deflate",
+        "entry_bytes": 4,
+        "entry_count": 9216,
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "name": "xlsx-cell-values-medium",
+        "package_format": "XLSX/OPC/ZIP",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "shape": "medium",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "uncompressed_payload_bytes": 4231168,
+        "xlsx": {
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "rows_per_sheet": 48,
+          "sheet_count": 4,
+          "source_members": {
+            "shared_strings": null,
+            "styles": "xl/styles.xml",
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ]
+          }
+        }
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "adverse_both_statistics": [
+          "p50"
+        ],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": 0.09957794025103593,
+            "p50": -0.012690677428361125,
+            "p95": 0.6253791118953079,
+            "p99": 1.1701673327286324
+          },
+          "a2_to_b2": {
+            "mean": 0.02656223963735658,
+            "p50": -0.035254218167203706,
+            "p95": 0.19812242352859666,
+            "p99": 0.04534454433679619
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          },
+          "control": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 3550599.702592367,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 3556090.7774076364
+            },
+            "max": 3698197,
+            "mean": 3553345.2400000016,
+            "min": 3486402,
+            "p50": 3545910,
+            "p95": 3617006,
+            "p99": 3666826,
+            "sample_count": 500,
+            "standard_deviation": 31247.093398619916
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 3550022.1714459276,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 3555764.184554071
+            },
+            "max": 3838117,
+            "mean": 3552893.1779999994,
+            "min": 3494735,
+            "p50": 3545675,
+            "p95": 3608375,
+            "p99": 3638806,
+            "sample_count": 500,
+            "standard_deviation": 32675.06379394267
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 3547717.0985907437,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 3551896.685409259
+            },
+            "max": 3693008,
+            "mean": 3549806.8920000014,
+            "min": 3495856,
+            "p50": 3546360,
+            "p95": 3594386,
+            "p99": 3623918,
+            "sample_count": 500,
+            "standard_deviation": 23784.03938744378
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 3549566.0554339085,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 3554332.844566091
+            },
+            "max": 3748686,
+            "mean": 3551949.4499999997,
+            "min": 3498136,
+            "p50": 3546925,
+            "p95": 3601226,
+            "p99": 3637156,
+            "sample_count": 500,
+            "standard_deviation": 27125.528286489887
+          }
+        },
+        "rejected_statistics": {
+          "p50": "candidate is not lower in both paired directions"
+        },
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": 0.06035702969721797,
+            "p50": 0.015931828691954565,
+            "p95": 0.19029675722084383,
+            "p99": 0.3652952412278644
+          },
+          "control": {
+            "mean": -0.012722152492062553,
+            "p50": -0.006627353768144144,
+            "p95": -0.23862277253618047,
+            "p99": -0.7641486124512045
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":4226429,\"archive_member_count\":17,\"archive_sha256\":\"dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036\",\"compression\":\"deflate\",\"entry_bytes\":4,\"entry_count\":9216,\"generator\":\"litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1\",\"name\":\"xlsx-cell-values-medium\",\"package_format\":\"XLSX/OPC/ZIP\",\"payload_kind\":\"deterministic-multi-sheet-scalar-grid-with-media\",\"shape\":\"medium\",\"target_entry\":\"Sheet1!A1\",\"target_payload_bytes\":1,\"target_payload_sha256\":\"5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9\",\"uncompressed_payload_bytes\":4231168,\"xlsx\":{\"columns_per_sheet\":48,\"one_percent_update_count\":93,\"rows_per_sheet\":48,\"sheet_count\":4,\"source_members\":{\"shared_strings\":null,\"styles\":\"xl/styles.xml\",\"workbook\":\"xl/workbook.xml\",\"worksheets\":[\"xl/worksheets/sheet1.xml\",\"xl/worksheets/sheet2.xml\",\"xl/worksheets/sheet3.xml\",\"xl/worksheets/sheet4.xml\"]}}}",
+        "operation_metrics_canonical_json": "{\"alignment\":\"elapsed_ns.samples_by_elapsed_then_sample_index\",\"cfb_phases\":{\"atomic_publication\":{\"elapsed_ns\":{\"scope\":\"timed_cfb_phase_elapsed_ns\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_calls\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_requested_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_returned_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"}},\"open\":{\"elapsed_ns\":{\"scope\":\"timed_cfb_phase_elapsed_ns\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_calls\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_requested_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_returned_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"}},\"plan\":{\"elapsed_ns\":{\"scope\":\"timed_cfb_phase_elapsed_ns\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_calls\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_requested_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_returned_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"}},\"status\":\"not_applicable\"},\"latency_claim\":\"evidence_only_filesystem_selector\",\"materialization\":{\"opc_parts\":{\"scope\":\"logical_materialization_counter\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"status\":\"not_applicable\"},\"process\":{\"cancelled_write_bytes\":{\"scope\":\"child_process_interval_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"clock_ticks_per_second\":{\"scope\":\"procfs_after_sample_unit_factor\",\"status\":\"measured\",\"values\":\"present\"},\"major_faults\":{\"scope\":\"procfs_operation_delta\",\"status\":\"measured\",\"values\":\"present\"},\"minor_faults\":{\"scope\":\"procfs_operation_delta\",\"status\":\"measured\",\"values\":\"present\"},\"nonvoluntary_context_switches\":{\"scope\":\"procfs_operation_delta\",\"status\":\"measured\",\"values\":\"present\"},\"peak_rss_bytes\":{\"scope\":\"process_lifetime_high_water_after_not_operation_peak\",\"status\":\"measured\",\"values\":\"present\"},\"rchar\":{\"scope\":\"child_process_interval_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"read_bytes\":{\"scope\":\"child_process_interval_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"rss_delta_bytes\":{\"scope\":\"procfs_operation_delta_not_peak\",\"status\":\"measured\",\"values\":\"present\"},\"status\":\"measured\",\"syscr\":{\"scope\":\"child_process_interval_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"syscw\":{\"scope\":\"child_process_interval_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"system_cpu_ticks\":{\"scope\":\"procfs_operation_delta\",\"status\":\"measured\",\"values\":\"present\"},\"user_cpu_ticks\":{\"scope\":\"procfs_operation_delta\",\"status\":\"measured\",\"values\":\"present\"},\"voluntary_context_switches\":{\"scope\":\"procfs_operation_delta\",\"status\":\"measured\",\"values\":\"present\"},\"wchar\":{\"scope\":\"child_process_interval_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"write_bytes\":{\"scope\":\"child_process_interval_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"}},\"publication\":{\"changed_spans\":{\"scope\":\"logical_publication_counter\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"published_bytes\":{\"scope\":\"logical_publication_counter\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"status\":\"not_applicable\"},\"sample_count\":500,\"sample_indices\":\"<permutation>\",\"sink\":{\"accepted_bytes\":{\"scope\":\"logical_sink_accepted_write_bytes\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"largest_write\":{\"scope\":\"logical_sink_largest_accepted_write\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"output_bytes\":{\"scope\":\"post_operation_output_length_not_sink_write_volume\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"status\":\"not_applicable\",\"write_calls\":{\"scope\":\"logical_sink_accepted_write_calls\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"write_size_buckets\":{\"bytes_0\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"bytes_16385_to_65536\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"bytes_1_to_512\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"bytes_4097_to_16384\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"bytes_513_to_4096\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"bytes_over_65536\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"status\":\"not_applicable\"},\"write_status\":\"not_applicable\"},\"source\":{\"compressed_bytes\":{\"scope\":\"unavailable_read_at_has_no_compressed_member_boundary\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"counter_scope\":\"not_applicable_filesystem_xlsx\",\"decompressed_bytes\":{\"scope\":\"unavailable_read_at_has_no_decompressed_byte_boundary\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_calls\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_largest_requested_bytes\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_largest_returned_bytes\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_pattern\":{\"scope\":\"operation_logical_read_at_range_order_not_physical_io\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_requested_bytes\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_returned_bytes\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"max_concurrent_reads\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"recompressed_bytes\":{\"scope\":\"unavailable_atomic_save_has_no_recompressed_byte_boundary\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"status\":\"not_applicable\"}}",
+        "operation_metrics_status": "verified_equal",
+        "output_sha256_canonical_json": null,
+        "output_sha256_status": "consistently_absent",
+        "sink_canonical_json": null,
+        "sink_present": false,
+        "sink_status": "consistently_absent",
+        "source_canonical_json": null,
+        "source_present": false,
+        "source_status": "consistently_absent"
+      },
+      "output_sha256": null,
+      "shape": "medium",
+      "sink": null,
+      "source": null
+    }
+  ],
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-abba-summary",
+    "version": "0.1.0"
+  },
+  "verification": {
+    "binary_hashes_distinct": true,
+    "binary_identity_verified": true,
+    "case_corpus_identity_verified": true,
+    "configuration_identity_verified": true,
+    "environment_legs_recorded": true,
+    "environment_stable_identity_verified": true,
+    "filesystem_evidence_identity_verified": true,
+    "operation_metrics_identity": {
+      "consistently_absent": 0,
+      "verified_equal": 1
+    },
+    "output_sha256_identity": {
+      "consistently_absent": 1,
+      "verified_equal": 0
+    },
+    "output_sha256_identity_verified": false,
+    "result_count": 1,
+    "sink_identity": {
+      "consistently_absent": 1,
+      "verified_equal": 0
+    },
+    "sink_identity_verified": false,
+    "source_identity": {
+      "consistently_absent": 1,
+      "verified_equal": 0
+    },
+    "source_identity_verified": false,
+    "statistics_recomputed_from_samples": true,
+    "tool_identity_verified": true
+  }
+}
