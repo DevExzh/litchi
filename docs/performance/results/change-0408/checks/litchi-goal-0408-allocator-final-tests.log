@@ -1,0 +1,12 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.06s
+     Running unittests src/bin/litchi-perf-baseline-alloc.rs (/tmp/litchi-goal-fp-target/release/deps/litchi_perf_baseline_alloc-4cf5c15fdfa46303)
+
+running 5 tests
+test allocator::tests::global_allocator_records_a_failed_allocation ... ok
+test allocator::tests::global_allocator_records_a_failed_realloc_without_losing_old_allocation ... ok
+test allocator::tests::global_allocator_records_realloc_grow_and_shrink ... ok
+test allocator::tests::global_allocator_records_successful_alloc_and_dealloc_with_live_peak ... ok
+test allocator::tests::global_allocator_records_zeroed_alloc_and_zeroes_memory ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
