@@ -50,6 +50,8 @@ on:
       - 'tools/perf_resource_profile.py'
       - 'tools/validate_perf_corpus_binding.py'
       - 'tools/test_perf_corpus_binding.py'
+      - 'tools/validate_opc_serial_eager_allocator_abba.py'
+      - 'tools/test_validate_opc_serial_eager_allocator_abba.py'
       - 'tools/validate_crud_coverage_index.py'
       - 'tools/test_crud_coverage_index.py'
       - 'tools/test_perf_resource_profile.py'
@@ -123,6 +125,8 @@ on:
       - 'tools/perf_resource_profile.py'
       - 'tools/validate_perf_corpus_binding.py'
       - 'tools/test_perf_corpus_binding.py'
+      - 'tools/validate_opc_serial_eager_allocator_abba.py'
+      - 'tools/test_validate_opc_serial_eager_allocator_abba.py'
       - 'tools/validate_crud_coverage_index.py'
       - 'tools/test_crud_coverage_index.py'
       - 'tools/test_perf_resource_profile.py'
@@ -300,6 +304,7 @@ jobs:
             tools.test_perf_abba_package \
             tools.test_perf_resource_profile \
             tools.test_perf_corpus_binding \
+            tools.test_validate_opc_serial_eager_allocator_abba \
             tools.test_crud_coverage_index \
             tools.test_perf_workflow_policy
 
