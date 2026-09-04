@@ -100,7 +100,7 @@ parity passes. Warning-denied Clippy is green for owner and focused host,
 warning-denied rustdoc is green for the owner, and targeted formatting and diff
 checks pass.
 
-The `owner_native_smoke` example creates a slide and a two-row table, adds a
+The `pptx_owner_native_smoke` example creates a slide and a two-row table, adds a
 typed definition for the table's referenced GUID, stores background, whole-
 table, and first-row region declarations, saves through the legacy writer
 composition seam, reopens, and checks the exact typed definition. Desktop

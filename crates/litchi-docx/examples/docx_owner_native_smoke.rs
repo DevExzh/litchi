@@ -3,7 +3,7 @@
 //! Run with:
 //!
 //! ```sh
-//! cargo run -p litchi-docx --example owner_native_smoke -- \
+//! cargo run -p litchi-docx --example docx_owner_native_smoke -- \
 //!     target/office-owner-smoke
 //! ```
 
