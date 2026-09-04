@@ -6,16 +6,18 @@
 //! retains unrelated links, media, and opaque package members so publication
 //! locality can be checked independently of the typed DOCX inventory.
 
-use super::{Case, CaseResult, CorpusManifest, CountingSink, SinkSummary, SourceSummary};
+use super::{
+    Case, CaseResult, CorpusManifest, CountingSink, SinkSummary, SourceSummary, operation_metrics,
+};
 use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 use litchi_docx::source_backed;
 use litchi_docx::story_hyperlinks::Mode;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
-use quick_xml::events::Event;
-use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;
+use quick_xml::events::Event;
+use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use serde::Serialize;
 use soapberry_zip::office::ArchiveReader;
@@ -23,6 +25,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::io::{self, Write};
 use std::sync::{Arc, atomic::AtomicU64, atomic::Ordering};
+use std::time::Instant;
 
 const CORPUS_GENERATOR: &str = "litchi-docx-story-hyperlink-publication-v1";
 const CORPUS_SHAPE: &str = "7-story-kinds-14-links-7-media-1-opaque";
@@ -162,7 +165,36 @@ pub(super) struct DocxStoryHyperlinkPublicationSummary {
     source_archive_sha256: String,
     output_archive_bytes: u64,
     output_archive_sha256: String,
+    /// Original retained-sample index for every vector below. The vectors are
+    /// serialized in the same `(elapsed_ns, sample_index)` order as the
+    /// top-level statistics record.
+    sample_indices: Vec<usize>,
+    open_ns: Vec<u64>,
+    plan_ns: Vec<u64>,
+    publication_ns: Vec<u64>,
     end_to_end_ns: Vec<u64>,
+    source_read_calls: Vec<u64>,
+    source_read_bytes: Vec<u64>,
+    source_ordinary_payload_read_calls: Vec<u64>,
+    source_ordinary_payload_read_bytes: Vec<u64>,
+    source_max_in_flight_reads: Vec<u64>,
+    cache_hits: Vec<u64>,
+    cache_cold_loads: Vec<u64>,
+    cache_waiter_joins: Vec<u64>,
+    cache_successful_loads: Vec<u64>,
+    cache_failed_loads: Vec<u64>,
+    cache_evictions: Vec<u64>,
+    cache_bypasses: Vec<u64>,
+    cache_oversized_bypasses: Vec<u64>,
+    cache_allocation_bypasses: Vec<u64>,
+    cache_in_flight_loads: Vec<usize>,
+    cache_retained_entries: Vec<usize>,
+    cache_retained_bytes: Vec<usize>,
+    output_archive_sha256_samples: Vec<String>,
+    allocation_samples: Vec<crate::allocation_metrics::Sample>,
+    /// True only when every retained sample's elapsed value was checked as
+    /// `open_ns + plan_ns + publication_ns` without saturation or inference.
+    phase_sum_verified: bool,
     source_zip_oracle_verified: bool,
     source_hash_verified: bool,
     no_op_exact_bytes_verified: bool,
@@ -210,19 +242,60 @@ struct SourceIdentity {
 }
 
 impl SourceIdentity {
-    fn capture(source: &OwnedSource) -> Result<Self, Box<dyn std::error::Error>> {
+    fn capture(source: &dyn ReadAt, bytes: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
             version: source.version()?,
             length: source.len()?,
-            sha256: super::sha256_hex(source.as_slice()),
+            sha256: super::sha256_hex(bytes),
         })
     }
 
-    fn matches(&self, source: &OwnedSource) -> Result<bool, Box<dyn std::error::Error>> {
+    fn matches(
+        &self,
+        source: &dyn ReadAt,
+        bytes: &[u8],
+    ) -> Result<bool, Box<dyn std::error::Error>> {
         Ok(self.version == source.version()?
             && self.length == source.len()?
-            && self.sha256 == super::sha256_hex(source.as_slice()))
+            && self.sha256 == super::sha256_hex(bytes))
     }
+}
+
+fn checked_phase_sum(
+    open_ns: u64,
+    plan_ns: u64,
+    publication_ns: u64,
+) -> Result<u64, Box<dyn std::error::Error>> {
+    open_ns
+        .checked_add(plan_ns)
+        .and_then(|value| value.checked_add(publication_ns))
+        .ok_or_else(|| "DOCX story publication phase sum overflows u64".into())
+}
+
+fn verify_sample_indices(
+    sample_indices: &[usize],
+    sample_order: &[usize],
+    sample_count: usize,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if sample_indices.len() != sample_count || sample_order.len() != sample_count {
+        return Err(
+            "DOCX story publication sample index cardinality differs from elapsed samples".into(),
+        );
+    }
+    for (name, values) in [
+        ("sample_indices", sample_indices),
+        ("sample_order", sample_order),
+    ] {
+        let mut sorted = values.to_vec();
+        sorted.sort_unstable();
+        if sorted != (0..sample_count).collect::<Vec<_>>() {
+            return Err(format!(
+                "DOCX story publication {name} is not a complete sample permutation"
+            )
+            .into());
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -234,7 +307,9 @@ struct FailingSink {
 impl Write for FailingSink {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         if self.accepted >= self.fail_after {
-            return Err(io::Error::other("intentional story publication sink failure"));
+            return Err(io::Error::other(
+                "intentional story publication sink failure",
+            ));
         }
         let remaining = self.fail_after - self.accepted;
         let accepted = remaining.min(bytes.len());
@@ -526,11 +601,10 @@ fn parse_relationship_oracle(
                     if local_name.as_ref() == b"Relationship" {
                         if depth != 1 {
                             return Err(
-                                "DOCX relationship oracle found a nested relationship".into(),
+                                "DOCX relationship oracle found a nested relationship".into()
                             );
                         }
-                        let relationship =
-                            parse_relationship_entry(&element, reader.decoder())?;
+                        let relationship = parse_relationship_entry(&element, reader.decoder())?;
                         if relationships
                             .insert(relationship.id.clone(), relationship)
                             .is_some()
@@ -645,9 +719,7 @@ fn verify_relationship_oracle(
 ) -> Result<bool, Box<dyn std::error::Error>> {
     let actual_members = members
         .keys()
-        .filter(|name| {
-            name.starts_with(RELATIONSHIP_MEMBER_PREFIX) && name.ends_with(".rels")
-        })
+        .filter(|name| name.starts_with(RELATIONSHIP_MEMBER_PREFIX) && name.ends_with(".rels"))
         .cloned()
         .collect::<BTreeSet<_>>();
     if actual_members != expected_story_relationship_members() {
@@ -726,9 +798,7 @@ pub(super) fn build_corpus() -> Result<Corpus, Box<dyn std::error::Error>> {
     })
 }
 
-fn source_package(
-    bytes: Vec<u8>,
-) -> Result<source_backed::Package, Box<dyn std::error::Error>> {
+fn source_package(bytes: Vec<u8>) -> Result<source_backed::Package, Box<dyn std::error::Error>> {
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes));
     Ok(source_backed::Package::from_read_at(source)?)
 }
@@ -760,7 +830,8 @@ fn story_oracle(xml: &[u8], story: StorySpec) -> Result<StoryOracle, Box<dyn std
     let mut oracle = StoryOracle::default();
     loop {
         let (namespace, event) = reader.read_resolved_event()?;
-        let is_word = matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == W.as_bytes());
+        let is_word =
+            matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == W.as_bytes());
         match event {
             Event::Start(element) | Event::Empty(element)
                 if is_word && element.local_name().as_ref() == b"hyperlink" =>
@@ -847,12 +918,7 @@ fn verify_story_xml(
 fn expected_changed_members() -> BTreeSet<String> {
     STORIES
         .iter()
-        .flat_map(|story| {
-            [
-                story_part_name(story.file),
-                story_rels_name(story.file),
-            ]
-        })
+        .flat_map(|story| [story_part_name(story.file), story_rels_name(story.file)])
         .collect()
 }
 
@@ -879,9 +945,7 @@ fn verify_redaction_output(
     }
     let source_raw = super::raw_zip_members(&corpus.archive)?;
     let output_raw = super::raw_zip_members(output)?;
-    if source_raw.keys().collect::<BTreeSet<_>>()
-        != output_raw.keys().collect::<BTreeSet<_>>()
-    {
+    if source_raw.keys().collect::<BTreeSet<_>>() != output_raw.keys().collect::<BTreeSet<_>>() {
         return Ok(false);
     }
     let expected_changed = expected_changed_members();
@@ -974,7 +1038,9 @@ fn unknown_owner_archive(corpus: &Corpus) -> Result<Vec<u8>, Box<dyn std::error:
     Ok(PackageWriter::to_bytes(&package)?)
 }
 
-fn verify_refusal_gates(corpus: &Corpus) -> Result<(bool, bool, bool, bool, bool, bool), Box<dyn std::error::Error>> {
+fn verify_refusal_gates(
+    corpus: &Corpus,
+) -> Result<(bool, bool, bool, bool, bool, bool), Box<dyn std::error::Error>> {
     let revision = Arc::new(AtomicU64::new(0));
     let versioned: Arc<dyn ReadAt> = Arc::new(VersionedSource {
         bytes: corpus.archive.clone(),
@@ -1057,10 +1123,7 @@ fn verify_refusal_gates(corpus: &Corpus) -> Result<(bool, bool, bool, bool, bool
     ))
 }
 
-fn prepared_output(
-    corpus: &Corpus,
-    case: Case,
-) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+fn prepared_output(corpus: &Corpus, case: Case) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let target_urls = match case {
         Case::DocxStoryHyperlinkNoopSave => &[][..],
         Case::DocxStoryHyperlinkRedactionSave => &[SHARED_TARGET][..],
@@ -1080,6 +1143,9 @@ pub(super) fn run(
         Case::DocxStoryHyperlinkNoopSave | Case::DocxStoryHyperlinkRedactionSave
     ) {
         return Err("DOCX story publication runner received an unrelated case".into());
+    }
+    if samples == 0 {
+        return Err("DOCX story publication runner requires at least one retained sample".into());
     }
     let noop_output = publish_to_vec(corpus, &[])?;
     let redaction_output = publish_to_vec(corpus, &[SHARED_TARGET])?;
@@ -1102,8 +1168,8 @@ pub(super) fn run(
     let redaction_members = archive_members(&redaction_output)?;
     let relationship_oracle_verified = verify_relationship_oracle(&noop_members, false)?
         && verify_relationship_oracle(&redaction_members, true)?;
-    let xml_semantic_oracle_verified = verify_story_xml(&noop_members, false)?
-        && verify_story_xml(&redaction_members, true)?;
+    let xml_semantic_oracle_verified =
+        verify_story_xml(&noop_members, false)? && verify_story_xml(&redaction_members, true)?;
     let repeated_output = prepared_output(corpus, case)?;
     let deterministic_output_verified = repeated_output == expected_output;
     let (
@@ -1137,15 +1203,70 @@ pub(super) fn run(
     let maximum = u64::try_from(expected_output.len())?
         .checked_add(64 * 1024)
         .ok_or("DOCX story publication sink budget overflow")?;
+    let expected_output_hash = super::sha256_hex(&expected_output);
     let mut elapsed = Vec::new();
     elapsed.try_reserve_exact(samples)?;
     let mut sink_summaries: Vec<SinkSummary> = Vec::new();
     sink_summaries.try_reserve_exact(samples)?;
+    let mut observations = Vec::new();
+    observations.try_reserve_exact(samples)?;
+    let mut source_summary = SourceSummary::default();
+    let mut sample_indices = Vec::new();
+    sample_indices.try_reserve_exact(samples)?;
+    let mut open_ns = Vec::new();
+    open_ns.try_reserve_exact(samples)?;
+    let mut plan_ns = Vec::new();
+    plan_ns.try_reserve_exact(samples)?;
+    let mut publication_ns = Vec::new();
+    publication_ns.try_reserve_exact(samples)?;
+    let mut end_to_end_ns = Vec::new();
+    end_to_end_ns.try_reserve_exact(samples)?;
+    let mut source_read_calls = Vec::new();
+    source_read_calls.try_reserve_exact(samples)?;
+    let mut source_read_bytes = Vec::new();
+    source_read_bytes.try_reserve_exact(samples)?;
+    let mut source_ordinary_payload_read_calls = Vec::new();
+    source_ordinary_payload_read_calls.try_reserve_exact(samples)?;
+    let mut source_ordinary_payload_read_bytes = Vec::new();
+    source_ordinary_payload_read_bytes.try_reserve_exact(samples)?;
+    let mut source_max_in_flight_reads = Vec::new();
+    source_max_in_flight_reads.try_reserve_exact(samples)?;
+    let mut cache_hits = Vec::new();
+    cache_hits.try_reserve_exact(samples)?;
+    let mut cache_cold_loads = Vec::new();
+    cache_cold_loads.try_reserve_exact(samples)?;
+    let mut cache_waiter_joins = Vec::new();
+    cache_waiter_joins.try_reserve_exact(samples)?;
+    let mut cache_successful_loads = Vec::new();
+    cache_successful_loads.try_reserve_exact(samples)?;
+    let mut cache_failed_loads = Vec::new();
+    cache_failed_loads.try_reserve_exact(samples)?;
+    let mut cache_evictions = Vec::new();
+    cache_evictions.try_reserve_exact(samples)?;
+    let mut cache_bypasses = Vec::new();
+    cache_bypasses.try_reserve_exact(samples)?;
+    let mut cache_oversized_bypasses = Vec::new();
+    cache_oversized_bypasses.try_reserve_exact(samples)?;
+    let mut cache_allocation_bypasses = Vec::new();
+    cache_allocation_bypasses.try_reserve_exact(samples)?;
+    let mut cache_in_flight_loads = Vec::new();
+    cache_in_flight_loads.try_reserve_exact(samples)?;
+    let mut cache_retained_entries = Vec::new();
+    cache_retained_entries.try_reserve_exact(samples)?;
+    let mut cache_retained_bytes = Vec::new();
+    cache_retained_bytes.try_reserve_exact(samples)?;
+    let mut output_archive_sha256_samples = Vec::new();
+    output_archive_sha256_samples.try_reserve_exact(samples)?;
+    let mut allocation_samples = Vec::new();
+    allocation_samples.try_reserve_exact(samples)?;
     let mut source_immutability_verified = true;
     for iteration in 0..super::iteration_count(warmup_iterations, samples)? {
-        let source_bytes = corpus.archive.clone();
-        let measured_source = Arc::new(OwnedSource::new(source_bytes));
-        let source_identity = SourceIdentity::capture(&measured_source)?;
+        let measured_source = Arc::new(super::InstrumentedSource::new(
+            corpus.archive.clone(),
+            Vec::new(),
+        ));
+        let source_identity =
+            SourceIdentity::capture(measured_source.as_ref(), measured_source.bytes.as_slice())?;
         let source: Arc<dyn ReadAt> = measured_source.clone();
         let mut sink = CountingSink::bounded(maximum, u64::MAX);
         sink.reserve_budget()?;
@@ -1154,20 +1275,85 @@ pub(super) fn run(
             Case::DocxStoryHyperlinkRedactionSave => &[SHARED_TARGET][..],
             _ => unreachable!("case validated above"),
         };
-        let started = std::time::Instant::now();
-        let package = source_backed::Package::from_read_at(source)?;
-        let plan = package.plan_story_hyperlink_redaction(target_urls, Mode::Strict)?;
-        let commit = plan.apply()?;
-        package.publish_story_hyperlink_redaction_to_stream(&mut sink, &commit)?;
-        let duration = started.elapsed();
-        source_immutability_verified &= source_identity.matches(&measured_source)?;
+        let mut cache_diagnostics = None;
+        // The closure owns the package through publication. If any phase
+        // fails, it returns through the same boundary and the allocation
+        // region is still finished before the error is propagated.
+        let allocation_region = crate::allocation_metrics::begin();
+        let phase_result = (|| -> Result<(u64, u64, u64), Box<dyn std::error::Error>> {
+            let open_started = Instant::now();
+            let package = source_backed::Package::from_read_at(source.clone())?;
+            let open_ns = super::elapsed_ns(open_started.elapsed())?;
+
+            let plan_started = Instant::now();
+            let plan = package.plan_story_hyperlink_redaction(target_urls, Mode::Strict)?;
+            let commit = plan.apply()?;
+            let plan_ns = super::elapsed_ns(plan_started.elapsed())?;
+            cache_diagnostics = Some(package.cache_diagnostics());
+
+            let publication_started = Instant::now();
+            let publication_result =
+                package.publish_story_hyperlink_redaction_to_stream(&mut sink, &commit);
+            let publication_ns = super::elapsed_ns(publication_started.elapsed())?;
+            publication_result?;
+            Ok((open_ns, plan_ns, publication_ns))
+        })();
+        let allocation_sample = allocation_region
+            .finish()
+            .unwrap_or_else(crate::allocation_metrics::unavailable_sample);
+        let (open_duration_ns, plan_duration_ns, publication_duration_ns) = phase_result?;
+        let end_duration_ns =
+            checked_phase_sum(open_duration_ns, plan_duration_ns, publication_duration_ns)?;
+        let cache = cache_diagnostics.ok_or(
+            "DOCX story publication cache diagnostics were not captured before publication",
+        )?;
+        let source_metrics = measured_source.snapshot();
+        source_immutability_verified &=
+            source_identity.matches(measured_source.as_ref(), measured_source.bytes.as_slice())?;
         if sink.bytes != expected_output {
             return Err("DOCX story publication output differs from its preflight output".into());
         }
+        let output_digest = super::sha256_hex(&sink.bytes);
+        if output_digest != expected_output_hash {
+            return Err(
+                "DOCX story publication output digest differs from its preflight output".into(),
+            );
+        }
         std::hint::black_box(&sink.bytes);
         if iteration >= warmup_iterations {
-            elapsed.push(super::elapsed_ns(duration)?);
+            let sample_index = elapsed.len();
+            elapsed.push(end_duration_ns);
+            sample_indices.push(sample_index);
+            open_ns.push(open_duration_ns);
+            plan_ns.push(plan_duration_ns);
+            publication_ns.push(publication_duration_ns);
+            end_to_end_ns.push(end_duration_ns);
+            source_read_calls.push(source_metrics.read_calls);
+            source_read_bytes.push(source_metrics.read_bytes);
+            source_ordinary_payload_read_calls.push(source_metrics.ordinary_payload_read_calls);
+            source_ordinary_payload_read_bytes.push(source_metrics.ordinary_payload_read_bytes);
+            source_max_in_flight_reads.push(source_metrics.max_in_flight_reads);
+            cache_hits.push(cache.hits);
+            cache_cold_loads.push(cache.cold_loads);
+            cache_waiter_joins.push(cache.waiter_joins);
+            cache_successful_loads.push(cache.successful_loads);
+            cache_failed_loads.push(cache.failed_loads);
+            cache_evictions.push(cache.evictions);
+            cache_bypasses.push(cache.bypasses);
+            cache_oversized_bypasses.push(cache.oversized_bypasses);
+            cache_allocation_bypasses.push(cache.allocation_bypasses);
+            cache_in_flight_loads.push(cache.in_flight_loads);
+            cache_retained_entries.push(cache.retained_entries);
+            cache_retained_bytes.push(cache.retained_bytes);
+            output_archive_sha256_samples.push(output_digest);
+            allocation_samples.push(allocation_sample.clone());
+            source_summary.record(source_metrics);
             sink_summaries.push(sink.summary());
+            observations.push(operation_metrics::InProcessObservation {
+                elapsed_ns: end_duration_ns,
+                process_metrics: None,
+                allocation_metrics: Some(allocation_sample),
+            });
         }
     }
     if !source_immutability_verified {
@@ -1175,10 +1361,99 @@ pub(super) fn run(
     }
     let sink = super::deterministic_sink_summary(&sink_summaries, "DOCX story publication")?;
     let output_hash = super::sha256_hex(&expected_output);
+    let elapsed_statistics = super::statistics(elapsed);
+    let elapsed_sample_order = elapsed_statistics.sample_order.clone();
+    verify_sample_indices(
+        &sample_indices,
+        &elapsed_sample_order,
+        elapsed_statistics.samples.len(),
+    )?;
+    super::reorder_sample_vector(&mut source_summary.read_calls, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut source_summary.read_bytes, &elapsed_sample_order)?;
+    super::reorder_sample_vector(
+        &mut source_summary.ordinary_payload_read_calls,
+        &elapsed_sample_order,
+    )?;
+    super::reorder_sample_vector(
+        &mut source_summary.ordinary_payload_read_bytes,
+        &elapsed_sample_order,
+    )?;
+    super::reorder_sample_vector(
+        &mut source_summary.max_in_flight_reads,
+        &elapsed_sample_order,
+    )?;
+    super::reorder_sample_vector(&mut sample_indices, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut open_ns, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut plan_ns, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut publication_ns, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut end_to_end_ns, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut source_read_calls, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut source_read_bytes, &elapsed_sample_order)?;
+    super::reorder_sample_vector(
+        &mut source_ordinary_payload_read_calls,
+        &elapsed_sample_order,
+    )?;
+    super::reorder_sample_vector(
+        &mut source_ordinary_payload_read_bytes,
+        &elapsed_sample_order,
+    )?;
+    super::reorder_sample_vector(&mut source_max_in_flight_reads, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut cache_hits, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut cache_cold_loads, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut cache_waiter_joins, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut cache_successful_loads, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut cache_failed_loads, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut cache_evictions, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut cache_bypasses, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut cache_oversized_bypasses, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut cache_allocation_bypasses, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut cache_in_flight_loads, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut cache_retained_entries, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut cache_retained_bytes, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut output_archive_sha256_samples, &elapsed_sample_order)?;
+    super::reorder_sample_vector(&mut allocation_samples, &elapsed_sample_order)?;
+    verify_sample_indices(
+        &sample_indices,
+        &elapsed_sample_order,
+        elapsed_statistics.samples.len(),
+    )?;
+    if sample_indices != elapsed_sample_order {
+        return Err(
+            "DOCX story publication sample_indices do not match elapsed sample_order".into(),
+        );
+    }
+    if end_to_end_ns != elapsed_statistics.samples {
+        return Err(
+            "DOCX story publication end_to_end_ns is not the elapsed compatibility alias".into(),
+        );
+    }
+    if output_archive_sha256_samples
+        .iter()
+        .any(|digest| digest != &output_hash)
+    {
+        return Err("DOCX story publication measured output digests are not stable".into());
+    }
+    if observations.len() != elapsed_statistics.samples.len()
+        || allocation_samples.len() != elapsed_statistics.samples.len()
+    {
+        return Err(
+            "DOCX story publication allocation/sample evidence cardinality differs from elapsed"
+                .into(),
+        );
+    }
+    let operation_metrics =
+        operation_metrics::from_in_process_observations_without_sink(&observations)?;
+    if operation_metrics.sample_count != elapsed_statistics.samples.len()
+        || operation_metrics.sample_indices != elapsed_statistics.sample_order
+    {
+        return Err(
+            "DOCX story publication operation metrics are not aligned with elapsed samples".into(),
+        );
+    }
     let summary = DocxStoryHyperlinkPublicationSummary {
         implementation: "litchi-docx::source_backed::Package + story_hyperlinks::Plan",
-        timing_scope: "fresh source and reserved sequential sink prepared outside; open + strict target plan + commit + sequential publication inside",
-        performance_claim: "none: correctness-only end-to-end publication evidence",
+        timing_scope: "fresh source and reserved sequential sink prepared outside; elapsed_ns is explicitly open_ns + plan_ns + publication_ns; the allocation region begins immediately before open and ends immediately after publication; correctness, source/cache, digest, and refusal gates are outside",
+        performance_claim: "none: correctness and phase evidence only; publication_ns is eligible for a later dedicated ABBA and is not a claim",
         predeclared_allocator_model: (case == Case::DocxStoryHyperlinkRedactionSave)
             .then_some(STORY_RELATIONSHIP_ALLOCATOR_MODEL),
         story_kinds: STORIES.iter().map(|story| story.kind.to_owned()).collect(),
@@ -1189,7 +1464,31 @@ pub(super) fn run(
         source_archive_sha256: corpus.manifest.archive_sha256.clone(),
         output_archive_bytes: u64::try_from(expected_output.len())?,
         output_archive_sha256: output_hash.clone(),
-        end_to_end_ns: elapsed.clone(),
+        sample_indices,
+        open_ns,
+        plan_ns,
+        publication_ns,
+        end_to_end_ns,
+        source_read_calls,
+        source_read_bytes,
+        source_ordinary_payload_read_calls,
+        source_ordinary_payload_read_bytes,
+        source_max_in_flight_reads,
+        cache_hits,
+        cache_cold_loads,
+        cache_waiter_joins,
+        cache_successful_loads,
+        cache_failed_loads,
+        cache_evictions,
+        cache_bypasses,
+        cache_oversized_bypasses,
+        cache_allocation_bypasses,
+        cache_in_flight_loads,
+        cache_retained_entries,
+        cache_retained_bytes,
+        output_archive_sha256_samples,
+        allocation_samples,
+        phase_sum_verified: true,
         source_zip_oracle_verified,
         source_hash_verified,
         no_op_exact_bytes_verified,
@@ -1213,12 +1512,12 @@ pub(super) fn run(
         case: case.name(),
         cache_state: None,
         corpus: corpus.manifest.clone(),
-        elapsed_ns: super::statistics(elapsed),
+        elapsed_ns: elapsed_statistics,
         sink: Some(sink),
         source: Some(Box::new(source)),
         execution: None,
         output_sha256: Some(output_hash),
-        operation_metrics: None,
+        operation_metrics: Some(operation_metrics),
     })
 }
 
@@ -1232,9 +1531,15 @@ mod tests {
         let second = build_corpus().expect("second DOCX story publication corpus");
         assert_eq!(first.archive, second.archive);
         assert_eq!(first.source_members, second.source_members);
-        assert_eq!(first.manifest.archive_sha256, second.manifest.archive_sha256);
+        assert_eq!(
+            first.manifest.archive_sha256,
+            second.manifest.archive_sha256
+        );
         assert_eq!(STORIES.len(), 7);
-        assert_eq!(first.manifest.archive_member_count, first.source_members.len());
+        assert_eq!(
+            first.manifest.archive_member_count,
+            first.source_members.len()
+        );
         assert!(first.source_members.contains_key(OPAQUE_MEMBER));
         assert!(!Case::DEFAULT.contains(&Case::DocxStoryHyperlinkNoopSave));
         assert!(!Case::DEFAULT.contains(&Case::DocxStoryHyperlinkRedactionSave));
@@ -1255,21 +1560,56 @@ mod tests {
             Case::DocxStoryHyperlinkNoopSave,
             Case::DocxStoryHyperlinkRedactionSave,
         ] {
-            let result = run(case, &corpus, 0, 1).expect("DOCX story publication run");
+            let result = run(case, &corpus, 0, 2).expect("DOCX story publication run");
             assert_eq!(result.case, case.name());
-            assert_eq!(result.elapsed_ns.samples.len(), 1);
+            assert_eq!(result.elapsed_ns.samples.len(), 2);
+            assert_eq!(result.elapsed_ns.sample_order.len(), 2);
+            assert_eq!(result.operation_metrics.as_ref().unwrap().sample_count, 2);
+            assert_eq!(
+                result.operation_metrics.as_ref().unwrap().sample_indices,
+                result.elapsed_ns.sample_order
+            );
             let summary = result
                 .source
                 .expect("DOCX story publication source evidence")
                 .docx_story_hyperlink_publication
                 .expect("DOCX story publication summary");
+            assert_eq!(summary.sample_indices, result.elapsed_ns.sample_order);
+            assert_eq!(summary.open_ns.len(), 2);
+            assert_eq!(summary.plan_ns.len(), 2);
+            assert_eq!(summary.publication_ns.len(), 2);
+            assert_eq!(summary.end_to_end_ns, result.elapsed_ns.samples);
+            assert!(
+                summary
+                    .end_to_end_ns
+                    .iter()
+                    .enumerate()
+                    .all(|(index, &elapsed)| elapsed
+                        == summary.open_ns[index]
+                            + summary.plan_ns[index]
+                            + summary.publication_ns[index])
+            );
+            assert!(summary.phase_sum_verified);
+            assert_eq!(summary.source_read_calls.len(), 2);
+            assert_eq!(summary.source_read_bytes.len(), 2);
+            assert_eq!(summary.cache_hits.len(), 2);
+            assert_eq!(summary.output_archive_sha256_samples.len(), 2);
+            assert_eq!(summary.allocation_samples.len(), 2);
+            assert!(
+                summary
+                    .allocation_samples
+                    .iter()
+                    .all(|sample| sample.status == crate::allocation_metrics::Status::Unavailable)
+            );
             assert_eq!(summary.story_kinds.len(), 7);
             assert_eq!(summary.selected_relationship_count, 7);
             assert_eq!(summary.unselected_relationship_count, 7);
-            let expected_allocator_model =
-                (case == Case::DocxStoryHyperlinkRedactionSave)
-                    .then_some(STORY_RELATIONSHIP_ALLOCATOR_MODEL);
-            assert_eq!(summary.predeclared_allocator_model, expected_allocator_model);
+            let expected_allocator_model = (case == Case::DocxStoryHyperlinkRedactionSave)
+                .then_some(STORY_RELATIONSHIP_ALLOCATOR_MODEL);
+            assert_eq!(
+                summary.predeclared_allocator_model,
+                expected_allocator_model
+            );
             assert!(summary.source_zip_oracle_verified);
             assert!(summary.source_hash_verified);
             assert!(summary.no_op_exact_bytes_verified);
@@ -1284,7 +1624,59 @@ mod tests {
             assert!(summary.unknown_owner_refusal_verified);
             assert!(summary.partial_sink_refusal_verified);
             assert!(summary.zero_sink_refusal_verified);
-            assert_eq!(summary.performance_claim, "none: correctness-only end-to-end publication evidence");
+            assert_eq!(
+                summary.performance_claim,
+                "none: correctness and phase evidence only; publication_ns is eligible for a later dedicated ABBA and is not a claim"
+            );
         }
+    }
+
+    #[test]
+    fn phase_sum_is_checked_without_saturation() {
+        assert_eq!(checked_phase_sum(11, 13, 17).unwrap(), 41);
+        assert!(checked_phase_sum(u64::MAX, 1, 0).is_err());
+        assert!(checked_phase_sum(u64::MAX - 1, 0, 1).is_ok());
+    }
+
+    #[test]
+    fn sample_vectors_reorder_by_elapsed_then_original_index_and_retain_ties() {
+        let statistics = super::super::statistics(vec![20, 10, 20]);
+        assert_eq!(statistics.sample_order, vec![1, 0, 2]);
+        let mut phase = vec![200_u64, 100, 201];
+        super::super::reorder_sample_vector(&mut phase, &statistics.sample_order).unwrap();
+        assert_eq!(phase, vec![100, 200, 201]);
+
+        let mut indices = vec![0, 1, 2];
+        verify_sample_indices(&indices, &statistics.sample_order, 3).unwrap();
+        super::super::reorder_sample_vector(&mut indices, &statistics.sample_order).unwrap();
+        assert_eq!(indices, statistics.sample_order);
+        verify_sample_indices(&indices, &statistics.sample_order, 3).unwrap();
+        assert!(verify_sample_indices(&indices[..2], &statistics.sample_order, 3).is_err());
+    }
+
+    #[test]
+    fn publication_failure_is_captured_after_the_region_and_before_error_propagation() {
+        let corpus = build_corpus().expect("DOCX story publication corpus");
+        let package = source_package(corpus.archive.clone()).expect("source package");
+        let plan = package
+            .plan_story_hyperlink_redaction(&[SHARED_TARGET], Mode::Strict)
+            .expect("redaction plan")
+            .apply()
+            .expect("redaction commit");
+        let mut sink = FailingSink {
+            accepted: 0,
+            fail_after: 1,
+        };
+        let region = crate::allocation_metrics::begin();
+        let result = package.publish_story_hyperlink_redaction_to_stream(&mut sink, &plan);
+        let allocation = region
+            .finish()
+            .unwrap_or_else(crate::allocation_metrics::unavailable_sample);
+        assert!(result.is_err());
+        assert!(sink.accepted > 0);
+        assert_eq!(
+            allocation.status,
+            crate::allocation_metrics::Status::Unavailable
+        );
     }
 }
