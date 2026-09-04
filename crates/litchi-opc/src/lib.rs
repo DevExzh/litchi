@@ -72,6 +72,8 @@ pub use pkgreader::{
 };
 pub use pkgwriter::PackageWriter;
 pub use rel::{Relationship, Relationships, TargetMode};
+#[cfg(feature = "performance-diagnostics")]
+pub use source_backed::{CacheState, DiagnosticSnapshot, FlightState, Operation};
 pub use source_backed::{
     PartData, PartView, SourceArtifact, SourceArtifactFingerprint, SourceBackedPackage,
     SourceCacheCounterDelta, SourceCacheDiagnostics, SourceCacheDiagnosticsError,
