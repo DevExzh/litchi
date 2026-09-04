@@ -126,3 +126,14 @@ context.
 [Change 0407](0407-managed-xlsx-budget-validation.md) adds independent typed
 validation of the managed XLSX memory tuple and configuration allowance, with
 81 focused comparator tests and a fresh managed CLI smoke.
+
+## Change 0410 correction: managed row-visibility publication planning
+
+The row-visibility source API now documents that changed managed publication
+may reserve bounded transient OPC topology-planning memory from the caller's
+hierarchical budget. Its focused integration fixture supplies the explicit
+64 KiB headroom for successful unknown-member-preserving publication and also
+checks payload-only planning refusal, empty output, and release. This is a
+source API and correctness-test correction; it adds no row-visibility context
+to the 0405 harness records or changes that record's eight-test count and
+cell-value configuration evidence.

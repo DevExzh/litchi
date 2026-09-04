@@ -4547,12 +4547,38 @@ impl SourceBackedPackage {
                 .then_with(|| left.r_id.cmp(&right.r_id))
         });
         self.check_topology_progress()?;
-        if introduces_signature && !self.has_signature_infrastructure() {
+        let has_signature_infrastructure = self.has_signature_infrastructure();
+        if introduces_signature && !has_signature_infrastructure {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
-        if (!additions.is_empty() || !removals.is_empty()) && self.has_signature_infrastructure() {
+        if (!additions.is_empty() || !removals.is_empty()) && has_signature_infrastructure {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
+
+        // A signed source must reject a changed Part before namespace,
+        // relationship, physical-member, or output-limit planning. Exact
+        // no-op replacements remain eligible for the byte-for-byte signed
+        // source copy below. Keep only the verification result: retaining
+        // PartData here would retain a source payload (and its managed
+        // reservation) across all subsequent topology planning.
+        let signed_replacements_are_noop = if additions.is_empty() && has_signature_infrastructure {
+            for (index, replacement) in replacements.iter().enumerate() {
+                if index & 0x3f == 0 {
+                    self.check_topology_progress()?;
+                }
+                let target = self
+                    .part_index(&replacement.partname)
+                    .ok_or_else(|| OpcError::PartNotFound(replacement.partname.to_string()))?;
+                let original = self.read_part(target)?;
+                if original.as_bytes() != replacement.replacement.as_slice() {
+                    return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+                }
+            }
+            true
+        } else {
+            false
+        };
+
         let (physical_members, _physical_member_memory) = self.build_physical_member_lookup()?;
         let content_types_key = folded_ascii_name(
             &self.content_types_member,
@@ -4614,23 +4640,6 @@ impl SourceBackedPackage {
                 .iter()
                 .map(|overlay| (overlay.target, overlay.replacement.len())),
         )?;
-        if additions.is_empty() {
-            let mut changed_replacement = false;
-            for (index, replacement) in pending_replacements.iter().enumerate() {
-                if index & 0x3f == 0 {
-                    self.check_topology_progress()?;
-                }
-                if self.read_part(replacement.target)?.as_bytes()
-                    != replacement.replacement.as_slice()
-                {
-                    changed_replacement = true;
-                    break;
-                }
-            }
-            if changed_replacement && self.has_signature_infrastructure() {
-                return Err(OpcError::SignedSourceRequiresExplicitPolicy);
-            }
-        }
 
         // Build the source/new Part namespace with the same duplicate,
         // equivalent, and derived-name rules used by package ingestion.
@@ -5227,26 +5236,32 @@ impl SourceBackedPackage {
                 resource: "source-backed OPC topology changed members",
                 source,
             })?;
-        for replacement in &pending_replacements {
-            self.check_topology_progress()?;
-            let original = self.read_part(replacement.target)?;
-            // Compare bytes before any XML audit. A caller may intentionally
-            // publish an exact no-op replacement for a source whose Part
-            // payload is malformed; the contract is byte-preserving in that
-            // case and must not turn the no-op into a parser failure.
-            if original.as_bytes() == replacement.replacement.as_slice() {
-                continue;
+        if !signed_replacements_are_noop {
+            for replacement in &pending_replacements {
+                self.check_topology_progress()?;
+                let original = self.read_part(replacement.target)?;
+                // Compare bytes before any XML audit. A caller may intentionally
+                // publish an exact no-op replacement for a source whose Part
+                // payload is malformed; the contract is byte-preserving in that
+                // case and must not turn the no-op into a parser failure.
+                if original.as_bytes() == replacement.replacement.as_slice() {
+                    continue;
+                }
+                let part = &self.parts[replacement.target];
+                if xml_minifier::audit::package::is_xml_part(
+                    part.partname.as_str(),
+                    &part.content_type,
+                ) {
+                    validate_overlay_xml(part.partname.as_str(), original.as_bytes())?;
+                    validate_overlay_xml(part.partname.as_str(), &replacement.replacement)?;
+                }
+                changed.push(ChangedOverlay {
+                    target: ChangedOverlayTarget::Part(replacement.target),
+                    replacement: ChangedOverlayPayload::Shared(Arc::clone(
+                        &replacement.replacement,
+                    )),
+                });
             }
-            let part = &self.parts[replacement.target];
-            if xml_minifier::audit::package::is_xml_part(part.partname.as_str(), &part.content_type)
-            {
-                validate_overlay_xml(part.partname.as_str(), original.as_bytes())?;
-                validate_overlay_xml(part.partname.as_str(), &replacement.replacement)?;
-            }
-            changed.push(ChangedOverlay {
-                target: ChangedOverlayTarget::Part(replacement.target),
-                replacement: ChangedOverlayPayload::Shared(Arc::clone(&replacement.replacement)),
-            });
         }
         for (index, publication) in relationship_publications.iter_mut().enumerate() {
             if index & 0x3f == 0 {
@@ -9628,6 +9643,49 @@ mod tests {
     }
 
     #[test]
+    fn topology_changed_replacement_reads_source_payload_once() {
+        const BEFORE: &[u8] = b"<before/>";
+        let source_bytes = archive_bytes(root_relationships(), BEFORE, false);
+        let payload_start = source_bytes
+            .windows(BEFORE.len())
+            .position(|window| window == BEFORE)
+            .expect("the source payload must be present") as u64;
+        let payload_end = payload_start + BEFORE.len() as u64;
+        let source = Arc::new(CountingSource::new(source_bytes));
+        let package = SourceBackedPackage::from_read_at_with_cache_limits(
+            source.clone(),
+            SourceCacheLimits::new(1, 1).unwrap(),
+        )
+        .unwrap();
+        let ranges_before = source.read_ranges().len();
+
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_replace_part(
+            PackURI::new("/word/document.xml").unwrap(),
+            b"<after/>".to_vec(),
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        package.write_topology_to_stream(&mut output, plan).unwrap();
+
+        let payload_reads = source.read_ranges()[ranges_before..]
+            .iter()
+            .filter(|&&(offset, length)| {
+                let end = offset.saturating_add(length as u64);
+                offset < payload_end && end > payload_start
+            })
+            .count();
+        assert_eq!(payload_reads, 1);
+        assert_eq!(
+            soapberry_zip::office::ArchiveReader::new(&output)
+                .unwrap()
+                .read("word/document.xml")
+                .unwrap(),
+            b"<after/>"
+        );
+    }
+
+    #[test]
     fn topology_zip64_add_remove_preserves_untouched_records_and_tail() {
         let extension = [0x11, 0x22, 0x33, 0x44];
         let source_bytes = add_zip64_tail_extension(
@@ -10055,6 +10113,37 @@ mod tests {
                 OFFICE_DOCUMENT,
                 PackURI::new("/signature/origin.xml").unwrap(),
             )
+            .unwrap();
+        output.clear();
+        let error = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source)))
+            .unwrap()
+            .write_topology_to_stream(&mut output, mutation)
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            OpcError::SignedSourceRequiresExplicitPolicy
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn topology_signed_part_noop_copies_and_mutation_refuses_before_output() {
+        let source = signed_archive(b"<signed/>");
+        let target = PackURI::new("/word/document.xml").unwrap();
+
+        let mut noop = SourceTopologyPlan::new();
+        noop.try_replace_part(target.clone(), b"<signed/>".to_vec())
+            .unwrap();
+        let mut output = Vec::new();
+        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source.clone())))
+            .unwrap()
+            .write_topology_to_stream(&mut output, noop)
+            .unwrap();
+        assert_eq!(output, source);
+
+        let mut mutation = SourceTopologyPlan::new();
+        mutation
+            .try_replace_part(target, b"<changed/>".to_vec())
             .unwrap();
         output.clear();
         let error = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source)))
@@ -14814,7 +14903,7 @@ mod tests {
     #[cfg(feature = "performance-diagnostics")]
     fn assert_balanced_diagnostic_events(events: &[DiagnosticSnapshot]) {
         assert_eq!(events.len() % 2, 0, "event stream must contain pairs");
-        for pair in events.chunks_exact(2) {
+        for pair in events.as_chunks::<2>().0 {
             match (&pair[0], &pair[1]) {
                 (
                     DiagnosticSnapshot::Started { operation: started },
