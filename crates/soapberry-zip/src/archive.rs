@@ -216,7 +216,13 @@ impl<'data> ZipSliceArchive<&'data [u8]> {
         central_name: &[u8],
     ) -> Result<ZipSliceEntry<'data>, Error> {
         validate_single_disk_archive(self.data, &self.eocd)?;
-        slice_stored_entry(self.data, entry, central_name, self.eocd.directory_offset())
+        slice_stored_entry(
+            self.data,
+            entry,
+            central_name,
+            self.eocd.directory_offset(),
+            self.eocd.is_zip64(),
+        )
     }
 
     pub(crate) fn validate_strict_stream_target(
@@ -236,6 +242,7 @@ impl<'data> ZipSliceArchive<&'data [u8]> {
             &entry,
             central_name,
             self.eocd.directory_offset(),
+            self.eocd.is_zip64(),
         )?;
         Ok(StrictEntryLayout {
             local_header_offset: u64::try_from(metadata.header_offset)
@@ -274,8 +281,13 @@ impl<'data> ZipSliceArchive<&'data [u8]> {
         entry: ZipArchiveEntryWayfinder,
         central_name: &[u8],
     ) -> Result<(u64, u64), Error> {
-        let (start, end) =
-            borrowed_entry_span(self.data, entry, central_name, self.eocd.directory_offset())?;
+        let (start, end) = borrowed_entry_span(
+            self.data,
+            entry,
+            central_name,
+            self.eocd.directory_offset(),
+            self.eocd.is_zip64(),
+        )?;
         Ok((
             u64::try_from(start).map_err(|_| Error::from(ErrorKind::Eof))?,
             u64::try_from(end).map_err(|_| Error::from(ErrorKind::Eof))?,
@@ -344,6 +356,7 @@ fn validate_borrowed_entry_metadata(
     entry: &ZipArchiveEntryWayfinder,
     central_name: &[u8],
     central_directory_offset: u64,
+    archive_is_zip64: bool,
 ) -> Result<BorrowedEntryMetadata, Error> {
     validate_borrowed_wayfinder_metadata(entry)?;
     let header_offset =
@@ -442,7 +455,7 @@ fn validate_borrowed_entry_metadata(
         let descriptor_data = data
             .get(payload_end..central_directory_offset)
             .ok_or_else(|| Error::from(ErrorKind::Eof))?;
-        let descriptor = DataDescriptor::parse_complete(descriptor_data, entry)?;
+        let descriptor = DataDescriptor::parse_complete(descriptor_data, entry, archive_is_zip64)?;
         let descriptor_end = payload_end
             .checked_add(descriptor.encoded_size)
             .ok_or_else(|| Error::from(ErrorKind::Eof))?;
@@ -473,9 +486,16 @@ fn slice_stored_entry<'data>(
     entry: ZipArchiveEntryWayfinder,
     central_name: &[u8],
     central_directory_offset: u64,
+    archive_is_zip64: bool,
 ) -> Result<ZipSliceEntry<'data>, Error> {
     validate_borrowed_wayfinder(&entry)?;
-    validate_borrowed_entry_metadata(data, &entry, central_name, central_directory_offset)?;
+    validate_borrowed_entry_metadata(
+        data,
+        &entry,
+        central_name,
+        central_directory_offset,
+        archive_is_zip64,
+    )?;
     let header_offset =
         usize::try_from(entry.local_header_offset).map_err(|_| Error::from(ErrorKind::Eof))?;
     let central_directory_offset =
@@ -572,7 +592,7 @@ fn slice_stored_entry<'data>(
         let descriptor_data = data
             .get(payload_end..central_directory_offset)
             .ok_or_else(|| Error::from(ErrorKind::Eof))?;
-        let descriptor = DataDescriptor::parse_complete(descriptor_data, &entry)?;
+        let descriptor = DataDescriptor::parse_complete(descriptor_data, &entry, archive_is_zip64)?;
         let descriptor_end = payload_end
             .checked_add(descriptor.encoded_size)
             .ok_or_else(|| Error::from(ErrorKind::Eof))?;
@@ -605,9 +625,15 @@ fn borrowed_entry_span(
     entry: ZipArchiveEntryWayfinder,
     central_name: &[u8],
     central_directory_offset: u64,
+    archive_is_zip64: bool,
 ) -> Result<(usize, usize), Error> {
-    let metadata =
-        validate_borrowed_entry_metadata(data, &entry, central_name, central_directory_offset)?;
+    let metadata = validate_borrowed_entry_metadata(
+        data,
+        &entry,
+        central_name,
+        central_directory_offset,
+        archive_is_zip64,
+    )?;
     Ok((metadata.header_offset, metadata.span_end))
 }
 
@@ -616,12 +642,14 @@ fn validate_reader_entry_layout<R: ReaderAt>(
     entry: &ZipArchiveEntryWayfinder,
     central_name: &[u8],
     central_directory_offset: u64,
+    archive_is_zip64: bool,
 ) -> Result<StrictEntryLayout, Error> {
     let (layout, local_name_mismatch) = validate_reader_entry_layout_with_name_policy(
         reader,
         entry,
         central_name,
         central_directory_offset,
+        archive_is_zip64,
         false,
     )?;
     debug_assert!(!local_name_mismatch);
@@ -633,6 +661,7 @@ fn validate_reader_entry_layout_with_name_policy<R: ReaderAt>(
     entry: &ZipArchiveEntryWayfinder,
     central_name: &[u8],
     central_directory_offset: u64,
+    archive_is_zip64: bool,
     allow_name_mismatch: bool,
 ) -> Result<(StrictEntryLayout, bool), Error> {
     validate_borrowed_wayfinder_metadata(entry)?;
@@ -746,6 +775,7 @@ fn validate_reader_entry_layout_with_name_policy<R: ReaderAt>(
             data_end_offset,
             central_directory_offset,
             entry,
+            archive_is_zip64,
         )?;
         data_end_offset
             .checked_add(
@@ -1439,6 +1469,7 @@ where
             &entry,
             central_name,
             self.eocd.directory_offset(),
+            self.eocd.is_zip64(),
         )
     }
 
@@ -1459,6 +1490,7 @@ where
             &entry,
             central_name,
             self.eocd.directory_offset(),
+            self.eocd.is_zip64(),
             true,
         )
     }
@@ -1876,7 +1908,7 @@ impl<'a> ZipLocalFileHeader<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct DataDescriptor {
     crc: u32,
     compressed_size: u64,
@@ -1915,48 +1947,75 @@ impl DataDescriptor {
     fn parse_complete(
         data: &[u8],
         entry: &ZipArchiveEntryWayfinder,
+        archive_is_zip64: bool,
     ) -> Result<DataDescriptor, Error> {
-        let width: usize = if entry.zip64_sizes { 8 } else { 4 };
+        let (widths, width_count) = if entry.zip64_sizes {
+            ([8usize, 0], 1)
+        } else if archive_is_zip64 {
+            ([4usize, 8], 2)
+        } else {
+            ([4usize, 0], 1)
+        };
         let has_signature = data.get(..4).map(le_u32) == Some(Self::SIGNATURE);
 
-        if has_signature {
-            let signed = Self::parse_fields(data, 4, width);
-            let unsigned = (entry.crc == Self::SIGNATURE)
-                .then(|| Self::parse_fields(data, 0, width))
-                .flatten();
-            match (signed, unsigned) {
-                (Some(signed), Some(unsigned)) => {
-                    match (signed.matches(entry), unsigned.matches(entry)) {
-                        (true, true) => {
-                            return Err(Error::from(ErrorKind::InvalidInput {
-                                msg: "ambiguous stored data descriptor signature".to_string(),
-                            }));
-                        },
-                        (true, false) => return Ok(signed),
-                        (false, true) => return Ok(unsigned),
-                        (false, false) => {
-                            signed.validate(entry)?;
-                            unsigned.validate(entry)?;
-                        },
-                    }
-                },
-                (Some(signed), None) => {
-                    signed.validate(entry)?;
-                    return Ok(signed);
-                },
-                (None, Some(unsigned)) => {
-                    unsigned.validate(entry)?;
-                    return Ok(unsigned);
-                },
-                (None, None) => return Err(Error::from(ErrorKind::Eof)),
+        // A signature can be either the marker on a signed descriptor or the
+        // CRC of an unsigned descriptor.  Keep the signed interpretation
+        // first, then the unsigned interpretation, and try narrower framing
+        // before wider framing within each interpretation.  For a ZIP64
+        // archive with ordinary per-entry sizes both descriptor widths are
+        // seen in the wild, so only a unique central-record match is safe.
+        let mut starts = [0usize; 2];
+        let start_count = if has_signature {
+            starts[0] = 4;
+            if entry.crc == Self::SIGNATURE {
+                starts[1] = 0;
+                2
+            } else {
+                1
             }
-            return Err(Error::from(ErrorKind::Eof));
+        } else {
+            1
+        };
+        if !has_signature {
+            starts[0] = 0;
         }
 
-        let descriptor =
-            Self::parse_fields(data, 0, width).ok_or_else(|| Error::from(ErrorKind::Eof))?;
-        descriptor.validate(entry)?;
-        Ok(descriptor)
+        let mut parsed = [None; 4];
+        let mut parsed_count = 0usize;
+        for start in starts[..start_count].iter().copied() {
+            for width in widths[..width_count].iter().copied() {
+                if let Some(descriptor) = Self::parse_fields(data, start, width) {
+                    parsed[parsed_count] = Some(descriptor);
+                    parsed_count += 1;
+                }
+            }
+        }
+
+        let mut matching = None;
+        for (index, descriptor) in parsed[..parsed_count].iter().enumerate() {
+            if descriptor
+                .as_ref()
+                .is_some_and(|descriptor| descriptor.matches(entry))
+                && matching.replace(index).is_some()
+            {
+                return Err(Error::from(ErrorKind::InvalidInput {
+                    msg: "ambiguous stored data descriptor framing".to_string(),
+                }));
+            }
+        }
+        if let Some(index) = matching {
+            return Ok(parsed[index]
+                .take()
+                .expect("matching descriptor was parsed"));
+        }
+
+        // Preserve the historical error ordering: report the first complete
+        // candidate's checksum/size error in signed-before-unsigned and
+        // narrow-before-wide order.  If no candidate is complete, report EOF.
+        for descriptor in parsed[..parsed_count].iter().flatten() {
+            descriptor.validate(entry)?;
+        }
+        Err(Error::from(ErrorKind::Eof))
     }
 
     fn parse_complete_at<R: ReaderAt>(
@@ -1964,14 +2023,19 @@ impl DataDescriptor {
         offset: u64,
         central_directory_offset: u64,
         entry: &ZipArchiveEntryWayfinder,
+        archive_is_zip64: bool,
     ) -> Result<DataDescriptor, Error> {
         if offset > central_directory_offset {
             return Err(Error::from(ErrorKind::Eof));
         }
-        let width: usize = if entry.zip64_sizes { 8 } else { 4 };
+        let max_width: usize = if entry.zip64_sizes || archive_is_zip64 {
+            8
+        } else {
+            4
+        };
         let maximum = 4usize
             .checked_add(4)
-            .and_then(|size| size.checked_add(width.checked_mul(2)?))
+            .and_then(|size| size.checked_add(max_width.checked_mul(2)?))
             .ok_or_else(|| Error::from(ErrorKind::Eof))?;
         let available = central_directory_offset - offset;
         let read_length = usize::try_from(
@@ -1982,7 +2046,7 @@ impl DataDescriptor {
         if read_length != 0 {
             reader.read_exact_at(&mut buffer[..read_length], offset)?;
         }
-        Self::parse_complete(&buffer[..read_length], entry)
+        Self::parse_complete(&buffer[..read_length], entry, archive_is_zip64)
     }
 
     fn parse_fields(data: &[u8], offset: usize, width: usize) -> Option<DataDescriptor> {
@@ -3292,8 +3356,248 @@ mod tests {
             disk_number_start: 0,
         };
         let descriptor = signature.to_le_bytes().repeat(4);
-        let error = DataDescriptor::parse_complete(&descriptor, &entry).unwrap_err();
+        let error = DataDescriptor::parse_complete(&descriptor, &entry, false).unwrap_err();
         assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+    }
+
+    fn descriptor_entry(
+        crc: u32,
+        compressed_size: u64,
+        uncompressed_size: u64,
+        zip64_sizes: bool,
+    ) -> ZipArchiveEntryWayfinder {
+        ZipArchiveEntryWayfinder {
+            uncompressed_size,
+            compressed_size,
+            local_header_offset: 0,
+            crc,
+            has_data_descriptor: true,
+            flags: 0x08,
+            compression_method: CompressionMethodId(0),
+            zip64_sizes,
+            zip64_uncompressed_size_resolved: true,
+            zip64_compressed_size_resolved: true,
+            zip64_local_header_offset_resolved: true,
+            zip64_disk_start_resolved: true,
+            disk_number_start: 0,
+        }
+    }
+
+    fn descriptor_bytes(
+        width: usize,
+        signed: bool,
+        crc: u32,
+        compressed_size: u64,
+        uncompressed_size: u64,
+    ) -> Vec<u8> {
+        let mut descriptor = Vec::new();
+        if signed {
+            descriptor.extend_from_slice(&DataDescriptor::SIGNATURE.to_le_bytes());
+        }
+        descriptor.extend_from_slice(&crc.to_le_bytes());
+        match width {
+            4 => {
+                descriptor.extend_from_slice(
+                    &u32::try_from(compressed_size)
+                        .expect("test descriptor compressed size fits ZIP32")
+                        .to_le_bytes(),
+                );
+                descriptor.extend_from_slice(
+                    &u32::try_from(uncompressed_size)
+                        .expect("test descriptor uncompressed size fits ZIP32")
+                        .to_le_bytes(),
+                );
+            },
+            8 => {
+                descriptor.extend_from_slice(&compressed_size.to_le_bytes());
+                descriptor.extend_from_slice(&uncompressed_size.to_le_bytes());
+            },
+            _ => panic!("unsupported test descriptor width"),
+        }
+        descriptor
+    }
+
+    fn push_u16(output: &mut Vec<u8>, value: u16) {
+        output.extend_from_slice(&value.to_le_bytes());
+    }
+
+    fn push_u32(output: &mut Vec<u8>, value: u32) {
+        output.extend_from_slice(&value.to_le_bytes());
+    }
+
+    fn push_u64(output: &mut Vec<u8>, value: u64) {
+        output.extend_from_slice(&value.to_le_bytes());
+    }
+
+    fn archive_zip64_descriptor_fixture(width: usize, signed: bool) -> Vec<u8> {
+        let payload = b"hello";
+        let name = b"x";
+        let crc = crate::crc32(payload);
+        let size = u32::try_from(payload.len()).unwrap();
+        let mut archive = Vec::new();
+
+        // Local header with ordinary (zero) descriptor sizes.
+        push_u32(&mut archive, 0x0403_4b50);
+        push_u16(&mut archive, if width == 8 { 45 } else { 20 });
+        push_u16(&mut archive, 0x08);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        push_u32(&mut archive, 0);
+        push_u32(&mut archive, 0);
+        push_u32(&mut archive, 0);
+        push_u16(&mut archive, u16::try_from(name.len()).unwrap());
+        push_u16(&mut archive, 0);
+        archive.extend_from_slice(name);
+        archive.extend_from_slice(payload);
+        archive.extend_from_slice(&descriptor_bytes(
+            width,
+            signed,
+            crc,
+            u64::from(size),
+            u64::from(size),
+        ));
+
+        let central_directory_offset = u64::try_from(archive.len()).unwrap();
+        let mut central = Vec::new();
+        push_u32(&mut central, 0x0201_4b50);
+        push_u16(&mut central, if width == 8 { 45 } else { 20 });
+        push_u16(&mut central, if width == 8 { 45 } else { 20 });
+        push_u16(&mut central, 0x08);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u32(&mut central, crc);
+        push_u32(&mut central, size);
+        push_u32(&mut central, size);
+        push_u16(&mut central, u16::try_from(name.len()).unwrap());
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u16(&mut central, 0);
+        push_u32(&mut central, 0);
+        push_u32(&mut central, 0);
+        central.extend_from_slice(name);
+        let central_directory_size = u64::try_from(central.len()).unwrap();
+        archive.extend_from_slice(&central);
+
+        // A ZIP64 EOCD is required by the classic central-directory offset
+        // sentinel, while this member itself remains entirely ZIP32.
+        let zip64_eocd_offset = u64::try_from(archive.len()).unwrap();
+        push_u32(&mut archive, END_OF_CENTRAL_DIR_SIGNATURE64);
+        push_u64(&mut archive, 44);
+        push_u16(&mut archive, 45);
+        push_u16(&mut archive, 45);
+        push_u32(&mut archive, 0);
+        push_u32(&mut archive, 0);
+        push_u64(&mut archive, 1);
+        push_u64(&mut archive, 1);
+        push_u64(&mut archive, central_directory_size);
+        push_u64(&mut archive, central_directory_offset);
+        push_u32(&mut archive, END_OF_CENTRAL_DIR_LOCATOR_SIGNATURE);
+        push_u32(&mut archive, 0);
+        push_u64(&mut archive, zip64_eocd_offset);
+        push_u32(&mut archive, 1);
+        push_u32(&mut archive, 0x0605_4b50);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 0);
+        push_u16(&mut archive, 1);
+        push_u16(&mut archive, 1);
+        push_u32(&mut archive, u32::try_from(central_directory_size).unwrap());
+        push_u32(&mut archive, u32::MAX);
+        push_u16(&mut archive, 0);
+        archive
+    }
+
+    #[test]
+    fn complete_descriptor_uses_archive_zip64_context_without_changing_zip32_empty_entries() {
+        let crc = 0x3610_a686;
+        let entry = descriptor_entry(crc, 5, 5, false);
+        for signed in [false, true] {
+            for width in [4, 8] {
+                let descriptor = descriptor_bytes(width, signed, crc, 5, 5);
+                let parsed = DataDescriptor::parse_complete(&descriptor, &entry, true).unwrap();
+                assert_eq!(parsed.crc, crc);
+                assert_eq!(parsed.compressed_size, 5);
+                assert_eq!(parsed.uncompressed_size, 5);
+                assert_eq!(
+                    parsed.encoded_size,
+                    width * 2 + 4 + if signed { 4 } else { 0 }
+                );
+            }
+        }
+
+        let empty_entry = descriptor_entry(0, 0, 0, false);
+        let mut descriptor = descriptor_bytes(4, false, 0, 0, 0);
+        descriptor.extend_from_slice(&[0; 8]);
+        let parsed = DataDescriptor::parse_complete(&descriptor, &empty_entry, false).unwrap();
+        assert_eq!(parsed.encoded_size, 12);
+    }
+
+    #[test]
+    fn strict_layout_accepts_archive_zip64_descriptors_at_reader_boundaries() {
+        for signed in [false, true] {
+            for width in [4, 8] {
+                let data = archive_zip64_descriptor_fixture(width, signed);
+                let archive = ZipArchive::from_slice(data.as_slice()).unwrap();
+                assert!(archive.is_zip64());
+                let entry = archive.entries().next_entry().unwrap().unwrap();
+                assert!(!entry.is_zip64());
+                let layout = archive
+                    .validate_strict_entry_layout(entry.wayfinder(), b"x")
+                    .unwrap();
+                assert_eq!(layout.data_end_offset - layout.data_start_offset, 5);
+                assert_eq!(layout.span_end, archive.directory_offset());
+
+                let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
+                let reader_archive =
+                    ZipArchive::from_seekable(Cursor::new(data.as_slice()), &mut buffer).unwrap();
+                let wayfinder = {
+                    let mut entries = reader_archive.entries(&mut buffer);
+                    entries.next_entry().unwrap().unwrap().wayfinder()
+                };
+                let layout = reader_archive
+                    .validate_strict_entry_layout(wayfinder, b"x")
+                    .unwrap();
+                assert_eq!(layout.span_end, reader_archive.directory_offset());
+            }
+        }
+    }
+
+    #[test]
+    fn complete_descriptor_requires_zip64_width_for_zip64_size_sentinels() {
+        let entry = descriptor_entry(0x3610_a686, 5, 5, true);
+        for signed in [false, true] {
+            let descriptor = descriptor_bytes(8, signed, entry.crc, 5, 5);
+            assert!(DataDescriptor::parse_complete(&descriptor, &entry, false).is_ok());
+
+            let descriptor = descriptor_bytes(4, signed, entry.crc, 5, 5);
+            let error = DataDescriptor::parse_complete(&descriptor, &entry, false).unwrap_err();
+            assert!(matches!(error.kind(), ErrorKind::Eof));
+        }
+    }
+
+    #[test]
+    fn complete_descriptor_rejects_malformed_and_ambiguous_width_candidates() {
+        let entry = descriptor_entry(0, 0, 0, false);
+        let ambiguous = descriptor_bytes(4, false, 0, 0, 0);
+        let mut ambiguous = ambiguous;
+        ambiguous.extend_from_slice(&[0; 8]);
+        let error = DataDescriptor::parse_complete(&ambiguous, &entry, true).unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+
+        let malformed = descriptor_bytes(8, true, 0x3610_a686, 5, 5);
+        let error = DataDescriptor::parse_complete(&malformed[..malformed.len() - 4], &entry, true)
+            .unwrap_err();
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::InvalidChecksum { .. } | ErrorKind::InvalidSize { .. } | ErrorKind::Eof
+        ));
+
+        let entry = descriptor_entry(0x3610_a686, 5, 5, false);
+        let malformed = descriptor_bytes(4, false, 0x3610_a686, 4, 5);
+        let error = DataDescriptor::parse_complete(&malformed, &entry, true).unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::InvalidSize { .. }));
     }
 
     use super::*;

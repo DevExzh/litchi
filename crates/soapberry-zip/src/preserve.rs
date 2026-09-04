@@ -102,6 +102,18 @@ impl PreservedEntry {
         self.compression_method
     }
 
+    /// The declared compressed payload size, with ZIP64 fields resolved by
+    /// the physical index. This excludes local headers and data descriptors.
+    pub fn compressed_size(&self) -> u64 {
+        self.wayfinder.compressed_size_hint()
+    }
+
+    /// The declared decoded payload size, with ZIP64 fields resolved by the
+    /// physical index. Indexing does not decode the payload or verify its CRC.
+    pub fn uncompressed_size(&self) -> u64 {
+        self.wayfinder.uncompressed_size_hint()
+    }
+
     /// The exact raw member-name bytes from this entry's central-directory
     /// record. These bytes are not normalized or decoded as UTF-8.
     pub fn raw_name_bytes(&self) -> &[u8] {
@@ -266,9 +278,10 @@ impl PreservationPlan {
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PreservationPolicy {
-    /// Preserve ZIP32 framing only. This is the public/default contract.
+    /// Preserve ZIP32 framing only. This remains an internal refusal policy;
+    /// public constructors use [`Self::AllowZip64`].
     Zip32Only,
-    /// Permit the internal ZIP64 framing-preservation foundation.
+    /// Permit validated ZIP64 framing and per-entry metadata to be retained.
     AllowZip64,
 }
 
@@ -290,15 +303,14 @@ where
     ///
     /// Multi-disk, prefixed, ambiguous, overlapping, and truncated layouts are
     /// rejected with [`ErrorKind::UnsupportedPreservation`] before a caller
-    /// can begin writing a plan. ZIP64 sources are rejected by this
-    /// public/default constructor until a higher-level integration opts into
-    /// the internal ZIP64 preservation foundation.
+    /// can begin writing a plan. ZIP64 framing is retained when the source
+    /// passes the same single-disk and field-resolution checks as ZIP32.
     pub fn new(archive: &'source ZipArchive<R>, buffer: &mut [u8]) -> Result<Self, Error> {
         Self::new_with_limits_and_policy(
             archive,
             buffer,
             ArchiveLimits::default(),
-            PreservationPolicy::Zip32Only,
+            PreservationPolicy::AllowZip64,
         )
     }
 
@@ -311,21 +323,20 @@ where
     /// budget. `max_metadata_bytes` covers the aggregate variable central
     /// metadata, ZIP64 extensible data, and EOCD comment. Limits are validated
     /// in a metadata-only pass before any owned entry or raw-record buffers are
-    /// reserved. ZIP64 sources remain refused by this public constructor; the
-    /// internal [`PreservationPolicy::AllowZip64`] policy is intentionally not
-    /// used by OPC yet.
+    /// reserved. ZIP64 framing and extensible tail data are retained when the
+    /// source passes the same structural checks as ZIP32.
     pub fn new_with_limits(
         archive: &'source ZipArchive<R>,
         buffer: &mut [u8],
         limits: ArchiveLimits,
     ) -> Result<Self, Error> {
-        Self::new_with_limits_and_policy(archive, buffer, limits, PreservationPolicy::Zip32Only)
+        Self::new_with_limits_and_policy(archive, buffer, limits, PreservationPolicy::AllowZip64)
     }
 
     /// Builds the internal ZIP64 preservation foundation under explicit
-    /// archive metadata limits. OPC currently deliberately does not call this
-    /// constructor; it is kept crate-private while the integration contract
-    /// remains refusal for mutated ZIP64 sources.
+    /// archive metadata limits. The public constructors use the same policy;
+    /// this entry point remains available to crate-internal tests that need to
+    /// exercise the narrower ZIP32 policy explicitly.
     #[allow(dead_code)]
     pub(crate) fn new_with_policy(
         archive: &'source ZipArchive<R>,
@@ -430,10 +441,7 @@ where
         }
 
         let entry_count_hint = archive.entries_hint();
-        let max_files_u64 = match u64::try_from(limits.max_files) {
-            Ok(value) => value,
-            Err(_) => u64::MAX,
-        };
+        let max_files_u64 = u64::try_from(limits.max_files).unwrap_or(u64::MAX);
         let central_metadata_budget = limits
             .max_metadata_bytes
             .checked_sub(metadata_prefix_u64)
@@ -687,13 +695,13 @@ where
                 accounting,
             )?;
         }
-        for index in self.entries.len()..prepared.len() {
-            if prepared[index].omitted {
+        for entry in prepared.iter().skip(self.entries.len()) {
+            if entry.omitted {
                 continue;
             }
             write_prepared_local(
-                &prepared[index].local,
-                prepared[index].generated_payload.as_ref(),
+                &entry.local,
+                entry.generated_payload.as_ref(),
                 self.source,
                 &mut sink,
                 &mut copy_buffer,
@@ -1748,7 +1756,7 @@ fn map_metadata_limit_error(error: Error, metadata_prefix: u64, limits: ArchiveL
         ..
     } = error.kind()
     {
-        let actual = metadata_prefix.checked_add(*actual).unwrap_or(u64::MAX);
+        let actual = metadata_prefix.saturating_add(*actual);
         return limit_error(
             LimitResource::MetadataBytes,
             actual,
@@ -2508,7 +2516,7 @@ mod tests {
     }
 
     #[test]
-    fn default_policy_refuses_projected_zip64_descriptor_before_publication() {
+    fn public_policy_preserves_projected_zip64_descriptor_before_publication() {
         let payload = [
             crate::DataDescriptor::SIGNATURE.to_le_bytes().as_slice(),
             b"payload bytes".as_slice(),
@@ -2518,16 +2526,14 @@ mod tests {
             let data = zip64_descriptor_archive(&payload, signed);
             let (archive, mut buffer) = indexed(&data);
             assert!(!archive.is_zip64());
-            let sink = b"untouched".to_vec();
-            let error = match PreservationIndex::new(&archive, &mut buffer) {
-                Ok(_) => panic!("default policy must refuse projected ZIP64 entry"),
-                Err(error) => error,
-            };
-            assert!(matches!(
-                error.kind(),
-                ErrorKind::UnsupportedPreservation { .. }
-            ));
-            assert_eq!(sink, b"untouched");
+            let index = PreservationIndex::new(&archive, &mut buffer)
+                .expect("public policy preserves projected ZIP64 entries");
+            assert_eq!(
+                index
+                    .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                    .unwrap(),
+                data
+            );
         }
     }
 
@@ -3392,31 +3398,28 @@ mod tests {
     }
 
     #[test]
-    fn default_policy_refuses_zip64_while_internal_policy_preserves_it() {
+    fn public_policy_preserves_zip64_while_internal_zip32_policy_refuses_it() {
         let data = zip64_archive();
         let (archive, mut buffer) = indexed(&data);
-        let error = match PreservationIndex::new(&archive, &mut buffer) {
-            Ok(_) => panic!("public preservation must refuse ZIP64"),
-            Err(error) => error,
-        };
-        assert!(matches!(
-            error.kind(),
-            ErrorKind::UnsupportedPreservation { .. }
-        ));
-
-        let (archive, mut buffer) = indexed(&data);
-        let index = PreservationIndex::new_with_policy(
-            &archive,
-            &mut buffer,
-            PreservationPolicy::AllowZip64,
-        )
-        .unwrap();
+        let index = PreservationIndex::new(&archive, &mut buffer)
+            .expect("public preservation must accept validated ZIP64");
         assert_eq!(
             index
                 .write_to(&PreservationPlan::copy_all(&index), Vec::new())
                 .unwrap(),
             data
         );
+
+        let (archive, mut buffer) = indexed(&data);
+        let error = PreservationIndex::new_with_policy(
+            &archive,
+            &mut buffer,
+            PreservationPolicy::Zip32Only,
+        );
+        assert!(matches!(
+            error,
+            Err(error) if matches!(error.kind(), ErrorKind::UnsupportedPreservation { .. })
+        ));
     }
 
     #[test]

@@ -197,6 +197,7 @@ fn try_write_preserved<W: Write>(
     let Ok(archive) = soapberry_zip::ZipArchive::from_slice(source) else {
         return Ok(PreservationWrite::Fallback(writer));
     };
+    let source_uses_zip64 = archive.is_zip64();
     let archive = archive.into_zip_archive();
     let mut buffer = Vec::new();
     buffer
@@ -591,12 +592,14 @@ fn try_write_preserved<W: Write>(
         .and_then(|size| size.checked_add(regenerated_members.saturating_mul(64 * 1024)))
         .and_then(|size| size.checked_add(appended_bytes.saturating_mul(2)))
         .and_then(|size| size.checked_add(appended_members.saturating_mul(64 * 1024)));
-    if conservative_output_bound.is_none_or(|size| size > u64::from(u32::MAX))
-        || !output_entry_count_is_zip32_safe(
-            provenance.members.len(),
-            omitted_members,
-            appended_members,
-        )
+    if conservative_output_bound.is_none()
+        || (!source_uses_zip64
+            && (conservative_output_bound.is_some_and(|size| size > u64::from(u32::MAX))
+                || !output_entry_count_is_zip32_safe(
+                    provenance.members.len(),
+                    omitted_members,
+                    appended_members,
+                )))
     {
         return Ok(PreservationWrite::Fallback(writer));
     }
@@ -1484,6 +1487,28 @@ mod tests {
         bytes[ordinary_eocd + 8..ordinary_eocd + 12].fill(0xff);
         bytes[ordinary_eocd + 12..ordinary_eocd + 20].fill(0xff);
         bytes
+    }
+
+    fn add_zip64_tail_extension(mut bytes: Vec<u8>, extension: &[u8]) -> Vec<u8> {
+        let archive = soapberry_zip::ZipArchive::from_slice(&bytes).expect("parse ZIP64");
+        assert!(archive.is_zip64());
+        let head = archive.head_eocd_offset() as usize;
+        let old_size = u64::from_le_bytes(bytes[head + 4..head + 12].try_into().unwrap());
+        bytes.splice(head + 56..head + 56, extension.iter().copied());
+        bytes[head + 4..head + 12].copy_from_slice(
+            &old_size
+                .checked_add(extension.len() as u64)
+                .unwrap()
+                .to_le_bytes(),
+        );
+        bytes
+    }
+
+    fn zip64_tail_extensible_data(data: &[u8]) -> Vec<u8> {
+        let archive = soapberry_zip::ZipArchive::from_slice(data).expect("parse ZIP64");
+        let head = archive.head_eocd_offset() as usize;
+        let locator = archive.eocd_offset() as usize - 20;
+        data[head + 56..locator].to_vec()
     }
 
     fn promote_member_to_zip64_descriptor(mut bytes: Vec<u8>, membername: &str) -> Vec<u8> {
@@ -2487,65 +2512,122 @@ mod tests {
     }
 
     #[test]
-    fn zip64_source_refuses_normalization_after_mutation() {
-        let (source, first, _second) = two_part_source(b"ZIP64 fallback");
-        let source = promote_to_zip64(source);
+    fn zip64_source_targeted_save_preserves_untouched_records_and_tail() {
+        let (source, first, second) = two_part_source(b"ZIP64 targeted save");
+        let source = add_zip64_tail_extension(promote_to_zip64(source), &[0xa1, 0xb2, 0xc3, 0xd4]);
+        let source_raw = raw_archive(&source);
         assert!(
             soapberry_zip::ZipArchive::from_slice(&source)
                 .unwrap()
                 .is_zip64()
         );
         let mut package = OpcPackage::from_vec(source.clone()).expect("open ZIP64 OPC");
+        let untouched_second = package.get_part(&second).unwrap().blob().to_vec();
         assert_eq!(PackageWriter::to_bytes(&package).unwrap(), source);
         package
             .get_part_mut(&first)
             .unwrap()
             .set_blob(b"ZIP64 changed".to_vec());
 
-        assert!(matches!(
-            PackageWriter::to_bytes(&package),
-            Err(crate::OpcError::PreservationUnavailable { .. })
-        ));
+        let output = PackageWriter::to_bytes(&package).expect("targeted ZIP64 save");
+        let output_archive = soapberry_zip::ZipArchive::from_slice(&output).unwrap();
+        assert!(output_archive.is_zip64());
+        assert_eq!(
+            zip64_tail_extensible_data(&output),
+            [0xa1, 0xb2, 0xc3, 0xd4]
+        );
+        assert_eq!(output_archive.comment().as_bytes(), b"ZIP64 targeted save");
+
+        let output_raw = raw_archive(&output);
+        assert_eq!(
+            output_raw.local_members[second.membername()],
+            source_raw.local_members[second.membername()]
+        );
+        assert_eq!(
+            central_without_local_offset(&output_raw.central_records[second.membername()]),
+            central_without_local_offset(&source_raw.central_records[second.membername()])
+        );
+        let reopened = OpcPackage::from_bytes(&output).expect("reopen targeted ZIP64 save");
+        assert_eq!(reopened.get_part(&first).unwrap().blob(), b"ZIP64 changed");
+        assert_eq!(reopened.get_part(&second).unwrap().blob(), untouched_second);
 
         let mut output = Vec::new();
-        let error = PackageWriter::write_to_stream(&mut output, &package)
-            .expect_err("default OPC ZIP64 preservation must refuse before output");
-        assert!(matches!(
-            error,
-            crate::OpcError::PreservationUnavailable { .. }
-        ));
-        assert!(output.is_empty());
+        PackageWriter::write_to_stream(&mut output, &package).expect("targeted ZIP64 stream save");
+        assert_eq!(output, PackageWriter::to_bytes(&package).unwrap());
     }
 
     #[test]
-    fn projected_zip64_descriptor_source_refuses_normalization_before_output() {
-        let (source, first, _second) = two_part_source(b"projected ZIP64 fallback");
-        let source = promote_member_to_zip64_descriptor(source, first.membername());
+    fn zip64_targeted_stream_failure_reports_partial_output() {
+        let (source, first, _second) = two_part_source(b"ZIP64 sink failure");
+        let source = promote_to_zip64(source);
+        let mut package = OpcPackage::from_vec(source).expect("open ZIP64 sink source");
+        package
+            .get_part_mut(&first)
+            .unwrap()
+            .set_blob(b"ZIP64 changed before sink failure".to_vec());
+
+        let error = PackageWriter::write_to_stream(
+            FailAfter {
+                written: 0,
+                limit: 70_000,
+            },
+            &package,
+        )
+        .expect_err("ZIP64 sink must reject targeted output");
+        assert!(matches!(
+            error,
+            crate::OpcError::IncompleteOutput { written, .. } if written == 70_000
+        ));
+    }
+
+    #[test]
+    fn projected_zip64_descriptor_targeted_save_preserves_untouched_member() {
+        let (source, first, second) = two_part_source(b"projected ZIP64 targeted save");
+        let source = promote_member_to_zip64_descriptor(source, second.membername());
+        let source_raw = raw_archive(&source);
         let archive = soapberry_zip::ZipArchive::from_slice(&source).expect("open projected ZIP64");
         assert!(!archive.is_zip64());
         assert!(archive.entries().any(|entry| {
             let entry = entry.expect("central entry");
-            entry.file_path().as_ref() == first.membername().as_bytes() && entry.is_zip64()
+            entry.file_path().as_ref() == second.membername().as_bytes() && entry.is_zip64()
         }));
 
         let mut package = OpcPackage::from_vec(source).expect("open projected ZIP64 OPC");
+        let untouched_second = package.get_part(&second).unwrap().blob().to_vec();
         package
             .get_part_mut(&first)
             .expect("first part")
             .set_blob(b"projected ZIP64 changed".to_vec());
 
-        assert!(matches!(
-            PackageWriter::to_bytes(&package),
-            Err(crate::OpcError::PreservationUnavailable { .. })
-        ));
-        let mut output = Vec::new();
-        let error = PackageWriter::write_to_stream(&mut output, &package)
-            .expect_err("projected ZIP64 preservation must refuse before output");
-        assert!(matches!(
-            error,
-            crate::OpcError::PreservationUnavailable { .. }
-        ));
-        assert!(output.is_empty());
+        let output = PackageWriter::to_bytes(&package).expect("targeted projected ZIP64 save");
+        let output_raw = raw_archive(&output);
+        assert_eq!(
+            output_raw.local_members[second.membername()],
+            source_raw.local_members[second.membername()]
+        );
+        assert_eq!(
+            central_without_local_offset(&output_raw.central_records[second.membername()]),
+            central_without_local_offset(&source_raw.central_records[second.membername()])
+        );
+        let output_archive = soapberry_zip::ZipArchive::from_slice(&output).unwrap();
+        assert!(output_archive.entries().any(|entry| {
+            let entry = entry.expect("central entry");
+            entry.file_path().as_ref() == second.membername().as_bytes() && entry.is_zip64()
+        }));
+        let reopened = OpcPackage::from_bytes(&output).expect("reopen projected ZIP64 save");
+        assert_eq!(
+            reopened.get_part(&first).expect("changed part").blob(),
+            b"projected ZIP64 changed"
+        );
+        assert_eq!(
+            reopened.get_part(&second).expect("untouched part").blob(),
+            untouched_second
+        );
+
+        let mut streamed = Vec::new();
+        PackageWriter::write_to_stream(&mut streamed, &package)
+            .expect("targeted projected ZIP64 stream save");
+        assert_eq!(streamed, output);
     }
 
     #[test]

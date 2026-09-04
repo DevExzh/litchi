@@ -1020,12 +1020,10 @@ fn validate_preserved_member_framing(
             .and_then(|offset| offset.checked_add(local_name_len.unwrap_or(u64::MAX)))
             .and_then(|offset| offset.checked_add(local_extra_len.unwrap_or(u64::MAX)))
             .ok_or_else(|| unsupported("local ZIP payload range overflow"))?;
-        let compressed_size = le_u32(&central, 20)
-            .map(u64::from)
-            .ok_or_else(|| unsupported("truncated central ZIP compressed-size field"))?;
-        let uncompressed_size = le_u32(&central, 24)
-            .map(u64::from)
-            .ok_or_else(|| unsupported("truncated central ZIP uncompressed-size field"))?;
+        // The physical owner has resolved ZIP64 sentinel fields and checked
+        // their provenance. Fixed central fields alone are not payload sizes.
+        let compressed_size = entry.compressed_size();
+        let uncompressed_size = entry.uncompressed_size();
         let payload_end = payload_start
             .checked_add(compressed_size)
             .ok_or_else(|| unsupported("local ZIP payload range overflow"))?;
