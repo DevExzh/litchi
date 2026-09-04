@@ -617,6 +617,24 @@ fn validate_reader_entry_layout<R: ReaderAt>(
     central_name: &[u8],
     central_directory_offset: u64,
 ) -> Result<StrictEntryLayout, Error> {
+    let (layout, local_name_mismatch) = validate_reader_entry_layout_with_name_policy(
+        reader,
+        entry,
+        central_name,
+        central_directory_offset,
+        false,
+    )?;
+    debug_assert!(!local_name_mismatch);
+    Ok(layout)
+}
+
+fn validate_reader_entry_layout_with_name_policy<R: ReaderAt>(
+    reader: &R,
+    entry: &ZipArchiveEntryWayfinder,
+    central_name: &[u8],
+    central_directory_offset: u64,
+    allow_name_mismatch: bool,
+) -> Result<(StrictEntryLayout, bool), Error> {
     validate_borrowed_wayfinder_metadata(entry)?;
     if entry.local_header_offset > central_directory_offset {
         return Err(Error::from(ErrorKind::Eof));
@@ -670,7 +688,8 @@ fn validate_reader_entry_layout<R: ReaderAt>(
     let local_name = variable_data
         .get(..file_name_len)
         .ok_or_else(|| Error::from(ErrorKind::Eof))?;
-    if local_name != central_name {
+    let local_name_mismatch = local_name != central_name;
+    if local_name_mismatch && !allow_name_mismatch {
         return Err(Error::from(ErrorKind::InvalidInput {
             msg: "strict local and central names differ".to_string(),
         }));
@@ -740,16 +759,19 @@ fn validate_reader_entry_layout<R: ReaderAt>(
         return Err(Error::from(ErrorKind::Eof));
     }
 
-    Ok(StrictEntryLayout {
-        local_header_offset: entry.local_header_offset,
-        data_start_offset,
-        data_end_offset,
-        span_end,
-        verifier: ZipVerification {
-            crc: entry.crc,
-            uncompressed_size: entry.uncompressed_size,
+    Ok((
+        StrictEntryLayout {
+            local_header_offset: entry.local_header_offset,
+            data_start_offset,
+            data_end_offset,
+            span_end,
+            verifier: ZipVerification {
+                crc: entry.crc,
+                uncompressed_size: entry.uncompressed_size,
+            },
         },
-    })
+        local_name_mismatch,
+    ))
 }
 
 fn validate_borrowed_wayfinder(entry: &ZipArchiveEntryWayfinder) -> Result<(), Error> {
@@ -1417,6 +1439,27 @@ where
             &entry,
             central_name,
             self.eocd.directory_offset(),
+        )
+    }
+
+    /// Validate one source entry for raw preservation.
+    ///
+    /// Raw preservation intentionally retains the historical ability to copy
+    /// a member whose local and central names differ when the caller does not
+    /// regenerate or append members.  All other strict local-header, ZIP64
+    /// size, and data-descriptor checks are shared with the trusted reader
+    /// path.  The returned boolean reports that name mismatch.
+    pub(crate) fn validate_preservation_entry_layout(
+        &self,
+        entry: ZipArchiveEntryWayfinder,
+        central_name: &[u8],
+    ) -> Result<(StrictEntryLayout, bool), Error> {
+        validate_reader_entry_layout_with_name_policy(
+            &self.reader,
+            &entry,
+            central_name,
+            self.eocd.directory_offset(),
+            true,
         )
     }
 

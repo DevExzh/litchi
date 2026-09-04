@@ -2402,6 +2402,15 @@ mod tests {
             PackageWriter::to_bytes(&package),
             Err(crate::OpcError::PreservationUnavailable { .. })
         ));
+
+        let mut output = Vec::new();
+        let error = PackageWriter::write_to_stream(&mut output, &package)
+            .expect_err("default OPC ZIP64 preservation must refuse before output");
+        assert!(matches!(
+            error,
+            crate::OpcError::PreservationUnavailable { .. }
+        ));
+        assert!(output.is_empty());
     }
 
     #[test]
