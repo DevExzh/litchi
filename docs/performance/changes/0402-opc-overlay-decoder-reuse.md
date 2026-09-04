@@ -139,9 +139,14 @@ temperature. The global `["warm", "cold-requested"]` setting does not turn
 the in-process normal samples into cold evidence, and no fresh-child claim is
 made. No general OPC/OOXML, managed, eager, mutable, changed-payload,
 other-overlay-mode, real-producer, or iWork claim follows. The partial
-publication matrix is not entered into `claim-registry-v1.json`: that
-registry cannot represent this custom `publication_ns` scope and its partial
-accepted/adverse-cell adjudication without overstating the result.
+publication matrix remains intentionally absent from `claim-registry-v1.json`:
+the v1 extension now supports the closed custom `publication_ns` scope and
+partial accepted/adverse-cell adjudication, but this change adds no 0402
+registry claim entry. Allocator vectors remain outside the registry boundary
+and are validated by `tools/validate_opc_overlay_allocator_abba.py`; the full
+self-excluding inventory remains outside it and is checked through the
+retained `evidence-manifest.json` hashes and documented bundle
+integrity/audit checks.
 
 ## Reproduction and artifacts
 

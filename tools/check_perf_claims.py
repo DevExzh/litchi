@@ -3,6 +3,8 @@
 
 The registry is deliberately small and boring: it records the production
 decision separately from the evidence that informed that decision.  The
+JSON schema describes the structural shape; this checker owns cross-field
+policy such as count/disjointness and status/code_state consistency.  The
 structural mode is suitable for normal CI and does not require the retained
 external evidence packages.  Strict mode additionally opens an evidence root,
 recomputes the package/member hashes, and checks the ABBA summary and optional
@@ -35,6 +37,36 @@ REVISION_RE = re.compile(r"[0-9a-f]{40}\Z")
 STATISTICS = ("p50", "mean", "p95", "p99")
 ABBA_ROLES = ("a1", "b1", "b2", "a2")
 ABBA_ORDER = ("a1_control", "b1_candidate", "b2_candidate", "a2_control")
+REPORT_PROFILES = frozenset(("legacy-v1", "current-v1"))
+
+# Claim-registry v1 originally had one implicit metric: the generic ABBA
+# ``elapsed_ns`` field.  Keep that default implicit for every existing entry,
+# while allowing a later entry to bind a different, audited metric profile.
+# The profile id is intentionally a small closed set.  A profile is not a
+# user-defined JSON path: strict verification must know which summary tool and
+# raw-report projection establish the metric before accepting a claim.
+_METRIC_PROFILE_SPECS: dict[str, dict[str, Any]] = {
+    "elapsed_ns": {
+        "metric": "elapsed_ns",
+        "summary_key": "elapsed_ns",
+        "report_path": ("elapsed_ns",),
+        "summary_tool": "litchi-perf-abba-summary",
+        "report_profiles": REPORT_PROFILES,
+        "adverse_key": "adverse_both_statistics",
+        "custom_package": False,
+    },
+    "publication_ns": {
+        "metric": "source.opc_source_overlay.publication_ns",
+        "summary_key": "publication_ns",
+        "report_path": ("source", "opc_source_overlay", "publication_ns"),
+        "summary_tool": "litchi-opc-overlay-abba-summary",
+        "report_profiles": frozenset(("current-v1",)),
+        # The publication summary currently emits accepted/rejected decisions;
+        # there is no separate adverse-both list for this profile.
+        "adverse_key": None,
+        "custom_package": True,
+    },
+}
 RESOURCE_LEGS = ("A1", "B1", "B2", "A2")
 RESOURCE_PAIRS = ("A1_control_to_B1_candidate", "A2_control_to_B2_candidate")
 RESOURCE_VARIANTS = {
@@ -336,6 +368,31 @@ def _check_string_list(value: Any, location: str, *, allow_empty: bool = False) 
     return result
 
 
+def _resolve_metric_profile(value: dict[str, Any], location: str) -> dict[str, Any]:
+    """Resolve the closed metric/profile vocabulary used by a claim.
+
+    Older registry entries omit the field and therefore retain the implicit
+    generic elapsed-ns profile.  New entries must select one exact profile;
+    profile data is kept in this checker so an arbitrary metric/path cannot be
+    smuggled into a strict claim.
+    """
+    profile_raw = value.get("metric_profile", _MISSING)
+    if profile_raw is _MISSING:
+        profile_id = "elapsed_ns"
+        explicit = False
+    else:
+        if not isinstance(profile_raw, str) or profile_raw not in _METRIC_PROFILE_SPECS:
+            raise ClaimInputError(
+                f"{location}.metric_profile is unsupported: {profile_raw!r}"
+            )
+        profile_id = profile_raw
+        explicit = True
+    spec = dict(_METRIC_PROFILE_SPECS[profile_id])
+    spec["id"] = profile_id
+    spec["explicit"] = explicit
+    return spec
+
+
 def _validate_policy(registry: dict[str, Any]) -> dict[str, dict[str, Any]]:
     policies = _require_object(registry.get("policies"), "registry.policies")
     if set(policies) != {"latency-abba-v1", "resource-guardrail-v1"}:
@@ -460,7 +517,18 @@ def _validate_claim(claim: Any, location: str, evidence_by_id: dict[str, dict[st
     value = _require_object(claim, location)
     _require_keys(
         value,
-        {"id", "change_id", "claim_class", "status", "code_state", "reason_codes", "scope", "latency_evidence", "resource_guardrail", "documentation"},
+        {
+            "id",
+            "change_id",
+            "claim_class",
+            "status",
+            "code_state",
+            "reason_codes",
+            "scope",
+            "latency_evidence",
+            "resource_guardrail",
+            "documentation",
+        },
         {"id", "change_id", "claim_class", "status", "code_state", "reason_codes", "scope", "latency_evidence", "documentation"},
         location,
     )
@@ -480,10 +548,19 @@ def _validate_claim(claim: Any, location: str, evidence_by_id: dict[str, dict[st
     latency = _require_object(value["latency_evidence"], f"{location}.latency_evidence")
     _require_keys(
         latency,
-        {"evidence_id", "allowed_statistics", "accepted_cells", "adverse_both_cells", "accepted_statistics"},
+        {
+            "evidence_id",
+            "allowed_statistics",
+            "accepted_cells",
+            "adverse_both_cells",
+            "accepted_statistics",
+            "adverse_both_statistics",
+            "metric_profile",
+        },
         {"evidence_id", "allowed_statistics", "accepted_cells", "adverse_both_cells"},
         f"{location}.latency_evidence",
     )
+    nested_profile = _resolve_metric_profile(latency, f"{location}.latency_evidence")
     evidence_id = _require_string(latency["evidence_id"], f"{location}.latency_evidence.evidence_id")
     evidence = evidence_by_id.get(evidence_id)
     if evidence is None or evidence.get("kind") != "abba_package":
@@ -494,8 +571,36 @@ def _validate_claim(claim: Any, location: str, evidence_by_id: dict[str, dict[st
     accepted_count = _require_int(latency["accepted_cells"], f"{location}.latency_evidence.accepted_cells")
     adverse_count = _require_int(latency["adverse_both_cells"], f"{location}.latency_evidence.adverse_both_cells")
     cells = _validate_cells(latency.get("accepted_statistics", []), f"{location}.latency_evidence.accepted_statistics")
+    adverse = _validate_cells(
+        latency.get("adverse_both_statistics", []),
+        f"{location}.latency_evidence.adverse_both_statistics",
+    )
     if len(cells) != accepted_count:
         raise ClaimPolicyError(f"{location}.latency_evidence.accepted_cells does not match accepted_statistics")
+    if "adverse_both_statistics" in latency and len(adverse) != adverse_count:
+        raise ClaimPolicyError(
+            f"{location}.latency_evidence.adverse_both_cells does not match adverse_both_statistics"
+        )
+    if (
+        nested_profile["explicit"]
+        and "adverse_both_statistics" not in latency
+        and adverse_count != 0
+    ):
+        raise ClaimPolicyError(
+            f"{location}.latency_evidence explicit metric profile requires adverse_both_statistics"
+        )
+    accepted_set = {(item["case"], item["corpus"], item["statistic"]) for item in cells}
+    adverse_set = {(item["case"], item["corpus"], item["statistic"]) for item in adverse}
+    if accepted_set & adverse_set:
+        raise ClaimPolicyError(
+            f"{location}.latency_evidence accepted/adverse cell sets overlap"
+        )
+    allowed_set = set(allowed_stats)
+    for cell in cells + adverse:
+        if cell["statistic"] not in allowed_set:
+            raise ClaimPolicyError(
+                f"{location}.latency_evidence cell statistic is outside allowed_statistics"
+            )
     docs = _check_string_list(value["documentation"], f"{location}.documentation")
     for index, path in enumerate(docs):
         _validate_relative_path(path, f"{location}.documentation[{index}]")
@@ -520,9 +625,28 @@ def _validate_claim(claim: Any, location: str, evidence_by_id: dict[str, dict[st
     elif status == "landed":
         # A latency-only landed claim is valid; no resource requirement is implied.
         pass
+    # Before this additive extension a landed claim could only be represented
+    # when every reported cell was accepted.  A landed claim may now retain
+    # adverse-both cells, but only when those cells are explicitly declared;
+    # this prevents a legacy count from being silently reinterpreted as a
+    # partial claim.
+    if status == "landed" and adverse_count and not (
+        "adverse_both_statistics" in latency
+    ):
+        raise ClaimInputError(
+            f"{location} landed claim with adverse cells must declare their cell set"
+        )
     if status == "landed" and not cells:
         raise ClaimPolicyError(f"{location} landed claim has no accepted latency cells")
-    return {"value": value, "scope": scope, "latency": latency, "accepted_cells": cells, "resource": resource}
+    return {
+        "value": value,
+        "scope": scope,
+        "latency": latency,
+        "accepted_cells": cells,
+        "adverse_cells": adverse,
+        "resource": resource,
+        "metric_profile": nested_profile["id"],
+    }
 
 
 def validate_registry(registry: Any, *, repo_root: Path) -> tuple[dict[str, Any], dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
@@ -629,8 +753,35 @@ def _decompress_json(
     return extracted, digest.hexdigest(), size
 
 
-def _canonical_summary_cells(summary: dict[str, Any], *, location: str) -> tuple[set[tuple[str, str, str]], set[tuple[str, str, str]]]:
-    """Extract claim cells from a canonical summary."""
+def _claim_metric_profile(claim: dict[str, Any]) -> dict[str, Any]:
+    """Resolve the closed profile from public claim fields for strict checks.
+
+    Strict verification receives dictionaries from callers, so internal
+    convenience fields such as ``_metric_spec`` are deliberately ignored.
+    Re-resolving here prevents a caller from selecting a verifier by injecting
+    a precomputed profile object.
+    """
+
+    latency = claim.get("latency")
+    if not isinstance(latency, dict):
+        latency = claim.get("latency_evidence")
+    return _resolve_metric_profile(
+        latency if isinstance(latency, dict) else {},
+        f"claim {claim.get('id', '<unknown>')}.latency_evidence",
+    )
+
+
+def _canonical_summary_cells(
+    summary: dict[str, Any],
+    *,
+    location: str,
+    metric_profile: dict[str, Any] | None = None,
+) -> tuple[set[tuple[str, str, str]], set[tuple[str, str, str]]]:
+    """Extract accepted/adverse cells from a canonical summary profile."""
+
+    profile = metric_profile or _METRIC_PROFILE_SPECS["elapsed_ns"]
+    metric_key = profile["summary_key"]
+    adverse_key = profile["adverse_key"]
 
     accepted: set[tuple[str, str, str]] = set()
     adverse: set[tuple[str, str, str]] = set()
@@ -640,19 +791,22 @@ def _canonical_summary_cells(summary: dict[str, Any], *, location: str) -> tuple
         case = _require_string(result_object.get("case"), f"{result_location}.case")
         corpus = _require_object(result_object.get("corpus"), f"{result_location}.corpus")
         corpus_name = _require_string(corpus.get("name"), f"{result_location}.corpus.name")
-        elapsed = _require_object(result_object.get("elapsed_ns"), f"{result_location}.elapsed_ns")
+        metric = _require_object(result_object.get(metric_key), f"{result_location}.{metric_key}")
         for statistic in _check_string_list(
-            elapsed.get("accepted_statistics"),
-            f"{result_location}.elapsed_ns.accepted_statistics",
+            metric.get("accepted_statistics"),
+            f"{result_location}.{metric_key}.accepted_statistics",
             allow_empty=True,
         ):
             accepted.add((case, corpus_name, statistic))
-        for statistic in _check_string_list(
-            elapsed.get("adverse_both_statistics"),
-            f"{result_location}.elapsed_ns.adverse_both_statistics",
-            allow_empty=True,
-        ):
-            adverse.add((case, corpus_name, statistic))
+        if adverse_key is not None:
+            for statistic in _check_string_list(
+                metric.get(adverse_key),
+                f"{result_location}.{metric_key}.{adverse_key}",
+                allow_empty=True,
+            ):
+                adverse.add((case, corpus_name, statistic))
+    if accepted & adverse:
+        raise ClaimInputError(f"{location} contains an accepted/adverse cell overlap")
     return accepted, adverse
 
 
@@ -747,7 +901,13 @@ def _identity_statuses(summary: dict[str, Any], result_count: int) -> None:
             )
 
 
-def _summary_cells(summary: dict[str, Any]) -> tuple[dict[tuple[str, str, str], dict[str, Any]], set[tuple[str, str, str]]]:
+def _summary_cells(
+    summary: dict[str, Any],
+    metric_profile: dict[str, Any] | None = None,
+) -> tuple[dict[tuple[str, str, str], dict[str, Any]], set[tuple[str, str, str]]]:
+    profile = metric_profile or _METRIC_PROFILE_SPECS["elapsed_ns"]
+    metric_key = profile["summary_key"]
+    adverse_key = profile["adverse_key"]
     rows: dict[tuple[str, str, str], dict[str, Any]] = {}
     accepted: set[tuple[str, str, str]] = set()
     adverse: set[tuple[str, str, str]] = set()
@@ -756,16 +916,20 @@ def _summary_cells(summary: dict[str, Any]) -> tuple[dict[tuple[str, str, str], 
         case = _require_string(result.get("case"), f"summary.results[{index}].case")
         corpus = _require_object(result.get("corpus"), f"summary.results[{index}].corpus")
         name = _require_string(corpus.get("name"), f"summary.results[{index}].corpus.name")
-        elapsed = _require_object(result.get("elapsed_ns"), f"summary.results[{index}].elapsed_ns")
-        for key in ("accepted_statistics", "adverse_both_statistics"):
-            stats = _require_list(elapsed.get(key), f"summary.results[{index}].elapsed_ns.{key}")
+        metric = _require_object(result.get(metric_key), f"summary.results[{index}].{metric_key}")
+        keys = ("accepted_statistics",) + ((adverse_key,) if adverse_key is not None else ())
+        for key in keys:
+            stats = _require_list(metric.get(key), f"summary.results[{index}].{metric_key}.{key}")
             for stat_index, stat in enumerate(stats):
                 if stat not in STATISTICS:
-                    raise ClaimInputError(f"summary.results[{index}].elapsed_ns.{key}[{stat_index}] is invalid")
+                    raise ClaimInputError(f"summary.results[{index}].{metric_key}.{key}[{stat_index}] is invalid")
                 cell = (case, name, stat)
                 target = accepted if key == "accepted_statistics" else adverse
                 if cell in target:
                     raise ClaimInputError(f"summary contains duplicate {key} cell {cell!r}")
+                other = adverse if key == "accepted_statistics" else accepted
+                if cell in other:
+                    raise ClaimInputError(f"summary contains an accepted/adverse overlap {cell!r}")
                 target.add(cell)
         row_key = (case, name, "")
         if row_key in rows:
@@ -785,7 +949,8 @@ def _verify_scope_and_cells(
     if package_change_id != claim["change_id"]:
         raise ClaimPolicyError(f"claim {claim['id']!r} change_id does not match its package")
     scope = claim["scope"]
-    rows, combined = _summary_cells(summary)
+    metric_profile = _claim_metric_profile(claim)
+    rows, combined = _summary_cells(summary, metric_profile)
     summary_accepted = {cell for cell in combined if not cell[2].startswith("!adverse:")}
     summary_adverse = {
         (case, corpus, stat[9:])
@@ -826,14 +991,335 @@ def _verify_scope_and_cells(
         missing = sorted(accepted - declared)
         extra = sorted(declared - accepted)
         raise ClaimPolicyError(f"claim {claim['id']!r} accepted cell set differs (missing={missing!r}, extra={extra!r})")
+    declared_adverse = {
+        (item["case"], item["corpus"], item["statistic"])
+        for item in claim.get("adverse_cells", [])
+    }
+    if declared_adverse != adverse and (
+        metric_profile["explicit"] or "adverse_both_statistics" in claim["latency"]
+    ):
+        missing = sorted(adverse - declared_adverse)
+        extra = sorted(declared_adverse - adverse)
+        raise ClaimPolicyError(
+            f"claim {claim['id']!r} adverse cell set differs (missing={missing!r}, extra={extra!r})"
+        )
     allowed = set(latency["allowed_statistics"])
     if not accepted <= {(case, corpus, stat) for case, corpus, stat in accepted if stat in allowed}:
         raise ClaimPolicyError(f"claim {claim['id']!r} lists a statistic outside allowed_statistics")
+    if not adverse <= {(case, corpus, stat) for case, corpus, stat in adverse if stat in allowed}:
+        raise ClaimPolicyError(f"claim {claim['id']!r} adverse statistic is outside allowed_statistics")
     if accepted & adverse:
         raise ClaimPolicyError(f"claim {claim['id']!r} claims an adverse-both cell")
-    if claim["status"] == "landed" and adverse:
+    if (
+        claim["status"] == "landed"
+        and adverse
+        and not metric_profile["explicit"]
+        and "adverse_both_statistics" not in claim["latency"]
+    ):
         raise ClaimPolicyError(f"landed claim {claim['id']!r} has adverse-both cells")
     _ = policy
+
+
+def _verify_publication_package(
+    evidence: dict[str, Any],
+    claim: dict[str, Any],
+    *,
+    package_dir: Path,
+    manifest_path: Path,
+    manifest: dict[str, Any],
+    policy: dict[str, Any],
+) -> dict[str, Any]:
+    """Verify the closed ``publication_ns`` package profile.
+
+    Change 0402 uses a deliberately separate summary producer and manifest
+    envelope.  Keep that shape behind the one registry profile id instead of
+    making the registry carry arbitrary tool names, paths, or JSON selectors.
+    Only the four normal reports are claim inputs: they are independently
+    decompressed, hashed, and recomputed by the authoritative summary module.
+    The package's allocator artifacts and full self-excluding evidence
+    inventory remain outside this registry checker. Allocator vectors are
+    validated by ``tools/validate_opc_overlay_allocator_abba.py``; full
+    inventory identity is checked through the retained
+    ``evidence-manifest.json`` hashes and documented bundle integrity/audit
+    checks.
+    """
+
+    evidence_id = evidence["id"]
+    expected_manifest_keys = {
+        "allocator_reports",
+        "artifacts",
+        "change",
+        "change_id",
+        "compression",
+        "manifest_kind",
+        "manifest_path",
+        "normal_reports",
+        "schema_version",
+        "self_excluded",
+        "summary",
+        "summary_identity",
+        "validator_bindings",
+    }
+    _require_keys(
+        manifest,
+        expected_manifest_keys,
+        expected_manifest_keys,
+        f"{evidence_id}.manifest",
+    )
+    if (
+        manifest.get("schema_version") != 1
+        or manifest.get("manifest_kind") != "litchi-opc-overlay-abba-artifacts"
+    ):
+        raise ClaimInputError(f"publication manifest {evidence_id} has unsupported schema")
+    if manifest.get("manifest_path") != manifest_path.name:
+        raise ClaimInputError(f"publication manifest {evidence_id} manifest_path mismatch")
+    if manifest.get("change_id") != claim["change_id"] or manifest.get("change") != claim["change_id"]:
+        raise ClaimPolicyError(f"publication manifest {evidence_id} change id does not match claim")
+    if manifest.get("self_excluded") is not True:
+        raise ClaimInputError(f"publication manifest {evidence_id} is not self-excluding")
+
+    compression = _require_object(
+        manifest.get("compression"), f"{evidence_id}.manifest.compression"
+    )
+    if compression.get("format") != "zstd":
+        raise ClaimInputError(f"publication manifest {evidence_id} compression format is not zstd")
+    if compression.get("checksum") != "XXH64" or compression.get("content_size") is not True:
+        raise ClaimInputError(f"publication manifest {evidence_id} compression metadata is incomplete")
+    _require_int(compression.get("level"), f"{evidence_id}.manifest.compression.level", minimum=1)
+    _require_int(compression.get("threads"), f"{evidence_id}.manifest.compression.threads", minimum=1)
+
+    summary_meta = evidence["summary"]
+    summary_path = safe_path(
+        package_dir,
+        summary_meta["path"],
+        location=f"evidence.{evidence_id}.summary.path",
+        require_exists=True,
+    )
+    summary_raw_sha, summary_bytes = sha256_file(summary_path)
+    if summary_raw_sha != summary_meta["sha256"]:
+        raise ClaimInputError(f"summary hash mismatch for {evidence_id}")
+    if summary_bytes > _MAX_ABBA_SUMMARY_BYTES:
+        raise ClaimInputError(
+            f"publication summary {evidence_id} exceeds the byte ceiling ({_MAX_ABBA_SUMMARY_BYTES})"
+        )
+    summary = load_json(summary_path, location=str(summary_path))
+    summary_object = _require_object(summary, f"{evidence_id}.summary")
+    expected_summary_keys = {
+        "environment",
+        "harness_identity",
+        "implementation_identity",
+        "protocol",
+        "report_identity",
+        "results",
+        "schema_version",
+        "tool",
+        "verification",
+    }
+    _require_keys(
+        summary_object,
+        expected_summary_keys,
+        expected_summary_keys,
+        f"{evidence_id}.summary",
+    )
+    if summary_object.get("schema_version") != 1:
+        raise ClaimInputError(f"publication summary {evidence_id} schema must be version 1")
+    canonical_sha = canonical_sha256(summary_object)
+    if canonical_sha != summary_meta["canonical_sha256"]:
+        raise ClaimInputError(f"summary canonical hash mismatch for {evidence_id}")
+
+    manifest_summary = _require_object(
+        manifest.get("summary"), f"{evidence_id}.manifest.summary"
+    )
+    summary_identity_keys = {
+        "bytes",
+        "canonical_bytes",
+        "canonical_sha256",
+        "path",
+        "report_identity",
+        "result_count",
+        "schema_version",
+        "sha256",
+        "tool",
+    }
+    _require_keys(
+        manifest_summary,
+        summary_identity_keys,
+        summary_identity_keys,
+        f"{evidence_id}.manifest.summary",
+    )
+    for key, expected in (
+        ("path", summary_meta["path"]),
+        ("sha256", summary_meta["sha256"]),
+        ("canonical_sha256", summary_meta["canonical_sha256"]),
+        ("schema_version", 1),
+    ):
+        if manifest_summary.get(key) != expected:
+            raise ClaimInputError(f"publication manifest {evidence_id} summary.{key} mismatch")
+    if manifest_summary.get("bytes") != summary_bytes:
+        raise ClaimInputError(f"publication manifest {evidence_id} summary byte count mismatch")
+    if manifest_summary.get("canonical_bytes") != canonical_size(summary_object):
+        raise ClaimInputError(f"publication manifest {evidence_id} summary canonical byte count mismatch")
+    if manifest.get("summary_identity") != manifest_summary:
+        raise ClaimInputError(f"publication manifest {evidence_id} summary identity mismatch")
+    if manifest_summary.get("tool") != {"name": "litchi-opc-overlay-abba-summary", "version": "0.1.0"}:
+        raise ClaimInputError(f"publication manifest {evidence_id} summary tool identity mismatch")
+    if summary_object.get("tool") != manifest_summary["tool"]:
+        raise ClaimInputError(f"publication summary {evidence_id} tool identity mismatch")
+
+    normal_reports = _require_list(
+        manifest.get("normal_reports"), f"{evidence_id}.manifest.normal_reports"
+    )
+    if len(normal_reports) != len(ABBA_ROLES):
+        raise ClaimInputError(f"publication manifest {evidence_id} must contain exactly four normal reports")
+    if [item.get("role") for item in normal_reports if isinstance(item, dict)] != list(ABBA_ROLES):
+        raise ClaimInputError(f"publication manifest {evidence_id} normal report roles mismatch")
+    # allocator_reports, artifacts, and validator_bindings are intentionally
+    # not opened here: this profile binds only normal latency evidence.
+
+    try:
+        from tools import perf_opc_overlay_abba_summary
+    except ImportError:  # pragma: no cover - direct script execution fallback
+        import perf_opc_overlay_abba_summary  # type: ignore[no-redef]
+
+    reports_by_role: dict[str, dict[str, Any]] = {}
+    report_canonical_hashes: dict[str, str] = {}
+    total_uncompressed_bytes = 0
+    expected_report_keys = {
+        "bytes",
+        "canonical_bytes",
+        "canonical_sha256",
+        "compression",
+        "path",
+        "profile",
+        "role",
+        "sha256",
+        "uncompressed_bytes",
+        "uncompressed_sha256",
+    }
+    for index, raw in enumerate(normal_reports):
+        item = _require_object(raw, f"{evidence_id}.manifest.normal_reports[{index}]")
+        _require_keys(
+            item,
+            expected_report_keys,
+            expected_report_keys,
+            f"{evidence_id}.manifest.normal_reports[{index}]",
+        )
+        role = item["role"]
+        if role not in ABBA_ROLES or role in reports_by_role:
+            raise ClaimInputError(f"publication manifest {evidence_id} has invalid/duplicate normal role")
+        if item["profile"] != "normal" or item["compression"] != "zstd":
+            raise ClaimInputError(f"publication artifact {evidence_id}/{role} identity is unsupported")
+        declared_uncompressed_bytes = _require_int(
+            item["uncompressed_bytes"],
+            f"publication artifact {role}.uncompressed_bytes",
+            minimum=0,
+        )
+        if declared_uncompressed_bytes > _MAX_ABBA_MEMBER_BYTES:
+            raise ClaimInputError(
+                f"publication artifact {evidence_id}/{role} exceeds the per-member decompressed-byte ceiling "
+                f"({_MAX_ABBA_MEMBER_BYTES})"
+            )
+        artifact_path = safe_path(
+            package_dir,
+            item["path"],
+            location=f"publication artifact {role}.path",
+            require_exists=True,
+        )
+        compressed_sha, compressed_bytes = sha256_file(artifact_path)
+        if compressed_sha != item["sha256"] or compressed_bytes != item["bytes"]:
+            raise ClaimInputError(f"publication artifact {evidence_id}/{role} compressed identity mismatch")
+        report, uncompressed_sha, uncompressed_bytes = _decompress_json(
+            artifact_path,
+            location=f"{evidence_id}/{role}",
+            max_bytes=_MAX_ABBA_MEMBER_BYTES,
+        )
+        if uncompressed_sha != item["uncompressed_sha256"] or uncompressed_bytes != item["uncompressed_bytes"]:
+            raise ClaimInputError(f"publication artifact {evidence_id}/{role} uncompressed identity mismatch")
+        total_uncompressed_bytes += uncompressed_bytes
+        if total_uncompressed_bytes > _MAX_ABBA_DECOMPRESSED_BYTES:
+            raise ClaimInputError(
+                f"publication evidence {evidence_id} exceeds the strict decompressed-byte ceiling "
+                f"({_MAX_ABBA_DECOMPRESSED_BYTES})"
+            )
+        report_object = _require_object(report, f"{evidence_id}/{role}")
+        report_canonical = canonical_sha256(report_object)
+        if report_canonical != item["canonical_sha256"]:
+            raise ClaimInputError(f"publication artifact {evidence_id}/{role} canonical identity mismatch")
+        if canonical_size(report_object) != item["canonical_bytes"]:
+            raise ClaimInputError(f"publication artifact {evidence_id}/{role} canonical byte count mismatch")
+        reports_by_role[role] = report_object
+        report_canonical_hashes[role] = report_canonical
+    if set(reports_by_role) != set(ABBA_ROLES):
+        raise ClaimInputError(f"publication evidence {evidence_id} does not cover all ABBA roles")
+
+    report_identity = _require_object(
+        manifest_summary["report_identity"], f"{evidence_id}.manifest.summary.report_identity"
+    )
+    if set(report_identity) != set(ABBA_ROLES):
+        raise ClaimInputError(f"publication summary {evidence_id} report identity roles mismatch")
+    summary_report_identity = _require_object(
+        summary_object["report_identity"], f"{evidence_id}.summary.report_identity"
+    )
+    if summary_report_identity != report_identity:
+        raise ClaimInputError(f"publication summary {evidence_id} report identity differs from manifest")
+    for role in ABBA_ROLES:
+        descriptor = _require_object(
+            report_identity[role], f"{evidence_id}.summary.report_identity.{role}"
+        )
+        if set(descriptor) != {"canonical_sha256"} or descriptor["canonical_sha256"] != report_canonical_hashes[role]:
+            raise ClaimInputError(f"publication summary report identity mismatch for {evidence_id}/{role}")
+
+    try:
+        canonical_summary = perf_opc_overlay_abba_summary.summarize_reports(reports_by_role)
+    except Exception as error:
+        raise ClaimInputError(
+            f"{evidence_id} normal reports fail canonical publication recomputation: {error}"
+        ) from error
+    if canonical_sha256(canonical_summary) != canonical_sha:
+        raise ClaimInputError(
+            f"{evidence_id} summary differs from canonical publication recomputation"
+        )
+    result_list = _require_list(summary_object.get("results"), f"{evidence_id}.summary.results")
+    if manifest_summary.get("result_count") != len(result_list):
+        raise ClaimInputError(f"publication manifest {evidence_id} result count mismatch")
+    implementation = _require_object(
+        summary_object.get("implementation_identity"),
+        f"{evidence_id}.summary.implementation_identity",
+    )
+    control = _require_object(
+        implementation.get("control"),
+        f"{evidence_id}.summary.implementation_identity.control",
+    )
+    candidate = _require_object(
+        implementation.get("candidate"),
+        f"{evidence_id}.summary.implementation_identity.candidate",
+    )
+    control_revision = _require_revision(control.get("git_revision"), f"{evidence_id}.control_revision")
+    candidate_revision = _require_revision(candidate.get("git_revision"), f"{evidence_id}.candidate_revision")
+    if control_revision == candidate_revision or implementation.get("distinct") is not True:
+        raise ClaimInputError(f"publication summary {evidence_id} revisions are not distinct")
+    protocol = _require_object(summary_object.get("protocol"), f"{evidence_id}.summary.protocol")
+    if protocol.get("order") != list(ABBA_ORDER) or protocol.get("statistics") != list(STATISTICS):
+        raise ClaimInputError(f"publication summary {evidence_id} protocol order/statistics mismatch")
+    if protocol.get("drift_ceiling_percent") != policy["drift_ceiling_percent"]:
+        raise ClaimInputError(f"publication summary {evidence_id} drift policy mismatch")
+    _verify_scope_and_cells(
+        summary_object,
+        claim,
+        package_change_id=manifest["change_id"],
+        policy=policy,
+        recomputed_cells=_canonical_summary_cells(
+            canonical_summary,
+            location=f"{evidence_id}.canonical",
+            metric_profile=_claim_metric_profile(claim),
+        ),
+    )
+    return {
+        "summary": summary_object,
+        "control_revision": control_revision,
+        "candidate_revision": candidate_revision,
+        "result_count": len(result_list),
+    }
 
 
 def verify_abba_package(
@@ -852,6 +1338,18 @@ def verify_abba_package(
     if actual_manifest_sha != manifest_meta["sha256"]:
         raise ClaimInputError(f"ABBA manifest hash mismatch for {evidence['id']}")
     manifest = load_json(manifest_path, location=str(manifest_path))
+    metric_profile = _claim_metric_profile(claim)
+    if metric_profile["custom_package"]:
+        if not isinstance(manifest, dict):
+            raise ClaimInputError(f"ABBA manifest {evidence['id']} must be an object")
+        return _verify_publication_package(
+            evidence,
+            claim,
+            package_dir=package_dir,
+            manifest_path=manifest_path,
+            manifest=manifest,
+            policy=policy,
+        )
     if not isinstance(manifest, dict) or manifest.get("schema_version") != 1 or manifest.get("manifest_kind") != "litchi-perf-abba-artifacts":
         raise ClaimInputError(f"ABBA manifest {evidence['id']} has unsupported schema")
     _require_keys(
@@ -1075,6 +1573,7 @@ def verify_abba_package(
     recomputed_cells = _canonical_summary_cells(
         canonical_summary,
         location=f"{evidence['id']}.canonical",
+        metric_profile=_claim_metric_profile(claim),
     )
     _verify_scope_and_cells(
         summary,
@@ -1657,7 +2156,14 @@ def lint_registry(
                 if mode == "strict" and evidence_root is not None:
                     verify_abba_package(
                         evidence,
-                        {**claim, "scope": parsed["scope"], "latency": parsed["latency"], "accepted_cells": parsed["accepted_cells"], "resource": parsed["resource"]},
+                        {
+                            **claim,
+                            "scope": parsed["scope"],
+                            "latency": parsed["latency"],
+                            "accepted_cells": parsed["accepted_cells"],
+                            "adverse_cells": parsed["adverse_cells"],
+                            "resource": parsed["resource"],
+                        },
                         evidence_root=evidence_root,
                         policy=registry["policies"]["latency-abba-v1"],
                     )
@@ -1666,7 +2172,14 @@ def lint_registry(
                 if mode == "strict" and evidence_root is not None:
                     latency_result = verify_abba_package(
                         evidence_by_id[parsed["latency"]["evidence_id"]],
-                        {**claim, "scope": parsed["scope"], "latency": parsed["latency"], "accepted_cells": parsed["accepted_cells"], "resource": parsed["resource"]},
+                        {
+                            **claim,
+                            "scope": parsed["scope"],
+                            "latency": parsed["latency"],
+                            "accepted_cells": parsed["accepted_cells"],
+                            "adverse_cells": parsed["adverse_cells"],
+                            "resource": parsed["resource"],
+                        },
                         evidence_root=evidence_root,
                         policy=registry["policies"]["latency-abba-v1"],
                     )
