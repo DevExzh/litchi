@@ -2538,11 +2538,14 @@ mod streaming_0400_numeric_scratch_tests {
     use litchi_sheet::{Cell as Address, Rect};
 
     use super::super::model::MAX_CELL_CHARACTERS;
-    use super::super::selected::{RangeScanOutcome, ScanOutcome, SelectedCell, scan, scan_range};
+    use super::super::selected::{
+        NotEligibleReason, RangeScanOutcome, ScanOutcome, SelectedCell, scan, scan_range,
+    };
     use crate::cell::{Cell, Value};
     use crate::formula::Cache;
 
     const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    const STRICT_SPREADSHEETML: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 
     type StreamResult<T> = super::super::selected::StreamResult<T>;
 
@@ -2595,6 +2598,13 @@ mod streaming_0400_numeric_scratch_tests {
                 ..
             }) => {},
             other => panic!("expected typed XML stream error, got {other:?}"),
+        }
+    }
+
+    fn assert_not_eligible(xml: &str, expected: NotEligibleReason) {
+        match scan_xml(xml, "A1") {
+            Ok(ScanOutcome::NotEligible(actual)) => assert_eq!(actual, expected),
+            other => panic!("expected {expected:?}, got {other:?}"),
         }
     }
 
@@ -2688,5 +2698,78 @@ mod streaming_0400_numeric_scratch_tests {
             )
         );
         assert_stream_xml_error(scan_xml(&xml, "B1"));
+    }
+
+    #[test]
+    fn streaming_0400_dimension_keeps_scalar_and_range_queries_eligible() {
+        let empty = worksheet(
+            r#"<dimension ref="$B$2:F9"/><sheetData><row r="2"><c r="B2"><v>-0.000</v></c><c r="F2"><v>6.02E+23</v></c></row></sheetData>"#,
+        );
+        assert_number(eligible(&empty, "B2"), "-0.000");
+        let selected = match scan_range_xml(&empty, "A1:F9").expect("dimension range scan") {
+            RangeScanOutcome::Eligible(selected) => selected,
+            other => panic!("expected eligible dimension range, got {other:?}"),
+        };
+        assert_eq!(selected.cells.len(), 2);
+        assert_eq!(selected.cells[0].address.a1(), "B2");
+        assert_eq!(selected.cells[1].address.a1(), "F2");
+
+        let explicit = worksheet(
+            r#"<dimension ref="A1:C3">
+            </dimension><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>"#,
+        );
+        assert_number(eligible(&explicit, "A1"), "7");
+    }
+
+    #[test]
+    fn streaming_0400_dimension_supports_strict_prefixed_and_ignorable_metadata() {
+        let strict = format!(
+            r#"<s:worksheet xmlns:s="{STRICT_SPREADSHEETML}"><s:dimension ref="A1:C3"/><s:sheetData><s:row r="1"><s:c r="A1"><s:v>7</s:v></s:c></s:row></s:sheetData></s:worksheet>"#,
+        );
+        assert_number(eligible(&strict, "A1"), "7");
+
+        let ignorable = format!(
+            r#"<worksheet xmlns="{SPREADSHEETML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future" mc:Ignorable="x"><dimension ref="A1" x:hint="ignored"/><sheetData><row r="1"><c r="A1"><v>8</v></c></row></sheetData></worksheet>"#,
+        );
+        assert_number(eligible(&ignorable, "A1"), "8");
+    }
+
+    #[test]
+    fn streaming_0400_dimension_rejects_malformed_duplicate_and_late_metadata() {
+        for xml in [
+            worksheet(r#"<dimension/><sheetData/>"#),
+            worksheet(r#"<dimension ref="A0"/><sheetData/>"#),
+            worksheet(r#"<dimension ref="B2:A1"/><sheetData/>"#),
+            worksheet(r#"<dimension ref="XFE1"/><sheetData/>"#),
+            worksheet(r#"<dimension ref="A1"/><dimension ref="B2"/><sheetData/>"#),
+            worksheet(r#"<sheetData/><dimension ref="A1"/>"#),
+        ] {
+            assert!(
+                scan_xml(&xml, "A1").is_err(),
+                "accepted invalid dimension: {xml}"
+            );
+        }
+    }
+
+    #[test]
+    fn streaming_0400_dimension_content_and_unknown_attributes_fall_back() {
+        let attribute = worksheet(r#"<dimension ref="A1" future="keep"/><sheetData/>"#);
+        assert_not_eligible(&attribute, NotEligibleReason::UnsupportedStructure);
+
+        let nested = worksheet(
+            r#"<dimension ref="A1"><future/></dimension><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData>"#,
+        );
+        assert_not_eligible(&nested, NotEligibleReason::UnsupportedStructure);
+
+        let attribute_and_nested = worksheet(
+            r#"<dimension ref="A1" future="keep"><future>payload</future></dimension><sheetData/>"#,
+        );
+        assert_not_eligible(
+            &attribute_and_nested,
+            NotEligibleReason::UnsupportedStructure,
+        );
+
+        let text = worksheet(r#"<dimension ref="A1">payload</dimension><sheetData/>"#);
+        assert_not_eligible(&text, NotEligibleReason::UnsupportedStructure);
     }
 }

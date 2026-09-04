@@ -275,6 +275,7 @@ pub fn scan(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Frame {
     Worksheet,
+    Dimension,
     SheetData,
     MergeCells,
     MergeCell,
@@ -432,6 +433,7 @@ struct Scanner {
     previous_row: u32,
     root_seen: bool,
     root_closed: bool,
+    seen_dimension: bool,
     seen_sheet_data: bool,
     seen_merge_cells: bool,
     merge_window_closed: bool,
@@ -454,6 +456,7 @@ impl Scanner {
             previous_row: 0,
             root_seen: false,
             root_closed: false,
+            seen_dimension: false,
             seen_sheet_data: false,
             seen_merge_cells: false,
             merge_window_closed: false,
@@ -527,9 +530,12 @@ impl Scanner {
         if self.not_eligible.is_some() {
             if let SemanticEvent::Start(element) | SemanticEvent::Empty(element) = event
                 && self.stack.last() == Some(&Frame::Worksheet)
-                && is_spreadsheetml_element(element, "mergeCells")
             {
-                self.validate_merge_cells_placement()?;
+                if is_spreadsheetml_element(element, "dimension") {
+                    self.validate_dimension_placement()?;
+                } else if is_spreadsheetml_element(element, "mergeCells") {
+                    self.validate_merge_cells_placement()?;
+                }
             }
             return Ok(());
         }
@@ -539,6 +545,11 @@ impl Scanner {
             SemanticEvent::End(element) => self.end(element),
             SemanticEvent::Text(text) | SemanticEvent::CData(text) => self.text(text.text()),
             SemanticEvent::GeneralRef(reference) if self.in_payload() => {
+                self.general_reference(reference)
+            },
+            SemanticEvent::GeneralRef(reference)
+                if self.stack.last() == Some(&Frame::Dimension) =>
+            {
                 self.general_reference(reference)
             },
             SemanticEvent::GeneralRef(_) if self.in_merge() => {
@@ -577,6 +588,7 @@ impl Scanner {
             .ok_or_else(|| invalid("selected worksheet parser lost its parent context"))?;
         let frame = match parent {
             Frame::Worksheet => self.start_worksheet_child(element)?,
+            Frame::Dimension => self.start_dimension_child(element)?,
             Frame::SheetData => self.start_sheet_data_child(element)?,
             Frame::MergeCells => self.start_merge_cells_child(element)?,
             Frame::MergeCell => self.start_merge_cell_child(element)?,
@@ -607,6 +619,9 @@ impl Scanner {
     }
 
     fn start_worksheet_child(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
+        if is_spreadsheetml_element(element, "dimension") {
+            return self.start_dimension(element);
+        }
         if is_spreadsheetml_element(element, "sheetData") {
             if self.seen_sheet_data {
                 return Err(invalid("worksheet has duplicate sheetData"));
@@ -637,6 +652,46 @@ impl Scanner {
         } else {
             self.mark(NotEligibleReason::UnsupportedStructure);
         }
+        Ok(None)
+    }
+
+    fn start_dimension(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
+        self.validate_dimension_placement()?;
+        self.seen_dimension = true;
+        self.validate_attributes(element, &["ref"], false)?;
+        let reference = unqualified_attribute(element, "ref")
+            .ok_or_else(|| invalid("worksheet dimension is missing ref"))?;
+        Rect::from_a1(reference).map_err(|error| {
+            invalid(format!(
+                "invalid worksheet dimension '{reference}': {error}"
+            ))
+        })?;
+        if self.not_eligible.is_some() {
+            Ok(None)
+        } else {
+            Ok(Some(Frame::Dimension))
+        }
+    }
+
+    fn validate_dimension_placement(&self) -> Result<()> {
+        if self.seen_sheet_data {
+            return Err(invalid(
+                "worksheet dimension appears after column or cell data",
+            ));
+        }
+        if self.seen_dimension {
+            return Err(invalid("worksheet has duplicate dimension elements"));
+        }
+        Ok(())
+    }
+
+    fn start_dimension_child(&mut self, element: &SemanticElement<'_>) -> Result<Option<Frame>> {
+        if is_merge_markup(element) {
+            return Err(invalid(
+                "worksheet merge markup appears outside its schema context",
+            ));
+        }
+        self.mark(NotEligibleReason::UnsupportedStructure);
         Ok(None)
     }
 
@@ -966,6 +1021,7 @@ impl Scanner {
         }
         match frame {
             Frame::Worksheet => self.root_closed = true,
+            Frame::Dimension => {},
             Frame::SheetData => {},
             Frame::MergeCells => self.finish_merge_cells()?,
             Frame::MergeCell => {},
@@ -979,6 +1035,7 @@ impl Scanner {
     fn finish_empty(&mut self, frame: Frame) -> Result<()> {
         match frame {
             Frame::Worksheet => self.root_closed = true,
+            Frame::Dimension => {},
             Frame::SheetData => {},
             Frame::MergeCells => self.finish_merge_cells()?,
             Frame::MergeCell => {},
@@ -1157,7 +1214,12 @@ impl Scanner {
                     Ok(())
                 }
             },
-            Frame::Worksheet | Frame::SheetData | Frame::Row | Frame::Cell | Frame::Inline => {
+            Frame::Worksheet
+            | Frame::Dimension
+            | Frame::SheetData
+            | Frame::Row
+            | Frame::Cell
+            | Frame::Inline => {
                 if text.trim().is_empty() {
                     Ok(())
                 } else {
@@ -1327,6 +1389,7 @@ fn matches_frame(frame: Frame, element: &litchi_ooxml_common::mce::SemanticEnd<'
     let namespace = element.expanded_name.namespace.as_bytes();
     let expected = match frame {
         Frame::Worksheet => "worksheet",
+        Frame::Dimension => "dimension",
         Frame::SheetData => "sheetData",
         Frame::MergeCells => "mergeCells",
         Frame::MergeCell => "mergeCell",
