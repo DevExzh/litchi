@@ -111,6 +111,34 @@ fn validate_zip64_record_layout(
     Ok(())
 }
 
+fn ambiguous_zip64_record_error() -> Error {
+    Error::from(ErrorKind::InvalidInput {
+        msg: "ambiguous ZIP64 end-of-central-directory records before its locator".to_string(),
+    })
+}
+
+/// Validate every property which makes a parsed record a usable ZIP64 EOCD
+/// candidate.  In particular, a signature and a self-consistent record size
+/// are not enough: an embedded signature may describe a different disk set,
+/// entry count, or central-directory range.
+fn validate_zip64_record_candidate(
+    eocd: &EndOfCentralDirectoryRecord,
+    record_offset: u64,
+    record: &Zip64EndOfCentralDirectoryRecord,
+    locator_offset: u64,
+) -> std::result::Result<(), Error> {
+    validate_zip64_record_single_disk(record)?;
+    validate_zip64_record_layout(record, record_offset, locator_offset)?;
+
+    // `create_zip64` performs the checked central-directory end calculation
+    // against the candidate's offset before the candidate is accepted.
+    EndOfCentralDirectory::create_zip64(
+        eocd.clone(),
+        Zip64EndOfCentralDirectory::from_parts(record_offset, record.clone()),
+    )?;
+    Ok(())
+}
+
 /// Recover a ZIP64 EOCD whose locator offset is expressed without a source
 /// prefix.  The old fallback assumed that the record was always exactly the
 /// fixed 56-byte size; extensible data moves the record start farther back.
@@ -119,7 +147,7 @@ fn validate_zip64_record_layout(
 fn locate_zip64_record_in_slice(
     data: &[u8],
     locator_offset: usize,
-    hinted_offset: u64,
+    eocd: &EndOfCentralDirectoryRecord,
     initial_error: Error,
     max_search_space: u64,
 ) -> Result<(u64, Zip64EndOfCentralDirectoryRecord), Error> {
@@ -130,12 +158,8 @@ fn locate_zip64_record_in_slice(
                 msg: "ZIP64 end-of-central-directory record is before its locator".to_string(),
             })
         })?;
-    let fixed_offset_u64 = u64::try_from(fixed_offset).map_err(|_| Error::from(ErrorKind::Eof))?;
     let locator_offset_u64 =
         u64::try_from(locator_offset).map_err(|_| Error::from(ErrorKind::Eof))?;
-    if fixed_offset_u64 == hinted_offset {
-        return Err(initial_error);
-    }
 
     let search_start =
         locator_offset.saturating_sub(usize::try_from(max_search_space).unwrap_or(usize::MAX));
@@ -144,42 +168,53 @@ fn locate_zip64_record_in_slice(
     }
 
     let signature = END_OF_CENTRAL_DIR_SIGNATURE64.to_le_bytes();
-    let mut layout_error = None;
-    for candidate in (search_start..=fixed_offset).rev() {
-        let signature_end = match candidate.checked_add(signature.len()) {
+    let mut found_candidate = None;
+    let mut candidate_error = None;
+    let mut ambiguous = false;
+    for candidate_start in (search_start..=fixed_offset).rev() {
+        let signature_end = match candidate_start.checked_add(signature.len()) {
             Some(end) => end,
             None => continue,
         };
-        if data.get(candidate..signature_end) != Some(&signature) {
+        if data.get(candidate_start..signature_end) != Some(&signature) {
             continue;
         }
 
-        let fixed_end = match candidate.checked_add(Zip64EndOfCentralDirectoryRecord::SIZE) {
+        let fixed_end = match candidate_start.checked_add(Zip64EndOfCentralDirectoryRecord::SIZE) {
             Some(end) => end,
             None => continue,
         };
-        let Some(record_data) = data.get(candidate..fixed_end) else {
+        let Some(record_data) = data.get(candidate_start..fixed_end) else {
             continue;
         };
         let record = match Zip64EndOfCentralDirectoryRecord::parse(record_data) {
             Ok(record) => record,
             Err(_) => continue,
         };
-        let Ok(candidate_offset) = u64::try_from(candidate) else {
+        let Ok(candidate_offset) = u64::try_from(candidate_start) else {
             continue;
         };
-        if let Err(error) =
-            validate_zip64_record_layout(&record, candidate_offset, locator_offset_u64)
+        match validate_zip64_record_candidate(eocd, candidate_offset, &record, locator_offset_u64)
         {
-            if layout_error.is_none() {
-                layout_error = Some(error);
-            }
-            continue;
+            Ok(()) => {
+                if found_candidate.is_some() {
+                    ambiguous = true;
+                } else {
+                    found_candidate = Some((candidate_offset, record));
+                }
+            },
+            Err(error) => {
+                if candidate_error.is_none() {
+                    candidate_error = Some(error);
+                }
+            },
         }
-        return Ok((candidate_offset, record));
     }
 
-    Err(layout_error.unwrap_or(initial_error))
+    if ambiguous {
+        return Err(ambiguous_zip64_record_error());
+    }
+    found_candidate.ok_or_else(|| candidate_error.unwrap_or(initial_error))
 }
 
 /// Reader-backed counterpart to [`locate_zip64_record_in_slice`].  The
@@ -189,7 +224,7 @@ fn locate_zip64_record_in_slice(
 fn locate_zip64_record_in_reader<R: ReaderAt>(
     reader: &R,
     locator_offset: u64,
-    hinted_offset: u64,
+    eocd: &EndOfCentralDirectoryRecord,
     initial_error: Error,
     max_search_space: u64,
 ) -> Result<(u64, Zip64EndOfCentralDirectoryRecord), Error> {
@@ -200,10 +235,6 @@ fn locate_zip64_record_in_reader<R: ReaderAt>(
                 msg: "ZIP64 end-of-central-directory record is before its locator".to_string(),
             })
         })?;
-    if fixed_offset == hinted_offset {
-        return Err(initial_error);
-    }
-
     let search_start = locator_offset.saturating_sub(max_search_space);
     if search_start > fixed_offset {
         return Err(initial_error);
@@ -231,21 +262,23 @@ fn locate_zip64_record_in_reader<R: ReaderAt>(
     let candidate_end = scan_len
         .checked_sub(Zip64EndOfCentralDirectoryRecord::SIZE)
         .ok_or_else(|| Error::from(ErrorKind::Eof))?;
-    let mut layout_error = None;
-    for candidate in (0..=candidate_end).rev() {
-        let signature_end = match candidate.checked_add(signature.len()) {
+    let mut found_candidate = None;
+    let mut candidate_error = None;
+    let mut ambiguous = false;
+    for candidate_start in (0..=candidate_end).rev() {
+        let signature_end = match candidate_start.checked_add(signature.len()) {
             Some(end) => end,
             None => continue,
         };
-        if scan.get(candidate..signature_end) != Some(&signature) {
+        if scan.get(candidate_start..signature_end) != Some(&signature) {
             continue;
         }
 
-        let fixed_end = match candidate.checked_add(Zip64EndOfCentralDirectoryRecord::SIZE) {
+        let fixed_end = match candidate_start.checked_add(Zip64EndOfCentralDirectoryRecord::SIZE) {
             Some(end) => end,
             None => continue,
         };
-        let Some(record_data) = scan.get(candidate..fixed_end) else {
+        let Some(record_data) = scan.get(candidate_start..fixed_end) else {
             continue;
         };
         let record = match Zip64EndOfCentralDirectoryRecord::parse(record_data) {
@@ -253,19 +286,28 @@ fn locate_zip64_record_in_reader<R: ReaderAt>(
             Err(_) => continue,
         };
         let candidate_offset = search_start
-            .checked_add(u64::try_from(candidate).map_err(|_| Error::from(ErrorKind::Eof))?)
+            .checked_add(u64::try_from(candidate_start).map_err(|_| Error::from(ErrorKind::Eof))?)
             .ok_or_else(|| Error::from(ErrorKind::Eof))?;
-        if let Err(error) = validate_zip64_record_layout(&record, candidate_offset, locator_offset)
-        {
-            if layout_error.is_none() {
-                layout_error = Some(error);
-            }
-            continue;
+        match validate_zip64_record_candidate(eocd, candidate_offset, &record, locator_offset) {
+            Ok(()) => {
+                if found_candidate.is_some() {
+                    ambiguous = true;
+                } else {
+                    found_candidate = Some((candidate_offset, record));
+                }
+            },
+            Err(error) => {
+                if candidate_error.is_none() {
+                    candidate_error = Some(error);
+                }
+            },
         }
-        return Ok((candidate_offset, record));
     }
 
-    Err(layout_error.unwrap_or(initial_error))
+    if ambiguous {
+        return Err(ambiguous_zip64_record_error());
+    }
+    found_candidate.ok_or_else(|| candidate_error.unwrap_or(initial_error))
 }
 
 /// Locates the End of Central Directory (EOCD) record in a ZIP archive.
@@ -393,9 +435,11 @@ impl ZipLocator {
         let zip64l = &data[locator_offset..];
         let zip64_locator = Zip64EndOfCentralDirectoryLocatorRecord::parse(zip64l)?;
         validate_zip64_locator_single_disk(&zip64_locator)?;
+        let locator_offset_u64 =
+            u64::try_from(locator_offset).map_err(|_| Error::from(ErrorKind::Eof))?;
         validate_zip64_record_fits_before_locator(
             zip64_locator.directory_offset,
-            locator_offset as u64,
+            locator_offset_u64,
         )?;
         let zip64_offset = usize::try_from(zip64_locator.directory_offset)
             .map_err(|_| Error::from(ErrorKind::InvalidEndOfCentralDirectory))?;
@@ -404,17 +448,31 @@ impl ZipLocator {
             .ok_or_else(|| Error::from(ErrorKind::Eof))?;
         let (zip64_record_offset, zip64_record) =
             match Zip64EndOfCentralDirectoryRecord::parse(zip64_eocd) {
-                Ok(record) => (zip64_locator.directory_offset, record),
+                Ok(record) => match validate_zip64_record_candidate(
+                    &eocd,
+                    zip64_locator.directory_offset,
+                    &record,
+                    locator_offset_u64,
+                ) {
+                    Ok(()) => (zip64_locator.directory_offset, record),
+                    Err(error) => locate_zip64_record_in_slice(
+                        data,
+                        locator_offset,
+                        &eocd,
+                        error,
+                        self.max_search_space,
+                    )?,
+                },
                 Err(error) => locate_zip64_record_in_slice(
                     data,
                     locator_offset,
-                    zip64_locator.directory_offset,
+                    &eocd,
                     error,
                     self.max_search_space,
                 )?,
             };
         validate_zip64_record_single_disk(&zip64_record)?;
-        validate_zip64_record_layout(&zip64_record, zip64_record_offset, locator_offset as u64)?;
+        validate_zip64_record_layout(&zip64_record, zip64_record_offset, locator_offset_u64)?;
 
         let zip64 = Zip64EndOfCentralDirectory::from_parts(zip64_record_offset, zip64_record);
         EndOfCentralDirectory::create_zip64(eocd, zip64)
@@ -848,12 +906,33 @@ impl ZipLocator {
         };
         let zip64_record_result = Zip64EndOfCentralDirectoryRecord::parse(zip64_record_bytes);
         let zip64_record = match zip64_record_result {
-            Ok(record) => record,
+            Ok(record) => match validate_zip64_record_candidate(
+                &eocd,
+                zip64_locator.directory_offset,
+                &record,
+                locator_offset,
+            ) {
+                Ok(()) => record,
+                Err(error) => {
+                    let (physical_offset, record) = match locate_zip64_record_in_reader(
+                        &reader,
+                        locator_offset,
+                        &eocd,
+                        error,
+                        self.max_search_space,
+                    ) {
+                        Ok(result) => result,
+                        Err(error) => return Err((reader.inner, error)),
+                    };
+                    zip64_record_offset = physical_offset;
+                    record
+                },
+            },
             Err(error) => {
                 let (physical_offset, record) = match locate_zip64_record_in_reader(
                     &reader,
                     locator_offset,
-                    zip64_locator.directory_offset,
+                    &eocd,
                     error,
                     self.max_search_space,
                 ) {
@@ -1408,25 +1487,76 @@ mod tests {
         zip64_archive_with_extensible_data(&[])
     }
 
-    fn zip64_archive_with_extensible_data(extensible_data: &[u8]) -> Vec<u8> {
-        let mut data = central_directory_entry();
-        let zip64_eocd_offset = data.len() as u64;
+    fn zip64_record_bytes(
+        size: u64,
+        disk_number: u32,
+        cd_disk: u32,
+        num_entries: u64,
+        total_entries: u64,
+        central_dir_size: u64,
+        central_dir_offset: u64,
+    ) -> Vec<u8> {
+        let mut record = Vec::with_capacity(Zip64EndOfCentralDirectoryRecord::SIZE);
+        record.extend_from_slice(&END_OF_CENTRAL_DIR_SIGNATURE64.to_le_bytes());
+        record.extend_from_slice(&size.to_le_bytes());
+        record.extend_from_slice(&45u16.to_le_bytes());
+        record.extend_from_slice(&45u16.to_le_bytes());
+        record.extend_from_slice(&disk_number.to_le_bytes());
+        record.extend_from_slice(&cd_disk.to_le_bytes());
+        record.extend_from_slice(&num_entries.to_le_bytes());
+        record.extend_from_slice(&total_entries.to_le_bytes());
+        record.extend_from_slice(&central_dir_size.to_le_bytes());
+        record.extend_from_slice(&central_dir_offset.to_le_bytes());
+        record
+    }
 
-        data.extend_from_slice(&0x0606_4b50u32.to_le_bytes());
-        data.extend_from_slice(&(44u64 + extensible_data.len() as u64).to_le_bytes());
-        data.extend_from_slice(&45u16.to_le_bytes());
-        data.extend_from_slice(&45u16.to_le_bytes());
-        data.extend_from_slice(&[0; 8]);
-        data.extend_from_slice(&1u64.to_le_bytes());
-        data.extend_from_slice(&1u64.to_le_bytes());
-        data.extend_from_slice(&(ZipFileHeaderFixed::SIZE as u64).to_le_bytes());
-        data.extend_from_slice(&0u64.to_le_bytes());
+    fn append_zip64_record(
+        data: &mut Vec<u8>,
+        extensible_data: &[u8],
+        disk_number: u32,
+        cd_disk: u32,
+        num_entries: u64,
+        total_entries: u64,
+        central_dir_size: u64,
+        central_dir_offset: u64,
+    ) -> usize {
+        let offset = data.len();
+        let extensible_len = u64::try_from(extensible_data.len()).expect("test data fits u64");
+        data.extend_from_slice(&zip64_record_bytes(
+            44 + extensible_len,
+            disk_number,
+            cd_disk,
+            num_entries,
+            total_entries,
+            central_dir_size,
+            central_dir_offset,
+        ));
         data.extend_from_slice(extensible_data);
+        offset
+    }
 
+    fn append_zip64_locator(data: &mut Vec<u8>, directory_offset: u64) -> usize {
+        let offset = data.len();
         data.extend_from_slice(&END_OF_CENTRAL_DIR_LOCATOR_SIGNATURE.to_le_bytes());
         data.extend_from_slice(&0u32.to_le_bytes());
-        data.extend_from_slice(&zip64_eocd_offset.to_le_bytes());
+        data.extend_from_slice(&directory_offset.to_le_bytes());
         data.extend_from_slice(&1u32.to_le_bytes());
+        offset
+    }
+
+    fn zip64_archive_with_extensible_data(extensible_data: &[u8]) -> Vec<u8> {
+        let mut data = central_directory_entry();
+        let zip64_eocd_offset = append_zip64_record(
+            &mut data,
+            extensible_data,
+            0,
+            0,
+            1,
+            1,
+            ZipFileHeaderFixed::SIZE as u64,
+            0,
+        );
+        append_zip64_locator(&mut data, zip64_eocd_offset as u64);
 
         append_eocd(
             &mut data,
@@ -1436,6 +1566,135 @@ mod tests {
             &[],
         );
         data
+    }
+
+    fn zip64_archive_with_nonadjacent_hinted_record() -> (Vec<u8>, u64) {
+        let mut data = central_directory_entry();
+        let mut extensible_data = vec![0xa5; 80];
+        let false_record = zip64_record_bytes(44, 0, 0, 1, 1, 46, 0);
+        extensible_data[..Zip64EndOfCentralDirectoryRecord::SIZE]
+            .copy_from_slice(&false_record);
+
+        let real_offset = append_zip64_record(
+            &mut data,
+            &extensible_data,
+            0,
+            0,
+            1,
+            1,
+            ZipFileHeaderFixed::SIZE as u64,
+            0,
+        );
+        let false_offset = real_offset + Zip64EndOfCentralDirectoryRecord::SIZE;
+        append_zip64_locator(&mut data, false_offset as u64);
+        append_eocd(
+            &mut data,
+            u16::MAX,
+            ZipFileHeaderFixed::SIZE as u32,
+            u32::MAX,
+            &[],
+        );
+        (data, real_offset as u64)
+    }
+
+    fn zip64_archive_with_false_multidisk_hinted_record() -> (Vec<u8>, u64) {
+        let mut data = central_directory_entry();
+        let mut extensible_data = vec![0xb6; 80];
+        // The false record's declared 68-byte payload reaches the locator
+        // exactly, but its disk number makes it ineligible.  The real record
+        // enclosing it remains a valid single-disk candidate.
+        let false_record = zip64_record_bytes(68, 1, 0, 1, 1, 46, 0);
+        extensible_data[..Zip64EndOfCentralDirectoryRecord::SIZE]
+            .copy_from_slice(&false_record);
+
+        let real_offset = append_zip64_record(
+            &mut data,
+            &extensible_data,
+            0,
+            0,
+            1,
+            1,
+            ZipFileHeaderFixed::SIZE as u64,
+            0,
+        );
+        let false_offset = real_offset + Zip64EndOfCentralDirectoryRecord::SIZE;
+        let locator_offset = append_zip64_locator(&mut data, false_offset as u64);
+        assert_eq!(
+            false_offset as u64 + 12 + 68,
+            locator_offset as u64,
+            "false candidate fixture must reach the locator"
+        );
+        append_eocd(
+            &mut data,
+            u16::MAX,
+            ZipFileHeaderFixed::SIZE as u32,
+            u32::MAX,
+            &[],
+        );
+        (data, real_offset as u64)
+    }
+
+    fn zip64_archive_with_ambiguous_fallback_candidates() -> Vec<u8> {
+        let mut data = central_directory_entry();
+        let mut extensible_data = vec![0xc7; 180];
+        let false_record = zip64_record_bytes(44, 0, 0, 1, 1, 46, 0);
+        extensible_data[..Zip64EndOfCentralDirectoryRecord::SIZE]
+            .copy_from_slice(&false_record);
+
+        // This second valid-looking candidate is embedded after the false
+        // hint.  Its 104-byte declared payload reaches the eventual locator.
+        let second_record = zip64_record_bytes(104, 0, 0, 1, 1, 46, 0);
+        let second_record_start = 64;
+        extensible_data[second_record_start
+            ..second_record_start + Zip64EndOfCentralDirectoryRecord::SIZE]
+            .copy_from_slice(&second_record);
+
+        let real_offset = append_zip64_record(
+            &mut data,
+            &extensible_data,
+            0,
+            0,
+            1,
+            1,
+            ZipFileHeaderFixed::SIZE as u64,
+            0,
+        );
+        let false_offset = real_offset + Zip64EndOfCentralDirectoryRecord::SIZE;
+        let second_offset = false_offset + second_record_start;
+        let locator_offset = append_zip64_locator(&mut data, false_offset as u64);
+        assert_eq!(
+            second_offset as u64 + 12 + 104,
+            locator_offset as u64,
+            "second candidate fixture must reach the locator"
+        );
+        append_eocd(
+            &mut data,
+            u16::MAX,
+            ZipFileHeaderFixed::SIZE as u32,
+            u32::MAX,
+            &[],
+        );
+        data
+    }
+
+    fn assert_zip64_record_location(data: Vec<u8>, expected_head_offset: u64) {
+        let archive = ZipLocator::new()
+            .locate_in_slice(data.clone())
+            .expect("slice locator should recover the real ZIP64 record");
+        assert!(archive.is_zip64());
+        assert_eq!(archive.head_eocd_offset(), expected_head_offset);
+        assert_eq!(archive.entries_hint(), 1);
+
+        let reader_archive = ZipLocator::new()
+            .locate_in_reader(
+                CountingReader::new(data.clone()),
+                &mut [0; 128],
+                data.len() as u64,
+            )
+            .expect("reader locator should recover the real ZIP64 record");
+        assert!(reader_archive.is_zip64());
+        assert_eq!(reader_archive.head_eocd_offset(), expected_head_offset);
+        assert_eq!(reader_archive.entries_hint(), 1);
     }
 
     fn zip64_empty_archive_at_zero() -> Vec<u8> {
@@ -1871,6 +2130,50 @@ mod tests {
                 7 + 46 + 56 + extension.len() as u64 + ZIP64_END_OF_CENTRAL_DIR_LOCATOR_SIZE as u64
             );
         }
+    }
+
+    #[test]
+    fn parseable_nonadjacent_hinted_record_falls_back_to_the_real_record() {
+        let (data, real_offset) = zip64_archive_with_nonadjacent_hinted_record();
+        assert_zip64_record_location(data, real_offset);
+    }
+
+    #[test]
+    fn false_multidisk_hinted_record_does_not_mask_the_real_record() {
+        let (data, real_offset) = zip64_archive_with_false_multidisk_hinted_record();
+        assert_zip64_record_location(data, real_offset);
+    }
+
+    #[test]
+    fn fallback_rejects_ambiguous_valid_zip64_records_in_slice_and_reader() {
+        let data = zip64_archive_with_ambiguous_fallback_candidates();
+        let slice_error = locate_slice_error(data.clone());
+        let reader_error = locate_reader_error(data);
+
+        assert!(matches!(
+            slice_error.kind(),
+            ErrorKind::InvalidInput { msg }
+                if msg.contains("ambiguous ZIP64 end-of-central-directory records")
+        ));
+        assert!(matches!(
+            reader_error.kind(),
+            ErrorKind::InvalidInput { msg }
+                if msg.contains("ambiguous ZIP64 end-of-central-directory records")
+        ));
+        assert_eq!(slice_error.to_string(), reader_error.to_string());
+    }
+
+    #[test]
+    fn opaque_embedded_zip64_signature_is_ignored_by_bounded_fallback() {
+        let mut extension = vec![0xa5; 80];
+        extension[..END_OF_CENTRAL_DIR_SIGNATURE64.to_le_bytes().len()]
+            .copy_from_slice(&END_OF_CENTRAL_DIR_SIGNATURE64.to_le_bytes());
+        let data = prefixed_extensible_zip64_archive(&extension);
+
+        // The prefix leaves the locator's unadjusted hint in the middle of
+        // the central entry.  Fallback must skip the opaque signature in the
+        // extensible sector and recover the actual record at offset 53.
+        assert_zip64_record_location(data, 7 + ZipFileHeaderFixed::SIZE as u64);
     }
 
     #[test]
