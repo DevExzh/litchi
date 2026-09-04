@@ -11,6 +11,8 @@ rust-version.workspace = true
 [features]
 default = []
 sign = ["dep:litchi-sign"]
+# Runtime-neutral, caller-owned cache/flight lock-boundary callbacks.
+performance-diagnostics = []
 
 [dependencies]
 atoi_simd     = { workspace = true }

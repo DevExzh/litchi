@@ -902,6 +902,193 @@ pub struct SourceCacheCounterDelta {
     pub budget_reservation_failures: u64,
 }
 
+/// The cache-state lock scope exposed by the optional diagnostics seam.
+///
+/// The enum intentionally carries no cache identity, member name, or other
+/// payload. A [`DiagnosticSnapshot`] pair for this operation covers only the
+/// immediate `Mutex::lock` call on the cache state; it does not cover the
+/// critical section that follows it. The observer's `Finished` callback runs
+/// while that guard remains live and must obey the callback contract on the
+/// profiled entry point.
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CacheState {
+    /// The package's payload-cache state mutex.
+    Lock,
+}
+
+/// The same-Part flight-state lock scope exposed by the optional diagnostics
+/// seam.
+///
+/// A [`DiagnosticSnapshot`] pair for this operation covers only the
+/// immediate `Mutex::lock` call on a flight state. In particular, it does not
+/// cover a subsequent `Condvar::wait_timeout`, its duration, or its
+/// reacquisition of the mutex. The observer's `Finished` callback runs while
+/// the flight guard remains live and must obey the callback contract on the
+/// profiled entry point.
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FlightState {
+    /// One same-Part single-flight state mutex.
+    Lock,
+}
+
+/// One content-free lock operation observed by the diagnostics seam.
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Operation {
+    /// A lock acquisition on payload-cache state.
+    Cache(CacheState),
+    /// A lock acquisition on same-Part flight state.
+    Flight(FlightState),
+}
+
+/// One boundary of an operation-local cache/flight lock observation.
+///
+/// Callbacks are invoked synchronously and are borrowed only for the duration
+/// of the profiled call. They are never retained by the package or cache. The
+/// `Finished` callback runs while the corresponding acquired guard is still
+/// live so the pair measures acquisition only; public entry-point docs state
+/// the required nonblocking/nonreentrant contract and panic behavior.
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiagnosticSnapshot {
+    /// Emitted immediately before the corresponding direct `Mutex::lock`.
+    Started { operation: Operation },
+    /// Emitted immediately after the corresponding direct `Mutex::lock`.
+    Finished { operation: Operation },
+}
+
+#[cfg(feature = "performance-diagnostics")]
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync>() {}
+
+    assert_send_sync::<CacheState>();
+    assert_send_sync::<FlightState>();
+    assert_send_sync::<Operation>();
+    assert_send_sync::<DiagnosticSnapshot>();
+};
+
+#[derive(Clone, Copy)]
+enum LockOperation {
+    Cache,
+    Flight,
+}
+
+trait DiagnosticObserver {
+    #[inline(always)]
+    fn started(&mut self, _operation: LockOperation) {}
+
+    /// Emit the post-acquisition callback. Implementations must not let a
+    /// callback panic unwind while the acquired guard is still live.
+    fn finished_after_lock(&mut self, _operation: LockOperation);
+}
+
+struct NoopDiagnosticObserver;
+
+impl DiagnosticObserver for NoopDiagnosticObserver {
+    #[inline(always)]
+    fn finished_after_lock(&mut self, _operation: LockOperation) {}
+}
+
+#[cfg(feature = "performance-diagnostics")]
+struct CallbackDiagnosticObserver<'observer, F> {
+    callback: &'observer mut F,
+    panic: Option<Box<dyn std::any::Any + Send>>,
+}
+
+#[cfg(feature = "performance-diagnostics")]
+impl<F> CallbackDiagnosticObserver<'_, F>
+where
+    F: FnMut(DiagnosticSnapshot),
+{
+    fn new(callback: &mut F) -> CallbackDiagnosticObserver<'_, F> {
+        CallbackDiagnosticObserver {
+            callback,
+            panic: None,
+        }
+    }
+
+    /// Resume an observer panic only after the profiled operation has
+    /// released every cache/flight guard it owns.
+    #[inline(always)]
+    fn resume_if_panicked(&mut self) {
+        if let Some(panic) = self.panic.take() {
+            std::panic::resume_unwind(panic);
+        }
+    }
+}
+
+#[cfg(feature = "performance-diagnostics")]
+impl<F> DiagnosticObserver for CallbackDiagnosticObserver<'_, F>
+where
+    F: FnMut(DiagnosticSnapshot),
+{
+    #[inline(always)]
+    fn started(&mut self, operation: LockOperation) {
+        if self.panic.is_some() {
+            return;
+        }
+        if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            (self.callback)(DiagnosticSnapshot::Started {
+                operation: public_lock_operation(operation),
+            });
+        })) {
+            self.panic = Some(panic);
+        }
+    }
+
+    #[inline(always)]
+    fn finished_after_lock(&mut self, operation: LockOperation) {
+        if self.panic.is_some() {
+            return;
+        }
+        if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            (self.callback)(DiagnosticSnapshot::Finished {
+                operation: public_lock_operation(operation),
+            });
+        })) {
+            self.panic = Some(panic);
+        }
+    }
+}
+
+#[cfg(feature = "performance-diagnostics")]
+#[inline]
+const fn public_lock_operation(operation: LockOperation) -> Operation {
+    match operation {
+        LockOperation::Cache => Operation::Cache(CacheState::Lock),
+        LockOperation::Flight => Operation::Flight(FlightState::Lock),
+    }
+}
+
+/// Lock a cache/flight mutex while giving a stack-borrowed observer the two
+/// direct-lock boundaries. `Finished` executes while the acquired guard is
+/// still live so the event measures lock acquisition only; the callback must
+/// therefore be nonblocking, nonreentrant, and must not acquire a lock. A
+/// panicking `Started` or `Finished` callback is caught at this boundary; the
+/// observer suppresses later notifications, lets the operation release all of
+/// its guards, and the public entry point resumes the panic. `Started` runs
+/// before the lock, so a panicking callback does not receive a matching
+/// `Finished`, although the lock and the enclosing operation still complete
+/// normally. No observer callback is emitted for condition-variable
+/// reacquisition because that happens inside `Condvar::wait_timeout`, outside
+/// this helper.
+#[inline(always)]
+fn lock_with_observer<'mutex, T, O>(
+    mutex: &'mutex Mutex<T>,
+    observer: &mut O,
+    operation: LockOperation,
+) -> std::sync::LockResult<std::sync::MutexGuard<'mutex, T>>
+where
+    O: DiagnosticObserver,
+{
+    observer.started(operation);
+    let result = mutex.lock();
+    observer.finished_after_lock(operation);
+    result
+}
+
 /// Failure returned by a fail-closed source-cache diagnostic operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -1732,6 +1919,44 @@ impl<'package> PartView<'package> {
         self.package.read_part(self.index)
     }
 
+    /// Read this part's payload while observing the cache and same-Part
+    /// single-flight mutex lock boundaries.
+    ///
+    /// The callback is borrowed only for this call and is never retained. It
+    /// receives content-free [`DiagnosticSnapshot`] pairs immediately around
+    /// direct `Mutex::lock` calls. A pair does not include the cache critical
+    /// section, a `Condvar::wait_timeout` duration, or that condition
+    /// variable's mutex reacquisition.
+    ///
+    /// The callback runs synchronously while the corresponding mutex guard is
+    /// held for the `Finished` notification. It must return promptly, must
+    /// not block, re-enter this package or operation, or acquire any lock.
+    /// These preconditions keep the acquisition-only boundary observable
+    /// without retaining an observer or consulting ambient state.
+    ///
+    /// # Panics
+    ///
+    /// Observer panics propagate from this entry point. A panic from either
+    /// callback is caught at the lock boundary, later notifications are
+    /// suppressed, and the panic is resumed after the profiled operation has
+    /// released all cache/flight guards; observer code cannot poison those
+    /// mutexes. Because `Started` runs before lock acquisition, a panic there
+    /// has no matching `Finished` callback, and a caller-owned event log may
+    /// consequently be partial or unbalanced. Normal returns and errors keep
+    /// every emitted boundary in a balanced pair.
+    #[cfg(feature = "performance-diagnostics")]
+    pub fn data_with_observer(
+        &self,
+        mut observer: impl FnMut(DiagnosticSnapshot),
+    ) -> Result<PartData> {
+        let mut observer = CallbackDiagnosticObserver::new(&mut observer);
+        let result = self
+            .package
+            .read_part_with_observer(self.index, None, None, &mut observer);
+        observer.resume_if_panicked();
+        result
+    }
+
     /// Read this part's payload while recording the cold ZIP work in a
     /// caller-owned report.
     ///
@@ -2198,7 +2423,7 @@ struct PendingPublication {
 }
 
 #[derive(Debug, Default)]
-struct CacheState {
+struct CacheStateInner {
     entries: HashMap<EntryId, CacheEntry>,
     pending: HashMap<EntryId, PendingPublication>,
     flights: HashMap<EntryId, Arc<LoadFlight>>,
@@ -2207,7 +2432,7 @@ struct CacheState {
 }
 
 #[derive(Debug, Default)]
-struct FlightState {
+struct FlightStateInner {
     complete: bool,
     payload: Option<CachedPayload>,
     reservation: Option<Arc<Reservation>>,
@@ -2217,7 +2442,7 @@ struct FlightState {
 
 #[derive(Debug)]
 struct LoadFlight {
-    state: Mutex<FlightState>,
+    state: Mutex<FlightStateInner>,
     completed: Condvar,
 }
 
@@ -2228,44 +2453,53 @@ impl LoadFlight {
         payload_object_reservation: Option<Arc<Reservation>>,
     ) -> Self {
         Self {
-            state: Mutex::new(FlightState {
+            state: Mutex::new(FlightStateInner {
                 reservation,
                 flight_object_reservation,
                 payload_object_reservation,
-                ..FlightState::default()
+                ..FlightStateInner::default()
             }),
             completed: Condvar::new(),
         }
     }
 
-    fn reservation(&self) -> Option<Arc<Reservation>> {
-        self.state
-            .lock()
+    fn reservation_with_observer<O>(&self, observer: &mut O) -> Option<Arc<Reservation>>
+    where
+        O: DiagnosticObserver,
+    {
+        lock_with_observer(&self.state, observer, LockOperation::Flight)
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .reservation
             .as_ref()
             .map(Arc::clone)
     }
 
-    fn payload_object_reservation(&self) -> Option<Arc<Reservation>> {
-        self.state
-            .lock()
+    fn payload_object_reservation_with_observer<O>(
+        &self,
+        observer: &mut O,
+    ) -> Option<Arc<Reservation>>
+    where
+        O: DiagnosticObserver,
+    {
+        lock_with_observer(&self.state, observer, LockOperation::Flight)
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .payload_object_reservation
             .as_ref()
             .map(Arc::clone)
     }
 
-    fn diagnostic_reservations(
+    fn diagnostic_reservations_with_observer<O>(
         &self,
+        observer: &mut O,
     ) -> (
         Option<Arc<Reservation>>,
         Option<Arc<Reservation>>,
         Option<Arc<Reservation>>,
-    ) {
-        let state = self
-            .state
-            .lock()
+    )
+    where
+        O: DiagnosticObserver,
+    {
+        let state = lock_with_observer(&self.state, observer, LockOperation::Flight)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         (
             state.reservation.as_ref().map(Arc::clone),
@@ -2274,13 +2508,24 @@ impl LoadFlight {
         )
     }
 
+    #[cfg(test)]
     fn wait(
         &self,
         context: Option<&ExecutionContext>,
     ) -> std::result::Result<Option<CachedPayload>, ExecutionError> {
-        let mut state = self
-            .state
-            .lock()
+        let mut observer = NoopDiagnosticObserver;
+        self.wait_with_observer(context, &mut observer)
+    }
+
+    fn wait_with_observer<O>(
+        &self,
+        context: Option<&ExecutionContext>,
+        observer: &mut O,
+    ) -> std::result::Result<Option<CachedPayload>, ExecutionError>
+    where
+        O: DiagnosticObserver,
+    {
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Flight)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         while !state.complete {
             if let Some(context) = context {
@@ -2300,10 +2545,11 @@ impl LoadFlight {
         Ok(state.payload.clone())
     }
 
-    fn finish_success(&self, payload: CachedPayload) -> bool {
-        let mut state = self
-            .state
-            .lock()
+    fn finish_success_with_observer<O>(&self, payload: CachedPayload, observer: &mut O) -> bool
+    where
+        O: DiagnosticObserver,
+    {
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Flight)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         if state.complete {
             drop(payload);
@@ -2323,10 +2569,11 @@ impl LoadFlight {
         true
     }
 
-    fn finish_failure(&self) -> bool {
-        let mut state = self
-            .state
-            .lock()
+    fn finish_failure_with_observer<O>(&self, observer: &mut O) -> bool
+    where
+        O: DiagnosticObserver,
+    {
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Flight)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         if state.complete {
             return false;
@@ -2365,7 +2612,7 @@ struct LoadResources {
 #[derive(Debug)]
 struct PartCache {
     limits: SourceCacheLimits,
-    state: Mutex<CacheState>,
+    state: Mutex<CacheStateInner>,
     counters: CacheCounters,
     diagnostics: Arc<DiagnosticState>,
     budget: Option<ExecutionContext>,
@@ -2385,9 +2632,8 @@ impl PartCache {
 
     #[cfg(test)]
     fn insert_for_test(&self, entry_id: EntryId, payload: CachedPayload) -> CacheRetention {
-        let mut state = self
-            .state
-            .lock()
+        let mut observer = NoopDiagnosticObserver;
+        let mut state = lock_with_observer(&self.state, &mut observer, LockOperation::Cache)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         self.insert_locked(&mut state, entry_id, payload)
     }
@@ -2448,7 +2694,7 @@ impl PartCache {
     fn new_with_diagnostics(limits: SourceCacheLimits, diagnostics: Arc<DiagnosticState>) -> Self {
         Self {
             limits,
-            state: Mutex::new(CacheState::default()),
+            state: Mutex::new(CacheStateInner::default()),
             counters: CacheCounters::new(Arc::clone(&diagnostics)),
             diagnostics,
             budget: None,
@@ -2470,7 +2716,7 @@ impl PartCache {
     ) -> Self {
         Self {
             limits,
-            state: Mutex::new(CacheState::default()),
+            state: Mutex::new(CacheStateInner::default()),
             counters: CacheCounters::new(Arc::clone(&diagnostics)),
             diagnostics,
             budget: Some(context),
@@ -2508,15 +2754,27 @@ impl PartCache {
         self.budget.as_ref()
     }
 
+    #[cfg(test)]
     fn enter(
         &self,
         entry_id: EntryId,
         declared_bytes: u64,
     ) -> std::result::Result<CacheAccess, ExecutionError> {
+        let mut observer = NoopDiagnosticObserver;
+        self.enter_with_observer(entry_id, declared_bytes, &mut observer)
+    }
+
+    fn enter_with_observer<O>(
+        &self,
+        entry_id: EntryId,
+        declared_bytes: u64,
+        observer: &mut O,
+    ) -> std::result::Result<CacheAccess, ExecutionError>
+    where
+        O: DiagnosticObserver,
+    {
         self.check_context()?;
-        let mut state = self
-            .state
-            .lock()
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Cache)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.clock = state.clock.wrapping_add(1);
         let clock = state.clock;
@@ -2592,7 +2850,7 @@ impl PartCache {
 
     fn reserve_for_load(
         &self,
-        state: &mut CacheState,
+        state: &mut CacheStateInner,
         declared_bytes: u64,
     ) -> std::result::Result<Option<Arc<Reservation>>, ExecutionError> {
         let Some(context) = self.budget.as_ref() else {
@@ -2624,7 +2882,7 @@ impl PartCache {
         }
     }
 
-    fn make_room_for_load(&self, state: &mut CacheState, declared_bytes: u64) {
+    fn make_room_for_load(&self, state: &mut CacheStateInner, declared_bytes: u64) {
         let weight = usize::try_from(declared_bytes).unwrap_or(usize::MAX);
         if weight > self.limits.max_bytes {
             self.evict_all(state);
@@ -2639,11 +2897,11 @@ impl PartCache {
         }
     }
 
-    fn evict_all(&self, state: &mut CacheState) {
+    fn evict_all(&self, state: &mut CacheStateInner) {
         while self.evict_oldest(state) {}
     }
 
-    fn evict_oldest(&self, state: &mut CacheState) -> bool {
+    fn evict_oldest(&self, state: &mut CacheStateInner) -> bool {
         let Some((&oldest, _)) = state
             .entries
             .iter()
@@ -2663,16 +2921,18 @@ impl PartCache {
         }
     }
 
-    fn publish_pending(
+    fn publish_pending_with_observer<O>(
         &self,
         entry_id: EntryId,
         flight: &Arc<LoadFlight>,
         payload: CachedPayload,
-    ) -> std::result::Result<CachePublication, ExecutionError> {
+        observer: &mut O,
+    ) -> std::result::Result<CachePublication, ExecutionError>
+    where
+        O: DiagnosticObserver,
+    {
         self.check_context()?;
-        let mut state = self
-            .state
-            .lock()
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Cache)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let is_current = state
             .flights
@@ -2704,10 +2964,21 @@ impl PartCache {
         Ok(CachePublication::Pending)
     }
 
+    #[cfg(test)]
     fn complete_failure(&self, entry_id: EntryId, flight: &Arc<LoadFlight>) {
-        let mut state = self
-            .state
-            .lock()
+        let mut observer = NoopDiagnosticObserver;
+        self.complete_failure_with_observer(entry_id, flight, &mut observer);
+    }
+
+    fn complete_failure_with_observer<O>(
+        &self,
+        entry_id: EntryId,
+        flight: &Arc<LoadFlight>,
+        observer: &mut O,
+    ) where
+        O: DiagnosticObserver,
+    {
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Cache)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let is_current = state
             .flights
@@ -2715,7 +2986,7 @@ impl PartCache {
             .is_some_and(|current| Arc::ptr_eq(current, flight));
         if !is_current {
             remove_pending_locked(&mut state, entry_id, flight, None);
-            let transitioned = flight.finish_failure();
+            let transitioned = flight.finish_failure_with_observer(observer);
             if transitioned {
                 self.counters.failed_loads.increment();
             }
@@ -2725,7 +2996,7 @@ impl PartCache {
         // Publish failure to current waiters before allowing a new retrying
         // loader to install a replacement flight. The conditional transition
         // prevents a late completion from resurrecting an already failed load.
-        let transitioned = flight.finish_failure();
+        let transitioned = flight.finish_failure_with_observer(observer);
         remove_flight(&mut state, entry_id, flight);
         if transitioned {
             self.counters.failed_loads.increment();
@@ -2746,6 +3017,7 @@ impl PartCache {
         Ok(())
     }
 
+    #[cfg(test)]
     fn complete_uncached_success(
         &self,
         entry_id: EntryId,
@@ -2753,9 +3025,28 @@ impl PartCache {
         payload: CachedPayload,
         retention: CacheRetention,
     ) -> Option<CachedPayload> {
-        let mut state = self
-            .state
-            .lock()
+        let mut observer = NoopDiagnosticObserver;
+        self.complete_uncached_success_with_observer(
+            entry_id,
+            flight,
+            payload,
+            retention,
+            &mut observer,
+        )
+    }
+
+    fn complete_uncached_success_with_observer<O>(
+        &self,
+        entry_id: EntryId,
+        flight: &Arc<LoadFlight>,
+        payload: CachedPayload,
+        retention: CacheRetention,
+        observer: &mut O,
+    ) -> Option<CachedPayload>
+    where
+        O: DiagnosticObserver,
+    {
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Cache)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let is_current = state
             .flights
@@ -2763,14 +3054,14 @@ impl PartCache {
             .is_some_and(|current| Arc::ptr_eq(current, flight));
         if !is_current {
             drop(payload);
-            let transitioned = flight.finish_failure();
+            let transitioned = flight.finish_failure_with_observer(observer);
             if transitioned {
                 self.counters.failed_loads.increment();
             }
             return None;
         }
         let delivered = payload.clone();
-        let transitioned = flight.finish_success(delivered);
+        let transitioned = flight.finish_success_with_observer(delivered, observer);
         remove_flight(&mut state, entry_id, flight);
         if transitioned {
             self.counters.successful_loads.increment();
@@ -2782,15 +3073,28 @@ impl PartCache {
         }
     }
 
+    #[cfg(test)]
     fn commit_pending(
         &self,
         entry_id: EntryId,
         flight: &Arc<LoadFlight>,
         payload: CachedPayload,
     ) -> Option<CachedPayload> {
-        let mut state = self
-            .state
-            .lock()
+        let mut observer = NoopDiagnosticObserver;
+        self.commit_pending_with_observer(entry_id, flight, payload, &mut observer)
+    }
+
+    fn commit_pending_with_observer<O>(
+        &self,
+        entry_id: EntryId,
+        flight: &Arc<LoadFlight>,
+        payload: CachedPayload,
+        observer: &mut O,
+    ) -> Option<CachedPayload>
+    where
+        O: DiagnosticObserver,
+    {
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Cache)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let is_current = state
             .flights
@@ -2806,7 +3110,7 @@ impl PartCache {
         if !is_current || !pending_matches || !entry_matches {
             remove_pending_locked(&mut state, entry_id, flight, Some(&payload.bytes));
             drop(payload);
-            let transitioned = flight.finish_failure();
+            let transitioned = flight.finish_failure_with_observer(observer);
             if is_current {
                 remove_flight(&mut state, entry_id, flight);
             }
@@ -2821,7 +3125,7 @@ impl PartCache {
         // ordered publication, while all source freshness checks stay outside
         // both locks.
         let delivered = payload.clone();
-        let transitioned = flight.finish_success(delivered);
+        let transitioned = flight.finish_success_with_observer(delivered, observer);
         if !transitioned {
             remove_pending_locked(&mut state, entry_id, flight, Some(&payload.bytes));
             remove_flight(&mut state, entry_id, flight);
@@ -2834,6 +3138,7 @@ impl PartCache {
         Some(payload)
     }
 
+    #[cfg(test)]
     fn rollback_publication(
         &self,
         entry_id: EntryId,
@@ -2841,9 +3146,27 @@ impl PartCache {
         payload: CachedPayload,
         publication: CachePublication,
     ) {
-        let mut state = self
-            .state
-            .lock()
+        let mut observer = NoopDiagnosticObserver;
+        self.rollback_publication_with_observer(
+            entry_id,
+            flight,
+            payload,
+            publication,
+            &mut observer,
+        );
+    }
+
+    fn rollback_publication_with_observer<O>(
+        &self,
+        entry_id: EntryId,
+        flight: &Arc<LoadFlight>,
+        payload: CachedPayload,
+        publication: CachePublication,
+        observer: &mut O,
+    ) where
+        O: DiagnosticObserver,
+    {
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Cache)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         if matches!(publication, CachePublication::Pending) {
             remove_pending_locked(&mut state, entry_id, flight, Some(&payload.bytes));
@@ -2854,23 +3177,28 @@ impl PartCache {
             .get(&entry_id)
             .is_some_and(|current| Arc::ptr_eq(current, flight));
         if !is_current {
-            let transitioned = flight.finish_failure();
+            let transitioned = flight.finish_failure_with_observer(observer);
             if transitioned {
                 self.counters.failed_loads.increment();
             }
             return;
         }
-        let transitioned = flight.finish_failure();
+        let transitioned = flight.finish_failure_with_observer(observer);
         remove_flight(&mut state, entry_id, flight);
         if transitioned {
             self.counters.failed_loads.increment();
         }
     }
 
-    fn invalidate_if_matches(&self, entry_id: EntryId, payload: &CachedPayload) {
-        let mut state = self
-            .state
-            .lock()
+    fn invalidate_if_matches_with_observer<O>(
+        &self,
+        entry_id: EntryId,
+        payload: &CachedPayload,
+        observer: &mut O,
+    ) where
+        O: DiagnosticObserver,
+    {
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Cache)
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let matches = state
             .entries
@@ -2906,7 +3234,7 @@ impl PartCache {
 
     fn insert_locked(
         &self,
-        state: &mut CacheState,
+        state: &mut CacheStateInner,
         entry_id: EntryId,
         payload: CachedPayload,
     ) -> CacheRetention {
@@ -2941,32 +3269,56 @@ impl PartCache {
         CacheRetention::Retained
     }
 
+    #[cfg(test)]
     fn diagnostics(&self) -> SourceCacheDiagnostics {
-        let state = self
-            .state
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        self.diagnostics_snapshot(&state)
+        let mut observer = NoopDiagnosticObserver;
+        self.diagnostics_with_observer(&mut observer)
     }
 
+    fn diagnostics_with_observer<O>(&self, observer: &mut O) -> SourceCacheDiagnostics
+    where
+        O: DiagnosticObserver,
+    {
+        let state = lock_with_observer(&self.state, observer, LockOperation::Cache)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        self.diagnostics_snapshot(&state, observer)
+    }
+
+    #[cfg(test)]
     fn try_diagnostics(
         &self,
     ) -> std::result::Result<SourceCacheDiagnostics, SourceCacheDiagnosticsError> {
-        let state = self
-            .state
-            .lock()
+        let mut observer = NoopDiagnosticObserver;
+        self.try_diagnostics_with_observer(&mut observer)
+    }
+
+    fn try_diagnostics_with_observer<O>(
+        &self,
+        observer: &mut O,
+    ) -> std::result::Result<SourceCacheDiagnostics, SourceCacheDiagnosticsError>
+    where
+        O: DiagnosticObserver,
+    {
+        let state = lock_with_observer(&self.state, observer, LockOperation::Cache)
             .map_err(|_| SourceCacheDiagnosticsError::StatePoisoned)?;
         if self.diagnostics.overflowed.load(Ordering::Acquire) {
             return Err(SourceCacheDiagnosticsError::CounterOverflow);
         }
-        let snapshot = self.diagnostics_snapshot(&state);
+        let snapshot = self.diagnostics_snapshot(&state, observer);
         if self.diagnostics.overflowed.load(Ordering::Acquire) {
             return Err(SourceCacheDiagnosticsError::CounterOverflow);
         }
         Ok(snapshot)
     }
 
-    fn diagnostics_snapshot(&self, state: &CacheState) -> SourceCacheDiagnostics {
+    fn diagnostics_snapshot<O>(
+        &self,
+        state: &CacheStateInner,
+        observer: &mut O,
+    ) -> SourceCacheDiagnostics
+    where
+        O: DiagnosticObserver,
+    {
         // A successful loader briefly owns the same reservation through its
         // cache entry, completion payload, and returned handles. Count only
         // unique reservation identities so a diagnostic snapshot cannot
@@ -2985,7 +3337,7 @@ impl PartCache {
         }
         for flight in state.flights.values() {
             let (reservation, payload_object_reservation, flight_object_reservation) =
-                flight.diagnostic_reservations();
+                flight.diagnostic_reservations_with_observer(observer);
             if let Some(reservation) = reservation.as_ref() {
                 let already_counted = state.entries.values().any(|entry| {
                     entry
@@ -3126,7 +3478,7 @@ enum CacheRetention {
     AllocationFailure,
 }
 
-fn remove_flight(state: &mut CacheState, entry_id: EntryId, flight: &Arc<LoadFlight>) {
+fn remove_flight(state: &mut CacheStateInner, entry_id: EntryId, flight: &Arc<LoadFlight>) {
     if state
         .flights
         .get(&entry_id)
@@ -3137,7 +3489,7 @@ fn remove_flight(state: &mut CacheState, entry_id: EntryId, flight: &Arc<LoadFli
 }
 
 fn remove_pending_locked(
-    state: &mut CacheState,
+    state: &mut CacheStateInner,
     entry_id: EntryId,
     flight: &Arc<LoadFlight>,
     expected_payload: Option<&Arc<Vec<u8>>>,
@@ -3837,7 +4189,8 @@ impl SourceBackedPackage {
     /// unmanaged compatibility publication remains uncharged.
     #[must_use]
     pub fn cache_diagnostics(&self) -> SourceCacheDiagnostics {
-        let mut diagnostics = self.cache.diagnostics();
+        let mut observer = NoopDiagnosticObserver;
+        let mut diagnostics = self.cache.diagnostics_with_observer(&mut observer);
         diagnostics.budget_catalog_reserved_objects = self
             .catalog_object_reservation
             .as_ref()
@@ -3855,7 +4208,79 @@ impl SourceBackedPackage {
     pub fn try_cache_diagnostics(
         &self,
     ) -> std::result::Result<SourceCacheDiagnostics, SourceCacheDiagnosticsError> {
-        let mut diagnostics = self.cache.try_diagnostics()?;
+        let mut observer = NoopDiagnosticObserver;
+        let mut diagnostics = self.cache.try_diagnostics_with_observer(&mut observer)?;
+        diagnostics.budget_catalog_reserved_objects = self
+            .catalog_object_reservation
+            .as_ref()
+            .map_or(0, |reservation| reservation.amount());
+        Ok(diagnostics)
+    }
+
+    /// Return cache diagnostics while observing cache and same-Part
+    /// single-flight mutex lock boundaries.
+    ///
+    /// The callback is stack-borrowed and receives no package, Part, or
+    /// source identity. The returned snapshot is the same compatibility
+    /// snapshot as [`Self::cache_diagnostics`].
+    ///
+    /// The callback runs synchronously while the cache mutex guard is held
+    /// for the `Finished` notification (and while any active flight guard is
+    /// held for its own notification). It must return promptly, must not
+    /// block, re-enter this package or operation, or acquire any lock.
+    ///
+    /// # Panics
+    ///
+    /// Observer panics propagate from this entry point. A panic from either
+    /// callback is caught at the lock boundary, later notifications are
+    /// suppressed, and the panic is resumed after the profiled operation has
+    /// released all cache/flight guards, so observer code does not poison
+    /// those mutexes. Because `Started` runs before lock acquisition, a panic
+    /// there has no matching `Finished` callback, and a caller-owned event
+    /// log may consequently be partial or unbalanced. Normal returns and
+    /// errors keep every emitted boundary in a balanced pair.
+    #[cfg(feature = "performance-diagnostics")]
+    #[must_use]
+    pub fn cache_diagnostics_with_observer(
+        &self,
+        mut observer: impl FnMut(DiagnosticSnapshot),
+    ) -> SourceCacheDiagnostics {
+        let mut observer = CallbackDiagnosticObserver::new(&mut observer);
+        let mut diagnostics = self.cache.diagnostics_with_observer(&mut observer);
+        observer.resume_if_panicked();
+        diagnostics.budget_catalog_reserved_objects = self
+            .catalog_object_reservation
+            .as_ref()
+            .map_or(0, |reservation| reservation.amount());
+        diagnostics
+    }
+
+    /// Return a fail-closed cache diagnostic snapshot while observing the
+    /// immediate cache/flight lock boundaries.
+    ///
+    /// The callback runs synchronously while the corresponding mutex guard is
+    /// held for the `Finished` notification. It must return promptly, must
+    /// not block, re-enter this package or operation, or acquire any lock.
+    ///
+    /// # Panics
+    ///
+    /// Observer panics propagate from this entry point. A panic from either
+    /// callback is caught at the lock boundary, later notifications are
+    /// suppressed, and the panic is resumed after the profiled operation has
+    /// released all cache/flight guards, so observer code does not poison
+    /// those mutexes. Because `Started` runs before lock acquisition, a panic
+    /// there has no matching `Finished` callback, and a caller-owned event
+    /// log may consequently be partial or unbalanced. Normal returns and
+    /// errors keep every emitted boundary in a balanced pair.
+    #[cfg(feature = "performance-diagnostics")]
+    pub fn try_cache_diagnostics_with_observer(
+        &self,
+        mut observer: impl FnMut(DiagnosticSnapshot),
+    ) -> std::result::Result<SourceCacheDiagnostics, SourceCacheDiagnosticsError> {
+        let mut observer = CallbackDiagnosticObserver::new(&mut observer);
+        let result = self.cache.try_diagnostics_with_observer(&mut observer);
+        observer.resume_if_panicked();
+        let mut diagnostics = result?;
         diagnostics.budget_catalog_reserved_objects = self
             .catalog_object_reservation
             .as_ref()
@@ -6785,7 +7210,8 @@ impl SourceBackedPackage {
     }
 
     fn read_part(&self, index: usize) -> Result<PartData> {
-        self.read_part_with_accounting_and_session(index, None, None)
+        let mut observer = NoopDiagnosticObserver;
+        self.read_part_with_observer(index, None, None, &mut observer)
     }
 
     fn read_part_with_session(
@@ -6793,7 +7219,8 @@ impl SourceBackedPackage {
         index: usize,
         session: &mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>,
     ) -> Result<PartData> {
-        self.read_part_with_accounting_and_session(index, None, Some(session))
+        let mut observer = NoopDiagnosticObserver;
+        self.read_part_with_observer(index, None, Some(session), &mut observer)
     }
 
     fn read_part_with_accounting(
@@ -6801,15 +7228,20 @@ impl SourceBackedPackage {
         index: usize,
         accounting: Option<&mut OpcOperationAccounting>,
     ) -> Result<PartData> {
-        self.read_part_with_accounting_and_session(index, accounting, None)
+        let mut observer = NoopDiagnosticObserver;
+        self.read_part_with_observer(index, accounting, None, &mut observer)
     }
 
-    fn read_part_with_accounting_and_session(
+    fn read_part_with_observer<O>(
         &self,
         index: usize,
         accounting: Option<&mut OpcOperationAccounting>,
         mut session: Option<&mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>>,
-    ) -> Result<PartData> {
+        observer: &mut O,
+    ) -> Result<PartData>
+    where
+        O: DiagnosticObserver,
+    {
         self.cache.check_context().map_err(map_execution_error)?;
         let entry_id = self
             .parts
@@ -6831,12 +7263,13 @@ impl SourceBackedPackage {
             self.source.ensure_current()?;
             match self
                 .cache
-                .enter(entry_id, declared_bytes.unwrap_or_default())
+                .enter_with_observer(entry_id, declared_bytes.unwrap_or_default(), observer)
                 .map_err(map_execution_error)?
             {
                 CacheAccess::Hit(bytes) => {
                     if let Err(error) = self.source.ensure_current() {
-                        self.cache.invalidate_if_matches(entry_id, &bytes);
+                        self.cache
+                            .invalidate_if_matches_with_observer(entry_id, &bytes, observer);
                         return Err(error);
                     }
                     self.cache.check_context().map_err(map_execution_error)?;
@@ -6844,11 +7277,12 @@ impl SourceBackedPackage {
                 },
                 CacheAccess::Waiter(flight) => {
                     if let Some(payload) = flight
-                        .wait(self.cache.context())
+                        .wait_with_observer(self.cache.context(), observer)
                         .map_err(map_execution_error)?
                     {
                         if let Err(error) = self.source.ensure_current() {
-                            self.cache.invalidate_if_matches(entry_id, &payload);
+                            self.cache
+                                .invalidate_if_matches_with_observer(entry_id, &payload, observer);
                             return Err(error);
                         }
                         self.cache.check_context().map_err(map_execution_error)?;
@@ -6867,6 +7301,7 @@ impl SourceBackedPackage {
                         None,
                         accounting,
                         session.as_deref_mut(),
+                        observer,
                     );
                 },
                 CacheAccess::Bypass(reservation) => {
@@ -6878,13 +7313,14 @@ impl SourceBackedPackage {
                         Some(reservation),
                         accounting,
                         session.as_deref_mut(),
+                        observer,
                     );
                 },
             }
         }
     }
 
-    fn load_part_with_accounting(
+    fn load_part_with_accounting<O>(
         &self,
         index: usize,
         entry_id: EntryId,
@@ -6893,7 +7329,11 @@ impl SourceBackedPackage {
         bypass_resources: Option<LoadResources>,
         mut accounting: Option<&mut OpcOperationAccounting>,
         mut session: Option<&mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>>,
-    ) -> Result<PartData> {
+        observer: &mut O,
+    ) -> Result<PartData>
+    where
+        O: DiagnosticObserver,
+    {
         let mut zip_accounting = LowLevelZipOperationAccounting::default();
         let result = (|| {
             let part = self
@@ -6948,7 +7388,7 @@ impl SourceBackedPackage {
         })();
         let reservation = flight
             .as_ref()
-            .and_then(|flight| flight.reservation())
+            .and_then(|flight| flight.reservation_with_observer(observer))
             .or_else(|| {
                 bypass_resources
                     .as_ref()
@@ -6956,7 +7396,7 @@ impl SourceBackedPackage {
             });
         let object_reservation = flight
             .as_ref()
-            .and_then(|flight| flight.payload_object_reservation())
+            .and_then(|flight| flight.payload_object_reservation_with_observer(observer))
             .or_else(|| {
                 bypass_resources.as_ref().and_then(|resources| {
                     resources
@@ -6973,18 +7413,20 @@ impl SourceBackedPackage {
                     reservation,
                     object_reservation,
                 };
-                let publication =
-                    match self
-                        .cache
-                        .publish_pending(entry_id, &flight, payload.clone())
-                    {
-                        Ok(publication) => publication,
-                        Err(error) => {
-                            drop(payload);
-                            self.cache.complete_failure(entry_id, &flight);
-                            return Err(map_execution_error(error));
-                        },
-                    };
+                let publication = match self.cache.publish_pending_with_observer(
+                    entry_id,
+                    &flight,
+                    payload.clone(),
+                    observer,
+                ) {
+                    Ok(publication) => publication,
+                    Err(error) => {
+                        drop(payload);
+                        self.cache
+                            .complete_failure_with_observer(entry_id, &flight, observer);
+                        return Err(map_execution_error(error));
+                    },
+                };
                 #[cfg(test)]
                 self.cache.pause_test_publication();
                 // The low-level report has been merged above. Make source
@@ -6993,25 +7435,42 @@ impl SourceBackedPackage {
                 // same-Part flight. These checks deliberately run outside all
                 // cache and flight locks.
                 if let Err(error) = self.source.ensure_current() {
-                    self.cache
-                        .rollback_publication(entry_id, &flight, payload, publication);
+                    self.cache.rollback_publication_with_observer(
+                        entry_id,
+                        &flight,
+                        payload,
+                        publication,
+                        observer,
+                    );
                     return Err(error);
                 }
                 if let Err(error) = self.cache.check_context() {
-                    self.cache
-                        .rollback_publication(entry_id, &flight, payload, publication);
+                    self.cache.rollback_publication_with_observer(
+                        entry_id,
+                        &flight,
+                        payload,
+                        publication,
+                        observer,
+                    );
                     return Err(map_execution_error(error));
                 }
                 let payload = match publication {
-                    CachePublication::Pending => {
-                        self.cache.commit_pending(entry_id, &flight, payload)
-                    },
-                    CachePublication::Uncached(retention) => self
+                    CachePublication::Pending => self
                         .cache
-                        .complete_uncached_success(entry_id, &flight, payload, retention),
+                        .commit_pending_with_observer(entry_id, &flight, payload, observer),
+                    CachePublication::Uncached(retention) => {
+                        self.cache.complete_uncached_success_with_observer(
+                            entry_id, &flight, payload, retention, observer,
+                        )
+                    },
                     CachePublication::NotCurrent => {
-                        self.cache
-                            .rollback_publication(entry_id, &flight, payload, publication);
+                        self.cache.rollback_publication_with_observer(
+                            entry_id,
+                            &flight,
+                            payload,
+                            publication,
+                            observer,
+                        );
                         None
                     },
                 };
@@ -7028,7 +7487,8 @@ impl SourceBackedPackage {
             (Some(flight), Err(error)) => {
                 drop(reservation);
                 drop(object_reservation);
-                self.cache.complete_failure(entry_id, &flight);
+                self.cache
+                    .complete_failure_with_observer(entry_id, &flight, observer);
                 Err(error)
             },
             (None, Ok(bytes)) => {
@@ -8500,6 +8960,76 @@ mod tests {
 
         fn version(&self) -> std::io::Result<SourceVersion> {
             Ok(SourceVersion::new(77, 0))
+        }
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    struct GatedPayloadSource {
+        bytes: Vec<u8>,
+        payload_offset: usize,
+        payload_gate_entered: AtomicBool,
+        payload_gate_released: AtomicBool,
+        payload_gate_armed: AtomicBool,
+        payload_reads: AtomicUsize,
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    impl GatedPayloadSource {
+        fn new(bytes: Vec<u8>, payload_offset: usize) -> Self {
+            Self {
+                bytes,
+                payload_offset,
+                payload_gate_entered: AtomicBool::new(false),
+                payload_gate_released: AtomicBool::new(false),
+                payload_gate_armed: AtomicBool::new(true),
+                payload_reads: AtomicUsize::new(0),
+            }
+        }
+
+        fn wait_until_payload_read(&self, timeout: Duration) -> bool {
+            let deadline = std::time::Instant::now() + timeout;
+            while !self.payload_gate_entered.load(Ordering::Acquire)
+                && std::time::Instant::now() < deadline
+            {
+                std::thread::yield_now();
+            }
+            self.payload_gate_entered.load(Ordering::Acquire)
+        }
+
+        fn release_payload_read(&self) {
+            self.payload_gate_released.store(true, Ordering::Release);
+        }
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    impl ReadAt for GatedPayloadSource {
+        fn len(&self) -> std::io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            let offset = usize::try_from(offset).map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidInput, "offset too large")
+            })?;
+            if offset == self.payload_offset {
+                self.payload_reads.fetch_add(1, Ordering::SeqCst);
+                if self.payload_gate_armed.swap(false, Ordering::AcqRel) {
+                    self.payload_gate_entered.store(true, Ordering::Release);
+                    while !self.payload_gate_released.load(Ordering::Acquire) {
+                        std::thread::yield_now();
+                    }
+                }
+            }
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            Ok(SourceVersion::new(78, 0))
         }
     }
 
@@ -10606,6 +11136,7 @@ mod tests {
         // entered SourceReader yet. This is the exact race boundary where a
         // cancellation must survive ZIP's std::io::Error conversion.
         cancellation_source.cancel();
+        let mut observer = NoopDiagnosticObserver;
         let error = package
             .load_part_with_accounting(
                 index,
@@ -10615,6 +11146,7 @@ mod tests {
                 None,
                 None,
                 None,
+                &mut observer,
             )
             .unwrap_err();
         assert!(matches!(error, OpcError::Cancelled));
@@ -13886,6 +14418,592 @@ mod tests {
         assert_eq!(sink.bytes, source_bytes);
         assert_eq!(sink.first_memory, Some(0));
         assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    fn assert_balanced_diagnostic_events(events: &[DiagnosticSnapshot]) {
+        assert_eq!(events.len() % 2, 0, "event stream must contain pairs");
+        for pair in events.chunks_exact(2) {
+            match (&pair[0], &pair[1]) {
+                (
+                    DiagnosticSnapshot::Started { operation: started },
+                    DiagnosticSnapshot::Finished {
+                        operation: finished,
+                    },
+                ) => assert_eq!(started, finished, "lock operation changed in pair"),
+                _ => panic!("lock events must alternate Started and Finished"),
+            }
+        }
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    fn count_started_operation(events: &[DiagnosticSnapshot], wanted: Operation) -> usize {
+        events
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event,
+                    DiagnosticSnapshot::Started { operation } if *operation == wanted
+                )
+            })
+            .count()
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn performance_diagnostics_uncontended_hit_reports_only_cache_lock() {
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"diagnostic hit", false),
+        )))
+        .unwrap();
+        let part = package.main_document_part().unwrap();
+        let mut cold_events = Vec::new();
+        part.data_with_observer(|event| cold_events.push(event))
+            .unwrap();
+        assert_balanced_diagnostic_events(&cold_events);
+        assert!(count_started_operation(&cold_events, Operation::Cache(CacheState::Lock)) > 0);
+        assert!(count_started_operation(&cold_events, Operation::Flight(FlightState::Lock)) > 0);
+
+        let mut hit_events = Vec::new();
+        part.data_with_observer(|event| hit_events.push(event))
+            .unwrap();
+        assert_eq!(
+            hit_events,
+            vec![
+                DiagnosticSnapshot::Started {
+                    operation: Operation::Cache(CacheState::Lock),
+                },
+                DiagnosticSnapshot::Finished {
+                    operation: Operation::Cache(CacheState::Lock),
+                },
+            ]
+        );
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn performance_diagnostics_same_part_loader_and_waiter_are_balanced() {
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"diagnostic waiter", false),
+        )))
+        .unwrap();
+        let hook = Arc::new(TestPublicationHook::new());
+        let _hook_guard = package
+            .cache
+            .install_test_publication_hook(Arc::clone(&hook));
+
+        let (loader_events, waiter_events) = std::thread::scope(|scope| {
+            let package = &package;
+            let loader = scope.spawn(move || {
+                let mut events = Vec::new();
+                let result = package
+                    .main_document_part()
+                    .unwrap()
+                    .data_with_observer(|event| events.push(event));
+                (result, events)
+            });
+            hook.wait_until_entered();
+            let waiter = scope.spawn(move || {
+                let mut events = Vec::new();
+                let result = package
+                    .main_document_part()
+                    .unwrap()
+                    .data_with_observer(|event| events.push(event));
+                (result, events)
+            });
+            hook.wait_until_waiter_joined();
+            hook.release();
+            let (loader_result, loader_events) = loader.join().unwrap();
+            let (waiter_result, waiter_events) = waiter.join().unwrap();
+            assert!(loader_result.is_ok());
+            assert!(waiter_result.is_ok());
+            (loader_events, waiter_events)
+        });
+
+        assert_balanced_diagnostic_events(&loader_events);
+        assert_balanced_diagnostic_events(&waiter_events);
+        assert_eq!(
+            count_started_operation(&waiter_events, Operation::Cache(CacheState::Lock)),
+            1
+        );
+        // The waiter blocks in Condvar::wait_timeout after this one direct
+        // flight-state lock. Reacquisition and timed waiting must be silent.
+        assert_eq!(
+            count_started_operation(&waiter_events, Operation::Flight(FlightState::Lock)),
+            1
+        );
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn performance_diagnostics_cache_and_flight_scopes_are_reported() {
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"diagnostic scopes", false),
+        )))
+        .unwrap();
+        let mut idle_events = Vec::new();
+        let _ = package.cache_diagnostics_with_observer(|event| idle_events.push(event));
+        assert_eq!(
+            idle_events,
+            vec![
+                DiagnosticSnapshot::Started {
+                    operation: Operation::Cache(CacheState::Lock),
+                },
+                DiagnosticSnapshot::Finished {
+                    operation: Operation::Cache(CacheState::Lock),
+                },
+            ]
+        );
+
+        let entry_id = package.parts[0].entry_id;
+        let flight = Arc::new(LoadFlight::new(None, None, None));
+        package
+            .cache
+            .state
+            .lock()
+            .unwrap()
+            .flights
+            .insert(entry_id, Arc::clone(&flight));
+        let mut active_events = Vec::new();
+        let diagnostics =
+            package.cache_diagnostics_with_observer(|event| active_events.push(event));
+        assert_eq!(diagnostics.in_flight_loads, 1);
+        assert_balanced_diagnostic_events(&active_events);
+        assert_eq!(
+            count_started_operation(&active_events, Operation::Cache(CacheState::Lock)),
+            1
+        );
+        assert_eq!(
+            count_started_operation(&active_events, Operation::Flight(FlightState::Lock)),
+            1
+        );
+        package.cache.complete_failure(entry_id, &flight);
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn performance_diagnostics_poison_preserves_error_and_event_pair() {
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"diagnostic poison", false),
+        )))
+        .unwrap();
+        std::thread::scope(|scope| {
+            let cache = &package.cache;
+            let join = scope.spawn(move || {
+                let _state = cache.state.lock().unwrap();
+                panic!("test diagnostic cache-state poison");
+            });
+            assert!(join.join().is_err());
+        });
+
+        let mut events = Vec::new();
+        assert_eq!(
+            package.try_cache_diagnostics_with_observer(|event| events.push(event)),
+            Err(SourceCacheDiagnosticsError::StatePoisoned)
+        );
+        assert_eq!(
+            events,
+            vec![
+                DiagnosticSnapshot::Started {
+                    operation: Operation::Cache(CacheState::Lock),
+                },
+                DiagnosticSnapshot::Finished {
+                    operation: Operation::Cache(CacheState::Lock),
+                },
+            ]
+        );
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn performance_diagnostics_failure_retry_and_cancellation_are_balanced() {
+        const DOCUMENT: &[u8] = b"diagnostic failure and retry";
+        let mut bytes = archive_bytes(root_relationships(), DOCUMENT, false);
+        let payload_offset = bytes
+            .windows(DOCUMENT.len())
+            .position(|window| window == DOCUMENT)
+            .unwrap();
+        bytes[payload_offset] ^= 0xff;
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
+        let part = package.main_document_part().unwrap();
+        for _ in 0..2 {
+            let mut events = Vec::new();
+            assert!(part.data_with_observer(|event| events.push(event)).is_err());
+            assert_balanced_diagnostic_events(&events);
+            assert!(count_started_operation(&events, Operation::Flight(FlightState::Lock)) > 0);
+        }
+
+        let (budget, cancellation_source, context) =
+            managed_context_with_cancellation(DOCUMENT.len() as u64);
+        let source_bytes = archive_bytes(root_relationships(), DOCUMENT, false);
+        let payload_offset = source_bytes
+            .windows(DOCUMENT.len())
+            .position(|window| window == DOCUMENT)
+            .unwrap();
+        let source = Arc::new(CancelDuringPayloadSource::new(
+            source_bytes,
+            payload_offset,
+            cancellation_source,
+        ));
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            source,
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+        let mut events = Vec::new();
+        assert!(matches!(
+            package
+                .main_document_part()
+                .unwrap()
+                .data_with_observer(|event| events.push(event)),
+            Err(OpcError::Cancelled)
+        ));
+        assert_balanced_diagnostic_events(&events);
+        assert!(count_started_operation(&events, Operation::Flight(FlightState::Lock)) > 0);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn performance_diagnostics_started_panic_has_no_finished_and_cache_recovers() {
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"started panic", false),
+        )))
+        .unwrap();
+        let part = package.main_document_part().unwrap();
+        let mut started = false;
+        let mut events = Vec::new();
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = part.data_with_observer(|event| {
+                events.push(event);
+                if matches!(event, DiagnosticSnapshot::Started { .. }) {
+                    started = true;
+                    panic!("test Started callback panic");
+                }
+            });
+        }));
+        assert!(panic.is_err());
+        assert!(started);
+        assert_eq!(events.len(), 1);
+        assert!(matches!(events[0], DiagnosticSnapshot::Started { .. }));
+
+        // Started runs before lock acquisition. The observer panic is deferred
+        // while the load completes, later notifications are suppressed, and
+        // no cache mutex is poisoned; the ordinary path can immediately read
+        // the committed payload.
+        assert_eq!(part.data().unwrap().as_bytes(), b"started panic");
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn performance_diagnostics_started_flight_panic_does_not_strand_waiter() {
+        const DOCUMENT: &[u8] = b"started flight panic with waiter";
+        let bytes = archive_bytes(root_relationships(), DOCUMENT, false);
+        let payload_offset = bytes
+            .windows(DOCUMENT.len())
+            .position(|window| window == DOCUMENT)
+            .unwrap();
+        let source = Arc::new(GatedPayloadSource::new(bytes, payload_offset));
+        let package = Arc::new(
+            SourceBackedPackage::from_read_at(source.clone())
+                .expect("gated source package should open"),
+        );
+
+        let (loader_tx, loader_rx) = std::sync::mpsc::channel();
+        let loader_package = Arc::clone(&package);
+        let loader = std::thread::spawn(move || {
+            let mut events = Vec::new();
+            let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                loader_package
+                    .main_document_part()
+                    .unwrap()
+                    .data_with_observer(|event| {
+                        events.push(event);
+                        if matches!(
+                            event,
+                            DiagnosticSnapshot::Started {
+                                operation: Operation::Flight(FlightState::Lock),
+                            }
+                        ) {
+                            panic!("test Started Flight callback panic");
+                        }
+                    })
+                    .unwrap();
+            }))
+            .is_err();
+            loader_tx
+                .send((panicked, events))
+                .expect("loader result receiver should remain available");
+        });
+
+        // The source gate proves that the loader has already inserted its
+        // flight before the observer's first Flight Started callback. This
+        // avoids relying on sleeps and keeps every wait in this regression
+        // test bounded.
+        if !source.wait_until_payload_read(Duration::from_secs(2)) {
+            source.release_payload_read();
+            panic!("loader did not reach the gated payload read");
+        }
+        assert!(source.payload_reads.load(Ordering::Acquire) > 0);
+
+        let (waiter_joined_tx, waiter_joined_rx) = std::sync::mpsc::channel();
+        let (waiter_tx, waiter_rx) = std::sync::mpsc::channel();
+        let waiter_package = Arc::clone(&package);
+        let waiter = std::thread::spawn(move || {
+            let mut events = Vec::new();
+            let result = waiter_package
+                .main_document_part()
+                .unwrap()
+                .data_with_observer(|event| {
+                    if matches!(
+                        event,
+                        DiagnosticSnapshot::Finished {
+                            operation: Operation::Flight(FlightState::Lock),
+                        }
+                    ) {
+                        waiter_joined_tx
+                            .send(())
+                            .expect("waiter-joined receiver should remain available");
+                    }
+                    events.push(event);
+                })
+                .map(|data| data.as_bytes().to_vec());
+            waiter_tx
+                .send((result, events))
+                .expect("waiter result receiver should remain available");
+        });
+
+        // The waiter reports its direct flight-lock Finished boundary while
+        // that guard is live and immediately before entering
+        // Condvar::wait_timeout. Only then release the loader, guaranteeing
+        // that the waiter exercises the same-flight path rather than a cache
+        // hit after publication.
+        if waiter_joined_rx
+            .recv_timeout(Duration::from_secs(2))
+            .is_err()
+        {
+            source.release_payload_read();
+            panic!("waiter did not join the active load flight");
+        }
+        source.release_payload_read();
+
+        let loader_message = loader_rx
+            .recv_timeout(Duration::from_secs(3))
+            .expect("loader must finish after observer panic");
+        let waiter_message = waiter_rx
+            .recv_timeout(Duration::from_secs(3))
+            .expect("waiter must be notified after loader cleanup");
+        loader.join().expect("loader thread should exit normally");
+        waiter.join().expect("waiter thread should exit normally");
+
+        assert!(loader_message.0, "loader observer panic must propagate");
+        assert_eq!(loader_message.1.len(), 3);
+        assert_eq!(
+            count_started_operation(&loader_message.1, Operation::Flight(FlightState::Lock)),
+            1
+        );
+        assert!(!loader_message.1.iter().any(|event| matches!(
+            event,
+            DiagnosticSnapshot::Finished {
+                operation: Operation::Flight(FlightState::Lock),
+            }
+        )));
+
+        assert_eq!(waiter_message.0.unwrap(), DOCUMENT);
+        assert_balanced_diagnostic_events(&waiter_message.1);
+        assert_eq!(
+            count_started_operation(&waiter_message.1, Operation::Cache(CacheState::Lock)),
+            1
+        );
+        // The wait itself and its mutex reacquisitions remain outside the
+        // direct-lock event seam.
+        assert_eq!(
+            count_started_operation(&waiter_message.1, Operation::Flight(FlightState::Lock)),
+            1
+        );
+        assert_eq!(package.cache_diagnostics().in_flight_loads, 0);
+        assert!(package.try_cache_diagnostics().is_ok());
+        assert_eq!(
+            package
+                .main_document_part()
+                .unwrap()
+                .data()
+                .unwrap()
+                .as_bytes(),
+            DOCUMENT
+        );
+        assert_eq!(package.cache_diagnostics().successful_loads, 1);
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn performance_diagnostics_started_nested_publication_flight_panic_recovers() {
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"nested publication panic", false),
+        )))
+        .unwrap();
+        let part = package.main_document_part().unwrap();
+        let mut flight_starts = 0;
+        let mut events = Vec::new();
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = part.data_with_observer(|event| {
+                if matches!(
+                    event,
+                    DiagnosticSnapshot::Started {
+                        operation: Operation::Flight(FlightState::Lock),
+                    }
+                ) {
+                    flight_starts += 1;
+                    // The third Flight lock is acquired by publication while
+                    // the cache-state guard is still held. A direct callback
+                    // unwind here would poison that guard and strand the
+                    // loader; the observer must defer it until cleanup.
+                    if flight_starts == 3 {
+                        panic!("test nested publication Started Flight panic");
+                    }
+                }
+                events.push(event);
+            });
+        }));
+        assert!(panic.is_err());
+        assert_eq!(flight_starts, 3);
+        // The third Started callback panics before the caller-owned log can
+        // record that event. Its invocation is counted above, while its
+        // event and every later notification are intentionally absent.
+        assert_eq!(events.len(), 10);
+        assert_eq!(
+            count_started_operation(&events, Operation::Flight(FlightState::Lock)),
+            2
+        );
+        assert!(matches!(
+            events.last(),
+            Some(DiagnosticSnapshot::Finished {
+                operation: Operation::Cache(CacheState::Lock),
+            })
+        ));
+
+        // The nested panic was caught before the flight mutex lock and the
+        // operation completed publication before resuming it. Both locks are
+        // therefore usable and the committed value is immediately a hit.
+        assert!(package.try_cache_diagnostics().is_ok());
+        assert_eq!(package.cache_diagnostics().in_flight_loads, 0);
+        assert_eq!(part.data().unwrap().as_bytes(), b"nested publication panic");
+        assert_eq!(package.cache_diagnostics().successful_loads, 1);
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn performance_diagnostics_finished_panic_drops_guard_and_cache_recovers() {
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"finished panic", false),
+        )))
+        .unwrap();
+        let part = package.main_document_part().unwrap();
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = part.data_with_observer(|event| {
+                if matches!(
+                    event,
+                    DiagnosticSnapshot::Finished {
+                        operation: Operation::Cache(CacheState::Lock),
+                    }
+                ) {
+                    panic!("test Finished callback panic");
+                }
+            });
+        }));
+        assert!(panic.is_err());
+
+        // The helper catches the panic while its guard is live; the public
+        // entry point resumes only after dropping that guard. The next load
+        // is therefore uncontended and proves observer panic did not poison
+        // it.
+        let mut events = Vec::new();
+        assert_eq!(
+            part.data_with_observer(|event| events.push(event))
+                .unwrap()
+                .as_bytes(),
+            b"finished panic"
+        );
+        assert_balanced_diagnostic_events(&events);
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn performance_diagnostics_finished_panic_drops_flight_guard() {
+        let flight = LoadFlight::new(None, None, None);
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut callback = |event| {
+                if matches!(
+                    event,
+                    DiagnosticSnapshot::Finished {
+                        operation: Operation::Flight(FlightState::Lock),
+                    }
+                ) {
+                    panic!("test flight Finished callback panic");
+                }
+            };
+            let mut observer = CallbackDiagnosticObserver::new(&mut callback);
+            let _ = flight.reservation_with_observer(&mut observer);
+            observer.resume_if_panicked();
+        }));
+        assert!(panic.is_err());
+
+        // The flight mutex is still usable after the panic was resumed.
+        assert!(flight.state.lock().is_ok());
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn performance_diagnostics_finished_panic_does_not_abandon_loader_flight() {
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"flight panic recovery", false),
+        )))
+        .unwrap();
+        let part = package.main_document_part().unwrap();
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = part.data_with_observer(|event| {
+                if matches!(
+                    event,
+                    DiagnosticSnapshot::Finished {
+                        operation: Operation::Flight(FlightState::Lock),
+                    }
+                ) {
+                    panic!("test loader-flight Finished callback panic");
+                }
+            });
+        }));
+        assert!(panic.is_err());
+
+        // Finished panic is deferred until the whole read unwinds cleanly;
+        // otherwise an abandoned flight would make the next same-Part read
+        // wait forever. The package remains usable and the payload committed.
+        assert_eq!(part.data().unwrap().as_bytes(), b"flight panic recovery");
+        assert_eq!(package.cache_diagnostics().successful_loads, 1);
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn performance_diagnostics_reentrancy_contract_refuses_before_lock() {
+        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
+            archive_bytes(root_relationships(), b"reentrancy contract", false),
+        )))
+        .unwrap();
+
+        // Re-entering an observed operation from Finished would deadlock by
+        // design because that callback runs with the corresponding guard
+        // live. A caller-owned callback can apply a bounded refusal policy;
+        // this test models that refusal instead of intentionally hanging.
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = package.cache_diagnostics_with_observer(|event| {
+                if matches!(event, DiagnosticSnapshot::Started { .. }) {
+                    panic!("observer contract refuses reentrant lock acquisition");
+                }
+            });
+        }));
+        assert!(panic.is_err());
+        assert!(package.try_cache_diagnostics().is_ok());
     }
 }
 
