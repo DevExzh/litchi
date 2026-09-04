@@ -281,4 +281,37 @@ mod tests {
         ));
         assert_eq!(session.context().budget().used(Resource::InputBytes), 0);
     }
+
+    #[test]
+    fn explicit_owned_open_rejects_malformed_zip_before_input_charge() {
+        let (_source, context) = execution_context(16 * MIB);
+        let session = OpenSession::new(context).unwrap();
+
+        assert!(matches!(
+            session.from_vec(b"not an OPC ZIP".to_vec(), ReadLimits::default()),
+            Err(OpcError::ZipError(_))
+        ));
+        assert_eq!(session.context().budget().used(Resource::InputBytes), 0);
+    }
+
+    #[test]
+    fn explicit_owned_open_rejects_input_limit_before_zip_and_input_charge() {
+        let (_source, context) = execution_context(16 * MIB);
+        let session = OpenSession::new(context).unwrap();
+        let limits = ReadLimits::builder()
+            .max_input_bytes(3)
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert!(matches!(
+            session.from_vec(b"four".to_vec(), limits),
+            Err(OpcError::ReadLimit {
+                resource: crate::ReadResource::InputBytes,
+                actual: 4,
+                maximum: 3,
+            })
+        ));
+        assert_eq!(session.context().budget().used(Resource::InputBytes), 0);
+    }
 }
