@@ -9,7 +9,7 @@ use crate::sprm_operations::{
     SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_RMARK, SPRM_C_F_RMARK_DEL,
     SPRM_C_IBST_RMARK, SPRM_C_IBST_RMARK_DEL, SPRM_C_IDSL_RMARK, SPRM_C_IDSL_RMARK_DEL,
     SPRM_C_PROP_RMARK_CURRENT, SPRM_C_PROP_RMARK90, SPRM_C_RSID_PROP, SPRM_C_RSID_RM_DEL,
-    SPRM_C_RSID_TEXT, SPRM_C_WALL, SPRM_P_PROP_RMARK, SPRM_P_PROP_RMARK_CURRENT,
+    SPRM_C_RSID_TEXT, SPRM_C_WALL, SPRM_P_F_IN_TABLE, SPRM_P_PROP_RMARK, SPRM_P_PROP_RMARK_CURRENT,
     SPRM_P_PROP_RMARK90, SPRM_P_WALL, SPRM_T_PROP_RMARK, SPRM_T_RSID, SPRM_T_WALL,
 };
 use std::collections::{BTreeSet, HashMap};
@@ -355,6 +355,23 @@ pub(super) fn strict_sprms(grp: &[u8]) -> Result<Vec<crate::sprm::Sprm>> {
         .map_err(|error| corrupted(format!("malformed or overlapping SPRM sequence: {error}")))
 }
 
+/// Parse one PAPX group and retain only the final table-membership state.
+///
+/// PAPX carries a two-byte style index before its SPRM body. The reverse
+/// lookup deliberately mirrors the legacy reader semantics: duplicate
+/// `sprmPFInTable` records are resolved by the last record, and only the
+/// literal byte value `1` means that the paragraph is in a table.
+pub(super) fn papx_in_table_state(grpprl: &[u8]) -> Result<bool> {
+    let body = grpprl
+        .get(2..)
+        .ok_or_else(|| corrupted("PAPX has no style index"))?;
+    Ok(strict_sprms(body)?
+        .iter()
+        .rev()
+        .find(|sprm| sprm.opcode == SPRM_P_F_IN_TABLE)
+        .is_some_and(|sprm| sprm.operand_byte() == Some(1)))
+}
+
 pub(super) fn split_transform_chpx(
     runs: &mut Vec<FcRun>,
     intervals: &[(u32, u32)],
@@ -412,18 +429,23 @@ pub(super) fn split_transform_papx(
     intervals: &[(u32, u32)],
     transform: impl Fn(&[u8]) -> Result<Vec<u8>>,
 ) -> Result<()> {
-    let mut hit = false;
-    for run in runs.iter_mut() {
+    let mut replacements = Vec::new();
+    for (index, run) in runs.iter().enumerate() {
         if intervals
             .iter()
             .any(|(a, b)| *a < run.end && *b > run.start)
         {
-            run.grpprl = transform(&run.grpprl)?;
-            hit = true;
+            let grpprl = transform(&run.grpprl)?;
+            let in_table = papx_in_table_state(&grpprl)?;
+            replacements.push((index, grpprl, in_table));
         }
     }
-    if !hit {
+    if replacements.is_empty() {
         return Err(corrupted("tracked property range is outside PAPX coverage"));
+    }
+    for (index, grpprl, in_table) in replacements {
+        let run = &mut runs[index];
+        run.replace_grpprl(grpprl, in_table);
     }
     Ok(())
 }
@@ -483,15 +505,16 @@ pub(super) fn parse_papx(word: &[u8], table: &[u8]) -> Result<Vec<PapxRun>> {
             if grpprl.len() < 2 {
                 return Err(corrupted("PAPX style index is missing"));
             }
-            strict_sprms(&grpprl[2..])?;
-            output.push(PapxRun {
-                start: entry.fc,
-                end: entry.end_fc,
+            let in_table = papx_in_table_state(&grpprl)?;
+            output.push(PapxRun::new(
+                entry.fc,
+                entry.end_fc,
                 grpprl,
-                phe: entry
+                in_table,
+                entry
                     .paragraph_height
                     .ok_or_else(|| corrupted("PAPX PHE is missing"))?,
-            });
+            ));
         }
     }
     output.sort_by_key(|r| r.start);
@@ -1006,6 +1029,183 @@ pub(super) fn kind_order(kind: RevisionKind) -> u8 {
         RevisionKind::CharacterFormatting => 2,
         RevisionKind::ParagraphFormatting => 3,
         RevisionKind::TableRowFormatting => 4,
+    }
+}
+
+#[cfg(test)]
+mod papx_cache_tests {
+    use super::*;
+
+    fn assert_send_sync<T: Send + Sync>() {}
+
+    fn table_sprm(value: u8) -> [u8; 3] {
+        let opcode = SPRM_P_F_IN_TABLE.to_le_bytes();
+        [opcode[0], opcode[1], value]
+    }
+
+    fn papx_grpprl(sprms: &[u8]) -> Vec<u8> {
+        let mut grpprl = vec![0x34, 0x12];
+        grpprl.extend_from_slice(sprms);
+        grpprl
+    }
+
+    fn papx_run(start: u32, end: u32, grpprl: Vec<u8>) -> PapxRun {
+        let in_table = papx_in_table_state(&grpprl).expect("test PAPX should parse");
+        PapxRun::new(
+            start,
+            end,
+            grpprl,
+            in_table,
+            ParagraphHeight {
+                info_field: 0,
+                reserved: 0,
+                dxa_col: 0,
+                dym_line_or_height: 0,
+            },
+        )
+    }
+
+    #[test]
+    fn papx_table_state_is_absent_single_and_last_duplicate() {
+        assert!(!papx_in_table_state(&papx_grpprl(&[])).unwrap());
+        assert!(papx_in_table_state(&papx_grpprl(&table_sprm(1))).unwrap());
+        assert!(!papx_in_table_state(&papx_grpprl(&table_sprm(0))).unwrap());
+        assert!(
+            papx_in_table_state(&papx_grpprl(&[table_sprm(0), table_sprm(1),].concat())).unwrap()
+        );
+        assert!(
+            !papx_in_table_state(&papx_grpprl(&[table_sprm(1), table_sprm(0),].concat())).unwrap()
+        );
+        assert!(!papx_in_table_state(&papx_grpprl(&table_sprm(2))).unwrap());
+    }
+
+    #[test]
+    fn papx_table_state_rejects_malformed_grpprl_before_caching() {
+        let malformed = papx_grpprl(&SPRM_P_F_IN_TABLE.to_le_bytes());
+        assert!(papx_in_table_state(&malformed).is_err());
+        let mut valid_prefix = papx_grpprl(&table_sprm(1));
+        valid_prefix.extend_from_slice(&SPRM_P_F_IN_TABLE.to_le_bytes());
+        assert!(papx_in_table_state(&valid_prefix).is_err());
+        assert!(papx_in_table_state(&[]).is_err());
+        assert!(papx_in_table_state(&[0]).is_err());
+    }
+
+    #[test]
+    fn split_transform_papx_updates_cache_only_after_strict_success() {
+        let original = papx_grpprl(&table_sprm(1));
+        let mut runs = vec![papx_run(10, 20, original.clone())];
+
+        split_transform_papx(&mut runs, &[(10, 11)], |grpprl| {
+            let mut transformed = grpprl.to_vec();
+            transformed.extend_from_slice(&table_sprm(0));
+            Ok(transformed)
+        })
+        .unwrap();
+        assert!(!runs[0].in_table());
+        assert_eq!(runs[0].grpprl, [original, table_sprm(0).to_vec()].concat());
+
+        let before = runs[0].clone();
+        assert!(
+            split_transform_papx(&mut runs, &[(20, 21)], |_| {
+                Ok(papx_grpprl(&SPRM_P_F_IN_TABLE.to_le_bytes()))
+            })
+            .is_err()
+        );
+        assert_eq!(runs[0].grpprl, before.grpprl);
+        assert_eq!(runs[0].in_table(), before.in_table());
+
+        split_transform_papx(&mut runs, &[(19, 20)], |grpprl| Ok(grpprl.to_vec())).unwrap();
+        assert!(!runs[0].in_table());
+    }
+
+    #[test]
+    fn restoring_before_wall_recomputes_table_state_and_keeps_wire_prefix() {
+        let mut body = Vec::from(table_sprm(1));
+        body.extend_from_slice(&SPRM_P_WALL.to_le_bytes());
+        body.push(1);
+        body.extend_from_slice(&table_sprm(0));
+        let original = papx_grpprl(&body);
+        let mut runs = vec![papx_run(0, 4, original)];
+
+        split_transform_papx(&mut runs, &[(1, 2)], |grpprl| {
+            let mut restored = grpprl[..2].to_vec();
+            restored.extend_from_slice(&restore_before_wall(
+                &grpprl[2..],
+                SPRM_P_WALL,
+                &[SPRM_P_WALL],
+            )?);
+            Ok(restored)
+        })
+        .unwrap();
+        assert!(runs[0].in_table());
+        assert_eq!(runs[0].grpprl, papx_grpprl(&table_sprm(1)));
+    }
+
+    #[test]
+    fn split_transform_papx_is_atomic_when_a_later_run_is_malformed() {
+        let first = papx_grpprl(&table_sprm(1));
+        let second = papx_grpprl(&table_sprm(0));
+        let mut runs = vec![
+            papx_run(0, 10, first.clone()),
+            papx_run(10, 20, second.clone()),
+        ];
+        let before = runs.clone();
+        assert!(
+            split_transform_papx(&mut runs, &[(0, 20)], |grpprl| {
+                if grpprl == first.as_slice() {
+                    Ok(papx_grpprl(&table_sprm(0)))
+                } else {
+                    Ok(papx_grpprl(&SPRM_P_F_IN_TABLE.to_le_bytes()))
+                }
+            })
+            .is_err()
+        );
+        for (actual, expected) in runs.iter().zip(before) {
+            assert_eq!(actual.grpprl, expected.grpprl);
+            assert_eq!(actual.in_table(), expected.in_table());
+        }
+    }
+
+    #[test]
+    fn papx_cache_stays_paired_through_sort_and_serialization() {
+        let first = papx_grpprl(&table_sprm(1));
+        let second = papx_grpprl(&table_sprm(0));
+        let mut runs = vec![
+            papx_run(10, 20, second.clone()),
+            papx_run(0, 10, first.clone()),
+        ];
+        runs.sort_by_key(|run| run.start);
+        assert!(runs[0].in_table());
+        assert!(!runs[1].in_table());
+
+        let pages = build_papx_pages(&runs).unwrap();
+        let parsed = PapxFkp::parse(&pages[0].bytes, &[]).unwrap();
+        assert_eq!(parsed.entry(0).unwrap().grpprl, first);
+        assert_eq!(parsed.entry(1).unwrap().grpprl, second);
+    }
+
+    #[test]
+    fn cached_state_matches_strict_reverse_lookup_for_duplicate_sequences() {
+        let values = [0, 1, 2, 255];
+        for first in values {
+            for last in values {
+                let body = [table_sprm(first), table_sprm(last)].concat();
+                let grpprl = papx_grpprl(&body);
+                let expected = strict_sprms(&grpprl[2..])
+                    .unwrap()
+                    .iter()
+                    .rev()
+                    .find(|sprm| sprm.opcode == SPRM_P_F_IN_TABLE)
+                    .is_some_and(|sprm| sprm.operand_byte() == Some(1));
+                assert_eq!(papx_in_table_state(&grpprl).unwrap(), expected);
+                assert_eq!(grpprl, papx_grpprl(&body));
+            }
+        }
+    }
+
+    #[test]
+    fn papx_run_cache_is_send_sync() {
+        assert_send_sync::<PapxRun>();
     }
 }
 pub(super) fn validate_range(start: u32, end: u32, limit: u32) -> Result<()> {
