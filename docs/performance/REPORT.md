@@ -22,7 +22,8 @@ validation-constructor coverage is correctness-only. The mapless exact
 experiment measured approximately
 `+2,750% / +3,500%`. The preliminary scalar-`Vec` exact probe measured
 `+14.85% / +20.96%`; the full inlined linear-probe ABBA measured
-`+20.22% / +12.42%` while saving `N` allocation events. `std` prehashed exact
+`+20.22% / +12.42%` while saving `N` source-open allocator allocation calls.
+`std` prehashed exact
 measured `+13.42% / +15.88%`;
 and direct `HashTable` exact measured `+14.66% / +13.36%`, with a high-sample
 follow-up around `+14.7%`–`+15.6%`. The final pooled `Arc<str>` experiment

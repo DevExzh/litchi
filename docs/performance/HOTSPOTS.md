@@ -19,7 +19,8 @@ allocator-enabled latency is observational only. Validation-constructor
 coverage is correctness-only. Mapless exact regressed approximately
 `+2,750% / +3,500%`. The preliminary scalar-`Vec` exact probe measured
 `+14.85% / +20.96%`; the full inlined linear-probe ABBA measured
-`+20.22% / +12.42%` while saving `N` allocation events. `std` prehashed exact
+`+20.22% / +12.42%` while saving `N` source-open allocator allocation calls.
+`std` prehashed exact
 `+13.42% / +15.88%`; and direct `HashTable` exact `+14.66% / +13.36%`, with
 a high-sample follow-up still around `+14.7%`–`+15.6%`. The final pooled
 `Arc<str>` experiment regressed exact `+6.09% / +6.96%`, source-open

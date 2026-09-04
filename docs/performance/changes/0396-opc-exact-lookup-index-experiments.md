@@ -82,7 +82,7 @@ failed optimization search into a success claim.
 | --- | ---: | --- | --- |
 | Mapless exact lookup | approximately `+2,750% / +3,500%` | Removing the exact-name map routes exact queries through the case-fold ordering. | Rejected: severe exact-lookup regression. |
 | Preliminary scalar-`Vec` exact-position probe | `+14.85% / +20.96%` | Five-sample probe before the final inlining/layout iteration. | Rejected: exact-lookup regression. |
-| Inlined linear-probe `Vec`, full ABBA | `+20.22% / +12.42%` | Saves `N` allocation events, with `N` equal to the ordinary Part count. | Rejected: allocation saving does not offset exact-lookup latency. |
+| Inlined linear-probe `Vec`, full ABBA | `+20.22% / +12.42%` | Saves `N` source-open allocator allocation calls, with `N` equal to the ordinary Part count. | Rejected: allocation saving does not offset exact-lookup latency. |
 | `std` prehashed exact index | `+13.42% / +15.88%` | Prehashing does not recover the exact-name fast path under the measured protocol. | Rejected: exact-lookup regression. |
 | Direct `HashTable` exact index | `+14.66% / +13.36%` | A higher-sample follow-up remained approximately `+14.7%`–`+15.6%`. | Rejected: repeated exact-lookup regression. |
 | Final pooled `Arc<str>` PackURI storage | `+6.09% / +6.96%` | Source-open p50 `+3.38% / +4.30%`; mixed exact/alias/miss lookup `-0.59% / -0.50%`. Allocator source-open vectors add 3 allocation calls and approximately `N` deallocation calls; net-live bytes fall by 65,536 / 524,288 at 2,048 / 16,384 Parts. | Rejected: lifecycle and latency regressions outweigh the retained-live-byte observation. |

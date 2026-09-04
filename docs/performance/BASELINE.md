@@ -22,8 +22,9 @@ lifecycle/allocation vectors. Validation-constructor coverage is
 correctness-only.
 The mapless exact candidate regressed approximately `+2,750% / +3,500%`.
 The preliminary scalar-`Vec` exact probe was `+14.85% / +20.96%`; the full
-inlined linear-probe ABBA was `+20.22% / +12.42%` with `N` allocation
-savings. `std` prehashed exact was `+13.42% / +15.88%`; and direct `HashTable` exact was
+inlined linear-probe ABBA was `+20.22% / +12.42%` with `N` source-open
+allocator allocation-call savings. `std` prehashed exact was
+`+13.42% / +15.88%`; and direct `HashTable` exact was
 `+14.66% / +13.36%`, with a high-sample follow-up still approximately
 `+14.7%`–`+15.6%`. The final pooled `Arc<str>` candidate regressed exact
 lookup `+6.09% / +6.96%`, source-open `+3.38% / +4.30%`, and mixed lookup
