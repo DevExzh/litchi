@@ -91,10 +91,14 @@ const OPC_RELATIONSHIP_CORPUS_GENERATOR: &str = "litchi-opc-relationship-heavy-v
 const OPC_SOURCE_OVERLAY_MULTI_CORPUS_GENERATOR: &str = "litchi-opc-source-overlay-multi-part-v1";
 const OPC_SOURCE_OVERLAY_MULTI_PART_COUNTS: [usize; 3] = [2, 8, 32];
 const OPC_CASEFOLD_LOOKUP_CORPUS_GENERATOR: &str = "litchi-opc-casefold-lookup-v1";
-const OPC_CASEFOLD_PART_COUNTS: [usize; 3] = [256, 2_048, 16_384];
+const OPC_CASEFOLD_PART_COUNTS: [usize; 4] = [256, 2_047, 2_048, 16_384];
 const OPC_CASEFOLD_PART_BYTES: usize = 32;
 const OPC_CASEFOLD_QUERY_REPETITIONS: usize = 16;
 const OPC_CASEFOLD_QUERY_COUNT: usize = 9;
+const OPC_CASEFOLD_CLASS_QUERY_COUNT: usize = 3;
+const OPC_CASEFOLD_CLASS_QUERY_REPETITIONS: usize = 48;
+const OPC_CASEFOLD_CLASS_LOOKUP_COUNT: usize =
+    OPC_CASEFOLD_CLASS_QUERY_COUNT * OPC_CASEFOLD_CLASS_QUERY_REPETITIONS;
 const OPC_CASEFOLD_QUERY_CLASSES: [&str; OPC_CASEFOLD_QUERY_COUNT] = [
     "exact_first",
     "exact_middle",
@@ -989,6 +993,9 @@ enum Case {
     OpcCasefoldSourceOpen,
     OpcCasefoldEagerLookup,
     OpcCasefoldSourceLookup,
+    OpcCasefoldSourceExactLookup,
+    OpcCasefoldSourceCaseAliasLookup,
+    OpcCasefoldSourceGenuineMissLookup,
     OpcFileEagerOpen,
     OpcFileSourceOpen,
     OpcFileEagerOnePartAtomicSave,
@@ -1448,6 +1455,9 @@ impl Case {
             Self::OpcCasefoldSourceOpen => "opc_casefold_source_open",
             Self::OpcCasefoldEagerLookup => "opc_casefold_eager_lookup",
             Self::OpcCasefoldSourceLookup => "opc_casefold_source_lookup",
+            Self::OpcCasefoldSourceExactLookup => "opc_casefold_source_exact_lookup",
+            Self::OpcCasefoldSourceCaseAliasLookup => "opc_casefold_source_case_alias_lookup",
+            Self::OpcCasefoldSourceGenuineMissLookup => "opc_casefold_source_genuine_miss_lookup",
             Self::OpcFileEagerOpen => "opc_file_eager_open",
             Self::OpcFileSourceOpen => "opc_file_source_open",
             Self::OpcFileEagerOnePartAtomicSave => "opc_file_eager_one_part_atomic_save",
@@ -2025,6 +2035,9 @@ impl Case {
                 | Self::OpcCasefoldSourceOpen
                 | Self::OpcCasefoldEagerLookup
                 | Self::OpcCasefoldSourceLookup
+                | Self::OpcCasefoldSourceExactLookup
+                | Self::OpcCasefoldSourceCaseAliasLookup
+                | Self::OpcCasefoldSourceGenuineMissLookup
         )
     }
 
@@ -2038,8 +2051,21 @@ impl Case {
     const fn is_opc_casefold_source_backed(self) -> bool {
         matches!(
             self,
-            Self::OpcCasefoldSourceOpen | Self::OpcCasefoldSourceLookup
+            Self::OpcCasefoldSourceOpen
+                | Self::OpcCasefoldSourceLookup
+                | Self::OpcCasefoldSourceExactLookup
+                | Self::OpcCasefoldSourceCaseAliasLookup
+                | Self::OpcCasefoldSourceGenuineMissLookup
         )
+    }
+
+    const fn opc_casefold_source_class(self) -> Option<usize> {
+        match self {
+            Self::OpcCasefoldSourceExactLookup => Some(0),
+            Self::OpcCasefoldSourceCaseAliasLookup => Some(1),
+            Self::OpcCasefoldSourceGenuineMissLookup => Some(2),
+            _ => None,
+        }
     }
 
     const fn is_fresh_writer(self) -> bool {
@@ -3191,6 +3217,7 @@ struct OpcCasefoldCorpus {
     queries: Vec<OpcCasefoldQuery>,
     canonical_name_oracle_sha256: String,
     expected_lookup_sha256: String,
+    expected_class_lookup_sha256: [String; 3],
     malformed_equivalent_name_gate_verified: bool,
 }
 
@@ -8193,7 +8220,7 @@ fn validate_opc_casefold_lookup_options(
         && (shapes != CorpusShape::ALL.as_slice() || payloads != PayloadKind::ALL.as_slice())
     {
         return Err(
-            "OPC case-fold lookup selectors use fixed 256/2048/16384-part corpora; omit --shape and --payload"
+            "OPC case-fold lookup selectors use fixed 256/2047/2048/16384-part corpora; omit --shape and --payload"
                 .into(),
         );
     }
@@ -10472,6 +10499,9 @@ fn parse_case(value: &str) -> Option<Case> {
         "opc_casefold_source_open" => Some(Case::OpcCasefoldSourceOpen),
         "opc_casefold_eager_lookup" => Some(Case::OpcCasefoldEagerLookup),
         "opc_casefold_source_lookup" => Some(Case::OpcCasefoldSourceLookup),
+        "opc_casefold_source_exact_lookup" => Some(Case::OpcCasefoldSourceExactLookup),
+        "opc_casefold_source_case_alias_lookup" => Some(Case::OpcCasefoldSourceCaseAliasLookup),
+        "opc_casefold_source_genuine_miss_lookup" => Some(Case::OpcCasefoldSourceGenuineMissLookup),
         "opc_file_eager_open" => Some(Case::OpcFileEagerOpen),
         "opc_file_source_open" => Some(Case::OpcFileSourceOpen),
         "opc_file_eager_one_part_atomic_save" => Some(Case::OpcFileEagerOnePartAtomicSave),
@@ -11097,6 +11127,9 @@ fn usage_text() -> String {
                                        opc_source_materialize,\n\
                                        opc_casefold_eager_open,opc_casefold_source_open,\n\
                                        opc_casefold_eager_lookup,opc_casefold_source_lookup,\n\
+                                       opc_casefold_source_exact_lookup,\n\
+                                       opc_casefold_source_case_alias_lookup,\n\
+                                       opc_casefold_source_genuine_miss_lookup,\n\
                                        opc_source_concurrent_same_part,\n\
                                        opc_source_cache_budget_boundary,\n\
                                        opc_source_cache_control_contention,\n\
@@ -11494,6 +11527,7 @@ fn build_opc_corpus(
 fn opc_casefold_shape_name(part_count: usize) -> &'static str {
     match part_count {
         256 => "parts_256",
+        2_047 => "parts_2047",
         2_048 => "parts_2048",
         16_384 => "parts_16384",
         _ => unreachable!("unsupported OPC case-fold corpus size"),
@@ -11589,6 +11623,35 @@ fn opc_casefold_lookup_digest(
                 let name = part_names
                     .get(*index)
                     .ok_or("OPC case-fold lookup outcome index is outside the corpus")?;
+                framed.push(1);
+                let name_len = u64::try_from(name.len()).unwrap_or(u64::MAX);
+                framed.extend_from_slice(&name_len.to_le_bytes());
+                framed.extend_from_slice(name.as_bytes());
+            },
+            None => framed.push(0),
+        }
+    }
+    Ok(sha256_hex(&framed))
+}
+
+fn opc_casefold_class_lookup_digest(
+    queries: &[OpcCasefoldQuery],
+    outcomes: &[Option<usize>],
+    part_names: &[String],
+) -> Result<String, Box<dyn Error>> {
+    if queries.len() != OPC_CASEFOLD_CLASS_QUERY_COUNT || outcomes.len() != queries.len() {
+        return Err("OPC case-fold class query/output vectors have differing fixed counts".into());
+    }
+    let mut framed = Vec::new();
+    for (query, outcome) in queries.iter().zip(outcomes) {
+        let class_len = u64::try_from(query.class.len()).unwrap_or(u64::MAX);
+        framed.extend_from_slice(&class_len.to_le_bytes());
+        framed.extend_from_slice(query.class.as_bytes());
+        match outcome {
+            Some(index) => {
+                let name = part_names
+                    .get(*index)
+                    .ok_or("OPC case-fold class lookup outcome index is outside the corpus")?;
                 framed.push(1);
                 let name_len = u64::try_from(name.len()).unwrap_or(u64::MAX);
                 framed.extend_from_slice(&name_len.to_le_bytes());
@@ -11745,6 +11808,18 @@ fn build_opc_casefold_corpus(part_count: usize) -> Result<OpcCasefoldCorpus, Box
         .collect::<Vec<_>>();
     let expected_lookup_sha256 =
         opc_casefold_lookup_digest(&queries, &expected_outcomes, &part_names)?;
+    let mut expected_class_lookup_sha256 = Vec::with_capacity(3);
+    for class_index in 0..3 {
+        let start = class_index * OPC_CASEFOLD_CLASS_QUERY_COUNT;
+        expected_class_lookup_sha256.push(opc_casefold_class_lookup_digest(
+            &queries[start..start + OPC_CASEFOLD_CLASS_QUERY_COUNT],
+            &expected_outcomes[start..start + OPC_CASEFOLD_CLASS_QUERY_COUNT],
+            &part_names,
+        )?);
+    }
+    let expected_class_lookup_sha256: [String; 3] = expected_class_lookup_sha256
+        .try_into()
+        .map_err(|_| "OPC case-fold class lookup oracle has an unexpected count")?;
     let first_payload = first_payload.ok_or("OPC case-fold corpus has no first payload")?;
     let uncompressed_payload_bytes = part_count
         .checked_mul(OPC_CASEFOLD_PART_BYTES)
@@ -11778,6 +11853,7 @@ fn build_opc_casefold_corpus(part_count: usize) -> Result<OpcCasefoldCorpus, Box
         queries,
         canonical_name_oracle_sha256,
         expected_lookup_sha256,
+        expected_class_lookup_sha256,
         malformed_equivalent_name_gate_verified: true,
     })
 }
@@ -20624,7 +20700,10 @@ fn run_case_with_config(
         Case::OpcCasefoldEagerOpen
         | Case::OpcCasefoldSourceOpen
         | Case::OpcCasefoldEagerLookup
-        | Case::OpcCasefoldSourceLookup => {
+        | Case::OpcCasefoldSourceLookup
+        | Case::OpcCasefoldSourceExactLookup
+        | Case::OpcCasefoldSourceCaseAliasLookup
+        | Case::OpcCasefoldSourceGenuineMissLookup => {
             Err("OPC case-fold lookup uses its fixed dedicated corpus runner".into())
         },
         Case::OpcNoopSave => run_opc_noop_save(corpus, warmup_iterations, samples),
@@ -50061,6 +50140,148 @@ fn run_opc_casefold_source_lookup(
     Ok(evidence)
 }
 
+fn execute_opc_casefold_source_class_lookup<'a>(
+    package: &'a SourceBackedPackage,
+    queries: &[&OpcCasefoldQuery],
+    outcomes: &mut Vec<Option<&'a PackURI>>,
+) -> Result<(), Box<dyn Error>> {
+    if queries.len() != OPC_CASEFOLD_CLASS_QUERY_COUNT {
+        return Err("OPC case-fold class lookup query vector has an unexpected count".into());
+    }
+    outcomes.clear();
+    for _ in 0..OPC_CASEFOLD_CLASS_QUERY_REPETITIONS {
+        for query in queries {
+            outcomes.push(match package.part(&query.partname) {
+                Ok(part) => Some(part.partname()),
+                Err(OpcError::PartNotFound(_)) => None,
+                Err(error) => return Err(error.into()),
+            });
+        }
+    }
+    std::hint::black_box(outcomes);
+    Ok(())
+}
+
+fn finalize_opc_casefold_source_class_lookup(
+    raw_outcomes: &[Option<&PackURI>],
+    queries: &[&OpcCasefoldQuery],
+    corpus: &OpcCasefoldCorpus,
+) -> Result<[Option<usize>; OPC_CASEFOLD_CLASS_QUERY_COUNT], Box<dyn Error>> {
+    let expected_len = OPC_CASEFOLD_CLASS_LOOKUP_COUNT;
+    if queries.len() != OPC_CASEFOLD_CLASS_QUERY_COUNT || raw_outcomes.len() != expected_len {
+        return Err("OPC case-fold class lookup result vector has an unexpected count".into());
+    }
+    let mut outcomes = [None; OPC_CASEFOLD_CLASS_QUERY_COUNT];
+    for (repetition, raw_repetition) in raw_outcomes.chunks_exact(queries.len()).enumerate() {
+        for (query_index, query) in queries.iter().enumerate() {
+            let outcome =
+                validate_opc_casefold_lookup_partname(query, raw_repetition[query_index], corpus)?;
+            if repetition == 0 {
+                outcomes[query_index] = outcome;
+            } else if outcomes[query_index] != outcome {
+                return Err("OPC case-fold class lookup result changed across repetitions".into());
+            }
+        }
+    }
+    Ok(outcomes)
+}
+
+fn run_opc_casefold_source_class_lookup(
+    corpus: &OpcCasefoldCorpus,
+    class_index: usize,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<OpcCasefoldRunEvidence, Box<dyn Error>> {
+    if class_index >= 3 {
+        return Err("invalid OPC case-fold source lookup class".into());
+    }
+    let start = class_index * OPC_CASEFOLD_CLASS_QUERY_COUNT;
+    let queries = corpus.queries[start..start + OPC_CASEFOLD_CLASS_QUERY_COUNT]
+        .iter()
+        .collect::<Vec<_>>();
+    let read_at: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
+    let package = SourceBackedPackage::from_read_at(read_at)?;
+    let setup_digest = opc_casefold_source_name_digest(&package, corpus)?;
+    if setup_digest != corpus.canonical_name_oracle_sha256 {
+        return Err(
+            "source-backed OPC case-fold class lookup setup differs from corpus oracle".into(),
+        );
+    }
+
+    let replay_source = Arc::new(InstrumentedSource::new(
+        corpus.archive.clone(),
+        corpus.ordinary_payload_ranges.clone(),
+    ));
+    let replay_read_at: Arc<dyn ReadAt> = replay_source.clone();
+    let replay_package = SourceBackedPackage::from_read_at(replay_read_at)?;
+    let replay_setup_digest = opc_casefold_source_name_digest(&replay_package, corpus)?;
+    if replay_setup_digest != setup_digest {
+        return Err(
+            "source-backed OPC case-fold class replay setup differs from timed setup".into(),
+        );
+    }
+    replay_source.reset();
+
+    let mut evidence = OpcCasefoldRunEvidence::default();
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        // The query references and output capacity are prepared before timing;
+        // the timed region is only the repeated source-backed lookup operation.
+        let mut raw_outcomes = Vec::with_capacity(OPC_CASEFOLD_CLASS_LOOKUP_COUNT);
+        let allocation_region = allocation_metrics::begin();
+        let started = Instant::now();
+        execute_opc_casefold_source_class_lookup(&package, &queries, &mut raw_outcomes)?;
+        let duration = started.elapsed();
+        let allocation_metrics = allocation_region.finish();
+        let outcomes = finalize_opc_casefold_source_class_lookup(&raw_outcomes, &queries, corpus)?;
+        let output_digest = opc_casefold_class_lookup_digest(
+            &corpus.queries[start..start + OPC_CASEFOLD_CLASS_QUERY_COUNT],
+            &outcomes,
+            &corpus.part_names,
+        )?;
+        if output_digest != corpus.expected_class_lookup_sha256[class_index] {
+            return Err(
+                "source-backed OPC case-fold class lookup output differs from fixed oracle".into(),
+            );
+        }
+
+        let source_evidence = if iteration < warmup_iterations {
+            None
+        } else {
+            replay_source.reset();
+            let mut replay_raw_outcomes = Vec::with_capacity(OPC_CASEFOLD_CLASS_LOOKUP_COUNT);
+            execute_opc_casefold_source_class_lookup(
+                &replay_package,
+                &queries,
+                &mut replay_raw_outcomes,
+            )?;
+            let snapshot = replay_source.snapshot();
+            let version_calls = replay_source.version_calls();
+            let replay_outcomes =
+                finalize_opc_casefold_source_class_lookup(&replay_raw_outcomes, &queries, corpus)?;
+            let replay_digest = opc_casefold_class_lookup_digest(
+                &corpus.queries[start..start + OPC_CASEFOLD_CLASS_QUERY_COUNT],
+                &replay_outcomes,
+                &corpus.part_names,
+            )?;
+            if replay_digest != output_digest {
+                return Err(
+                    "source-backed OPC case-fold class replay differs from timed output".into(),
+                );
+            }
+            Some((snapshot, version_calls))
+        };
+        evidence.record(
+            iteration,
+            warmup_iterations,
+            duration,
+            allocation_metrics,
+            output_digest,
+            source_evidence,
+        )?;
+    }
+    Ok(evidence)
+}
+
 fn run_opc_casefold_lookup(
     case: Case,
     corpus: &OpcCasefoldCorpus,
@@ -50072,7 +50293,10 @@ fn run_opc_casefold_lookup(
     }
     let open = case.is_opc_casefold_open();
     let source_backed = case.is_opc_casefold_source_backed();
-    let mut evidence = if open {
+    let class_index = case.opc_casefold_source_class();
+    let mut evidence = if let Some(class_index) = class_index {
+        run_opc_casefold_source_class_lookup(corpus, class_index, warmup_iterations, samples)?
+    } else if open {
         if source_backed {
             run_opc_casefold_source_open(corpus, warmup_iterations, samples)?
         } else {
@@ -50097,15 +50321,28 @@ fn run_opc_casefold_lookup(
     }
     let operation_metrics =
         operation_metrics::from_in_process_observations_without_sink(&evidence.observations)?;
-    let query_classes = corpus.queries.iter().map(|query| query.class).collect();
-    let query_positions = corpus.queries.iter().map(|query| query.position).collect();
-    let query_expected_found = corpus
-        .queries
+    let query_range = class_index
+        .map(|index| {
+            let start = index * OPC_CASEFOLD_CLASS_QUERY_COUNT;
+            start..start + OPC_CASEFOLD_CLASS_QUERY_COUNT
+        })
+        .unwrap_or(0..corpus.queries.len());
+    let query_classes: Vec<_> = corpus.queries[query_range.clone()]
+        .iter()
+        .map(|query| query.class)
+        .collect();
+    let query_positions: Vec<_> = corpus.queries[query_range.clone()]
+        .iter()
+        .map(|query| query.position)
+        .collect();
+    let query_expected_found: Vec<_> = corpus.queries[query_range]
         .iter()
         .map(|query| query.expected_index.is_some())
         .collect();
     let lookup_count = if open {
         0
+    } else if class_index.is_some() {
+        OPC_CASEFOLD_CLASS_LOOKUP_COUNT
     } else {
         OPC_CASEFOLD_QUERY_COUNT
             .checked_mul(OPC_CASEFOLD_QUERY_REPETITIONS)
@@ -50113,6 +50350,8 @@ fn run_opc_casefold_lookup(
     };
     let expected_output_sha256 = if open {
         corpus.canonical_name_oracle_sha256.clone()
+    } else if let Some(class_index) = class_index {
+        corpus.expected_class_lookup_sha256[class_index].clone()
     } else {
         corpus.expected_lookup_sha256.clone()
     };
@@ -50126,6 +50365,8 @@ fn run_opc_casefold_lookup(
     let source_counter_scope = if source_backed {
         if open {
             "independent_untimed_instrumented_source_open_replay"
+        } else if class_index.is_some() {
+            "independent_untimed_instrumented_source_class_lookup_replay"
         } else {
             "independent_untimed_instrumented_source_repeated_lookup_replay"
         }
@@ -50138,13 +50379,25 @@ fn run_opc_casefold_lookup(
         } else {
             "OpcPackage"
         },
-        operation: if open { "open" } else { "repeated_lookup" },
+        operation: if open {
+            "open"
+        } else if let Some(class_index) = class_index {
+            [
+                "repeated_lookup_exact",
+                "repeated_lookup_case_alias",
+                "repeated_lookup_genuine_miss",
+            ][class_index]
+        } else {
+            "repeated_lookup"
+        },
         timing_scope: if open {
             if source_backed {
                 "SourceBackedPackage::from_read_at over litchi_core::OwnedSource only; source ownership, instrumented replay, and post-open name oracle excluded"
             } else {
                 "OpcPackage::from_bytes only; archive clone and post-open name oracle excluded"
             }
+        } else if source_backed && class_index.is_some() {
+            "fixed pre-open SourceBackedPackage over litchi_core::OwnedSource; one lookup class (three positions) repeated 48 times; instrumented replay excluded"
         } else if source_backed {
             "fixed pre-open SourceBackedPackage over litchi_core::OwnedSource; nine-query vector repeated 16 times; instrumented replay excluded"
         } else {
@@ -50159,8 +50412,12 @@ fn run_opc_casefold_lookup(
         corpus_archive_sha256: corpus.manifest.archive_sha256.clone(),
         corpus_payload_sha256: corpus.part_payload_sha256.clone(),
         canonical_name_oracle_sha256: corpus.canonical_name_oracle_sha256.clone(),
-        query_count: corpus.queries.len(),
-        query_repetitions: OPC_CASEFOLD_QUERY_REPETITIONS,
+        query_count: query_classes.len(),
+        query_repetitions: if class_index.is_some() {
+            OPC_CASEFOLD_CLASS_QUERY_REPETITIONS
+        } else {
+            OPC_CASEFOLD_QUERY_REPETITIONS
+        },
         query_classes,
         query_positions,
         query_expected_found,
@@ -53825,7 +54082,7 @@ mod tests {
 
     #[test]
     fn opc_casefold_lookup_selectors_are_opt_in_and_have_fixed_oracles() {
-        let sizes = [256, 2_048, 16_384];
+        let sizes = [256, 2_047, 2_048, 16_384];
         for part_count in sizes {
             let first = build_opc_casefold_corpus(part_count).unwrap();
             let second = build_opc_casefold_corpus(part_count).unwrap();
@@ -53840,6 +54097,10 @@ mod tests {
                 second.canonical_name_oracle_sha256
             );
             assert_eq!(first.expected_lookup_sha256, second.expected_lookup_sha256);
+            assert_eq!(
+                first.expected_class_lookup_sha256,
+                second.expected_class_lookup_sha256
+            );
             assert_eq!(first.manifest.entry_count, part_count);
             assert_eq!(first.manifest.entry_bytes, 32);
             assert_eq!(first.manifest.archive_member_count, part_count + 2);
@@ -53973,6 +54234,74 @@ mod tests {
                 assert!(summary.source_read_calls.is_empty());
                 assert!(summary.source_version_calls.is_empty());
             }
+            assert!(measured.operation_metrics.is_some());
+        }
+
+        let class_cases = [
+            Case::OpcCasefoldSourceExactLookup,
+            Case::OpcCasefoldSourceCaseAliasLookup,
+            Case::OpcCasefoldSourceGenuineMissLookup,
+        ];
+        let corpus = build_opc_casefold_corpus(2_047).unwrap();
+        for (class_index, case) in class_cases.into_iter().enumerate() {
+            assert_eq!(parse_case(case.name()), Some(case));
+            assert!(!Case::DEFAULT.contains(&case));
+            assert!(usage_text().contains(case.name()));
+            let measured = super::run_opc_casefold_lookup(case, &corpus, 0, 1).unwrap();
+            let summary = measured
+                .source
+                .unwrap()
+                .opc_casefold_lookup
+                .expect("OPC case-fold source class lookup summary");
+            assert_eq!(summary.query_count, super::OPC_CASEFOLD_CLASS_QUERY_COUNT);
+            assert_eq!(
+                summary.query_repetitions,
+                super::OPC_CASEFOLD_CLASS_QUERY_REPETITIONS
+            );
+            let start = class_index * super::OPC_CASEFOLD_CLASS_QUERY_COUNT;
+            let class_queries =
+                &corpus.queries[start..start + super::OPC_CASEFOLD_CLASS_QUERY_COUNT];
+            assert_eq!(
+                summary.query_classes,
+                class_queries
+                    .iter()
+                    .map(|query| query.class)
+                    .collect::<Vec<_>>()
+            );
+            assert_eq!(
+                summary.query_positions,
+                class_queries
+                    .iter()
+                    .map(|query| query.position)
+                    .collect::<Vec<_>>()
+            );
+            assert_eq!(
+                summary.query_expected_found,
+                class_queries
+                    .iter()
+                    .map(|query| query.expected_index.is_some())
+                    .collect::<Vec<_>>()
+            );
+            assert_eq!(summary.lookup_count, super::OPC_CASEFOLD_CLASS_LOOKUP_COUNT);
+            assert_eq!(summary.query_expected_found, vec![class_index != 2; 3]);
+            assert_eq!(summary.observed_output_sha256.len(), 1);
+            assert_eq!(
+                summary.observed_output_sha256[0],
+                corpus.expected_class_lookup_sha256[class_index]
+            );
+            assert_eq!(
+                summary.source_counter_scope,
+                "independent_untimed_instrumented_source_class_lookup_replay"
+            );
+            assert_eq!(summary.source_read_calls, vec![0]);
+            assert_eq!(summary.source_read_bytes, vec![0]);
+            assert_eq!(
+                summary.source_version_calls,
+                vec![super::OPC_CASEFOLD_CLASS_LOOKUP_COUNT as u64]
+            );
+            assert_eq!(summary.source_payload_read_calls, vec![0]);
+            assert_eq!(summary.source_payload_read_bytes, vec![0]);
+            assert_eq!(summary.source_max_in_flight_reads, vec![0]);
             assert!(measured.operation_metrics.is_some());
         }
     }
@@ -54256,7 +54585,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 415);
+        assert_eq!(selectable_count, 418);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 

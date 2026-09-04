@@ -1,5 +1,40 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0396 compliance update
+
+0396 is harness/evidence coverage plus rejected private experiments. It
+expands the existing four opt-in case-fold selectors to seven by adding three
+class-isolated source selectors, and adds the 2,047-Part corpus to the prior
+256-, 2,048-, and 16,384-Part corpora; 2,047 is immediately below the 2,048
+source case-fold threshold. These additions add no public raw type,
+dependency edge, package identifier, archive/runtime handle, lock, unsafe
+code, executor path, CRUD signature, or authorized production implementation.
+The exact, alias, miss, canonical-position, output, source-counter, and
+equivalent-name oracles are independent of elapsed time; the default matrix
+remains 36 cases / 198 rows and the selectable registry rises from 415 to 418.
+
+Every reported latency result and delta is normal, non-allocator release-binary
+p50 evidence. Source-open measurements time normal unmanaged
+`SourceBackedPackage::from_read_at`; lookup measurements time fixed pre-open
+unmanaged packages over the fixed 2,048/16,384-Part cases. Allocator-enabled
+elapsed time is observational only, and validation-constructor coverage is
+correctness-only.
+The mapless, scalar, standard-prehashed, direct
+`HashTable`, and pooled `Arc<str>` experiments are explicitly rejected: their
+exact lookup, source-open, mixed-query, or lifecycle regressions do not alter
+the production boundary. The pooled allocator result is exact allocator and
+net-live footprint evidence only, not RSS, total-memory, or
+system-footprint evidence.
+
+The control is `c0ca6cb5f22ddc68d827b743018855f6b9dc89bd`; the final pooled
+candidate is `8f7714ee011b170d938f2532fdd385fb2b61cd32`. The [0396 record](changes/0396-opc-exact-lookup-index-experiments.md)
+and [evidence bundle](results/change-0396/) retain the candidate families,
+normal timing observations, allocator vectors, corpus identities, and
+rejection adjudication. `performance_claim: none`; `claim_authorized: false`.
+No validation-constructor, eager/managed/mutable/default/general OPC/OOXML,
+RSS, total-memory, physical-I/O, decompression, cold-cache, throughput, or
+scaling claim follows.
+
 ## Change 0395 compliance update
 
 The case-fold index remains private to the owning `litchi-opc`

@@ -1,5 +1,47 @@
 # Performance program phase report
 
+## Change 0396: rejected OPC exact-lookup experiments
+
+This batch accepts benchmark coverage only. It expands the existing four
+opt-in case-fold selectors to seven by adding three class-isolated source
+selectors for exact, ASCII-case alias, and genuine-miss lookups. It also adds
+a 2,047-Part corpus to the prior 256-, 2,048-, and 16,384-Part fixed stored
+OPC corpora. The seven available selectors cover source/eager open, combined
+case-fold lookup, and the three source lookup classes. The combined and
+class-specific vectors each contain 144 lookups. The selectable registry rises
+from **415** to **418** and the default remains **36 cases / 198 rows**; no
+CRUD surface or production lookup implementation is changed by 0396. The
+2,047 corpus is immediately below the 2,048 source case-fold threshold.
+
+Every latency result and delta below is normal, non-allocator release-binary
+p50 evidence. Source-open measurements time normal unmanaged
+`SourceBackedPackage::from_read_at`; lookup measurements time fixed pre-open
+unmanaged packages. Values are ordered as **2,048 / 16,384 Parts**.
+Allocator-enabled elapsed time is observational only, and
+validation-constructor coverage is correctness-only. The mapless exact
+experiment measured approximately
+`+2,750% / +3,500%`; scalar exact measured `+20.22% / +12.42%` while saving
+`N` allocation events; `std` prehashed exact measured `+13.42% / +15.88%`;
+and direct `HashTable` exact measured `+14.66% / +13.36%`, with a high-sample
+follow-up around `+14.7%`–`+15.6%`. The final pooled `Arc<str>` experiment
+measured exact `+6.09% / +6.96%`, source-open `+3.38% / +4.30%`, and mixed
+lookup `-0.59% / -0.50%`. Its allocator source-open vectors added three
+allocation calls and approximately `N` deallocation calls, while net-live
+bytes fell by 65,536 / 524,288 at 2,048 / 16,384 Parts. This is exact
+allocator and net-live footprint evidence, not an RSS, total-memory,
+or system-footprint claim.
+
+The control is `c0ca6cb5f22ddc68d827b743018855f6b9dc89bd`; the final pooled
+`Arc<str>` candidate is `8f7714ee011b170d938f2532fdd385fb2b61cd32`. These
+candidate results are transparently retained but all are rejected because
+the exact/lifecycle regressions outweigh the measured allocator observation.
+The [0396 evidence bundle](results/change-0396/) contains the fixed corpus,
+exact/alias/miss oracles, normal reports, allocator vectors, and adjudication.
+`performance_claim: none`; `claim_authorized: false`. No claim follows for
+validation-constructor latency, eager/managed/mutable/default/general OPC or
+OOXML behavior, RSS, total memory, physical I/O, decompression, cold cache,
+throughput, or scaling.
+
 ## Change 0395: OPC source-backed case-fold lookup index
 
 The source-backed OPC exact-name hash path is unchanged. For unmanaged

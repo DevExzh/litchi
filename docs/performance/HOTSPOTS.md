@@ -1,5 +1,41 @@
 # Performance hotspot inventory
 
+## Change 0396 update
+
+The exact-name lookup hotspot was investigated after expanding the existing
+four opt-in case-fold selectors to seven by adding three class-isolated source
+selectors for exact, ASCII-case-alias, and genuine-miss lookup. The corpus
+coverage adds 2,047 Parts to the prior 256-, 2,048-, and 16,384-Part stored
+OPC corpora. The 2,047 corpus is the below-threshold boundary control; exact,
+ASCII-case-alias, genuine-miss, and combined 144-query vectors are
+independently oracle-checked. The selectable registry rises from **415** to
+**418**, while the default remains **36 cases / 198 rows**.
+
+Every latency result and delta here is normal, non-allocator release-binary
+p50 evidence. Source-open measurements time normal unmanaged
+`SourceBackedPackage::from_read_at`; lookup measurements time fixed pre-open
+unmanaged packages. Values are in **2,048 / 16,384 Parts** order;
+allocator-enabled latency is observational only. Validation-constructor
+coverage is correctness-only. Mapless exact regressed approximately
+`+2,750% / +3,500%`; scalar exact
+`+20.22% / +12.42%` while saving `N` allocation events; `std` prehashed exact
+`+13.42% / +15.88%`; and direct `HashTable` exact `+14.66% / +13.36%`, with
+a high-sample follow-up still around `+14.7%`–`+15.6%`. The final pooled
+`Arc<str>` experiment regressed exact `+6.09% / +6.96%`, source-open
+`+3.38% / +4.30%`, and mixed lookup `-0.59% / -0.50%`; its allocator result
+was three extra allocation calls, approximately `N` extra deallocation calls,
+and net-live reductions of 65,536 / 524,288 bytes. This is exact allocator and
+net-live footprint evidence, not an RSS, total-memory, or system-footprint
+claim. All candidates were rejected for lifecycle or latency regressions, so
+no new production hotspot ranking or optimization claim is accepted.
+
+The control is `c0ca6cb5f22ddc68d827b743018855f6b9dc89bd` and the final pooled
+candidate is `8f7714ee011b170d938f2532fdd385fb2b61cd32`. See the [0396 change
+record](changes/0396-opc-exact-lookup-index-experiments.md) and [evidence
+bundle](results/change-0396/). No RSS, total-memory, physical-I/O,
+decompression, cold-cache, throughput, scaling, eager/managed/mutable, or
+general OPC/OOXML claim follows.
+
 ## Change 0395 update
 
 The measured OPC hotspot was the bounded linear `eq_ignore_ascii_case` scan
