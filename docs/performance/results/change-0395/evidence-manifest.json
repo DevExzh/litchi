@@ -1,0 +1,571 @@
+{
+  "artifacts": [
+    {
+      "bytes": 3796,
+      "path": "README.md",
+      "role": "human_readme",
+      "sha256": "7c9844f284d9e56832ed990e3b6d7c544ae9076b686917f0425aad26aac1c158"
+    },
+    {
+      "bytes": 13719,
+      "path": "adjudication.json",
+      "role": "parent_adjudication",
+      "sha256": "72470dd53f7f4469792d6a54f4df5bd0cab3fa357bcff88bca233dda66c66037"
+    },
+    {
+      "bytes": 944033,
+      "path": "allocation-metrics.json",
+      "role": "allocator_operation_vectors",
+      "sha256": "a618206d1c0d83bcd338fc45a7ef3fb6cb1c188f18589dccfcb3fa2fb0979c70"
+    },
+    {
+      "compressed_bytes": 1703,
+      "compressed_sha256": "d997827915bb943562c52b662884e6169b278c9e5bb64cf57a4bbbab2afad966",
+      "encoding": "zstd",
+      "path": "final-a1-allocator-catalog.json.zst",
+      "raw_bytes": 16335,
+      "raw_sha256": "69b8ae84137e1b85a57adeca91f0c6a98f2f4cddb0ab3b2bd314f721e5bb8194",
+      "role": "final_control_A1_allocator_catalog",
+      "source_path": "/tmp/litchi-0395-final-abba.kSeAEz/A1-allocator-catalog.json"
+    },
+    {
+      "compressed_bytes": 9467,
+      "compressed_sha256": "689fabe2a81a281bda0651f3e844e8d582e715e24e77c7d23bc81621cebdc61d",
+      "encoding": "zstd",
+      "path": "final-a1-allocator.json.zst",
+      "raw_bytes": 346318,
+      "raw_sha256": "a4869bd6f107e93f854234f2be242981022dabab6c30126d29f4002aec659091",
+      "role": "final_control_A1_allocator_report",
+      "source_path": "/tmp/litchi-0395-final-abba.kSeAEz/A1-allocator.json"
+    },
+    {
+      "compressed_bytes": 1703,
+      "compressed_sha256": "d997827915bb943562c52b662884e6169b278c9e5bb64cf57a4bbbab2afad966",
+      "encoding": "zstd",
+      "path": "final-a1-normal-catalog.json.zst",
+      "raw_bytes": 16335,
+      "raw_sha256": "69b8ae84137e1b85a57adeca91f0c6a98f2f4cddb0ab3b2bd314f721e5bb8194",
+      "role": "final_control_A1_normal_catalog",
+      "source_path": "/tmp/litchi-0395-final-abba.kSeAEz/A1-normal-catalog.json"
+    },
+    {
+      "compressed_bytes": 7156,
+      "compressed_sha256": "f4e3b55b0a49f630907b59602e5ff8a1bd907426620271cdc167e4c349a0ebd1",
+      "encoding": "zstd",
+      "path": "final-a1-normal.json.zst",
+      "raw_bytes": 248188,
+      "raw_sha256": "2728a5a87871d090131573d78d196375dfbfa1b4052f960cd2b3b34da287c93d",
+      "role": "final_control_A1_normal_report",
+      "source_path": "/tmp/litchi-0395-final-abba.kSeAEz/A1-normal.json"
+    },
+    {
+      "compressed_bytes": 1703,
+      "compressed_sha256": "d997827915bb943562c52b662884e6169b278c9e5bb64cf57a4bbbab2afad966",
+      "encoding": "zstd",
+      "path": "final-a2-allocator-catalog.json.zst",
+      "raw_bytes": 16335,
+      "raw_sha256": "69b8ae84137e1b85a57adeca91f0c6a98f2f4cddb0ab3b2bd314f721e5bb8194",
+      "role": "final_control_A2_allocator_catalog",
+      "source_path": "/tmp/litchi-0395-final-abba.kSeAEz/A2-allocator-catalog.json"
+    },
+    {
+      "compressed_bytes": 9457,
+      "compressed_sha256": "5866231238f86a2190acc927f69632c87676da74aab8e203621ec429ce86c0a9",
+      "encoding": "zstd",
+      "path": "final-a2-allocator.json.zst",
+      "raw_bytes": 346335,
+      "raw_sha256": "36d6468e39cbda8bc72fadf865b5b65814a81aad2aa1bce89c09c9da5525f398",
+      "role": "final_control_A2_allocator_report",
+      "source_path": "/tmp/litchi-0395-final-abba.kSeAEz/A2-allocator.json"
+    },
+    {
+      "compressed_bytes": 1703,
+      "compressed_sha256": "d997827915bb943562c52b662884e6169b278c9e5bb64cf57a4bbbab2afad966",
+      "encoding": "zstd",
+      "path": "final-a2-normal-catalog.json.zst",
+      "raw_bytes": 16335,
+      "raw_sha256": "69b8ae84137e1b85a57adeca91f0c6a98f2f4cddb0ab3b2bd314f721e5bb8194",
+      "role": "final_control_A2_normal_catalog",
+      "source_path": "/tmp/litchi-0395-final-abba.kSeAEz/A2-normal-catalog.json"
+    },
+    {
+      "compressed_bytes": 7158,
+      "compressed_sha256": "9d930a91194622d633c204b9bf36e1a9d3665ef06e02f6a6c7f8ae4cc3dcb570",
+      "encoding": "zstd",
+      "path": "final-a2-normal.json.zst",
+      "raw_bytes": 248185,
+      "raw_sha256": "561f687afe7dfc9606fc87a338e68787ffcc1f7a78181ccf7e1276ff26917601",
+      "role": "final_control_A2_normal_report",
+      "source_path": "/tmp/litchi-0395-final-abba.kSeAEz/A2-normal.json"
+    },
+    {
+      "compressed_bytes": 1703,
+      "compressed_sha256": "d997827915bb943562c52b662884e6169b278c9e5bb64cf57a4bbbab2afad966",
+      "encoding": "zstd",
+      "path": "final-b1-allocator-catalog.json.zst",
+      "raw_bytes": 16335,
+      "raw_sha256": "69b8ae84137e1b85a57adeca91f0c6a98f2f4cddb0ab3b2bd314f721e5bb8194",
+      "role": "final_candidate_B1_allocator_catalog",
+      "source_path": "/tmp/litchi-0395-final-abba.kSeAEz/B1-allocator-catalog.json"
+    },
+    {
+      "compressed_bytes": 9358,
+      "compressed_sha256": "7c6ccc516d8dfc9e0393bbab7da95104057507612d9d8954ba52e630c78a3465",
+      "encoding": "zstd",
+      "path": "final-b1-allocator.json.zst",
+      "raw_bytes": 346221,
+      "raw_sha256": "971a56ee50aeae165ef5e6ed5ce90f053e321cd4052aad98fd24a6c3304d7486",
+      "role": "final_candidate_B1_allocator_report",
+      "source_path": "/tmp/litchi-0395-final-abba.kSeAEz/B1-allocator.json"
+    },
+    {
+      "compressed_bytes": 1703,
+      "compressed_sha256": "d997827915bb943562c52b662884e6169b278c9e5bb64cf57a4bbbab2afad966",
+      "encoding": "zstd",
+      "path": "final-b1-normal-catalog.json.zst",
+      "raw_bytes": 16335,
+      "raw_sha256": "69b8ae84137e1b85a57adeca91f0c6a98f2f4cddb0ab3b2bd314f721e5bb8194",
+      "role": "final_candidate_B1_normal_catalog",
+      "source_path": "/tmp/litchi-0395-final-abba.kSeAEz/B1-normal-catalog.json"
+    },
+    {
+      "compressed_bytes": 7128,
+      "compressed_sha256": "48cf736f117646d9719b7321a8a42b55eddaf8d5212eb4f7b8f3cd5c7c3fd4bd",
+      "encoding": "zstd",
+      "path": "final-b1-normal.json.zst",
+      "raw_bytes": 248083,
+      "raw_sha256": "65d68772f8a91a100a5f6dba5532438ecd87e5421eab3e70171c10a63257f099",
+      "role": "final_candidate_B1_normal_report",
+      "source_path": "/tmp/litchi-0395-final-abba.kSeAEz/B1-normal.json"
+    },
+    {
+      "compressed_bytes": 1703,
+      "compressed_sha256": "d997827915bb943562c52b662884e6169b278c9e5bb64cf57a4bbbab2afad966",
+      "encoding": "zstd",
+      "path": "final-b2-allocator-catalog.json.zst",
+      "raw_bytes": 16335,
+      "raw_sha256": "69b8ae84137e1b85a57adeca91f0c6a98f2f4cddb0ab3b2bd314f721e5bb8194",
+      "role": "final_candidate_B2_allocator_catalog",
+      "source_path": "/tmp/litchi-0395-final-abba.kSeAEz/B2-allocator-catalog.json"
+    },
+    {
+      "compressed_bytes": 9384,
+      "compressed_sha256": "ae31ea31573a313409878cf66b0d4f6814f12503a67b224169f8d144eac7dede",
+      "encoding": "zstd",
+      "path": "final-b2-allocator.json.zst",
+      "raw_bytes": 346217,
+      "raw_sha256": "fa7d30fd8e969aab18bc0f26cac9f8c3213fa8a1639f48e6a9d08e0ea8c33abf",
+      "role": "final_candidate_B2_allocator_report",
+      "source_path": "/tmp/litchi-0395-final-abba.kSeAEz/B2-allocator.json"
+    },
+    {
+      "compressed_bytes": 1703,
+      "compressed_sha256": "d997827915bb943562c52b662884e6169b278c9e5bb64cf57a4bbbab2afad966",
+      "encoding": "zstd",
+      "path": "final-b2-normal-catalog.json.zst",
+      "raw_bytes": 16335,
+      "raw_sha256": "69b8ae84137e1b85a57adeca91f0c6a98f2f4cddb0ab3b2bd314f721e5bb8194",
+      "role": "final_candidate_B2_normal_catalog",
+      "source_path": "/tmp/litchi-0395-final-abba.kSeAEz/B2-normal-catalog.json"
+    },
+    {
+      "compressed_bytes": 7105,
+      "compressed_sha256": "44fff7833e340771962903b2020dbc815972bb069bfb216d73a3c4a310b68b39",
+      "encoding": "zstd",
+      "path": "final-b2-normal.json.zst",
+      "raw_bytes": 248056,
+      "raw_sha256": "ea7b0b81d3eb88e836145c2deb41466fcfc5388b45cf80beab475fcccf41ec31",
+      "role": "final_candidate_B2_normal_report",
+      "source_path": "/tmp/litchi-0395-final-abba.kSeAEz/B2-normal.json"
+    },
+    {
+      "bytes": 222018,
+      "path": "final-summary.json",
+      "role": "final_abba_summary",
+      "sha256": "ae6dba9a398cb881283d40bb48be2b5074f26dc7f79d0f5ebb3693ee61eaf9d6"
+    },
+    {
+      "bytes": 44955,
+      "path": "latency-metrics.tsv",
+      "role": "latency_projection",
+      "sha256": "44529547494f2c3baf67af579538a62d95c0d5b444b736690b2a26d223277699"
+    },
+    {
+      "compressed_bytes": 1703,
+      "compressed_sha256": "d997827915bb943562c52b662884e6169b278c9e5bb64cf57a4bbbab2afad966",
+      "encoding": "zstd",
+      "path": "probe-a1-allocator-catalog.json.zst",
+      "raw_bytes": 16335,
+      "raw_sha256": "69b8ae84137e1b85a57adeca91f0c6a98f2f4cddb0ab3b2bd314f721e5bb8194",
+      "role": "probe_control_A1_allocator_catalog",
+      "source_path": "/tmp/litchi-0395-abba.v7EBO4/A1-allocator-catalog.json"
+    },
+    {
+      "compressed_bytes": 9427,
+      "compressed_sha256": "fcb2b9d10525fac9437f8b949d388918bb2756c326109744cae7e2eced47d425",
+      "encoding": "zstd",
+      "path": "probe-a1-allocator.json.zst",
+      "raw_bytes": 346332,
+      "raw_sha256": "c70ccbc7585e9a2f4d6e016ba570e4181330f2187809c5f56df7cafdb5a5fc1b",
+      "role": "probe_control_A1_allocator_report",
+      "source_path": "/tmp/litchi-0395-abba.v7EBO4/A1-allocator.json"
+    },
+    {
+      "compressed_bytes": 1703,
+      "compressed_sha256": "d997827915bb943562c52b662884e6169b278c9e5bb64cf57a4bbbab2afad966",
+      "encoding": "zstd",
+      "path": "probe-a1-normal-catalog.json.zst",
+      "raw_bytes": 16335,
+      "raw_sha256": "69b8ae84137e1b85a57adeca91f0c6a98f2f4cddb0ab3b2bd314f721e5bb8194",
+      "role": "probe_control_A1_normal_catalog",
+      "source_path": "/tmp/litchi-0395-abba.v7EBO4/A1-normal-catalog.json"
+    },
+    {
+      "compressed_bytes": 7150,
+      "compressed_sha256": "cde9e2d9cd23728dac091c9d38822f5ac21d65d7865f809f79da7d834dbbfec4",
+      "encoding": "zstd",
+      "path": "probe-a1-normal.json.zst",
+      "raw_bytes": 248161,
+      "raw_sha256": "25e093b891447581a56d371510e824513a62577c6e9da2c32effeea7b1bac305",
+      "role": "probe_control_A1_normal_report",
+      "source_path": "/tmp/litchi-0395-abba.v7EBO4/A1-normal.json"
+    },
+    {
+      "compressed_bytes": 1703,
+      "compressed_sha256": "d997827915bb943562c52b662884e6169b278c9e5bb64cf57a4bbbab2afad966",
+      "encoding": "zstd",
+      "path": "probe-a2-allocator-catalog.json.zst",
+      "raw_bytes": 16335,
+      "raw_sha256": "69b8ae84137e1b85a57adeca91f0c6a98f2f4cddb0ab3b2bd314f721e5bb8194",
+      "role": "probe_control_A2_allocator_catalog",
+      "source_path": "/tmp/litchi-0395-abba.v7EBO4/A2-allocator-catalog.json"
+    },
+    {
+      "compressed_bytes": 9473,
+      "compressed_sha256": "defb86efc82f7d8bf2f001b4550ff6e0cf86956739081c87ec06feeba8cd14fb",
+      "encoding": "zstd",
+      "path": "probe-a2-allocator.json.zst",
+      "raw_bytes": 346324,
+      "raw_sha256": "5c1735e0b5161a555f0182a6622b475708803bcd5155c7deed96c03bfb2a7a8d",
+      "role": "probe_control_A2_allocator_report",
+      "source_path": "/tmp/litchi-0395-abba.v7EBO4/A2-allocator.json"
+    },
+    {
+      "compressed_bytes": 1703,
+      "compressed_sha256": "d997827915bb943562c52b662884e6169b278c9e5bb64cf57a4bbbab2afad966",
+      "encoding": "zstd",
+      "path": "probe-a2-normal-catalog.json.zst",
+      "raw_bytes": 16335,
+      "raw_sha256": "69b8ae84137e1b85a57adeca91f0c6a98f2f4cddb0ab3b2bd314f721e5bb8194",
+      "role": "probe_control_A2_normal_catalog",
+      "source_path": "/tmp/litchi-0395-abba.v7EBO4/A2-normal-catalog.json"
+    },
+    {
+      "compressed_bytes": 7143,
+      "compressed_sha256": "5162899f5cb65daae0df9dcf0857389d355149491af64b32c7da9ef68c82e6b0",
+      "encoding": "zstd",
+      "path": "probe-a2-normal.json.zst",
+      "raw_bytes": 248160,
+      "raw_sha256": "0132873251cfe967f05496aa95de215735a4467c1618595eac77cb9dbac1b079",
+      "role": "probe_control_A2_normal_report",
+      "source_path": "/tmp/litchi-0395-abba.v7EBO4/A2-normal.json"
+    },
+    {
+      "compressed_bytes": 1703,
+      "compressed_sha256": "d997827915bb943562c52b662884e6169b278c9e5bb64cf57a4bbbab2afad966",
+      "encoding": "zstd",
+      "path": "probe-b1-allocator-catalog.json.zst",
+      "raw_bytes": 16335,
+      "raw_sha256": "69b8ae84137e1b85a57adeca91f0c6a98f2f4cddb0ab3b2bd314f721e5bb8194",
+      "role": "probe_candidate_B1_allocator_catalog",
+      "source_path": "/tmp/litchi-0395-abba.v7EBO4/B1-allocator-catalog.json"
+    },
+    {
+      "compressed_bytes": 9441,
+      "compressed_sha256": "72e39e86527e32133c699a922ce28fa37f2ef76c9aa092f75c4a07e6e1e9c71f",
+      "encoding": "zstd",
+      "path": "probe-b1-allocator.json.zst",
+      "raw_bytes": 346240,
+      "raw_sha256": "6c1d2f29e60be1d3b95eb2ab36f2f2bed94f9b07823536acae03f1f2dce5d6d6",
+      "role": "probe_candidate_B1_allocator_report",
+      "source_path": "/tmp/litchi-0395-abba.v7EBO4/B1-allocator.json"
+    },
+    {
+      "compressed_bytes": 1703,
+      "compressed_sha256": "d997827915bb943562c52b662884e6169b278c9e5bb64cf57a4bbbab2afad966",
+      "encoding": "zstd",
+      "path": "probe-b1-normal-catalog.json.zst",
+      "raw_bytes": 16335,
+      "raw_sha256": "69b8ae84137e1b85a57adeca91f0c6a98f2f4cddb0ab3b2bd314f721e5bb8194",
+      "role": "probe_candidate_B1_normal_catalog",
+      "source_path": "/tmp/litchi-0395-abba.v7EBO4/B1-normal-catalog.json"
+    },
+    {
+      "compressed_bytes": 7107,
+      "compressed_sha256": "49a81b75cb2dc3663678b8ff234eb45bbcfb793b0ab79cf72056a474372f4ae6",
+      "encoding": "zstd",
+      "path": "probe-b1-normal.json.zst",
+      "raw_bytes": 248066,
+      "raw_sha256": "f2624ec7db68c396af4d5b52e67b21e4d2823ecaac018a06b52163bfb08b33df",
+      "role": "probe_candidate_B1_normal_report",
+      "source_path": "/tmp/litchi-0395-abba.v7EBO4/B1-normal.json"
+    },
+    {
+      "compressed_bytes": 1703,
+      "compressed_sha256": "d997827915bb943562c52b662884e6169b278c9e5bb64cf57a4bbbab2afad966",
+      "encoding": "zstd",
+      "path": "probe-b2-allocator-catalog.json.zst",
+      "raw_bytes": 16335,
+      "raw_sha256": "69b8ae84137e1b85a57adeca91f0c6a98f2f4cddb0ab3b2bd314f721e5bb8194",
+      "role": "probe_candidate_B2_allocator_catalog",
+      "source_path": "/tmp/litchi-0395-abba.v7EBO4/B2-allocator-catalog.json"
+    },
+    {
+      "compressed_bytes": 9400,
+      "compressed_sha256": "a9defecb4c9ac09e3cd5ad7505f34390916c0bbf41ee54c9602d66af6361f326",
+      "encoding": "zstd",
+      "path": "probe-b2-allocator.json.zst",
+      "raw_bytes": 346231,
+      "raw_sha256": "c080a9cafb9ec57e3dac51235226753330178e1c90a9134f306be2c1ba3b0db6",
+      "role": "probe_candidate_B2_allocator_report",
+      "source_path": "/tmp/litchi-0395-abba.v7EBO4/B2-allocator.json"
+    },
+    {
+      "compressed_bytes": 1703,
+      "compressed_sha256": "d997827915bb943562c52b662884e6169b278c9e5bb64cf57a4bbbab2afad966",
+      "encoding": "zstd",
+      "path": "probe-b2-normal-catalog.json.zst",
+      "raw_bytes": 16335,
+      "raw_sha256": "69b8ae84137e1b85a57adeca91f0c6a98f2f4cddb0ab3b2bd314f721e5bb8194",
+      "role": "probe_candidate_B2_normal_catalog",
+      "source_path": "/tmp/litchi-0395-abba.v7EBO4/B2-normal-catalog.json"
+    },
+    {
+      "compressed_bytes": 7075,
+      "compressed_sha256": "7bc828f9a3b3b977699309c2eb951f0b26ec8d858148911f5c509afcc97d0f16",
+      "encoding": "zstd",
+      "path": "probe-b2-normal.json.zst",
+      "raw_bytes": 248037,
+      "raw_sha256": "64da3ebd4d1d78fff37110e25e0c966d58afe0fa39dc7045e34167e8fe07146b",
+      "role": "probe_candidate_B2_normal_report",
+      "source_path": "/tmp/litchi-0395-abba.v7EBO4/B2-normal.json"
+    },
+    {
+      "bytes": 221975,
+      "path": "probe-summary.json",
+      "role": "threshold_probe_summary",
+      "sha256": "6e57d6ba30b52f4795e94b6c038f9b3ff08e3f7da7586b4ae3b814256d101c49"
+    }
+  ],
+  "binaries": {
+    "control_allocator_sha256": "883369e7dc6effe6fa31d50aed671a476534755b38e344cc30db2e1d9c1f7e52",
+    "control_normal_sha256": "cddfea6a11680f0b721ca7652b3b13119cacfa8a976e30a6aa2d201197167f41",
+    "final_candidate_allocator_sha256": "d7a7514e8b25c0ae591af44acb4019ad4197ac4852b84aa92f469c1ada646f6a",
+    "final_candidate_normal_sha256": "171aeeafd689800256922c09d5583bc0c2493dd0553ee1ef8245133f2c7067f6",
+    "probe_candidate_allocator_sha256": "8c35a94d7f201c6cde15ec80579b9e7e4773f2e4ffec7a78261f891b822344b8",
+    "probe_candidate_normal_sha256": "329fb1a0160f25fce7696cb2f4c4736507068fa4eae71915ff21c0ae326c1119"
+  },
+  "change": "0395-opc-source-casefold-index",
+  "claims": {
+    "authorized_metric": "p50 elapsed_ns",
+    "authorized_parts": [
+      2048,
+      16384
+    ],
+    "authorized_selector": "opc_casefold_source_lookup",
+    "claim_authorized": true,
+    "eager_lookup_claim": "withheld: randomized HashMap traversal made ABBA timing non-decision-quality",
+    "performance_claim": "scoped",
+    "scope": "unmanaged SourceBackedPackage fixed 9-query x 16-repetition vector",
+    "timing_profile": "normal benchmark constructor only; allocator timing retained as observational evidence"
+  },
+  "corpus_catalog": {
+    "catalog_id": "litchi-perf-corpus-v2",
+    "catalog_sha256": "6d69a092ee45159ebdb446e9e675ba4bcc652b2b36492cd74e2984b6b3ba00f3",
+    "content_set_sha256": "da597eb290d945b34b6031534d030e50c585a97321a73754cbfd87a7eec16828",
+    "generator": "litchi-opc-casefold-lookup-v1"
+  },
+  "protocol": {
+    "cpu_affinity": "2",
+    "order": [
+      "A1",
+      "B1",
+      "B2",
+      "A2"
+    ],
+    "part_counts": [
+      256,
+      2048,
+      16384
+    ],
+    "profiles": [
+      "normal",
+      "allocator"
+    ],
+    "samples_per_case": 30,
+    "selectors": [
+      "opc_casefold_eager_open",
+      "opc_casefold_source_open",
+      "opc_casefold_eager_lookup",
+      "opc_casefold_source_lookup"
+    ],
+    "warmups_per_case": 5,
+    "workers": 1
+  },
+  "raw_capture_roots": {
+    "final": "/tmp/litchi-0395-final-abba.kSeAEz",
+    "probe": "/tmp/litchi-0395-abba.v7EBO4"
+  },
+  "revisions": {
+    "candidate_base": "57c8ed4bd8c02938eb7ef21e0d713c05be062125",
+    "control": "57c8ed4bd8c02938eb7ef21e0d713c05be062125",
+    "final_candidate_patch_sha256": "9f6fef3f8a64a3be76b7dd5653831b8dfdd50e4ad959c477047b124ed6a27f31",
+    "final_candidate_source_sha256": "af43eafe9f287a7581a5e08ef4240840f967dce4d7764c12a3cd3fe32e493417",
+    "probe_candidate_patch_sha256": "c708daf06fdcc828a0bde7a25681d82d4ee151e6c62a677053c14ed81e57a1e2",
+    "probe_candidate_source_sha256": "da424162c3b3ddbfa47cef5668df85d8c522dfe17e2ff50d692f087e25699b58"
+  },
+  "schema_version": 1,
+  "status": "accepted_scoped_candidate_with_retained_rejected_probe",
+  "toolchain": {
+    "cargo": "1.98.1",
+    "pinned_toolchain_note": "Cargo/Rust 1.95 was not used for capture or validation.",
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)"
+  },
+  "validation": {
+    "compression_check": "all 32 report/catalog zstd frames pass zstd -t",
+    "pair_result": "all 16 pairs passed; each emitted 3 corpora, 12 bindings",
+    "pairs": [
+      {
+        "catalog": "probe-a1-normal-catalog.json.zst",
+        "leg": "A1",
+        "profile": "normal",
+        "report": "probe-a1-normal.json.zst",
+        "result": "validated schema-2 corpus catalog: 3 corpora, 12 bindings",
+        "run": "probe"
+      },
+      {
+        "catalog": "probe-a1-allocator-catalog.json.zst",
+        "leg": "A1",
+        "profile": "allocator",
+        "report": "probe-a1-allocator.json.zst",
+        "result": "validated schema-2 corpus catalog: 3 corpora, 12 bindings",
+        "run": "probe"
+      },
+      {
+        "catalog": "probe-b1-normal-catalog.json.zst",
+        "leg": "B1",
+        "profile": "normal",
+        "report": "probe-b1-normal.json.zst",
+        "result": "validated schema-2 corpus catalog: 3 corpora, 12 bindings",
+        "run": "probe"
+      },
+      {
+        "catalog": "probe-b1-allocator-catalog.json.zst",
+        "leg": "B1",
+        "profile": "allocator",
+        "report": "probe-b1-allocator.json.zst",
+        "result": "validated schema-2 corpus catalog: 3 corpora, 12 bindings",
+        "run": "probe"
+      },
+      {
+        "catalog": "probe-b2-normal-catalog.json.zst",
+        "leg": "B2",
+        "profile": "normal",
+        "report": "probe-b2-normal.json.zst",
+        "result": "validated schema-2 corpus catalog: 3 corpora, 12 bindings",
+        "run": "probe"
+      },
+      {
+        "catalog": "probe-b2-allocator-catalog.json.zst",
+        "leg": "B2",
+        "profile": "allocator",
+        "report": "probe-b2-allocator.json.zst",
+        "result": "validated schema-2 corpus catalog: 3 corpora, 12 bindings",
+        "run": "probe"
+      },
+      {
+        "catalog": "probe-a2-normal-catalog.json.zst",
+        "leg": "A2",
+        "profile": "normal",
+        "report": "probe-a2-normal.json.zst",
+        "result": "validated schema-2 corpus catalog: 3 corpora, 12 bindings",
+        "run": "probe"
+      },
+      {
+        "catalog": "probe-a2-allocator-catalog.json.zst",
+        "leg": "A2",
+        "profile": "allocator",
+        "report": "probe-a2-allocator.json.zst",
+        "result": "validated schema-2 corpus catalog: 3 corpora, 12 bindings",
+        "run": "probe"
+      },
+      {
+        "catalog": "final-a1-normal-catalog.json.zst",
+        "leg": "A1",
+        "profile": "normal",
+        "report": "final-a1-normal.json.zst",
+        "result": "validated schema-2 corpus catalog: 3 corpora, 12 bindings",
+        "run": "final"
+      },
+      {
+        "catalog": "final-a1-allocator-catalog.json.zst",
+        "leg": "A1",
+        "profile": "allocator",
+        "report": "final-a1-allocator.json.zst",
+        "result": "validated schema-2 corpus catalog: 3 corpora, 12 bindings",
+        "run": "final"
+      },
+      {
+        "catalog": "final-b1-normal-catalog.json.zst",
+        "leg": "B1",
+        "profile": "normal",
+        "report": "final-b1-normal.json.zst",
+        "result": "validated schema-2 corpus catalog: 3 corpora, 12 bindings",
+        "run": "final"
+      },
+      {
+        "catalog": "final-b1-allocator-catalog.json.zst",
+        "leg": "B1",
+        "profile": "allocator",
+        "report": "final-b1-allocator.json.zst",
+        "result": "validated schema-2 corpus catalog: 3 corpora, 12 bindings",
+        "run": "final"
+      },
+      {
+        "catalog": "final-b2-normal-catalog.json.zst",
+        "leg": "B2",
+        "profile": "normal",
+        "report": "final-b2-normal.json.zst",
+        "result": "validated schema-2 corpus catalog: 3 corpora, 12 bindings",
+        "run": "final"
+      },
+      {
+        "catalog": "final-b2-allocator-catalog.json.zst",
+        "leg": "B2",
+        "profile": "allocator",
+        "report": "final-b2-allocator.json.zst",
+        "result": "validated schema-2 corpus catalog: 3 corpora, 12 bindings",
+        "run": "final"
+      },
+      {
+        "catalog": "final-a2-normal-catalog.json.zst",
+        "leg": "A2",
+        "profile": "normal",
+        "report": "final-a2-normal.json.zst",
+        "result": "validated schema-2 corpus catalog: 3 corpora, 12 bindings",
+        "run": "final"
+      },
+      {
+        "catalog": "final-a2-allocator-catalog.json.zst",
+        "leg": "A2",
+        "profile": "allocator",
+        "report": "final-a2-allocator.json.zst",
+        "result": "validated schema-2 corpus catalog: 3 corpora, 12 bindings",
+        "run": "final"
+      }
+    ],
+    "raw_stream_check": "zstd -d -c compressed artifact bytes match the recorded raw SHA-256",
+    "validated_pair_count": 16,
+    "validator_command": "python3 tools/validate_perf_corpus_binding.py --report REPORT --catalog CATALOG"
+  }
+}

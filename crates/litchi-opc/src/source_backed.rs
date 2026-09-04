@@ -40,6 +40,9 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
 const SOURCE_PUBLICATION_CHUNK_BYTES: usize = 64 * 1024;
+/// Conservative measured tuning boundary for retaining the casefold order
+/// index. This is a performance threshold, not a semantic part-count limit.
+const SOURCE_CASEFOLD_INDEX_MIN_PARTS: usize = 2_048;
 const MAX_SOURCE_OVERLAY_PARTS: usize = 64;
 const MAX_SOURCE_RELATIONSHIP_REMOVALS: usize = 4096;
 const MAX_SOURCE_TOPOLOGY_PARTS: usize = 64;
@@ -3178,6 +3181,43 @@ fn payload_is_externally_pinned(payload: &CachedPayload) -> bool {
             .is_some_and(|reservation| Arc::strong_count(reservation) > 1)
 }
 
+/// Compare two Part spellings under OPC's allocation-free ASCII folding rule.
+fn cmp_ascii_case_insensitive(left: &str, right: &str) -> std::cmp::Ordering {
+    let mut left_bytes = left.as_bytes().iter();
+    let mut right_bytes = right.as_bytes().iter();
+    loop {
+        match (left_bytes.next(), right_bytes.next()) {
+            (Some(left), Some(right)) => {
+                let ordering = left.to_ascii_lowercase().cmp(&right.to_ascii_lowercase());
+                if ordering != std::cmp::Ordering::Equal {
+                    return ordering;
+                }
+            },
+            (None, None) => return std::cmp::Ordering::Equal,
+            (None, Some(_)) => return std::cmp::Ordering::Less,
+            (Some(_), None) => return std::cmp::Ordering::Greater,
+        }
+    }
+}
+
+fn build_casefold_order(parts: &[CatalogPart]) -> Result<Vec<usize>> {
+    let mut order = Vec::new();
+    order
+        .try_reserve_exact(parts.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC case-insensitive part lookup order",
+            source,
+        })?;
+    order.extend(0..parts.len());
+    order.sort_unstable_by(|left, right| {
+        cmp_ascii_case_insensitive(
+            parts[*left].partname.as_str(),
+            parts[*right].partname.as_str(),
+        )
+    });
+    Ok(order)
+}
+
 /// A structurally validated OPC package backed by an immutable positional source.
 ///
 /// Opening reads and validates ZIP metadata, content types, and relationship
@@ -3194,6 +3234,14 @@ pub struct SourceBackedPackage {
     package_relationships: Relationships,
     parts: Vec<CatalogPart>,
     parts_by_name: HashMap<PackURI, usize>,
+    /// Positions in `parts`, sorted by ASCII-case-insensitive Part spelling.
+    /// When present, this immutable index costs exactly one `usize` per
+    /// admitted ordinary Part (logical requested bytes; allocator capacity may
+    /// vary), bounded by `ReadLimits::max_parts()`. It stores no folded-name
+    /// allocations. Managed opens intentionally leave it absent so their
+    /// cancellation-aware path adds no unreserved retained memory or sorting
+    /// work; those opens retain the bounded linear fallback instead.
+    casefold_order: Option<Vec<usize>>,
     non_part_members: Vec<NonPartMember>,
     cache: PartCache,
     catalog_object_reservation: Option<Arc<Reservation>>,
@@ -3318,6 +3366,18 @@ impl SourceBackedPackage {
                 entry_id,
             });
         }
+        // PackageReader has already guaranteed ASCII-case-insensitive
+        // uniqueness, so positions can be searched without folded Strings.
+        // The 2,048-Part boundary is a conservative measured tuning threshold,
+        // not a semantic limit on admitted ordinary Parts.
+        let casefold_order = if catalog_parts.len() >= SOURCE_CASEFOLD_INDEX_MIN_PARTS {
+            Some(
+                build_casefold_order(&catalog_parts)
+                    .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?,
+            )
+        } else {
+            None
+        };
 
         Ok(Self {
             source: snapshot,
@@ -3327,6 +3387,7 @@ impl SourceBackedPackage {
             package_relationships,
             parts: catalog_parts,
             parts_by_name,
+            casefold_order,
             non_part_members,
             cache: PartCache::new_with_diagnostics(SourceCacheLimits::default(), diagnostics),
             catalog_object_reservation: None,
@@ -3620,6 +3681,19 @@ impl SourceBackedPackage {
         if let Some(context) = context.as_ref() {
             context.check().map_err(map_execution_error)?;
         }
+        // PackageReader has already guaranteed ASCII-case-insensitive
+        // uniqueness, so sufficiently large unmanaged opens can search
+        // positions without folded Strings. The 2,048-Part boundary is a
+        // conservative measured tuning threshold, not a semantic limit.
+        // Managed opens always retain the old bounded linear fallback so this
+        // cancellation-aware path does not add unreserved retained memory or
+        // non-interruptible sorting work.
+        let casefold_order =
+            if context.is_some() || catalog_parts.len() < SOURCE_CASEFOLD_INDEX_MIN_PARTS {
+                None
+            } else {
+                Some(build_casefold_order(&catalog_parts)?)
+            };
 
         let cache = if let Some(context) = context {
             let input_reservation_failures = input_reservation_failures.ok_or_else(|| {
@@ -3646,6 +3720,7 @@ impl SourceBackedPackage {
             package_relationships,
             parts: catalog_parts,
             parts_by_name,
+            casefold_order,
             non_part_members,
             cache,
             catalog_object_reservation,
@@ -3699,15 +3774,24 @@ impl SourceBackedPackage {
     ///
     /// The exact hash lookup is the common path. OPC part names compare
     /// case-insensitively, however, and [`PackageReader`] admits only one
-    /// spelling of an ASCII-case-equivalent name. Consequently a miss can be
-    /// resolved by a bounded, allocation-free scan without introducing a
-    /// second folded-name index into the source-backed catalog.
+    /// spelling of an ASCII-case-equivalent name. Opens that retain the
+    /// immutable order index resolve misses with a binary search that allocates
+    /// no folded names; managed opens retain the bounded linear fallback.
     fn part_index(&self, partname: &PackURI) -> Option<usize> {
         self.parts_by_name.get(partname).copied().or_else(|| {
             let wanted = partname.as_str();
-            self.parts
-                .iter()
-                .position(|part| part.partname.as_str().eq_ignore_ascii_case(wanted))
+            if let Some(casefold_order) = self.casefold_order.as_ref() {
+                casefold_order
+                    .binary_search_by(|index| {
+                        cmp_ascii_case_insensitive(self.parts[*index].partname.as_str(), wanted)
+                    })
+                    .ok()
+                    .map(|position| casefold_order[position])
+            } else {
+                self.parts
+                    .iter()
+                    .position(|part| part.partname.as_str().eq_ignore_ascii_case(wanted))
+            }
         })
     }
 
@@ -8997,6 +9081,29 @@ mod tests {
         writer.finish_to_bytes().unwrap()
     }
 
+    fn archive_with_descending_xml_parts(count: usize) -> Vec<u8> {
+        assert!(count > 0);
+        let first_name = format!("part-{index:04}.xml", index = count - 1);
+        let root_relationships = format!(
+            r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="{first_name}"/></Relationships>"#
+        );
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored("_rels/.rels", root_relationships.as_bytes())
+            .unwrap();
+        for index in (0..count).rev() {
+            let name = format!("part-{index:04}.xml");
+            writer.write_stored(&name, b"payload").unwrap();
+        }
+        writer.finish_to_bytes().unwrap()
+    }
+
     fn archive_with_document_relationships(document_relationships: &[u8]) -> Vec<u8> {
         let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
         writer
@@ -10003,16 +10110,161 @@ mod tests {
     }
 
     #[test]
+    fn casefold_lookup_index_handles_unsorted_parts_without_changing_iteration_order() {
+        let parts: [(&str, &[u8]); 5] = [
+            ("zeta.xml", b"zeta"),
+            ("ALPHA.xml", b"alpha"),
+            ("middle.XML", b"middle"),
+            ("beta.xml", b"beta"),
+            ("Omega.xml", b"omega"),
+        ];
+        let bytes = archive_with_ordered_xml_parts(&parts);
+
+        fn assert_lookup_behavior(package: &SourceBackedPackage) {
+            assert!(package.casefold_order.is_none());
+            let source_order = [
+                "/zeta.xml",
+                "/ALPHA.xml",
+                "/middle.XML",
+                "/beta.xml",
+                "/Omega.xml",
+            ];
+            let iterated: Vec<_> = package
+                .iter_parts()
+                .map(|part| part.partname().as_str())
+                .collect();
+            assert_eq!(iterated, source_order);
+
+            for (canonical, alias) in [
+                ("/ALPHA.xml", "/alpha.XML"),
+                ("/middle.XML", "/MIDDLE.xml"),
+                ("/zeta.xml", "/ZETA.XML"),
+            ] {
+                let canonical = PackURI::new(canonical).unwrap();
+                assert_eq!(package.part(&canonical).unwrap().partname(), &canonical);
+                let alias = PackURI::new(alias).unwrap();
+                assert_eq!(package.part(&alias).unwrap().partname(), &canonical);
+            }
+
+            let missing = PackURI::new("/delta.xml").unwrap();
+            assert!(matches!(
+                package.part(&missing),
+                Err(OpcError::PartNotFound(name)) if name == "/delta.xml"
+            ));
+        }
+
+        let normal =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes.clone())))
+                .unwrap();
+        assert_lookup_behavior(&normal);
+
+        let validation = match SourceBackedPackage::from_read_at_for_validation(
+            Arc::new(CountingSource::new(bytes)),
+            ReadLimits::default(),
+        ) {
+            Ok(package) => package,
+            Err(error) => panic!("validation open failed: {}", error.error),
+        };
+        assert_lookup_behavior(&validation);
+    }
+
+    fn assert_large_catalog_lookup_behavior(
+        package: &SourceBackedPackage,
+        expects_casefold_index: bool,
+    ) {
+        assert_eq!(package.casefold_order.is_some(), expects_casefold_index);
+        let iterated: Vec<_> = package
+            .iter_parts()
+            .map(|part| part.partname().as_str())
+            .collect();
+        assert_eq!(iterated.len(), SOURCE_CASEFOLD_INDEX_MIN_PARTS);
+        assert_eq!(iterated[0], "/part-2047.xml");
+        assert_eq!(iterated[1024], "/part-1023.xml");
+        assert_eq!(iterated[2047], "/part-0000.xml");
+
+        for (canonical, alias) in [
+            ("/part-0000.xml", "/PART-0000.XML"),
+            ("/part-1024.xml", "/PART-1024.XML"),
+            ("/part-2047.xml", "/PART-2047.XML"),
+        ] {
+            let canonical = PackURI::new(canonical).unwrap();
+            assert_eq!(package.part(&canonical).unwrap().partname(), &canonical);
+            let alias = PackURI::new(alias).unwrap();
+            assert_eq!(package.part(&alias).unwrap().partname(), &canonical);
+        }
+
+        for missing in [
+            PackURI::new("/part-2048.xml").unwrap(),
+            PackURI::new("/part-1024.bin").unwrap(),
+            PackURI::new("/part-0000.bin").unwrap(),
+        ] {
+            assert!(matches!(
+                package.part(&missing),
+                Err(OpcError::PartNotFound(name)) if name == missing.as_str()
+            ));
+        }
+    }
+
+    #[test]
+    fn casefold_lookup_index_is_retained_at_measured_large_catalog_threshold() {
+        let bytes = archive_with_descending_xml_parts(SOURCE_CASEFOLD_INDEX_MIN_PARTS);
+
+        let normal =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes.clone())))
+                .unwrap();
+        assert_large_catalog_lookup_behavior(&normal, true);
+
+        let validation = match SourceBackedPackage::from_read_at_for_validation(
+            Arc::new(CountingSource::new(bytes)),
+            ReadLimits::default(),
+        ) {
+            Ok(package) => package,
+            Err(error) => panic!("validation open failed: {}", error.error),
+        };
+        assert_large_catalog_lookup_behavior(&validation, true);
+    }
+
+    #[test]
+    fn managed_open_omits_casefold_lookup_index_and_keeps_linear_fallback() {
+        let bytes = archive_with_descending_xml_parts(SOURCE_CASEFOLD_INDEX_MIN_PARTS);
+        let (budget, _cancellation_source, context) = managed_context_with_cancellation(1);
+        let package = SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(bytes)),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap();
+
+        assert!(package.casefold_order.is_none());
+        assert_eq!(budget.used(Resource::Memory), 0);
+
+        assert_large_catalog_lookup_behavior(&package, false);
+    }
+
+    #[test]
     fn source_catalog_still_rejects_case_equivalent_part_names() {
         let bytes = archive_with_part_names(
             "word/document.xml",
             &["word/document.xml", "WORD/DOCUMENT.XML"],
         );
-        let Err(error) = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes)))
+        let Err(error) =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes.clone())))
         else {
             panic!("case-equivalent parts must remain ambiguous");
         };
         assert!(matches!(error, OpcError::EquivalentPartNames { .. }));
+
+        let validation_error = match SourceBackedPackage::from_read_at_for_validation(
+            Arc::new(CountingSource::new(bytes)),
+            ReadLimits::default(),
+        ) {
+            Ok(_) => panic!("case-equivalent parts must remain ambiguous"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            validation_error.error,
+            OpcError::EquivalentPartNames { .. }
+        ));
     }
 
     #[test]

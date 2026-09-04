@@ -1,5 +1,48 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0395 compliance update
+
+The case-fold index remains private to the owning `litchi-opc`
+`SourceBackedPackage` substrate. It adds no public raw type, dependency edge,
+package identifier, archive/runtime handle, lock, unsafe code, executor path,
+or CRUD signature. Exact `PackURI` lookup remains first; the index stores only
+Part positions and uses an allocation-free comparator over existing names.
+Source iteration order and canonical spelling are unchanged.
+
+Correctness and bounded behavior remain ahead of selection. Package catalog
+validation still rejects equivalent Part names; exact lookup, alias lookup,
+misses, freshness-before-lookup, resource limits, cancellation, and existing
+error precedence remain in force. Index construction is fallible. The
+measured 2,048 threshold is not a semantic limit, and managed
+`ExecutionContext` opens intentionally retain the old linear fallback to avoid
+unreserved retained memory and non-interruptible sorting work. Mutable
+`OpcPackage` behavior is untouched.
+
+Focused boundary, unsorted-order, equivalent-name, managed-budget, and
+cancellation tests passed, the full `litchi-opc` library passed `282/282`,
+and exact formatting/diff checks plus independent implementation and test
+reviews passed under explicit stable Rust/Cargo 1.98.1. The final CPU-2
+`A1/B1/B2/A2` package used five warmups and 30 samples and binds the exact
+revision, patch/source/binary hashes, corpus catalog, reports, and
+adjudication in the [0395 record](changes/0395-opc-source-casefold-index.md)
+and [evidence bundle](results/change-0395/). Its timing evidence is from the
+normal, non-allocator unmanaged `SourceBackedPackage::from_read_at` binary;
+allocator-enabled latency is observational only, and validation-constructor
+coverage is correctness-only.
+
+`performance_claim: scoped`; `claim_authorized: true`. The authorized timing
+claim is limited to normal, non-allocator unmanaged packages opened through
+`SourceBackedPackage::from_read_at`, with source-lookup p50 on the fixed
+2,048- and 16,384-Part 144-query vectors. The initial all-size probe's 256-Part
+regression and the large randomized eager-lookup drift are recorded as
+rejection/withholding evidence. Validation-constructor coverage is
+correctness-only, and allocator-enabled latency is observational only. No
+claim follows for source-open latency, means/tails, eager, managed, mutable,
+default/general OPC or OOXML behavior, RSS, physical I/O, decompression, cold
+cache, throughput, or scaling. The exact allocator, retained-vector footprint,
+and source-counter observations are evidence, not a broader performance
+claim.
+
 ## Change 0393 compliance update
 
 The selected-query state remains private to `litchi-pptx`, the semantic owner

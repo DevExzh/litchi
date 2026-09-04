@@ -1,5 +1,48 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0395: unmanaged OPC source-backed case-fold lookup index
+
+`SourceBackedPackage` retains its exact `PackURI` hash lookup and now uses a
+private, allocation-free case-fold order index for unmanaged normal and
+validation opens with at least 2,048 ordinary Parts. Case-insensitive misses
+use binary search over Part positions; no folded-name strings are retained.
+Below the measured 2,048 tuning threshold and on managed
+`ExecutionContext` opens, the bounded linear fallback remains. Source order,
+canonical spelling, freshness checks, mutable `OpcPackage`, and public APIs
+are unchanged. The index is fallibly reserved, costs one `usize` per admitted
+ordinary Part, and the threshold is not a semantic part-count limit.
+
+The fixed stored-OPC corpus has 256, 2,048, and 16,384 ordinary Parts with
+32-byte payloads and a 144-query vector (nine query classes repeated 16
+times). Final CPU-2 `A1/B1/B2/A2` release runs used five warmups and 30
+samples under explicit Rust/Cargo 1.98.1. The following latency evidence is
+from the normal, non-allocator unmanaged `SourceBackedPackage::from_read_at`
+binary; allocator-enabled latency is observational only, and validation
+constructor coverage is correctness-only. Source-lookup p50 changed by
+`-74.23%`/`-74.37%` at 2,048 and `-96.60%`/`-96.45%` at 16,384; 256-Part
+lookup was effectively neutral at `-0.09%`/`-1.06%`. Source-open p50 deltas
+were `+0.87%`/`+4.50%`, `+3.41%`/`+3.83%`, and `+1.40%`/`+1.50%` for the
+three sizes. The initial all-size index probe rejected 256 Parts
+(`+31.31%`/`+33.45%` lookup p50 in the normal non-allocator binary), which
+established the measured 2,048 boundary.
+
+Allocator evidence is exact retained-vector footprint evidence: open remains
+`5,977` calls/`779,619` bytes at
+256 Parts, then adds one call and `16,384` or `131,072` bytes at 2,048 or
+16,384 Parts; lookup remains 48 calls/1,536 bytes. Source lookup replays have
+zero reads/bytes/payload bytes and 144 version calls. The [0395 change record](changes/0395-opc-source-casefold-index.md)
+and [evidence bundle](results/change-0395/) bind the reports, catalogs,
+hashes, environment, tests, and claim adjudication.
+
+`performance_claim: scoped`; `claim_authorized: true`. Only normal,
+non-allocator unmanaged packages opened through
+`SourceBackedPackage::from_read_at`, with source-lookup p50 on the fixed
+2,048- and 16,384-Part vectors, are authorized. Allocator-enabled latency is
+observational only; validation-constructor coverage is correctness-only.
+Tails, means, source-open latency, eager/managed/mutable/default/general
+behavior, RSS, I/O, decompression, cold cache, throughput, and scaling remain
+withheld.
+
 ## Change 0393: selected PPTX image metadata avoids full descriptor retention
 
 `SourceSlide::image` and `read_image` now retain only the selected picture

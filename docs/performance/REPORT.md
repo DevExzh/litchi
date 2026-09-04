@@ -1,5 +1,53 @@
 # Performance program phase report
 
+## Change 0395: OPC source-backed case-fold lookup index
+
+The source-backed OPC exact-name hash path is unchanged. For unmanaged
+normal and validation opens at or above the measured 2,048-Part threshold,
+the case-insensitive fallback now searches a private sorted position vector
+with an allocation-free ASCII-fold comparator. The vector retains no folded
+strings and leaves source iteration order, canonical names, freshness fences,
+managed cancellation behavior, mutable `OpcPackage`, and public APIs intact.
+Managed opens and catalogs below 2,048 Parts keep the bounded linear fallback.
+
+The fixed stored-OPC corpus contains 256, 2,048, and 16,384 ordinary Parts,
+each with a 32-byte payload. The nine-query vector is repeated 16 times for
+144 lookups. Final release `A1/B1/B2/A2` runs used CPU affinity 2, one worker,
+five warmups, 30 samples, and explicit stable Rust/Cargo 1.98.1. The latency
+evidence below is from the normal, non-allocator unmanaged
+`SourceBackedPackage::from_read_at` binary; allocator-enabled latency is
+observational only, and validation-constructor coverage is correctness-only.
+Source lookup p50 improved `74.23%`/`74.37%` at 2,048 and `96.60%`/`96.45%`
+at 16,384; the 256-Part path was neutral (`-0.09%`/`-1.06%`). Source-open
+p50 changed by `+0.87%`/`+4.50%`, `+3.41%`/`+3.83%`, and `+1.40%`/`+1.50%`
+for 256, 2,048, and 16,384 Parts. The first all-size probe rejected the
+unthresholded design after 256-Part normal non-allocator lookup regressed
+`+31.31%`/`+33.45%`.
+
+The exact allocator and retained-vector footprint evidence is one additional
+allocation and `8 * parts` bytes for indexed catalogs; source lookup remains
+48 calls and 1,536 bytes. Source lookup counters remain zero reads, bytes, and
+payload bytes with 144 version calls. Eager lookup timing is withheld because
+randomized `HashMap` traversal produced large control/candidate drift. Full
+normal non-allocator source p95/p99/mean observations, open timing, and
+allocator vectors are in the [0395 evidence bundle](results/change-0395/),
+whose provenance records base revision
+`57c8ed4bd8c02938eb7ef21e0d713c05be062125`, final patch/source hashes, binary
+hashes, catalog hash, CPU, compiler, and protocol.
+
+Focused boundary/cancellation/equivalence tests and the complete
+`litchi-opc` library suite passed `282/282`; exact rustfmt/diff checks and
+independent implementation/test reviews passed. `performance_claim: scoped`;
+`claim_authorized: true`. The accepted claim is only normal, non-allocator
+unmanaged packages opened through `SourceBackedPackage::from_read_at`, using
+source-lookup p50 for the fixed 144-query vector on the 2,048- and 16,384-Part
+corpora. Validation-constructor coverage is correctness-only. The exact
+allocator and retained-vector footprint evidence is reportable, while
+allocator-enabled latency is observational only. No latency claim is made
+for opening, 256 Parts, eager lookup, managed or mutable packages,
+typical/default/general OPC or OOXML behavior, means/tails, RSS, physical I/O,
+decompression, cold cache, throughput, or scaling.
+
 ## Change 0393: PPTX selected-image query
 
 PPTX source-backed `image` and `read_image` no longer build and retain the
