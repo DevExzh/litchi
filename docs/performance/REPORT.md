@@ -1,5 +1,49 @@
 # Performance program phase report
 
+## Change 0401: XLSX selected numeric ownership elision
+
+Change 0401 measures production candidate
+`87f26d5ee02a1903e668bf7f60fa3ef954a0c3fb` against control
+`0859063be5a67bd2aafb3531f2126020b2b5000d`. A crate-private borrowed
+`Number::validate_lexical(&str)` check validates unselected numeric text
+without constructing an owned lexical value when the cell is non-formula and
+non-inline. Selected values and formula caches retain ownership, and inline
+strings—including unselected inline strings—retain normal validation.
+
+The opt-in selector is `xlsx_file_selected_cell`. Its fixed medium corpus is
+`litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1` (four 48×48 sheets,
+9,216 numeric cells, 17 ZIP members, 4,226,429 archive bytes). The prepared
+query selects `Bench01`/position 1 through `bEnCh01` and reads `M29` (row 28,
+column 12), with stored Number lexical value `1028012`. The selected sheet has
+2,303 unselected numeric cells.
+
+The normal release CPU-2 ABBA used one worker, warm fresh children, 20
+warmups, and 500 samples per leg. The timed interval is only the prepared
+case-insensitive selection plus exact cell read. Positive values mean lower
+candidate elapsed time. Only mean/p95/p99 are accepted:
+
+| Statistic | A1 control → B1 candidate | A2 control → B2 candidate | Verdict |
+| --- | ---: | ---: | --- |
+| mean | `+0.099577940251%` | `+0.026562239637%` | accepted |
+| p95 | `+0.625379111895%` | `+0.198122423529%` | accepted |
+| p99 | `+1.170167332729%` | `+0.045344544337%` | accepted |
+| p50 | `-0.012690677428%` | `-0.035254218167%` | rejected; adverse in both directions |
+
+No median speedup claim is made. The separate 3-warmup/30-sample allocator
+ABBA records exact candidate-minus-control deltas of −2,303 allocation calls,
+−2,303 deallocation calls, and −16,121 allocated and deallocated bytes, with
+reallocation and failed-allocation counts unchanged. The fixed oracle's
+7-byte lexical allocation is an accounting fact for these 2,303 cells only;
+it is not a general memory-size claim.
+
+`performance_claim: scoped`; `claim_authorized: true` only for the accepted
+mean/p95/p99 normal selected-cell operation, fixed corpus, and stated ABBA
+protocol. No claim follows for allocator elapsed time, live/peak/RSS,
+physical I/O, cold or cold-cache behavior, throughput, other cell types,
+queries, ranges, or corpora, or general XLSX behavior. See the [0401 change
+record](changes/0401-xlsx-selected-numeric-elision.md) and [evidence
+bundle](results/change-0401/).
+
 ## Change 0400: dimension-bearing XLSX selected-cell streaming and numeric value scratch
 
 Change 0400 measures candidate `f159c0aed603672aacee8e5923586ce4aa8753f7`

@@ -1,5 +1,12 @@
 # Performance CRUD coverage
 
+## 2026-09-04: change 0401 narrows ownership in the existing XLSX selected-cell query
+
+- Change 0401 keeps the existing `xlsx_file_selected_cell` read query and public CRUD surface unchanged. Its private scanner branch borrows numeric lexical validation and elides owned values only for unselected, non-formula, non-inline numeric/untyped cells; selected values, formula caches, and inline validation remain covered. This is not a new CRUD semantic operation or CRUD-completion evidence.
+- The fixed medium `litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1` corpus has four 48×48 worksheets (9,216 numeric cells), 17 ZIP members, and 4,226,429 archive bytes. The query prepares `bEnCh01` for `Bench01`/position 1 and reads `M29`, expecting stored Number lexical `1028012`; the selected sheet contributes 2,303 unselected numeric cells to this oracle. The registry remains **420** and the default remains **36 cases / 198 rows**.
+- Control `0859063be5a67bd2aafb3531f2126020b2b5000d` and candidate `87f26d5ee02a1903e668bf7f60fa3ef954a0c3fb` were measured with stable Rust 1.98.1, CPU 2, one worker, warm fresh children, 20 warmups, and 500 samples per leg. Only mean/p95/p99 are retained: A1→B1 **+0.099577940251% / +0.625379111895% / +1.170167332729%** and A2→B2 **+0.026562239637% / +0.198122423529% / +0.045344544337%**. P50 is adverse and rejected (**−0.012690677428% / −0.035254218167%**); no median speedup claim follows.
+- The separate 3-warmup/30-sample allocator ABBA records exact candidate-minus-control deltas of **−2,303 allocation calls**, **−2,303 deallocation calls**, **−16,121 allocated bytes**, and **−16,121 deallocated bytes**, with reallocations and failed allocations unchanged. Allocator elapsed time, live/peak/RSS, physical I/O, cold, throughput, other cell types/queries/ranges/corpora, and generalized XLSX claims remain excluded. See the [0401 change record](changes/0401-xlsx-selected-numeric-elision.md) and [evidence bundle](results/change-0401/).
+
 ## 2026-09-04: change 0400 improves the existing XLSX selected-cell read query
 
 - Change 0400 improves an existing XLSX read-query path with dimension-bearing selected streaming and a bounded reusable numeric-value scratch buffer. A valid worksheet `dimension` is validated but does not bound the query result, and the public CRUD semantics/API remain unchanged. This adds no CRUD semantic operation, is not CRUD-completion evidence, and makes no general XLSX claim.

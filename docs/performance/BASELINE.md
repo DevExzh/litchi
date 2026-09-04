@@ -1,5 +1,42 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0401: XLSX selected numeric ownership elision
+
+Production commit `87f26d5ee02a1903e668bf7f60fa3ef954a0c3fb` follows control
+`0859063be5a67bd2aafb3531f2126020b2b5000d`. It adds a private borrowed
+`Number::validate_lexical(&str)` check and elides owned numeric lexical values
+only for unselected, non-formula, non-inline numeric/untyped cells. Selected
+numbers retain their exact lexical spelling; formulas retain cached-number
+ownership; unselected inline strings still undergo their normal validation.
+
+The measured selector is `xlsx_file_selected_cell` on the fixed
+`litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1` medium corpus:
+four 48×48 worksheets (9,216 numeric cells), 17 ZIP members, 4,226,429 archive
+bytes, and source SHA-256
+`dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036`. The
+fixed query prepares `bEnCh01` for canonical `Bench01` (position 1) and reads
+`M29` (row 28, column 12), whose stored Number lexical value is `1028012`.
+The selected sheet has 2,303 unselected numeric cells for this oracle.
+
+Normal release ABBA used CPU 2, one worker, warm fresh children, 20 warmups,
+and 500 samples per leg in A1/B1/B2/A2 order. Only mean, p95, and p99 are
+accepted: reductions are `+0.099577940251% / +0.625379111895% /
++1.170167332729%` (mean/p95/p99) for A1→B1 and
+`+0.026562239637% / +0.198122423529% / +0.045344544337%` for A2→B2. The
+p50 readings are adverse and rejected (`-0.012690677428%` and
+`-0.035254218167%`); no median speedup claim is made.
+
+The separate warm allocator ABBA used three warmups and 30 samples per leg.
+Candidate-minus-control deltas are exactly **−2,303 allocation calls**,
+**−2,303 deallocation calls**, **−16,121 allocated bytes**, and
+**−16,121 deallocated bytes**; reallocations and failed allocations are
+unchanged. The 7-byte lexical allocation underlying this fixed delta is an
+oracle-specific Rust 1.98.1 observation, not a general byte-size claim.
+Allocator elapsed time, live/peak/RSS, physical I/O, cold behavior,
+throughput, other cells/queries/ranges/corpora, and general XLSX behavior are
+excluded. See the [0401 change record](changes/0401-xlsx-selected-numeric-elision.md)
+and [evidence bundle](results/change-0401/).
+
 ## Change 0400: dimension-bearing XLSX selected-cell streaming and numeric scratch
 
 The cumulative candidate (`f159c0aed`) keeps valid SpreadsheetML

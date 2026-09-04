@@ -1,5 +1,40 @@
 # Performance hotspot inventory
 
+## Change 0401 update
+
+The selected-cell scanner now borrows numeric lexical validation and avoids
+constructing an owned Number for an unselected, non-formula, non-inline
+numeric/untyped cell. The guard does not apply to selected values, formula
+cached values, or inline text; unselected inline text still follows the
+existing validation path. Control `0859063be5a67bd2aafb3531f2126020b2b5000d`
+is compared with production candidate
+`87f26d5ee02a1903e668bf7f60fa3ef954a0c3fb`.
+
+The fixed `xlsx_file_selected_cell` oracle is the medium
+`litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1` corpus with four
+48×48 worksheets and 9,216 numeric cells. It prepares `bEnCh01` for
+`Bench01`/position 1 and reads `M29`, expecting Number lexical `1028012`.
+On the selected 48×48 sheet, one cell is selected and 2,303 numeric cells are
+unselected. Each fixed-oracle lexical allocation is 7 bytes in the allocator
+run; this is not a general numeric-size claim.
+
+The CPU-2 normal release ABBA used one worker, warm fresh children, 20
+warmups, and 500 samples per leg. Mean/p95/p99 reductions are
+`+0.099577940251% / +0.625379111895% / +1.170167332729%` in A1→B1 and
+`+0.026562239637% / +0.198122423529% / +0.045344544337%` in A2→B2. These
+three statistics are retained; p50 is adverse in both directions
+(`-0.012690677428%` / `-0.035254218167%`) and rejected, so no median claim is
+made. The 3-warmup/30-sample allocator ABBA independently records −2,303
+allocation calls, −2,303 deallocation calls, and −16,121 allocated and
+deallocated bytes, with reallocations and failed allocations unchanged.
+
+This is a narrow warm selected-cell result. Eager full-worksheet work,
+non-selected/all-cell queries, other cell types, ranges, queries, corpora,
+cold/cache, throughput, physical I/O, live/peak/RSS, allocator elapsed time,
+and general XLSX behavior remain outside the claim. See the [0401 change
+record](changes/0401-xlsx-selected-numeric-elision.md) and [evidence
+bundle](results/change-0401/).
+
 ## Change 0400 update
 
 The first Change 0400 hypothesis was numeric-value scratch reuse alone. It was

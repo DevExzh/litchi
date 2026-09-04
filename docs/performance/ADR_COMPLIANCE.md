@@ -1,5 +1,42 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0401 compliance update
+
+0401 stays inside the existing `litchi-xlsx` raw worksheet selected scanner.
+The only production addition is a crate-private borrowed numeric lexical
+validator shared with `Number::new`, plus a guarded ownership-elision branch
+for unselected, non-formula, non-inline numeric/untyped cells. No public type,
+API, dependency edge, package/runtime handle, lock, unsafe path, executor
+path, CRUD signature, or format-neutral promise changes.
+
+Selected values and exact lexical forms remain owned as before. Formula cached
+numbers remain owned, and inline strings—including unselected inline strings—
+retain their existing decode/validation path. The borrowed path validates
+nonempty numeric text before discarding it, so malformed and non-finite input
+errors remain fail-closed. The exact regression tests cover borrowed-versus-
+owned Number errors, selected/unselected valid lexemes, selected and
+unselected errors, formula cache parity, and unselected inline validation.
+
+The matched revisions are control
+`0859063be5a67bd2aafb3531f2126020b2b5000d` and candidate
+`87f26d5ee02a1903e668bf7f60fa3ef954a0c3fb`. The fixed oracle is the
+`xlsx_file_selected_cell` `Bench01!M29` query on the pinned medium corpus.
+Normal CPU-2 warm ABBA used 20/500 and retains only mean/p95/p99 reductions:
+`+0.099577940251% / +0.625379111895% / +1.170167332729%` and
+`+0.026562239637% / +0.198122423529% / +0.045344544337%` for the two paired
+directions. P50 is rejected as adverse (`-0.012690677428%` /
+`-0.035254218167%`), with no median claim. The 3/30 allocator run records
+exact −2,303 allocation calls, −2,303 deallocation calls, and −16,121 bytes
+for both allocated and deallocated totals, with reallocations and failed
+allocations unchanged.
+
+`performance_claim: scoped`; `claim_authorized: true`, limited to the
+accepted mean/p95/p99 normal selected-cell operation on this fixed corpus and
+protocol. Allocator elapsed time, live/peak/RSS, physical I/O, cold behavior,
+throughput, other cell types/queries/ranges/corpora, and general XLSX behavior
+are excluded. See the [0401 change record](changes/0401-xlsx-selected-numeric-elision.md)
+and [evidence bundle](results/change-0401/).
+
 ## Change 0400 compliance update
 
 0400 remains inside the owning `litchi-xlsx` raw worksheet selected scanner and
