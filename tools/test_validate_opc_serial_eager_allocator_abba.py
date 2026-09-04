@@ -15,6 +15,7 @@ from tools.validate_opc_serial_eager_allocator_abba import (
     ALLOCATOR_SCOPE,
     ABBA_ORDER,
     CASE,
+    Contract,
     CORPUS_ORACLE,
     COUNTER_METRICS,
     EXPECTED_DELTA_BY_SHAPE,
@@ -45,31 +46,64 @@ CANDIDATE_REVISION = "fadf43722289fc78f565b8265a03d4763d2660b5"
 # Independent producer-manifest cross-check.  Do not derive this table from
 # CORPUS_ORACLE: this test must fail if the validator and its fixture drift
 # together, as happened when the incompressible payload hashes were first
-# transcribed.
-INDEPENDENT_CORPUS_IDENTITIES = {
+# transcribed.  Keep every fixed oracle field here, including archive hashes.
+INDEPENDENT_CORPUS_ORACLE = {
     "tiny": {
-        "archive_bytes": 1_310,
-        "archive_member_count": 5,
+        "name": "tiny-compressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "tiny",
+        "payload_kind": "compressible",
+        "compression": "deflate",
         "entry_count": 3,
+        "part_count": 3,
+        "archive_member_count": 5,
         "entry_bytes": 512,
+        "uncompressed_payload_bytes": 1_536,
+        "archive_bytes": 1_310,
+        "archive_sha256": "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a",
+        "target_entry": "benchmark/parts/00001.bin",
+        "target_payload_bytes": 512,
         "target_payload_sha256": "630b1da45fe604eda3b5468b7c9ca7facfbd404941779786276a69ff870e4bdd",
         "part_names_sha256": "5458f5d1eb9283e10cd7057abf8f63cce9d1e0b6c57c5f9f945a9bad3b99cda4",
         "part_payload_sha256": "d1baa4a40fc63856136504f95933bcb2bb3da28f2000cabe1153eaee88c723c0",
     },
     "many-small": {
-        "archive_bytes": 303_003,
-        "archive_member_count": 258,
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
         "entry_count": 256,
+        "part_count": 256,
+        "archive_member_count": 258,
         "entry_bytes": 1_024,
+        "uncompressed_payload_bytes": 262_144,
+        "archive_bytes": 303_003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1_024,
         "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
         "part_names_sha256": "82415ca7ad25155c41df5d93707c95e5fcc31e66cde226ff046fc84906f56bc2",
         "part_payload_sha256": "7bdf372948a4f914aea31187d1f2813254957cd907279690b022ef00737caaa7",
     },
     "few-large": {
-        "archive_bytes": 16_783_632,
-        "archive_member_count": 6,
+        "name": "few-large-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "few-large",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
         "entry_count": 4,
+        "part_count": 4,
+        "archive_member_count": 6,
         "entry_bytes": 4 * 1024 * 1024,
+        "uncompressed_payload_bytes": 16 * 1024 * 1024,
+        "archive_bytes": 16_783_632,
+        "archive_sha256": "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        "target_entry": "benchmark/parts/00002.bin",
+        "target_payload_bytes": 4 * 1024 * 1024,
         "target_payload_sha256": "3dbf6225021a99c1da8750a738bde21f57591c0be1a60aa510966c47ee25b098",
         "part_names_sha256": "d48e27d95e97a4de43e476096910540416f6e19eb54a3759d5ca081b4136166c",
         "part_payload_sha256": "ac1e942c87db2e622c1e1c2efd1046e5d791a44db73bd6255078f8816d922db3",
@@ -424,11 +458,56 @@ class SerialEagerAllocatorValidatorTests(unittest.TestCase):
                 paths[role] = path
             return validate_paths(paths["A1"], paths["B1"], paths["B2"], paths["A2"], contract_path)
 
+    def _validate_direct(self, contract: object) -> dict[str, object]:
+        with tempfile.TemporaryDirectory(prefix="litchi-0403-serial-eager-validator-") as directory:
+            root = Path(directory)
+            paths = {}
+            for role in ROLES:
+                path = root / f"{role.lower()}.json"
+                path.write_text(json.dumps(self.reports[role]), encoding="utf-8")
+                paths[role] = path
+            return validate_paths(
+                paths["A1"], paths["B1"], paths["B2"], paths["A2"], contract=contract,
+            )
+
+    def _valid_contract_object(self) -> Contract:
+        document = self.contract
+        return Contract(
+            raw_sha256="",
+            tool=copy.deepcopy(document["tool"]),
+            environment=copy.deepcopy(document["environment"]),
+            legs=copy.deepcopy(document["legs"]),
+            corpora={
+                shape: copy.deepcopy(document["corpora"][index])
+                for index, shape in enumerate(SHAPES)
+            },
+        )
+
     def test_fixed_hashes_match_independent_producer_manifest(self) -> None:
-        for shape, expected in INDEPENDENT_CORPUS_IDENTITIES.items():
+        self.assertEqual(set(CORPUS_ORACLE), set(INDEPENDENT_CORPUS_ORACLE))
+        for shape, expected in INDEPENDENT_CORPUS_ORACLE.items():
             with self.subTest(shape=shape):
-                for key, value in expected.items():
-                    self.assertEqual(CORPUS_ORACLE[shape][key], value)
+                self.assertEqual(set(CORPUS_ORACLE[shape]), set(expected))
+                self.assertEqual(CORPUS_ORACLE[shape], expected)
+
+    def test_direct_api_revalidates_programmatic_contract(self) -> None:
+        self._validate_direct(self._valid_contract_object())
+        mutations = (
+            (lambda contract: contract.legs["A1"].__setitem__("revision", "not-a-revision"), "revision"),
+            (lambda contract: contract.legs["B1"].__setitem__("binary_sha256", "0" * 63), "binary_sha256"),
+            (lambda contract: contract.environment.__setitem__("logical_cpus_available", True), "logical_cpus_available"),
+            (lambda contract: contract.environment.__setitem__("cpu_affinity", 2), "cpu_affinity"),
+            (lambda contract: contract.tool.__setitem__("binary", "litchi-perf-baseline"), "contract.tool"),
+            (lambda contract: contract.corpora["tiny"].__setitem__("archive_bytes", 1.0), "contract.corpora"),
+        )
+        for mutation, message in mutations:
+            with self.subTest(message=message):
+                forged = copy.deepcopy(self._valid_contract_object())
+                mutation(forged)
+                with self.assertRaisesRegex(ValidationError, message):
+                    self._validate_direct(forged)
+        with self.assertRaisesRegex(ValidationError, "exact Contract"):
+            self._validate_direct(self.contract)
 
     def test_rejects_unstable_elapsed_ties(self) -> None:
         elapsed = _elapsed(100)
