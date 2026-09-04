@@ -122,3 +122,7 @@ verifies the actual first write size, one-under typed output limit, zero output
 charge, and source identity. The configuration identity records the allowance
 so payload-only historical reports cannot be silently compared with this
 context.
+
+[Change 0407](0407-managed-xlsx-budget-validation.md) adds independent typed
+validation of the managed XLSX memory tuple and configuration allowance, with
+81 focused comparator tests and a fresh managed CLI smoke.
