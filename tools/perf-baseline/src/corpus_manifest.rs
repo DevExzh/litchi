@@ -20,6 +20,137 @@ use sha2::{Digest, Sha256};
 pub(crate) const MANIFEST_VERSION: u32 = 2;
 pub(crate) const MANIFEST_KIND: &str = "corpus-catalog";
 
+const COMPRESSIBLE_PAYLOAD_FORMULA: &str =
+    "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n";
+const INCOMPRESSIBLE_PAYLOAD_FORMULA: &str = concat!(
+    "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; ",
+    "xorshift64 shifts=(13,7,17); byte=state>>24",
+);
+
+#[derive(Clone, Copy)]
+struct FamilyMetadata {
+    family: &'static str,
+    kind: &'static str,
+    source_kind: &'static str,
+    source_path: &'static str,
+    producer: &'static str,
+    license_spdx: &'static str,
+    license_evidence: &'static str,
+    redistributable: bool,
+    algorithm_id: &'static str,
+    seed_spec: &'static str,
+    source_functions: &'static [&'static str],
+}
+
+const CFB_SOURCE_FUNCTIONS: &[&str] = &[
+    "build_cfb_corpus",
+    "cfb_entry_name",
+    "payload_bytes",
+    "CorpusShape",
+    "PayloadKind",
+];
+const OPC_SOURCE_FUNCTIONS: &[&str] = &[
+    "build_opc_corpus",
+    "entry_name",
+    "payload_bytes",
+    "CorpusShape",
+    "PayloadKind",
+];
+const LEGACY_WRITER_SOURCE_FUNCTIONS: &[&str] = &[
+    "build_writer_corpus",
+    "write_fresh_doc",
+    "write_fresh_xls",
+    "write_fresh_ppt",
+    "WriterShape",
+    "writer_text",
+    "writer_payload_text",
+];
+const XLSX_SOURCE_FUNCTIONS: &[&str] = &[
+    "build_xlsx_corpus",
+    "build_xlsx_workbook",
+    "xlsx_one_percent_updates",
+    "xlsx_value",
+    "xlsx_sheet_name",
+    "xlsx_address",
+    "XlsxShape",
+];
+
+// Keep this source-audited map in lockstep with the Python migration and the
+// table in CORPUS_MANIFEST_V2.md.  It describes generator algorithms, not an
+// archive/member scan.
+const FAMILY_MAP: &[(&str, FamilyMetadata)] = &[
+    (
+        "litchi-cfb-synthetic-v1",
+        FamilyMetadata {
+            family: "cfb",
+            kind: "synthetic",
+            source_kind: "generated",
+            source_path: "tools/perf-baseline/src/lib.rs",
+            producer: "Litchi deterministic generator",
+            license_spdx: "Apache-2.0",
+            license_evidence: "repository-license",
+            redistributable: true,
+            algorithm_id: "litchi-perf.cfb-payload-v1",
+            seed_spec: "indexed-formula-v1",
+            source_functions: CFB_SOURCE_FUNCTIONS,
+        },
+    ),
+    (
+        "litchi-opc-synthetic-v2",
+        FamilyMetadata {
+            family: "opc",
+            kind: "synthetic",
+            source_kind: "generated",
+            source_path: "tools/perf-baseline/src/lib.rs",
+            producer: "Litchi deterministic generator",
+            license_spdx: "Apache-2.0",
+            license_evidence: "repository-license",
+            redistributable: true,
+            algorithm_id: "litchi-perf.opc-payload-v1",
+            seed_spec: "indexed-formula-v1",
+            source_functions: OPC_SOURCE_FUNCTIONS,
+        },
+    ),
+    (
+        "litchi-legacy-writer-v1",
+        FamilyMetadata {
+            family: "legacy-writer",
+            kind: "synthetic",
+            source_kind: "generated",
+            source_path: "tools/perf-baseline/src/lib.rs",
+            producer: "Litchi deterministic generator",
+            license_spdx: "Apache-2.0",
+            license_evidence: "repository-license",
+            redistributable: true,
+            algorithm_id: "litchi-perf.legacy-writer-v1",
+            seed_spec: "none",
+            source_functions: LEGACY_WRITER_SOURCE_FUNCTIONS,
+        },
+    ),
+    (
+        "litchi-xlsx-synthetic-v1",
+        FamilyMetadata {
+            family: "xlsx",
+            kind: "synthetic",
+            source_kind: "generated",
+            source_path: "tools/perf-baseline/src/lib.rs",
+            producer: "Litchi deterministic generator",
+            license_spdx: "Apache-2.0",
+            license_evidence: "repository-license",
+            redistributable: true,
+            algorithm_id: "litchi-perf.xlsx-integer-grid-v1",
+            seed_spec: "none",
+            source_functions: XLSX_SOURCE_FUNCTIONS,
+        },
+    ),
+];
+
+fn family_metadata(generator: &str) -> Option<&'static FamilyMetadata> {
+    FAMILY_MAP
+        .iter()
+        .find_map(|(id, metadata)| (*id == generator).then_some(metadata))
+}
+
 #[derive(Debug)]
 pub(crate) struct ManifestError(String);
 
@@ -310,6 +441,161 @@ pub(crate) struct LegacyCaseCorpus {
     pub(crate) corpus: Value,
 }
 
+fn generator_parameters(
+    legacy: &LegacyCorpusManifestV1,
+    family: Option<&FamilyMetadata>,
+) -> BTreeMap<String, Value> {
+    let mut parameters = BTreeMap::new();
+    parameters.insert("legacy_shape".to_owned(), json!(legacy.shape));
+    parameters.insert("legacy_payload_kind".to_owned(), json!(legacy.payload_kind));
+    let Some(family) = family else {
+        return parameters;
+    };
+
+    parameters.insert("family".to_owned(), json!(family.family));
+    parameters.insert("package_format".to_owned(), json!(legacy.package_format));
+    parameters.insert("compression".to_owned(), json!(legacy.compression));
+    parameters.insert("entry_count".to_owned(), json!(legacy.entry_count));
+    parameters.insert("entry_bytes".to_owned(), json!(legacy.entry_bytes));
+    parameters.insert(
+        "archive_member_count".to_owned(),
+        json!(legacy.archive_member_count),
+    );
+    parameters.insert(
+        "source_functions".to_owned(),
+        json!(family.source_functions),
+    );
+
+    match family.family {
+        "cfb" | "opc" => {
+            let is_cfb = family.family == "cfb";
+            let target_index = if is_cfb {
+                legacy.entry_count.saturating_sub(1)
+            } else {
+                legacy.entry_count / 2
+            };
+            parameters.insert("target_index".to_owned(), json!(target_index));
+            parameters.insert(
+                "target_name_pattern".to_owned(),
+                json!(if is_cfb {
+                    "benchmark_stream_{index:05}.bin"
+                } else {
+                    "benchmark/parts/{index:05}.bin"
+                }),
+            );
+            parameters.insert(
+                "payload_formula".to_owned(),
+                json!(if legacy.payload_kind == "compressible" {
+                    COMPRESSIBLE_PAYLOAD_FORMULA
+                } else {
+                    INCOMPRESSIBLE_PAYLOAD_FORMULA
+                }),
+            );
+            if legacy.payload_kind == "compressible" {
+                parameters.insert("payload_block_bytes".to_owned(), json!(45));
+            }
+            if family.family == "opc" {
+                parameters.insert(
+                    "relationship".to_owned(),
+                    json!({
+                        "id": "rIdBenchmarkMain",
+                        "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+                        "target": legacy.target_entry,
+                        "mode": "Internal",
+                        "part_content_type": "application/octet-stream",
+                    }),
+                );
+            }
+        },
+        "legacy-writer" => {
+            let writer_format = legacy.package_format.split_once('/').map_or_else(
+                || legacy.package_format.to_ascii_lowercase(),
+                |(format, _)| format.to_ascii_lowercase(),
+            );
+            parameters.insert("writer_format".to_owned(), json!(writer_format));
+            parameters.insert("writer_shape".to_owned(), json!(legacy.shape));
+            parameters.insert("target_stream".to_owned(), json!(legacy.target_entry));
+            parameters.insert(
+                "writer_text_template".to_owned(),
+                json!("litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload"),
+            );
+            parameters.insert(
+                "payload_heavy_repeat_block".to_owned(),
+                json!("litchi-perf-baseline-payload-heavy-v1 "),
+            );
+            let payload_heavy_bytes = match writer_format.as_str() {
+                "doc" => 20_000,
+                "xls" => 32_700,
+                "ppt" => 40_000,
+                _ => 0,
+            };
+            parameters.insert("payload_heavy_bytes".to_owned(), json!(payload_heavy_bytes));
+            match writer_format.as_str() {
+                "doc" => {
+                    parameters.insert("paragraph_count".to_owned(), json!(legacy.entry_count));
+                },
+                "xls" => {
+                    let dimensions = match legacy.shape.as_str() {
+                        "tiny" => json!({"sheets": 1, "rows": 4, "columns": 4}),
+                        "large" => json!({"sheets": 4, "rows": 128, "columns": 16}),
+                        _ => json!({"sheets": 128, "string_bytes": 32_700}),
+                    };
+                    parameters.insert("dimensions".to_owned(), dimensions);
+                    parameters.insert(
+                        "numeric_value_formula".to_owned(),
+                        json!("(sheet * rows * columns + row * columns + column) as f64"),
+                    );
+                },
+                "ppt" => {
+                    let dimensions = match legacy.shape.as_str() {
+                        "tiny" => json!({"slides": 1, "text_boxes_per_slide": 2}),
+                        "large" => json!({"slides": 12, "text_boxes_per_slide": 12}),
+                        _ => json!({"slides": 16, "text_boxes_per_slide": 8}),
+                    };
+                    parameters.insert("dimensions".to_owned(), dimensions);
+                    parameters.insert(
+                        "textbox_position_formula".to_owned(),
+                        json!("x=36+(box_number % 3)*180; y=36+(box_number / 3)*90; width=144; height=54"),
+                    );
+                },
+                _ => {},
+            }
+        },
+        "xlsx" => {
+            if let Some(xlsx) = &legacy.xlsx {
+                parameters.insert("sheet_count".to_owned(), json!(xlsx.sheet_count));
+                parameters.insert("rows_per_sheet".to_owned(), json!(xlsx.rows_per_sheet));
+                parameters.insert(
+                    "columns_per_sheet".to_owned(),
+                    json!(xlsx.columns_per_sheet),
+                );
+                parameters.insert(
+                    "one_percent_update_count".to_owned(),
+                    json!(xlsx.one_percent_update_count),
+                );
+            }
+            parameters.insert(
+                "value_formula".to_owned(),
+                json!("(sheet * 1_000_000 + row * 1_000 + column) as i32"),
+            );
+            parameters.insert(
+                "sheet_name_formula".to_owned(),
+                json!("index == 0 ? Sheet1 : Bench{index:02}"),
+            );
+            parameters.insert(
+                "address_formula".to_owned(),
+                json!("column_to_letters(column + 1) + (row + 1)"),
+            );
+            parameters.insert(
+                "one_percent_update_formula".to_owned(),
+                json!("ceil(cell_count / 100)"),
+            );
+        },
+        _ => {},
+    }
+    parameters
+}
+
 impl CorpusCatalogV2 {
     pub(crate) fn from_legacy_results(
         records: &[LegacyCaseCorpus],
@@ -483,8 +769,10 @@ impl CorpusManifestV2 {
         let target_payload_bytes = u64::try_from(legacy.target_payload_bytes)
             .map_err(|_| ManifestError::new("target byte count does not fit u64"))?;
         let id = content_id(&legacy.package_format, &legacy.archive_sha256);
+        let family = family_metadata(&legacy.generator);
+        let generated = family.is_some() || legacy.generator.contains("synthetic");
         let mut categories = vec!["legacy-migrated".to_owned()];
-        if legacy.generator.contains("synthetic") {
+        if generated {
             categories.push("synthetic".to_owned());
         }
         if legacy.payload_kind == "compressible" {
@@ -501,15 +789,11 @@ impl CorpusManifestV2 {
         categories.sort();
         categories.dedup();
 
-        let mut generator_parameters = BTreeMap::new();
-        generator_parameters.insert("legacy_shape".to_owned(), json!(legacy.shape));
-        generator_parameters.insert("legacy_payload_kind".to_owned(), json!(legacy.payload_kind));
+        let generator_parameters = generator_parameters(&legacy, family);
         let generator_revision = legacy
             .generator
             .rsplit_once("-v")
             .map(|(_, revision)| format!("v{revision}"));
-        let generated = legacy.generator.contains("synthetic");
-
         let mut shape_parameters = BTreeMap::new();
         shape_parameters.insert("entry_count".to_owned(), json!(entry_count));
         shape_parameters.insert("entry_bytes".to_owned(), json!(entry_bytes));
@@ -543,33 +827,58 @@ impl CorpusManifestV2 {
             categories,
             generator: GeneratorV2 {
                 id: legacy_generator,
-                kind: if generated { "synthetic" } else { "unknown" }.to_owned(),
+                kind: family
+                    .map_or(if generated { "synthetic" } else { "unknown" }, |family| {
+                        family.kind
+                    })
+                    .to_owned(),
                 revision: generator_revision,
-                algorithm_id: None,
-                seed_spec: None,
+                algorithm_id: family.map(|family| family.algorithm_id.to_owned()),
+                seed_spec: family.map(|family| family.seed_spec.to_owned()),
                 parameters: generator_parameters,
             },
             provenance: ProvenanceV2 {
-                source_kind: if generated { "generated" } else { "unknown" }.to_owned(),
-                source_path: None,
-                producer: if generated {
-                    Some("Litchi deterministic generator".to_owned())
-                } else {
-                    None
-                },
+                source_kind: family
+                    .map_or(if generated { "generated" } else { "unknown" }, |family| {
+                        family.source_kind
+                    })
+                    .to_owned(),
+                source_path: family.map(|family| family.source_path.to_owned()),
+                producer: family.map_or_else(
+                    || {
+                        if generated {
+                            Some("Litchi deterministic generator".to_owned())
+                        } else {
+                            None
+                        }
+                    },
+                    |family| Some(family.producer.to_owned()),
+                ),
                 producer_version: None,
                 source_sha256: None,
-                license_spdx: if generated {
-                    Some("Apache-2.0".to_owned())
-                } else {
-                    None
-                },
-                license_evidence: if generated {
-                    Some("repository-license".to_owned())
-                } else {
-                    None
-                },
-                redistributable: if generated { Some(true) } else { None },
+                license_spdx: family.map_or_else(
+                    || {
+                        if generated {
+                            Some("Apache-2.0".to_owned())
+                        } else {
+                            None
+                        }
+                    },
+                    |family| Some(family.license_spdx.to_owned()),
+                ),
+                license_evidence: family.map_or_else(
+                    || {
+                        if generated {
+                            Some("repository-license".to_owned())
+                        } else {
+                            None
+                        }
+                    },
+                    |family| Some(family.license_evidence.to_owned()),
+                ),
+                redistributable: family
+                    .map(|family| family.redistributable)
+                    .or(if generated { Some(true) } else { None }),
             },
             bytes: ByteSummaryV2 {
                 archive_bytes,
@@ -881,6 +1190,81 @@ mod tests {
         assert_eq!(migrated.security.encryption.state, "unknown");
         assert_eq!(migrated.provenance.source_kind, "generated");
         assert_eq!(migrated.limits.profile_id, None);
+    }
+
+    #[test]
+    fn known_family_map_enriches_without_source_hashes() {
+        assert_eq!(FAMILY_MAP.len(), 4);
+        let expected = [
+            (
+                "litchi-cfb-synthetic-v1",
+                "litchi-perf.cfb-payload-v1",
+                "indexed-formula-v1",
+                "cfb",
+            ),
+            (
+                "litchi-opc-synthetic-v2",
+                "litchi-perf.opc-payload-v1",
+                "indexed-formula-v1",
+                "opc",
+            ),
+            (
+                "litchi-legacy-writer-v1",
+                "litchi-perf.legacy-writer-v1",
+                "none",
+                "legacy-writer",
+            ),
+            (
+                "litchi-xlsx-synthetic-v1",
+                "litchi-perf.xlsx-integer-grid-v1",
+                "none",
+                "xlsx",
+            ),
+        ];
+        for (generator, algorithm_id, seed_spec, family) in expected {
+            let mut corpus = legacy();
+            corpus.generator = generator.to_owned();
+            if family == "legacy-writer" {
+                corpus.package_format = "DOC/CFB".to_owned();
+                corpus.payload_kind = "not-applicable".to_owned();
+                corpus.target_entry = "WordDocument".to_owned();
+            } else if family == "xlsx" {
+                corpus.package_format = "XLSX/OPC/ZIP".to_owned();
+                corpus.payload_kind = "deterministic-integer-grid".to_owned();
+                corpus.xlsx = Some(LegacyXlsxManifestV1 {
+                    sheet_count: 3,
+                    rows_per_sheet: 8,
+                    columns_per_sheet: 8,
+                    one_percent_update_count: 2,
+                    source_members: LegacyXlsxSourceMembersV1 {
+                        workbook: "xl/workbook.xml".to_owned(),
+                        worksheets: vec!["xl/worksheets/sheet1.xml".to_owned()],
+                        shared_strings: None,
+                        styles: Some("xl/styles.xml".to_owned()),
+                    },
+                });
+            }
+            let migrated = CorpusManifestV2::from_legacy(corpus).unwrap();
+            assert_eq!(migrated.generator.kind, "synthetic");
+            assert_eq!(
+                migrated.generator.algorithm_id.as_deref(),
+                Some(algorithm_id)
+            );
+            assert_eq!(migrated.generator.seed_spec.as_deref(), Some(seed_spec));
+            assert_eq!(migrated.generator.parameters["family"], json!(family));
+            assert_eq!(
+                migrated.provenance.source_path.as_deref(),
+                Some("tools/perf-baseline/src/lib.rs")
+            );
+            assert_eq!(migrated.provenance.source_kind, "generated");
+            assert_eq!(migrated.provenance.source_sha256, None);
+            assert!(
+                migrated
+                    .categories
+                    .iter()
+                    .any(|category| category == "synthetic")
+            );
+        }
     }
 
     #[test]

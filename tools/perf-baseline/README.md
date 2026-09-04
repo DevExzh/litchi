@@ -2295,6 +2295,29 @@ cargo run --release --locked --manifest-path tools/perf-baseline/Cargo.toml -- \
 
 ## Corpus matrix
 
+The optional schema-2 sidecar uses one shared static family map for the default
+CFB, OPC, legacy DOC/XLS/PPT writer, and XLSX generators. Its proposed
+algorithm IDs are `litchi-perf.cfb-payload-v1`,
+`litchi-perf.opc-payload-v1`, `litchi-perf.legacy-writer-v1`, and
+`litchi-perf.xlsx-integer-grid-v1`, respectively. CFB/OPC records use
+`seed_spec: "indexed-formula-v1"`: there is no global RNG; the compressible
+payload uses the fixed 45-byte block at `(offset + index) % 45`, and the
+incompressible payload uses the index-derived xorshift64 state with constants
+`0x9e3779b97f4a7c15` and `0xd1b54a32d192ed03`, shifts `13,7,17`, and byte
+`state >> 24`. Legacy writers and XLSX use `seed_spec: "none"`; their fixed
+text/dimension and integer-grid formulas are recorded in
+`generator.parameters`. The legacy writer ID is classified as `synthetic`
+because the writer corpus is generated deterministically in memory.
+
+The map is mirrored by the Python catalog generator and Rust runtime migration.
+Known generator source is identified by the repository-relative
+`tools/perf-baseline/src/lib.rs` path, while `provenance.source_sha256` remains
+null: it is reserved for input/fixture bytes, not hashes of generator source.
+The catalog still leaves member inventories, relationship closure, security,
+and limit evidence unknown/unavailable unless an independent archive scan
+records them. See [`CORPUS_MANIFEST_V2.md`](../../docs/performance/CORPUS_MANIFEST_V2.md)
+for the normative map and regeneration invariants.
+
 Each shape is generated twice, once with a repeated deterministic payload and
 once with a deterministic xorshift payload. The latter is intended to be hard
 to compress, not cryptographically random.

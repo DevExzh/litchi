@@ -6,12 +6,12 @@
     "algorithm": "sorted-json-utf8-compact-v1",
     "hash": "sha256"
   },
-  "catalog_sha256": "2add6164efd5d4324315d46327a53f1567c74d95f4cd719f898af1cb9c700297",
+  "catalog_sha256": "679d39548de0150b9fdfcdd2628ca3adc1bbd3c041a21d7a95ab70095c2d0ba9",
   "content_set_sha256": "f0fad22aa4deed6ccf2f8ecc202222ee2c901aec3fe908e69edee0dbd46b1d71",
   "build": {
     "tool": "litchi-perf-baseline",
     "tool_version": "0.1.0",
-    "git_revision": "d407436e866ccf8635520de753fa51189588535c",
+    "git_revision": "e42aedef6ef7a9baae177f2e031196125c4a0706",
     "git_worktree_dirty": false,
     "source_files": []
   },
@@ -48,16 +48,32 @@
         "id": "litchi-cfb-synthetic-v1",
         "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.cfb-payload-v1",
+        "seed_spec": "indexed-formula-v1",
         "parameters": {
           "legacy_shape": "tiny",
-          "legacy_payload_kind": "incompressible"
+          "legacy_payload_kind": "incompressible",
+          "family": "cfb",
+          "package_format": "CFB/OLE2",
+          "compression": "none",
+          "entry_count": 3,
+          "entry_bytes": 512,
+          "archive_member_count": 3,
+          "source_functions": [
+            "build_cfb_corpus",
+            "cfb_entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 2,
+          "target_name_pattern": "benchmark_stream_{index:05}.bin",
+          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24"
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -188,16 +204,32 @@
         "id": "litchi-cfb-synthetic-v1",
         "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.cfb-payload-v1",
+        "seed_spec": "indexed-formula-v1",
         "parameters": {
           "legacy_shape": "wide-root",
-          "legacy_payload_kind": "incompressible"
+          "legacy_payload_kind": "incompressible",
+          "family": "cfb",
+          "package_format": "CFB/OLE2",
+          "compression": "none",
+          "entry_count": 2048,
+          "entry_bytes": 64,
+          "archive_member_count": 2048,
+          "source_functions": [
+            "build_cfb_corpus",
+            "cfb_entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 2047,
+          "target_name_pattern": "benchmark_stream_{index:05}.bin",
+          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24"
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -329,16 +361,32 @@
         "id": "litchi-cfb-synthetic-v1",
         "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.cfb-payload-v1",
+        "seed_spec": "indexed-formula-v1",
         "parameters": {
           "legacy_shape": "few-large",
-          "legacy_payload_kind": "incompressible"
+          "legacy_payload_kind": "incompressible",
+          "family": "cfb",
+          "package_format": "CFB/OLE2",
+          "compression": "none",
+          "entry_count": 4,
+          "entry_bytes": 4194304,
+          "archive_member_count": 4,
+          "source_functions": [
+            "build_cfb_corpus",
+            "cfb_entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 3,
+          "target_name_pattern": "benchmark_stream_{index:05}.bin",
+          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24"
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -470,16 +518,33 @@
         "id": "litchi-cfb-synthetic-v1",
         "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.cfb-payload-v1",
+        "seed_spec": "indexed-formula-v1",
         "parameters": {
           "legacy_shape": "few-large",
-          "legacy_payload_kind": "compressible"
+          "legacy_payload_kind": "compressible",
+          "family": "cfb",
+          "package_format": "CFB/OLE2",
+          "compression": "none",
+          "entry_count": 4,
+          "entry_bytes": 4194304,
+          "archive_member_count": 4,
+          "source_functions": [
+            "build_cfb_corpus",
+            "cfb_entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 3,
+          "target_name_pattern": "benchmark_stream_{index:05}.bin",
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
+          "payload_block_bytes": 45
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -611,16 +676,33 @@
         "id": "litchi-cfb-synthetic-v1",
         "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.cfb-payload-v1",
+        "seed_spec": "indexed-formula-v1",
         "parameters": {
           "legacy_shape": "many-small",
-          "legacy_payload_kind": "compressible"
+          "legacy_payload_kind": "compressible",
+          "family": "cfb",
+          "package_format": "CFB/OLE2",
+          "compression": "none",
+          "entry_count": 256,
+          "entry_bytes": 1024,
+          "archive_member_count": 256,
+          "source_functions": [
+            "build_cfb_corpus",
+            "cfb_entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 255,
+          "target_name_pattern": "benchmark_stream_{index:05}.bin",
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
+          "payload_block_bytes": 45
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -751,16 +833,33 @@
         "id": "litchi-cfb-synthetic-v1",
         "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.cfb-payload-v1",
+        "seed_spec": "indexed-formula-v1",
         "parameters": {
           "legacy_shape": "tiny",
-          "legacy_payload_kind": "compressible"
+          "legacy_payload_kind": "compressible",
+          "family": "cfb",
+          "package_format": "CFB/OLE2",
+          "compression": "none",
+          "entry_count": 3,
+          "entry_bytes": 512,
+          "archive_member_count": 3,
+          "source_functions": [
+            "build_cfb_corpus",
+            "cfb_entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 2,
+          "target_name_pattern": "benchmark_stream_{index:05}.bin",
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
+          "payload_block_bytes": 45
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -891,16 +990,33 @@
         "id": "litchi-cfb-synthetic-v1",
         "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.cfb-payload-v1",
+        "seed_spec": "indexed-formula-v1",
         "parameters": {
           "legacy_shape": "wide-root",
-          "legacy_payload_kind": "compressible"
+          "legacy_payload_kind": "compressible",
+          "family": "cfb",
+          "package_format": "CFB/OLE2",
+          "compression": "none",
+          "entry_count": 2048,
+          "entry_bytes": 64,
+          "archive_member_count": 2048,
+          "source_functions": [
+            "build_cfb_corpus",
+            "cfb_entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 2047,
+          "target_name_pattern": "benchmark_stream_{index:05}.bin",
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
+          "payload_block_bytes": 45
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -1032,16 +1148,32 @@
         "id": "litchi-cfb-synthetic-v1",
         "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.cfb-payload-v1",
+        "seed_spec": "indexed-formula-v1",
         "parameters": {
           "legacy_shape": "many-small",
-          "legacy_payload_kind": "incompressible"
+          "legacy_payload_kind": "incompressible",
+          "family": "cfb",
+          "package_format": "CFB/OLE2",
+          "compression": "none",
+          "entry_count": 256,
+          "entry_bytes": 1024,
+          "archive_member_count": 256,
+          "source_functions": [
+            "build_cfb_corpus",
+            "cfb_entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 255,
+          "target_name_pattern": "benchmark_stream_{index:05}.bin",
+          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24"
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -1164,28 +1296,51 @@
       "format": "DOC/CFB",
       "size_class": "large",
       "categories": [
-        "legacy-migrated"
+        "legacy-migrated",
+        "synthetic"
       ],
       "generator": {
         "id": "litchi-legacy-writer-v1",
-        "kind": "unknown",
+        "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.legacy-writer-v1",
+        "seed_spec": "none",
         "parameters": {
           "legacy_shape": "large",
-          "legacy_payload_kind": "not-applicable"
+          "legacy_payload_kind": "not-applicable",
+          "family": "legacy-writer",
+          "package_format": "DOC/CFB",
+          "compression": "none",
+          "entry_count": 512,
+          "entry_bytes": 0,
+          "archive_member_count": 5,
+          "source_functions": [
+            "build_writer_corpus",
+            "write_fresh_doc",
+            "write_fresh_xls",
+            "write_fresh_ppt",
+            "WriterShape",
+            "writer_text",
+            "writer_payload_text"
+          ],
+          "writer_format": "doc",
+          "writer_shape": "large",
+          "target_stream": "WordDocument",
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
+          "payload_heavy_bytes": 20000,
+          "paragraph_count": 512
         }
       },
       "provenance": {
-        "source_kind": "unknown",
-        "source_path": null,
-        "producer": null,
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
-        "license_spdx": null,
-        "license_evidence": null,
-        "redistributable": null
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
       },
       "bytes": {
         "archive_bytes": 97792,
@@ -1295,28 +1450,51 @@
       "format": "DOC/CFB",
       "size_class": "unknown",
       "categories": [
-        "legacy-migrated"
+        "legacy-migrated",
+        "synthetic"
       ],
       "generator": {
         "id": "litchi-legacy-writer-v1",
-        "kind": "unknown",
+        "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.legacy-writer-v1",
+        "seed_spec": "none",
         "parameters": {
           "legacy_shape": "payload-heavy",
-          "legacy_payload_kind": "not-applicable"
+          "legacy_payload_kind": "not-applicable",
+          "family": "legacy-writer",
+          "package_format": "DOC/CFB",
+          "compression": "none",
+          "entry_count": 128,
+          "entry_bytes": 0,
+          "archive_member_count": 5,
+          "source_functions": [
+            "build_writer_corpus",
+            "write_fresh_doc",
+            "write_fresh_xls",
+            "write_fresh_ppt",
+            "WriterShape",
+            "writer_text",
+            "writer_payload_text"
+          ],
+          "writer_format": "doc",
+          "writer_shape": "payload-heavy",
+          "target_stream": "WordDocument",
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
+          "payload_heavy_bytes": 20000,
+          "paragraph_count": 128
         }
       },
       "provenance": {
-        "source_kind": "unknown",
-        "source_path": null,
-        "producer": null,
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
-        "license_spdx": null,
-        "license_evidence": null,
-        "redistributable": null
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
       },
       "bytes": {
         "archive_bytes": 5179904,
@@ -1426,28 +1604,51 @@
       "format": "DOC/CFB",
       "size_class": "tiny",
       "categories": [
-        "legacy-migrated"
+        "legacy-migrated",
+        "synthetic"
       ],
       "generator": {
         "id": "litchi-legacy-writer-v1",
-        "kind": "unknown",
+        "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.legacy-writer-v1",
+        "seed_spec": "none",
         "parameters": {
           "legacy_shape": "tiny",
-          "legacy_payload_kind": "not-applicable"
+          "legacy_payload_kind": "not-applicable",
+          "family": "legacy-writer",
+          "package_format": "DOC/CFB",
+          "compression": "none",
+          "entry_count": 3,
+          "entry_bytes": 0,
+          "archive_member_count": 5,
+          "source_functions": [
+            "build_writer_corpus",
+            "write_fresh_doc",
+            "write_fresh_xls",
+            "write_fresh_ppt",
+            "WriterShape",
+            "writer_text",
+            "writer_payload_text"
+          ],
+          "writer_format": "doc",
+          "writer_shape": "tiny",
+          "target_stream": "WordDocument",
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
+          "payload_heavy_bytes": 20000,
+          "paragraph_count": 3
         }
       },
       "provenance": {
-        "source_kind": "unknown",
-        "source_path": null,
-        "producer": null,
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
-        "license_spdx": null,
-        "license_evidence": null,
-        "redistributable": null
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
       },
       "bytes": {
         "archive_bytes": 15360,
@@ -1565,16 +1766,39 @@
         "id": "litchi-opc-synthetic-v2",
         "kind": "synthetic",
         "revision": "v2",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.opc-payload-v1",
+        "seed_spec": "indexed-formula-v1",
         "parameters": {
           "legacy_shape": "tiny",
-          "legacy_payload_kind": "incompressible"
+          "legacy_payload_kind": "incompressible",
+          "family": "opc",
+          "package_format": "OPC/ZIP",
+          "compression": "deflate",
+          "entry_count": 3,
+          "entry_bytes": 512,
+          "archive_member_count": 5,
+          "source_functions": [
+            "build_opc_corpus",
+            "entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 1,
+          "target_name_pattern": "benchmark/parts/{index:05}.bin",
+          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24",
+          "relationship": {
+            "id": "rIdBenchmarkMain",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+            "target": "benchmark/parts/00001.bin",
+            "mode": "Internal",
+            "part_content_type": "application/octet-stream"
+          }
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -1708,16 +1932,39 @@
         "id": "litchi-opc-synthetic-v2",
         "kind": "synthetic",
         "revision": "v2",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.opc-payload-v1",
+        "seed_spec": "indexed-formula-v1",
         "parameters": {
           "legacy_shape": "many-small",
-          "legacy_payload_kind": "incompressible"
+          "legacy_payload_kind": "incompressible",
+          "family": "opc",
+          "package_format": "OPC/ZIP",
+          "compression": "deflate",
+          "entry_count": 256,
+          "entry_bytes": 1024,
+          "archive_member_count": 258,
+          "source_functions": [
+            "build_opc_corpus",
+            "entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 128,
+          "target_name_pattern": "benchmark/parts/{index:05}.bin",
+          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24",
+          "relationship": {
+            "id": "rIdBenchmarkMain",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+            "target": "benchmark/parts/00128.bin",
+            "mode": "Internal",
+            "part_content_type": "application/octet-stream"
+          }
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -1850,16 +2097,40 @@
         "id": "litchi-opc-synthetic-v2",
         "kind": "synthetic",
         "revision": "v2",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.opc-payload-v1",
+        "seed_spec": "indexed-formula-v1",
         "parameters": {
           "legacy_shape": "tiny",
-          "legacy_payload_kind": "compressible"
+          "legacy_payload_kind": "compressible",
+          "family": "opc",
+          "package_format": "OPC/ZIP",
+          "compression": "deflate",
+          "entry_count": 3,
+          "entry_bytes": 512,
+          "archive_member_count": 5,
+          "source_functions": [
+            "build_opc_corpus",
+            "entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 1,
+          "target_name_pattern": "benchmark/parts/{index:05}.bin",
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
+          "payload_block_bytes": 45,
+          "relationship": {
+            "id": "rIdBenchmarkMain",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+            "target": "benchmark/parts/00001.bin",
+            "mode": "Internal",
+            "part_content_type": "application/octet-stream"
+          }
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -1993,16 +2264,40 @@
         "id": "litchi-opc-synthetic-v2",
         "kind": "synthetic",
         "revision": "v2",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.opc-payload-v1",
+        "seed_spec": "indexed-formula-v1",
         "parameters": {
           "legacy_shape": "many-small",
-          "legacy_payload_kind": "compressible"
+          "legacy_payload_kind": "compressible",
+          "family": "opc",
+          "package_format": "OPC/ZIP",
+          "compression": "deflate",
+          "entry_count": 256,
+          "entry_bytes": 1024,
+          "archive_member_count": 258,
+          "source_functions": [
+            "build_opc_corpus",
+            "entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 128,
+          "target_name_pattern": "benchmark/parts/{index:05}.bin",
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
+          "payload_block_bytes": 45,
+          "relationship": {
+            "id": "rIdBenchmarkMain",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+            "target": "benchmark/parts/00128.bin",
+            "mode": "Internal",
+            "part_content_type": "application/octet-stream"
+          }
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -2136,16 +2431,39 @@
         "id": "litchi-opc-synthetic-v2",
         "kind": "synthetic",
         "revision": "v2",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.opc-payload-v1",
+        "seed_spec": "indexed-formula-v1",
         "parameters": {
           "legacy_shape": "few-large",
-          "legacy_payload_kind": "incompressible"
+          "legacy_payload_kind": "incompressible",
+          "family": "opc",
+          "package_format": "OPC/ZIP",
+          "compression": "deflate",
+          "entry_count": 4,
+          "entry_bytes": 4194304,
+          "archive_member_count": 6,
+          "source_functions": [
+            "build_opc_corpus",
+            "entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 2,
+          "target_name_pattern": "benchmark/parts/{index:05}.bin",
+          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24",
+          "relationship": {
+            "id": "rIdBenchmarkMain",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+            "target": "benchmark/parts/00002.bin",
+            "mode": "Internal",
+            "part_content_type": "application/octet-stream"
+          }
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -2278,16 +2596,39 @@
         "id": "litchi-opc-synthetic-v2",
         "kind": "synthetic",
         "revision": "v2",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.opc-payload-v1",
+        "seed_spec": "indexed-formula-v1",
         "parameters": {
           "legacy_shape": "wide-root",
-          "legacy_payload_kind": "incompressible"
+          "legacy_payload_kind": "incompressible",
+          "family": "opc",
+          "package_format": "OPC/ZIP",
+          "compression": "deflate",
+          "entry_count": 2048,
+          "entry_bytes": 64,
+          "archive_member_count": 2050,
+          "source_functions": [
+            "build_opc_corpus",
+            "entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 1024,
+          "target_name_pattern": "benchmark/parts/{index:05}.bin",
+          "payload_formula": "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; xorshift64 shifts=(13,7,17); byte=state>>24",
+          "relationship": {
+            "id": "rIdBenchmarkMain",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+            "target": "benchmark/parts/01024.bin",
+            "mode": "Internal",
+            "part_content_type": "application/octet-stream"
+          }
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -2421,16 +2762,40 @@
         "id": "litchi-opc-synthetic-v2",
         "kind": "synthetic",
         "revision": "v2",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.opc-payload-v1",
+        "seed_spec": "indexed-formula-v1",
         "parameters": {
           "legacy_shape": "few-large",
-          "legacy_payload_kind": "compressible"
+          "legacy_payload_kind": "compressible",
+          "family": "opc",
+          "package_format": "OPC/ZIP",
+          "compression": "deflate",
+          "entry_count": 4,
+          "entry_bytes": 4194304,
+          "archive_member_count": 6,
+          "source_functions": [
+            "build_opc_corpus",
+            "entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 2,
+          "target_name_pattern": "benchmark/parts/{index:05}.bin",
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
+          "payload_block_bytes": 45,
+          "relationship": {
+            "id": "rIdBenchmarkMain",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+            "target": "benchmark/parts/00002.bin",
+            "mode": "Internal",
+            "part_content_type": "application/octet-stream"
+          }
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -2563,16 +2928,40 @@
         "id": "litchi-opc-synthetic-v2",
         "kind": "synthetic",
         "revision": "v2",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.opc-payload-v1",
+        "seed_spec": "indexed-formula-v1",
         "parameters": {
           "legacy_shape": "wide-root",
-          "legacy_payload_kind": "compressible"
+          "legacy_payload_kind": "compressible",
+          "family": "opc",
+          "package_format": "OPC/ZIP",
+          "compression": "deflate",
+          "entry_count": 2048,
+          "entry_bytes": 64,
+          "archive_member_count": 2050,
+          "source_functions": [
+            "build_opc_corpus",
+            "entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 1024,
+          "target_name_pattern": "benchmark/parts/{index:05}.bin",
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
+          "payload_block_bytes": 45,
+          "relationship": {
+            "id": "rIdBenchmarkMain",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+            "target": "benchmark/parts/01024.bin",
+            "mode": "Internal",
+            "part_content_type": "application/octet-stream"
+          }
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -2697,28 +3086,55 @@
       "format": "PPT/CFB",
       "size_class": "large",
       "categories": [
-        "legacy-migrated"
+        "legacy-migrated",
+        "synthetic"
       ],
       "generator": {
         "id": "litchi-legacy-writer-v1",
-        "kind": "unknown",
+        "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.legacy-writer-v1",
+        "seed_spec": "none",
         "parameters": {
           "legacy_shape": "large",
-          "legacy_payload_kind": "not-applicable"
+          "legacy_payload_kind": "not-applicable",
+          "family": "legacy-writer",
+          "package_format": "PPT/CFB",
+          "compression": "none",
+          "entry_count": 144,
+          "entry_bytes": 0,
+          "archive_member_count": 4,
+          "source_functions": [
+            "build_writer_corpus",
+            "write_fresh_doc",
+            "write_fresh_xls",
+            "write_fresh_ppt",
+            "WriterShape",
+            "writer_text",
+            "writer_payload_text"
+          ],
+          "writer_format": "ppt",
+          "writer_shape": "large",
+          "target_stream": "PowerPoint Document",
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
+          "payload_heavy_bytes": 40000,
+          "dimensions": {
+            "slides": 12,
+            "text_boxes_per_slide": 12
+          },
+          "textbox_position_formula": "x=36+(box_number % 3)*180; y=36+(box_number / 3)*90; width=144; height=54"
         }
       },
       "provenance": {
-        "source_kind": "unknown",
-        "source_path": null,
-        "producer": null,
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
-        "license_spdx": null,
-        "license_evidence": null,
-        "redistributable": null
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
       },
       "bytes": {
         "archive_bytes": 40960,
@@ -2828,28 +3244,55 @@
       "format": "PPT/CFB",
       "size_class": "unknown",
       "categories": [
-        "legacy-migrated"
+        "legacy-migrated",
+        "synthetic"
       ],
       "generator": {
         "id": "litchi-legacy-writer-v1",
-        "kind": "unknown",
+        "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.legacy-writer-v1",
+        "seed_spec": "none",
         "parameters": {
           "legacy_shape": "payload-heavy",
-          "legacy_payload_kind": "not-applicable"
+          "legacy_payload_kind": "not-applicable",
+          "family": "legacy-writer",
+          "package_format": "PPT/CFB",
+          "compression": "none",
+          "entry_count": 128,
+          "entry_bytes": 0,
+          "archive_member_count": 4,
+          "source_functions": [
+            "build_writer_corpus",
+            "write_fresh_doc",
+            "write_fresh_xls",
+            "write_fresh_ppt",
+            "WriterShape",
+            "writer_text",
+            "writer_payload_text"
+          ],
+          "writer_format": "ppt",
+          "writer_shape": "payload-heavy",
+          "target_stream": "PowerPoint Document",
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
+          "payload_heavy_bytes": 40000,
+          "dimensions": {
+            "slides": 16,
+            "text_boxes_per_slide": 8
+          },
+          "textbox_position_formula": "x=36+(box_number % 3)*180; y=36+(box_number / 3)*90; width=144; height=54"
         }
       },
       "provenance": {
-        "source_kind": "unknown",
-        "source_path": null,
-        "producer": null,
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
-        "license_spdx": null,
-        "license_evidence": null,
-        "redistributable": null
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
       },
       "bytes": {
         "archive_bytes": 5191168,
@@ -2959,28 +3402,55 @@
       "format": "PPT/CFB",
       "size_class": "tiny",
       "categories": [
-        "legacy-migrated"
+        "legacy-migrated",
+        "synthetic"
       ],
       "generator": {
         "id": "litchi-legacy-writer-v1",
-        "kind": "unknown",
+        "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.legacy-writer-v1",
+        "seed_spec": "none",
         "parameters": {
           "legacy_shape": "tiny",
-          "legacy_payload_kind": "not-applicable"
+          "legacy_payload_kind": "not-applicable",
+          "family": "legacy-writer",
+          "package_format": "PPT/CFB",
+          "compression": "none",
+          "entry_count": 2,
+          "entry_bytes": 0,
+          "archive_member_count": 4,
+          "source_functions": [
+            "build_writer_corpus",
+            "write_fresh_doc",
+            "write_fresh_xls",
+            "write_fresh_ppt",
+            "WriterShape",
+            "writer_text",
+            "writer_payload_text"
+          ],
+          "writer_format": "ppt",
+          "writer_shape": "tiny",
+          "target_stream": "PowerPoint Document",
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
+          "payload_heavy_bytes": 40000,
+          "dimensions": {
+            "slides": 1,
+            "text_boxes_per_slide": 2
+          },
+          "textbox_position_formula": "x=36+(box_number % 3)*180; y=36+(box_number / 3)*90; width=144; height=54"
         }
       },
       "provenance": {
-        "source_kind": "unknown",
-        "source_path": null,
-        "producer": null,
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
-        "license_spdx": null,
-        "license_evidence": null,
-        "redistributable": null
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
       },
       "bytes": {
         "archive_bytes": 7680,
@@ -3090,28 +3560,56 @@
       "format": "XLS/CFB",
       "size_class": "large",
       "categories": [
-        "legacy-migrated"
+        "legacy-migrated",
+        "synthetic"
       ],
       "generator": {
         "id": "litchi-legacy-writer-v1",
-        "kind": "unknown",
+        "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.legacy-writer-v1",
+        "seed_spec": "none",
         "parameters": {
           "legacy_shape": "large",
-          "legacy_payload_kind": "not-applicable"
+          "legacy_payload_kind": "not-applicable",
+          "family": "legacy-writer",
+          "package_format": "XLS/CFB",
+          "compression": "none",
+          "entry_count": 8192,
+          "entry_bytes": 0,
+          "archive_member_count": 1,
+          "source_functions": [
+            "build_writer_corpus",
+            "write_fresh_doc",
+            "write_fresh_xls",
+            "write_fresh_ppt",
+            "WriterShape",
+            "writer_text",
+            "writer_payload_text"
+          ],
+          "writer_format": "xls",
+          "writer_shape": "large",
+          "target_stream": "Workbook",
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
+          "payload_heavy_bytes": 32700,
+          "dimensions": {
+            "sheets": 4,
+            "rows": 128,
+            "columns": 16
+          },
+          "numeric_value_formula": "(sheet * rows * columns + row * columns + column) as f64"
         }
       },
       "provenance": {
-        "source_kind": "unknown",
-        "source_path": null,
-        "producer": null,
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
-        "license_spdx": null,
-        "license_evidence": null,
-        "redistributable": null
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
       },
       "bytes": {
         "archive_bytes": 163840,
@@ -3221,28 +3719,56 @@
       "format": "XLS/CFB",
       "size_class": "tiny",
       "categories": [
-        "legacy-migrated"
+        "legacy-migrated",
+        "synthetic"
       ],
       "generator": {
         "id": "litchi-legacy-writer-v1",
-        "kind": "unknown",
+        "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.legacy-writer-v1",
+        "seed_spec": "none",
         "parameters": {
           "legacy_shape": "tiny",
-          "legacy_payload_kind": "not-applicable"
+          "legacy_payload_kind": "not-applicable",
+          "family": "legacy-writer",
+          "package_format": "XLS/CFB",
+          "compression": "none",
+          "entry_count": 16,
+          "entry_bytes": 0,
+          "archive_member_count": 1,
+          "source_functions": [
+            "build_writer_corpus",
+            "write_fresh_doc",
+            "write_fresh_xls",
+            "write_fresh_ppt",
+            "WriterShape",
+            "writer_text",
+            "writer_payload_text"
+          ],
+          "writer_format": "xls",
+          "writer_shape": "tiny",
+          "target_stream": "Workbook",
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
+          "payload_heavy_bytes": 32700,
+          "dimensions": {
+            "sheets": 1,
+            "rows": 4,
+            "columns": 4
+          },
+          "numeric_value_formula": "(sheet * rows * columns + row * columns + column) as f64"
         }
       },
       "provenance": {
-        "source_kind": "unknown",
-        "source_path": null,
-        "producer": null,
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
-        "license_spdx": null,
-        "license_evidence": null,
-        "redistributable": null
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
       },
       "bytes": {
         "archive_bytes": 4096,
@@ -3352,28 +3878,55 @@
       "format": "XLS/CFB",
       "size_class": "unknown",
       "categories": [
-        "legacy-migrated"
+        "legacy-migrated",
+        "synthetic"
       ],
       "generator": {
         "id": "litchi-legacy-writer-v1",
-        "kind": "unknown",
+        "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.legacy-writer-v1",
+        "seed_spec": "none",
         "parameters": {
           "legacy_shape": "payload-heavy",
-          "legacy_payload_kind": "not-applicable"
+          "legacy_payload_kind": "not-applicable",
+          "family": "legacy-writer",
+          "package_format": "XLS/CFB",
+          "compression": "none",
+          "entry_count": 128,
+          "entry_bytes": 0,
+          "archive_member_count": 1,
+          "source_functions": [
+            "build_writer_corpus",
+            "write_fresh_doc",
+            "write_fresh_xls",
+            "write_fresh_ppt",
+            "WriterShape",
+            "writer_text",
+            "writer_payload_text"
+          ],
+          "writer_format": "xls",
+          "writer_shape": "payload-heavy",
+          "target_stream": "Workbook",
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload",
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
+          "payload_heavy_bytes": 32700,
+          "dimensions": {
+            "sheets": 128,
+            "string_bytes": 32700
+          },
+          "numeric_value_formula": "(sheet * rows * columns + row * columns + column) as f64"
         }
       },
       "provenance": {
-        "source_kind": "unknown",
-        "source_path": null,
-        "producer": null,
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
-        "license_spdx": null,
-        "license_evidence": null,
-        "redistributable": null
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
       },
       "bytes": {
         "archive_bytes": 4256256,
@@ -3504,16 +4057,39 @@
         "id": "litchi-xlsx-synthetic-v1",
         "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.xlsx-integer-grid-v1",
+        "seed_spec": "none",
         "parameters": {
           "legacy_shape": "dense-wide",
-          "legacy_payload_kind": "deterministic-integer-grid"
+          "legacy_payload_kind": "deterministic-integer-grid",
+          "family": "xlsx",
+          "package_format": "XLSX/OPC/ZIP",
+          "compression": "deflate",
+          "entry_count": 131072,
+          "entry_bytes": 4,
+          "archive_member_count": 7,
+          "source_functions": [
+            "build_xlsx_corpus",
+            "build_xlsx_workbook",
+            "xlsx_one_percent_updates",
+            "xlsx_value",
+            "xlsx_sheet_name",
+            "xlsx_address",
+            "XlsxShape"
+          ],
+          "sheet_count": 2,
+          "rows_per_sheet": 256,
+          "columns_per_sheet": 256,
+          "one_percent_update_count": 1311,
+          "value_formula": "(sheet * 1_000_000 + row * 1_000 + column) as i32",
+          "sheet_name_formula": "index == 0 ? Sheet1 : Bench{index:02}",
+          "address_formula": "column_to_letters(column + 1) + (row + 1)",
+          "one_percent_update_formula": "ceil(cell_count / 100)"
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -3668,16 +4244,39 @@
         "id": "litchi-xlsx-synthetic-v1",
         "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.xlsx-integer-grid-v1",
+        "seed_spec": "none",
         "parameters": {
           "legacy_shape": "tiny",
-          "legacy_payload_kind": "deterministic-integer-grid"
+          "legacy_payload_kind": "deterministic-integer-grid",
+          "family": "xlsx",
+          "package_format": "XLSX/OPC/ZIP",
+          "compression": "deflate",
+          "entry_count": 192,
+          "entry_bytes": 4,
+          "archive_member_count": 8,
+          "source_functions": [
+            "build_xlsx_corpus",
+            "build_xlsx_workbook",
+            "xlsx_one_percent_updates",
+            "xlsx_value",
+            "xlsx_sheet_name",
+            "xlsx_address",
+            "XlsxShape"
+          ],
+          "sheet_count": 3,
+          "rows_per_sheet": 8,
+          "columns_per_sheet": 8,
+          "one_percent_update_count": 2,
+          "value_formula": "(sheet * 1_000_000 + row * 1_000 + column) as i32",
+          "sheet_name_formula": "index == 0 ? Sheet1 : Bench{index:02}",
+          "address_formula": "column_to_letters(column + 1) + (row + 1)",
+          "one_percent_update_formula": "ceil(cell_count / 100)"
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,
@@ -3833,16 +4432,39 @@
         "id": "litchi-xlsx-synthetic-v1",
         "kind": "synthetic",
         "revision": "v1",
-        "algorithm_id": null,
-        "seed_spec": null,
+        "algorithm_id": "litchi-perf.xlsx-integer-grid-v1",
+        "seed_spec": "none",
         "parameters": {
           "legacy_shape": "medium",
-          "legacy_payload_kind": "deterministic-integer-grid"
+          "legacy_payload_kind": "deterministic-integer-grid",
+          "family": "xlsx",
+          "package_format": "XLSX/OPC/ZIP",
+          "compression": "deflate",
+          "entry_count": 4096,
+          "entry_bytes": 4,
+          "archive_member_count": 9,
+          "source_functions": [
+            "build_xlsx_corpus",
+            "build_xlsx_workbook",
+            "xlsx_one_percent_updates",
+            "xlsx_value",
+            "xlsx_sheet_name",
+            "xlsx_address",
+            "XlsxShape"
+          ],
+          "sheet_count": 4,
+          "rows_per_sheet": 32,
+          "columns_per_sheet": 32,
+          "one_percent_update_count": 41,
+          "value_formula": "(sheet * 1_000_000 + row * 1_000 + column) as i32",
+          "sheet_name_formula": "index == 0 ? Sheet1 : Bench{index:02}",
+          "address_formula": "column_to_letters(column + 1) + (row + 1)",
+          "one_percent_update_formula": "ceil(cell_count / 100)"
         }
       },
       "provenance": {
         "source_kind": "generated",
-        "source_path": null,
+        "source_path": "tools/perf-baseline/src/lib.rs",
         "producer": "Litchi deterministic generator",
         "producer_version": null,
         "source_sha256": null,

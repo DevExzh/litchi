@@ -22,6 +22,9 @@ INDEX_PATH = ROOT / "docs/performance/crud-coverage-index-v1.json"
 CATALOG_PATH = ROOT / "docs/performance/results/perf-corpus-manifest-v2.json"
 SELECTOR_PATH = ROOT / "tools/perf-baseline/src/lib.rs"
 CHECKLIST_PATH = ROOT / "docs/CRUD_Scenario_Checklist.md"
+EXPECTED_CATALOG_SHA256 = (
+    "679d39548de0150b9fdfcdd2628ca3adc1bbd3c041a21d7a95ab70095c2d0ba9"
+)
 
 
 def _canonical(value: object) -> bytes:
@@ -143,6 +146,11 @@ class CrudCoverageIndexTests(unittest.TestCase):
 
     def test_checked_index_has_all_fifteen_categories_and_real_selectors(self) -> None:
         self.assertEqual(self.validate(self.index), (15, 30))
+
+    def test_checked_catalog_hash_matches_regenerated_catalog(self) -> None:
+        checked_catalog = self.index["checked_catalog"]
+        self.assertEqual(checked_catalog["catalog_sha256"], EXPECTED_CATALOG_SHA256)
+        self.assertEqual(checked_catalog["catalog_sha256"], self.catalog["catalog_sha256"])
 
     def test_missing_category_is_rejected(self) -> None:
         index = copy.deepcopy(self.index)
