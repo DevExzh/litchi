@@ -44,10 +44,16 @@ deallocated bytes. Allocator elapsed time, live/peak/RSS, and total memory
 are excluded. The `litchi-opc` gate passed 289 library tests / 386 total test
 items; the dedicated publication and allocator validators passed 10/10 and
 22/22 tests. `performance_claim: none`; `claim_authorized: false`; the
-claim registry remains unchanged because it cannot represent this custom
-publication metric and partial cell adjudication. See the [0402 change
-record](changes/0402-opc-overlay-decoder-reuse.md) and retained [evidence
-bundle](results/change-0402/).
+claim registry remains unchanged and has no 0402 claim entry. Its v1
+extension now supports the closed `publication_ns` metric profile and partial
+accepted/adverse-cell adjudication, but this evidence is intentionally not
+landed in the registry. Allocator vectors remain outside the registry
+boundary and are validated by
+`tools/validate_opc_overlay_allocator_abba.py`; the full self-excluding
+inventory remains outside it and is checked through the retained
+`evidence-manifest.json` hashes and documented bundle integrity/audit checks.
+See the [0402 change record](changes/0402-opc-overlay-decoder-reuse.md) and
+retained [evidence bundle](results/change-0402/).
 
 ## Change 0401 compliance update
 

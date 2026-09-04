@@ -1,0 +1,292 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/DevExzh/litchi/schema/performance/claim-registry-v1.schema.json",
+  "title": "Litchi performance claim registry schema 1",
+  "description": "Structural registry shape only. Cross-field claim counts, disjoint accepted/adverse cells, status/code_state consistency, and strict evidence recomputation are enforced by tools/check_perf_claims.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "registry_kind",
+    "canonicalization",
+    "policies",
+    "evidence",
+    "claims"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "registry_kind": { "const": "litchi-performance-claim-registry" },
+    "canonicalization": { "$ref": "#/$defs/canonicalization" },
+    "policies": { "$ref": "#/$defs/policies" },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidence" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "claims": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/claim" },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*\\x00)(?!.*(^|/)\\.($|/))(?!.*(^|/)\\.\\.($|/))[^/]+(?:/[^/]+)*$"
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stringList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nonEmptyString" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "canonicalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "hash"],
+      "properties": {
+        "algorithm": { "const": "sorted-json-utf8-compact-v1" },
+        "hash": { "const": "sha256" }
+      }
+    },
+    "policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["latency-abba-v1", "resource-guardrail-v1"],
+      "properties": {
+        "latency-abba-v1": { "$ref": "#/$defs/latencyPolicy" },
+        "resource-guardrail-v1": { "$ref": "#/$defs/resourcePolicy" }
+      }
+    },
+    "latencyPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum_samples", "order", "drift_ceiling_percent"],
+      "properties": {
+        "minimum_samples": { "type": "integer", "minimum": 1 },
+        "order": {
+          "const": ["a1", "b1", "b2", "a2"]
+        },
+        "drift_ceiling_percent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["p50", "mean", "p95", "p99"],
+          "properties": {
+            "p50": { "type": "number", "exclusiveMinimum": 0 },
+            "mean": { "type": "number", "exclusiveMinimum": 0 },
+            "p95": { "type": "number", "exclusiveMinimum": 0 },
+            "p99": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        }
+      }
+    },
+    "resourcePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_regression_percent", "required_pairings"],
+      "properties": {
+        "max_regression_percent": {
+          "type": "number",
+          "minimum": 0
+        },
+        "required_pairings": {
+          "const": [
+            "A1_control_to_B1_candidate",
+            "A2_control_to_B2_candidate"
+          ]
+        }
+      }
+    },
+    "evidence": {
+      "oneOf": [
+        { "$ref": "#/$defs/abbaEvidence" },
+        { "$ref": "#/$defs/resourceEvidence" }
+      ]
+    },
+    "abbaEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "relative_path", "manifest", "summary"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "kind": { "const": "abba_package" },
+        "relative_path": { "$ref": "#/$defs/relativePath" },
+        "manifest": { "$ref": "#/$defs/manifestIdentity" },
+        "summary": { "$ref": "#/$defs/summaryIdentity" }
+      }
+    },
+    "manifestIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "schema_version"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "schema_version": { "const": 1 }
+      }
+    },
+    "summaryIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "canonical_sha256", "schema_version"],
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "canonical_sha256": { "$ref": "#/$defs/sha256" },
+        "schema_version": { "const": 1 }
+      }
+    },
+    "resourceEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "relative_path", "sha256", "schema_version", "abba_schema_version"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "kind": { "const": "resource_abba_report" },
+        "relative_path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "schema_version": { "const": 1 },
+        "abba_schema_version": { "const": 1 }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "change_id",
+        "claim_class",
+        "status",
+        "code_state",
+        "reason_codes",
+        "scope",
+        "latency_evidence",
+        "documentation"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "change_id": { "$ref": "#/$defs/nonEmptyString" },
+        "claim_class": { "$ref": "#/$defs/nonEmptyString" },
+        "status": {
+          "enum": [
+            "rejected",
+            "held",
+            "pending",
+            "landed",
+            "descriptive_only",
+            "correctness_only"
+          ]
+        },
+        "code_state": { "enum": ["not_landed", "landed"] },
+        "reason_codes": { "$ref": "#/$defs/stringList" },
+        "scope": { "$ref": "#/$defs/scope" },
+        "latency_evidence": { "$ref": "#/$defs/latencyEvidence" },
+        "resource_guardrail": { "$ref": "#/$defs/resourceGuardrail" },
+        "documentation": { "$ref": "#/$defs/pathList" }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "selectors", "corpora"],
+      "properties": {
+        "format": { "$ref": "#/$defs/nonEmptyString" },
+        "selectors": { "$ref": "#/$defs/stringList" },
+        "corpora": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/corpus" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "corpus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "archive_sha256"],
+      "properties": {
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "archive_sha256": { "$ref": "#/$defs/sha256" },
+        "generator": { "$ref": "#/$defs/nonEmptyString" },
+        "shape": { "$ref": "#/$defs/nonEmptyString" },
+        "package_format": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "metricProfile": {
+      "type": "string",
+      "enum": ["elapsed_ns", "publication_ns"],
+      "default": "elapsed_ns"
+    },
+    "latencyEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_id", "allowed_statistics", "accepted_cells", "adverse_both_cells"],
+      "properties": {
+        "evidence_id": { "$ref": "#/$defs/nonEmptyString" },
+        "metric_profile": { "$ref": "#/$defs/metricProfile" },
+        "allowed_statistics": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/statistic" }
+        },
+        "accepted_cells": { "type": "integer", "minimum": 0 },
+        "adverse_both_cells": { "type": "integer", "minimum": 0 },
+        "accepted_statistics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/cell" },
+          "uniqueItems": true
+        },
+        "adverse_both_statistics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/cell" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "statistic": {
+      "enum": ["p50", "mean", "p95", "p99"]
+    },
+    "cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case", "corpus", "statistic"],
+      "properties": {
+        "case": { "$ref": "#/$defs/nonEmptyString" },
+        "corpus": { "$ref": "#/$defs/nonEmptyString" },
+        "statistic": { "$ref": "#/$defs/statistic" }
+      }
+    },
+    "pathList": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/relativePath" }
+    },
+    "resourceGuardrail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "metrics"],
+      "properties": {
+        "required": { "type": "boolean" },
+        "evidence_id": { "$ref": "#/$defs/nonEmptyString" },
+        "metrics": { "$ref": "#/$defs/stringList" }
+      }
+    }
+  }
+}
