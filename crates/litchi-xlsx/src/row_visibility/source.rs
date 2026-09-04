@@ -77,7 +77,8 @@ impl SourceBackedEditor {
     /// Open with an explicit caller-owned execution context and the default
     /// finite deferred-Part cache. Retained and in-flight worksheet payloads
     /// remain attached to the context's hierarchical budget through the
-    /// delegated cell-values editor.
+    /// delegated cell-values editor. Changed publication also reserves
+    /// bounded OPC topology-planning memory from that same budget.
     pub fn from_read_at_with_execution_context(
         source: Arc<dyn ReadAt>,
         limits: ReadLimits,
@@ -102,9 +103,10 @@ impl SourceBackedEditor {
     }
 
     /// Open with explicit read, cache, and caller-owned execution policies.
-    /// The managed budget covers only retained and in-flight OPC `PartData`
-    /// payload reservations; parsed row state, rewritten XML, and output
-    /// buffers remain governed by their existing bounded operations.
+    /// The managed budget covers retained and in-flight OPC `PartData`
+    /// payload reservations and bounded transient topology-planning memory;
+    /// parsed row state, rewritten XML, and output buffers remain governed by
+    /// their existing bounded operations.
     pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
         source: Arc<dyn ReadAt>,
         limits: ReadLimits,
@@ -157,6 +159,10 @@ impl SourceBackedEditor {
     }
 
     /// Publish one exact-source-checked worksheet overlay to a sequential sink.
+    /// For a managed editor, changed publication needs the retained selected
+    /// payload plus bounded transient topology-planning headroom from the
+    /// caller's budget. A planning reservation refusal occurs before the
+    /// first output byte and does not detach the retained payload reservation.
     pub fn publish_commit_to_stream<W: Write>(
         self,
         writer: W,

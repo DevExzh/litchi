@@ -24,6 +24,10 @@ const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relatio
 const MAIN: &str = "/xl/workbook.xml";
 const SHEET: &str = "/xl/worksheets/sheet1.xml";
 const UNUSED: &str = "/xl/media/unused.bin";
+// Changed publication retains the selected payload and reserves bounded OPC
+// topology metadata. Keep this allowance explicit and separate from payload
+// capacity, matching the managed XLSX publication contract.
+const MANAGED_PUBLICATION_PLANNING_HEADROOM: u64 = 64 * 1024;
 static NEXT_SOURCE_ID: AtomicU64 = AtomicU64::new(20_000);
 
 struct VersionedSource {
@@ -662,7 +666,8 @@ fn managed_changed_publication_preserves_unknown_members_and_releases_budget() {
         .unwrap()
         .blob()
         .to_vec();
-    let (budget, _cancellation_source, context) = managed_context(exact);
+    let (budget, _cancellation_source, context) =
+        managed_context(exact + MANAGED_PUBLICATION_PLANNING_HEADROOM);
     let editor = SourceBackedEditor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(bytes.clone())),
         litchi_xlsx::ReadLimits::default(),
@@ -679,6 +684,7 @@ fn managed_changed_publication_preserves_unknown_members_and_releases_budget() {
     let commit = edit.commit().unwrap();
     assert!(commit.changed());
     assert_eq!(commit.snapshot().source_xml(), after_xml.as_bytes());
+    assert_eq!(budget.used(Resource::Memory), exact);
 
     let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
     commit.patch().apply(&mut replay).unwrap();
@@ -714,6 +720,37 @@ fn managed_changed_publication_preserves_unknown_members_and_releases_budget() {
             .blob(),
         unused,
     );
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_changed_publication_refuses_without_planning_headroom() {
+    let (before_xml, _after_xml) = exact_rows();
+    let bytes = ordinary(before_xml);
+    let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
+    let (budget, _cancellation_source, context) = managed_context(exact);
+    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(bytes)),
+        litchi_xlsx::ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap();
+    edit.hide(row(1)).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.changed());
+    assert_eq!(budget.used(Resource::Memory), exact);
+
+    let mut output = Vec::new();
+    let result = editor.publish_commit_to_stream(&mut output, &commit);
+    assert!(matches!(
+        result,
+        Err(Error::Package(OpcError::Execution(
+            ExecutionError::ResourceLimit(_)
+        )))
+    ));
+    assert!(output.is_empty());
     drop(commit);
     assert_eq!(budget.used(Resource::Memory), 0);
 }

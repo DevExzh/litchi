@@ -276,7 +276,7 @@ fn phys_pkg_borrowed_enforces_part_limit_without_materialization_charge() {
     ));
 }
 
-fn borrow_stored_from_source<'data>(source: &'data [u8]) -> &'data [u8] {
+fn borrow_stored_from_source(source: &[u8]) -> &[u8] {
     let reader = PhysPkgReader::new(source).expect("fixture must parse");
     reader
         .blob_for_borrowed(&pack(STORED_URI))
