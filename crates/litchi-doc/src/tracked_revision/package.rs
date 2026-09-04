@@ -19,7 +19,7 @@ use crate::sprm_operations::{
     SPRM_C_F_OLE2, SPRM_C_F_RMARK, SPRM_C_F_RMARK_DEL, SPRM_C_F_SPEC, SPRM_C_IBST_RMARK,
     SPRM_C_IBST_RMARK_DEL, SPRM_C_IDSL_RMARK, SPRM_C_IDSL_RMARK_DEL, SPRM_C_KUL,
     SPRM_C_PIC_LOCATION, SPRM_C_PROP_RMARK_CURRENT, SPRM_C_PROP_RMARK90, SPRM_C_RSID_PROP,
-    SPRM_C_RSID_RM_DEL, SPRM_C_RSID_TEXT, SPRM_C_WALL, SPRM_P_F_IN_TABLE, SPRM_P_PROP_RMARK,
+    SPRM_C_RSID_RM_DEL, SPRM_C_RSID_TEXT, SPRM_C_WALL, SPRM_P_PROP_RMARK,
     SPRM_P_PROP_RMARK_CURRENT, SPRM_P_PROP_RMARK90, SPRM_P_WALL, SPRM_T_PROP_RMARK, SPRM_T_RSID,
     SPRM_T_WALL,
 };
@@ -1453,15 +1453,7 @@ impl RevisionEditor {
             .ok_or_else(|| corrupted("paragraph FC overflow"))?;
         let run = containing_papx(&self.papx, fc)
             .ok_or_else(|| corrupted("paragraph terminator has no PAPX run"))?;
-        let body = run
-            .grpprl
-            .get(2..)
-            .ok_or_else(|| corrupted("PAPX has no style index"))?;
-        Ok(strict_sprms(body)?
-            .iter()
-            .rev()
-            .find(|sprm| sprm.opcode == SPRM_P_F_IN_TABLE)
-            .is_some_and(|sprm| sprm.operand_byte() == Some(1)))
+        Ok(run.in_table())
     }
 
     /// Resolves the exact Data-stream offset carried by
@@ -2689,17 +2681,18 @@ mod containment_tests {
     }
 
     fn papx(start: u32, end: u32) -> PapxRun {
-        PapxRun {
+        PapxRun::new(
             start,
             end,
-            grpprl: vec![0; 2],
-            phe: crate::parts::fkp::ParagraphHeight {
+            vec![0; 2],
+            false,
+            crate::parts::fkp::ParagraphHeight {
                 info_field: 0,
                 reserved: 0,
                 dxa_col: 0,
                 dym_line_or_height: 0,
             },
-        }
+        )
     }
 
     #[test]
@@ -2775,6 +2768,104 @@ mod containment_tests {
                 assert_eq!(indexed, scalar, "PAPX containment differs at FC {fc}");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod papx_cache_tests {
+    use super::*;
+    use crate::sprm_operations::SPRM_P_F_IN_TABLE;
+    use crate::writer::{CharacterFormatting, ParagraphFormatting, Writer};
+    use std::io::Cursor;
+
+    fn table_sprm(value: u8) -> [u8; 3] {
+        let opcode = SPRM_P_F_IN_TABLE.to_le_bytes();
+        [opcode[0], opcode[1], value]
+    }
+
+    fn doc_with_table_state(in_table: bool) -> Vec<u8> {
+        let mut writer = Writer::new();
+        writer
+            .add_paragraph_runs(
+                vec![("cell".to_owned(), CharacterFormatting::default())],
+                ParagraphFormatting {
+                    in_table: Some(in_table),
+                    ..ParagraphFormatting::default()
+                },
+            )
+            .expect("table-state fixture paragraph should be valid");
+        let mut output = Cursor::new(Vec::new());
+        writer
+            .write_to(&mut output)
+            .expect("table-state fixture should serialize");
+        output.into_inner()
+    }
+
+    fn simple_table_doc() -> Vec<u8> {
+        let mut writer = Writer::new();
+        let table = writer
+            .add_table(1, 1)
+            .expect("table fixture should be accepted");
+        writer
+            .set_table_cell_text(table, 0, 0, "cached cell")
+            .expect("table cell fixture should be accepted");
+        let mut output = Cursor::new(Vec::new());
+        writer
+            .write_to(&mut output)
+            .expect("table fixture should serialize");
+        output.into_inner()
+    }
+
+    #[test]
+    fn editor_table_queries_use_cached_state_and_track_edits() {
+        let mut editor = RevisionEditor::open(doc_with_table_state(true), Limits::default())
+            .expect("table-state fixture should open");
+        let terminator_cp = editor.main_story_cp_len() - 1;
+        assert!(editor.is_in_table_at_cp(terminator_cp).unwrap());
+
+        let original = editor.papx[0].grpprl.clone();
+        let intervals = editor.fc_intervals(0, terminator_cp + 1).unwrap();
+        split_transform_papx(&mut editor.papx, &intervals, |grpprl| {
+            let mut transformed = grpprl.to_vec();
+            transformed.extend_from_slice(&table_sprm(0));
+            Ok(transformed)
+        })
+        .unwrap();
+        assert!(!editor.is_in_table_at_cp(terminator_cp).unwrap());
+        assert_eq!(
+            editor.papx[0].grpprl,
+            [original, table_sprm(0).to_vec()].concat()
+        );
+        assert!(!editor.papx[0].in_table());
+    }
+
+    #[test]
+    fn editor_table_queries_preserve_absent_state_and_malformed_open_errors() {
+        let mut editor = RevisionEditor::open(doc_with_table_state(false), Limits::default())
+            .expect("non-table fixture should open");
+        let terminator_cp = editor.main_story_cp_len() - 1;
+        assert!(!editor.is_in_table_at_cp(terminator_cp).unwrap());
+
+        let before = editor.papx[0].clone();
+        let intervals = editor.fc_intervals(0, terminator_cp + 1).unwrap();
+        assert!(
+            split_transform_papx(&mut editor.papx, &intervals, |_| {
+                Ok(vec![0, 0, table_sprm(1)[0]])
+            })
+            .is_err()
+        );
+        assert_eq!(editor.papx[0].grpprl, before.grpprl);
+        assert_eq!(editor.papx[0].in_table(), before.in_table());
+    }
+
+    #[test]
+    fn public_table_cell_extraction_remains_indirectly_regressed() {
+        let snapshot = crate::body_text::Snapshot::parse(&simple_table_doc())
+            .expect("table fixture should be readable");
+        let cells = snapshot
+            .table_cells()
+            .expect("table cell extraction should succeed");
+        assert!(cells.iter().any(|cell| cell.text() == "cached cell"));
     }
 }
 

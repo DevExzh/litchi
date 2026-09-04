@@ -92,7 +92,42 @@ pub(super) struct PapxRun {
     pub(super) start: u32,
     pub(super) end: u32,
     pub(super) grpprl: Vec<u8>,
+    /// Final `sprmPFInTable` state from the strictly parsed PAPX body.
+    ///
+    /// Keeping only this scalar avoids retaining a parsed SPRM vector while
+    /// making paragraph-terminator table checks allocation-free. It must be
+    /// refreshed whenever `grpprl` changes.
+    in_table: bool,
     pub(super) phe: ParagraphHeight,
+}
+
+impl PapxRun {
+    pub(super) fn new(
+        start: u32,
+        end: u32,
+        grpprl: Vec<u8>,
+        in_table: bool,
+        phe: ParagraphHeight,
+    ) -> Self {
+        Self {
+            start,
+            end,
+            grpprl,
+            in_table,
+            phe,
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub(super) const fn in_table(&self) -> bool {
+        self.in_table
+    }
+
+    pub(super) fn replace_grpprl(&mut self, grpprl: Vec<u8>, in_table: bool) {
+        self.grpprl = grpprl;
+        self.in_table = in_table;
+    }
 }
 
 #[derive(Clone, Debug)]
