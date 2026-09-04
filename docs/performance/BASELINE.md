@@ -6,7 +6,7 @@
 4 MiB of media. The selected-cell timer covers worksheet selection and M29
 read after workbook preparation: normal p50/p95/p99 are
 3.528/3.586/3.635 ms over 500 fresh children. A separate 30-sample allocator
-run records 81,918 allocations and 10,690,444 allocated bytes per query.
+run records 81,918 allocation calls and 10,690,444 allocated bytes per query.
 Source and eager one-cell save runs retain matched output and preservation
 checks. Corrected source-member attribution is versioned because historical
 zeroes came from unconfigured ranges; the record includes a committed-source
