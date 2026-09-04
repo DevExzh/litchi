@@ -810,13 +810,15 @@ release measurement yet because the host workload is noisy. The selectors
 raise the current selectable registry from 408 to 411 cases and do not change
 the default 36 cases / 198 records.
 
-## OPC case-fold lookup baseline (changes 0394 and 0396)
+## OPC case-fold lookup and owned-open baseline (changes 0394, 0396, and 0397)
 
-Seven selectors are opt-in. Change 0394 introduced the first four; Change
-0396 adds the three class-isolated source lookup selectors:
+Eight selectors are opt-in. Change 0394 introduced the first four, change 0396
+added the three class-isolated source lookup selectors, and change 0397 adds a
+fixed-corpus owned-open selector:
 
 ```text
 opc_casefold_eager_open
+opc_casefold_owned_open
 opc_casefold_source_open
 opc_casefold_eager_lookup
 opc_casefold_source_lookup
@@ -834,9 +836,13 @@ structural members are `[Content_Types].xml` and `_rels/.rels`. The corpus
 generator, archive/member identity, payload hash, canonical-name hash, and
 per-class lookup oracles are reported in every result.
 
-The open selectors time only the corresponding `OpcPackage::from_bytes` or
-`SourceBackedPackage::from_read_at` constructor. Source-backed elapsed and
-allocator samples use an immutable `litchi_core::OwnedSource`. The lookup
+The open selectors time only the corresponding `OpcPackage::from_bytes`,
+`OpcPackage::from_vec`, or `SourceBackedPackage::from_read_at` constructor.
+The owned archive clone occurs before the timed/allocation region. Its
+post-construction part-count, canonical-name, payload, and byte-exact no-op
+publication checks occur afterward and are retained as per-sample oracles.
+Source-backed elapsed and allocator samples use an immutable
+`litchi_core::OwnedSource`. The lookup
 selectors open their package once outside timing, then repeat one prebuilt
 nine-query vector 16 times in fixed order: exact first/middle/last, case-only
 aliases at the same three positions (using the case-insensitive lookup path),
@@ -862,7 +868,7 @@ allocation samples; eager results mark those counters not applicable.
 Operation-scoped allocator metrics are emitted only by the allocator target,
 and missing metrics are never inferred. These selectors set
 `performance_claim: none`, make no index recommendation, and raise the
-selectable registry from 415 to 418 without changing the default 36 cases /
+selectable registry from 415 to 419 without changing the default 36 cases /
 198 records.
 
 The serialized `CaseResult.source` record is heap-indirect. `SourceSummary`
