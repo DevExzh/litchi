@@ -151,6 +151,15 @@ fn row_tags(xml: &[u8]) -> Result<Vec<RowTag>> {
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
         match event {
+            Event::Start(element) | Event::Empty(element)
+                if is_spreadsheetml_local(
+                    &namespace,
+                    element.name().local_name().as_ref(),
+                    b"f",
+                ) =>
+            {
+                return Err(invalid("row-visibility edits refuse formulas"));
+            },
             Event::Start(element) if is_sheet_data(&namespace, &element) => {
                 if inside_sheet_data {
                     return Err(invalid("row-visibility worksheet has nested sheetData"));
@@ -361,6 +370,25 @@ mod tests {
                 r#"<worksheet xmlns="{SML}"><sheetData><row {attributes}/></sheetData></worksheet>"#
             );
             assert!(scan(xml.as_bytes()).is_err());
+        }
+    }
+
+    #[test]
+    fn formula_cells_fail_closed_even_when_the_formula_is_prefixed() {
+        for xml in [
+            format!(
+                r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><f>A1</f><v>1</v></c></row></sheetData></worksheet>"#
+            ),
+            format!(
+                r#"<s:worksheet xmlns:s="{SML}"><s:sheetData><s:row r="1"><s:c r="A1"><s:f>A1</s:f><s:v>1</s:v></s:c></s:row></s:sheetData></s:worksheet>"#
+            ),
+        ] {
+            let error = scan(xml.as_bytes()).unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains("row-visibility edits refuse formulas")
+            );
         }
     }
 }
