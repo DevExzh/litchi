@@ -1,0 +1,285 @@
+{
+  "allocator_reports": [
+    {
+      "bytes": 18203,
+      "canonical_bytes": 176609,
+      "canonical_sha256": "d655f97817fc97fdd98211ec6528794a40240395b52ae9ef12e72850fc8b8b46",
+      "compression": "zstd",
+      "path": "a1-allocator.json.zst",
+      "profile": "allocator",
+      "role": "a1",
+      "sha256": "cc8425abf3c04abcdc5ae97f317d40cefe8dc57ecf69c8ebbfc0aa0e18f35afe",
+      "uncompressed_bytes": 407905,
+      "uncompressed_sha256": "b10c45412f68bfce0e64c1d56375d59687dd7162e7b5d3404e2458310ba943ec"
+    },
+    {
+      "bytes": 18303,
+      "canonical_bytes": 176495,
+      "canonical_sha256": "866a75ac819198da0ab335864a4f06a00201ea81a59a16213129e843f3419d89",
+      "compression": "zstd",
+      "path": "b1-allocator.json.zst",
+      "profile": "allocator",
+      "role": "b1",
+      "sha256": "0082bdf1373b1e764ef3a7656c30062baa80640c5ba03fa08d7823c2fbf6073b",
+      "uncompressed_bytes": 407791,
+      "uncompressed_sha256": "b74f62be542d5dc26590b7c4f3f4363299e11f46e03b71479c08fc951717a075"
+    },
+    {
+      "bytes": 18247,
+      "canonical_bytes": 176491,
+      "canonical_sha256": "98e20ef5203a62090b0f9be0a9da315d26df0f3d0904e762107637c5c1bd4bea",
+      "compression": "zstd",
+      "path": "b2-allocator.json.zst",
+      "profile": "allocator",
+      "role": "b2",
+      "sha256": "acc4d69820e2c2e9e2acea469d240720ee7cec902db34321a3b588ffea287918",
+      "uncompressed_bytes": 407787,
+      "uncompressed_sha256": "692b23b7e1a3ffdbfdacaed6f65e2898637b600fcc1bec123a25d4b367b7cf75"
+    },
+    {
+      "bytes": 18381,
+      "canonical_bytes": 176606,
+      "canonical_sha256": "e483317fbbe3e0d94469d60da8852dde4730ff7bb8883c5175981ef362a20fb2",
+      "compression": "zstd",
+      "path": "a2-allocator.json.zst",
+      "profile": "allocator",
+      "role": "a2",
+      "sha256": "da941ac5b7fff34b1dd13c4266d2415309cad1ca3cede86423799ccfd62edb6d",
+      "uncompressed_bytes": 407902,
+      "uncompressed_sha256": "c0145af6bbf5e7e1bc900bbb5294b10f11f1735587807a6fa14025d29f784740"
+    }
+  ],
+  "artifacts": [
+    {
+      "bytes": 91234,
+      "canonical_bytes": 1048337,
+      "canonical_sha256": "b1ad858c3642047bdf3222d4136edc0b46625276bc495e94428f6737ca4d5ec2",
+      "compression": "zstd",
+      "path": "a1-normal.json.zst",
+      "profile": "normal",
+      "role": "a1",
+      "sha256": "9d66f75ed84b777a860b2dfd9f53a0f82fd82ed27da056f87ba666612bdcd742",
+      "uncompressed_bytes": 3385543,
+      "uncompressed_sha256": "d908aad2512616e4de94dfa8c0fbf7807a18782c5bf8fbf63022551ab9d42c25"
+    },
+    {
+      "bytes": 93111,
+      "canonical_bytes": 1048271,
+      "canonical_sha256": "6890e1fbd181999a1510a7f7690a1b057d109c94ee9eab4056cca6c0cbcc4849",
+      "compression": "zstd",
+      "path": "b1-normal.json.zst",
+      "profile": "normal",
+      "role": "b1",
+      "sha256": "825199a3380136ffe53969f08962a286e2a8480b78a90434e58e8eed547b0196",
+      "uncompressed_bytes": 3385477,
+      "uncompressed_sha256": "abbb02da7702645828ebda154c6bdd79a0437259b716585e7a4aa6a6b3d0d648"
+    },
+    {
+      "bytes": 92542,
+      "canonical_bytes": 1048399,
+      "canonical_sha256": "563fb3979608e9da07497b44f9816a10e49c21b070886c99f792da7dcbaa60fc",
+      "compression": "zstd",
+      "path": "b2-normal.json.zst",
+      "profile": "normal",
+      "role": "b2",
+      "sha256": "d221dc3b0bdffbfef8c21cfff53374436b56eeb918e10a46d06bec992e257691",
+      "uncompressed_bytes": 3385605,
+      "uncompressed_sha256": "f8b72c737d6d9b290f024ded3b465a15e11b8a113be6f63b5dc0c8b8984a14b7"
+    },
+    {
+      "bytes": 93636,
+      "canonical_bytes": 1048442,
+      "canonical_sha256": "0f55db88719bf569010984bc04b4531deb5193f0c4be36df62e9c62f830aa4d4",
+      "compression": "zstd",
+      "path": "a2-normal.json.zst",
+      "profile": "normal",
+      "role": "a2",
+      "sha256": "533cd0bc7b6ee11c2b16e327c311b52faf206e4f156e45ae912184a7a9dbb7e7",
+      "uncompressed_bytes": 3385648,
+      "uncompressed_sha256": "c7a2bfe1430d88afdf13adb3873a022b2d6311e7313815b84c4b820ea178d08c"
+    },
+    {
+      "bytes": 18203,
+      "canonical_bytes": 176609,
+      "canonical_sha256": "d655f97817fc97fdd98211ec6528794a40240395b52ae9ef12e72850fc8b8b46",
+      "compression": "zstd",
+      "path": "a1-allocator.json.zst",
+      "profile": "allocator",
+      "role": "a1",
+      "sha256": "cc8425abf3c04abcdc5ae97f317d40cefe8dc57ecf69c8ebbfc0aa0e18f35afe",
+      "uncompressed_bytes": 407905,
+      "uncompressed_sha256": "b10c45412f68bfce0e64c1d56375d59687dd7162e7b5d3404e2458310ba943ec"
+    },
+    {
+      "bytes": 18303,
+      "canonical_bytes": 176495,
+      "canonical_sha256": "866a75ac819198da0ab335864a4f06a00201ea81a59a16213129e843f3419d89",
+      "compression": "zstd",
+      "path": "b1-allocator.json.zst",
+      "profile": "allocator",
+      "role": "b1",
+      "sha256": "0082bdf1373b1e764ef3a7656c30062baa80640c5ba03fa08d7823c2fbf6073b",
+      "uncompressed_bytes": 407791,
+      "uncompressed_sha256": "b74f62be542d5dc26590b7c4f3f4363299e11f46e03b71479c08fc951717a075"
+    },
+    {
+      "bytes": 18247,
+      "canonical_bytes": 176491,
+      "canonical_sha256": "98e20ef5203a62090b0f9be0a9da315d26df0f3d0904e762107637c5c1bd4bea",
+      "compression": "zstd",
+      "path": "b2-allocator.json.zst",
+      "profile": "allocator",
+      "role": "b2",
+      "sha256": "acc4d69820e2c2e9e2acea469d240720ee7cec902db34321a3b588ffea287918",
+      "uncompressed_bytes": 407787,
+      "uncompressed_sha256": "692b23b7e1a3ffdbfdacaed6f65e2898637b600fcc1bec123a25d4b367b7cf75"
+    },
+    {
+      "bytes": 18381,
+      "canonical_bytes": 176606,
+      "canonical_sha256": "e483317fbbe3e0d94469d60da8852dde4730ff7bb8883c5175981ef362a20fb2",
+      "compression": "zstd",
+      "path": "a2-allocator.json.zst",
+      "profile": "allocator",
+      "role": "a2",
+      "sha256": "da941ac5b7fff34b1dd13c4266d2415309cad1ca3cede86423799ccfd62edb6d",
+      "uncompressed_bytes": 407902,
+      "uncompressed_sha256": "c0145af6bbf5e7e1bc900bbb5294b10f11f1735587807a6fa14025d29f784740"
+    }
+  ],
+  "change": "0402-opc-source-overlay-abba",
+  "change_id": "0402-opc-source-overlay-abba",
+  "compression": {
+    "checksum": "XXH64",
+    "content_size": true,
+    "executable": {
+      "bytes": 1037784,
+      "path": "/usr/bin/zstd",
+      "sha256": "35bfa0d33c03bc1d74ade24ceae006098fa2d5e7c9addc7be45640832f9384d6",
+      "version": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***"
+    },
+    "format": "zstd",
+    "level": 3,
+    "threads": 1
+  },
+  "manifest_kind": "litchi-opc-overlay-abba-artifacts",
+  "manifest_path": "0402-opc-source-overlay-abba-manifest.json",
+  "normal_reports": [
+    {
+      "bytes": 91234,
+      "canonical_bytes": 1048337,
+      "canonical_sha256": "b1ad858c3642047bdf3222d4136edc0b46625276bc495e94428f6737ca4d5ec2",
+      "compression": "zstd",
+      "path": "a1-normal.json.zst",
+      "profile": "normal",
+      "role": "a1",
+      "sha256": "9d66f75ed84b777a860b2dfd9f53a0f82fd82ed27da056f87ba666612bdcd742",
+      "uncompressed_bytes": 3385543,
+      "uncompressed_sha256": "d908aad2512616e4de94dfa8c0fbf7807a18782c5bf8fbf63022551ab9d42c25"
+    },
+    {
+      "bytes": 93111,
+      "canonical_bytes": 1048271,
+      "canonical_sha256": "6890e1fbd181999a1510a7f7690a1b057d109c94ee9eab4056cca6c0cbcc4849",
+      "compression": "zstd",
+      "path": "b1-normal.json.zst",
+      "profile": "normal",
+      "role": "b1",
+      "sha256": "825199a3380136ffe53969f08962a286e2a8480b78a90434e58e8eed547b0196",
+      "uncompressed_bytes": 3385477,
+      "uncompressed_sha256": "abbb02da7702645828ebda154c6bdd79a0437259b716585e7a4aa6a6b3d0d648"
+    },
+    {
+      "bytes": 92542,
+      "canonical_bytes": 1048399,
+      "canonical_sha256": "563fb3979608e9da07497b44f9816a10e49c21b070886c99f792da7dcbaa60fc",
+      "compression": "zstd",
+      "path": "b2-normal.json.zst",
+      "profile": "normal",
+      "role": "b2",
+      "sha256": "d221dc3b0bdffbfef8c21cfff53374436b56eeb918e10a46d06bec992e257691",
+      "uncompressed_bytes": 3385605,
+      "uncompressed_sha256": "f8b72c737d6d9b290f024ded3b465a15e11b8a113be6f63b5dc0c8b8984a14b7"
+    },
+    {
+      "bytes": 93636,
+      "canonical_bytes": 1048442,
+      "canonical_sha256": "0f55db88719bf569010984bc04b4531deb5193f0c4be36df62e9c62f830aa4d4",
+      "compression": "zstd",
+      "path": "a2-normal.json.zst",
+      "profile": "normal",
+      "role": "a2",
+      "sha256": "533cd0bc7b6ee11c2b16e327c311b52faf206e4f156e45ae912184a7a9dbb7e7",
+      "uncompressed_bytes": 3385648,
+      "uncompressed_sha256": "c7a2bfe1430d88afdf13adb3873a022b2d6311e7313815b84c4b820ea178d08c"
+    }
+  ],
+  "schema_version": 1,
+  "self_excluded": true,
+  "summary": {
+    "bytes": 406507,
+    "canonical_bytes": 390627,
+    "canonical_sha256": "efaa6dbe11daab25b636044bbab5b79a165f356bc94653a82f12055088bdd853",
+    "path": "summary.json",
+    "report_identity": {
+      "a1": {
+        "canonical_sha256": "b1ad858c3642047bdf3222d4136edc0b46625276bc495e94428f6737ca4d5ec2"
+      },
+      "a2": {
+        "canonical_sha256": "0f55db88719bf569010984bc04b4531deb5193f0c4be36df62e9c62f830aa4d4"
+      },
+      "b1": {
+        "canonical_sha256": "6890e1fbd181999a1510a7f7690a1b057d109c94ee9eab4056cca6c0cbcc4849"
+      },
+      "b2": {
+        "canonical_sha256": "563fb3979608e9da07497b44f9816a10e49c21b070886c99f792da7dcbaa60fc"
+      }
+    },
+    "result_count": 9,
+    "schema_version": 1,
+    "sha256": "65e78362e712f15d73383102dd129ce96ba4f07b7073e41b91e1ed92c9cd4085",
+    "tool": {
+      "name": "litchi-opc-overlay-abba-summary",
+      "version": "0.1.0"
+    }
+  },
+  "summary_identity": {
+    "bytes": 406507,
+    "canonical_bytes": 390627,
+    "canonical_sha256": "efaa6dbe11daab25b636044bbab5b79a165f356bc94653a82f12055088bdd853",
+    "path": "summary.json",
+    "report_identity": {
+      "a1": {
+        "canonical_sha256": "b1ad858c3642047bdf3222d4136edc0b46625276bc495e94428f6737ca4d5ec2"
+      },
+      "a2": {
+        "canonical_sha256": "0f55db88719bf569010984bc04b4531deb5193f0c4be36df62e9c62f830aa4d4"
+      },
+      "b1": {
+        "canonical_sha256": "6890e1fbd181999a1510a7f7690a1b057d109c94ee9eab4056cca6c0cbcc4849"
+      },
+      "b2": {
+        "canonical_sha256": "563fb3979608e9da07497b44f9816a10e49c21b070886c99f792da7dcbaa60fc"
+      }
+    },
+    "result_count": 9,
+    "schema_version": 1,
+    "sha256": "65e78362e712f15d73383102dd129ce96ba4f07b7073e41b91e1ed92c9cd4085",
+    "tool": {
+      "name": "litchi-opc-overlay-abba-summary",
+      "version": "0.1.0"
+    }
+  },
+  "validator_bindings": {
+    "allocator": {
+      "lineage_commit": "db29f7705b641829487bcdada98e50656d078aed",
+      "path": "tools/validate_opc_overlay_allocator_abba.py",
+      "sha256": "57eba5ad085be18a5ec084cd2cf96ff0830eec89b595975db2e5f8c61007ba2a"
+    },
+    "normal_phase": {
+      "commit": "8720c9f103243903fcb1047eaaf3d384e964bfa5",
+      "path": "tools/perf_opc_overlay_abba_summary.py",
+      "sha256": "079d8c8272fa98f639d7ba5fa6dd257f60a7dc6f1702ad00f17be64e66c0a09"
+    }
+  }
+}

@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "case": "opc_source_overlay_multi_part_noop",
+  "cache_state": "warm",
+  "samples_per_case": 30,
+  "warmup_iterations_per_case": 3,
+  "execution_workers": [
+    1
+  ],
+  "abba_order": [
+    "A1_control",
+    "B1_candidate",
+    "B2_candidate",
+    "A2_control"
+  ],
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "binary": "litchi-perf-baseline-alloc",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "instrumentation": "system_allocator_operation_scoped"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "logical_cpus_available": 1,
+    "rustflags": null,
+    "cargo_build_target": null
+  },
+  "legs": {
+    "A1": {
+      "implementation": "control",
+      "revision": "46ef44966d5be16f153b1f3375ac14401b7139ac",
+      "binary_sha256": "783a66cb3065c0bf3f00b956a27c366cc157a55d8d6690dc924b4ea00e38cd30",
+      "binary_bytes": 54794360,
+      "mode_bits": 509,
+      "profile": "release"
+    },
+    "B1": {
+      "implementation": "candidate",
+      "revision": "51964019db3f6b0787645e3a56c2ecb83bdca65c",
+      "binary_sha256": "be0ff5aed6cc07a416cd3a5db1a42df9fcf4a4b55905b3d251c924ba827c4db4",
+      "binary_bytes": 54774424,
+      "mode_bits": 509,
+      "profile": "release"
+    },
+    "B2": {
+      "implementation": "candidate",
+      "revision": "51964019db3f6b0787645e3a56c2ecb83bdca65c",
+      "binary_sha256": "be0ff5aed6cc07a416cd3a5db1a42df9fcf4a4b55905b3d251c924ba827c4db4",
+      "binary_bytes": 54774424,
+      "mode_bits": 509,
+      "profile": "release"
+    },
+    "A2": {
+      "implementation": "control",
+      "revision": "46ef44966d5be16f153b1f3375ac14401b7139ac",
+      "binary_sha256": "783a66cb3065c0bf3f00b956a27c366cc157a55d8d6690dc924b4ea00e38cd30",
+      "binary_bytes": 54794360,
+      "mode_bits": 509,
+      "profile": "release"
+    }
+  },
+  "corpora": [
+    {
+      "shape": "overlay-small",
+      "payload_kind": "compressible",
+      "base_name": "overlay-small-compressible",
+      "generator": "litchi-opc-source-overlay-multi-part-v1",
+      "package_format": "OPC/ZIP",
+      "compression": "deflate",
+      "entry_count": 32,
+      "archive_member_count": 34,
+      "entry_bytes": 1024,
+      "uncompressed_payload_bytes": 32768,
+      "archive_bytes": 7451,
+      "archive_sha256": "4338dea03f37b0ea2ad63a055fb5cfb7df79a5b0de864365e981e453e1a65509",
+      "target_entry": "benchmark/parts/00016.bin",
+      "target_payload_bytes": 1024,
+      "target_payload_sha256": "5b7b9793a43d08ca2c0670289d932541377407ed352ab9f6c145f63d19de9f98"
+    },
+    {
+      "shape": "overlay-large",
+      "payload_kind": "incompressible",
+      "base_name": "overlay-large-incompressible",
+      "generator": "litchi-opc-source-overlay-multi-part-v1",
+      "package_format": "OPC/ZIP",
+      "compression": "deflate",
+      "entry_count": 32,
+      "archive_member_count": 34,
+      "entry_bytes": 65536,
+      "uncompressed_payload_bytes": 2097152,
+      "archive_bytes": 2103195,
+      "archive_sha256": "8356d7467215b04a3d1c3703f50fbd6322f2002ca7c3ead1f24414c5e550ef73",
+      "target_entry": "benchmark/parts/00016.bin",
+      "target_payload_bytes": 65536,
+      "target_payload_sha256": "e17b543eec6b4d3534978d7d59e7240dcbf0f2a2050fd80f32ea3daec266aa73"
+    },
+    {
+      "shape": "overlay-media-incompressible",
+      "payload_kind": "incompressible",
+      "base_name": "overlay-media-incompressible-incompressible",
+      "generator": "litchi-opc-source-overlay-multi-part-v1",
+      "package_format": "OPC/ZIP",
+      "compression": "deflate",
+      "entry_count": 32,
+      "archive_member_count": 34,
+      "entry_bytes": 262144,
+      "uncompressed_payload_bytes": 8388608,
+      "archive_bytes": 8396580,
+      "archive_sha256": "bf8c309af5306c6682b9df65b97246f81b022fe5e3b5e02cc2c4dcf3e1e87883",
+      "target_entry": "benchmark/parts/00016.bin",
+      "target_payload_bytes": 262144,
+      "target_payload_sha256": "3ad07c7e34d3dd6d9ff75b696ccbdd702777b6e4dea04b19bbe3d0aa6d21cdeb"
+    }
+  ],
+  "expected_deltas": {
+    "2": {
+      "allocation_calls": -2,
+      "deallocation_calls": -2,
+      "reallocation_calls": 0,
+      "failed_allocation_calls": 0,
+      "allocated_bytes": -80320,
+      "deallocated_bytes": -80320
+    },
+    "8": {
+      "allocation_calls": -14,
+      "deallocation_calls": -14,
+      "reallocation_calls": 0,
+      "failed_allocation_calls": 0,
+      "allocated_bytes": -562240,
+      "deallocated_bytes": -562240
+    },
+    "32": {
+      "allocation_calls": -62,
+      "deallocation_calls": -62,
+      "reallocation_calls": 0,
+      "failed_allocation_calls": 0,
+      "allocated_bytes": -2489920,
+      "deallocated_bytes": -2489920
+    }
+  }
+}
