@@ -577,6 +577,7 @@ mod tests {
             execution_workers: vec![1, 2, 4],
             opc_cache_lock_diagnostics: false,
             xlsx_cell_values_managed_planning_memory_headroom: None,
+            opc_source_materialize_oracle: None,
         }
     }
 

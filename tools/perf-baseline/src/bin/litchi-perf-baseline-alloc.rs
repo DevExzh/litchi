@@ -161,7 +161,11 @@ mod allocator {
             let _lock = TEST_LOCK.lock().unwrap();
             allocation_metrics::enable();
             let before = allocation_metrics::snapshot();
-            let layout = Layout::from_size_align(isize::MAX as usize, 1).unwrap();
+            // Keep the size opaque to LLVM.  With the constant folded into the
+            // call, the optimized test can treat the allocator result as
+            // non-null and remove the real failure path we are exercising.
+            let maximal_size = std::hint::black_box(isize::MAX as usize);
+            let layout = Layout::from_size_align(maximal_size, 1).unwrap();
             // SAFETY: `layout` satisfies the `GlobalAlloc` layout contract;
             // this test deliberately exercises the allocator's null result.
             let pointer = unsafe { GLOBAL_ALLOCATOR.alloc(layout) };
@@ -188,7 +192,8 @@ mod allocator {
             // SAFETY: `pointer` was returned for `layout` by the same
             // allocator. `isize::MAX` is deliberately unallocatable; a null
             // result leaves the original allocation owned by this test.
-            let failed = unsafe { GLOBAL_ALLOCATOR.realloc(pointer, layout, isize::MAX as usize) };
+            let maximal_size = std::hint::black_box(isize::MAX as usize);
+            let failed = unsafe { GLOBAL_ALLOCATOR.realloc(pointer, layout, maximal_size) };
             assert!(failed.is_null(), "the maximal realloc should be rejected");
             let after_failed = allocation_metrics::snapshot();
             assert!(

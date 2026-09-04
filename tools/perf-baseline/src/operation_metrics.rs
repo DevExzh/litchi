@@ -261,13 +261,13 @@ pub(crate) struct OpcZipMetrics {
 }
 
 impl OpcZipMetrics {
-    fn measured(samples: &[OpcOperationAccounting]) -> Self {
+    fn measured(samples: &[OpcOperationAccounting], scope: &'static str) -> Self {
         let measured = |value: fn(&OpcOperationAccounting) -> u64| {
-            MetricVector::measured(samples.iter().map(value).collect(), OPC_ZIP_SCOPE)
+            MetricVector::measured(samples.iter().map(value).collect(), scope)
         };
         Self {
             status: MetricStatus::Measured,
-            scope: OPC_ZIP_SCOPE,
+            scope,
             compressed_deflate_payload_bytes_read: measured(
                 OpcOperationAccounting::compressed_deflate_payload_bytes_read,
             ),
@@ -342,8 +342,7 @@ pub(crate) struct InProcessSourceObservation {
 const ALIGNMENT: &str = "elapsed_ns.samples_by_elapsed_then_sample_index";
 const LATENCY_CLAIM: &str = "evidence_only_filesystem_selector";
 const COMPARABLE_LATENCY_CLAIM: &str = "comparable_timed_operation";
-const OPC_SOURCE_MATERIALIZATION_LATENCY_CLAIM: &str =
-    "evidence_only_opc_source_materialization";
+const OPC_SOURCE_MATERIALIZATION_LATENCY_CLAIM: &str = "evidence_only_opc_source_materialization";
 const SOURCE_SCOPE: &str = "operation_logical_read_at";
 const IN_PROCESS_SOURCE_SCOPE: &str = "in_process_instrumented_source_read_at";
 const IN_PROCESS_SOURCE_REQUEST_SCOPE: &str =
@@ -376,6 +375,10 @@ const IN_PROCESS_PROC_IO_SCOPE: &str = IN_PROCESS_PROCESS_SCOPE;
 const OPC_ZIP_SCOPE: &str =
     "opc_source_backed_package_write_part_overlay_to_stream_with_accounting";
 const OPC_ZIP_LATENCY_CLAIM: &str = "evidence_only_opc_source_overlay_accounting";
+const OPC_MATERIALIZATION_ZIP_SCOPE: &str =
+    "opc_source_backed_package_into_opc_package_with_accounting";
+const OPC_MATERIALIZATION_ZIP_LATENCY_CLAIM: &str =
+    "evidence_only_opc_source_materialization_accounting";
 
 /// Builds the additive envelope for one warm or cold `CaseResult`.
 ///
@@ -956,6 +959,31 @@ impl OperationMetrics {
         elapsed: &[u64],
         reports: &[OpcOperationAccounting],
     ) -> Result<(), Box<dyn Error>> {
+        self.set_opc_zip_with_scope(elapsed, reports, OPC_ZIP_SCOPE, OPC_ZIP_LATENCY_CLAIM)
+    }
+
+    /// Adds cold-read accounting from serial owning-package materialization.
+    /// The sink counters remain zero because this conversion has no sink.
+    pub(crate) fn set_opc_materialization_zip(
+        &mut self,
+        elapsed: &[u64],
+        reports: &[OpcOperationAccounting],
+    ) -> Result<(), Box<dyn Error>> {
+        self.set_opc_zip_with_scope(
+            elapsed,
+            reports,
+            OPC_MATERIALIZATION_ZIP_SCOPE,
+            OPC_MATERIALIZATION_ZIP_LATENCY_CLAIM,
+        )
+    }
+
+    fn set_opc_zip_with_scope(
+        &mut self,
+        elapsed: &[u64],
+        reports: &[OpcOperationAccounting],
+        scope: &'static str,
+        latency_claim: &'static str,
+    ) -> Result<(), Box<dyn Error>> {
         if elapsed.is_empty() {
             return Err("OPC ZIP operation metrics cannot have zero samples".into());
         }
@@ -975,8 +1003,8 @@ impl OperationMetrics {
             .map(|&index| reports[index])
             .collect::<Vec<_>>();
         self.sample_indices = order;
-        self.latency_claim = OPC_ZIP_LATENCY_CLAIM;
-        self.opc_zip = Some(OpcZipMetrics::measured(&ordered_reports));
+        self.latency_claim = latency_claim;
+        self.opc_zip = Some(OpcZipMetrics::measured(&ordered_reports, scope));
         Ok(())
     }
 
@@ -1793,7 +1821,10 @@ mod tests {
             "in_process_instrumented_source_read_at"
         );
         assert_eq!(envelope.source.status, MetricStatus::Measured);
-        assert_eq!(envelope.source.logical_read_calls.values, Some(vec![10, 11, 20]));
+        assert_eq!(
+            envelope.source.logical_read_calls.values,
+            Some(vec![10, 11, 20])
+        );
         assert_eq!(
             envelope.source.logical_read_returned_bytes.values,
             Some(vec![100, 110, 200])

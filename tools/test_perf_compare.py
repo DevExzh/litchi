@@ -415,6 +415,64 @@ def opc_source_materialize_operation_metrics_report_fields():
     return operation_metrics
 
 
+def opc_source_materialize_accounted_operation_metrics_report_fields():
+    operation_metrics = opc_source_materialize_operation_metrics_report_fields()
+    operation_metrics["latency_claim"] = (
+        perf_compare.OPC_MATERIALIZATION_ZIP_LATENCY_CLAIM
+    )
+    zip_metrics = opc_zip_operation_metrics_report_fields()["opc_zip"]
+    for key, value in zip_metrics.items():
+        if isinstance(value, dict):
+            value["scope"] = perf_compare.OPC_MATERIALIZATION_ZIP_SCOPE
+    zip_metrics["scope"] = perf_compare.OPC_MATERIALIZATION_ZIP_SCOPE
+    operation_metrics["opc_zip"] = zip_metrics
+    return operation_metrics
+
+
+def opc_source_materialize_report_pair(
+    *, accounted=False, comparison_policy=None
+):
+    case = (
+        perf_compare.OPC_SOURCE_MATERIALIZE_ACCOUNTED_CASE
+        if accounted
+        else perf_compare.OPC_SOURCE_MATERIALIZE_CASE
+    )
+    oracle = (
+        perf_compare.OPC_SOURCE_MATERIALIZE_ORACLE_VERSION if accounted else None
+    )
+    metrics_factory = (
+        opc_source_materialize_accounted_operation_metrics_report_fields
+        if accounted
+        else opc_source_materialize_operation_metrics_report_fields
+    )
+    baseline = report()
+    current = report(revision="current")
+    for item in (baseline, current):
+        item["configuration"]["cases"] = [case]
+        if oracle is not None:
+            item["configuration"][
+                perf_compare.OPC_SOURCE_MATERIALIZE_ORACLE_CONFIG_FIELD
+            ] = oracle
+        item["results"][0]["case"] = case
+        item["results"][0]["operation_metrics"] = metrics_factory()
+        if accounted:
+            item["results"][0]["elapsed_ns"]["sample_order"] = list(range(5))
+    selected_policy = (
+        policy() if comparison_policy is None else copy.deepcopy(comparison_policy)
+    )
+    selected_policy["required_cases"] = [case]
+    corpus_identity = json.dumps(
+        baseline["results"][0]["corpus"],
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+    selected_policy["expected_result_keys_sha256"] = (
+        perf_compare.result_key_manifest_sha256([(case, corpus_identity)])
+    )
+    return baseline, current, selected_policy
+
+
 def opc_zip_operation_metrics_report_fields(status="measured", values=None):
     operation_metrics = operation_metrics_report_fields()
     operation_metrics["latency_claim"] = (
@@ -2665,16 +2723,123 @@ class PerfCompareTests(unittest.TestCase):
                         baseline, current, self.operation_metrics_policy()
                     )
 
-    def test_opc_source_materialization_scope_and_claim_are_evidence_only(self):
-        baseline = report()
-        current = report(revision="current")
-        for item in (baseline["results"][0], current["results"][0]):
-            item["operation_metrics"] = (
-                opc_source_materialize_operation_metrics_report_fields()
+    def test_accounted_materialization_scope_is_evidence_only_and_fail_closed(self):
+        baseline, current, comparison_policy = (
+            opc_source_materialize_report_pair(
+                accounted=True,
+                comparison_policy=self.operation_metrics_policy(),
             )
+        )
+        result = perf_compare.compare_reports(baseline, current, comparison_policy)
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["summary"]["latency_compared_results"], 0)
+        self.assertEqual(result["summary"]["latency_excluded_results"], 1)
+        mutations = (
+            lambda m: m.pop("opc_zip"),
+            lambda m: m["opc_zip"].update(scope=perf_compare.OPC_ZIP_SCOPE),
+            lambda m: m["opc_zip"]["output_bytes_accepted"].update(scope=perf_compare.OPC_ZIP_SCOPE),
+            lambda m: m.update(latency_claim=perf_compare.OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM),
+            lambda m: m.update(latency_claim=perf_compare.OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM),
+        )
+        for index, mutate in enumerate(mutations):
+            with self.subTest(index=index):
+                malformed = copy.deepcopy(current)
+                mutate(malformed["results"][0]["operation_metrics"])
+                with self.assertRaises(perf_compare.ComparisonInputError):
+                    perf_compare.compare_reports(baseline, malformed, comparison_policy)
+
+    def test_opc_materialization_claims_are_bound_to_result_case(self):
+        baseline, current, comparison_policy = opc_source_materialize_report_pair(
+            comparison_policy=self.operation_metrics_policy()
+        )
+        current["results"][0]["elapsed_ns"]["sample_order"] = list(range(5))
+        current["results"][0]["operation_metrics"] = (
+            opc_source_materialize_accounted_operation_metrics_report_fields()
+        )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "latency_claim=.*requires result case .*opc_source_materialize_accounted",
+        ):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
+
+        baseline, current, comparison_policy = opc_source_materialize_report_pair(
+            accounted=True,
+            comparison_policy=self.operation_metrics_policy(),
+        )
+        current["results"][0]["operation_metrics"] = (
+            opc_source_materialize_operation_metrics_report_fields()
+        )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "latency_claim=.*requires result case .*opc_source_materialize'",
+        ):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
+
+    def test_opc_materialization_oracle_identity_requires_new_accounted_marker(self):
+        baseline, current, comparison_policy = opc_source_materialize_report_pair(
+            accounted=True,
+            comparison_policy=self.operation_metrics_policy(),
+        )
+        current["configuration"].pop(
+            perf_compare.OPC_SOURCE_MATERIALIZE_ORACLE_CONFIG_FIELD
+        )
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "configuration.opc_source_materialize_oracle is required",
+        ):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
+
+        baseline, current, comparison_policy = opc_source_materialize_report_pair(
+            accounted=True,
+            comparison_policy=self.operation_metrics_policy(),
+        )
+        current["configuration"][
+            perf_compare.OPC_SOURCE_MATERIALIZE_ORACLE_CONFIG_FIELD
+        ] = "future-oracle"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "configuration.opc_source_materialize_oracle must be",
+        ):
+            perf_compare.compare_reports(baseline, current, comparison_policy)
+
+        baseline, current, comparison_policy = opc_source_materialize_report_pair(
+            comparison_policy=self.operation_metrics_policy()
+        )
+        self.assertNotIn(
+            perf_compare.OPC_SOURCE_MATERIALIZE_ORACLE_CONFIG_FIELD,
+            baseline["configuration"],
+        )
+        self.assertNotIn(
+            perf_compare.OPC_SOURCE_MATERIALIZE_ORACLE_CONFIG_FIELD,
+            current["configuration"],
+        )
+        result = perf_compare.compare_reports(baseline, current, comparison_policy)
+        self.assertEqual(result["status"], "pass")
+
+        for item in (baseline, current):
+            item["configuration"][
+                perf_compare.OPC_SOURCE_MATERIALIZE_ORACLE_CONFIG_FIELD
+            ] = perf_compare.OPC_SOURCE_MATERIALIZE_ORACLE_VERSION
+        result = perf_compare.compare_reports(baseline, current, comparison_policy)
+        self.assertEqual(result["status"], "pass")
+
+        invalid_legacy = copy.deepcopy(current)
+        invalid_legacy["configuration"][
+            perf_compare.OPC_SOURCE_MATERIALIZE_ORACLE_CONFIG_FIELD
+        ] = "future-oracle"
+        with self.assertRaisesRegex(
+            perf_compare.ComparisonInputError,
+            "configuration.opc_source_materialize_oracle must be",
+        ):
+            perf_compare.compare_reports(baseline, invalid_legacy, comparison_policy)
+
+    def test_opc_source_materialization_scope_and_claim_are_evidence_only(self):
+        baseline, current, comparison_policy = opc_source_materialize_report_pair(
+            comparison_policy=self.operation_metrics_policy()
+        )
 
         result = perf_compare.compare_reports(
-            baseline, current, self.operation_metrics_policy()
+            baseline, current, comparison_policy
         )
         self.assertEqual(result["status"], "pass")
         self.assertEqual(result["summary"]["latency_compared_results"], 0)
@@ -2684,12 +2849,9 @@ class PerfCompareTests(unittest.TestCase):
         )
 
     def test_opc_source_materialization_scope_requires_dedicated_claim(self):
-        baseline = report()
-        current = report(revision="current")
-        for item in (baseline["results"][0], current["results"][0]):
-            item["operation_metrics"] = (
-                opc_source_materialize_operation_metrics_report_fields()
-            )
+        baseline, current, comparison_policy = opc_source_materialize_report_pair(
+            comparison_policy=self.operation_metrics_policy()
+        )
         current["results"][0]["operation_metrics"][
             "latency_claim"
         ] = perf_compare.EVIDENCE_ONLY_LATENCY_CLAIM
@@ -2698,15 +2860,12 @@ class PerfCompareTests(unittest.TestCase):
             "source.counter_scope=.*requires latency_claim",
         ):
             perf_compare.compare_reports(
-                baseline, current, self.operation_metrics_policy()
+                baseline, current, comparison_policy
             )
 
-        baseline = report()
-        current = report(revision="current")
-        for item in (baseline["results"][0], current["results"][0]):
-            item["operation_metrics"] = (
-                opc_source_materialize_operation_metrics_report_fields()
-            )
+        baseline, current, comparison_policy = opc_source_materialize_report_pair(
+            comparison_policy=self.operation_metrics_policy()
+        )
         current["results"][0]["operation_metrics"]["source"][
             "counter_scope"
         ] = "timed_read_at"
@@ -2715,16 +2874,13 @@ class PerfCompareTests(unittest.TestCase):
             "latency_claim=.*requires source.counter_scope",
         ):
             perf_compare.compare_reports(
-                baseline, current, self.operation_metrics_policy()
+                baseline, current, comparison_policy
             )
 
     def test_opc_source_materialization_scope_rejects_comparable_claim(self):
-        baseline = report()
-        current = report(revision="current")
-        for item in (baseline["results"][0], current["results"][0]):
-            item["operation_metrics"] = (
-                opc_source_materialize_operation_metrics_report_fields()
-            )
+        baseline, current, comparison_policy = opc_source_materialize_report_pair(
+            comparison_policy=self.operation_metrics_policy()
+        )
         current["results"][0]["operation_metrics"][
             "latency_claim"
         ] = perf_compare.COMPARABLE_LATENCY_CLAIM
@@ -2733,7 +2889,7 @@ class PerfCompareTests(unittest.TestCase):
             "source.counter_scope=.*requires latency_claim",
         ):
             perf_compare.compare_reports(
-                baseline, current, self.operation_metrics_policy()
+                baseline, current, comparison_policy
             )
 
     def test_source_counter_scope_status_compatibility_fails_closed(self):
