@@ -5594,12 +5594,25 @@ impl SourceBackedPackage {
                 resource: "source-backed OPC changed replacement plan",
                 source,
             })?;
-        for overlay in overlays {
-            // Reading every selected closure proves its local framing,
-            // compression, declared size, and CRC before output.
-            let original = self.read_part(overlay.target)?;
-            if original.as_bytes() != overlay.replacement.as_slice() {
-                changed.push((overlay, original));
+        {
+            // The selected validation reads are one sequential operation. An
+            // unmanaged package may reuse one indexed Deflate decoder across
+            // those reads; Store members bypass it and cache hits remain
+            // cache-only. Managed packages intentionally retain the existing
+            // one-shot path to avoid retaining unaccounted decoder workspace
+            // across managed loads; their cancellation and reservation policy
+            // remains unchanged.
+            let mut read_session = (!self.cache.is_managed()).then(|| self.archive.read_session());
+            for overlay in overlays {
+                // Reading every selected closure proves its local framing,
+                // compression, declared size, and CRC before output.
+                let original = match read_session.as_mut() {
+                    Some(session) => self.read_part_with_session(overlay.target, session)?,
+                    None => self.read_part(overlay.target)?,
+                };
+                if original.as_bytes() != overlay.replacement.as_slice() {
+                    changed.push((overlay, original));
+                }
             }
         }
         if changed.is_empty() && omitted_members.is_empty() {
@@ -8754,6 +8767,38 @@ mod tests {
         if include_junk {
             writer.write_stored("scratch.bin", b"not a part").unwrap();
         }
+        writer.finish_to_bytes().unwrap()
+    }
+
+    fn mixed_compression_archive() -> Vec<u8> {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored("_rels/.rels", root_relationships())
+            .unwrap();
+        writer
+            .write_deflated(
+                "word/document.xml",
+                b"<document>deflated source payload</document>",
+            )
+            .unwrap();
+        writer
+            .write_deflated(
+                "custom/second.xml",
+                b"<second>deflated source payload</second>",
+            )
+            .unwrap();
+        writer
+            .write_stored_stream(
+                "custom/orphan.xml",
+                std::io::Cursor::new(b"<orphan>stored source payload</orphan>".to_vec()),
+            )
+            .unwrap();
         writer.finish_to_bytes().unwrap()
     }
 
@@ -12581,6 +12626,84 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn overlay_mixed_storage_has_semantic_parity_and_managed_cold_work() {
+        let source_bytes = mixed_compression_archive();
+        let source_raw = raw_records(&source_bytes);
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let second = PackURI::new("/custom/second.xml").unwrap();
+        let orphan = PackURI::new("/custom/orphan.xml").unwrap();
+        let document_payload = b"<document>deflated source payload</document>";
+        let second_payload = b"<second>deflated source payload</second>";
+        let orphan_payload = b"<orphan>stored source payload</orphan>";
+        let replacements = || {
+            vec![
+                (orphan.clone(), orphan_payload.to_vec()),
+                (second.clone(), second_payload.to_vec()),
+                (
+                    document.clone(),
+                    b"<document>changed payload</document>".to_vec(),
+                ),
+            ]
+        };
+
+        let mut unmanaged_output = Vec::new();
+        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
+            .unwrap()
+            .write_part_overlays_to_stream(&mut unmanaged_output, replacements())
+            .unwrap();
+
+        let reopened = OpcPackage::from_bytes(&unmanaged_output).unwrap();
+        assert_eq!(
+            reopened.get_part(&document).unwrap().blob(),
+            b"<document>changed payload</document>"
+        );
+        assert_eq!(reopened.get_part(&second).unwrap().blob(), second_payload);
+        assert_eq!(reopened.get_part(&orphan).unwrap().blob(), orphan_payload);
+
+        let output_raw = raw_records(&unmanaged_output);
+        let source_orphan = source_raw.get(b"custom/orphan.xml".as_slice()).unwrap();
+        let output_orphan = output_raw.get(b"custom/orphan.xml".as_slice()).unwrap();
+        assert_eq!(output_orphan.local, source_orphan.local);
+        assert_eq!(
+            central_without_local_offset(&output_orphan.central),
+            central_without_local_offset(&source_orphan.central)
+        );
+        let source_second = source_raw.get(b"custom/second.xml".as_slice()).unwrap();
+        let output_second = output_raw.get(b"custom/second.xml".as_slice()).unwrap();
+        assert_eq!(output_second.local, source_second.local);
+        assert_eq!(
+            central_without_local_offset(&output_second.central),
+            central_without_local_offset(&source_second.central)
+        );
+        let source_document = source_raw.get(b"word/document.xml".as_slice()).unwrap();
+        let output_document = output_raw.get(b"word/document.xml".as_slice()).unwrap();
+        assert_ne!(output_document.local, source_document.local);
+        assert_eq!(
+            &output_document.central[10..12],
+            &source_document.central[10..12]
+        );
+
+        let (budget, _cancellation_source, context) =
+            managed_context_with_all_resources(64 * 1024, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
+        let mut managed_output = Vec::new();
+        SourceBackedPackage::from_read_at_with_execution_context(
+            Arc::new(CountingSource::new(source_bytes)),
+            ReadLimits::default(),
+            context,
+        )
+        .unwrap()
+        .write_part_overlays_to_stream(&mut managed_output, replacements())
+        .unwrap();
+
+        assert_eq!(managed_output, unmanaged_output);
+        assert_eq!(
+            budget.used(Resource::Work),
+            (document_payload.len() + second_payload.len() + orphan_payload.len()) as u64
+        );
+        assert_eq!(budget.used(Resource::Memory), 0);
     }
 
     #[test]
