@@ -1,0 +1,272 @@
+{
+  "schema_version": 1,
+  "manifest_kind": "litchi-performance-evidence",
+  "change": "0400",
+  "outcome": "accepted_scoped_production_change",
+  "claim_authorized": true,
+  "self_excluded": true,
+  "accepted_deliverable": "warm normal selected-cell p50/mean/p95/p99 latency claim with exact operation-scoped allocator-vector observations",
+  "mechanism": "cumulative dimension-bearing selected streaming plus reusable numeric value scratch",
+  "revisions": {
+    "control": "2e47ccebf449ef88943c0abcecd32bd9141eb520",
+    "candidate": "f159c0aed603672aacee8e5923586ce4aa8753f7",
+    "candidate_commits": {
+      "numeric_value_scratch": "e97d8920fa5b26bf346721fc8216983e12a4cad0",
+      "dimension_bearing_streaming": "f159c0aed603672aacee8e5923586ce4aa8753f7"
+    }
+  },
+  "protocol": {
+    "case": "xlsx_file_selected_cell",
+    "order": [
+      "A1_control",
+      "B1_candidate",
+      "B2_candidate",
+      "A2_control"
+    ],
+    "cache_state": "warm",
+    "fresh_child_per_sample": true,
+    "process_isolated": true,
+    "cpu_affinity": "2",
+    "execution_workers": [
+      1
+    ],
+    "normal": {
+      "profile": "release",
+      "instrumentation": "none",
+      "warmups_per_leg": 20,
+      "samples_per_leg": 500,
+      "latency_claimable": true
+    },
+    "allocator": {
+      "profile": "release",
+      "instrumentation": "system_allocator_operation_scoped",
+      "warmups_per_leg": 3,
+      "samples_per_leg": 30,
+      "allocator_vectors_claimable_in_scope": true,
+      "elapsed_latency_claimable": false
+    }
+  },
+  "toolchain": {
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "cargo": "1.98.1",
+    "rustdoc": "1.98.1",
+    "allocator": "CountingSystemAllocator(std::alloc::System)"
+  },
+  "corpus": {
+    "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+    "shape": "medium",
+    "sheet_count": 4,
+    "rows_per_sheet": 48,
+    "columns_per_sheet": 48,
+    "numeric_cell_count": 9216,
+    "archive_member_count": 17,
+    "archive_bytes": 4226429,
+    "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+    "semantic_sha256": "020fdd140d2959ea4f480676a3d4d0bf840927e25251cb6cad37a043ab80627e",
+    "catalog_sidecar": "not_requested_schema_1_reports"
+  },
+  "selected_cell_oracle": {
+    "canonical_sheet_name": "Bench01",
+    "sheet_position": 1,
+    "prepared_selector": "bEnCh01",
+    "cell_address": "M29",
+    "zero_based_row": 28,
+    "zero_based_column": 12,
+    "view": "stored",
+    "value_kind": "number",
+    "lexical_value": "1028012",
+    "digest": "36e53d9002ae8c433ad918b400196fb886fa675f850076808ac51327d1f42ac1"
+  },
+  "binary_identities": {
+    "normal_control": {
+      "profile": "release",
+      "bytes": 54777624,
+      "sha256": "a840c31cde950aa13244dae4f23a8fdb60d9d730e322d2a7d64e0eacbef3385f"
+    },
+    "normal_candidate": {
+      "profile": "release",
+      "bytes": 54755632,
+      "sha256": "98e90e2863fb60b37fde615bde03dd4b31a477fe1a5ee75564b8a3d3ca263c8c"
+    },
+    "allocator_control": {
+      "profile": "release",
+      "bytes": 54781064,
+      "sha256": "7aa3aab90fea509e5806f081cb2f1247b348d9ec1b376fad9f56899355b3112c"
+    },
+    "allocator_candidate": {
+      "profile": "release",
+      "bytes": 54756712,
+      "sha256": "f69200b54d294dcc83af235e2ce5d1e8b2848ea63b9ab783408bec1092310482"
+    }
+  },
+  "compression": {
+    "encoding": "zstd",
+    "cli": "zstd 1.5.7",
+    "level": 19,
+    "threads": 1,
+    "checksum": "XXH64",
+    "content_size": true,
+    "all_frames_tested": true,
+    "all_decompressed_raw_identities_verified": true
+  },
+  "validation": {
+    "normal_summary": {
+      "command": "python3 tools/perf_abba_summary.py --case xlsx_file_selected_cell A1 B1 B2 A2 --json-out OUTPUT",
+      "statistics_recomputed_from_2000_raw_samples": true,
+      "canonical_summary_sha256": "7002efc23732ebfa551163e2eb67bfc9551535e8fbbfa509560835442c2b3590"
+    },
+    "allocator_abba": {
+      "command": "python3 tools/validate_perf_allocator_abba.py --a1 A1 --b1 B1 --b2 B2 --a2 A2 --projection allocation-metrics.json",
+      "status": "passed",
+      "raw_reports": 4,
+      "raw_samples": 120,
+      "unique_child_process_ids": 120,
+      "exact_allocator_vectors": 40,
+      "allocator_elapsed_time_evaluated": false,
+      "validator_path": "../../../../tools/validate_perf_allocator_abba.py",
+      "validator_bytes": 43055,
+      "validator_sha256": "a7b3e6d8d122152d38bebf1adfaeb46575066a2c36db65c1af1278db2927ed8c",
+      "test_path": "../../../../tools/test_validate_perf_allocator_abba.py",
+      "test_bytes": 9030,
+      "test_sha256": "3e6280ed29f5a9b08ed28339d4ca9eb64013ade925afc516f3a245a57f3641ec",
+      "tests_passed": 16
+    },
+    "correctness": {
+      "focused_selected_tests": "9 passed, 0 failed",
+      "focused_source_and_fallback_tests": "3 passed, 0 failed",
+      "complete_0400_filter": "12 passed, 0 failed",
+      "full_litchi_xlsx_lib_tests": "918 passed, 0 failed",
+      "unified_facade_tests": "4 passed, 0 failed",
+      "cargo_check_litchi_xlsx": "passed",
+      "changed_file_rustfmt": "passed",
+      "git_diff_check": "passed",
+      "warning_denied_all_target_clippy": "non-clean: 26 control diagnostics, 28 candidate diagnostics; two candidate additions are test-only result_large_err findings in 0400 helpers"
+    },
+    "withheld": [
+      "allocator elapsed latency",
+      "RSS or peak operation memory",
+      "global live or peak allocator snapshots as memory claims",
+      "physical I/O",
+      "cold-cache or cold-verified behavior",
+      "throughput or scaling",
+      "broad XLSX or other selector behavior",
+      "isolated causal attribution to either cumulative mechanism"
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "README.md",
+      "role": "human_readme",
+      "bytes": 10257,
+      "sha256": "3dbcf204e964c97a8a15f4fc04ad6fb80de9090c81541b7f65f07befddfc0b05"
+    },
+    {
+      "path": "adjudication.json",
+      "role": "adjudication",
+      "bytes": 17841,
+      "sha256": "ff7b21e33cc3f19abc194c827b46ad8640771a710495daa85feb5d2f6623375f"
+    },
+    {
+      "path": "allocation-metrics.json",
+      "role": "allocator_projection",
+      "bytes": 35817,
+      "sha256": "c5ab52c3e0f90f71e560838eb75acf5e3447b5ecc4b8836d645971d02d9c85b6"
+    },
+    {
+      "path": "latency-metrics.tsv",
+      "role": "normal_latency_projection",
+      "bytes": 1886,
+      "sha256": "c8f5fe7cc70fb3248d5261e6e7e05d6db6d153c5e44f8d88e07e9d45f316bf57"
+    },
+    {
+      "path": "summary.json",
+      "role": "normal_abba_summary",
+      "bytes": 22158,
+      "sha256": "567d77a8974cd5d6d44dc2733f5e279bf73b93012151c1f3ea82834805780d0f",
+      "canonical_bytes": 17791,
+      "canonical_sha256": "7002efc23732ebfa551163e2eb67bfc9551535e8fbbfa509560835442c2b3590"
+    },
+    {
+      "path": "0400-xlsx-selected-cell-streaming-abba-manifest.json",
+      "role": "normal_abba_package_manifest",
+      "bytes": 4230,
+      "sha256": "0063ed42bc7785e03eba0ef546eac03a54b73de756549aa2bfc99a22abb6b4f1"
+    },
+    {
+      "path": "a1-normal.json.zst",
+      "role": "normal_control_A1_report",
+      "encoding": "zstd",
+      "compressed_bytes": 18718,
+      "compressed_sha256": "c2c96794d6e90618576394d51706f35b86225b64b6ea368c9bfa2b4d61f46e2c",
+      "raw_bytes": 1313568,
+      "raw_sha256": "6039575b6fbde3a865309dc5598e8fb32237989fa5ef8c9b950aab4bf8418e89",
+      "canonical_sha256": "6b95383434148c92676f4bdf1708ed4bf3034b1884c4ee617da2ebf80034fe5a"
+    },
+    {
+      "path": "b1-normal.json.zst",
+      "role": "normal_candidate_B1_report",
+      "encoding": "zstd",
+      "compressed_bytes": 18059,
+      "compressed_sha256": "dfbba9028c90079b1420c74d4521b116ac63ccb7548be0c2ab6a9572c54c79f3",
+      "raw_bytes": 1311571,
+      "raw_sha256": "c83c561f32a0a0d63fa14c5ca18d1f1c58df476d0622f786775ccd50593bedf2",
+      "canonical_sha256": "f663875fb885ee49df17727901fb5b5bd1c7df4000754e8accf08dc1c777e804"
+    },
+    {
+      "path": "b2-normal.json.zst",
+      "role": "normal_candidate_B2_report",
+      "encoding": "zstd",
+      "compressed_bytes": 18188,
+      "compressed_sha256": "0c5c5d009f8dda3739c2d7c5085b0ae553a93b77bda6b3419e1ec9bfdb207b67",
+      "raw_bytes": 1311573,
+      "raw_sha256": "c443fb092c083668441f04be9e122ac1606305132f60bd86831e15ecc91b73b0",
+      "canonical_sha256": "4f2e49fa6c3d6115bd163a6767a71c38538938c469079006545b59585542ed15"
+    },
+    {
+      "path": "a2-normal.json.zst",
+      "role": "normal_control_A2_report",
+      "encoding": "zstd",
+      "compressed_bytes": 18813,
+      "compressed_sha256": "293a277fb468cb2e9fa5fed5405ea2fa26f5a9960d3048270f87ca0dc2a1065b",
+      "raw_bytes": 1313569,
+      "raw_sha256": "22e1a9d99afe05ea445460f8e43f2a2ed756a49b3a415f73c58c3c84d4458463",
+      "canonical_sha256": "3a7a87b0fc0af454aaa6409da3464f8d7d8994db228f51ea888d9a8eb236993a"
+    },
+    {
+      "path": "a1-allocator.json.zst",
+      "role": "allocator_control_A1_report",
+      "encoding": "zstd",
+      "compressed_bytes": 4916,
+      "compressed_sha256": "43bd95ede9bcb00862e344e0295971a6e97a61424d71e67645d3707b56eacba2",
+      "raw_bytes": 119610,
+      "raw_sha256": "5fe367dd08f32c8178b7b612b56f00241d7f6eb1c338088d61dc58de81d45f41"
+    },
+    {
+      "path": "b1-allocator.json.zst",
+      "role": "allocator_candidate_B1_report",
+      "encoding": "zstd",
+      "compressed_bytes": 4938,
+      "compressed_sha256": "8c5e8be48baa54740bb3b410dd8e986c668583d4f69aed4b6694602c1614b5e7",
+      "raw_bytes": 119373,
+      "raw_sha256": "a51918f7bc01844f5a60d922c73e758262344ef70c70e47b8c3ef7f6982fa720"
+    },
+    {
+      "path": "b2-allocator.json.zst",
+      "role": "allocator_candidate_B2_report",
+      "encoding": "zstd",
+      "compressed_bytes": 4967,
+      "compressed_sha256": "1228b8e6c0b54675f01bc0848a11ac47b378aee7bb840e974c8043c1cc1c8f89",
+      "raw_bytes": 119372,
+      "raw_sha256": "b33054fe59a20814039dfb3c8669544de777a561e3bde158a813285ba5670f60"
+    },
+    {
+      "path": "a2-allocator.json.zst",
+      "role": "allocator_control_A2_report",
+      "encoding": "zstd",
+      "compressed_bytes": 4937,
+      "compressed_sha256": "24a77f7bf077d4b0482c58bcfd604cef9c262f3bf011331d68a4d075ad845a96",
+      "raw_bytes": 119610,
+      "raw_sha256": "2b46c6b06b51e44af0dab34679c9f9d2f7ad547fe82cab963829223fee0ef189"
+    }
+  ]
+}

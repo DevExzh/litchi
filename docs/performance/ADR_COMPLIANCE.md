@@ -1,5 +1,65 @@
 # Performance optimization ADR-compliance matrix
 
+## Change 0400 compliance update
+
+0400 remains inside the owning `litchi-xlsx` raw worksheet selected scanner and
+source facade. It combines two private changes: dimension-bearing selected
+streaming and reuse of the numeric cell-value scratch buffer. No public raw
+type or identifier, dependency edge, package/runtime handle, lock, unsafe path,
+executor path, CRUD signature, or format-neutral promise is introduced.
+
+The SpreadsheetML `dimension` element is parsed and validated for required
+`ref`, valid A1 geometry, schema placement, and duplicate/late occurrence, but
+its range is deliberately not semantic: it does not bound selected results or
+change the returned cell/value state. Strict and transitional names,
+prefixes, and MCE-ignorable metadata remain supported. Unknown attributes,
+nested content, unsupported namespace/markup, or other structure outside the
+admitted grammar marks the query `NotEligible` and conservatively uses the
+existing eager worksheet path. Malformed, missing, duplicate, late, and
+out-of-grid dimension references retain fail-closed eager-parser errors.
+
+Numeric and untyped cell values borrow a private reusable `String`; the
+scanner clears it before each value and recycles it only when its capacity is
+at most `MAX_CELL_CHARACTERS`. Other value kinds do not use it, and oversized
+buffers are dropped. Selected-cell ownership, formulas, empty/unknown states,
+merge behavior, source freshness, malformed-input precedence, and eager
+fallback parity remain covered by focused adversarial tests and the full XLSX
+library suite. Thus the optimization changes neither public results nor the
+failure/preservation boundary, and it does not introduce unbounded retained
+capacity.
+
+The matched control is `2e47ccebf449ef88943c0abcecd32bd9141eb520`; the final
+candidate is `f159c0aed603672aacee8e5923586ce4aa8753f7`. Evidence uses the
+fixed medium
+`litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1` corpus: four
+48×48 sheets, 9,216 cells, 17 ZIP members, 4,226,429 archive bytes, and source
+SHA-256
+`dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036`; the
+semantic SHA-256 is
+`020fdd140d2959ea4f480676a3d4d0bf840927e25251cb6cad37a043ab80627e`. The
+independent selected oracle is canonical `Bench01`, zero-based position `1`,
+prepared selector `bEnCh01`, cell `M29`, stored Number lexical value
+`1028012`, with selected-cell digest
+`36e53d9002ae8c433ad918b400196fb886fa675f850076808ac51327d1f42ac1`.
+
+Normal release evidence is a fresh-child, CPU-2, one-worker, warm-only
+`A1(control), B1(candidate), B2(candidate), A2(control)` run under stable
+Rust/Cargo/Rustdoc 1.98.1 with 20 warmups and 500 retained samples per leg.
+The timer contains only case-insensitive sheet selection and the exact cell
+read; workbook open and query strings are prepared before timing. Paired
+candidate reductions (positive means faster) for p50/mean/p95/p99 are
+`+27.775881% / +27.728990% / +27.657228% / +28.150563%` for A1→B1 and
+`+27.711459% / +27.691341% / +27.705070% / +27.835790%` for A2→B2. The
+claim is scoped to this normal, non-allocator filesystem selector and
+protocol. It does not extend to open latency, cold-verified queries,
+allocator elapsed time, RSS/peak memory, physical I/O, cache behavior,
+throughput, other XLSX workloads, or generalized facade behavior. See the
+[0400 change record](changes/0400-xlsx-selected-dimension-streaming.md) and
+[0400 evidence bundle](results/change-0400/).
+
+`performance_claim: scoped`; `claim_authorized: true`, limited to the stated
+selected-cell operation and exact corpus/protocol.
+
 ## Change 0399 compliance update
 
 0399 adds only the opt-in `xlsx_file_selected_cell` harness selector over the

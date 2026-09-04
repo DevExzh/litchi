@@ -1,0 +1,463 @@
+{
+  "schema_version": 1,
+  "change": "0400",
+  "outcome": "ACCEPTED_SCOPED",
+  "decision": "Accept the warm normal, non-allocator release-binary latency result for the xlsx_file_selected_cell selector on the fixed filesystem XLSX corpus and stated ABBA protocol. Retain allocator measurements as exact operation-scoped observations only.",
+  "performance_claim": "scoped",
+  "claim_authorized": true,
+  "accepted_claim": {
+    "selector": "xlsx_file_selected_cell",
+    "profile": "normal",
+    "instrumentation": "none",
+    "metric": "elapsed_ns",
+    "statistics": [
+      "p50",
+      "mean",
+      "p95",
+      "p99"
+    ],
+    "scope": "Case-insensitive selection of prepared bEnCh01 followed by the exact stored-number read at M29, using the public litchi::Workbook::open(path) path on the fixed medium filesystem XLSX corpus.",
+    "timer_scope": "Only case-insensitive worksheet selection and the exact M29 cell read are timed.",
+    "excluded_from_timer": [
+      "Workbook open",
+      "Query and selector preparation",
+      "Post-operation semantic, source, corpus, and selected-cell oracle checks"
+    ],
+    "interpretation": "Positive percentages mean the candidate is faster. The result is cumulative across valid dimension-bearing selected-cell streaming and reusable numeric-value scratch; it is not attributed to either mechanism in isolation.",
+    "sample_count_per_leg": 500,
+    "leg_statistics_ns": {
+      "a1_control": {
+        "p50": 4898426,
+        "mean": 4901210.558000002,
+        "p95": 4960931,
+        "p99": 5033672
+      },
+      "b1_candidate": {
+        "p50": 3537845,
+        "mean": 3542154.3819999974,
+        "p95": 3588875,
+        "p99": 3616665
+      },
+      "b2_candidate": {
+        "p50": 3542565,
+        "mean": 3546763.1199999996,
+        "p95": 3594295,
+        "p99": 3642526
+      },
+      "a2_control": {
+        "p50": 4900590,
+        "mean": 4905032.362000004,
+        "p95": 4971711,
+        "p99": 5047552
+      }
+    },
+    "paired_reductions_percent": {
+      "a1_to_b1": {
+        "p50": 27.775881477029564,
+        "mean": 27.728989806032406,
+        "p95": 27.657228048525567,
+        "p99": 28.150562849546017
+      },
+      "a2_to_b2": {
+        "p50": 27.711459232459767,
+        "mean": 27.691341091298664,
+        "p95": 27.705069743595313,
+        "p99": 27.83579049804737
+      }
+    },
+    "same_implementation_drift_percent": {
+      "control": {
+        "p50": 0.04417745618694658,
+        "mean": 0.07797673564063048,
+        "p95": 0.21729792250688432,
+        "p99": 0.2757430360977036
+      },
+      "candidate": {
+        "p50": 0.13341455038307218,
+        "mean": 0.1301111556125909,
+        "p95": 0.15102225627808158,
+        "p99": 0.715051020760839
+      }
+    },
+    "drift_ceilings_percent": {
+      "p50": 5.0,
+      "mean": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "drift_within_ceiling": true,
+    "adverse_both_statistics": []
+  },
+  "allocator_observation": {
+    "status": "observational_only",
+    "profile": "allocator",
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "scope": "Exact operation-scoped allocation/deallocation/reallocation/failed-call/byte deltas plus absolute process live/high-water snapshots from fresh child processes.",
+    "sample_count_per_leg": 30,
+    "same_implementation_vectors": {
+      "control": {
+        "legs": [
+          "a1",
+          "a2"
+        ],
+        "all_legs_exactly_equal": true,
+        "per_sample_vectors_constant": true,
+        "values": {
+          "allocation_calls": 100992,
+          "deallocation_calls": 98642,
+          "reallocation_calls": 38,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 13925077,
+          "deallocated_bytes": 13412029,
+          "live_bytes_before": 20339,
+          "live_bytes_after": 533387,
+          "peak_live_bytes_before": 139614,
+          "peak_live_bytes_after": 8494390
+        }
+      },
+      "candidate": {
+        "legs": [
+          "b1",
+          "b2"
+        ],
+        "all_legs_exactly_equal": true,
+        "per_sample_vectors_constant": true,
+        "values": {
+          "allocation_calls": 84221,
+          "deallocation_calls": 84206,
+          "reallocation_calls": 12,
+          "failed_allocation_calls": 0,
+          "allocated_bytes": 10706565,
+          "deallocated_bytes": 10705182,
+          "live_bytes_before": 20343,
+          "live_bytes_after": 21726,
+          "peak_live_bytes_before": 139618,
+          "peak_live_bytes_after": 8494761
+        }
+      }
+    },
+    "candidate_minus_control": {
+      "allocation_calls": {
+        "delta": -16771,
+        "relative_percent": -16.606265842839036
+      },
+      "deallocation_calls": {
+        "delta": -14436,
+        "relative_percent": -14.634739766022587
+      },
+      "reallocation_calls": {
+        "delta": -26,
+        "relative_percent": -68.42105263157895
+      },
+      "failed_allocation_calls": {
+        "delta": 0,
+        "control": 0,
+        "candidate": 0,
+        "unchanged_exactly": true
+      },
+      "allocated_bytes": {
+        "delta": -3218512,
+        "relative_percent": -23.113064294007135
+      },
+      "deallocated_bytes": {
+        "delta": -2706847,
+        "relative_percent": -20.182233426426382
+      },
+      "live_bytes_before": {
+        "delta": 4,
+        "status": "setup_diagnostic_only"
+      },
+      "live_bytes_after": {
+        "delta": -511661,
+        "status": "diagnostic_only"
+      },
+      "peak_live_bytes_before": {
+        "delta": 4,
+        "status": "diagnostic_only"
+      },
+      "peak_live_bytes_after": {
+        "delta": 371,
+        "status": "withheld_metric"
+      }
+    },
+    "latency_claim_authorized": false,
+    "peak_or_rss_claim_authorized": false
+  },
+  "protocol": {
+    "abba_order": [
+      "A1_control",
+      "B1_candidate",
+      "B2_candidate",
+      "A2_control"
+    ],
+    "normal": {
+      "warmup_iterations_per_leg": 20,
+      "retained_samples_per_leg": 500,
+      "filesystem_cache_state": "warm",
+      "fresh_child_per_sample": true,
+      "process_isolated": true,
+      "execution_workers": 1,
+      "cpu_affinity": "2",
+      "profile": "release",
+      "instrumentation": "none"
+    },
+    "allocator": {
+      "warmup_iterations_per_leg": 3,
+      "retained_samples_per_leg": 30,
+      "filesystem_cache_state": "warm",
+      "fresh_child_per_sample": true,
+      "process_isolated": true,
+      "execution_workers": 1,
+      "cpu_affinity": "2",
+      "profile": "release",
+      "instrumentation": "CountingSystemAllocator(std::alloc::System)",
+      "elapsed_time_used_for_acceptance": false
+    },
+    "environment": {
+      "os": "linux",
+      "kernel": "Linux 7.0.0-1011-aws",
+      "cpu_model": "AMD EPYC 9R45",
+      "logical_cpus_available": 1,
+      "filesystem_type": "tmpfs",
+      "source_destination_same_device": true,
+      "toolchain": "rustc 1.98.1 (48a229cea 2026-09-01)",
+      "rustflags": null,
+      "cargo_build_target": null
+    },
+    "acceptance": {
+      "normal_statistics": [
+        "p50",
+        "mean",
+        "p95",
+        "p99"
+      ],
+      "normal_same_implementation_drift_ceiling_percent": {
+        "p50": 5.0,
+        "mean": 5.0,
+        "p95": 10.0,
+        "p99": 15.0
+      },
+      "allocator_statistics": "observational vectors only"
+    }
+  },
+  "mechanism": {
+    "kind": "cumulative_dimension_bearing_streaming_and_numeric_value_scratch",
+    "dimension_streaming": {
+      "behavior": "Valid SpreadsheetML dimension metadata remains on the selected-cell streaming path.",
+      "validation": "dimension@ref is parsed and validated, then discarded.",
+      "result_bound": false,
+      "fallback_boundary": "Missing, malformed, duplicate, late, or unsupported metadata preserves eager-parser errors or conservative fallback behavior."
+    },
+    "numeric_value_scratch": {
+      "behavior": "A private bounded String scratch buffer is reused for untyped and numeric cell values encountered by the selected-query scanner, including selected and unselected cells.",
+      "lifecycle": "The scanner takes and clears it at cell start and recycles it after semantic construction and selection complete.",
+      "oversize_capacity": "Capacity above the cell-character limit is discarded.",
+      "semantic_output_unchanged": true
+    },
+    "causal_attribution": "The accepted measurement compares the cumulative candidate with the control; no dimension-only or scratch-only attribution is authorized."
+  },
+  "corpus": {
+    "name": "xlsx-cell-values-medium",
+    "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+    "package_format": "XLSX/OPC/ZIP",
+    "shape": "medium",
+    "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+    "compression": "deflate",
+    "sheet_count": 4,
+    "rows_per_sheet": 48,
+    "columns_per_sheet": 48,
+    "entry_count": 9216,
+    "archive_member_count": 17,
+    "archive_bytes": 4226429,
+    "uncompressed_payload_bytes": 4231168,
+    "entry_bytes": 4,
+    "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+    "semantic_sha256": "020fdd140d2959ea4f480676a3d4d0bf840927e25251cb6cad37a043ab80627e",
+    "target_entry": "Sheet1!A1",
+    "target_payload_bytes": 1,
+    "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+  },
+  "oracles": {
+    "worksheet": {
+      "canonical_name": "Bench01",
+      "zero_based_position": 1,
+      "prepared_selector": "bEnCh01",
+      "case_insensitive": true
+    },
+    "cell": {
+      "a1": "M29",
+      "zero_based_row": 28,
+      "zero_based_column": 12,
+      "view": "Stored",
+      "value_kind": "Number",
+      "lexical_value": "1028012"
+    },
+    "selected_cell_evidence_sha256": "36e53d9002ae8c433ad918b400196fb886fa675f850076808ac51327d1f42ac1",
+    "semantic_workbook_sha256": "020fdd140d2959ea4f480676a3d4d0bf840927e25251cb6cad37a043ab80627e",
+    "all_normal_samples_exact_selected_oracle": true,
+    "all_normal_samples_exact_semantic_oracle": true,
+    "all_allocator_samples_exact_selected_oracle": true
+  },
+  "provenance": {
+    "control_revision": "2e47ccebf449ef88943c0abcecd32bd9141eb520",
+    "candidate_revision": "f159c0aed603672aacee8e5923586ce4aa8753f7",
+    "production_commits": {
+      "numeric_value_scratch": "e97d8920fa5b26bf346721fc8216983e12a4cad0",
+      "dimension_bearing_streaming": "f159c0aed603672aacee8e5923586ce4aa8753f7"
+    },
+    "source_sha256": {
+      "control": {
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs": "56c23a8a5eddb3fcf6a3cec72186efd32a894af1721e7dda3909d2f249b59c47",
+        "crates/litchi-xlsx/src/raw/worksheet/tests.rs": "acf14471c4e01b4e6e54840d7bf296989f364f5eb4dde25153f332c21b411223",
+        "crates/litchi-xlsx/src/workbook/source.rs": "66e84106835555a9a61ceb6bf375342649a5b4564edfc038dd9216a95fffe564"
+      },
+      "candidate": {
+        "crates/litchi-xlsx/src/raw/worksheet/selected.rs": "9460b4c1f7acd9763071ad42463073ef4cb75bac91ea4c670352f82fd8327651",
+        "crates/litchi-xlsx/src/raw/worksheet/tests.rs": "f0c842d14b0c7ce983c85a86556c9d9b977c1c24b7c44ca7df2acbe2aa16abf7",
+        "crates/litchi-xlsx/src/workbook/source.rs": "7f2f8ac3cc417d7f3458b8fd281541155391e8e973eed763728a4996728f704d"
+      },
+      "hash_definition": "SHA-256 of each exact source file at the stated revision"
+    },
+    "binaries": {
+      "normal": {
+        "control": {
+          "sha256": "a840c31cde950aa13244dae4f23a8fdb60d9d730e322d2a7d64e0eacbef3385f",
+          "bytes": 54777624,
+          "profile": "release"
+        },
+        "candidate": {
+          "sha256": "98e90e2863fb60b37fde615bde03dd4b31a477fe1a5ee75564b8a3d3ca263c8c",
+          "bytes": 54755632,
+          "profile": "release"
+        }
+      },
+      "allocator": {
+        "control": {
+          "sha256": "7aa3aab90fea509e5806f081cb2f1247b348d9ec1b376fad9f56899355b3112c",
+          "bytes": 54781064,
+          "profile": "release"
+        },
+        "candidate": {
+          "sha256": "f69200b54d294dcc83af235e2ce5d1e8b2848ea63b9ab783408bec1092310482",
+          "bytes": 54756712,
+          "profile": "release"
+        }
+      },
+      "binary_hashes_distinct": true
+    },
+    "evidence_artifacts": {
+      "summary": {
+        "path": "summary.json",
+        "sha256": "567d77a8974cd5d6d44dc2733f5e279bf73b93012151c1f3ea82834805780d0f",
+        "canonical_sha256": "7002efc23732ebfa551163e2eb67bfc9551535e8fbbfa509560835442c2b3590"
+      },
+      "latency_metrics": {
+        "path": "latency-metrics.tsv",
+        "sha256": "c8f5fe7cc70fb3248d5261e6e7e05d6db6d153c5e44f8d88e07e9d45f316bf57"
+      },
+      "normal_reports": [
+        {
+          "leg": "a1",
+          "path": "a1-normal.json.zst",
+          "uncompressed_sha256": "6039575b6fbde3a865309dc5598e8fb32237989fa5ef8c9b950aab4bf8418e89",
+          "canonical_sha256": "6b95383434148c92676f4bdf1708ed4bf3034b1884c4ee617da2ebf80034fe5a"
+        },
+        {
+          "leg": "b1",
+          "path": "b1-normal.json.zst",
+          "uncompressed_sha256": "c83c561f32a0a0d63fa14c5ca18d1f1c58df476d0622f786775ccd50593bedf2",
+          "canonical_sha256": "f663875fb885ee49df17727901fb5b5bd1c7df4000754e8accf08dc1c777e804"
+        },
+        {
+          "leg": "b2",
+          "path": "b2-normal.json.zst",
+          "uncompressed_sha256": "c443fb092c083668441f04be9e122ac1606305132f60bd86831e15ecc91b73b0",
+          "canonical_sha256": "4f2e49fa6c3d6115bd163a6767a71c38538938c469079006545b59585542ed15"
+        },
+        {
+          "leg": "a2",
+          "path": "a2-normal.json.zst",
+          "uncompressed_sha256": "22e1a9d99afe05ea445460f8e43f2a2ed756a49b3a415f73c58c3c84d4458463",
+          "canonical_sha256": "3a7a87b0fc0af454aaa6409da3464f8d7d8994db228f51ea888d9a8eb236993"
+        }
+      ],
+      "allocator_reports": [
+        {
+          "leg": "a1",
+          "path": "a1-allocator.json.zst",
+          "compressed_sha256": "43bd95ede9bcb00862e344e0295971a6e97a61424d71e67645d3707b56eacba2",
+          "uncompressed_sha256": "5fe367dd08f32c8178b7b612b56f00241d7f6eb1c338088d61dc58de81d45f41"
+        },
+        {
+          "leg": "b1",
+          "path": "b1-allocator.json.zst",
+          "compressed_sha256": "8c5e8be48baa54740bb3b410dd8e986c668583d4f69aed4b6694602c1614b5e7",
+          "uncompressed_sha256": "a51918f7bc01844f5a60d922c73e758262344ef70c70e47b8c3ef7f6982fa720"
+        },
+        {
+          "leg": "b2",
+          "path": "b2-allocator.json.zst",
+          "compressed_sha256": "1228b8e6c0b54675f01bc0848a11ac47b378aee7bb840e974c8043c1cc1c8f89",
+          "uncompressed_sha256": "b33054fe59a20814039dfb3c8669544de777a561e3bde158a813285ba5670f60"
+        },
+        {
+          "leg": "a2",
+          "path": "a2-allocator.json.zst",
+          "compressed_sha256": "24a77f7bf077d4b0482c58bcfd604cef9c262f3bf011331d68a4d075ad845a96",
+          "uncompressed_sha256": "2b46c6b06b51e44af0dab34679c9f9d2f7ad547fe82cab963829223fee0ef189"
+        }
+      ]
+    }
+  },
+  "validation": {
+    "python_schema_suite": "77/77 passed",
+    "focused_selected_path_tests": "9/9 passed",
+    "focused_source_and_fallback_tests": "3/3 passed; complete 0400 filter 12/12 passed",
+    "full_litchi_xlsx_library_tests": "918/918 passed",
+    "unified_facade_checks": "4/4 passed",
+    "cargo_check": "cargo check -p litchi-xlsx passed under Rust 1.98.1",
+    "format_and_diff": "exact changed-file rustfmt and git diff --check passed",
+    "clippy": "Warning-denied all-target Clippy remains non-clean: 26 diagnostics on control and 28 on candidate, including two candidate test-only result_large_err diagnostics in the 0400 helpers; production-library/full-test results are unaffected.",
+    "corpus_and_oracle_binding": true,
+    "configuration_identity_verified": true,
+    "environment_identity_verified": true,
+    "binary_identity_verified": true,
+    "statistics_recomputed_from_samples": true,
+    "allocator_vectors_verified": true,
+    "normal_sample_oracles_verified": "2,000/2,000 retained samples",
+    "allocator_sample_oracles_verified": "120/120 retained samples"
+  },
+  "rejected_captures": [
+    {
+      "capture": "pre-dimension numeric-scratch screening",
+      "status": "rejected",
+      "reason": "The pinned worksheet dimension metadata was unsupported by that candidate, so the selector fell back to eager materialization and candidate/control allocation vectors were identical. It does not measure the final dimension-bearing streaming path.",
+      "retained_in_bundle": false
+    },
+    {
+      "capture": "early allocator control screen",
+      "status": "rejected",
+      "reason": "The control process used runtime rustc 1.95 rather than the pinned Rust 1.98.1 toolchain.",
+      "retained_in_bundle": false
+    },
+    {
+      "capture": "early normal screen",
+      "status": "rejected",
+      "reason": "The run overlapped candidate compilation or otherwise had busy-CPU contamination and is not an isolated production comparison.",
+      "retained_in_bundle": false
+    }
+  ],
+  "withheld_claims": [
+    "Allocator-enabled elapsed latency",
+    "Allocator peak-live, RSS, total-memory, or system-memory behavior",
+    "Peak operation memory or a memory-reduction claim",
+    "Physical I/O, locality, or filesystem read-volume behavior; filesystem XLSX logical-read counters are not applicable",
+    "Cold-cache, cold-verified, or cache-transition behavior",
+    "Throughput, concurrency scaling, or worker-count scaling",
+    "Workbook-open, query-preparation, or any other timer-excluded lifecycle timing",
+    "Dimension-only or numeric-scratch-only causal attribution",
+    "Other cells, worksheet selectors, corpus shapes, payloads, or XLSX workloads",
+    "Broad XLSX, unified-facade, other-format, or cross-platform generalization",
+    "Any performance claim based on the rejected captures"
+  ]
+}

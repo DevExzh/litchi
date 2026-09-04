@@ -1,5 +1,66 @@
 # Performance hotspot inventory
 
+## Change 0400 update
+
+The first Change 0400 hypothesis was numeric-value scratch reuse alone. It was
+disproved by the pinned corpus: `Bench01` begins with
+`<dimension ref="A1:AV48"/>`, which the selected scanner initially classified as
+unsupported and therefore sent through the eager worksheet fallback. The
+scratch path was never reached; a diagnostic allocator screen measured the
+same **100,992 allocation calls** and **13,925,077 allocated bytes** for the
+candidate and control. That screen is rejected and excluded from the evidence
+bundle.
+
+The production change pivots to cumulative **dimension-bearing selected-cell
+streaming plus reusable numeric scratch**. Candidate
+`f159c0aed603672aacee8e5923586ce4aa8753f7` is compared with control
+`2e47ccebf449ef88943c0abcecd32bd9141eb520`. Valid transitional and strict
+SpreadsheetML `dimension` metadata is now validated and discarded without
+bounding the query, so the fixed worksheet stays on the selected streaming
+path. Unknown attributes or nested content still conservatively fall back to
+the eager parser. Untyped/numeric cell values reuse a private scratch buffer;
+oversized capacity is not retained.
+
+The existing `xlsx_file_selected_cell` selector uses the fixed medium
+`litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1` corpus: four
+48×48 worksheets (9,216 numeric cells), 17 ZIP members, 4,226,429 archive
+bytes, and source SHA-256
+`dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036`. Each
+fresh child prepares mixed-case `bEnCh01` for canonical `Bench01` (position 1)
+and reads `M29`; the typed oracle is Number lexical `1028012`, with selected
+cell digest
+`36e53d9002ae8c433ad918b400196fb886fa675f850076808ac51327d1f42ac1`.
+`litchi::Workbook::open(path)` and query preparation are outside the timer;
+only case-insensitive sheet selection and the exact cell read are timed.
+
+Normal release-binary CPU-2 A1/B1/B2/A2 ABBA used one worker, 20 warmups, and
+500 retained warm samples per leg under Rust/Cargo/Rustdoc 1.98.1. Positive
+values mean the candidate is faster:
+
+| Pair | p50 | mean | p95 | p99 |
+| ---: | ---: | ---: | ---: | ---: |
+| A1→B1 | `+27.775881%` | `+27.728990%` | `+27.657228%` | `+28.150563%` |
+| A2→B2 | `+27.711459%` | `+27.691341%` | `+27.705070%` | `+27.835790%` |
+
+Same-implementation drift stayed within the harness ceilings (maximum
+`0.72%`). Separate warm allocator ABBA used three warmups and 30 samples per
+leg. Exact candidate-minus-control reductions were **16,771 allocation calls
+(-16.6063%)**, **14,436 deallocation calls (-14.6347%)**, **26 reallocations
+(-68.4211%)**, **3,218,512 allocated bytes (-23.1131%)**, and **2,706,847
+deallocated bytes (-20.1822%)**. Allocator elapsed time and global live/peak
+snapshots are not claim metrics.
+
+The remaining high-impact opportunities are the eager full-worksheet path,
+non-selected/all-cell queries, workbook-open/decompression work outside this
+timer, and additional value or metadata forms that remain correctly gated to
+fallback. Any extension of the streaming grammar needs the same eager-parser
+parity for errors, namespaces, unknown content, limits, and cancellation.
+This result is limited to the normal, non-allocator exact selected-cell query
+on the one fixed medium corpus. It makes no cold/cache, throughput,
+physical-I/O, RSS/peak-memory, broad XLSX/facade, or generalization claim. See
+the [0400 change record](changes/0400-xlsx-selected-dimension-streaming.md)
+and [evidence bundle](results/change-0400/).
+
 ## Change 0399 update
 
 0399 adds a descriptive, opt-in selected-cell baseline through the existing
@@ -2233,8 +2294,12 @@ Confirmed source facts:
   unknown-owner preservation/refusal checks pass. Parsed stores, staging,
   rewritten candidates, and sink buffers remain outside that accounting; no
   performance or total-memory claim is made.
-- One first cell access parses the entire selected worksheet. The non-evicting
-  `OnceLock` retains it for the snapshot lifetime.
+- In the eager path, and for source-backed inputs that are ineligible for
+  selected streaming or take the unsupported-structure fallback, one first
+  cell access parses the entire selected worksheet. The non-evicting `OnceLock`
+  retains it for the snapshot lifetime. Eligible source-backed scalar/range
+  queries use the streaming scanner; after Change 0400 this includes
+  worksheets with validated `dimension` metadata.
 - The sparse cell store is row-major and supports binary-search point lookup.
   A compact immutable row-start index now skips preceding rows for narrow
   ranges. The measured range query improves about 80%; full scan and first-cell

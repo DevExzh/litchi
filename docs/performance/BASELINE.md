@@ -1,5 +1,55 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0400: dimension-bearing XLSX selected-cell streaming and numeric scratch
+
+The cumulative candidate (`f159c0aed`) keeps valid SpreadsheetML
+`<dimension>` metadata on the selected-cell streaming path and reuses a
+private, bounded numeric-value scratch buffer. The dimension is validated but
+does not bound returned results. It is compared with control `2e47ccebf`; the
+measured effect is cumulative across dimension-bearing streaming and scratch
+reuse, not statically attributable to scratch alone.
+
+The fixed medium
+`litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1` corpus contains four
+worksheets × 48 × 48 = 9,216 numeric cells, 17 ZIP members, and 4,226,429
+archive bytes (source SHA-256
+`dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036`). Each
+fresh child prepares mixed-case `bEnCh01` for canonical `Bench01` (zero-based
+sheet position `1`) and reads `M29` (zero-based row 28, column 12); the typed
+oracle is Number lexical `1028012`, with selected-cell evidence digest
+`36e53d9002ae8c433ad918b400196fb886fa675f850076808ac51327d1f42ac1`.
+`litchi::Workbook::open(path)` and query preparation are outside the timer;
+only case-insensitive sheet selection and the exact cell read are timed, with
+both selected handles retained through the snapshots.
+
+Normal release-binary CPU-2 A1/B1/B2/A2 ABBA used one worker, 20 warmups, and
+500 retained warm samples per leg under Rust/Cargo/Rustdoc 1.98.1. Positive
+values below mean the candidate is faster; paired reductions are listed as
+`p50 / mean / p95 / p99`: A1→B1 `+27.775881% / +27.728990% / +27.657228% /
++28.150563%`, and A2→B2 `+27.711459% / +27.691341% / +27.705070% /
++27.835790%`. Same-implementation drift stayed within the harness ceilings
+(maximum `0.72%`).
+
+Separate warm allocator ABBA used three warmups and 30 samples per leg. The
+candidate-minus-control exact reductions were allocation calls `-16,771`
+(`-16.6063%`), deallocation calls `-14,436` (`-14.6347%`), reallocations
+`-26` (`-68.4211%`), allocated bytes `-3,218,512` (`-23.1131%`), and
+deallocated bytes `-2,706,847` (`-20.1822%`). Allocator elapsed time and the
+global live/peak snapshots are not claim metrics.
+
+Stable validation passed the focused selected-path tests (9/9),
+source/fallback tests (3/3), the complete `0400` filter (12/12), full
+`litchi-xlsx --lib` tests (918/918), unified-facade tests (4/4), the
+`cargo check -p litchi-xlsx` gate, and exact changed-file rustfmt.
+Warning-denied all-target
+Clippy remains non-clean at 26 control and 28 candidate diagnostics; the two
+candidate additions are test-only `result_large_err` findings in the 0400 test
+helpers. Preliminary zero-effect captures from before dimension support and
+contaminated captures were rejected and excluded. No cold/cache, RSS,
+peak-memory, physical-I/O, throughput, or broad XLSX claim follows. See the
+[0400 change record](changes/0400-xlsx-selected-dimension-streaming.md) and
+[evidence bundle](results/change-0400/).
+
 ## Change 0399: unified XLSX selected-cell filesystem baseline
 
 The opt-in `xlsx_file_selected_cell` selector raises the selectable registry

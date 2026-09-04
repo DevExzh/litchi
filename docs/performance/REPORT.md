@@ -1,5 +1,86 @@
 # Performance program phase report
 
+## Change 0400: dimension-bearing XLSX selected-cell streaming and numeric value scratch
+
+Change 0400 measures candidate `f159c0aed603672aacee8e5923586ce4aa8753f7`
+against control `2e47ccebf449ef88943c0abcecd32bd9141eb520`. The candidate
+recognizes valid worksheet `<dimension>` metadata without falling back from the
+selected streaming path and reuses a private, bounded numeric-value scratch
+buffer for untyped and numeric cells. The measured effect is cumulative:
+dimension-bearing streaming also avoids the control's eager Store/raw
+worksheet materialization, so the timing result is not attributed to the
+scratch-buffer change alone.
+
+The opt-in selector is `xlsx_file_selected_cell`. The fixed medium corpus has
+four 48×48 worksheets (9,216 cells), 17 ZIP members, 4,226,429 archive bytes,
+and archive SHA-256
+`dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036`. The
+prepared mixed-case query selects canonical `Bench01` at position 1 and reads
+`M29` (`Number`, lexical value `1028012`); the semantic SHA-256 is
+`020fdd140d2959ea4f480676a3d4d0bf840927e25251cb6cad37a043ab80627e`, and
+the selected-cell evidence digest is
+`36e53d9002ae8c433ad918b400196fb886fa675f850076808ac51327d1f42ac1`.
+
+The clean normal release run used stable Rust/Cargo/Rustdoc 1.98.1, CPU
+affinity 2, one execution worker, warm filesystem state, 20 warmups, and 500
+retained samples per fresh isolated child in `A1 control → B1 candidate → B2
+candidate → A2 control` order. Workbook open and query preparation were before
+the timer; the timed scope is only case-insensitive sheet selection and the
+exact selected-cell read. The four leg statistics (nanoseconds) are:
+
+| Leg | Implementation | p50 | mean | p95 | p99 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| A1 | control | 4,898,426 | 4,901,210.558 | 4,960,931 | 5,033,672 |
+| B1 | candidate | 3,537,845 | 3,542,154.382 | 3,588,875 | 3,616,665 |
+| B2 | candidate | 3,542,565 | 3,546,763.120 | 3,594,295 | 3,642,526 |
+| A2 | control | 4,900,590 | 4,905,032.362 | 4,971,711 | 5,047,552 |
+
+Positive values below mean that the candidate is faster. Every paired statistic
+passed the acceptance gates in both directions, with these exact reductions:
+
+| Statistic | A1 → B1 | A2 → B2 |
+| --- | ---: | ---: |
+| p50 | `+27.775881477029564%` | `+27.711459232459767%` |
+| mean | `+27.728989806032406%` | `+27.691341091298664%` |
+| p95 | `+27.657228048525567%` | `+27.705069743595313%` |
+| p99 | `+28.150562849546017%` | `+27.83579049804737%` |
+
+The harness recorded 95% two-sided Student's t intervals for each mean; the
+A1/B1 intervals were `[4,897,784, 4,904,637]` and
+`[3,539,985, 3,544,324]` ns, and the A2/B2 intervals were
+`[4,900,784, 4,909,281]` and `[3,544,339, 3,549,187]` ns, respectively.
+Same-implementation drift for p50/mean/p95/p99 was
+`0.13341455038307218% / 0.1301111556125909% / 0.15102225627808158% /
+0.715051020760839%` for the candidate and
+`0.04417745618694658% / 0.07797673564063048% / 0.21729792250688432% /
+0.2757430360977036%` for the control, all below the 5% / 5% / 10% / 15%
+ceilings. All 2,000 normal samples retained the exact selected-cell, semantic,
+and corpus identities; each sample also came from a fresh isolated child with
+process evidence captured.
+
+A separate warm allocator run used three warmups and 30 fresh-child samples
+per leg. Each implementation produced the same vector on both of its legs;
+the exact operation-scoped candidate-minus-control deltas were:
+
+| Metric | Control (A1=A2) | Candidate (B1=B2) | Candidate − control |
+| --- | ---: | ---: | ---: |
+| Allocation calls | 100,992 | 84,221 | −16,771 (−16.6063%) |
+| Deallocation calls | 98,642 | 84,206 | −14,436 (−14.6347%) |
+| Reallocation calls | 38 | 12 | −26 (−68.4211%) |
+| Failed allocation calls | 0 | 0 | 0 |
+| Allocated bytes | 13,925,077 | 10,706,565 | −3,218,512 (−23.1131%) |
+| Deallocated bytes | 13,412,029 | 10,705,182 | −2,706,847 (−20.1822%) |
+
+Raw global live-after snapshots changed from 533,387 to 21,726
+(−511,661), but global live/peak snapshots and allocator elapsed time are not
+claim metrics. `performance_claim: scoped`; `claim_authorized: true`, limited to
+this warm normal release selector, fixed corpus, and A/B protocol. No claim
+follows for allocator elapsed time, RSS, peak operation memory, physical I/O,
+cold-verified/cold-cache behavior, throughput, scaling, or broad XLSX
+behavior; filesystem XLSX logical-read counters are not applicable. See the
+[0400 change record](changes/0400-xlsx-selected-dimension-streaming.md) and
+[evidence bundle](results/change-0400/).
+
 ## Change 0399: unified XLSX selected-cell filesystem baseline
 
 0399 adds exactly one opt-in filesystem selector,

@@ -1,0 +1,1023 @@
+{
+  "schema_version": 1,
+  "change": "0400",
+  "scope": "Exact operation-scoped call/byte metrics plus absolute process live/high-water snapshots for allocator-enabled xlsx_file_selected_cell; per-sample vectors remain lossless in raw allocator reports.",
+  "timing_status": "observational_only",
+  "sample_count": 30,
+  "case": "xlsx_file_selected_cell",
+  "cache_state": "warm",
+  "corpus_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+  "metrics": [
+    "allocation_calls",
+    "deallocation_calls",
+    "reallocation_calls",
+    "failed_allocation_calls",
+    "allocated_bytes",
+    "deallocated_bytes",
+    "live_bytes_before",
+    "live_bytes_after",
+    "peak_live_bytes_before",
+    "peak_live_bytes_after"
+  ],
+  "vector_digest_algorithm": "sha256(compact-json UTF-8 array)",
+  "report_digest_algorithm": "sha256(raw report UTF-8 bytes)",
+  "sample_index_alignment": "operation_metrics.sample_indices == elapsed_ns.sample_order; pairwise matching uses elapsed-order rank because sample_index is report-local.",
+  "oracle_identity": {
+    "source_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+    "semantic_sha256": "020fdd140d2959ea4f480676a3d4d0bf840927e25251cb6cad37a043ab80627e",
+    "selected_cell": {
+      "canonical_sheet_name": "Bench01",
+      "sheet_position": 1,
+      "prepared_selector": "bEnCh01",
+      "cell_address": "M29",
+      "view": "stored",
+      "value_kind": "number",
+      "lexical_value": "1028012",
+      "digest": "36e53d9002ae8c433ad918b400196fb886fa675f850076808ac51327d1f42ac1"
+    }
+  },
+  "protocol": {
+    "abba_order": [
+      "A1_control",
+      "B1_candidate",
+      "B2_candidate",
+      "A2_control"
+    ],
+    "samples_per_leg": 30,
+    "warmup_iterations_per_leg": 3,
+    "cache_state": "warm",
+    "fresh_child_per_sample": true,
+    "process_isolated": true,
+    "cpu_affinity": "2",
+    "execution_workers": [
+      1
+    ],
+    "logical_cpus_available": 1,
+    "filesystem_type": "tmpfs",
+    "source_destination_same_device": true,
+    "pairwise_alignment": "same elapsed-order rank; sample_index is report-local"
+  },
+  "provenance": {
+    "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "profile": "release",
+    "control": {
+      "revision": "2e47ccebf449ef88943c0abcecd32bd9141eb520",
+      "allocator_binary": {
+        "sha256": "7aa3aab90fea509e5806f081cb2f1247b348d9ec1b376fad9f56899355b3112c",
+        "bytes": 54781064,
+        "profile": "release"
+      }
+    },
+    "candidate": {
+      "revision": "f159c0aed603672aacee8e5923586ce4aa8753f7",
+      "allocator_binary": {
+        "sha256": "f69200b54d294dcc83af235e2ce5d1e8b2848ea63b9ab783408bec1092310482",
+        "bytes": 54756712,
+        "profile": "release"
+      }
+    }
+  },
+  "per_leg": {
+    "A1": {
+      "raw_report_sha256": "5fe367dd08f32c8178b7b612b56f00241d7f6eb1c338088d61dc58de81d45f41",
+      "aligned_sample_indices": {
+        "sample_count": 30,
+        "vector_sha256": "75737bbfaba6efcc73ab9c61994e25fb65ba03936da9d61227558c467e4cdffc",
+        "permutation": true,
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index"
+      },
+      "allocation": {
+        "allocation_calls": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "a9df28a3e0ec40a53e8bc7aa3016d8f2d18e434fcac75ef0cbb62da1a81d5720",
+          "constant": true,
+          "unique_values": [
+            100992
+          ]
+        },
+        "deallocation_calls": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "47aa3eb7e98e8f14ef35857adc58e77f1d408039a6e0a5ade212bdeb65671a77",
+          "constant": true,
+          "unique_values": [
+            98642
+          ]
+        },
+        "reallocation_calls": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "3cf8241414a37c2e326ad7798a7cf54489af8ec1407eb3a14935de0332e06776",
+          "constant": true,
+          "unique_values": [
+            38
+          ]
+        },
+        "failed_allocation_calls": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+          "constant": true,
+          "unique_values": [
+            0
+          ]
+        },
+        "allocated_bytes": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "31e8cc02e5095bd453f336bc0a52c36b0404394578659b792fe4ddb439e0f5cd",
+          "constant": true,
+          "unique_values": [
+            13925077
+          ]
+        },
+        "deallocated_bytes": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "71ae6622f6433c2c8bcf80c4e1eeac72f3871de4682e5fc96ffc24c27a7274a9",
+          "constant": true,
+          "unique_values": [
+            13412029
+          ]
+        },
+        "live_bytes_before": {
+          "status": "measured",
+          "scope": "absolute_process_live_snapshot",
+          "sample_count": 30,
+          "vector_sha256": "86089ea157175132834d6ecc53b4c43087544f03ec8e1086eb269a51e503c9be",
+          "constant": true,
+          "unique_values": [
+            20339
+          ]
+        },
+        "live_bytes_after": {
+          "status": "measured",
+          "scope": "absolute_process_live_snapshot",
+          "sample_count": 30,
+          "vector_sha256": "aff91cc1738f31b4dda1423ca9daeaf6986e83d95513d9be9f58caca38f65180",
+          "constant": true,
+          "unique_values": [
+            533387
+          ]
+        },
+        "peak_live_bytes_before": {
+          "status": "measured",
+          "scope": "absolute_process_high_water_snapshot",
+          "sample_count": 30,
+          "vector_sha256": "15452dd682ee1f211873c8a2083e4db282f50eec30d9b486b1ed752d3c9448b5",
+          "constant": true,
+          "unique_values": [
+            139614
+          ]
+        },
+        "peak_live_bytes_after": {
+          "status": "measured",
+          "scope": "absolute_process_high_water_snapshot",
+          "sample_count": 30,
+          "vector_sha256": "04c80cf7d82c52870eea413a34bbba5eab7d7d6ed6568b83fe5767bee840b7f2",
+          "constant": true,
+          "unique_values": [
+            8494390
+          ]
+        }
+      }
+    },
+    "A2": {
+      "raw_report_sha256": "2b46c6b06b51e44af0dab34679c9f9d2f7ad547fe82cab963829223fee0ef189",
+      "aligned_sample_indices": {
+        "sample_count": 30,
+        "vector_sha256": "b04c2e2fda1be187bc55fdf336e2575ccdc179b82a4d1739e094ff364021fa5e",
+        "permutation": true,
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index"
+      },
+      "allocation": {
+        "allocation_calls": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "a9df28a3e0ec40a53e8bc7aa3016d8f2d18e434fcac75ef0cbb62da1a81d5720",
+          "constant": true,
+          "unique_values": [
+            100992
+          ]
+        },
+        "deallocation_calls": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "47aa3eb7e98e8f14ef35857adc58e77f1d408039a6e0a5ade212bdeb65671a77",
+          "constant": true,
+          "unique_values": [
+            98642
+          ]
+        },
+        "reallocation_calls": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "3cf8241414a37c2e326ad7798a7cf54489af8ec1407eb3a14935de0332e06776",
+          "constant": true,
+          "unique_values": [
+            38
+          ]
+        },
+        "failed_allocation_calls": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+          "constant": true,
+          "unique_values": [
+            0
+          ]
+        },
+        "allocated_bytes": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "31e8cc02e5095bd453f336bc0a52c36b0404394578659b792fe4ddb439e0f5cd",
+          "constant": true,
+          "unique_values": [
+            13925077
+          ]
+        },
+        "deallocated_bytes": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "71ae6622f6433c2c8bcf80c4e1eeac72f3871de4682e5fc96ffc24c27a7274a9",
+          "constant": true,
+          "unique_values": [
+            13412029
+          ]
+        },
+        "live_bytes_before": {
+          "status": "measured",
+          "scope": "absolute_process_live_snapshot",
+          "sample_count": 30,
+          "vector_sha256": "86089ea157175132834d6ecc53b4c43087544f03ec8e1086eb269a51e503c9be",
+          "constant": true,
+          "unique_values": [
+            20339
+          ]
+        },
+        "live_bytes_after": {
+          "status": "measured",
+          "scope": "absolute_process_live_snapshot",
+          "sample_count": 30,
+          "vector_sha256": "aff91cc1738f31b4dda1423ca9daeaf6986e83d95513d9be9f58caca38f65180",
+          "constant": true,
+          "unique_values": [
+            533387
+          ]
+        },
+        "peak_live_bytes_before": {
+          "status": "measured",
+          "scope": "absolute_process_high_water_snapshot",
+          "sample_count": 30,
+          "vector_sha256": "15452dd682ee1f211873c8a2083e4db282f50eec30d9b486b1ed752d3c9448b5",
+          "constant": true,
+          "unique_values": [
+            139614
+          ]
+        },
+        "peak_live_bytes_after": {
+          "status": "measured",
+          "scope": "absolute_process_high_water_snapshot",
+          "sample_count": 30,
+          "vector_sha256": "04c80cf7d82c52870eea413a34bbba5eab7d7d6ed6568b83fe5767bee840b7f2",
+          "constant": true,
+          "unique_values": [
+            8494390
+          ]
+        }
+      }
+    },
+    "B1": {
+      "raw_report_sha256": "a51918f7bc01844f5a60d922c73e758262344ef70c70e47b8c3ef7f6982fa720",
+      "aligned_sample_indices": {
+        "sample_count": 30,
+        "vector_sha256": "a623bfc8f50b1974cea5504842e06532dc50453f7a8c0a64bea1eb93aaade978",
+        "permutation": true,
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index"
+      },
+      "allocation": {
+        "allocation_calls": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "7928daf0c444e93ccb47e6dd108d9d49cd1f761c2edb79924599b8fdc4fb3dd4",
+          "constant": true,
+          "unique_values": [
+            84221
+          ]
+        },
+        "deallocation_calls": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "2d163cab0c691c23bcee088fea767dc6c84b962e2f31511351184b82cab8dfae",
+          "constant": true,
+          "unique_values": [
+            84206
+          ]
+        },
+        "reallocation_calls": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "7f21e0c584f0b1002c34e8b5ceceda106b64b960ba852ea9e544c5398649a164",
+          "constant": true,
+          "unique_values": [
+            12
+          ]
+        },
+        "failed_allocation_calls": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+          "constant": true,
+          "unique_values": [
+            0
+          ]
+        },
+        "allocated_bytes": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "4a7e3ced8f21275d82eaf00dd7ca84c7eea77689c158a08f322ef56574dd1e8c",
+          "constant": true,
+          "unique_values": [
+            10706565
+          ]
+        },
+        "deallocated_bytes": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "0a9ac23520b26f33da6b4fa7324d999110f9e799b55f4f55e6a860df19d52a33",
+          "constant": true,
+          "unique_values": [
+            10705182
+          ]
+        },
+        "live_bytes_before": {
+          "status": "measured",
+          "scope": "absolute_process_live_snapshot",
+          "sample_count": 30,
+          "vector_sha256": "2e1190835222148e6674573f2574c29f5db2ff7b2bb816036196f8755e39188b",
+          "constant": true,
+          "unique_values": [
+            20343
+          ]
+        },
+        "live_bytes_after": {
+          "status": "measured",
+          "scope": "absolute_process_live_snapshot",
+          "sample_count": 30,
+          "vector_sha256": "5e6501f23b9615cd711dc16c6a77d2f8e3dde6e0e15f81e9fcd854d368783ddc",
+          "constant": true,
+          "unique_values": [
+            21726
+          ]
+        },
+        "peak_live_bytes_before": {
+          "status": "measured",
+          "scope": "absolute_process_high_water_snapshot",
+          "sample_count": 30,
+          "vector_sha256": "201da64599b16d03c2faf41bbc651bd3043a7cc50d28f7a733195589090112ca",
+          "constant": true,
+          "unique_values": [
+            139618
+          ]
+        },
+        "peak_live_bytes_after": {
+          "status": "measured",
+          "scope": "absolute_process_high_water_snapshot",
+          "sample_count": 30,
+          "vector_sha256": "10b2227b6a711af4389a8d9d39052f6a270ecc990e87e94a71ae4c11fb9a429e",
+          "constant": true,
+          "unique_values": [
+            8494761
+          ]
+        }
+      }
+    },
+    "B2": {
+      "raw_report_sha256": "b33054fe59a20814039dfb3c8669544de777a561e3bde158a813285ba5670f60",
+      "aligned_sample_indices": {
+        "sample_count": 30,
+        "vector_sha256": "d5be0f1d990e0d57199d877edab84752ad20326a337296a5846e6599a4fec0b5",
+        "permutation": true,
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index"
+      },
+      "allocation": {
+        "allocation_calls": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "7928daf0c444e93ccb47e6dd108d9d49cd1f761c2edb79924599b8fdc4fb3dd4",
+          "constant": true,
+          "unique_values": [
+            84221
+          ]
+        },
+        "deallocation_calls": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "2d163cab0c691c23bcee088fea767dc6c84b962e2f31511351184b82cab8dfae",
+          "constant": true,
+          "unique_values": [
+            84206
+          ]
+        },
+        "reallocation_calls": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "7f21e0c584f0b1002c34e8b5ceceda106b64b960ba852ea9e544c5398649a164",
+          "constant": true,
+          "unique_values": [
+            12
+          ]
+        },
+        "failed_allocation_calls": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+          "constant": true,
+          "unique_values": [
+            0
+          ]
+        },
+        "allocated_bytes": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "4a7e3ced8f21275d82eaf00dd7ca84c7eea77689c158a08f322ef56574dd1e8c",
+          "constant": true,
+          "unique_values": [
+            10706565
+          ]
+        },
+        "deallocated_bytes": {
+          "status": "measured",
+          "scope": "operation_global_system_allocator",
+          "sample_count": 30,
+          "vector_sha256": "0a9ac23520b26f33da6b4fa7324d999110f9e799b55f4f55e6a860df19d52a33",
+          "constant": true,
+          "unique_values": [
+            10705182
+          ]
+        },
+        "live_bytes_before": {
+          "status": "measured",
+          "scope": "absolute_process_live_snapshot",
+          "sample_count": 30,
+          "vector_sha256": "2e1190835222148e6674573f2574c29f5db2ff7b2bb816036196f8755e39188b",
+          "constant": true,
+          "unique_values": [
+            20343
+          ]
+        },
+        "live_bytes_after": {
+          "status": "measured",
+          "scope": "absolute_process_live_snapshot",
+          "sample_count": 30,
+          "vector_sha256": "5e6501f23b9615cd711dc16c6a77d2f8e3dde6e0e15f81e9fcd854d368783ddc",
+          "constant": true,
+          "unique_values": [
+            21726
+          ]
+        },
+        "peak_live_bytes_before": {
+          "status": "measured",
+          "scope": "absolute_process_high_water_snapshot",
+          "sample_count": 30,
+          "vector_sha256": "201da64599b16d03c2faf41bbc651bd3043a7cc50d28f7a733195589090112ca",
+          "constant": true,
+          "unique_values": [
+            139618
+          ]
+        },
+        "peak_live_bytes_after": {
+          "status": "measured",
+          "scope": "absolute_process_high_water_snapshot",
+          "sample_count": 30,
+          "vector_sha256": "10b2227b6a711af4389a8d9d39052f6a270ecc990e87e94a71ae4c11fb9a429e",
+          "constant": true,
+          "unique_values": [
+            8494761
+          ]
+        }
+      }
+    }
+  },
+  "matched_deltas": {
+    "A1_to_B1": {
+      "pairwise_sample_count": 30,
+      "pairwise_alignment": "same elapsed-order rank; sample_index is report-local",
+      "percentage_formula": "100 * (candidate - control) / control; reduction_percentage = -percentage_change",
+      "metrics": {
+        "allocation_calls": {
+          "control_unique_values": [
+            100992
+          ],
+          "candidate_unique_values": [
+            84221
+          ],
+          "candidate_minus_control_unique": [
+            -16771
+          ],
+          "delta_vector_sha256": "357da9ae6a64b1fabf0c7985f095632f5bb1cc6e35ae9c2e49bfe706d22308da",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 100992,
+          "candidate_value": 84221,
+          "delta": -16771,
+          "percentage_change": -16.606265842839,
+          "reduction_percentage": 16.606265842839,
+          "percentage_status": "defined"
+        },
+        "deallocation_calls": {
+          "control_unique_values": [
+            98642
+          ],
+          "candidate_unique_values": [
+            84206
+          ],
+          "candidate_minus_control_unique": [
+            -14436
+          ],
+          "delta_vector_sha256": "e742a5497ea4454e3f5a631da70f1327c7e69b2ac41e556c31f07eee46fd26d5",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 98642,
+          "candidate_value": 84206,
+          "delta": -14436,
+          "percentage_change": -14.634739766023,
+          "reduction_percentage": 14.634739766023,
+          "percentage_status": "defined"
+        },
+        "reallocation_calls": {
+          "control_unique_values": [
+            38
+          ],
+          "candidate_unique_values": [
+            12
+          ],
+          "candidate_minus_control_unique": [
+            -26
+          ],
+          "delta_vector_sha256": "cab66174a453317fa4ee8504b7217c06dff8e292e264a88bb93264d7b640a7be",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 38,
+          "candidate_value": 12,
+          "delta": -26,
+          "percentage_change": -68.421052631579,
+          "reduction_percentage": 68.421052631579,
+          "percentage_status": "defined"
+        },
+        "failed_allocation_calls": {
+          "control_unique_values": [
+            0
+          ],
+          "candidate_unique_values": [
+            0
+          ],
+          "candidate_minus_control_unique": [
+            0
+          ],
+          "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 0,
+          "candidate_value": 0,
+          "delta": 0,
+          "percentage_change": null,
+          "reduction_percentage": null,
+          "percentage_status": "undefined_zero_control"
+        },
+        "allocated_bytes": {
+          "control_unique_values": [
+            13925077
+          ],
+          "candidate_unique_values": [
+            10706565
+          ],
+          "candidate_minus_control_unique": [
+            -3218512
+          ],
+          "delta_vector_sha256": "70e347b2a34a8a3d4811d1729b61c8a2fcb060ff8b8d342e46c109804a9990d0",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 13925077,
+          "candidate_value": 10706565,
+          "delta": -3218512,
+          "percentage_change": -23.113064294007,
+          "reduction_percentage": 23.113064294007,
+          "percentage_status": "defined"
+        },
+        "deallocated_bytes": {
+          "control_unique_values": [
+            13412029
+          ],
+          "candidate_unique_values": [
+            10705182
+          ],
+          "candidate_minus_control_unique": [
+            -2706847
+          ],
+          "delta_vector_sha256": "c94217bc7d0a99eed496e8cf2b2e565a60898f2aaa8fc6d6f405bda4063408e9",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 13412029,
+          "candidate_value": 10705182,
+          "delta": -2706847,
+          "percentage_change": -20.182233426426,
+          "reduction_percentage": 20.182233426426,
+          "percentage_status": "defined"
+        },
+        "live_bytes_before": {
+          "control_unique_values": [
+            20339
+          ],
+          "candidate_unique_values": [
+            20343
+          ],
+          "candidate_minus_control_unique": [
+            4
+          ],
+          "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 20339,
+          "candidate_value": 20343,
+          "delta": 4,
+          "percentage_change": 0.019666650278,
+          "reduction_percentage": -0.019666650278,
+          "percentage_status": "defined"
+        },
+        "live_bytes_after": {
+          "control_unique_values": [
+            533387
+          ],
+          "candidate_unique_values": [
+            21726
+          ],
+          "candidate_minus_control_unique": [
+            -511661
+          ],
+          "delta_vector_sha256": "cbf1b5a014f167c62920fb5e640fda9a36ccdab13b14f888322f2342c9a1a3db",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 533387,
+          "candidate_value": 21726,
+          "delta": -511661,
+          "percentage_change": -95.926784867273,
+          "reduction_percentage": 95.926784867273,
+          "percentage_status": "defined"
+        },
+        "peak_live_bytes_before": {
+          "control_unique_values": [
+            139614
+          ],
+          "candidate_unique_values": [
+            139618
+          ],
+          "candidate_minus_control_unique": [
+            4
+          ],
+          "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 139614,
+          "candidate_value": 139618,
+          "delta": 4,
+          "percentage_change": 0.002865042188,
+          "reduction_percentage": -0.002865042188,
+          "percentage_status": "defined"
+        },
+        "peak_live_bytes_after": {
+          "control_unique_values": [
+            8494390
+          ],
+          "candidate_unique_values": [
+            8494761
+          ],
+          "candidate_minus_control_unique": [
+            371
+          ],
+          "delta_vector_sha256": "417bdc5db77067713a483b835664783df4fe75661f6e48386c39efad678956b8",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 8494390,
+          "candidate_value": 8494761,
+          "delta": 371,
+          "percentage_change": 0.004367588491,
+          "reduction_percentage": -0.004367588491,
+          "percentage_status": "defined"
+        }
+      }
+    },
+    "A2_to_B2": {
+      "pairwise_sample_count": 30,
+      "pairwise_alignment": "same elapsed-order rank; sample_index is report-local",
+      "percentage_formula": "100 * (candidate - control) / control; reduction_percentage = -percentage_change",
+      "metrics": {
+        "allocation_calls": {
+          "control_unique_values": [
+            100992
+          ],
+          "candidate_unique_values": [
+            84221
+          ],
+          "candidate_minus_control_unique": [
+            -16771
+          ],
+          "delta_vector_sha256": "357da9ae6a64b1fabf0c7985f095632f5bb1cc6e35ae9c2e49bfe706d22308da",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 100992,
+          "candidate_value": 84221,
+          "delta": -16771,
+          "percentage_change": -16.606265842839,
+          "reduction_percentage": 16.606265842839,
+          "percentage_status": "defined"
+        },
+        "deallocation_calls": {
+          "control_unique_values": [
+            98642
+          ],
+          "candidate_unique_values": [
+            84206
+          ],
+          "candidate_minus_control_unique": [
+            -14436
+          ],
+          "delta_vector_sha256": "e742a5497ea4454e3f5a631da70f1327c7e69b2ac41e556c31f07eee46fd26d5",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 98642,
+          "candidate_value": 84206,
+          "delta": -14436,
+          "percentage_change": -14.634739766023,
+          "reduction_percentage": 14.634739766023,
+          "percentage_status": "defined"
+        },
+        "reallocation_calls": {
+          "control_unique_values": [
+            38
+          ],
+          "candidate_unique_values": [
+            12
+          ],
+          "candidate_minus_control_unique": [
+            -26
+          ],
+          "delta_vector_sha256": "cab66174a453317fa4ee8504b7217c06dff8e292e264a88bb93264d7b640a7be",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 38,
+          "candidate_value": 12,
+          "delta": -26,
+          "percentage_change": -68.421052631579,
+          "reduction_percentage": 68.421052631579,
+          "percentage_status": "defined"
+        },
+        "failed_allocation_calls": {
+          "control_unique_values": [
+            0
+          ],
+          "candidate_unique_values": [
+            0
+          ],
+          "candidate_minus_control_unique": [
+            0
+          ],
+          "delta_vector_sha256": "aad6018fa2dc2d1955827beaf8b80fcc8193ed2617d1ca733f4eccca40957f15",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 0,
+          "candidate_value": 0,
+          "delta": 0,
+          "percentage_change": null,
+          "reduction_percentage": null,
+          "percentage_status": "undefined_zero_control"
+        },
+        "allocated_bytes": {
+          "control_unique_values": [
+            13925077
+          ],
+          "candidate_unique_values": [
+            10706565
+          ],
+          "candidate_minus_control_unique": [
+            -3218512
+          ],
+          "delta_vector_sha256": "70e347b2a34a8a3d4811d1729b61c8a2fcb060ff8b8d342e46c109804a9990d0",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 13925077,
+          "candidate_value": 10706565,
+          "delta": -3218512,
+          "percentage_change": -23.113064294007,
+          "reduction_percentage": 23.113064294007,
+          "percentage_status": "defined"
+        },
+        "deallocated_bytes": {
+          "control_unique_values": [
+            13412029
+          ],
+          "candidate_unique_values": [
+            10705182
+          ],
+          "candidate_minus_control_unique": [
+            -2706847
+          ],
+          "delta_vector_sha256": "c94217bc7d0a99eed496e8cf2b2e565a60898f2aaa8fc6d6f405bda4063408e9",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 13412029,
+          "candidate_value": 10705182,
+          "delta": -2706847,
+          "percentage_change": -20.182233426426,
+          "reduction_percentage": 20.182233426426,
+          "percentage_status": "defined"
+        },
+        "live_bytes_before": {
+          "control_unique_values": [
+            20339
+          ],
+          "candidate_unique_values": [
+            20343
+          ],
+          "candidate_minus_control_unique": [
+            4
+          ],
+          "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 20339,
+          "candidate_value": 20343,
+          "delta": 4,
+          "percentage_change": 0.019666650278,
+          "reduction_percentage": -0.019666650278,
+          "percentage_status": "defined"
+        },
+        "live_bytes_after": {
+          "control_unique_values": [
+            533387
+          ],
+          "candidate_unique_values": [
+            21726
+          ],
+          "candidate_minus_control_unique": [
+            -511661
+          ],
+          "delta_vector_sha256": "cbf1b5a014f167c62920fb5e640fda9a36ccdab13b14f888322f2342c9a1a3db",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 533387,
+          "candidate_value": 21726,
+          "delta": -511661,
+          "percentage_change": -95.926784867273,
+          "reduction_percentage": 95.926784867273,
+          "percentage_status": "defined"
+        },
+        "peak_live_bytes_before": {
+          "control_unique_values": [
+            139614
+          ],
+          "candidate_unique_values": [
+            139618
+          ],
+          "candidate_minus_control_unique": [
+            4
+          ],
+          "delta_vector_sha256": "807a806a4375a6130205ffb0e90f3192e883421a8168a223d32a76e7d019113d",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 139614,
+          "candidate_value": 139618,
+          "delta": 4,
+          "percentage_change": 0.002865042188,
+          "reduction_percentage": -0.002865042188,
+          "percentage_status": "defined"
+        },
+        "peak_live_bytes_after": {
+          "control_unique_values": [
+            8494390
+          ],
+          "candidate_unique_values": [
+            8494761
+          ],
+          "candidate_minus_control_unique": [
+            371
+          ],
+          "delta_vector_sha256": "417bdc5db77067713a483b835664783df4fe75661f6e48386c39efad678956b8",
+          "pairwise_sample_count": 30,
+          "pairwise_delta_constant": true,
+          "control_value": 8494390,
+          "candidate_value": 8494761,
+          "delta": 371,
+          "percentage_change": 0.004367588491,
+          "reduction_percentage": -0.004367588491,
+          "percentage_status": "defined"
+        }
+      }
+    }
+  },
+  "validation": {
+    "raw_report_count": 4,
+    "samples_per_leg": 30,
+    "total_sample_count": 120,
+    "unique_child_process_count": 120,
+    "fresh_child_process_ids_unique": true,
+    "raw_to_aggregate_alignment_verified": true,
+    "sample_index_permutation_verified": true,
+    "allocator_vector_count": 40,
+    "allocator_vector_status_scope_verified": true,
+    "a1_equals_a2_allocation_vectors": true,
+    "b1_equals_b2_allocation_vectors": true,
+    "same_implementation_leg_equality_verified": true,
+    "corpus_identity_verified": true,
+    "selected_cell_oracle_identity_verified": true,
+    "allocator_elapsed_summary_present": false,
+    "allocator_elapsed_summary_claimable": false
+  },
+  "claimability": {
+    "allocation_calls": {
+      "status": "scoped_observation",
+      "claimable": true,
+      "scope": "matched candidate-minus-control operation-global system-allocator observation for the fixed warm filesystem selector and corpus"
+    },
+    "deallocation_calls": {
+      "status": "scoped_observation",
+      "claimable": true,
+      "scope": "matched candidate-minus-control operation-global system-allocator observation for the fixed warm filesystem selector and corpus"
+    },
+    "reallocation_calls": {
+      "status": "scoped_observation",
+      "claimable": true,
+      "scope": "matched candidate-minus-control operation-global system-allocator observation for the fixed warm filesystem selector and corpus"
+    },
+    "failed_allocation_calls": {
+      "status": "scoped_observation",
+      "claimable": true,
+      "scope": "matched candidate-minus-control operation-global system-allocator observation for the fixed warm filesystem selector and corpus"
+    },
+    "allocated_bytes": {
+      "status": "scoped_observation",
+      "claimable": true,
+      "scope": "matched candidate-minus-control operation-global system-allocator observation for the fixed warm filesystem selector and corpus"
+    },
+    "deallocated_bytes": {
+      "status": "scoped_observation",
+      "claimable": true,
+      "scope": "matched candidate-minus-control operation-global system-allocator observation for the fixed warm filesystem selector and corpus"
+    },
+    "allocator_elapsed_ns": {
+      "status": "non_claimable",
+      "claimable": false,
+      "scope": "allocator-instrumented elapsed_ns",
+      "reason": "allocator instrumentation is observational and is not an authorized elapsed-time acceptance metric"
+    },
+    "live_bytes_before": {
+      "status": "non_claimable",
+      "claimable": false,
+      "scope": "absolute_process_live_snapshot",
+      "reason": "cross-process global baseline or high-water snapshot is not an operation memory claim"
+    },
+    "live_bytes_after": {
+      "status": "non_claimable",
+      "claimable": false,
+      "scope": "absolute_process_live_snapshot",
+      "reason": "cross-process global baseline or high-water snapshot is not an operation memory claim"
+    },
+    "peak_live_bytes_before": {
+      "status": "non_claimable",
+      "claimable": false,
+      "scope": "absolute_process_high_water_snapshot",
+      "reason": "cross-process global baseline or high-water snapshot is not an operation memory claim"
+    },
+    "peak_live_bytes_after": {
+      "status": "non_claimable",
+      "claimable": false,
+      "scope": "absolute_process_high_water_snapshot",
+      "reason": "cross-process global baseline or high-water snapshot is not an operation memory claim"
+    }
+  }
+}
