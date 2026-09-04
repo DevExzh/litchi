@@ -8955,9 +8955,10 @@ mod tests {
 
     #[test]
     fn directories_consume_metadata_but_not_payload_or_file_budgets() {
+        let directory_extra = zip64_sizes(0, 0);
         let bytes = fixture(&[FixtureEntry {
             name: b"folder/",
-            extra: b"",
+            extra: &directory_extra,
             comment: b"",
             compressed_size: u32::MAX,
             uncompressed_size: u32::MAX,
@@ -8966,7 +8967,7 @@ mod tests {
         let limits = ArchiveLimits {
             max_files: 0,
             max_member_name_bytes: 7,
-            max_metadata_bytes: 7 + CENTRAL_FIXED_RECORD_BYTES,
+            max_metadata_bytes: 7 + CENTRAL_FIXED_RECORD_BYTES + directory_extra.len() as u64,
             max_compressed_size: 0,
             max_entry_size: 0,
             max_total_size: 0,
@@ -9017,6 +9018,7 @@ mod tests {
 
     #[test]
     fn metadata_lookup_uses_only_the_central_directory_index() {
+        let directory_extra = zip64_sizes(u64::from(u32::MAX), u64::from(u32::MAX));
         let bytes = fixture(&[
             FixtureEntry {
                 name: b"body.xml",
@@ -9028,7 +9030,7 @@ mod tests {
             },
             FixtureEntry {
                 name: b"assets/",
-                extra: b"",
+                extra: &directory_extra,
                 comment: b"",
                 compressed_size: u32::MAX,
                 uncompressed_size: u32::MAX,
@@ -10262,16 +10264,8 @@ mod tests {
         let unresolved_central = central_header_offset_for_name(&unresolved, b"unresolved.bin");
         unresolved[unresolved_central + 42..unresolved_central + 46]
             .copy_from_slice(&u32::MAX.to_le_bytes());
-        let indexed = indexed_archive(unresolved);
-        let entry_id = indexed.entry_id("unresolved.bin").unwrap();
-        let mut accounting = ZipOperationAccounting::default();
-        let mut sink = vec![0xA5];
-        let error = indexed
-            .read_entry_to_with_accounting(entry_id, &mut sink, &mut accounting)
-            .unwrap_err();
+        let error = indexed_archive_result(unresolved, ArchiveLimits::UNBOUNDED).unwrap_err();
         assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
-        assert_eq!(sink, vec![0xA5]);
-        assert_eq!(accounting, ZipOperationAccounting::default());
 
         let mut writer = StreamingArchiveWriter::new();
         writer.write_stored("first.bin", b"first payload").unwrap();

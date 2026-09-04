@@ -13,6 +13,7 @@ use crate::time::{ZipDateTimeKind, extract_best_timestamp};
 use crate::utils::{le_u16, le_u32, le_u64};
 use crate::{EndOfCentralDirectory, EndOfCentralDirectoryRecordFixed, ZipLocator};
 use std::io::{Read, Seek, Write};
+use std::ops::Range;
 
 pub(crate) const END_OF_CENTRAL_DIR_SIGNATURE64: u32 = 0x06064b50;
 pub(crate) const END_OF_CENTRAL_DIR_LOCATOR_SIGNATURE: u32 = 0x07064b50;
@@ -100,6 +101,15 @@ impl<T: AsRef<[u8]>> ZipSliceArchive<T> {
     #[inline]
     pub fn is_zip64(&self) -> bool {
         self.eocd.is_zip64()
+    }
+
+    /// Returns the first EOCD offset that bounds the central directory.
+    ///
+    /// For ZIP32 this is the terminal EOCD offset.  For ZIP64 it is the
+    /// ZIP64 EOCD offset, which keeps the central directory separate from the
+    /// ZIP64 record, locator, and terminal EOCD tail.
+    pub fn head_eocd_offset(&self) -> u64 {
+        self.eocd.head_eocd_offset()
     }
 
     /// Returns the offset of the End of Central Directory (EOCD) signature.
@@ -867,6 +877,16 @@ fn local_header_sizes(
         })
     })?;
 
+    let required_len = usize::from(u8::from(needs_uncompressed))
+        .checked_add(usize::from(u8::from(needs_compressed)))
+        .and_then(|count| count.checked_mul(8))
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    if zip64_data.len() != required_len {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "stored local ZIP64 size extra field has unexpected length".to_string(),
+        }));
+    }
+
     let mut pos = 0usize;
     let mut uncompressed_size = u64::from(file_header.uncompressed_size);
     let mut compressed_size = u64::from(file_header.compressed_size);
@@ -1078,7 +1098,7 @@ impl<'data> ZipSliceEntries<'data> {
             extra_field,
             file_comment,
             self.current_offset,
-        );
+        )?;
         entry.local_header_offset = entry
             .local_header_offset
             .checked_add(self.base_offset)
@@ -1268,6 +1288,15 @@ impl<R> ZipArchive<R> {
     #[inline]
     pub fn is_zip64(&self) -> bool {
         self.eocd.is_zip64()
+    }
+
+    /// Returns the first EOCD offset that bounds the central directory.
+    ///
+    /// For ZIP32 this is the terminal EOCD offset.  For ZIP64 it is the
+    /// ZIP64 EOCD offset, which keeps the central directory separate from the
+    /// ZIP64 record, locator, and terminal EOCD tail.
+    pub fn head_eocd_offset(&self) -> u64 {
+        self.eocd.head_eocd_offset()
     }
 
     /// Returns a Read implementation for the comment of the zip archive.
@@ -2094,7 +2123,7 @@ where
                 extra_field,
                 file_comment,
                 central_directory_offset,
-            );
+            )?;
             file_header.local_header_offset = file_header
                 .local_header_offset
                 .checked_add(self.base_offset)
@@ -2135,7 +2164,7 @@ where
             extra_field,
             file_comment,
             central_directory_offset,
-        );
+        )?;
         file_header.local_header_offset = file_header
             .local_header_offset
             .checked_add(self.base_offset)
@@ -2457,6 +2486,154 @@ pub struct ZipFileHeaderRecord<'a> {
     zip64_compressed_size_resolved: bool,
     zip64_local_header_offset_resolved: bool,
     zip64_disk_start_resolved: bool,
+    /// Absolute source range of the ZIP64 local-header-offset value in the
+    /// central record, when the record used that value instead of its ZIP32
+    /// sentinel.  Keeping this span lets a preservation writer patch the
+    /// existing value in place without rediscovering the ZIP64 field.
+    zip64_local_header_offset_range: Option<Range<u64>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Zip64ExtraValues {
+    uncompressed_size: Option<u64>,
+    compressed_size: Option<u64>,
+    local_header_offset: Option<u64>,
+    disk_number_start: Option<u32>,
+    local_header_offset_range: Option<(usize, usize)>,
+}
+
+/// Resolve the ZIP64 extra field only when a central-directory fixed field
+/// carries its ZIP64 sentinel.  Generic extra fields intentionally retain the
+/// historical permissive iterator behavior; this parser is the strict path
+/// for metadata that controls archive layout or entry navigation.
+fn parse_zip64_extra_values(
+    header: &ZipFileHeaderFixed,
+    extra_field: &[u8],
+) -> Result<Option<Zip64ExtraValues>, Error> {
+    let needs_uncompressed = header.uncompressed_size == u32::MAX;
+    let needs_compressed = header.compressed_size == u32::MAX;
+    let needs_local_header_offset = header.local_header_offset == u32::MAX;
+    let needs_disk_number_start = header.disk_number_start == u16::MAX;
+
+    if !needs_uncompressed
+        && !needs_compressed
+        && !needs_local_header_offset
+        && !needs_disk_number_start
+    {
+        return Ok(None);
+    }
+
+    let mut zip64_data = None;
+    let mut fields = ExtraFields::new(extra_field);
+    for (field_id, field_data) in fields.by_ref() {
+        if field_id != ExtraFieldId::ZIP64 {
+            continue;
+        }
+        if zip64_data.replace(field_data).is_some() {
+            return Err(Error::from(ErrorKind::InvalidInput {
+                msg: "central header contains duplicate ZIP64 extra fields".to_string(),
+            }));
+        }
+    }
+    if !fields.remaining_bytes().is_empty() {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "central header contains malformed extra fields".to_string(),
+        }));
+    }
+    let zip64_data = zip64_data.ok_or_else(|| {
+        Error::from(ErrorKind::InvalidInput {
+            msg: "central header is missing its required ZIP64 extra field".to_string(),
+        })
+    })?;
+
+    let required_len = usize::from(u8::from(needs_uncompressed))
+        .checked_add(usize::from(u8::from(needs_compressed)))
+        .and_then(|count| count.checked_mul(8))
+        .and_then(|size| {
+            size.checked_add(usize::from(u8::from(needs_local_header_offset)).checked_mul(8)?)
+        })
+        .and_then(|size| {
+            size.checked_add(usize::from(u8::from(needs_disk_number_start)).checked_mul(4)?)
+        })
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    if zip64_data.len() < required_len {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "central header ZIP64 extra field is truncated".to_string(),
+        }));
+    }
+    if zip64_data.len() != required_len {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "central header ZIP64 extra field has unexpected trailing data".to_string(),
+        }));
+    }
+
+    let mut pos = 0usize;
+
+    let uncompressed_size = needs_uncompressed
+        .then(|| {
+            take_zip64_u64(
+                zip64_data,
+                &mut pos,
+                "central header ZIP64 uncompressed size is truncated",
+            )
+        })
+        .transpose()?;
+    let compressed_size = needs_compressed
+        .then(|| {
+            take_zip64_u64(
+                zip64_data,
+                &mut pos,
+                "central header ZIP64 compressed size is truncated",
+            )
+        })
+        .transpose()?;
+    let local_header_offset_start = needs_local_header_offset.then_some(pos);
+    let local_header_offset = needs_local_header_offset
+        .then(|| {
+            take_zip64_u64(
+                zip64_data,
+                &mut pos,
+                "central header ZIP64 local-header offset is truncated",
+            )
+        })
+        .transpose()?;
+    let local_header_offset_range = local_header_offset_start.map(|start| (start, pos));
+    let disk_number_start = if needs_disk_number_start {
+        let end = pos
+            .checked_add(4)
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+        let value = zip64_data.get(pos..end).map(le_u32).ok_or_else(|| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: "central header ZIP64 disk-start value is truncated".to_string(),
+            })
+        })?;
+        pos = end;
+        Some(value)
+    } else {
+        None
+    };
+
+    debug_assert_eq!(pos, required_len);
+    Ok(Some(Zip64ExtraValues {
+        uncompressed_size,
+        compressed_size,
+        local_header_offset,
+        disk_number_start,
+        local_header_offset_range,
+    }))
+}
+
+fn take_zip64_u64(data: &[u8], pos: &mut usize, message: &'static str) -> Result<u64, Error> {
+    let end = pos
+        .checked_add(8)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    let value = data.get(*pos..end).map(le_u64).ok_or_else(|| {
+        Error::from(ErrorKind::InvalidInput {
+            msg: message.to_string(),
+        })
+    })?;
+    *pos = end;
+    Ok(value)
 }
 
 impl<'a> ZipFileHeaderRecord<'a> {
@@ -2467,7 +2644,7 @@ impl<'a> ZipFileHeaderRecord<'a> {
         extra_field: &'a [u8],
         file_comment: &'a [u8],
         central_directory_offset: u64,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         let mut result = Self {
             signature: header.signature,
             version_made_by: header.version_made_by,
@@ -2496,65 +2673,46 @@ impl<'a> ZipFileHeaderRecord<'a> {
             zip64_compressed_size_resolved: header.compressed_size != u32::MAX,
             zip64_local_header_offset_resolved: header.local_header_offset != u32::MAX,
             zip64_disk_start_resolved: header.disk_number_start != u16::MAX,
+            zip64_local_header_offset_range: None,
         };
 
-        if result.uncompressed_size != u64::from(u32::MAX)
-            && result.compressed_size != u64::from(u32::MAX)
-            && result.local_header_offset != u64::from(u32::MAX)
-            && result.disk_number_start != u32::from(u16::MAX)
-        {
-            return result;
-        }
-
-        let extra_fields = ExtraFields::new(extra_field);
-        for (field_id, field_data) in extra_fields {
-            if field_id != ExtraFieldId::ZIP64 {
-                continue;
-            }
-
-            let mut field = field_data;
-
+        if let Some(values) = parse_zip64_extra_values(&header, extra_field)? {
             result.is_zip64 = true;
-
-            if header.uncompressed_size == u32::MAX {
-                let Some(uncompressed_size) = field.get(..8).map(le_u64) else {
-                    break;
-                };
-                result.uncompressed_size = uncompressed_size;
+            if let Some(value) = values.uncompressed_size {
+                result.uncompressed_size = value;
                 result.zip64_uncompressed_size_resolved = true;
-                field = &field[8..];
             }
-
-            if header.compressed_size == u32::MAX {
-                let Some(compressed_size) = field.get(..8).map(le_u64) else {
-                    break;
-                };
-                result.compressed_size = compressed_size;
+            if let Some(value) = values.compressed_size {
+                result.compressed_size = value;
                 result.zip64_compressed_size_resolved = true;
-                field = &field[8..];
             }
-
-            if header.local_header_offset == u32::MAX {
-                let Some(local_header_offset) = field.get(..8).map(le_u64) else {
-                    break;
-                };
-                result.local_header_offset = local_header_offset;
+            if let Some(value) = values.local_header_offset {
+                result.local_header_offset = value;
                 result.zip64_local_header_offset_resolved = true;
-                field = &field[8..];
             }
-
-            if header.disk_number_start == u16::MAX {
-                let Some(disk_number_start) = field.get(..4).map(le_u32) else {
-                    break;
-                };
-                result.disk_number_start = disk_number_start;
+            if let Some(value) = values.disk_number_start {
+                result.disk_number_start = value;
                 result.zip64_disk_start_resolved = true;
             }
-
-            break;
+            if let Some((start, end)) = values.local_header_offset_range {
+                let width = end
+                    .checked_sub(start)
+                    .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+                let start = u64::try_from(start)
+                    .map_err(|_| Error::from(ErrorKind::Eof))?
+                    .checked_add(ZipFileHeaderFixed::SIZE as u64)
+                    .and_then(|offset| offset.checked_add(4))
+                    .and_then(|offset| central_directory_offset.checked_add(offset))
+                    .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+                let width = u64::try_from(width).map_err(|_| Error::from(ErrorKind::Eof))?;
+                let end = start
+                    .checked_add(width)
+                    .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+                result.zip64_local_header_offset_range = Some(start..end);
+            }
         }
 
-        result
+        Ok(result)
     }
 
     /// Describes if the file is a directory.
@@ -2742,6 +2900,19 @@ impl<'a> ZipFileHeaderRecord<'a> {
     #[inline]
     pub fn is_zip64(&self) -> bool {
         self.is_zip64
+    }
+
+    /// Returns the absolute source range containing the ZIP64 local-header
+    /// offset value in this central-directory record.
+    ///
+    /// The range is present only when the record's 32-bit local-header offset
+    /// is the ZIP64 sentinel and the corresponding value was resolved from a
+    /// single, valid ZIP64 extra field.  It is expressed as a half-open byte
+    /// range in the same source coordinate system as
+    /// [`Self::central_directory_offset`].
+    #[inline]
+    pub fn zip64_local_header_offset_range(&self) -> Option<Range<u64>> {
+        self.zip64_local_header_offset_range.clone()
     }
 
     /// Returns the offset from the start of reader where this central directory
@@ -3067,6 +3238,78 @@ mod tests {
     use super::*;
     use std::io::{self, Cursor, Read};
 
+    fn central_fixed_with_zip64_extra(
+        uncompressed_size: u32,
+        compressed_size: u32,
+        disk_number_start: u16,
+        local_header_offset: u32,
+        extra: &[u8],
+    ) -> ZipFileHeaderFixed {
+        let name = b"item";
+        let mut bytes = vec![0u8; ZipFileHeaderFixed::SIZE];
+        bytes[0..4].copy_from_slice(&CENTRAL_HEADER_SIGNATURE.to_le_bytes());
+        bytes[20..24].copy_from_slice(&compressed_size.to_le_bytes());
+        bytes[24..28].copy_from_slice(&uncompressed_size.to_le_bytes());
+        bytes[28..30].copy_from_slice(&(name.len() as u16).to_le_bytes());
+        bytes[30..32].copy_from_slice(&(extra.len() as u16).to_le_bytes());
+        bytes[34..36].copy_from_slice(&disk_number_start.to_le_bytes());
+        bytes[42..46].copy_from_slice(&local_header_offset.to_le_bytes());
+        ZipFileHeaderFixed::parse(&bytes).unwrap()
+    }
+
+    fn zip64_extra(body: &[u8]) -> Vec<u8> {
+        let mut extra = Vec::with_capacity(4 + body.len());
+        extra.extend_from_slice(&ExtraFieldId::ZIP64.as_u16().to_le_bytes());
+        extra.extend_from_slice(&(body.len() as u16).to_le_bytes());
+        extra.extend_from_slice(body);
+        extra
+    }
+
+    #[test]
+    fn central_zip64_extra_resolves_sentinels_and_returns_offset_field_range() {
+        let mut body = Vec::new();
+        body.extend_from_slice(&5u64.to_le_bytes());
+        body.extend_from_slice(&4u64.to_le_bytes());
+        body.extend_from_slice(&1234u64.to_le_bytes());
+        let extra = zip64_extra(&body);
+        let header = central_fixed_with_zip64_extra(u32::MAX, u32::MAX, 0, u32::MAX, &extra);
+        let record = ZipFileHeaderRecord::from_parts(header, b"item", &extra, b"", 123).unwrap();
+
+        assert!(record.is_zip64());
+        assert_eq!(record.uncompressed_size_hint(), 5);
+        assert_eq!(record.compressed_size_hint(), 4);
+        assert_eq!(record.local_header_offset(), 1234);
+        assert_eq!(
+            record.zip64_local_header_offset_range(),
+            Some(123 + ZipFileHeaderFixed::SIZE as u64 + 4 + 16..123 + 46 + 4 + 24)
+        );
+    }
+
+    #[test]
+    fn central_zip64_extra_rejects_duplicate_truncated_and_missing_values() {
+        let valid_body = 7u64.to_le_bytes();
+        let valid = zip64_extra(&valid_body);
+
+        let mut duplicate = valid.clone();
+        duplicate.extend_from_slice(&valid);
+        let header = central_fixed_with_zip64_extra(1, u32::MAX, 0, 0, &duplicate);
+        let error = ZipFileHeaderRecord::from_parts(header, b"item", &duplicate, b"", 0)
+            .expect_err("duplicate ZIP64 fields must be rejected");
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+
+        let truncated = zip64_extra(&[1, 2, 3, 4]);
+        let header = central_fixed_with_zip64_extra(1, u32::MAX, 0, 0, &truncated);
+        let error = ZipFileHeaderRecord::from_parts(header, b"item", &truncated, b"", 0)
+            .expect_err("truncated ZIP64 values must be rejected");
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+
+        let missing = zip64_extra(&[]);
+        let header = central_fixed_with_zip64_extra(1, u32::MAX, 0, 0, &missing);
+        let error = ZipFileHeaderRecord::from_parts(header, b"item", &missing, b"", 0)
+            .expect_err("missing ZIP64 values must be rejected");
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+    }
+
     #[derive(Debug)]
     struct OverreportingReader;
 
@@ -3124,13 +3367,13 @@ mod tests {
 
         assert!(matches!(
             ZipArchive::from_slice(data),
-            Err(error) if matches!(error.kind(), ErrorKind::InvalidEndOfCentralDirectory)
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
         ));
 
         let mut buf = vec![0u8; RECOMMENDED_BUFFER_SIZE];
         assert!(matches!(
             ZipArchive::from_seekable(Cursor::new(data), &mut buf),
-            Err(error) if matches!(error.kind(), ErrorKind::InvalidEndOfCentralDirectory)
+            Err(error) if matches!(error.kind(), ErrorKind::InvalidInput { .. })
         ));
     }
 
