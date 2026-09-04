@@ -3227,6 +3227,12 @@ native-Office claim is made.
   This is a prepared query, so cold-requested samples are advisory only and
   cold-verified is explicitly ineligible; it makes no source or physical-I/O
   claim and leaves the default 36 cases / 198 records unchanged.
+  Change 0400 keeps valid dimension-bearing worksheets on this selected
+  streaming path, while unsupported dimension metadata conservatively falls
+  back. The accepted measured claim is limited to the fixed-corpus warm ABBA
+  documented in [Change 0400](../../docs/performance/changes/0400-xlsx-selected-dimension-streaming.md)
+  and its [results](../../docs/performance/results/change-0400/); allocator
+  elapsed-time, cold-cache, and broad XLSX claims remain excluded.
 - `xlsx_bytes_open`: move a prepared owned XLSX allocation into
   `litchi::Workbook::from_bytes(Vec<u8>)`; the input clone and typed eager
   semantic/hash guards are outside timing, so the measured scope is exactly
