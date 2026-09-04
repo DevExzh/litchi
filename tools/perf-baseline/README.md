@@ -810,48 +810,59 @@ release measurement yet because the host workload is noisy. The selectors
 raise the current selectable registry from 408 to 411 cases and do not change
 the default 36 cases / 198 records.
 
-## OPC case-fold lookup baseline (change 0394)
+## OPC case-fold lookup baseline (changes 0394 and 0396)
 
-Four additional selectors are opt-in:
+Seven selectors are opt-in. Change 0394 introduced the first four; Change
+0396 adds the three class-isolated source lookup selectors:
 
 ```text
 opc_casefold_eager_open
 opc_casefold_source_open
 opc_casefold_eager_lookup
 opc_casefold_source_lookup
+opc_casefold_source_exact_lookup
+opc_casefold_source_case_alias_lookup
+opc_casefold_source_genuine_miss_lookup
 ```
 
-They use one deterministic stored OPC corpus at each of exactly 256, 2,048,
-and 16,384 ordinary tiny parts. Every part is a stable five-digit
+They use one deterministic stored OPC corpus at each of exactly 256, 2,047,
+2,048, and 16,384 ordinary tiny parts. The 2,047-part corpus is the
+threshold-boundary control immediately below the source case-fold index
+threshold. Every part is a stable five-digit
 `casefold/ordinary-*.bin` member with a 32-byte payload; the two fixed
 structural members are `[Content_Types].xml` and `_rels/.rels`. The corpus
-generator, archive/member identity, payload hash, and canonical-name hash are
-reported in every result.
+generator, archive/member identity, payload hash, canonical-name hash, and
+per-class lookup oracles are reported in every result.
 
 The open selectors time only the corresponding `OpcPackage::from_bytes` or
 `SourceBackedPackage::from_read_at` constructor. Source-backed elapsed and
 allocator samples use an immutable `litchi_core::OwnedSource`. The lookup
 selectors open their package once outside timing, then repeat one prebuilt
 nine-query vector 16 times in fixed order: exact first/middle/last, case-only
-aliases at the same three positions (forcing the case-insensitive scan), and
-three genuine misses. Lookup counts, query classes/canonical corpus positions,
-canonical-name outcomes, and the output digest are fixed oracles; query-vector
-construction and all correctness hashing remain outside timed/allocation
-regions.
+aliases at the same three positions (using the case-insensitive lookup path),
+and three genuine misses. Lookup counts, query classes/canonical corpus
+positions, canonical-name outcomes, and the output digest are fixed oracles;
+query-vector construction and all correctness hashing remain outside
+timed/allocation regions.
 
-Each opt-in build also runs an untimed malformed equivalent-name corpus gate
-(`litchi-opc-casefold-equivalent-name-gate-v1`) for both implementations and
-requires `EquivalentPartNames`. Source-backed results expose exact source
-read, version, payload, and in-flight counters from an independent untimed
-`InstrumentedSource` replay whose semantic digest must match the timed
-operation. Range classification and counter atomics therefore do not affect
-elapsed or allocation samples; eager results mark those counters not
-applicable.
+The three source-backed class selectors open their package once outside timing,
+then independently repeat the three fixed positions for one class (exact,
+ASCII-case alias, or genuine miss) 48 times, for exactly 144 lookups each—the
+same total as the combined nine-query selector. Their query class, position,
+found metadata, fixed output oracle, and operation-scoped allocator observation
+are retained separately. Each opt-in build also runs an untimed malformed
+equivalent-name corpus gate (`litchi-opc-casefold-equivalent-name-gate-v1`) for
+both implementations and requires `EquivalentPartNames`. Source-backed results
+expose exact source read, version, payload, and in-flight counters from an
+independent untimed `InstrumentedSource` replay whose semantic digest must
+match the timed operation. The replay performs no ordinary payload reads.
+Range classification and counter atomics therefore do not affect elapsed or
+allocation samples; eager results mark those counters not applicable.
 
 Operation-scoped allocator metrics are emitted only by the allocator target,
 and missing metrics are never inferred. These selectors set
 `performance_claim: none`, make no index recommendation, and raise the
-selectable registry from 411 to 415 without changing the default 36 cases /
+selectable registry from 415 to 418 without changing the default 36 cases /
 198 records.
 
 The serialized `CaseResult.source` record is heap-indirect. `SourceSummary`

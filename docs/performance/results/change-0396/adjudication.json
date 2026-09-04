@@ -1,0 +1,184 @@
+{
+  "schema_version": 1,
+  "change": "0396",
+  "outcome": "REJECTED",
+  "decision": "All Change 0396 production experiments are rejected. The accepted deliverable is harness observability and auditable negative evidence; no production latency or allocation claim is authorized.",
+  "accepted_deliverable": {
+    "type": "harness_observability",
+    "evidence": [
+      "catalog/report bindings",
+      "output and malformed-equivalent-name oracles",
+      "normal and allocator report metadata",
+      "allocation metrics retained in raw reports"
+    ],
+    "summary_files": [
+      "final-summary.json",
+      "rejected-summary.json",
+      "latency-metrics.tsv",
+      "allocation-metrics.json"
+    ]
+  },
+  "timing_scope": {
+    "source_open_constructor": "unmanaged SourceBackedPackage::from_read_at normal constructor",
+    "lookup_timing_state": "fixed pre-open unmanaged SourceBackedPackage; lookup operation only",
+    "accepted_latency_profile": "none; production claim rejected",
+    "validation_constructor": "SourceBackedPackage::from_read_at_for_validation is correctness-tested only and is not benchmarked",
+    "allocator_profile": "observational_only; retained for allocation vectors and corroboration, not latency authorization",
+    "eager_OpcPackage": "observational only; not an accepted production claim"
+  },
+  "corpus_and_binding": {
+    "catalog_id": "litchi-perf-corpus-v2",
+    "corpus_parts": [
+      256,
+      2047,
+      2048,
+      16384
+    ],
+    "validator": "python3 tools/validate_perf_corpus_binding.py --report REPORT --catalog CATALOG",
+    "raw_pairs_validated_before_compression": true,
+    "selected_report_catalog_pairs": 48,
+    "validation_failures": 0
+  },
+  "experiments": [
+    {
+      "id": "mapless-binary-search",
+      "status": "rejected",
+      "evidence": "rejected-summary.json and raw/mapless-binary-search/",
+      "candidate_revision": "b8bbbb148f90807b10fd203d5ad64636b2638099",
+      "reason": "Full normal and allocator ABBA evidence shows the compact mapless/binary-search route is not a production candidate; source exact lookup p50 regresses by roughly 2,751%\u20133,650% at the indexed 2,048/16,384-part sizes in the retained normal/allocator legs."
+    },
+    {
+      "id": "linear-probe-full",
+      "status": "rejected",
+      "evidence": "rejected-summary.json and raw/linear-probe-full/",
+      "candidate_revision": "f010895328953e85b5c904753879461f0c098d44",
+      "reason": "Full 30-sample normal and allocator ABBA evidence is retained as a rejected linear-probe/binary-search alternative; mixed point estimates do not authorize production adoption."
+    },
+    {
+      "id": "linear-probe-probe",
+      "status": "rejected",
+      "evidence": "rejected-summary.json and raw/linear-probe-probe/",
+      "candidate_revision": "f010895328953e85b5c904753879461f0c098d44",
+      "reason": "Transparent five-sample probe retained before the full run; probe status is negative evidence only."
+    },
+    {
+      "id": "scalar-vec-probe",
+      "status": "rejected",
+      "evidence": "rejected-summary.json and raw/scalar-vec-probe/",
+      "candidate_revision": "d448d21461864205cf2bf96fc56e43a148b20b75",
+      "reason": "Transparent five-sample scalar Vec probe retained; it is not promoted to a production claim."
+    },
+    {
+      "id": "std-prehashed-map-probe",
+      "status": "rejected",
+      "evidence": "rejected-summary.json and raw/std-prehashed-map-probe/",
+      "candidate_revision": "3b9a7578e2a2955eb2dc197d2c3a3091dbaa3dcc",
+      "reason": "Transparent std prehashed-map probe retained; exact-lookup p50 remains slower across the four corpus sizes in both retained profiles."
+    },
+    {
+      "id": "hashbrown-hashtable-probe",
+      "status": "rejected",
+      "evidence": "rejected-summary.json and raw/hashbrown-hashtable-probe/",
+      "candidate_revision": "67a0ec5c783da56e500bc8707a166baee5feeb91",
+      "reason": "Transparent direct hashbrown HashTable probe retained; exact-lookup p50 is slower at the larger corpus sizes in the probe."
+    },
+    {
+      "id": "hashbrown-hashtable-exact-1000",
+      "status": "rejected",
+      "evidence": "rejected-summary.json and raw/hashbrown-hashtable-exact-1000/",
+      "candidate_revision": "67a0ec5c783da56e500bc8707a166baee5feeb91",
+      "reason": "The high-sample exact-only ABBA (1,000 samples, 20 warmups) rejects the direct HashTable path: normal p50 exact lookup increases 6.9869%\u20137.391304% at 256, 2.941176%\u20137.359307% at 2,047, and 14.718615%\u201315.584416% at 2,048/16,384."
+    },
+    {
+      "id": "shared-packuri-probe",
+      "status": "rejected",
+      "evidence": "rejected-summary.json and raw/shared-packuri-probe/",
+      "candidate_revision": "8f7714ee011b170d938f2532fdd385fb2b61cd32",
+      "reason": "Transparent shared-PackURI Arc probe retained before the final ABBA; normal source lookup p50 rises 6.37093% at 256 and 7.237402% at 2,047."
+    },
+    {
+      "id": "shared-packuri-arc-final",
+      "status": "rejected",
+      "evidence": "final-summary.json and raw/shared-packuri-arc-final/",
+      "candidate_revision": "8f7714ee011b170d938f2532fdd385fb2b61cd32",
+      "reason": "Final full 30-sample A1/A2/B1/B2 Arc ABBA is retained as the primary negative result. The normal pooled decision gates are exact p50 +6.09%/+6.96% at 2,048/16,384 parts, source-open +3.38%/+4.30%, and mixed-operation -0.59%/-0.50%; allocator evidence adds three allocation calls, +2,051/+16,387 deallocation calls, and net-live deltas of -65,536/-524,288 bytes at those sizes. Normal source-lookup per-leg p50 also rises 4.857543%\u20135.493987% at 256 and 6.373402%\u20136.480684% at 2,047. Allocator timing is observational."
+    }
+  ],
+  "final_abba_math": {
+    "run": "shared-packuri-arc-final",
+    "legs": "A1/A2 control and B1/B2 candidate",
+    "samples_per_case": 30,
+    "warmup_iterations_per_case": 5,
+    "normal_source_lookup_p50_delta_pct": {
+      "256": {
+        "A1_to_B1": 5.493987,
+        "A2_to_B2": 4.857543
+      },
+      "2047": {
+        "A1_to_B1": 6.373402,
+        "A2_to_B2": 6.480684
+      },
+      "2048": {
+        "A1_to_B1": -1.503558,
+        "A2_to_B2": -0.283832
+      },
+      "16384": {
+        "A1_to_B1": 0.106907,
+        "A2_to_B2": -1.202426
+      }
+    },
+    "allocator_source_lookup_p50_delta_pct": {
+      "256": {
+        "A1_to_B1": 6.418456,
+        "A2_to_B2": 7.085714
+      },
+      "2047": {
+        "A1_to_B1": 5.867565,
+        "A2_to_B2": 6.965079
+      },
+      "2048": {
+        "A1_to_B1": 0.740937,
+        "A2_to_B2": -0.63593
+      },
+      "16384": {
+        "A1_to_B1": 0.531305,
+        "A2_to_B2": 0.825065
+      }
+    },
+    "normal_pooled_decision_gates": {
+      "exact_p50_delta_pct": {
+        "2048": 6.09,
+        "16384": 6.96
+      },
+      "source_open_p50_delta_pct": {
+        "2048": 3.38,
+        "16384": 4.30
+      },
+      "mixed_operation_p50_delta_pct": {
+        "2048": -0.59,
+        "16384": -0.50
+      }
+    },
+    "allocator_decision_gates": {
+      "source_open_allocation_calls_delta": {
+        "2048": 3,
+        "16384": 3
+      },
+      "source_open_deallocation_calls_delta": {
+        "2048": 2051,
+        "16384": 16387
+      },
+      "source_open_net_live_bytes_delta": {
+        "2048": -65536,
+        "16384": -524288
+      }
+    }
+  },
+  "withheld_claims": [
+    "Any production performance improvement or regression claim for Change 0396",
+    "Allocator-profile latency as an authorized timing claim",
+    "Timing for SourceBackedPackage::from_read_at_for_validation",
+    "Eager OpcPackage, managed execution-context, physical-I/O, cold-cache, throughput, RSS, or broad-workload claims",
+    "A claim that the retained negative experiments are representative of unrelated workloads"
+  ]
+}
