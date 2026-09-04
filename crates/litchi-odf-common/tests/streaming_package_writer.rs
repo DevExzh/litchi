@@ -776,7 +776,6 @@ fn metadata_is_validated_and_bounded_before_member_output() {
         "text/plain ",
         "text/ plain",
         "text/plain/extra",
-        "text/plain; charset=utf-8",
         oversized_media_type.as_str(),
     ] {
         let before = sink_bytes.borrow().len();
@@ -790,6 +789,26 @@ fn metadata_is_validated_and_bounded_before_member_output() {
         assert!(matches!(error, PackageWriterError::Core(_)));
         assert_eq!(sink_bytes.borrow().len(), before);
     }
+
+    let parameterized_media_type = "text/plain; charset=utf-8";
+    writer
+        .add_file_reader_with_media_type(
+            "Pictures/metadata-parameterized.bin",
+            Cursor::new(b"metadata"),
+            parameterized_media_type,
+        )
+        .unwrap();
+    writer.finish_to_writer().unwrap();
+    let output = sink_bytes.borrow().clone();
+    let owned = OwnedPackage::from_bytes(output).unwrap();
+    assert_eq!(
+        owned
+            .package()
+            .unwrap()
+            .manifest()
+            .get_media_type("Pictures/metadata-parameterized.bin"),
+        Some(parameterized_media_type)
+    );
 
     let metadata_limits = PackageWriterLimits {
         max_metadata_bytes: 1_024,
