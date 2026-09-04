@@ -3213,6 +3213,20 @@ native-Office claim is made.
   worksheet names, worksheet count, and full text. The report classifies
   logical reads as unavailable for this facade path and makes no physical-I/O
   or speedup claim; cold-verified remains an explicit fincore/procfs proof.
+- `xlsx_file_selected_cell`: prepare `litchi::Workbook::open(Path)` outside
+  the timer, then case-insensitively select canonical `Bench01` through the
+  prepared mixed-case query `bEnCh01` and read its non-first `M29` cell through
+  the unified facade. The timed scope is
+  only worksheet selection plus the exact cell read; the selected worksheet
+  handle and `SelectedCellView` stay live through operation evidence capture.
+  A typed eager oracle independently verifies the canonical worksheet identity
+  and generated numeric value (`1028012` for the medium corpus), while the
+  existing full semantic/source hash guards remain active. The additive
+  selected-cell evidence digest is independently derived and stable for this
+  target (`36e53d9002ae8c433ad918b400196fb886fa675f850076808ac51327d1f42ac1`).
+  This is a prepared query, so cold-requested samples are advisory only and
+  cold-verified is explicitly ineligible; it makes no source or physical-I/O
+  claim and leaves the default 36 cases / 198 records unchanged.
 - `xlsx_bytes_open`: move a prepared owned XLSX allocation into
   `litchi::Workbook::from_bytes(Vec<u8>)`; the input clone and typed eager
   semantic/hash guards are outside timing, so the measured scope is exactly

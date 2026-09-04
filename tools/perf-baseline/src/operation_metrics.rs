@@ -812,6 +812,7 @@ fn aggregate_in_process_observations(
             docx_source_replay: None,
             xlsx_source_sha256: None,
             xlsx_semantic_sha256: None,
+            xlsx_selected_cell: None,
             xlsx_repeat_store: None,
         })
         .collect::<Vec<_>>();
@@ -1392,6 +1393,7 @@ mod tests {
             docx_source_replay: None,
             xlsx_source_sha256: None,
             xlsx_semantic_sha256: None,
+            xlsx_selected_cell: None,
             xlsx_repeat_store: None,
         }
     }

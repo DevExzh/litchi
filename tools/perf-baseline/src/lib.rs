@@ -1230,6 +1230,7 @@ enum Case {
     XlsxSourceNarrowColumnRangeScan,
     XlsxFileOpen,
     XlsxFileOpenLifecycle,
+    XlsxFileSelectedCell,
     XlsxSourceRepeatedStoreMedium,
     XlsxSourceRepeatedStoreMediumReacquisitionControl,
     XlsxSourceRepeatedStoreOversized,
@@ -1787,6 +1788,7 @@ impl Case {
             Self::XlsxSourceNarrowColumnRangeScan => "xlsx_source_narrow_column_range_scan",
             Self::XlsxFileOpen => "xlsx_file_open",
             Self::XlsxFileOpenLifecycle => "xlsx_file_open_lifecycle",
+            Self::XlsxFileSelectedCell => "xlsx_file_selected_cell",
             Self::XlsxSourceRepeatedStoreMedium => "xlsx_source_repeated_store_medium",
             Self::XlsxSourceRepeatedStoreMediumReacquisitionControl => {
                 "xlsx_source_repeated_store_medium_reacquisition_control"
@@ -2841,6 +2843,7 @@ impl Case {
                 | Self::DocxFileSourceOpenFullTextLifecycle
                 | Self::XlsxFileOpen
                 | Self::XlsxFileOpenLifecycle
+                | Self::XlsxFileSelectedCell
                 | Self::XlsxSourceRepeatedStoreMedium
                 | Self::XlsxSourceRepeatedStoreMediumReacquisitionControl
                 | Self::XlsxSourceRepeatedStoreOversized
@@ -2895,7 +2898,10 @@ impl Case {
     }
 
     const fn is_xlsx_root_file(self) -> bool {
-        matches!(self, Self::XlsxFileOpen | Self::XlsxFileOpenLifecycle)
+        matches!(
+            self,
+            Self::XlsxFileOpen | Self::XlsxFileOpenLifecycle | Self::XlsxFileSelectedCell
+        )
     }
 
     const fn is_xlsx_bytes_root_file(self) -> bool {
@@ -10867,6 +10873,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "xlsx_source_narrow_column_range_scan" => Some(Case::XlsxSourceNarrowColumnRangeScan),
         "xlsx_file_open" => Some(Case::XlsxFileOpen),
         "xlsx_file_open_lifecycle" => Some(Case::XlsxFileOpenLifecycle),
+        "xlsx_file_selected_cell" => Some(Case::XlsxFileSelectedCell),
         "xlsx_source_repeated_store_medium" => Some(Case::XlsxSourceRepeatedStoreMedium),
         "xlsx_source_repeated_store_medium_reacquisition_control" => {
             Some(Case::XlsxSourceRepeatedStoreMediumReacquisitionControl)
@@ -11350,6 +11357,7 @@ fn usage_text() -> String {
                                        xlsx_source_first_cell,\n\
                                        xlsx_source_narrow_column_range_scan,\n\
                                        xlsx_file_open,xlsx_file_open_lifecycle,\n\
+                                       xlsx_file_selected_cell,\n\
                                        xlsx_source_repeated_store_medium,\n\
                                        xlsx_source_repeated_store_medium_reacquisition_control,\n\
                                        xlsx_source_repeated_store_oversized,\n\
@@ -21092,6 +21100,7 @@ fn run_case_with_config(
         },
         Case::XlsxFileOpen
         | Case::XlsxFileOpenLifecycle
+        | Case::XlsxFileSelectedCell
         | Case::XlsxSourceRepeatedStoreMedium
         | Case::XlsxSourceRepeatedStoreMediumReacquisitionControl
         | Case::XlsxSourceRepeatedStoreOversized
@@ -54783,7 +54792,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 419);
+        assert_eq!(selectable_count, 420);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -60052,6 +60061,7 @@ mod tests {
         for (name, case) in [
             ("xlsx_file_open", Case::XlsxFileOpen),
             ("xlsx_file_open_lifecycle", Case::XlsxFileOpenLifecycle),
+            ("xlsx_file_selected_cell", Case::XlsxFileSelectedCell),
         ] {
             assert_eq!(parse_case(name), Some(case));
             assert_eq!(case.name(), name);

@@ -339,7 +339,21 @@ struct ChildResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     xlsx_semantic_sha256: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    xlsx_selected_cell: Option<XlsxSelectedCellEvidence>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     xlsx_repeat_store: Option<XlsxRepeatStoreEvidence>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub(crate) struct XlsxSelectedCellEvidence {
+    pub canonical_sheet_name: String,
+    pub sheet_position: usize,
+    pub prepared_selector: String,
+    pub cell_address: String,
+    pub view: String,
+    pub value_kind: String,
+    pub lexical_value: String,
+    pub digest: String,
 }
 
 impl ChildResult {
@@ -372,6 +386,7 @@ impl ChildResult {
             docx_source_replay: None,
             xlsx_source_sha256: None,
             xlsx_semantic_sha256: None,
+            xlsx_selected_cell: None,
             xlsx_repeat_store: None,
         }
     }
@@ -596,6 +611,8 @@ pub(crate) struct SampleEvidence {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub xlsx_semantic_sha256: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub xlsx_selected_cell: Option<XlsxSelectedCellEvidence>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub xlsx_repeat_store: Option<XlsxRepeatStoreEvidence>,
 }
 
@@ -798,6 +815,7 @@ enum Operation {
     DocxSourceOpenFullTextLifecycle,
     XlsxFileOpen,
     XlsxFileOpenLifecycle,
+    XlsxFileSelectedCell,
     XlsxSourceRepeatedStoreMedium,
     XlsxSourceRepeatedStoreMediumReacquisitionControl,
     XlsxSourceRepeatedStoreOversized,
@@ -855,6 +873,7 @@ impl Operation {
             },
             "xlsx_file_open" => Some(Self::XlsxFileOpen),
             "xlsx_file_open_lifecycle" => Some(Self::XlsxFileOpenLifecycle),
+            "xlsx_file_selected_cell" => Some(Self::XlsxFileSelectedCell),
             "xlsx_source_repeated_store_medium" => Some(Self::XlsxSourceRepeatedStoreMedium),
             "xlsx_source_repeated_store_medium_reacquisition_control" => {
                 Some(Self::XlsxSourceRepeatedStoreMediumReacquisitionControl)
@@ -917,6 +936,7 @@ impl Operation {
             },
             Self::XlsxFileOpen => super::Case::XlsxFileOpen,
             Self::XlsxFileOpenLifecycle => super::Case::XlsxFileOpenLifecycle,
+            Self::XlsxFileSelectedCell => super::Case::XlsxFileSelectedCell,
             Self::XlsxSourceRepeatedStoreMedium => super::Case::XlsxSourceRepeatedStoreMedium,
             Self::XlsxSourceRepeatedStoreMediumReacquisitionControl => {
                 super::Case::XlsxSourceRepeatedStoreMediumReacquisitionControl
@@ -989,6 +1009,7 @@ impl Operation {
             self,
             Self::XlsxFileOpen
                 | Self::XlsxFileOpenLifecycle
+                | Self::XlsxFileSelectedCell
                 | Self::XlsxSourceRepeatedStoreMedium
                 | Self::XlsxSourceRepeatedStoreMediumReacquisitionControl
                 | Self::XlsxSourceRepeatedStoreOversized
@@ -1004,6 +1025,10 @@ impl Operation {
                 | Self::XlsxSourceRepeatedStoreOversized
                 | Self::XlsxSourceRepeatedStoreOversizedReacquisitionControl
         )
+    }
+
+    const fn is_xlsx_selected_cell(self) -> bool {
+        matches!(self, Self::XlsxFileSelectedCell)
     }
 
     const fn xlsx_repeated_store_scenario(self) -> Option<XlsxRepeatStoreScenario> {
@@ -1107,7 +1132,10 @@ impl Operation {
     /// before the timed interval, so a page-cache proof would not describe the
     /// operation being measured.  Open and lifecycle controls remain eligible.
     const fn supports_cold_verified(self) -> bool {
-        !self.is_pptx_query() && !self.is_docx_query() && !self.is_xlsx_repeated_store()
+        !self.is_pptx_query()
+            && !self.is_docx_query()
+            && !self.is_xlsx_repeated_store()
+            && !matches!(self, Self::XlsxFileSelectedCell)
     }
 
     const fn pptx_query_name(self) -> Option<&'static str> {
@@ -1919,8 +1947,21 @@ fn record_sample(
             )
             .into());
         }
+        if operation.is_xlsx_selected_cell() {
+            let evidence = invocation
+                .child
+                .xlsx_selected_cell
+                .as_ref()
+                .ok_or("XLSX selected-cell sample omitted selected-cell evidence")?;
+            validate_xlsx_selected_cell_evidence(evidence)?;
+        }
     }
     validate_cfb_owned_evidence(operation, &invocation.child)?;
+    if !operation.is_xlsx_selected_cell() && invocation.child.xlsx_selected_cell.is_some() {
+        return Err(
+            format!("{stem} {cache_state} unexpectedly emitted selected-cell evidence").into(),
+        );
+    }
     if !operation.is_cfb_owned() {
         validate_cfb_phase_evidence(operation, &invocation.child)?;
     }
@@ -1973,6 +2014,7 @@ fn record_sample(
         docx_source_replay: invocation.child.docx_source_replay,
         xlsx_source_sha256: invocation.child.xlsx_source_sha256,
         xlsx_semantic_sha256: invocation.child.xlsx_semantic_sha256,
+        xlsx_selected_cell: invocation.child.xlsx_selected_cell,
         xlsx_repeat_store: invocation.child.xlsx_repeat_store,
     });
     Ok(())
@@ -2163,6 +2205,7 @@ fn expected_digest(operation: Operation, corpus: &super::Corpus) -> Result<Strin
         },
         Operation::XlsxFileOpen
         | Operation::XlsxFileOpenLifecycle
+        | Operation::XlsxFileSelectedCell
         | Operation::XlsxSourceRepeatedStoreMedium
         | Operation::XlsxSourceRepeatedStoreMediumReacquisitionControl
         | Operation::XlsxSourceRepeatedStoreOversized
@@ -2399,12 +2442,16 @@ where
     } else {
         None
     };
+    let mut deferred_xlsx_operation = if operation.is_xlsx_selected_cell() {
+        Some(prepare_xlsx_file_selected_cell_operation(&source)?)
+    } else {
+        None
+    };
     let before = verified_before.or_else(|| process_metrics::Snapshot::read().ok());
     let allocation_region = crate::allocation_metrics::begin();
     let started = Instant::now();
     let mut details = OperationDetails::default();
     let mut deferred_source_open_package = None;
-    let mut deferred_xlsx_operation = None;
     let counter_result = (|| -> Result<Option<Arc<CountingReadAt>>, Box<dyn Error>> {
         Ok(match operation {
             Operation::OpcEagerOpen => run_opc_eager_open(&source, &mut details)?,
@@ -2463,7 +2510,9 @@ where
                 run_docx_operation(operation, &source, prepared_docx.as_ref())?;
                 None
             },
-            Operation::XlsxFileOpen | Operation::XlsxFileOpenLifecycle => {
+            Operation::XlsxFileOpen
+            | Operation::XlsxFileOpenLifecycle
+            | Operation::XlsxFileSelectedCell => {
                 run_xlsx_operation(operation, &source, &mut deferred_xlsx_operation)?;
                 None
             },
@@ -2576,9 +2625,12 @@ where
         matches!(mode, ChildMode::ColdVerified | ChildMode::VerifiedPrime),
     )?;
     if let Some(deferred) = deferred_xlsx_operation.take() {
-        // Only release the exact timed workbook and lifecycle projection after
-        // their correctness validation and every operation-only snapshot.
+        // Only release the exact timed workbook, selected result, and
+        // lifecycle projection after their correctness validation and every
+        // operation-only snapshot.
         std::hint::black_box(deferred.timed_projection);
+        std::hint::black_box(deferred.timed_selected_sheet);
+        std::hint::black_box(deferred.timed_selected_cell);
         std::hint::black_box(deferred.workbook);
     }
     if let Some(deferred) = deferred_xlsx_repeat_store_operation.take() {
@@ -2626,8 +2678,10 @@ where
             .map(|value| value.0.clone())
             .or_else(|| xlsx_repeat_store.as_ref().map(|value| value.0.clone())),
         xlsx_semantic_sha256: xlsx_evidence
-            .map(|value| value.1)
+            .as_ref()
+            .map(|value| value.1.clone())
             .or_else(|| xlsx_repeat_store.as_ref().map(|value| value.1.clone())),
+        xlsx_selected_cell: xlsx_evidence.and_then(|value| value.2),
         xlsx_repeat_store: xlsx_repeat_store.map(|value| value.2),
     };
     serde_json::to_writer(io::stdout().lock(), &result)?;
@@ -4820,6 +4874,47 @@ fn xlsx_timed_names_count_text(
 struct DeferredXlsxOperation {
     workbook: litchi::Workbook,
     timed_projection: Option<(Vec<String>, usize, String)>,
+    selected_sheet_query: Option<String>,
+    selected_cell_address: Option<String>,
+    timed_selected_sheet: Option<litchi::sheet::SelectedWorksheet>,
+    timed_selected_cell: Option<litchi::sheet::SelectedCellView>,
+}
+
+const XLSX_FILE_SELECTED_CELL_TARGET: super::XlsxCoordinate = super::XlsxCoordinate {
+    sheet: 1,
+    row: 28,
+    column: 12,
+};
+
+fn mixed_ascii_case(value: &str) -> String {
+    value
+        .chars()
+        .enumerate()
+        .map(|(index, character)| {
+            if index % 2 == 0 {
+                character.to_ascii_lowercase()
+            } else {
+                character.to_ascii_uppercase()
+            }
+        })
+        .collect()
+}
+
+fn prepare_xlsx_file_selected_cell_operation(
+    source: &Path,
+) -> Result<DeferredXlsxOperation, Box<dyn Error>> {
+    let target = XLSX_FILE_SELECTED_CELL_TARGET;
+    let workbook = litchi::Workbook::open(source).map_err(|error| error.to_string())?;
+    let selected_sheet_query = mixed_ascii_case(&super::xlsx_sheet_name(target.sheet));
+    let selected_cell_address = super::xlsx_address(target.row, target.column)?;
+    Ok(DeferredXlsxOperation {
+        workbook,
+        timed_projection: None,
+        selected_sheet_query: Some(selected_sheet_query),
+        selected_cell_address: Some(selected_cell_address),
+        timed_selected_sheet: None,
+        timed_selected_cell: None,
+    })
 }
 
 fn xlsx_deferred_semantic_projection(
@@ -4839,6 +4934,14 @@ fn xlsx_deferred_semantic_projection(
             },
             (Operation::XlsxFileOpenLifecycle, None) => {
                 return Err("XLSX lifecycle omitted its timed projection".into());
+            },
+            (Operation::XlsxFileSelectedCell, None) => {
+                xlsx_timed_names_count_text(&deferred.workbook)?
+            },
+            (Operation::XlsxFileSelectedCell, Some(_)) => {
+                return Err(
+                    "XLSX selected-cell operation retained an unexpected projection".into(),
+                );
             },
             _ => return Err("non-XLSX operation passed to deferred XLSX projection".into()),
         };
@@ -4868,6 +4971,10 @@ fn run_xlsx_operation(
             *deferred = Some(DeferredXlsxOperation {
                 workbook: litchi::Workbook::open(source).map_err(|error| error.to_string())?,
                 timed_projection: None,
+                selected_sheet_query: None,
+                selected_cell_address: None,
+                timed_selected_sheet: None,
+                timed_selected_cell: None,
             });
         },
         Operation::XlsxFileOpenLifecycle => {
@@ -4880,7 +4987,34 @@ fn run_xlsx_operation(
             *deferred = Some(DeferredXlsxOperation {
                 workbook,
                 timed_projection: Some(projection),
+                selected_sheet_query: None,
+                selected_cell_address: None,
+                timed_selected_sheet: None,
+                timed_selected_cell: None,
             });
+        },
+        Operation::XlsxFileSelectedCell => {
+            let deferred = deferred
+                .as_mut()
+                .ok_or("XLSX selected-cell operation has no prepared workbook")?;
+            let selector = deferred
+                .selected_sheet_query
+                .as_deref()
+                .ok_or("XLSX selected-cell operation has no prepared sheet selector")?;
+            let address = deferred
+                .selected_cell_address
+                .as_deref()
+                .ok_or("XLSX selected-cell operation has no prepared cell address")?;
+            let sheet = deferred
+                .workbook
+                .sheet(selector)
+                .map_err(|error| error.to_string())?
+                .ok_or("XLSX selected-cell operation target sheet is missing")?;
+            let cell = sheet.cell(address).map_err(|error| error.to_string())?;
+            std::hint::black_box(&sheet);
+            std::hint::black_box(&cell);
+            deferred.timed_selected_sheet = Some(sheet);
+            deferred.timed_selected_cell = Some(cell);
         },
         _ => return Err("non-XLSX operation passed to run_xlsx_operation".into()),
     }
@@ -5141,6 +5275,7 @@ fn verify_child_output(
         },
         Operation::XlsxFileOpen
         | Operation::XlsxFileOpenLifecycle
+        | Operation::XlsxFileSelectedCell
         | Operation::XlsxSourceRepeatedStoreMedium
         | Operation::XlsxSourceRepeatedStoreMediumReacquisitionControl
         | Operation::XlsxSourceRepeatedStoreOversized
@@ -5227,7 +5362,7 @@ fn verify_xlsx_operation(
     corpus: &super::Corpus,
     allow_page_aligned_source: bool,
     deferred: &DeferredXlsxOperation,
-) -> Result<(String, String), Box<dyn Error>> {
+) -> Result<(String, String, Option<XlsxSelectedCellEvidence>), Box<dyn Error>> {
     assert_pinned_xlsx_corpus(corpus)?;
     let initial_bytes = fs::read(source)?;
     if !allow_page_aligned_source {
@@ -5244,6 +5379,10 @@ fn verify_xlsx_operation(
     if observed != expected {
         return Err("XLSX filesystem semantic projection differs from deterministic corpus".into());
     }
+    let selected_cell_evidence = operation
+        .is_xlsx_selected_cell()
+        .then(|| verify_xlsx_selected_cell(corpus, deferred))
+        .transpose()?;
     let semantic_sha256 = xlsx_semantic_projection_sha256(&observed)?;
 
     // Read and hash the source only after semantic verification. This is the
@@ -5258,7 +5397,126 @@ fn verify_xlsx_operation(
             return Err("XLSX filesystem source hash or length differs from its fixed pin".into());
         }
     }
-    Ok((source_sha256, semantic_sha256))
+    Ok((source_sha256, semantic_sha256, selected_cell_evidence))
+}
+
+fn verify_xlsx_selected_cell(
+    corpus: &super::Corpus,
+    deferred: &DeferredXlsxOperation,
+) -> Result<XlsxSelectedCellEvidence, Box<dyn Error>> {
+    let target = XLSX_FILE_SELECTED_CELL_TARGET;
+    let observed = deferred
+        .timed_selected_cell
+        .as_ref()
+        .ok_or("XLSX selected-cell operation omitted its timed cell view")?;
+    let expected_sheet_name = super::xlsx_sheet_name(target.sheet);
+    let expected_address = super::xlsx_address(target.row, target.column)?;
+    let expected_query = mixed_ascii_case(&expected_sheet_name);
+    if deferred.selected_sheet_query.as_deref() != Some(expected_query.as_str())
+        || deferred.selected_cell_address.as_deref() != Some(expected_address.as_str())
+    {
+        return Err("XLSX selected-cell operation changed its prepared selector".into());
+    }
+    let selected_sheet = deferred
+        .timed_selected_sheet
+        .as_ref()
+        .ok_or("XLSX selected-cell operation omitted its timed worksheet handle")?;
+    if selected_sheet.name() != expected_sheet_name.as_str()
+        || selected_sheet.position() != target.sheet
+    {
+        return Err("XLSX selected-cell worksheet identity differs from typed oracle".into());
+    }
+
+    let typed = litchi_xlsx::Workbook::from_bytes(corpus.archive.clone())?;
+    let sheet = typed
+        .sheet(expected_sheet_name.as_str())?
+        .ok_or("typed XLSX selected-cell oracle target sheet is missing")?;
+    if sheet.name() != expected_sheet_name.as_str() || sheet.position() != target.sheet {
+        return Err("typed XLSX selected-cell worksheet identity differs from corpus".into());
+    }
+    let expected = match sheet.cell(expected_address.as_str())? {
+        litchi_xlsx::cell::View::Missing => litchi::sheet::SelectedCellView::Missing,
+        litchi_xlsx::cell::View::Covered(range) => litchi::sheet::SelectedCellView::Covered(range),
+        litchi_xlsx::cell::View::Stored(cell) => {
+            litchi::sheet::SelectedCellView::Stored(cell.clone())
+        },
+        _ => {
+            return Err("typed XLSX selected-cell oracle returned an unknown view".into());
+        },
+    };
+    if observed != &expected {
+        return Err("XLSX selected-cell view differs from typed eager oracle".into());
+    }
+    let expected_value = super::xlsx_value(target).to_string();
+    match observed {
+        litchi::sheet::SelectedCellView::Stored(litchi_xlsx::Cell::Value(
+            litchi_xlsx::Value::Number(value),
+        )) if value.as_str() == expected_value => {
+            let prepared_selector = deferred
+                .selected_sheet_query
+                .as_ref()
+                .ok_or("XLSX selected-cell operation omitted prepared selector")?;
+            let evidence = XlsxSelectedCellEvidence {
+                canonical_sheet_name: expected_sheet_name,
+                sheet_position: target.sheet,
+                prepared_selector: prepared_selector.clone(),
+                cell_address: expected_address,
+                view: "stored".to_owned(),
+                value_kind: "number".to_owned(),
+                lexical_value: value.as_str().to_owned(),
+                digest: String::new(),
+            };
+            let digest = xlsx_selected_cell_evidence_digest(&evidence)?;
+            Ok(XlsxSelectedCellEvidence { digest, ..evidence })
+        },
+        _ => Err("XLSX selected-cell value differs from deterministic generator".into()),
+    }
+}
+
+fn xlsx_selected_cell_evidence_digest(
+    evidence: &XlsxSelectedCellEvidence,
+) -> Result<String, Box<dyn Error>> {
+    let position = u64::try_from(evidence.sheet_position)?;
+    let mut encoded = Vec::new();
+    encoded.extend_from_slice(b"litchi-xlsx-file-selected-cell-v1\0");
+    encoded.extend_from_slice(&position.to_le_bytes());
+    for field in [
+        evidence.canonical_sheet_name.as_str(),
+        evidence.prepared_selector.as_str(),
+        evidence.cell_address.as_str(),
+        evidence.view.as_str(),
+        evidence.value_kind.as_str(),
+        evidence.lexical_value.as_str(),
+    ] {
+        let bytes = field.as_bytes();
+        encoded.extend_from_slice(&u64::try_from(bytes.len())?.to_le_bytes());
+        encoded.extend_from_slice(bytes);
+    }
+    Ok(super::sha256_hex(&encoded))
+}
+
+fn validate_xlsx_selected_cell_evidence(
+    evidence: &XlsxSelectedCellEvidence,
+) -> Result<(), Box<dyn Error>> {
+    let target = XLSX_FILE_SELECTED_CELL_TARGET;
+    let expected_sheet_name = super::xlsx_sheet_name(target.sheet);
+    let expected_selector = mixed_ascii_case(&expected_sheet_name);
+    let expected_address = super::xlsx_address(target.row, target.column)?;
+    let expected_value = super::xlsx_value(target).to_string();
+    if evidence.canonical_sheet_name != expected_sheet_name
+        || evidence.sheet_position != target.sheet
+        || evidence.prepared_selector != expected_selector
+        || evidence.cell_address != expected_address
+        || evidence.view != "stored"
+        || evidence.value_kind != "number"
+        || evidence.lexical_value != expected_value
+    {
+        return Err("XLSX selected-cell evidence differs from its fixed oracle".into());
+    }
+    if evidence.digest != xlsx_selected_cell_evidence_digest(evidence)? {
+        return Err("XLSX selected-cell evidence digest is not stable".into());
+    }
+    Ok(())
 }
 
 fn validate_xlsx_repeat_store_counter_consistency(
@@ -5979,6 +6237,7 @@ mod tests {
             "docx_file_source_open_full_text_lifecycle",
             "xlsx_file_open",
             "xlsx_file_open_lifecycle",
+            "xlsx_file_selected_cell",
         ] {
             assert!(Operation::parse(name).is_some(), "{name}");
         }
@@ -6324,6 +6583,7 @@ mod tests {
         assert!(Operation::OpcSourceOpen.supports_cold_verified());
         assert!(Operation::XlsxFileOpen.supports_cold_verified());
         assert!(Operation::XlsxFileOpenLifecycle.supports_cold_verified());
+        assert!(!Operation::XlsxFileSelectedCell.supports_cold_verified());
         assert!(!Operation::XlsxSourceRepeatedStoreMedium.supports_cold_verified());
         assert!(!Operation::XlsxSourceRepeatedStoreMediumReacquisitionControl.supports_cold_verified());
         assert!(!Operation::XlsxSourceRepeatedStoreOversized.supports_cold_verified());
@@ -6335,14 +6595,20 @@ mod tests {
         let open = Operation::parse("xlsx_file_open").expect("XLSX open selector parses");
         let lifecycle =
             Operation::parse("xlsx_file_open_lifecycle").expect("XLSX lifecycle selector parses");
+        let selected = Operation::parse("xlsx_file_selected_cell")
+            .expect("XLSX selected-cell selector parses");
         assert!(open.is_xlsx());
         assert!(lifecycle.is_xlsx());
+        assert!(selected.is_xlsx());
         assert_eq!(open.case().name(), "xlsx_file_open");
         assert_eq!(lifecycle.case().name(), "xlsx_file_open_lifecycle");
+        assert_eq!(selected.case().name(), "xlsx_file_selected_cell");
         assert_eq!(Operation::parse(open.case().name()), Some(open));
         assert_eq!(Operation::parse(lifecycle.case().name()), Some(lifecycle));
+        assert_eq!(Operation::parse(selected.case().name()), Some(selected));
         assert!(!open.is_save());
         assert!(!lifecycle.is_save());
+        assert!(!selected.is_save());
     }
 
     #[test]
@@ -6502,8 +6768,12 @@ mod tests {
         let deferred = super::DeferredXlsxOperation {
             workbook: litchi::Workbook::open(&path).unwrap(),
             timed_projection: None,
+            selected_sheet_query: None,
+            selected_cell_address: None,
+            timed_selected_sheet: None,
+            timed_selected_cell: None,
         };
-        let (source_sha256, semantic_sha256) = super::verify_xlsx_operation(
+        let (source_sha256, semantic_sha256, selected_cell) = super::verify_xlsx_operation(
             super::Operation::XlsxFileOpen,
             &path,
             &corpus,
@@ -6513,6 +6783,7 @@ mod tests {
         .unwrap();
         assert_eq!(source_sha256, crate::sha256_hex(&aligned));
         assert_eq!(semantic_sha256, expected);
+        assert!(selected_cell.is_none());
         drop(deferred);
         fs::remove_file(path).unwrap();
     }
@@ -6582,6 +6853,7 @@ mod tests {
             docx_source_replay: None,
             xlsx_source_sha256: None,
             xlsx_semantic_sha256: None,
+            xlsx_selected_cell: None,
             xlsx_repeat_store: None,
         };
         let sample = crate::allocation_metrics::Sample {

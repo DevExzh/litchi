@@ -1078,6 +1078,37 @@ def with_filesystem_evidence(reports):
     return reports
 
 
+def xlsx_selected_cell_evidence():
+    return {
+        "canonical_sheet_name": "Bench01",
+        "sheet_position": 1,
+        "prepared_selector": "bEnCh01",
+        "cell_address": "M29",
+        "view": "stored",
+        "value_kind": "number",
+        "lexical_value": "1028012",
+        "digest": "36e53d9002ae8c433ad918b400196fb886fa675f850076808ac51327d1f42ac1",
+    }
+
+
+def with_xlsx_selected_cell_evidence(reports):
+    reports = copy.deepcopy(reports)
+    for leg in reports:
+        leg["results"] = [leg["results"][0]]
+        result = leg["results"][0]
+        result["case"] = "xlsx_file_selected_cell"
+        result["corpus"] = copy.deepcopy(
+            perf_abba_summary._XLSX_SELECTED_CELL_CORPUS
+        )
+        leg["configuration"]["cases"] = ["xlsx_file_selected_cell"]
+        leg["configuration"]["corpus_shapes"] = ["medium"]
+    reports = with_filesystem_evidence(reports)
+    for leg in reports:
+        for sample in leg["filesystem_evidence"][0]["samples"]:
+            sample["xlsx_selected_cell"] = xlsx_selected_cell_evidence()
+    return reports
+
+
 def with_xlsx_repeat_store_evidence(
     *,
     structural=False,
@@ -1649,6 +1680,130 @@ class PerfAbbaSummaryTests(unittest.TestCase):
             "one logical read range-size counter schema consistently",
         ):
             perf_abba_summary.summarize_reports(within_evidence)
+
+    def test_xlsx_selected_cell_evidence_is_validated_and_bound_as_identity(self):
+        reports = with_xlsx_selected_cell_evidence(four_legs())
+        summary = perf_abba_summary.summarize_reports(reports)
+        self.assertEqual(summary["results"][0]["case"], "xlsx_file_selected_cell")
+        self.assertTrue(summary["verification"]["filesystem_evidence_identity_verified"])
+        identity = json.loads(
+            perf_abba_summary._filesystem_evidence_identity_projection(
+                reports[0]["filesystem_evidence"][0]
+            )
+        )
+        self.assertEqual(
+            identity["samples"][0]["xlsx_selected_cell"],
+            xlsx_selected_cell_evidence(),
+        )
+
+        mismatched = copy.deepcopy(reports)
+        mismatched[1]["filesystem_evidence"][0]["samples"][0][
+            "xlsx_selected_cell"
+        ]["cell_address"] = "A1"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "cell_address differs from the fixed selected-cell oracle",
+        ):
+            perf_abba_summary.summarize_reports(mismatched)
+
+    def test_xlsx_selected_cell_evidence_has_strict_nested_schema(self):
+        valid = xlsx_selected_cell_evidence()
+        perf_abba_summary._validate_xlsx_selected_cell(valid, "selected")
+
+        missing = copy.deepcopy(valid)
+        missing.pop("digest")
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "schema mismatch.*digest"
+        ):
+            perf_abba_summary._validate_xlsx_selected_cell(missing, "selected")
+
+        unknown = copy.deepcopy(valid)
+        unknown["measurement_ns"] = 1
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "schema mismatch.*measurement_ns"
+        ):
+            perf_abba_summary._validate_xlsx_selected_cell(unknown, "selected")
+
+        wrong_kind = copy.deepcopy(valid)
+        wrong_kind["value_kind"] = "string"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError, "value_kind must be 'number'"
+        ):
+            perf_abba_summary._validate_xlsx_selected_cell(wrong_kind, "selected")
+
+        wrong_target = copy.deepcopy(valid)
+        wrong_target["cell_address"] = "A1"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "cell_address differs from the fixed selected-cell oracle",
+        ):
+            perf_abba_summary._validate_xlsx_selected_cell(wrong_target, "selected")
+
+        wrong_digest = copy.deepcopy(valid)
+        wrong_digest["digest"] = "d" * 64
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "digest differs from the fixed selected-cell oracle",
+        ):
+            perf_abba_summary._validate_xlsx_selected_cell(wrong_digest, "selected")
+
+    def test_xlsx_selected_cell_evidence_is_forbidden_for_other_filesystem_cases(self):
+        reports = with_filesystem_evidence(four_legs())
+        reports[0]["filesystem_evidence"][0]["samples"][0][
+            "xlsx_selected_cell"
+        ] = xlsx_selected_cell_evidence()
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "only valid for filesystem case 'xlsx_file_selected_cell'",
+        ):
+            perf_abba_summary.summarize_reports(reports)
+
+    def test_xlsx_selected_cell_requires_its_pinned_corpus_and_each_sample_evidence(self):
+        wrong_corpus = with_xlsx_selected_cell_evidence(four_legs())
+        for leg in wrong_corpus:
+            leg["results"][0]["corpus"]["generator"] = "wrong"
+            leg["filesystem_evidence"][0]["corpus"]["generator"] = "wrong"
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "does not match the pinned xlsx_file_selected_cell corpus",
+        ):
+            perf_abba_summary.summarize_reports(wrong_corpus)
+
+        missing = with_xlsx_selected_cell_evidence(four_legs())
+        missing[0]["filesystem_evidence"][0]["samples"][0].pop(
+            "xlsx_selected_cell"
+        )
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "must contain xlsx_selected_cell",
+        ):
+            perf_abba_summary.summarize_reports(missing)
+
+        null = with_xlsx_selected_cell_evidence(four_legs())
+        null[0]["filesystem_evidence"][0]["samples"][0]["xlsx_selected_cell"] = None
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "xlsx_selected_cell must be an object",
+        ):
+            perf_abba_summary.summarize_reports(null)
+
+    def test_xlsx_selected_cell_requires_top_level_filesystem_evidence(self):
+        for replacement in (perf_abba_summary._MISSING, []):
+            reports = with_xlsx_selected_cell_evidence(four_legs())
+            for leg in reports:
+                if replacement is perf_abba_summary._MISSING:
+                    leg.pop("filesystem_evidence")
+                else:
+                    leg["filesystem_evidence"] = replacement
+            message = (
+                "filesystem_evidence is required for selected XLSX selectors"
+                if replacement is perf_abba_summary._MISSING
+                else "filesystem_evidence is missing xlsx_file_selected_cell selectors"
+            )
+            with self.subTest(replacement=replacement), self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError, message
+            ):
+                perf_abba_summary.summarize_reports(reports)
 
     def test_xlsx_repeated_store_primary_accepts_positive_control_and_zero_candidate_deltas(self):
         reports = with_xlsx_repeat_store_evidence(child_process_ids=True)

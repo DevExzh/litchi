@@ -209,6 +209,40 @@ _XLSX_REPEAT_STORE_FULL_SEMANTIC_SHA256 = (
 _XLSX_REPEAT_STORE_PROJECTION_SHA256 = (
     "01c253bf3fc611835e0806414c6417a9cfbb012ff6e01f9bb55cec94236a6235"
 )
+_XLSX_SELECTED_CELL_CORPUS: dict[str, Any] = {
+    "name": "xlsx-cell-values-medium",
+    "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+    "package_format": "XLSX/OPC/ZIP",
+    "shape": "medium",
+    "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+    "compression": "deflate",
+    "entry_count": 9_216,
+    "archive_member_count": 17,
+    "entry_bytes": 4,
+    "uncompressed_payload_bytes": 4_231_168,
+    "archive_bytes": 4_226_429,
+    "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+    "target_entry": "Sheet1!A1",
+    "target_payload_bytes": 1,
+    "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+    "xlsx": {
+        "sheet_count": 4,
+        "rows_per_sheet": 48,
+        "columns_per_sheet": 48,
+        "one_percent_update_count": 93,
+        "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+                "xl/worksheets/sheet1.xml",
+                "xl/worksheets/sheet2.xml",
+                "xl/worksheets/sheet3.xml",
+                "xl/worksheets/sheet4.xml",
+            ],
+            "shared_strings": None,
+            "styles": "xl/styles.xml",
+        },
+    },
+}
 
 # The DOCX section-layout selector uses one fixed, non-CLI corpus.  Keep its
 # static manifest and section identity separate from the compiled smoke pins.
@@ -293,6 +327,7 @@ FIXED_CASE_CORPUS_IDENTITIES: dict[str, dict[str, Any]] = {
     "xlsx_source_repeated_store_oversized_reacquisition_control": (
         _XLSX_REPEAT_STORE_OVERSIZED_CORPUS
     ),
+    "xlsx_file_selected_cell": _XLSX_SELECTED_CELL_CORPUS,
     "xls_numeric_eager_number_edit_save": {
         "name": "xls-comments-opaque-heavy",
         "generator": "litchi-xls-comments-opaque-heavy-v1",
@@ -582,6 +617,7 @@ _FILESYSTEM_SAMPLE_KEYS = frozenset(
         "docx_source_replay",
         "xlsx_source_sha256",
         "xlsx_semantic_sha256",
+        "xlsx_selected_cell",
         "xlsx_repeat_store",
     }
 )
@@ -594,6 +630,7 @@ _FILESYSTEM_SAMPLE_IDENTITY_KEYS = frozenset(
         "output_sha256",
         "xlsx_source_sha256",
         "xlsx_semantic_sha256",
+        "xlsx_selected_cell",
     }
 )
 _FILESYSTEM_EVIDENCE_REQUIRED_KEYS = frozenset(
@@ -853,6 +890,29 @@ _XLSX_REPEAT_STORE_CORPUS_NAMES = frozenset(
         _XLSX_REPEAT_STORE_OVERSIZED_CORPUS["name"],
     }
 )
+
+_XLSX_SELECTED_CELL_KEYS = frozenset(
+    {
+        "canonical_sheet_name",
+        "sheet_position",
+        "prepared_selector",
+        "cell_address",
+        "view",
+        "value_kind",
+        "lexical_value",
+        "digest",
+    }
+)
+_XLSX_SELECTED_CELL_EXPECTED = {
+    "canonical_sheet_name": "Bench01",
+    "sheet_position": 1,
+    "prepared_selector": "bEnCh01",
+    "cell_address": "M29",
+    "view": "stored",
+    "value_kind": "number",
+    "lexical_value": "1028012",
+}
+_XLSX_SELECTED_CELL_CASE = "xlsx_file_selected_cell"
 
 
 class AbbaSummaryInputError(ValueError):
@@ -2087,8 +2147,62 @@ def _xlsx_repeat_store_identity_projection(
     )
 
 
+def _validate_xlsx_selected_cell(value: Any, location: str) -> dict[str, Any]:
+    """Validate the untimed identity of the unified XLSX cell selection."""
+
+    evidence = _require_object(value, location)
+    keys = set(evidence)
+    if keys != _XLSX_SELECTED_CELL_KEYS:
+        missing = sorted(_XLSX_SELECTED_CELL_KEYS - keys)
+        unknown = sorted(keys - _XLSX_SELECTED_CELL_KEYS)
+        raise AbbaSummaryInputError(
+            f"{location} schema mismatch (missing={missing!r}, unknown={unknown!r})"
+        )
+    for field in (
+        "canonical_sheet_name",
+        "prepared_selector",
+        "cell_address",
+        "lexical_value",
+    ):
+        _required_nonempty_string(evidence[field], location, field)
+    _u64(evidence["sheet_position"], f"{location}.sheet_position")
+    if evidence["view"] != "stored":
+        raise AbbaSummaryInputError(f"{location}.view must be 'stored'")
+    if evidence["value_kind"] != "number":
+        raise AbbaSummaryInputError(f"{location}.value_kind must be 'number'")
+    for field, expected in _XLSX_SELECTED_CELL_EXPECTED.items():
+        if evidence[field] != expected:
+            raise AbbaSummaryInputError(
+                f"{location}.{field} differs from the fixed selected-cell oracle"
+            )
+    digest = _validate_output_sha256(evidence["digest"], f"{location}.digest")
+    payload = bytearray(b"litchi-xlsx-file-selected-cell-v1\0")
+    payload.extend(evidence["sheet_position"].to_bytes(8, "little"))
+    for field in (
+        "canonical_sheet_name",
+        "prepared_selector",
+        "cell_address",
+        "view",
+        "value_kind",
+        "lexical_value",
+    ):
+        encoded = evidence[field].encode("utf-8")
+        payload.extend(len(encoded).to_bytes(8, "little"))
+        payload.extend(encoded)
+    if digest != hashlib.sha256(payload).hexdigest():
+        raise AbbaSummaryInputError(
+            f"{location}.digest differs from the fixed selected-cell oracle"
+        )
+    return evidence
+
+
 def _validate_filesystem_sample(
-    sample: Any, location: str, sample_count: int, cache_states: Sequence[str]
+    sample: Any,
+    location: str,
+    sample_count: int,
+    cache_states: Sequence[str],
+    *,
+    case: str,
 ) -> dict[str, Any]:
     sample_object = _require_object(sample, location)
     missing = _FILESYSTEM_SAMPLE_REQUIRED_KEYS - set(sample_object)
@@ -2157,6 +2271,21 @@ def _validate_filesystem_sample(
         )
     if "xlsx_repeat_store" in sample_object:
         _require_object(sample_object["xlsx_repeat_store"], f"{location}.xlsx_repeat_store")
+    selected_cell_present = "xlsx_selected_cell" in sample_object
+    if case == _XLSX_SELECTED_CELL_CASE:
+        if not selected_cell_present:
+            raise AbbaSummaryInputError(
+                f"{location} must contain xlsx_selected_cell for filesystem case "
+                f"{case!r}"
+            )
+        _validate_xlsx_selected_cell(
+            sample_object["xlsx_selected_cell"], f"{location}.xlsx_selected_cell"
+        )
+    elif selected_cell_present:
+        raise AbbaSummaryInputError(
+            f"{location}.xlsx_selected_cell is only valid for filesystem case "
+            "'xlsx_file_selected_cell'"
+        )
     for field in (
         "elapsed_ns",
         "parent_wall_ns",
@@ -2370,10 +2499,15 @@ def _validate_filesystem_evidence(
                 f"{label}.results case {case!r} uses a pinned repeated-store corpus "
                 "but is not one of the exact repeated-store selectors"
             )
+    requires_filesystem_evidence = any(
+        case in _XLSX_REPEAT_STORE_CASE_CONTRACT
+        or case == _XLSX_SELECTED_CELL_CASE
+        for case, _ in indexed
+    )
     if raw is _MISSING:
-        if any(case in _XLSX_REPEAT_STORE_CASE_CONTRACT for case, _ in indexed):
+        if requires_filesystem_evidence:
             raise AbbaSummaryInputError(
-                f"{label}.filesystem_evidence is required for repeated-store selectors"
+                f"{label}.filesystem_evidence is required for selected XLSX selectors"
             )
         return False, frozenset(), {}, frozenset()
     if not isinstance(raw, list):
@@ -2411,6 +2545,14 @@ def _validate_filesystem_evidence(
             )
         case = _required_nonempty_string(evidence_object.get("case"), location, "case")
         corpus = _require_object(evidence_object.get("corpus"), f"{location}.corpus")
+        if case == _XLSX_SELECTED_CELL_CASE and _canonical_json(
+            corpus, f"{location}.corpus"
+        ) != _canonical_json(
+            _XLSX_SELECTED_CELL_CORPUS, f"{location}.expected_corpus"
+        ):
+            raise AbbaSummaryInputError(
+                f"{location}.corpus does not match the pinned xlsx_file_selected_cell corpus"
+            )
         if (
             _looks_like_xlsx_repeat_store_corpus(corpus)
             and case not in _XLSX_REPEAT_STORE_CASE_CONTRACT
@@ -2521,6 +2663,7 @@ def _validate_filesystem_evidence(
                 f"{location}.samples[{sample_position}]",
                 sample_count,
                 cache_states,
+                case=case,
             )
             sample_range_size_presence = frozenset(
                 _FILESYSTEM_RANGE_SIZE_KEYS & set(validated_sample)
@@ -2706,6 +2849,15 @@ def _validate_filesystem_evidence(
         raise AbbaSummaryInputError(
             f"{label}.filesystem_evidence is missing repeated-store selectors: "
             f"{sorted(missing_repeat_keys)}"
+        )
+    expected_selected_cell_keys = {
+        key for key in indexed if key[0] == _XLSX_SELECTED_CELL_CASE
+    }
+    missing_selected_cell_keys = expected_selected_cell_keys - set(evidence_index)
+    if missing_selected_cell_keys:
+        raise AbbaSummaryInputError(
+            f"{label}.filesystem_evidence is missing xlsx_file_selected_cell selectors: "
+            f"{sorted(missing_selected_cell_keys)}"
         )
     return True, frozenset(filesystem_shapes), evidence_index, frozenset(
         report_child_process_ids

@@ -1,5 +1,35 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0399: unified XLSX selected-cell filesystem baseline
+
+The opt-in `xlsx_file_selected_cell` selector raises the selectable registry
+from **419** to **420** and leaves the default at **36 cases / 198 rows**. It
+uses the fixed medium
+`litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1` corpus: four
+worksheets × 48 × 48 = 9,216 deterministic numeric cells, 17 ZIP members,
+4,226,429 archive bytes, and SHA-256
+`dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036`.
+
+The query targets canonical `Bench01` (zero-based sheet position `1`) through
+prepared mixed-case `bEnCh01`, then reads `M29` (zero-based row 28, column 12).
+The independent typed oracle expects a stored number with lexical value
+`1028012`; its dedicated selected-cell evidence digest is
+`36e53d9002ae8c433ad918b400196fb886fa675f850076808ac51327d1f42ac1`.
+
+Every sample uses a fresh child. `litchi::Workbook::open(path)` and query
+preparation are outside the timer; only case-insensitive sheet selection and
+the exact cell read are timed, while both selected handles remain live through
+elapsed, allocation, and process snapshots. Semantic/source hashes and the
+independent eager typed oracle are checked after timing. Logical source
+counters are `not_applicable_filesystem_xlsx`; no physical-I/O or locality
+claim is made. Cold-requested samples are advisory, and prepared query work
+makes `cold-verified` explicitly ineligible. Stable 1.98.1 validation passed
+the harness check, focused registry/scope tests, all four XLSX filesystem
+integration tests, the **77/77** strict Python schema suite, normal warm and
+cold-requested CLI oracles, explicit cold-ineligibility, and an allocator warm
+oracle. `performance_claim: none` and `claim_authorized: false` with no
+candidate/control speedup claim. See the [0399 change record](changes/0399-unified-xlsx-selected-cell-baseline.md).
+
 ## Change 0398: unified XLSX worksheet and cell selectors
 
 The xlsx-gated unified `litchi::sheet::Workbook::sheet(name_or_zero_based
