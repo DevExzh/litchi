@@ -894,7 +894,17 @@ impl<W: Write> PackageWriter<W> {
                 "Cannot set MIME type after writing other files".to_string(),
             )));
         }
-        Self::validate_media_type(mimetype, false, "MIME type").map_err(PackageWriterError::Core)
+        Self::validate_media_type(mimetype, false, "MIME type")
+            .map_err(PackageWriterError::Core)?;
+        if mimetype
+            .bytes()
+            .any(|byte| byte.is_ascii_whitespace() || byte == b';')
+        {
+            return Err(PackageWriterError::Core(Error::InvalidFormat(
+                "ODF MIME type must contain exactly one valid type/subtype pair".to_string(),
+            )));
+        }
+        Ok(())
     }
 
     fn validate_media_type(value: &str, allow_empty: bool, field: &str) -> Result<()> {
@@ -916,8 +926,22 @@ impl<W: Write> PackageWriter<W> {
             )));
         }
 
+        if value
+            .bytes()
+            .next()
+            .is_some_and(|byte| byte.is_ascii_whitespace())
+            || value
+                .bytes()
+                .next_back()
+                .is_some_and(|byte| byte.is_ascii_whitespace())
+        {
+            return Err(Error::InvalidFormat(format!(
+                "ODF {field} must not have leading or trailing whitespace"
+            )));
+        }
+
         let mut segments = value.split(';');
-        let essence = segments.next().unwrap_or_default().trim();
+        let essence = segments.next().unwrap_or_default().trim_end();
         let mut parts = essence.split('/');
         let top_level = parts.next().unwrap_or_default();
         let subtype = parts.next();
