@@ -20,5 +20,12 @@
     "budget_schema_validation": "passed",
     "parallel_metrics_validation": "passed"
   },
-  "notes": "Diagnostic schema smoke only. Same harness binary as0406; subsequent changes are documentation and Python validation only. Toolchain, source revision, and binary hash are retained in the report."
+  "notes": "Diagnostic schema smoke only. Same harness binary as0406; subsequent changes are documentation and Python validation only. Toolchain, source revision, and binary hash are retained in the report.",
+  "final_integrity_check": {
+    "revision_bound_sources_0405_and_0407": "passed",
+    "profile_0406_original_artifacts": 104,
+    "profile_0406_hashes_and_derived_flamegraph": "passed",
+    "report_validation_and_six_zstd_report_copies": "passed",
+    "all_0405_0406_0407_gzip_logs": "passed"
+  }
 }
