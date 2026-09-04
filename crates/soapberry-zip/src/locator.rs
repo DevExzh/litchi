@@ -8,7 +8,6 @@ use crate::{
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::Seek;
-use std::num::NonZeroU64;
 
 const END_OF_CENTRAL_DIR_SIGNAUTRE: u32 = 0x06054b50;
 pub(crate) const END_OF_CENTRAL_DIR_SIGNAUTRE_BYTES: [u8; 4] =
@@ -767,7 +766,10 @@ impl ZipLocator {
 #[derive(Debug, Clone)]
 pub(crate) struct EndOfCentralDirectory {
     eocd_offset: u64,
-    zip64_eocd_offset: Option<NonZeroU64>,
+    // `0` is a valid ZIP64 EOCD offset for an empty archive.  Do not encode
+    // this as `NonZeroU64`: the locator's offset is an ordinary u64 and the
+    // zero value must remain distinguishable from the ZIP32/no-record case.
+    zip64_eocd_offset: Option<u64>,
     central_dir_size: u64,
     central_dir_offset: u64,
     num_entries: u64,
@@ -797,7 +799,7 @@ impl EndOfCentralDirectory {
     ) -> Result<Self, Error> {
         let result = EndOfCentralDirectory {
             eocd_offset: eocd.offset,
-            zip64_eocd_offset: NonZeroU64::new(zip64.offset),
+            zip64_eocd_offset: Some(zip64.offset),
             central_dir_size: zip64.central_dir_size,
             central_dir_offset: zip64.central_dir_offset,
             num_entries: zip64.num_entries,
@@ -888,9 +890,7 @@ impl EndOfCentralDirectory {
     /// Will be equivalent to [`Self::tail_eocd_offset`] eocd for non-zip64 files
     #[inline]
     pub(crate) fn head_eocd_offset(&self) -> u64 {
-        self.zip64_eocd_offset
-            .map(|x| x.get())
-            .unwrap_or(self.eocd_offset)
+        self.zip64_eocd_offset.unwrap_or(self.eocd_offset)
     }
 
     /// The last end of the central directory signature offsets.
@@ -1032,8 +1032,15 @@ impl EndOfCentralDirectoryRecordFixed {
 
     pub fn is_zip64(&self) -> bool {
         // https://github.com/zlib-ng/minizip-ng/blob/55db144e03027b43263e5ebcb599bf0878ba58de/mz_zip.c#L1011
-        self.num_entries == u16::MAX || // 4.4.22
-        self.central_dir_offset == u32::MAX // 4.4.24
+        // The classic EOCD has four independent ZIP64 sentinels.  A partial
+        // sentinel set is still ZIP64 and must resolve through the ZIP64
+        // record; checking only the per-disk count and offset loses valid
+        // archives whose total count or central-directory size overflowed the
+        // ZIP32 representation first.
+        self.num_entries == u16::MAX // 4.4.22
+            || self.total_entries == u16::MAX // 4.4.23
+            || self.central_dir_size == u32::MAX // 4.4.23
+            || self.central_dir_offset == u32::MAX // 4.4.24
     }
 }
 
@@ -1304,11 +1311,151 @@ mod tests {
         data
     }
 
+    fn zip64_empty_archive_at_zero() -> Vec<u8> {
+        let mut data = Vec::new();
+
+        // ZIP64 EOCD at the beginning of the source is valid for an empty
+        // archive.  The locator below deliberately points at offset zero.
+        data.extend_from_slice(&0x0606_4b50u32.to_le_bytes());
+        data.extend_from_slice(&44u64.to_le_bytes());
+        data.extend_from_slice(&45u16.to_le_bytes());
+        data.extend_from_slice(&45u16.to_le_bytes());
+        data.extend_from_slice(&[0; 8]);
+        data.extend_from_slice(&0u64.to_le_bytes());
+        data.extend_from_slice(&0u64.to_le_bytes());
+        data.extend_from_slice(&0u64.to_le_bytes());
+        data.extend_from_slice(&0u64.to_le_bytes());
+
+        data.extend_from_slice(&END_OF_CENTRAL_DIR_LOCATOR_SIGNATURE.to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes());
+        data.extend_from_slice(&0u64.to_le_bytes());
+        data.extend_from_slice(&1u32.to_le_bytes());
+
+        append_eocd(&mut data, u16::MAX, u32::MAX, u32::MAX, &[]);
+        data
+    }
+
+    fn zip64_archive_with_classic_fields(
+        num_entries: u16,
+        total_entries: u16,
+        central_dir_size: u32,
+        central_dir_offset: u32,
+    ) -> Vec<u8> {
+        let mut data = zip64_archive();
+        let (_, _, classic_eocd) = zip64_offsets();
+        data[classic_eocd + 8..classic_eocd + 10].copy_from_slice(&num_entries.to_le_bytes());
+        data[classic_eocd + 10..classic_eocd + 12].copy_from_slice(&total_entries.to_le_bytes());
+        data[classic_eocd + 12..classic_eocd + 16].copy_from_slice(&central_dir_size.to_le_bytes());
+        data[classic_eocd + 16..classic_eocd + 20]
+            .copy_from_slice(&central_dir_offset.to_le_bytes());
+        data
+    }
+
     fn zip64_offsets() -> (usize, usize, usize) {
         let zip64_eocd = ZipFileHeaderFixed::SIZE;
         let locator = zip64_eocd + Zip64EndOfCentralDirectoryRecord::SIZE;
         let classic_eocd = locator + Zip64EndOfCentralDirectoryLocatorRecord::SIZE;
         (zip64_eocd, locator, classic_eocd)
+    }
+
+    #[test]
+    fn classic_eocd_zip64_detection_covers_each_count_size_and_offset_sentinel() {
+        let ordinary = EndOfCentralDirectoryRecordFixed {
+            signature: END_OF_CENTRAL_DIR_SIGNAUTRE,
+            disk_number: 0,
+            eocd_disk: 0,
+            num_entries: 1,
+            total_entries: 1,
+            central_dir_size: 46,
+            central_dir_offset: 0,
+            comment_len: 0,
+        };
+        assert!(!ordinary.is_zip64());
+
+        let mut per_disk_count = ordinary.clone();
+        per_disk_count.num_entries = u16::MAX;
+        assert!(per_disk_count.is_zip64());
+
+        let mut total_count = ordinary.clone();
+        total_count.total_entries = u16::MAX;
+        assert!(total_count.is_zip64());
+
+        let mut directory_size = ordinary.clone();
+        directory_size.central_dir_size = u32::MAX;
+        assert!(directory_size.is_zip64());
+
+        let mut directory_offset = ordinary;
+        directory_offset.central_dir_offset = u32::MAX;
+        assert!(directory_offset.is_zip64());
+    }
+
+    #[test]
+    fn zip64_empty_archive_preserves_a_zero_eocd_offset() {
+        let data = zip64_empty_archive_at_zero();
+        let archive = ZipLocator::new()
+            .locate_in_slice(data.clone())
+            .expect("offset-zero ZIP64 archive should locate");
+        assert!(archive.is_zip64());
+        assert_eq!(archive.entries_hint(), 0);
+        assert_eq!(archive.directory_offset(), 0);
+        assert_eq!(archive.head_eocd_offset(), 0);
+        assert_eq!(archive.eocd_offset(), 76);
+        assert!(archive.entries().next().is_none());
+
+        let mut buffer = [0u8; 128];
+        let reader_archive = ZipLocator::new()
+            .locate_in_reader(
+                CountingReader::new(data.clone()),
+                &mut buffer,
+                data.len() as u64,
+            )
+            .expect("reader locator should preserve offset-zero ZIP64");
+        assert!(reader_archive.is_zip64());
+        assert_eq!(reader_archive.entries_hint(), 0);
+        assert_eq!(reader_archive.head_eocd_offset(), 0);
+    }
+
+    #[test]
+    fn zip64_partial_classic_sentinels_resolve_through_the_zip64_record() {
+        let ordinary = (1, 1, ZipFileHeaderFixed::SIZE as u32, 0);
+        let cases = [
+            (u16::MAX, ordinary.1, ordinary.2, ordinary.3),
+            (ordinary.0, u16::MAX, ordinary.2, ordinary.3),
+            (ordinary.0, ordinary.1, u32::MAX, ordinary.3),
+            (ordinary.0, ordinary.1, ordinary.2, u32::MAX),
+        ];
+
+        for fields in cases {
+            let data = zip64_archive_with_classic_fields(fields.0, fields.1, fields.2, fields.3);
+            let archive = ZipLocator::new()
+                .locate_in_slice(data)
+                .expect("each ZIP64 classic sentinel should resolve");
+            assert!(archive.is_zip64());
+            assert_eq!(archive.entries_hint(), 1);
+            assert_eq!(archive.directory_offset(), 0);
+        }
+    }
+
+    #[test]
+    fn zip64_central_directory_must_end_at_or_before_the_zip64_eocd() {
+        let (zip64_eocd, _, _) = zip64_offsets();
+        let mut data = zip64_archive();
+        // The valid central directory occupies [0, 46), immediately before
+        // the ZIP64 EOCD.  A size of 47 would intrude into that tail and must
+        // be rejected before an entries iterator is constructed.
+        data[zip64_eocd + 40..zip64_eocd + 48].copy_from_slice(&47u64.to_le_bytes());
+
+        let slice_error = locate_slice_error(data.clone());
+        assert!(matches!(
+            slice_error.kind(),
+            ErrorKind::InvalidEndOfCentralDirectory
+        ));
+
+        let reader_error = locate_reader_error(data);
+        assert!(matches!(
+            reader_error.kind(),
+            ErrorKind::InvalidEndOfCentralDirectory
+        ));
     }
 
     fn locate_slice_error(data: Vec<u8>) -> Error {
@@ -1671,7 +1818,9 @@ mod tests {
     fn slice_locator_rejects_central_directory_range_past_eocd_without_panicking() {
         let mut data = ordinary_archive(&[]);
         let eocd_offset = data.len() - EndOfCentralDirectoryRecordFixed::SIZE;
-        data[eocd_offset + 12..eocd_offset + 16].copy_from_slice(&u32::MAX.to_le_bytes());
+        // Keep this malformed archive ZIP32: `u32::MAX` is a valid ZIP64
+        // sentinel and now deliberately exercises the ZIP64 path.
+        data[eocd_offset + 12..eocd_offset + 16].copy_from_slice(&47u32.to_le_bytes());
 
         let result = std::panic::catch_unwind(|| ZipLocator::new().locate_in_slice(data));
         assert!(result.is_ok(), "malformed EOCD must not panic");
