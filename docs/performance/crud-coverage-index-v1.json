@@ -33,7 +33,7 @@
   "checked_catalog": {
     "path": "docs/performance/results/perf-corpus-manifest-v2.json",
     "catalog_id": "litchi-perf-corpus-v2",
-    "catalog_sha256": "2add6164efd5d4324315d46327a53f1567c74d95f4cd719f898af1cb9c700297",
+    "catalog_sha256": "679d39548de0150b9fdfcdd2628ca3adc1bbd3c041a21d7a95ab70095c2d0ba9",
     "content_set_sha256": "f0fad22aa4deed6ccf2f8ecc202222ee2c901aec3fe908e69edee0dbd46b1d71"
   },
   "status_values": ["measured", "correctness-only", "unsupported", "not-applicable"],

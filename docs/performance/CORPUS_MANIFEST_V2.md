@@ -47,8 +47,44 @@ Licenses are recorded only with evidence; an unannotated fixture has a null
 license and is not silently treated as redistributable.
 
 Generator records include an identifier, revision, algorithm/seed fields, and
-deterministic parameters.  V1 migration leaves algorithm and seed fields null
-because those facts were not present in the V1 object.
+deterministic parameters.  Unmapped generator identifiers retain null
+algorithm/seed fields because those facts are not present in the V1 object.
+The checked default families use the source-audited enrichment below.
+
+## Generator family map
+
+The Python and Rust migrations carry the same small static map for the four
+generator families in the default catalog.  The map is a generator contract;
+it is not a claim that every archive member was independently inventoried.
+
+| Generator ID | Family | V2 `kind` | Proposed `algorithm_id` | `seed_spec` |
+|---|---|---|---|---|
+| `litchi-cfb-synthetic-v1` | `cfb` | `synthetic` | `litchi-perf.cfb-payload-v1` | `indexed-formula-v1` |
+| `litchi-opc-synthetic-v2` | `opc` | `synthetic` | `litchi-perf.opc-payload-v1` | `indexed-formula-v1` |
+| `litchi-legacy-writer-v1` | `legacy-writer` | `synthetic` | `litchi-perf.legacy-writer-v1` | `none` |
+| `litchi-xlsx-synthetic-v1` | `xlsx` | `synthetic` | `litchi-perf.xlsx-integer-grid-v1` | `none` |
+
+`indexed-formula-v1` does not mean a process-global or random seed.  For CFB
+and OPC, compressible bytes are
+`BLOCK[(offset + index) % 45]`, where `BLOCK` is the fixed
+`litchi-perf-baseline-compressible-payload-v1` block plus its newline.  The
+incompressible form initializes xorshift64 with
+`(index * 0x9e3779b97f4a7c15 + 0xd1b54a32d192ed03) mod 2^64`, applies shifts
+`13, 7, 17`, and emits `state >> 24`.  `none` means no seed or PRNG is used:
+legacy writers use their fixed text, dimensions, and payload-repeat formulas,
+while XLSX uses its indexed integer-grid and `ceil(cell_count / 100)` update
+formula.  Source function identities and the exact per-shape parameters are
+retained in `generator.parameters`.
+
+The legacy DOC/XLS/PPT writer family is therefore classified as deterministically
+generated even though its historical generator ID does not contain
+`synthetic`.  Known generator source is recorded as
+`provenance.source_path = "tools/perf-baseline/src/lib.rs"`; its
+`provenance.source_sha256` remains null because that field is reserved for a
+fixture/input-byte hash, not a generator-source hash.  Archive member
+inventories, stored sizes/hashes, relationship closure metrics, security
+states, and limit evidence remain unknown or unavailable unless separately
+recorded from the archive.
 
 ## Migration contract
 

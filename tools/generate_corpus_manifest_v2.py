@@ -24,6 +24,101 @@ CANONICALIZATION = {
     "hash": "sha256",
 }
 
+# This is the source-audited family map for the checked default corpus matrix.
+# Keep it in lockstep with the table in CORPUS_MANIFEST_V2.md and the Rust
+# migration.  The values are generator-contract metadata, not archive scans.
+FAMILY_MAP: dict[str, dict[str, Any]] = {
+    "litchi-cfb-synthetic-v1": {
+        "family": "cfb",
+        "kind": "synthetic",
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": True,
+        "algorithm_id": "litchi-perf.cfb-payload-v1",
+        "seed_spec": "indexed-formula-v1",
+        "source_functions": [
+            "build_cfb_corpus",
+            "cfb_entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind",
+        ],
+    },
+    "litchi-opc-synthetic-v2": {
+        "family": "opc",
+        "kind": "synthetic",
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": True,
+        "algorithm_id": "litchi-perf.opc-payload-v1",
+        "seed_spec": "indexed-formula-v1",
+        "source_functions": [
+            "build_opc_corpus",
+            "entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind",
+        ],
+    },
+    "litchi-legacy-writer-v1": {
+        "family": "legacy-writer",
+        "kind": "synthetic",
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": True,
+        "algorithm_id": "litchi-perf.legacy-writer-v1",
+        "seed_spec": "none",
+        "source_functions": [
+            "build_writer_corpus",
+            "write_fresh_doc",
+            "write_fresh_xls",
+            "write_fresh_ppt",
+            "WriterShape",
+            "writer_text",
+            "writer_payload_text",
+        ],
+    },
+    "litchi-xlsx-synthetic-v1": {
+        "family": "xlsx",
+        "kind": "synthetic",
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": True,
+        "algorithm_id": "litchi-perf.xlsx-integer-grid-v1",
+        "seed_spec": "none",
+        "source_functions": [
+            "build_xlsx_corpus",
+            "build_xlsx_workbook",
+            "xlsx_one_percent_updates",
+            "xlsx_value",
+            "xlsx_sheet_name",
+            "xlsx_address",
+            "XlsxShape",
+        ],
+    },
+}
+
+_COMPRESSIBLE_PAYLOAD_FORMULA = (
+    "BLOCK[(offset + index) % 45], "
+    "BLOCK=litchi-perf-baseline-compressible-payload-v1\\n"
+)
+_INCOMPRESSIBLE_PAYLOAD_FORMULA = (
+    "state=(index*0x9e3779b97f4a7c15+0xd1b54a32d192ed03) mod 2^64; "
+    "xorshift64 shifts=(13,7,17); byte=state>>24"
+)
+
 
 def canonical_bytes(value: Any) -> bytes:
     return json.dumps(
@@ -48,11 +143,148 @@ def content_id(corpus: dict[str, Any]) -> str:
     return f"{format_slug(corpus['package_format'])}:sha256:{corpus['archive_sha256']}"
 
 
+def generator_parameters(
+    legacy: dict[str, Any], family: dict[str, Any] | None
+) -> dict[str, Any]:
+    """Return source-audited generator facts without inventing archive data."""
+
+    parameters: dict[str, Any] = {
+        "legacy_shape": legacy["shape"],
+        "legacy_payload_kind": legacy["payload_kind"],
+    }
+    if family is None:
+        return parameters
+
+    family_id = family["family"]
+    parameters.update(
+        {
+            "family": family_id,
+            "package_format": legacy["package_format"],
+            "compression": legacy["compression"],
+            "entry_count": legacy["entry_count"],
+            "entry_bytes": legacy["entry_bytes"],
+            "archive_member_count": legacy["archive_member_count"],
+            "source_functions": list(family["source_functions"]),
+        }
+    )
+
+    if family_id in {"cfb", "opc"}:
+        is_cfb = family_id == "cfb"
+        target_index = (
+            legacy["entry_count"] - 1
+            if is_cfb
+            else legacy["entry_count"] // 2
+        )
+        parameters.update(
+            {
+                "target_index": target_index,
+                "target_name_pattern": (
+                    "benchmark_stream_{index:05}.bin"
+                    if is_cfb
+                    else "benchmark/parts/{index:05}.bin"
+                ),
+                "payload_formula": (
+                    _COMPRESSIBLE_PAYLOAD_FORMULA
+                    if legacy["payload_kind"] == "compressible"
+                    else _INCOMPRESSIBLE_PAYLOAD_FORMULA
+                ),
+            }
+        )
+        if legacy["payload_kind"] == "compressible":
+            parameters["payload_block_bytes"] = 45
+        if family_id == "opc":
+            parameters["relationship"] = {
+                "id": "rIdBenchmarkMain",
+                "type": (
+                    "http://schemas.openxmlformats.org/officeDocument/2006/"
+                    "relationships/officeDocument"
+                ),
+                "target": legacy["target_entry"],
+                "mode": "Internal",
+                "part_content_type": "application/octet-stream",
+            }
+        return parameters
+
+    if family_id == "legacy-writer":
+        writer_format = legacy["package_format"].split("/", 1)[0].lower()
+        parameters.update(
+            {
+                "writer_format": writer_format,
+                "writer_shape": legacy["shape"],
+                "target_stream": legacy["target_entry"],
+                "writer_text_template": (
+                    "litchi-perf-baseline-{kind}-v1-"
+                    "{first:03}-{second:05}-{third:03} deterministic payload"
+                ),
+                "payload_heavy_repeat_block": (
+                    "litchi-perf-baseline-payload-heavy-v1 "
+                ),
+                "payload_heavy_bytes": {
+                    "doc": 20_000,
+                    "xls": 32_700,
+                    "ppt": 40_000,
+                }[writer_format],
+            }
+        )
+        if writer_format == "doc":
+            parameters["paragraph_count"] = legacy["entry_count"]
+        elif writer_format == "xls":
+            if legacy["shape"] == "tiny":
+                dimensions = {"sheets": 1, "rows": 4, "columns": 4}
+            elif legacy["shape"] == "large":
+                dimensions = {"sheets": 4, "rows": 128, "columns": 16}
+            else:
+                dimensions = {"sheets": 128, "string_bytes": 32_700}
+            parameters["dimensions"] = dimensions
+            parameters["numeric_value_formula"] = (
+                "(sheet * rows * columns + row * columns + column) as f64"
+            )
+        else:
+            if legacy["shape"] == "tiny":
+                dimensions = {"slides": 1, "text_boxes_per_slide": 2}
+            elif legacy["shape"] == "large":
+                dimensions = {"slides": 12, "text_boxes_per_slide": 12}
+            else:
+                dimensions = {"slides": 16, "text_boxes_per_slide": 8}
+            parameters["dimensions"] = dimensions
+            parameters["textbox_position_formula"] = (
+                "x=36+(box_number % 3)*180; "
+                "y=36+(box_number / 3)*90; width=144; height=54"
+            )
+        return parameters
+
+    if family_id == "xlsx":
+        xlsx = legacy["xlsx"]
+        if xlsx is not None:
+            parameters.update(
+                {
+                    "sheet_count": xlsx["sheet_count"],
+                    "rows_per_sheet": xlsx["rows_per_sheet"],
+                    "columns_per_sheet": xlsx["columns_per_sheet"],
+                    "one_percent_update_count": xlsx[
+                        "one_percent_update_count"
+                    ],
+                }
+            )
+        parameters.update(
+            {
+                "value_formula": "(sheet * 1_000_000 + row * 1_000 + column) as i32",
+                "sheet_name_formula": "index == 0 ? Sheet1 : Bench{index:02}",
+                "address_formula": "column_to_letters(column + 1) + (row + 1)",
+                "one_percent_update_formula": "ceil(cell_count / 100)",
+            }
+        )
+        return parameters
+
+    return parameters
+
+
 def migrate_corpus(legacy: dict[str, Any]) -> dict[str, Any]:
     generator = legacy["generator"]
     shape = legacy["shape"]
     payload_kind = legacy["payload_kind"]
-    generated = "synthetic" in generator
+    family = FAMILY_MAP.get(generator)
+    generated = family is not None or "synthetic" in generator
     categories = ["legacy-migrated"]
     if generated:
         categories.append("synthetic")
@@ -75,6 +307,25 @@ def migrate_corpus(legacy: dict[str, Any]) -> dict[str, Any]:
     if xlsx:
         for key in ("sheet_count", "rows_per_sheet", "columns_per_sheet"):
             shape_parameters[key] = xlsx[key]
+    generator_metadata = {
+        "id": generator,
+        "kind": family["kind"] if family else ("synthetic" if generated else "unknown"),
+        "revision": revision,
+        "algorithm_id": family["algorithm_id"] if family else None,
+        "seed_spec": family["seed_spec"] if family else None,
+        "parameters": generator_parameters(legacy, family),
+    }
+    provenance_metadata = {
+        "source_kind": family["source_kind"] if family else ("generated" if generated else "unknown"),
+        "source_path": family["source_path"] if family else None,
+        "producer": family["producer"] if family else ("Litchi deterministic generator" if generated else None),
+        "producer_version": None,
+        # This field identifies fixture/input bytes, never generator source.
+        "source_sha256": None,
+        "license_spdx": family["license_spdx"] if family else ("Apache-2.0" if generated else None),
+        "license_evidence": family["license_evidence"] if family else ("repository-license" if generated else None),
+        "redistributable": family["redistributable"] if family else (True if generated else None),
+    }
     return {
         "id": content_id(legacy),
         "name": legacy["name"],
@@ -82,27 +333,8 @@ def migrate_corpus(legacy: dict[str, Any]) -> dict[str, Any]:
         "format": legacy["package_format"],
         "size_class": shape if shape in {"tiny", "medium", "large"} else "unknown",
         "categories": categories,
-        "generator": {
-            "id": generator,
-            "kind": "synthetic" if generated else "unknown",
-            "revision": revision,
-            "algorithm_id": None,
-            "seed_spec": None,
-            "parameters": {
-                "legacy_shape": shape,
-                "legacy_payload_kind": payload_kind,
-            },
-        },
-        "provenance": {
-            "source_kind": "generated" if generated else "unknown",
-            "source_path": None,
-            "producer": "Litchi deterministic generator" if generated else None,
-            "producer_version": None,
-            "source_sha256": None,
-            "license_spdx": "Apache-2.0" if generated else None,
-            "license_evidence": "repository-license" if generated else None,
-            "redistributable": True if generated else None,
-        },
+        "generator": generator_metadata,
+        "provenance": provenance_metadata,
         "bytes": {
             "archive_bytes": legacy["archive_bytes"],
             "archive_sha256": legacy["archive_sha256"],
