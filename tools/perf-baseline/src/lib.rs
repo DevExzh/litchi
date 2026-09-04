@@ -862,6 +862,92 @@ enum PayloadKind {
     Incompressible,
 }
 
+/// Predeclared allocator deltas for the future serial decoder-session
+/// candidate. These signed values are a candidate-minus-control model, not
+/// observations from this harness run and not a performance claim.
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+struct OpcSerialEagerOpenAllocatorModel {
+    comparison: &'static str,
+    status: &'static str,
+    allocation_calls: i64,
+    deallocation_calls: i64,
+    reallocation_calls: i64,
+    failed_allocation_calls: i64,
+    allocated_bytes: i64,
+    deallocated_bytes: i64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct OpcSerialEagerOpenCorpusOracle {
+    shape: CorpusShape,
+    payload_kind: PayloadKind,
+    archive_bytes: usize,
+    archive_sha256: &'static str,
+    part_count: usize,
+    archive_member_count: usize,
+    allocator_model: OpcSerialEagerOpenAllocatorModel,
+}
+
+/// Fixed corpus and allocator-model identity for the opt-in serial eager
+/// decoder-session baseline. The archive sizes and hashes are independent
+/// runtime constants; they are not copied from the generated manifest.
+const OPC_SERIAL_EAGER_OPEN_FIXED_MATRIX: [OpcSerialEagerOpenCorpusOracle; 3] = [
+    OpcSerialEagerOpenCorpusOracle {
+        shape: CorpusShape::Tiny,
+        payload_kind: PayloadKind::Compressible,
+        archive_bytes: 1_310,
+        archive_sha256: "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a",
+        part_count: 3,
+        archive_member_count: 5,
+        allocator_model: OpcSerialEagerOpenAllocatorModel {
+            comparison: "candidate-control",
+            status: "expected_not_observed",
+            allocation_calls: -4,
+            deallocation_calls: -4,
+            reallocation_calls: 0,
+            failed_allocation_calls: 0,
+            allocated_bytes: -160_640,
+            deallocated_bytes: -160_640,
+        },
+    },
+    OpcSerialEagerOpenCorpusOracle {
+        shape: CorpusShape::ManySmall,
+        payload_kind: PayloadKind::Incompressible,
+        archive_bytes: 303_003,
+        archive_sha256: "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        part_count: 256,
+        archive_member_count: 258,
+        allocator_model: OpcSerialEagerOpenAllocatorModel {
+            comparison: "candidate-control",
+            status: "expected_not_observed",
+            allocation_calls: -510,
+            deallocation_calls: -510,
+            reallocation_calls: 0,
+            failed_allocation_calls: 0,
+            allocated_bytes: -20_481_600,
+            deallocated_bytes: -20_481_600,
+        },
+    },
+    OpcSerialEagerOpenCorpusOracle {
+        shape: CorpusShape::FewLarge,
+        payload_kind: PayloadKind::Incompressible,
+        archive_bytes: 16_783_632,
+        archive_sha256: "a0c1af9e2c7a19148b44fc2a8c594c7a274131d74f9f042d55b487d5337cd1e6",
+        part_count: 4,
+        archive_member_count: 6,
+        allocator_model: OpcSerialEagerOpenAllocatorModel {
+            comparison: "candidate-control",
+            status: "expected_not_observed",
+            allocation_calls: -6,
+            deallocation_calls: -6,
+            reallocation_calls: 0,
+            failed_allocation_calls: 0,
+            allocated_bytes: -240_960,
+            deallocated_bytes: -240_960,
+        },
+    },
+];
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CfbSelectiveTarget {
     Mini,
@@ -974,6 +1060,7 @@ enum Case {
     ZipReadOne,
     OpcOpen,
     OpcOpenOwned,
+    OpcSerialEagerOpen,
     OpcRelationshipOpen,
     OpcNoopSave,
     OpcMutatedSave,
@@ -1438,6 +1525,7 @@ impl Case {
             Self::ZipReadOne => "zip_read_one",
             Self::OpcOpen => "opc_open",
             Self::OpcOpenOwned => "opc_open_owned",
+            Self::OpcSerialEagerOpen => "opc_serial_eager_open",
             Self::OpcRelationshipOpen => "opc_relationship_open",
             Self::OpcNoopSave => "opc_noop_save",
             Self::OpcMutatedSave => "opc_mutated_save",
@@ -2030,6 +2118,10 @@ impl Case {
 
     const fn is_opc_relationship_open(self) -> bool {
         matches!(self, Self::OpcRelationshipOpen)
+    }
+
+    const fn is_opc_serial_eager_open(self) -> bool {
+        matches!(self, Self::OpcSerialEagerOpen)
     }
 
     const fn is_opc_casefold_lookup(self) -> bool {
@@ -3991,6 +4083,8 @@ struct SourceSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     opc_relationships: Option<OpcRelationshipSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    opc_serial_eager_open: Option<OpcSerialEagerOpenSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     opc_source_overlay: Option<OpcSourceOverlaySummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ordinary_payload_materializations: Option<Vec<u64>>,
@@ -4120,6 +4214,37 @@ struct OpcRelationshipSummary {
     observed_part_counts: Vec<usize>,
     observed_relationship_counts: Vec<usize>,
     observed_part_payload_bytes: Vec<usize>,
+}
+
+/// Fixed-matrix identity and post-timing semantic gates for the opt-in
+/// serial eager OPC constructor baseline.  The constructor is the only timed
+/// operation; all package graph, member, content-type, relationship, and
+/// deterministic payload checks are recorded after the clock stops.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+struct OpcSerialEagerOpenSummary {
+    implementation: &'static str,
+    timing_scope: &'static str,
+    performance_claim: &'static str,
+    /// Expected candidate-minus-control allocator deltas for the future
+    /// decoder-session candidate. This is a model, not observed evidence.
+    predeclared_allocator_model: OpcSerialEagerOpenAllocatorModel,
+    worker_count: usize,
+    source_archive_bytes: u64,
+    source_archive_sha256: String,
+    archive_member_count: usize,
+    part_count: usize,
+    part_names_sha256: String,
+    part_payload_sha256: String,
+    target_name: String,
+    target_payload_sha256: String,
+    all_ordinary_parts_deflated_verified: bool,
+    observed_part_counts: Vec<usize>,
+    observed_part_names_sha256: Vec<String>,
+    observed_part_payload_sha256: Vec<String>,
+    observed_content_types_verified: Vec<bool>,
+    observed_root_relationship_verified: Vec<bool>,
+    observed_main_target_verified: Vec<bool>,
+    observed_deterministic_payload_hashes_verified: Vec<bool>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -8248,6 +8373,22 @@ fn validate_opc_casefold_lookup_options(
     Ok(())
 }
 
+fn validate_opc_serial_eager_open_options(
+    cases: &[Case],
+    shapes: &[CorpusShape],
+    payloads: &[PayloadKind],
+) -> Result<(), Box<dyn Error>> {
+    if cases.iter().any(|case| case.is_opc_serial_eager_open())
+        && (shapes != CorpusShape::ALL.as_slice() || payloads != PayloadKind::ALL.as_slice())
+    {
+        return Err(
+            "opc_serial_eager_open uses a fixed tiny/many-small/few-large OPC corpus matrix; omit --shape and --payload"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 fn validate_xls_source_options(
     cases: &[Case],
     shapes: &[CorpusShape],
@@ -8314,6 +8455,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         &options.shapes,
         &options.payloads,
     )?;
+    validate_opc_serial_eager_open_options(&options.cases, &options.shapes, &options.payloads)?;
     validate_docx_section_layout_options(&options.cases, &options.shapes, &options.payloads)?;
     validate_pptx_source_image_query_options(&options.cases, &options.shapes, &options.payloads)?;
     validate_opc_casefold_lookup_options(&options.cases, &options.shapes, &options.payloads)?;
@@ -8531,6 +8673,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                     && !case.is_detection()
                     && !case.is_cfb_selective()
                     && !case.is_cfb_open_stream_evidence()
+                    && !case.is_opc_serial_eager_open()
                     && !case.is_opc_relationship_open()
             }) {
                 let corpus = if case.uses_synthetic_cfb() {
@@ -8585,6 +8728,31 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                 options.warmup_iterations,
                 options.samples,
             )?);
+        }
+    }
+
+    if options
+        .cases
+        .iter()
+        .any(|case| case.is_opc_serial_eager_open())
+    {
+        for oracle in OPC_SERIAL_EAGER_OPEN_FIXED_MATRIX {
+            let corpus = build_opc_corpus(oracle.shape, oracle.payload_kind)?;
+            for case in options
+                .cases
+                .iter()
+                .copied()
+                .filter(|case| case.is_opc_serial_eager_open())
+            {
+                if case != Case::OpcSerialEagerOpen {
+                    return Err("unsupported serial eager OPC selector".into());
+                }
+                results.push(run_opc_serial_eager_open(
+                    &corpus,
+                    options.warmup_iterations,
+                    options.samples,
+                )?);
+            }
         }
     }
 
@@ -10501,6 +10669,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "zip_read_one" => Some(Case::ZipReadOne),
         "opc_open" => Some(Case::OpcOpen),
         "opc_open_owned" => Some(Case::OpcOpenOwned),
+        "opc_serial_eager_open" => Some(Case::OpcSerialEagerOpen),
         "opc_relationship_open" => Some(Case::OpcRelationshipOpen),
         "opc_noop_save" => Some(Case::OpcNoopSave),
         "opc_mutated_save" => Some(Case::OpcMutatedSave),
@@ -11144,6 +11313,7 @@ fn usage_text() -> String {
            --filesystem-cache LIST     Filesystem states: warm,cold-requested,cold-verified\n\
            --filesystem-root PATH      Parent directory for filesystem samples\n\
            --case LIST                 zip_index,zip_read_one,opc_open,opc_open_owned,\n\
+                                       opc_serial_eager_open,\n\
                                        opc_relationship_open,\n\
                                        opc_noop_save,opc_mutated_save,opc_source_open,\n\
                                        opc_source_open_main_read,opc_source_cached_main_read,\n\
@@ -20719,6 +20889,9 @@ fn run_case_with_config(
         Case::ZipReadOne => run_zip_read_one(corpus, warmup_iterations, samples),
         Case::OpcOpen => run_opc_open(corpus, warmup_iterations, samples),
         Case::OpcOpenOwned => run_opc_open_owned(corpus, warmup_iterations, samples),
+        Case::OpcSerialEagerOpen => {
+            Err("serial eager OPC open uses its fixed dedicated corpus runner".into())
+        },
         Case::OpcRelationshipOpen => {
             Err("OPC relationship-heavy case uses its dedicated corpus runner".into())
         },
@@ -42736,6 +42909,313 @@ fn verify_opc_materialized_package(
     Ok(())
 }
 
+#[derive(Debug)]
+struct OpcSerialEagerOpenVerification {
+    part_count: usize,
+    part_names_sha256: String,
+    part_payload_sha256: String,
+    content_types_verified: bool,
+    root_relationship_verified: bool,
+    main_target_verified: bool,
+    deterministic_payload_hashes_verified: bool,
+}
+
+/// Preflight the fixed serial-eager matrix's ZIP method before any timed
+/// constructor runs.  The package writer currently emits Deflate for every
+/// non-directory member; checking the raw central-directory records keeps this
+/// baseline explicit about the decompression workload it exercises.
+fn verify_opc_serial_eager_fixed_corpus_preflight(
+    corpus: &Corpus,
+) -> Result<&'static OpcSerialEagerOpenCorpusOracle, Box<dyn Error>> {
+    let oracle = OPC_SERIAL_EAGER_OPEN_FIXED_MATRIX
+        .iter()
+        .find(|oracle| {
+            oracle.shape.name() == corpus.manifest.shape
+                && oracle.payload_kind.name() == corpus.manifest.payload_kind
+        })
+        .ok_or("serial eager OPC corpus shape/payload is outside the fixed matrix")?;
+    if corpus.manifest.generator != OPC_CORPUS_GENERATOR {
+        return Err("serial eager OPC corpus generator differs from the fixed identity".into());
+    }
+    if corpus.manifest.entry_count != oracle.part_count {
+        return Err(format!(
+            "serial eager OPC part count {} differs from fixed oracle {}",
+            corpus.manifest.entry_count, oracle.part_count
+        )
+        .into());
+    }
+    if corpus.manifest.archive_member_count != oracle.archive_member_count {
+        return Err(format!(
+            "serial eager OPC member count {} differs from fixed oracle {}",
+            corpus.manifest.archive_member_count, oracle.archive_member_count
+        )
+        .into());
+    }
+    if corpus.archive.len() != oracle.archive_bytes {
+        return Err(format!(
+            "serial eager OPC archive byte size {} differs from fixed oracle {}",
+            corpus.archive.len(), oracle.archive_bytes
+        )
+        .into());
+    }
+    if corpus.manifest.archive_bytes != oracle.archive_bytes {
+        return Err(format!(
+            "serial eager OPC manifest archive byte size {} differs from fixed oracle {}",
+            corpus.manifest.archive_bytes, oracle.archive_bytes
+        )
+        .into());
+    }
+    let archive_sha256 = sha256_hex(&corpus.archive);
+    if archive_sha256 != oracle.archive_sha256 {
+        return Err(format!(
+            "serial eager OPC archive SHA-256 {archive_sha256} differs from fixed oracle {}",
+            oracle.archive_sha256
+        )
+        .into());
+    }
+    if corpus.manifest.archive_sha256 != oracle.archive_sha256 {
+        return Err(format!(
+            "serial eager OPC manifest archive SHA-256 differs from fixed oracle {}",
+            oracle.archive_sha256
+        )
+        .into());
+    }
+    verify_opc_serial_eager_deflate_preflight(corpus, oracle)?;
+    Ok(oracle)
+}
+
+fn verify_opc_serial_eager_deflate_preflight(
+    corpus: &Corpus,
+    oracle: &OpcSerialEagerOpenCorpusOracle,
+) -> Result<(), Box<dyn Error>> {
+    let archive = ZipArchive::from_slice(&corpus.archive)?;
+    let mut file_count = 0usize;
+    for entry in archive.entries() {
+        let entry = entry?;
+        if entry.is_dir() {
+            continue;
+        }
+        file_count = file_count
+            .checked_add(1)
+            .ok_or("serial eager OPC ZIP file count overflows usize")?;
+        if entry.compression_method() != soapberry_zip::CompressionMethod::Deflate {
+            return Err(format!(
+                "serial eager OPC fixed corpus member {:?} is not Deflate",
+                entry.file_path().try_normalize()?.as_ref()
+            )
+            .into());
+        }
+    }
+    if file_count != oracle.archive_member_count {
+        return Err(format!(
+            "serial eager OPC ZIP file count {file_count} differs from fixed oracle {}",
+            oracle.archive_member_count
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn expected_opc_serial_eager_part_digests(
+    corpus: &Corpus,
+) -> Result<(String, String), Box<dyn Error>> {
+    let payload_kind = corpus_payload_kind(corpus)?;
+    let mut parts = BTreeMap::new();
+    for index in 0..corpus.manifest.entry_count {
+        let name = entry_name(index);
+        parts.insert(
+            name,
+            payload_bytes(payload_kind, index, corpus.manifest.entry_bytes),
+        );
+    }
+    Ok((member_name_digest(&parts), named_member_digest(&parts)))
+}
+
+/// Verify every logical package property after a timed `from_bytes` call.
+/// The returned digests are retained in the structured summary so a report
+/// cannot silently reduce the oracle to a part count alone.
+fn verify_opc_serial_eager_package(
+    corpus: &Corpus,
+    package: &OpcPackage,
+    expected_part_names_sha256: &str,
+    expected_part_payload_sha256: &str,
+) -> Result<OpcSerialEagerOpenVerification, Box<dyn Error>> {
+    if package.part_count() != corpus.manifest.entry_count {
+        return Err("serial eager OPC part count differs from fixed corpus manifest".into());
+    }
+
+    let expected_relationships = vec![(
+        "rIdBenchmarkMain".to_owned(),
+        relationship_type::OFFICE_DOCUMENT.to_owned(),
+        corpus.target_name.clone(),
+        false,
+    )];
+    if relationship_signatures(package.rels()) != expected_relationships {
+        return Err("serial eager OPC root relationship differs from fixed corpus".into());
+    }
+
+    let payload_kind = corpus_payload_kind(corpus)?;
+    let mut parts = BTreeMap::new();
+    for index in 0..corpus.manifest.entry_count {
+        let name = entry_name(index);
+        let uri = PackURI::new(format!("/{name}"))?;
+        let part = package.get_part(&uri)?;
+        let expected = payload_bytes(payload_kind, index, corpus.manifest.entry_bytes);
+        if part.content_type() != CONTENT_TYPE {
+            return Err(format!("serial eager OPC Part {name} content type differs").into());
+        }
+        if !part.rels().iter().next().is_none() {
+            return Err(format!("serial eager OPC Part {name} unexpectedly has relationships").into());
+        }
+        if part.blob() != expected {
+            return Err(format!("serial eager OPC Part {name} payload differs").into());
+        }
+        parts.insert(name, part.blob().to_vec());
+    }
+
+    let part_names_sha256 = member_name_digest(&parts);
+    let part_payload_sha256 = named_member_digest(&parts);
+    if part_names_sha256 != expected_part_names_sha256
+        || part_payload_sha256 != expected_part_payload_sha256
+    {
+        return Err("serial eager OPC deterministic part digest differs from fixed oracle".into());
+    }
+
+    let main = package.main_document_part()?;
+    if main.partname().membername() != corpus.target_name {
+        return Err("serial eager OPC main relationship resolved the wrong target".into());
+    }
+    if sha256_hex(main.blob()) != corpus.manifest.target_payload_sha256 {
+        return Err("serial eager OPC main target payload differs from fixed oracle".into());
+    }
+
+    Ok(OpcSerialEagerOpenVerification {
+        part_count: package.part_count(),
+        part_names_sha256,
+        part_payload_sha256,
+        content_types_verified: true,
+        root_relationship_verified: true,
+        main_target_verified: true,
+        deterministic_payload_hashes_verified: true,
+    })
+}
+
+/// Baseline the exact eager constructor used by the future serial decoder
+/// session candidate.  Corpus construction, raw ZIP preflight, and all
+/// package semantics are outside the timed region.  The normal target emits
+/// an explicit unavailable allocator sample; the allocator target measures
+/// the same constructor region.
+fn run_opc_serial_eager_open(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let oracle = verify_opc_serial_eager_fixed_corpus_preflight(corpus)?;
+    let (expected_part_names_sha256, expected_part_payload_sha256) =
+        expected_opc_serial_eager_part_digests(corpus)?;
+    let mut elapsed = Vec::with_capacity(samples);
+    let mut observations = Vec::with_capacity(samples);
+    let mut observed_part_counts = Vec::with_capacity(samples);
+    let mut observed_part_names_sha256 = Vec::with_capacity(samples);
+    let mut observed_part_payload_sha256 = Vec::with_capacity(samples);
+    let mut observed_content_types_verified = Vec::with_capacity(samples);
+    let mut observed_root_relationship_verified = Vec::with_capacity(samples);
+    let mut observed_main_target_verified = Vec::with_capacity(samples);
+    let mut observed_deterministic_payload_hashes_verified = Vec::with_capacity(samples);
+
+    for iteration in 0..iteration_count(warmup_iterations, samples)? {
+        let allocation_region = allocation_metrics::begin();
+        let started = Instant::now();
+        let package = OpcPackage::from_bytes(&corpus.archive)?;
+        let duration = started.elapsed();
+        let allocation_metrics = match allocation_region.finish() {
+            Some(sample) => Some(sample),
+            None => Some(allocation_metrics::unavailable_sample()),
+        };
+        let elapsed_ns = elapsed_ns(duration)?;
+        if iteration >= warmup_iterations {
+            elapsed.push(elapsed_ns);
+            observations.push(operation_metrics::InProcessObservation {
+                elapsed_ns,
+                process_metrics: None,
+                allocation_metrics,
+            });
+
+            let verification = verify_opc_serial_eager_package(
+                corpus,
+                &package,
+                &expected_part_names_sha256,
+                &expected_part_payload_sha256,
+            )?;
+            observed_part_counts.push(verification.part_count);
+            observed_part_names_sha256.push(verification.part_names_sha256);
+            observed_part_payload_sha256.push(verification.part_payload_sha256);
+            observed_content_types_verified.push(verification.content_types_verified);
+            observed_root_relationship_verified.push(verification.root_relationship_verified);
+            observed_main_target_verified.push(verification.main_target_verified);
+            observed_deterministic_payload_hashes_verified
+                .push(verification.deterministic_payload_hashes_verified);
+        }
+    }
+
+    let elapsed_statistics = statistics(elapsed);
+    let sample_order = elapsed_statistics.sample_order.clone();
+    reorder_sample_vector(&mut observed_part_counts, &sample_order)?;
+    reorder_sample_vector(&mut observed_part_names_sha256, &sample_order)?;
+    reorder_sample_vector(&mut observed_part_payload_sha256, &sample_order)?;
+    reorder_sample_vector(&mut observed_content_types_verified, &sample_order)?;
+    reorder_sample_vector(&mut observed_root_relationship_verified, &sample_order)?;
+    reorder_sample_vector(&mut observed_main_target_verified, &sample_order)?;
+    reorder_sample_vector(
+        &mut observed_deterministic_payload_hashes_verified,
+        &sample_order,
+    )?;
+    let operation_metrics = operation_metrics::from_in_process_observations_without_sink(
+        &observations,
+    )?;
+    Ok(CaseResult {
+        case: Case::OpcSerialEagerOpen.name(),
+        cache_state: None,
+        corpus: corpus.manifest.clone(),
+        elapsed_ns: elapsed_statistics,
+        sink: None,
+        source: boxed_source(SourceSummary {
+            opc_serial_eager_open: Some(OpcSerialEagerOpenSummary {
+                implementation: "OpcPackage::from_bytes",
+                timing_scope:
+                    "OpcPackage::from_bytes constructor only; ZIP preflight and all package semantic oracles excluded",
+                performance_claim: "none",
+                predeclared_allocator_model: oracle.allocator_model,
+                worker_count: 1,
+                source_archive_bytes: u64::try_from(oracle.archive_bytes)?,
+                source_archive_sha256: oracle.archive_sha256.to_owned(),
+                archive_member_count: oracle.archive_member_count,
+                part_count: oracle.part_count,
+                part_names_sha256: expected_part_names_sha256,
+                part_payload_sha256: expected_part_payload_sha256,
+                target_name: corpus.target_name.clone(),
+                target_payload_sha256: corpus.manifest.target_payload_sha256.clone(),
+                all_ordinary_parts_deflated_verified: true,
+                observed_part_counts,
+                observed_part_names_sha256,
+                observed_part_payload_sha256,
+                observed_content_types_verified,
+                observed_root_relationship_verified,
+                observed_main_target_verified,
+                observed_deterministic_payload_hashes_verified,
+            }),
+            ..SourceSummary::default()
+        }),
+        execution: Some(ExecutionSummary {
+            worker_count: 1,
+            logical_tasks: 1,
+            logical_bytes: u64::try_from(corpus.archive.len())?,
+        }),
+        output_sha256: Some(oracle.archive_sha256.to_owned()),
+        operation_metrics: Some(operation_metrics),
+    })
+}
+
 /// Measure only unmanaged `SourceBackedPackage::into_opc_package` after
 /// deterministic source-backed open has completed.  The complete graph and
 /// payload hashes are verified after each timed interval.  Process and
@@ -53739,6 +54219,7 @@ mod tests {
         ODT_RESOURCE_BATCH_COUNT, OOXML_TRACKER_CORPUS_GENERATOR, OpcCacheMode, PPT_PICTURE_BYTES,
         PPT_PICTURE_COUNT, PPT_PICTURES_CORPUS_GENERATOR, PPT_REPEATED_QUERY_COUNT,
         PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT, PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind,
+        OPC_SERIAL_EAGER_OPEN_FIXED_MATRIX,
         PPTX_SOURCE_IMAGE_QUERY_SELECTED_POSITION,
         RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
         RtfSemanticVariant, SemanticShape, SimulatedCursor, SimulatedRangeMetrics,
@@ -53775,7 +54256,8 @@ mod tests {
         run_cfb_selective_read, run_cfb_selective_simulated_read,
         run_docx_source_backed_existing_section_layout_edit_save,
         run_docx_source_backed_one_edit_save, run_odf_content_cow, run_ooxml_tracker_case,
-        run_opc_source_cache_budget_boundary, run_opc_source_cache_contention,
+        run_opc_serial_eager_open, run_opc_source_cache_budget_boundary,
+        run_opc_source_cache_contention,
         run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
         run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_cross_copy, run_pptx_source_backed_one_edit_save,
@@ -53788,7 +54270,9 @@ mod tests {
         run_xlsx_page_margin_edit_save, run_xlsx_page_setup_edit_save,
         run_xlsx_print_options_edit_save, run_xlsx_sheet_protection_edit_save, sha256_hex,
         simulated_request_delay, statistics, updated_writer_text, usage_text,
-        validate_xls_source_locality, validate_xls_source_options, verify_xlsx_cells, writer_shape,
+        validate_opc_serial_eager_open_options, validate_xls_source_locality,
+        validate_xls_source_options, verify_xlsx_cells, writer_shape,
+        verify_opc_serial_eager_fixed_corpus_preflight,
         zip_member_ranges,
         validate_pptx_source_image_query_options,
         xls_source_family_dispatch_cases, xls_writer_semantic_dispatch_selected, xlsb_cells_digest,
@@ -54236,6 +54720,173 @@ mod tests {
         assert_eq!(summary.observed_part_counts, vec![256]);
         assert_eq!(summary.observed_relationship_counts, vec![257]);
         assert_eq!(summary.observed_part_payload_bytes, vec![256 * 96]);
+    }
+
+    #[test]
+    fn opc_serial_eager_open_selector_is_opt_in_and_fixed() {
+        let case = Case::OpcSerialEagerOpen;
+        assert_eq!(parse_case(case.name()), Some(case));
+        assert_eq!(case.name(), "opc_serial_eager_open");
+        assert!(case.is_opc_serial_eager_open());
+        assert!(!case.uses_synthetic_opc());
+        assert!(!Case::DEFAULT.contains(&case));
+        assert_eq!(Case::DEFAULT.len(), 36);
+        assert!(usage_text().contains(case.name()));
+        assert_eq!(parse_case("opc_serial_eager_open:tiny"), None);
+
+        assert!(validate_opc_serial_eager_open_options(
+            &[case],
+            CorpusShape::ALL.as_slice(),
+            PayloadKind::ALL.as_slice(),
+        )
+        .is_ok());
+        assert!(validate_opc_serial_eager_open_options(
+            &[case],
+            &[CorpusShape::Tiny],
+            PayloadKind::ALL.as_slice(),
+        )
+        .is_err());
+        assert!(validate_opc_serial_eager_open_options(
+            &[case],
+            CorpusShape::ALL.as_slice(),
+            &[PayloadKind::Compressible],
+        )
+        .is_err());
+
+        let corpus = build_opc_corpus(CorpusShape::Tiny, PayloadKind::Compressible).unwrap();
+        let error = match run_case(case, &corpus, 0, 1) {
+            Ok(_) => panic!("serial eager selector unexpectedly used generic runner"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("dedicated corpus runner"));
+    }
+
+    #[test]
+    fn opc_serial_eager_open_preflight_rejects_wrong_fixed_identity() {
+        let mut wrong_shape = build_opc_corpus(CorpusShape::Tiny, PayloadKind::Compressible)
+            .unwrap();
+        wrong_shape.manifest.shape = CorpusShape::ManySmall.name();
+        assert!(verify_opc_serial_eager_fixed_corpus_preflight(&wrong_shape).is_err());
+
+        let mut wrong_payload =
+            build_opc_corpus(CorpusShape::Tiny, PayloadKind::Compressible).unwrap();
+        wrong_payload.manifest.payload_kind = PayloadKind::Incompressible.name();
+        assert!(verify_opc_serial_eager_fixed_corpus_preflight(&wrong_payload).is_err());
+
+        let mut wrong_hash =
+            build_opc_corpus(CorpusShape::Tiny, PayloadKind::Compressible).unwrap();
+        wrong_hash.archive[0] ^= 0x01;
+        assert!(verify_opc_serial_eager_fixed_corpus_preflight(&wrong_hash).is_err());
+
+        let mut wrong_size =
+            build_opc_corpus(CorpusShape::Tiny, PayloadKind::Compressible).unwrap();
+        wrong_size.manifest.archive_bytes += 1;
+        assert!(verify_opc_serial_eager_fixed_corpus_preflight(&wrong_size).is_err());
+    }
+
+    #[test]
+    fn opc_serial_eager_open_fixed_matrix_is_deterministic_and_gated() {
+        for oracle in OPC_SERIAL_EAGER_OPEN_FIXED_MATRIX {
+            let first = build_opc_corpus(oracle.shape, oracle.payload_kind).unwrap();
+            let second = build_opc_corpus(oracle.shape, oracle.payload_kind).unwrap();
+            assert_eq!(first.archive, second.archive);
+            assert_eq!(
+                first.manifest.archive_sha256,
+                second.manifest.archive_sha256
+            );
+            assert_eq!(first.manifest.generator, super::OPC_CORPUS_GENERATOR);
+            assert_eq!(first.manifest.shape, oracle.shape.name());
+            assert_eq!(first.manifest.payload_kind, oracle.payload_kind.name());
+            assert_eq!(first.archive.len(), oracle.archive_bytes);
+            assert_eq!(first.manifest.archive_bytes, oracle.archive_bytes);
+            assert_eq!(first.manifest.archive_sha256, oracle.archive_sha256);
+            assert_eq!(first.manifest.entry_count, oracle.part_count);
+            assert_eq!(first.manifest.archive_member_count, oracle.archive_member_count);
+            assert_eq!(
+                *verify_opc_serial_eager_fixed_corpus_preflight(&first).unwrap(),
+                oracle
+            );
+
+            let measured = run_opc_serial_eager_open(&first, 1, 2).unwrap();
+            assert_eq!(measured.case, "opc_serial_eager_open");
+            assert_eq!(measured.elapsed_ns.samples.len(), 2);
+            assert_eq!(
+                measured.operation_metrics.as_ref().unwrap().sample_count,
+                2
+            );
+            assert_eq!(
+                measured.operation_metrics.as_ref().unwrap().sample_indices,
+                measured.elapsed_ns.sample_order
+            );
+            assert_eq!(
+                measured.execution,
+                Some(super::ExecutionSummary {
+                    worker_count: 1,
+                    logical_tasks: 1,
+                    logical_bytes: first.archive.len() as u64,
+                })
+            );
+            assert_eq!(
+                measured.output_sha256.as_deref(),
+                Some(first.manifest.archive_sha256.as_str())
+            );
+
+            let operation = measured
+                .operation_metrics
+                .as_ref()
+                .expect("serial eager operation metrics");
+            assert_eq!(
+                operation.process.status,
+                super::operation_metrics::MetricStatus::Unavailable
+            );
+            let allocation = operation
+                .allocation
+                .as_ref()
+                .expect("serial eager allocator status");
+            assert_eq!(
+                allocation.status,
+                super::operation_metrics::MetricStatus::Unavailable
+            );
+            assert!(allocation.allocation_calls.values.is_none());
+            assert_eq!(
+                operation.sink.status,
+                super::operation_metrics::MetricStatus::NotApplicable
+            );
+
+            let summary = measured
+                .source
+                .as_ref()
+                .and_then(|source| source.opc_serial_eager_open.as_ref())
+                .expect("serial eager fixed-matrix summary");
+            assert_eq!(summary.worker_count, 1);
+            assert_eq!(summary.source_archive_bytes, oracle.archive_bytes as u64);
+            assert_eq!(summary.source_archive_sha256, oracle.archive_sha256);
+            assert_eq!(summary.archive_member_count, oracle.archive_member_count);
+            assert_eq!(summary.part_count, oracle.part_count);
+            assert_eq!(summary.predeclared_allocator_model, oracle.allocator_model);
+            assert!(summary.all_ordinary_parts_deflated_verified);
+            assert_eq!(summary.target_name, first.target_name);
+            assert_eq!(
+                summary.target_payload_sha256,
+                first.manifest.target_payload_sha256
+            );
+            assert_eq!(summary.observed_part_counts, vec![oracle.part_count; 2]);
+            assert_eq!(
+                summary.observed_part_names_sha256,
+                vec![summary.part_names_sha256.clone(); 2]
+            );
+            assert_eq!(
+                summary.observed_part_payload_sha256,
+                vec![summary.part_payload_sha256.clone(); 2]
+            );
+            assert_eq!(summary.observed_content_types_verified, vec![true; 2]);
+            assert_eq!(summary.observed_root_relationship_verified, vec![true; 2]);
+            assert_eq!(summary.observed_main_target_verified, vec![true; 2]);
+            assert_eq!(
+                summary.observed_deterministic_payload_hashes_verified,
+                vec![true; 2]
+            );
+        }
     }
 
     #[test]
@@ -54818,7 +55469,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 420);
+        assert_eq!(selectable_count, 421);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
