@@ -2110,6 +2110,49 @@ mod tests {
         }
 
         #[test]
+        fn dimension_metadata_0400_keeps_scalar_and_range_queries_streaming() {
+            let bytes = one_sheet_xlsx(&format!(
+                r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><dimension ref="$B$2:F9"/><sheetData><row r="2"><c r="B2"><v>-0.000</v></c><c r="F2"><v>6.02E+23</v></c></row></sheetData></worksheet>"#,
+            ));
+            let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+
+            assert!(sheet.data.cells.get().is_none());
+            assert!(matches!(
+                sheet.cell("B2").unwrap(),
+                SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
+                    if value.as_str() == "-0.000"
+            ));
+            assert!(sheet.data.cells.get().is_none());
+
+            let selected = sheet.cells("A1:F9").unwrap();
+            assert_eq!(selected.len(), 2);
+            assert_eq!(selected[0].address.a1(), "B2");
+            assert_eq!(selected[1].address.a1(), "F2");
+            assert!(sheet.data.cells.get().is_none());
+
+            let extent = sheet.stored_extent().unwrap().expect("declared extent");
+            assert_eq!(extent.a1(), "B2:F2");
+            assert!(sheet.data.cells.get().is_some());
+        }
+
+        #[test]
+        fn unsupported_dimension_metadata_0400_preserves_eager_fallback() {
+            let bytes = one_sheet_xlsx(&format!(
+                r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><dimension ref="A1" future="preserve"/><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData></worksheet>"#,
+            ));
+            let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
+            let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+
+            assert!(matches!(
+                sheet.cell("A1").unwrap(),
+                SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
+                    if value.as_str() == "7"
+            ));
+            assert!(sheet.data.cells.get().is_some());
+        }
+
+        #[test]
         fn merge_not_eligible_0363_falls_back_and_initializes_store() {
             let bytes = one_sheet_xlsx(&format!(
                 r#"<worksheet xmlns="{SPREADSHEETML_NAMESPACE}"><sheetData><row r="1"><c r="A1"><v>7</v></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B1" futureAttr="preserve"/></mergeCells></worksheet>"#,
