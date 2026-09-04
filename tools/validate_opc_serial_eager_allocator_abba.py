@@ -617,6 +617,10 @@ def _validate_model(value: Any, shape: str, context: str) -> dict[str, Any]:
 
 def _validate_contract(path: Path) -> Contract:
     document, raw_sha256 = _read_json(path, "contract")
+    return _validate_contract_document(document, raw_sha256)
+
+
+def _validate_contract_document(document: Any, raw_sha256: str) -> Contract:
     contract = _exact_keys(document, CONTRACT_KEYS, "contract")
     _expect(contract["schema_version"], SCHEMA_VERSION, "contract.schema_version")
     _expect(contract["case"], CASE, "contract.case")
@@ -779,6 +783,39 @@ def _contract_from_cli(args: argparse.Namespace) -> Contract:
         legs=legs,
         corpora={shape: dict(CORPUS_ORACLE[shape]) for shape in SHAPES},
     )
+
+
+def _revalidate_contract_object(value: Any) -> Contract:
+    """Re-check a programmatic contract through the same strict schema path.
+
+    ``Contract`` is frozen only at its outer dataclass boundary; its nested
+    dictionaries remain mutable.  Never trust one supplied by an API caller:
+    rebuild the narrow document, inject only the validator-owned fixed delta
+    table, and run the exact same checks used for a JSON contract file.
+    """
+    if type(value) is not Contract:
+        raise ValidationError("contract must be an exact Contract instance")
+    if type(value.raw_sha256) is not str:
+        raise ValidationError("contract.raw_sha256 must be a string")
+    if value.raw_sha256 and SHA256.fullmatch(value.raw_sha256) is None:
+        raise ValidationError("contract.raw_sha256 must be empty or a lowercase SHA-256 digest")
+    if type(value.corpora) is not dict or set(value.corpora) != set(SHAPES):
+        raise ValidationError("contract.corpora must be a fixed shape mapping")
+    document = {
+        "schema_version": SCHEMA_VERSION,
+        "case": CASE,
+        "cache_state": CACHE_STATE,
+        "samples_per_case": SAMPLE_COUNT,
+        "warmup_iterations_per_case": WARMUP_COUNT,
+        "execution_workers": list(WORKERS),
+        "abba_order": list(ABBA_ORDER),
+        "tool": value.tool,
+        "environment": value.environment,
+        "legs": value.legs,
+        "corpora": [value.corpora[shape] for shape in SHAPES],
+        "expected_deltas": {shape: dict(EXPECTED_DELTA_BY_SHAPE[shape]) for shape in SHAPES},
+    }
+    return _validate_contract_document(document, value.raw_sha256)
 
 
 def _validate_tool(value: Any, context: str) -> None:
@@ -1418,7 +1455,12 @@ def validate_paths(
 ) -> dict[str, Any]:
     if contract is not None and contract_path is not None:
         raise ValidationError("provide either contract_path or contract, not both")
-    checked_contract = contract if contract is not None else _validate_contract(contract_path) if contract_path is not None else None
+    if contract is not None:
+        checked_contract = _revalidate_contract_object(contract)
+    elif contract_path is not None:
+        checked_contract = _validate_contract(contract_path)
+    else:
+        checked_contract = None
     if checked_contract is None:
         raise ValidationError("a narrow contract or explicit identity contract is required")
     paths = {"A1": a1, "B1": b1, "B2": b2, "A2": a2}
