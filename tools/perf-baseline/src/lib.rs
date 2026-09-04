@@ -54444,7 +54444,7 @@ mod tests {
 
         for part_count in [256, 2_047, 2_048, 16_384] {
             let corpus = build_opc_casefold_corpus(part_count).unwrap();
-            let measured = run_opc_casefold_lookup(case, &corpus, 0, 1).unwrap();
+            let measured = super::run_opc_casefold_lookup(case, &corpus, 0, 1).unwrap();
             assert_eq!(measured.corpus.entry_count, part_count);
             assert_eq!(measured.corpus.archive_member_count, part_count + 2);
             assert_eq!(measured.elapsed_ns.samples.len(), 1);
@@ -54487,8 +54487,8 @@ mod tests {
         }
 
         let eager_corpus = build_opc_casefold_corpus(256).unwrap();
-        let eager =
-            run_opc_casefold_lookup(Case::OpcCasefoldEagerOpen, &eager_corpus, 0, 1).unwrap();
+        let eager = super::run_opc_casefold_lookup(Case::OpcCasefoldEagerOpen, &eager_corpus, 0, 1)
+            .unwrap();
         let eager_summary = eager
             .source
             .unwrap()
