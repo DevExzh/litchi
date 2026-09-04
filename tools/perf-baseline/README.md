@@ -2950,10 +2950,15 @@ and the [release manifest](../../docs/performance/results/doc-lazy-fingerprint-0
   Office Document main Part in one timed operation.
 - `opc_source_materialize`: build and validate the unmanaged source-backed
   catalog before timing, then time only conversion into the complete owning
-  `OpcPackage`. Every Part payload and relationship is verified after timing;
-  retained samples report logical source reads, materialized Part counts, and
-  operation-scoped process/allocation vectors. The normal binary labels
-  allocator vectors unavailable, while the allocator target measures them.
+  `OpcPackage`. Before the sample loop, the harness prepares a compact
+  deterministic oracle containing every Part URI, length, content-type gate,
+  and SHA-256 digest, plus the package relationship and main-Part expectations.
+  Each expected payload is generated, hashed, and dropped individually, so
+  repeated checks retain no complete expected-payload buffers. Every Part
+  payload and relationship is verified after timing; retained samples report
+  logical source reads, materialized Part counts, and operation-scoped
+  process/allocation vectors. The normal binary labels allocator vectors
+  unavailable, while the allocator target measures them.
   Its operation envelope uses the evidence-only claim
   `evidence_only_opc_source_materialization` and source scope
   `in_process_instrumented_source_read_at`; no copied-byte, decompressed-byte,
@@ -2963,6 +2968,15 @@ and the [release manifest](../../docs/performance/results/doc-lazy-fingerprint-0
   `[Content_Types].xml` and `.rels` are serialization artifacts outside
   `OpcPackage::part_count` and are not claimed as separately materialized
   logical Parts.
+- `opc_source_materialize_accounted`: run the same unmanaged source-backed
+  conversion through the caller-owned OPC ZIP accounting path. Accounting
+  updates are inside the timed conversion and are reported in
+  `operation_metrics.opc_zip` with latency claim
+  `evidence_only_opc_source_materialization_accounting` and scope
+  `opc_source_backed_package_into_opc_package_with_accounting`; the conversion
+  has no output sink, so output counters remain zero. This is a separate
+  opt-in selector with its own configuration identity and carries an
+  evidence-only scope.
 - `opc_source_cached_main_read`: cold-load before timing, then require the timed
   access to add zero source reads and return the same pinned `Arc` allocation.
 - `opc_source_concurrent_same_part`: start two cold main-Part reads together;

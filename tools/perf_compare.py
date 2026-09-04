@@ -32,6 +32,13 @@ OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM = "evidence_only_opc_source_overlay_accounti
 OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM = (
     "evidence_only_opc_source_materialization"
 )
+OPC_MATERIALIZATION_ZIP_LATENCY_CLAIM = (
+    "evidence_only_opc_source_materialization_accounting"
+)
+OPC_SOURCE_MATERIALIZE_CASE = "opc_source_materialize"
+OPC_SOURCE_MATERIALIZE_ACCOUNTED_CASE = "opc_source_materialize_accounted"
+OPC_SOURCE_MATERIALIZE_ORACLE_VERSION = "prepared-part-digest-v1"
+OPC_SOURCE_MATERIALIZE_ORACLE_CONFIG_FIELD = "opc_source_materialize_oracle"
 OPC_SOURCE_MATERIALIZATION_SOURCE_SCOPE = "in_process_instrumented_source_read_at"
 OPC_SOURCE_MATERIALIZATION_REQUEST_SCOPE = (
     "unavailable_in_process_source_does_not_record_requested_lengths"
@@ -44,6 +51,7 @@ OPERATION_ALIGNMENT = "elapsed_ns.samples_by_elapsed_then_sample_index"
 _EVIDENCE_ONLY_LATENCY_CLAIMS = {
     EVIDENCE_ONLY_LATENCY_CLAIM,
     OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM,
+    OPC_MATERIALIZATION_ZIP_LATENCY_CLAIM,
     OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM,
 }
 
@@ -715,6 +723,9 @@ _XLSX_MANAGED_HEADROOM_CONFIG_FIELD = (
 _XLSX_PAYLOAD_MEMORY_LIMIT_FIELD = "payload_memory_limit"
 _XLSX_PUBLICATION_HEADROOM_FIELD = "publication_planning_memory_headroom"
 _XLSX_RESULTING_MEMORY_LIMIT_FIELD = "cache_budget_memory_limit"
+_OPC_SOURCE_MATERIALIZE_ORACLE_CONFIG_FIELD = (
+    OPC_SOURCE_MATERIALIZE_ORACLE_CONFIG_FIELD
+)
 
 
 def _parallel_exact_keys(
@@ -1253,6 +1264,38 @@ def _parallel_configuration_identity(configuration: dict[str, Any]) -> dict[str,
     return normalized
 
 
+def _validate_opc_source_materialize_oracle(
+    configuration: dict[str, Any], label: str
+) -> None:
+    """Validate the source-materialization oracle configuration identity.
+
+    The normal source-materialization selector predates this marker, so an
+    old report may omit it.  Exact configuration matching already prevents a
+    marker-bearing report from being compared with an omitted legacy report.
+    The new accounted selector must carry the marker because it has no legacy
+    report shape to preserve.
+    """
+
+    field = _OPC_SOURCE_MATERIALIZE_ORACLE_CONFIG_FIELD
+    if field in configuration and (
+        configuration[field] != OPC_SOURCE_MATERIALIZE_ORACLE_VERSION
+    ):
+        raise ComparisonInputError(
+            f"{label}.configuration.{field} must be "
+            f"{OPC_SOURCE_MATERIALIZE_ORACLE_VERSION!r}"
+        )
+    cases = configuration.get("cases")
+    if (
+        isinstance(cases, list)
+        and OPC_SOURCE_MATERIALIZE_ACCOUNTED_CASE in cases
+        and field not in configuration
+    ):
+        raise ComparisonInputError(
+            f"{label}.configuration.{field} is required for "
+            f"{OPC_SOURCE_MATERIALIZE_ACCOUNTED_CASE!r}"
+        )
+
+
 def _validate_xlsx_managed_memory_evidence(
     report: dict[str, Any], label: str
 ) -> None:
@@ -1720,6 +1763,7 @@ def _validate_report_identity(
             raise ComparisonInputError(
                 f"{label}.configuration.opc_cache_lock_diagnostics must be boolean"
             )
+        _validate_opc_source_materialize_oracle(configuration, label)
         _validate_xlsx_managed_memory_evidence(report, label)
         for field, expected in policy["expected_configuration"].items():
             actual = configuration.get(field)
@@ -1945,6 +1989,9 @@ _OPC_ZIP_VECTOR_KEYS = (
 _OPC_ZIP_METRICS_KEYS = {"status", "scope", *_OPC_ZIP_VECTOR_KEYS}
 OPC_ZIP_SCOPE = (
     "opc_source_backed_package_write_part_overlay_to_stream_with_accounting"
+)
+OPC_MATERIALIZATION_ZIP_SCOPE = (
+    "opc_source_backed_package_into_opc_package_with_accounting"
 )
 _OPC_ZIP_SCOPE = OPC_ZIP_SCOPE
 _SOURCE_METRICS_KEYS = {
@@ -2270,15 +2317,18 @@ def _validate_operation_metrics(
     if not isinstance(latency_claim, str) or latency_claim not in {
         EVIDENCE_ONLY_LATENCY_CLAIM,
         OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM,
+        OPC_MATERIALIZATION_ZIP_LATENCY_CLAIM,
         OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM,
         COMPARABLE_LATENCY_CLAIM,
     }:
         raise ComparisonInputError(
             f"{path}.latency_claim must be one of "
-            f"{[COMPARABLE_LATENCY_CLAIM, EVIDENCE_ONLY_LATENCY_CLAIM, OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM, OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM]}"
+            f"{[COMPARABLE_LATENCY_CLAIM, EVIDENCE_ONLY_LATENCY_CLAIM, OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM, OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM, OPC_MATERIALIZATION_ZIP_LATENCY_CLAIM]}"
         )
     has_opc_zip = "opc_zip" in obj
-    if has_opc_zip != (latency_claim == OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM):
+    if has_opc_zip != (latency_claim in {
+        OPC_ZIP_EVIDENCE_ONLY_LATENCY_CLAIM, OPC_MATERIALIZATION_ZIP_LATENCY_CLAIM
+    }):
         raise ComparisonInputError(
             f"{path}.latency_claim and {path}.opc_zip must be present together"
         )
@@ -2408,14 +2458,21 @@ def _validate_operation_metrics(
 
     if (
         counter_scope == OPC_SOURCE_MATERIALIZATION_SOURCE_SCOPE
-        and latency_claim != OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM
+        and latency_claim not in {
+            OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM,
+            OPC_MATERIALIZATION_ZIP_LATENCY_CLAIM,
+        }
     ):
         raise ComparisonInputError(
             f"{path}.source.counter_scope={counter_scope!r} requires "
-            f"latency_claim={OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM!r}"
+            f"latency_claim={OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM!r} "
+            f"or {OPC_MATERIALIZATION_ZIP_LATENCY_CLAIM!r}"
         )
     if (
-        latency_claim == OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM
+        latency_claim in {
+            OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM,
+            OPC_MATERIALIZATION_ZIP_LATENCY_CLAIM,
+        }
         and counter_scope != OPC_SOURCE_MATERIALIZATION_SOURCE_SCOPE
     ):
         raise ComparisonInputError(
@@ -2584,24 +2641,52 @@ def _validate_operation_metrics(
         opc_zip_status = _validate_metric_status(
             opc_zip["status"], f"{path}.opc_zip.status"
         )
-        if opc_zip["scope"] != _OPC_ZIP_SCOPE:
+        expected_zip_scope = (
+            OPC_MATERIALIZATION_ZIP_SCOPE
+            if latency_claim == OPC_MATERIALIZATION_ZIP_LATENCY_CLAIM
+            else _OPC_ZIP_SCOPE
+        )
+        if opc_zip["scope"] != expected_zip_scope:
             raise ComparisonInputError(
-                f"{path}.opc_zip.scope must be {_OPC_ZIP_SCOPE!r}"
+                f"{path}.opc_zip.scope must be {expected_zip_scope!r}"
             )
         for key in _OPC_ZIP_VECTOR_KEYS:
             vector = opc_zip[key]
             vector_status = _validate_metric_vector(
                 vector, f"{path}.opc_zip.{key}", sample_count
             )
-            if vector.get("scope") != _OPC_ZIP_SCOPE:
+            if vector.get("scope") != expected_zip_scope:
                 raise ComparisonInputError(
-                    f"{path}.opc_zip.{key}.scope must be {_OPC_ZIP_SCOPE!r}"
+                    f"{path}.opc_zip.{key}.scope must be {expected_zip_scope!r}"
                 )
             if vector_status != opc_zip_status:
                 raise ComparisonInputError(
                     f"{path}.opc_zip.status does not match "
                     f"{path}.opc_zip.{key}.status"
                 )
+
+
+def _validate_operation_metric_case_binding(
+    value: dict[str, Any], path: str, case: Any
+) -> None:
+    """Keep OPC source-materialization envelopes tied to their selectors.
+
+    The structural operation envelope is validated first so malformed metrics
+    retain their existing error ordering.  These two claims identify concrete
+    harness operations and must not be attached to another result case.
+    """
+
+    expected_case = {
+        OPC_SOURCE_MATERIALIZATION_EVIDENCE_ONLY_LATENCY_CLAIM: (
+            OPC_SOURCE_MATERIALIZE_CASE
+        ),
+        OPC_MATERIALIZATION_ZIP_LATENCY_CLAIM: OPC_SOURCE_MATERIALIZE_ACCOUNTED_CASE,
+    }.get(value["latency_claim"])
+    if expected_case is not None and case != expected_case:
+        raise ComparisonInputError(
+            f"{path}.latency_claim={value['latency_claim']!r} requires "
+            f"result case {expected_case!r}, got {case!r}"
+        )
 
 
 def _unwrap_metric_vector(value: Any, path: str) -> Any:
@@ -2776,6 +2861,7 @@ def _collect_metrics(
                     "sample_order", _METRIC_SAMPLE_ORDER_MISSING
                 ),
             )
+            _validate_operation_metric_case_binding(value, root, result.get("case"))
         _walk_metrics(
             value,
             root,

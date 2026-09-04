@@ -88,6 +88,7 @@ const OPC_CACHE_SLOW_SOURCE_DELAY_US: u64 = 10_000;
 const OPC_CACHE_COHORT_TIMEOUT: Duration = Duration::from_secs(10);
 const CONTENT_TYPE: &str = "application/octet-stream";
 const OPC_CORPUS_GENERATOR: &str = "litchi-opc-synthetic-v2";
+const OPC_SOURCE_MATERIALIZE_ORACLE_VERSION: &str = "prepared-part-digest-v1";
 const OPC_RELATIONSHIP_CORPUS_GENERATOR: &str = "litchi-opc-relationship-heavy-v1";
 const OPC_SOURCE_OVERLAY_MULTI_CORPUS_GENERATOR: &str = "litchi-opc-source-overlay-multi-part-v1";
 const OPC_SOURCE_OVERLAY_MULTI_PART_COUNTS: [usize; 3] = [2, 8, 32];
@@ -1068,6 +1069,7 @@ enum Case {
     OpcSourceOpen,
     OpcSourceOpenMainRead,
     OpcSourceMaterialize,
+    OpcSourceMaterializeAccounted,
     OpcSourceCachedMainRead,
     OpcSourceConcurrentSamePart,
     OpcSourceCacheBudgetBoundary,
@@ -1533,6 +1535,7 @@ impl Case {
             Self::OpcSourceOpen => "opc_source_open",
             Self::OpcSourceOpenMainRead => "opc_source_open_main_read",
             Self::OpcSourceMaterialize => "opc_source_materialize",
+            Self::OpcSourceMaterializeAccounted => "opc_source_materialize_accounted",
             Self::OpcSourceCachedMainRead => "opc_source_cached_main_read",
             Self::OpcSourceConcurrentSamePart => "opc_source_concurrent_same_part",
             Self::OpcSourceCacheBudgetBoundary => "opc_source_cache_budget_boundary",
@@ -2109,6 +2112,7 @@ impl Case {
                 | Self::OpcSourceOpen
                 | Self::OpcSourceOpenMainRead
                 | Self::OpcSourceMaterialize
+                | Self::OpcSourceMaterializeAccounted
                 | Self::OpcSourceCachedMainRead
                 | Self::OpcSourceConcurrentSamePart
                 | Self::OpcRangeSourceOpen
@@ -2119,6 +2123,13 @@ impl Case {
 
     const fn is_opc_relationship_open(self) -> bool {
         matches!(self, Self::OpcRelationshipOpen)
+    }
+
+    const fn is_opc_source_materialize(self) -> bool {
+        matches!(
+            self,
+            Self::OpcSourceMaterialize | Self::OpcSourceMaterializeAccounted
+        )
     }
 
     const fn is_opc_serial_eager_open(self) -> bool {
@@ -3556,6 +3567,11 @@ struct Configuration {
     /// unrelated historical reports retain their existing identity.
     #[serde(skip_serializing_if = "Option::is_none")]
     xlsx_cell_values_managed_planning_memory_headroom: Option<u64>,
+    /// Configuration identity for the deterministic OPC source-materialize
+    /// oracle. Omitted when neither source-materialize selector is selected so
+    /// unrelated historical reports retain their existing identity.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    opc_source_materialize_oracle: Option<&'static str>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -10452,6 +10468,11 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             .any(|case| case.is_xlsx_cell_values_managed())
             .then(|| u64::try_from(XLSX_MANAGED_PUBLICATION_PLANNING_MEMORY_HEADROOM))
             .transpose()?,
+        opc_source_materialize_oracle: options
+            .cases
+            .iter()
+            .any(|case| case.is_opc_source_materialize())
+            .then_some(OPC_SOURCE_MATERIALIZE_ORACLE_VERSION),
     };
     let parallel_metrics = parallel_metrics::collect(&configuration, &results)?;
 
@@ -10741,6 +10762,7 @@ fn parse_case(value: &str) -> Option<Case> {
         "opc_source_open" => Some(Case::OpcSourceOpen),
         "opc_source_open_main_read" => Some(Case::OpcSourceOpenMainRead),
         "opc_source_materialize" => Some(Case::OpcSourceMaterialize),
+        "opc_source_materialize_accounted" => Some(Case::OpcSourceMaterializeAccounted),
         "opc_source_cached_main_read" => Some(Case::OpcSourceCachedMainRead),
         "opc_source_concurrent_same_part" => Some(Case::OpcSourceConcurrentSamePart),
         "opc_source_cache_budget_boundary" => Some(Case::OpcSourceCacheBudgetBoundary),
@@ -11382,7 +11404,7 @@ fn usage_text() -> String {
                                        opc_relationship_open,\n\
                                        opc_noop_save,opc_mutated_save,opc_source_open,\n\
                                        opc_source_open_main_read,opc_source_cached_main_read,\n\
-                                       opc_source_materialize,\n\
+                                       opc_source_materialize,opc_source_materialize_accounted,\n\
                                        opc_casefold_eager_open,opc_casefold_owned_open,\n\
                                        opc_casefold_source_open,\n\
                                        opc_casefold_eager_lookup,opc_casefold_source_lookup,\n\
@@ -21003,6 +21025,9 @@ fn run_case_with_config(
         },
         Case::OpcSourceMaterialize => {
             run_opc_source_materialize(corpus, warmup_iterations, samples)
+        },
+        Case::OpcSourceMaterializeAccounted => {
+            run_opc_source_materialize_accounted(corpus, warmup_iterations, samples)
         },
         Case::OpcSourceCachedMainRead => {
             run_opc_source_cached_main_read(corpus, warmup_iterations, samples)
@@ -43216,56 +43241,108 @@ fn run_opc_source_open(
     Ok(result_with_source(case, corpus, elapsed, source_summary))
 }
 
+/// Compact deterministic expectations for the complete logical graph produced
+/// by source-backed OPC materialization.  Payload buffers are generated and
+/// hashed one at a time while this oracle is prepared, then dropped; repeated
+/// iterations retain only Part names, URIs, lengths, and SHA-256 digests.
+#[derive(Debug)]
+struct OpcMaterializationOracle {
+    parts: Vec<OpcMaterializationPartExpectation>,
+    package_relationships: Vec<(String, String, String, bool)>,
+    main_target: String,
+    main_payload_sha256: String,
+}
+
+#[derive(Debug)]
+struct OpcMaterializationPartExpectation {
+    name: String,
+    uri: PackURI,
+    payload_len: usize,
+    payload_sha256: String,
+}
+
+/// Prepare the complete logical graph oracle before the timed materialization
+/// loop.  No expected payload buffer survives its per-Part digest calculation.
+fn prepare_opc_materialization_oracle(
+    corpus: &Corpus,
+) -> Result<OpcMaterializationOracle, Box<dyn Error>> {
+    let payload_kind = corpus_payload_kind(corpus)?;
+    let main_index = corpus.manifest.entry_count / 2;
+    let mut parts = Vec::with_capacity(corpus.manifest.entry_count);
+    for index in 0..corpus.manifest.entry_count {
+        let name = entry_name(index);
+        let uri = PackURI::new(format!("/{name}"))?;
+        let payload = payload_bytes(payload_kind, index, corpus.manifest.entry_bytes);
+        let payload_len = payload.len();
+        let payload_sha256 = sha256_hex(&payload);
+        parts.push(OpcMaterializationPartExpectation {
+            name,
+            uri,
+            payload_len,
+            payload_sha256,
+        });
+    }
+    let main_payload_sha256 = parts
+        .get(main_index)
+        .ok_or("OPC source materialization corpus has no main Part")?
+        .payload_sha256
+        .clone();
+    Ok(OpcMaterializationOracle {
+        parts,
+        package_relationships: vec![(
+            "rIdBenchmarkMain".to_owned(),
+            relationship_type::OFFICE_DOCUMENT.to_owned(),
+            corpus.target_name.clone(),
+            false,
+        )],
+        main_target: corpus.target_name.clone(),
+        main_payload_sha256,
+    })
+}
+
 /// Verify the complete logical graph produced by source-backed OPC
-/// materialization.  This is intentionally outside the timed interval: it
-/// regenerates each deterministic payload, checks its digest and metadata,
-/// and verifies the package-level main-document relationship.
+/// materialization.  This is intentionally outside the timed interval: the
+/// prepared oracle checks every deterministic payload, its digest and
+/// metadata, and the package-level main-document relationship.
 fn verify_opc_materialized_package(
     corpus: &Corpus,
     package: &OpcPackage,
+    oracle: &OpcMaterializationOracle,
 ) -> Result<(), Box<dyn Error>> {
     if package.part_count() != corpus.manifest.entry_count {
         return Err("OPC source materialization part count differs from corpus manifest".into());
     }
-    let payload_kind = corpus_payload_kind(corpus)?;
-    let expected_relationships = vec![(
-        "rIdBenchmarkMain".to_owned(),
-        relationship_type::OFFICE_DOCUMENT.to_owned(),
-        corpus.target_name.clone(),
-        false,
-    )];
-    if relationship_signatures(package.rels()) != expected_relationships {
+    if oracle.parts.len() != corpus.manifest.entry_count {
+        return Err(
+            "OPC source materialization oracle part count differs from corpus manifest".into(),
+        );
+    }
+    if relationship_signatures(package.rels()) != oracle.package_relationships {
         return Err("OPC source materialization package relationships differ from corpus".into());
     }
-    for index in 0..corpus.manifest.entry_count {
-        let name = entry_name(index);
-        let uri = PackURI::new(format!("/{name}"))?;
-        let part = package.get_part(&uri)?;
-        let expected = payload_bytes(payload_kind, index, corpus.manifest.entry_bytes);
+    for expected in &oracle.parts {
+        let part = package.get_part(&expected.uri)?;
         if part.content_type() != CONTENT_TYPE
-            || part.blob().len() != expected.len()
-            || sha256_hex(part.blob()) != sha256_hex(&expected)
+            || part.blob().len() != expected.payload_len
+            || sha256_hex(part.blob()) != expected.payload_sha256
         {
             return Err(format!(
-                "OPC source materialization Part {name} differs from deterministic payload"
+                "OPC source materialization Part {} differs from deterministic payload",
+                expected.name
             )
             .into());
         }
         if !part.rels().iter().next().is_none() {
             return Err(format!(
-                "OPC source materialization Part {name} unexpectedly has relationships"
+                "OPC source materialization Part {} unexpectedly has relationships",
+                expected.name
             )
             .into());
         }
     }
     let main = package.main_document_part()?;
-    if main.partname().membername() != corpus.target_name
-        || sha256_hex(main.blob())
-            != sha256_hex(&payload_bytes(
-                payload_kind,
-                corpus.manifest.entry_count / 2,
-                corpus.manifest.entry_bytes,
-            ))
+    if main.partname().membername() != oracle.main_target
+        || sha256_hex(main.blob()) != oracle.main_payload_sha256
     {
         return Err("OPC source materialization main-document payload differs from corpus".into());
     }
@@ -43590,12 +43667,47 @@ fn run_opc_source_materialize(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
+    run_opc_source_materialize_variant(
+        Case::OpcSourceMaterialize,
+        corpus,
+        warmup_iterations,
+        samples,
+        false,
+    )
+}
+
+/// Measure the same unmanaged source-backed conversion while collecting the
+/// caller-owned OPC ZIP accounting report inside the timed conversion.
+fn run_opc_source_materialize_accounted(
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    run_opc_source_materialize_variant(
+        Case::OpcSourceMaterializeAccounted,
+        corpus,
+        warmup_iterations,
+        samples,
+        true,
+    )
+}
+
+fn run_opc_source_materialize_variant(
+    case: Case,
+    corpus: &Corpus,
+    warmup_iterations: usize,
+    samples: usize,
+    accounted: bool,
+) -> Result<CaseResult, Box<dyn Error>> {
     let cache_limits = opc_source_cache_limits(corpus)?;
+    let oracle = prepare_opc_materialization_oracle(corpus)?;
     let mut elapsed = Vec::with_capacity(samples);
     let mut source_summary = SourceSummary::default();
     let mut observations = Vec::with_capacity(samples);
     let mut materialized_parts = Vec::with_capacity(samples);
     let mut source_observations = Vec::with_capacity(samples);
+    let mut opc_zip_reports: Option<Vec<OpcOperationAccounting>> =
+        accounted.then(|| Vec::with_capacity(samples));
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let (source, _target_range) = opc_instrumented_source(corpus)?;
@@ -43612,7 +43724,13 @@ fn run_opc_source_materialize(
         let process_before = process_metrics::Snapshot::read().ok();
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let owned = package.into_opc_package()?;
+        let (owned, opc_zip_report): (OpcPackage, Option<OpcOperationAccounting>) = if accounted {
+            let mut report = OpcOperationAccounting::default();
+            let owned = package.into_opc_package_with_accounting(&mut report)?;
+            (owned, Some(report))
+        } else {
+            (package.into_opc_package()?, None)
+        };
         let duration = started.elapsed();
         let allocation_metrics = match allocation_region.finish() {
             Some(sample) => Some(sample),
@@ -43624,7 +43742,7 @@ fn run_opc_source_materialize(
             .map(|(before, after)| after.delta(before));
 
         let part_count = u64::try_from(owned.part_count())?;
-        verify_opc_materialized_package(corpus, &owned)?;
+        verify_opc_materialized_package(corpus, &owned, &oracle)?;
         let source_metrics = source.snapshot();
         if source_metrics.ordinary_payload_read_calls == 0
             || source_metrics.ordinary_payload_read_bytes == 0
@@ -43644,12 +43762,27 @@ fn run_opc_source_materialize(
                 read_bytes: source_metrics.read_bytes,
                 max_concurrent_reads: source_metrics.max_in_flight_reads,
             });
+            if let Some(reports) = opc_zip_reports.as_mut() {
+                reports.push(
+                    opc_zip_report
+                        .ok_or("OPC source materialization accounting report is missing")?,
+                );
+            }
             source_summary.record_opc(source_metrics, part_count);
             elapsed.push(elapsed_value);
         }
         std::hint::black_box(&owned);
     }
 
+    let operation_metrics = operation_metrics::from_in_process_materialization_observations(
+        &observations,
+        &materialized_parts,
+        &source_observations,
+    )?;
+    let mut operation_metrics = operation_metrics;
+    if let Some(reports) = opc_zip_reports.as_deref() {
+        operation_metrics.set_opc_materialization_zip(&elapsed, reports)?;
+    }
     let elapsed_statistics = statistics(elapsed);
     let sample_order = elapsed_statistics.sample_order.clone();
     reorder_sample_vector(&mut source_summary.read_calls, &sample_order)?;
@@ -43666,13 +43799,8 @@ fn run_opc_source_materialize(
     if let Some(materializations) = source_summary.ordinary_payload_materializations.as_mut() {
         reorder_sample_vector(materializations, &sample_order)?;
     }
-    let operation_metrics = operation_metrics::from_in_process_materialization_observations(
-        &observations,
-        &materialized_parts,
-        &source_observations,
-    )?;
     Ok(CaseResult {
-        case: Case::OpcSourceMaterialize.name(),
+        case: case.name(),
         cache_state: None,
         corpus: corpus.manifest.clone(),
         elapsed_ns: elapsed_statistics,
@@ -54582,14 +54710,14 @@ mod tests {
         ODT_RESOURCE_BATCH_COUNT, OOXML_TRACKER_CORPUS_GENERATOR,
         OPC_CACHE_LOCK_DIAGNOSTICS_COVERAGE, OPC_CACHE_LOCK_DIAGNOSTICS_EXCLUDED,
         OPC_CACHE_LOCK_DIAGNOSTICS_SCOPE, OPC_SERIAL_EAGER_OPEN_FIXED_MATRIX, OpcCacheMode,
-        PPT_PICTURE_BYTES, PPT_PICTURE_COUNT, PPT_PICTURES_CORPUS_GENERATOR,
+        OpcPackage, PPT_PICTURE_BYTES, PPT_PICTURE_COUNT, PPT_PICTURES_CORPUS_GENERATOR,
         PPT_REPEATED_QUERY_COUNT, PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT, PPTX_MULTI_SLIDE_BATCH_COUNT,
-        PPTX_SOURCE_IMAGE_QUERY_SELECTED_POSITION, PayloadKind, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES,
-        RangeSimulationConfig, RequestSizeBuckets, RtfSemanticVariant, SemanticShape,
-        SimulatedCursor, SimulatedRangeMetrics, SimulatedRangeSource, SinkSummary,
-        SourceBackedPackage, WindowedHashingSink, Workbook, WriteSizeBuckets, WriterShape,
-        XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
-        XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
+        PPTX_SOURCE_IMAGE_QUERY_SELECTED_POSITION, PackURI, PayloadKind,
+        RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
+        RtfSemanticVariant, SemanticShape, SimulatedCursor, SimulatedRangeMetrics,
+        SimulatedRangeSource, SinkSummary, SourceBackedPackage, WindowedHashingSink, Workbook,
+        WriteSizeBuckets, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
+        XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR, XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
         XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsbShape, XlsxCellCrudShape,
         XlsxRowVisibilityShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
         build_detection_corpus, build_docx_section_layout_corpus, build_docx_source_edit_corpus,
@@ -54614,9 +54742,9 @@ mod tests {
         build_xlsx_row_visibility_corpus, build_xlsx_sheet_protection_edit_corpus,
         cfb_open_stream_expected_payload, cfb_target_aware_repeat_formula, doc_body_text_fnv1a,
         expected_opc_overlay_output, ole_common_changed_output, opc_overlay_replacement_payload,
-        parse_case, payload_bytes, pptx_named_slide_name, resolve_execution_workers, run_case,
-        run_case_with_config, run_cfb_open_stream, run_cfb_open_stream_simulated,
-        run_cfb_selective_read, run_cfb_selective_simulated_read,
+        parse_case, payload_bytes, pptx_named_slide_name, prepare_opc_materialization_oracle,
+        resolve_execution_workers, run_case, run_case_with_config, run_cfb_open_stream,
+        run_cfb_open_stream_simulated, run_cfb_selective_read, run_cfb_selective_simulated_read,
         run_docx_source_backed_existing_section_layout_edit_save,
         run_docx_source_backed_one_edit_save, run_odf_content_cow, run_ooxml_tracker_case,
         run_opc_serial_eager_open, run_opc_source_cache_budget_boundary,
@@ -54633,10 +54761,10 @@ mod tests {
         run_xlsx_sheet_protection_edit_save, sha256_hex, simulated_request_delay, statistics,
         updated_writer_text, usage_text, validate_opc_serial_eager_open_options,
         validate_pptx_source_image_query_options, validate_xls_source_locality,
-        validate_xls_source_options, verify_opc_serial_eager_fixed_corpus_preflight,
-        verify_xlsx_cells, writer_shape, xls_source_family_dispatch_cases,
-        xls_writer_semantic_dispatch_selected, xlsb_cells_digest, xlsb_expected_cells,
-        xlsx_cell_count, xlsx_spec, zip_member_ranges,
+        validate_xls_source_options, verify_opc_materialized_package,
+        verify_opc_serial_eager_fixed_corpus_preflight, verify_xlsx_cells, writer_shape,
+        xls_source_family_dispatch_cases, xls_writer_semantic_dispatch_selected, xlsb_cells_digest,
+        xlsb_expected_cells, xlsx_cell_count, xlsx_spec, zip_member_ranges,
     };
 
     #[test]
@@ -55847,7 +55975,7 @@ mod tests {
                         .is_some_and(|character| character.is_ascii_uppercase())
             })
             .count();
-        assert_eq!(selectable_count, 421);
+        assert_eq!(selectable_count, 422);
         assert_eq!(Case::DEFAULT.len(), 36);
     }
 
@@ -57375,6 +57503,10 @@ mod tests {
         let case = parse_case("opc_source_materialize").expect("materialization selector parses");
         assert_eq!(case, Case::OpcSourceMaterialize);
         assert!(!Case::DEFAULT.contains(&case));
+        let accounted_case = parse_case("opc_source_materialize_accounted")
+            .expect("accounted materialization selector parses");
+        assert_eq!(accounted_case, Case::OpcSourceMaterializeAccounted);
+        assert!(!Case::DEFAULT.contains(&accounted_case));
 
         for (shape, payload) in [
             (CorpusShape::Tiny, PayloadKind::Compressible),
@@ -57417,6 +57549,7 @@ mod tests {
                 super::operation_metrics::MetricStatus::NotApplicable
             );
             assert_eq!(operation.sink.accepted_bytes.values, None);
+            assert!(operation.opc_zip.is_none());
             let allocation = operation
                 .allocation
                 .as_ref()
@@ -57427,6 +57560,118 @@ mod tests {
             );
             assert!(allocation.allocated_bytes.values.is_none());
         }
+
+        let corpus = build_opc_corpus(CorpusShape::Tiny, PayloadKind::Compressible).unwrap();
+        let measured = run_case(accounted_case, &corpus, 0, 1).unwrap();
+        assert_eq!(measured.case, accounted_case.name());
+        let operation = measured
+            .operation_metrics
+            .as_ref()
+            .expect("accounted materialization emits operation metrics");
+        let opc_zip = operation
+            .opc_zip
+            .as_ref()
+            .expect("accounted materialization emits OPC ZIP accounting");
+        assert_eq!(
+            operation.latency_claim,
+            "evidence_only_opc_source_materialization_accounting"
+        );
+        assert_eq!(
+            opc_zip.scope,
+            "opc_source_backed_package_into_opc_package_with_accounting"
+        );
+        assert!(
+            opc_zip
+                .compressed_deflate_payload_bytes_read
+                .values
+                .as_ref()
+                .unwrap()[0]
+                > 0,
+            "accounted materialization must report compressed payload reads"
+        );
+        assert!(
+            opc_zip.deflate_bytes_produced.values.as_ref().unwrap()[0] > 0,
+            "accounted materialization must report decoded payload bytes"
+        );
+        assert_eq!(
+            opc_zip.output_bytes_accepted.values,
+            Some(vec![0]),
+            "materialization does not publish output"
+        );
+        assert_eq!(
+            opc_zip.generated_deflate_payload_bytes_emitted.values,
+            Some(vec![0])
+        );
+        assert_eq!(opc_zip.stored_payload_bytes_emitted.values, Some(vec![0]));
+        assert_eq!(
+            opc_zip.precompressed_payload_bytes_emitted.values,
+            Some(vec![0])
+        );
+        assert_eq!(
+            opc_zip.raw_unchanged_source_bytes_accepted.values,
+            Some(vec![0])
+        );
+        assert_eq!(operation.sink.accepted_bytes.values, None);
+    }
+
+    #[test]
+    fn opc_source_materialization_oracle_rejects_payload_metadata_and_main_target_changes() {
+        let corpus = build_opc_corpus(CorpusShape::Tiny, PayloadKind::Compressible).unwrap();
+        let oracle = prepare_opc_materialization_oracle(&corpus).unwrap();
+        let first_uri = PackURI::new(format!("/{}", super::entry_name(0))).unwrap();
+
+        let mut corrupted_payload = OpcPackage::from_bytes(&corpus.archive).unwrap();
+        let mut payload = corrupted_payload
+            .get_part(&first_uri)
+            .unwrap()
+            .blob()
+            .to_vec();
+        payload[0] ^= 0xff;
+        corrupted_payload
+            .get_part_mut(&first_uri)
+            .unwrap()
+            .set_blob(payload);
+        let error = verify_opc_materialized_package(&corpus, &corrupted_payload, &oracle)
+            .expect_err("payload corruption must fail the prepared oracle");
+        assert!(error.to_string().contains("Part benchmark/parts/00000.bin"));
+
+        let mut corrupted_metadata = OpcPackage::from_bytes(&corpus.archive).unwrap();
+        corrupted_metadata
+            .get_part_mut(&first_uri)
+            .unwrap()
+            .set_content_type("application/x-litchi-corrupt".to_owned())
+            .unwrap();
+        let error = verify_opc_materialized_package(&corpus, &corrupted_metadata, &oracle)
+            .expect_err("content-type corruption must fail the prepared oracle");
+        assert!(error.to_string().contains("Part benchmark/parts/00000.bin"));
+
+        let mut corrupted_relationships = OpcPackage::from_bytes(&corpus.archive).unwrap();
+        corrupted_relationships.rels_mut().add_relationship(
+            "urn:litchi:corrupt".to_owned(),
+            super::entry_name(0),
+            "rIdCorrupt".to_owned(),
+            false,
+        );
+        let error = verify_opc_materialized_package(&corpus, &corrupted_relationships, &oracle)
+            .expect_err("relationship corruption must fail the prepared oracle");
+        assert!(error.to_string().contains("package relationships"));
+
+        let source = OpcPackage::from_bytes(&corpus.archive).unwrap();
+        let mut wrong_main_target = OpcPackage::new();
+        for part in source.iter_parts() {
+            wrong_main_target
+                .try_add_part(part.clone_part())
+                .expect("copy synthetic Part into wrong-target fixture");
+        }
+        wrong_main_target.rels_mut().add_relationship(
+            super::relationship_type::OFFICE_DOCUMENT.to_owned(),
+            super::entry_name(0),
+            "rIdBenchmarkMain".to_owned(),
+            false,
+        );
+        let error = verify_opc_materialized_package(&corpus, &wrong_main_target, &oracle)
+            .expect_err("wrong main target must fail the prepared oracle");
+        assert!(error.to_string().contains("package relationships"));
     }
 
     #[test]
