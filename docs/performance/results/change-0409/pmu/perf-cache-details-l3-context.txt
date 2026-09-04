@@ -1,0 +1,121 @@
+        cpu/event=0x64,umask=0x40/
+  l2_cache_req_stat.ls_rd_blk_x
+       [Core to L2 cache requests (not including L2 prefetch) with status:
+        data cache store or state change hit in L2. Unit: cpu]
+        cpu/event=0x64,umask=0x10/
+  l2_fill_rsp_src.all
+       [L2 cache fills from all types of data sources. Unit: cpu]
+        cpu/event=0x165,umask=0xde/
+  l2_fill_rsp_src.alternate_memories
+       [L2 cache fills from extension memory. Unit: cpu]
+        cpu/event=0x165,umask=0x80/
+  l2_fill_rsp_src.dram_io_far
+       [L2 cache fills from either DRAM or MMIO in a different NUMA node (same
+        or different socket). Unit: cpu]
+        cpu/event=0x165,umask=0x40/
+  l2_fill_rsp_src.dram_io_near
+       [L2 cache fills from either DRAM or MMIO in the same NUMA node. Unit:
+        cpu]
+        cpu/event=0x165,umask=8/
+  l2_fill_rsp_src.far_cache
+       [L2 cache fills from cache of another CCX when the address was in a
+        different NUMA node. Unit: cpu]
+        cpu/event=0x165,umask=0x10/
+  l2_fill_rsp_src.local_ccx
+       [L2 cache fills from L3 cache or different L2 cache in the same CCX.
+        Unit: cpu]
+        cpu/event=0x165,umask=2/
+  l2_fill_rsp_src.near_cache
+       [L2 cache fills from cache of another CCX when the address was in the
+        same NUMA node. Unit: cpu]
+        cpu/event=0x165,umask=4/
+  l2_pf_hit_l2.l1_dc_hwpf
+       [L2 prefetches accepted by the L2 pipeline which hit in the L2 cache
+        and are generated from L1 data hardware prefetchers. Unit: cpu]
+        cpu/event=0x70,umask=0xe0/
+  l2_pf_hit_l2.l1_dc_l2_hwpf
+       [L2 prefetches accepted by the L2 pipeline which hit in the L2 cache
+        and are generated from L1 data and L2 hardware prefetchers. Unit: cpu]
+        cpu/event=0x70,umask=0xff/
+  l2_pf_hit_l2.l2_hwpf
+       [L2 prefetches accepted by the L2 pipeline which hit in the L2 cache
+        and are generated from L2 hardware prefetchers. Unit: cpu]
+        cpu/event=0x70,umask=0x1f/
+  l2_pf_miss_l2_hit_l3.l1_dc_hwpf
+       [L2 prefetches accepted by the L2 pipeline which miss the L2 cache but
+        hit in the L3 cache and are generated from L1 data hardware
+        prefetchers. Unit: cpu]
+        cpu/event=0x71,umask=0xe0/
+  l2_pf_miss_l2_hit_l3.l1_dc_l2_hwpf
+       [L2 prefetches accepted by the L2 pipeline which miss the L2 cache but
+        hit in the L3 cache and are generated from L1 data and L2 hardware
+        prefetchers. Unit: cpu]
+        cpu/event=0x71,umask=0xff/
+  l2_pf_miss_l2_hit_l3.l2_hwpf
+       [L2 prefetches accepted by the L2 pipeline which miss the L2 cache but
+        hit in the L3 cache and are generated from L2 hardware prefetchers.
+        Unit: cpu]
+        cpu/event=0x71,umask=0x1f/
+  l2_pf_miss_l2_l3.l1_dc_hwpf
+       [L2 prefetches accepted by the L2 pipeline which miss the L2 as well as
+        the L3 caches and are generated from L1 data hardware prefetchers.
+        Unit: cpu]
+        cpu/event=0x72,umask=0xe0/
+  l2_pf_miss_l2_l3.l1_dc_l2_hwpf
+       [L2 prefetches accepted by the L2 pipeline which miss the L2 as well as
+        the L3 caches and are generated from L1 data and L2 hardware
+        prefetchers. Unit: cpu]
+        cpu/event=0x72,umask=0xff/
+  l2_pf_miss_l2_l3.l2_hwpf
+       [L2 prefetches accepted by the L2 pipeline which miss the L2 as well as
+        the L3 caches and are generated from L2 hardware prefetchers. Unit:
+        cpu]
+        cpu/event=0x72,umask=0x1f/
+  l2_request_g1.all
+       [L2 cache requests of all types. Unit: cpu]
+        cpu/event=0x60,umask=0xf7/
+  l2_request_g1.all_dc
+       [L2 cache requests of common types from L1 data cache (including
+        prefetches). Unit: cpu]
+        cpu/event=0x60,umask=0xe0/
+  l2_request_g1.all_no_prefetch
+       [L2 cache requests of common types not including prefetches. Unit: cpu]
+        cpu/event=0x60,umask=0xf1/
+  l2_request_g1.cacheable_ic_read
+       [L2 cache requests: instruction cache reads. Unit: cpu]
+        cpu/event=0x60,umask=0x10/
+  l2_request_g1.group2
+       [L2 cache requests of non-cacheable type (non-cached data and
+        instructions reads,self-modifying code checks). Unit: cpu]
+        cpu/event=0x60,umask=1/
+  l2_request_g1.l2_hw_pf
+       [L2 cache requests: from hardware prefetchers to prefetch directly into
+        L2 (hit or miss). Unit: cpu]
+        cpu/event=0x60,umask=2/
+  l2_request_g1.ls_rd_blk_c_s
+       [L2 cache requests: data cache shared reads. Unit: cpu]
+        cpu/event=0x60,umask=0x20/
+  l2_request_g1.prefetch_l2_cmd
+       [L2 cache requests: prefetch directly into L2. Unit: cpu]
+        cpu/event=0x60,umask=4/
+  l2_request_g1.rd_blk_l
+       [L2 cache requests: data cache reads including hardware and software
+        prefetch. Unit: cpu]
+        cpu/event=0x60,umask=0x80/
+  l2_request_g1.rd_blk_x
+       [L2 cache requests: data cache stores. Unit: cpu]
+        cpu/event=0x60,umask=0x40/
+  l2_request_g2.ls_rd_sized
+       [L2 cache requests: coherent,non-cacheable LS sized reads. Unit: cpu]
+        cpu/event=0x61,umask=0x40/
+  l2_request_g2.ls_rd_sized_nc
+       [L2 cache requests: non-coherent,non-cacheable LS sized reads. Unit:
+        cpu]
+        cpu/event=0x61,umask=0x20/
+  l2_wcb_req.wcb_close
+       [Write Combining Buffer (WCB) closures. Unit: cpu]
+        cpu/event=0x63,umask=0x20/
+
+legacy cache:
+  branch-load-misses
+       [Branch prediction unit read misses. Unit: cpu]

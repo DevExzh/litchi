@@ -1,0 +1,43 @@
+Working directory: /home/zhuhe/code/litchi
+Toolchain: Rust/Cargo 1.98.1
+Build environment (initial and corrected):
+CARGO_TARGET_DIR=/tmp/litchi-goal-0409-target
+CARGO_BUILD_JOBS=4
+CARGO_INCREMENTAL=0
+CARGO_PROFILE_RELEASE_DEBUG=1
+RUSTFLAGS=-C force-frame-pointers=yes -C force-unwind-tables=yes
+
+Initial profiling build (abe38a9570129c6646bb1b1d7207c407fc86c3d6):
+cargo +1.98.1 build --locked --manifest-path tools/perf-baseline/Cargo.toml --release --features allocator-metrics --bin litchi-perf-baseline --bin litchi-perf-baseline-alloc
+
+Corrected harness check and rebuild commands are recorded below once run.
+
+Python checks:
+python3 -m unittest tools.test_perf_compare
+python3 -m unittest discover -s tools -p 'test_*.py'
+python3 tools/check_perf_claims.py --registry docs/performance/claim-registry-v1.json --repo-root . --evidence-root . --mode strict
+
+python3 tools/check_crate_boundaries.py
+# Initial invocation failed: pinned Rust 1.95.0 has no Cargo component.
+RUSTUP_TOOLCHAIN=1.98.1 python3 tools/check_crate_boundaries.py
+
+Corrected harness checks (build environment above):
+rustfmt +1.98.1 --edition 2024 --config skip_children=true --check tools/perf-baseline/src/lib.rs tools/perf-baseline/src/parallel_metrics.rs
+# Initial formatter check found three whitespace-only changes; applied after the library test run.
+cargo +1.98.1 test --locked --manifest-path tools/perf-baseline/Cargo.toml --release --features allocator-metrics --lib
+
+# Library suite passed 258 tests with one ignored.
+rustfmt +1.98.1 --edition 2024 --config skip_children=true tools/perf-baseline/src/lib.rs tools/perf-baseline/src/parallel_metrics.rs
+rustfmt +1.98.1 --edition 2024 --config skip_children=true --check tools/perf-baseline/src/lib.rs tools/perf-baseline/src/parallel_metrics.rs
+cargo +1.98.1 build --locked --manifest-path tools/perf-baseline/Cargo.toml --release --features allocator-metrics --bin litchi-perf-baseline --bin litchi-perf-baseline-alloc
+# Python rerun after review added marker-to-selector binding:
+python3 -m unittest discover -s tools -p 'test_*.py'
+
+# Final focused comparator suite (86 tests):
+python3 -m unittest tools.test_perf_compare
+# Post-documentation report classification:
+python3 tools/check_report_claim_classification.py --repo-root .
+# Corrected capture and resumed validation (no rerun of already captured source-edit):
+python3 /tmp/litchi-goal-0409-recapture.py
+# Attribution derived from retained perf data, not a workload rerun:
+python3 /tmp/litchi-goal-0409-attribution/attribute_0409.py

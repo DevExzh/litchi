@@ -1,0 +1,9 @@
+Working directory: /home/zhuhe/code/litchi
+Supplementary postprocessing commands reconstructed from coordinator tool calls.
+Original command timing was not journaled; no postprocessing speed claim is made.
+
+DEBUGINFOD_URLS='' perf report --stdio --no-inline --no-children --call-graph=none --percent-limit=0 -i /tmp/litchi-goal-0409-capture/perf.data > /tmp/litchi-goal-0409-attribution/perf-all-self.stdout 2> /tmp/litchi-goal-0409-attribution/perf-all-self.stderr
+DEBUGINFOD_URLS='' perf script --no-inline -i /tmp/litchi-goal-0409-capture/perf.data > /tmp/litchi-goal-0409-attribution/perf-script-no-inline.stdout 2> /tmp/litchi-goal-0409-attribution/perf-script-no-inline.stderr
+python3 /tmp/litchi-goal-0409-attribution/attribute_0409.py
+
+Both perf commands completed successfully with empty stderr. Full original capture commands and timings are retained in initial/commands.json after publishing.

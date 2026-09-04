@@ -1,0 +1,919 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 80K of event 'cycles:u'
+# Event count (approx.): 337888625521
+#
+# Overhead  Command          Shared Object         Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
+# ........  ...............  ....................  ..........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    32.80%  litchi-perf-bas  litchi-perf-baseline  [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --32.33%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+                          branch<litchi_perf_baseline::Corpus, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          build_xlsx_cell_crud_corpus (inlined)
+                          |          
+                           --31.89%--branch<alloc::vec::Vec<u8, alloc::alloc::Global>, litchi_opc::error::OpcError> (inlined)
+                                     to_bytes (inlined)
+                                     write<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+                                     branch<(), litchi_opc::error::OpcError> (inlined)
+                                     write<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+                                     map_err<(), soapberry_zip::errors::Error, litchi_opc::error::OpcError, litchi_opc::phys_pkg::{impl#6}::write::{closure_env#0}<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>> (inlined)
+                                     write_deflated_with_accounting<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+                                     {closure#0}<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+                                     |          
+                                     |--29.88%--write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>>>> (inlined)
+                                     |          write<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>>> (inlined)
+                                     |          write<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>> (inlined)
+                                     |          write<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress> (inlined)
+                                     |          map<(usize, flate2::mem::Status), core::io::error::Error, usize, flate2::zio::{impl#5}::write::{closure_env#0}<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress>> (inlined)
+                                     |          write_with_status<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress> (inlined)
+                                     |          run_vec (inlined)
+                                     |          compress_vec (inlined)
+                                     |          write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status, flate2::mem::CompressError>, flate2::mem::{impl#1}::compress_vec::{closure_env#0}> (inlined)
+                                     |          {closure#0} (inlined)
+                                     |          compress_uninit (inlined)
+                                     |          compress_uninit<flate2::ffi::zlib_rs::Deflate> (inlined)
+                                     |          compress (inlined)
+                                     |          compress_uninit (inlined)
+                                     |          into<zlib_rs::ReturnCode, core::result::Result<zlib_rs::stable::Status, zlib_rs::stable::DeflateError>> (inlined)
+                                     |          from (inlined)
+                                     |          deflate (inlined)
+                                     |          deflate_medium (inlined)
+                                     |          |          
+                                     |          |--9.82%--quick_insert_string (inlined)
+                                     |          |          |          
+                                     |          |          |--7.32%--quick_insert_value (inlined)
+                                     |          |          |          |          
+                                     |          |          |           --1.08%--update_hash (inlined)
+                                     |          |          |                     hash_calc (inlined)
+                                     |          |          |          
+                                     |          |          |--1.12%--filled (inlined)
+                                     |          |          |          len<u8> (inlined)
+                                     |          |          |          
+                                     |          |           --0.95%--index<u8, core::ops::range::RangeTo<usize>> (inlined)
+                                     |          |                     index<u8> (inlined)
+                                     |          |                     index<u8> (inlined)
+                                     |          |          
+                                     |          |--5.46%--emit_match (inlined)
+                                     |          |          |          
+                                     |          |          |--3.41%--tally_lit_help (inlined)
+                                     |          |          |          |          
+                                     |          |          |           --1.59%--push_lit (inlined)
+                                     |          |          |          
+                                     |          |           --1.27%--filled (inlined)
+                                     |          |                     len<u8> (inlined)
+                                     |          |          
+                                     |           --0.80%--insert_match (inlined)
+                                     |          
+                                      --2.00%--finish<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>>> (inlined)
+                                                branch<(), core::io::error::Error> (inlined)
+                                                flush<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress> (inlined)
+                                                map_err<flate2::mem::Status, flate2::mem::CompressError, core::io::error::Error, fn(flate2::mem::CompressError) -> core::io::error::Error> (inlined)
+                                                run_vec (inlined)
+                                                compress_vec (inlined)
+                                                write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status, flate2::mem::CompressError>, flate2::mem::{impl#1}::compress_vec::{closure_env#0}> (inlined)
+                                                {closure#0} (inlined)
+                                                compress_uninit (inlined)
+                                                compress_uninit<flate2::ffi::zlib_rs::Deflate> (inlined)
+                                                compress (inlined)
+                                                compress_uninit (inlined)
+                                                into<zlib_rs::ReturnCode, core::result::Result<zlib_rs::stable::Status, zlib_rs::stable::DeflateError>> (inlined)
+                                                from (inlined)
+                                                deflate (inlined)
+                                                deflate_medium (inlined)
+                                                |          
+                                                 --0.64%--quick_insert_string (inlined)
+
+    15.80%  litchi-perf-bas  litchi-perf-baseline  [.] zlib_rs::deflate::longest_match::longest_match
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --15.64%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+                          branch<litchi_perf_baseline::Corpus, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          build_xlsx_cell_crud_corpus (inlined)
+                          |          
+                          |--12.87%--branch<alloc::vec::Vec<u8, alloc::alloc::Global>, litchi_opc::error::OpcError> (inlined)
+                          |          to_bytes (inlined)
+                          |          write<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+                          |          branch<(), litchi_opc::error::OpcError> (inlined)
+                          |          write<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+                          |          map_err<(), soapberry_zip::errors::Error, litchi_opc::error::OpcError, litchi_opc::phys_pkg::{impl#6}::write::{closure_env#0}<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>> (inlined)
+                          |          write_deflated_with_accounting<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+                          |          {closure#0}<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+                          |          |          
+                          |          |--12.23%--write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>>>> (inlined)
+                          |          |          write<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>>> (inlined)
+                          |          |          write<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>> (inlined)
+                          |          |          write<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress> (inlined)
+                          |          |          map<(usize, flate2::mem::Status), core::io::error::Error, usize, flate2::zio::{impl#5}::write::{closure_env#0}<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress>> (inlined)
+                          |          |          write_with_status<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress> (inlined)
+                          |          |          run_vec (inlined)
+                          |          |          compress_vec (inlined)
+                          |          |          write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status, flate2::mem::CompressError>, flate2::mem::{impl#1}::compress_vec::{closure_env#0}> (inlined)
+                          |          |          {closure#0} (inlined)
+                          |          |          compress_uninit (inlined)
+                          |          |          compress_uninit<flate2::ffi::zlib_rs::Deflate> (inlined)
+                          |          |          compress (inlined)
+                          |          |          compress_uninit (inlined)
+                          |          |          into<zlib_rs::ReturnCode, core::result::Result<zlib_rs::stable::Status, zlib_rs::stable::DeflateError>> (inlined)
+                          |          |          from (inlined)
+                          |          |          deflate (inlined)
+                          |          |          |          
+                          |          |           --11.75%--deflate_medium (inlined)
+                          |          |                     longest_match (inlined)
+                          |          |                     |          
+                          |          |                      --10.96%--longest_match_help<false> (inlined)
+                          |          |                                |          
+                          |          |                                |--1.45%--is_match<8> (inlined)
+                          |          |                                |          
+                          |          |                                |--1.14%--try_into<&[u8], [u8; 8]> (inlined)
+                          |          |                                |          try_from<u8, 8> (inlined)
+                          |          |                                |          copied<[u8; 8], core::array::TryFromSliceError> (inlined)
+                          |          |                                |          
+                          |          |                                 --1.03%--filled (inlined)
+                          |          |                                           len<u8> (inlined)
+                          |          |          
+                          |           --0.63%--finish<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>>> (inlined)
+                          |                     branch<(), core::io::error::Error> (inlined)
+                          |                     flush<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress> (inlined)
+                          |                     map_err<flate2::mem::Status, flate2::mem::CompressError, core::io::error::Error, fn(flate2::mem::CompressError) -> core::io::error::Error> (inlined)
+                          |                     run_vec (inlined)
+                          |                     compress_vec (inlined)
+                          |                     write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status, flate2::mem::CompressError>, flate2::mem::{impl#1}::compress_vec::{closure_env#0}> (inlined)
+                          |                     {closure#0} (inlined)
+                          |                     compress_uninit (inlined)
+                          |                     compress_uninit<flate2::ffi::zlib_rs::Deflate> (inlined)
+                          |                     compress (inlined)
+                          |                     compress_uninit (inlined)
+                          |                     into<zlib_rs::ReturnCode, core::result::Result<zlib_rs::stable::Status, zlib_rs::stable::DeflateError>> (inlined)
+                          |                     from (inlined)
+                          |                     deflate (inlined)
+                          |                     |          
+                          |                      --0.60%--deflate_medium (inlined)
+                          |                                longest_match (inlined)
+                          |                                |          
+                          |                                 --0.56%--longest_match_help<false> (inlined)
+                          |          
+                           --2.77%--branch<alloc::vec::Vec<u8, alloc::alloc::Global>, litchi_xlsx::error::Error> (inlined)
+                                     to_bytes (inlined)
+                                     to_plain_bytes (inlined)
+                                     to_bytes (inlined)
+                                     branch<alloc::vec::Vec<u8, alloc::alloc::Global>, litchi_opc::error::OpcError> (inlined)
+                                     to_bytes (inlined)
+                                     write<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+                                     branch<(), litchi_opc::error::OpcError> (inlined)
+                                     write<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+                                     map_err<(), soapberry_zip::errors::Error, litchi_opc::error::OpcError, litchi_opc::phys_pkg::{impl#6}::write::{closure_env#0}<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>> (inlined)
+                                     write_deflated_with_accounting<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+                                     {closure#0}<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+                                     |          
+                                      --2.75%--write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>>>> (inlined)
+                                                write<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>>> (inlined)
+                                                write<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>> (inlined)
+                                                write<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress> (inlined)
+                                                map<(usize, flate2::mem::Status), core::io::error::Error, usize, flate2::zio::{impl#5}::write::{closure_env#0}<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress>> (inlined)
+                                                write_with_status<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress> (inlined)
+                                                run_vec (inlined)
+                                                compress_vec (inlined)
+                                                write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status, flate2::mem::CompressError>, flate2::mem::{impl#1}::compress_vec::{closure_env#0}> (inlined)
+                                                {closure#0} (inlined)
+                                                compress_uninit (inlined)
+                                                compress_uninit<flate2::ffi::zlib_rs::Deflate> (inlined)
+                                                compress (inlined)
+                                                compress_uninit (inlined)
+                                                into<zlib_rs::ReturnCode, core::result::Result<zlib_rs::stable::Status, zlib_rs::stable::DeflateError>> (inlined)
+                                                from (inlined)
+                                                deflate (inlined)
+                                                |          
+                                                 --2.74%--deflate_medium (inlined)
+                                                           longest_match (inlined)
+                                                           |          
+                                                            --2.66%--longest_match_help<false> (inlined)
+                                                                      |          
+                                                                       --1.51%--is_match<8> (inlined)
+
+     7.79%  litchi-perf-bas  litchi-perf-baseline  [.] sha2::sha256::x86_sha::compress
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+               |--6.14%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               |          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+               |          |          
+               |          |--4.58%--branch<(alloc::string::String, alloc::string::String, core::option::Option<litchi_perf_baseline::filesystem::XlsxSelectedCellEvidence>), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               |          |          verify_xlsx_operation (inlined)
+               |          |          |          
+               |          |          |--1.55%--sha256_hex (inlined)
+               |          |          |          digest<sha2::Sha256, &[u8]> (inlined)
+               |          |          |          update (inlined)
+               |          |          |          digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, block_buffer::Eager, sha2::{impl#5}::update::{closure_env#0}> (inlined)
+               |          |          |          compress (inlined)
+               |          |          |          |          
+               |          |          |           --0.60%--schedule (inlined)
+               |          |          |          
+               |          |          |--1.53%--branch<litchi_perf_baseline::filesystem::XlsxRootSemanticProjection, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               |          |          |          xlsx_typed_semantic_oracle (inlined)
+               |          |          |          branch<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               |          |          |          assert_pinned_xlsx_corpus (inlined)
+               |          |          |          ne (inlined)
+               |          |          |          ne<str, str> (inlined)
+               |          |          |          eq (inlined)
+               |          |          |          eq<[u8], [u8]> (inlined)
+               |          |          |          eq<u8, u8> (inlined)
+               |          |          |          sha256_hex (inlined)
+               |          |          |          digest<sha2::Sha256, &[u8]> (inlined)
+               |          |          |          update (inlined)
+               |          |          |          digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, block_buffer::Eager, sha2::{impl#5}::update::{closure_env#0}> (inlined)
+               |          |          |          compress (inlined)
+               |          |          |          |          
+               |          |          |           --0.55%--schedule (inlined)
+               |          |          |          
+               |          |           --1.48%--branch<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               |          |                     assert_pinned_xlsx_corpus (inlined)
+               |          |                     ne (inlined)
+               |          |                     ne<str, str> (inlined)
+               |          |                     eq (inlined)
+               |          |                     eq<[u8], [u8]> (inlined)
+               |          |                     eq<u8, u8> (inlined)
+               |          |                     sha256_hex (inlined)
+               |          |                     digest<sha2::Sha256, &[u8]> (inlined)
+               |          |                     update (inlined)
+               |          |                     digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, block_buffer::Eager, sha2::{impl#5}::update::{closure_env#0}> (inlined)
+               |          |                     compress (inlined)
+               |          |                     |          
+               |          |                      --0.53%--schedule (inlined)
+               |          |          
+               |           --1.56%--branch<litchi_perf_baseline::Corpus, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               |                     build_xlsx_cell_crud_corpus (inlined)
+               |                     sha256_hex (inlined)
+               |                     |          
+               |                      --1.56%--digest<sha2::Sha256, &[u8]> (inlined)
+               |                                update (inlined)
+               |                                digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, block_buffer::Eager, sha2::{impl#5}::update::{closure_env#0}> (inlined)
+               |                                compress (inlined)
+               |                                |          
+               |                                 --0.60%--schedule (inlined)
+               |          
+                --1.39%--run_selected (inlined)
+                          {closure#1} (inlined)
+                          |          
+                           --1.24%--run_one (inlined)
+                                     |          
+                                     |--0.63%--branch<litchi_perf_baseline::filesystem::Invocation, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                                     |          spawn_checked_child (inlined)
+                                     |          branch<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                                     |          assert_source_sha256 (inlined)
+                                     |          sha256_hex (inlined)
+                                     |          digest<sha2::Sha256, &[u8]> (inlined)
+                                     |          update (inlined)
+                                     |          digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, block_buffer::Eager, sha2::{impl#5}::update::{closure_env#0}> (inlined)
+                                     |          compress (inlined)
+                                     |          
+                                      --0.61%--spawn_checked_child (inlined)
+                                                branch<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                                                assert_source_sha256 (inlined)
+                                                sha256_hex (inlined)
+                                                digest<sha2::Sha256, &[u8]> (inlined)
+                                                update (inlined)
+                                                digest_blocks<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UInt<typenum::uint::UTerm, typenum::bit::B1>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, typenum::bit::B0>, block_buffer::Eager, sha2::{impl#5}::update::{closure_env#0}> (inlined)
+                                                compress (inlined)
+
+     4.69%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_perf_baseline::payload_bytes
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --4.61%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+                          branch<litchi_perf_baseline::Corpus, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          build_xlsx_cell_crud_corpus (inlined)
+                          xlsx_cell_crud_media_payload (inlined)
+                          index_mut<u8, core::ops::range::RangeTo<usize>, alloc::alloc::Global> (inlined)
+                          deref_mut<u8, alloc::alloc::Global> (inlined)
+                          as_mut_slice<u8, alloc::alloc::Global> (inlined)
+                          payload_bytes (inlined)
+
+     2.62%  litchi-perf-bas  litchi-perf-baseline  [.] <zlib_rs::deflate::Heap>::pqdownheap
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --2.59%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+                          branch<litchi_perf_baseline::Corpus, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          build_xlsx_cell_crud_corpus (inlined)
+                          |          
+                           --2.56%--branch<alloc::vec::Vec<u8, alloc::alloc::Global>, litchi_opc::error::OpcError> (inlined)
+                                     to_bytes (inlined)
+                                     write<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+                                     branch<(), litchi_opc::error::OpcError> (inlined)
+                                     write<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+                                     map_err<(), soapberry_zip::errors::Error, litchi_opc::error::OpcError, litchi_opc::phys_pkg::{impl#6}::write::{closure_env#0}<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>> (inlined)
+                                     write_deflated_with_accounting<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+                                     {closure#0}<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>> (inlined)
+                                     |          
+                                      --2.38%--write_all<soapberry_zip::writer::ZipDataWriter<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>>>> (inlined)
+                                                write<flate2::deflate::write::DeflateEncoder<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>>> (inlined)
+                                                write<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>> (inlined)
+                                                write<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress> (inlined)
+                                                map<(usize, flate2::mem::Status), core::io::error::Error, usize, flate2::zio::{impl#5}::write::{closure_env#0}<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress>> (inlined)
+                                                write_with_status<&mut soapberry_zip::office::LimitedEntryWriter<core::io::cursor::Cursor<alloc::vec::Vec<u8, alloc::alloc::Global>>>, flate2::mem::Compress> (inlined)
+                                                run_vec (inlined)
+                                                compress_vec (inlined)
+                                                write_to_spare_capacity_of_vec<core::result::Result<flate2::mem::Status, flate2::mem::CompressError>, flate2::mem::{impl#1}::compress_vec::{closure_env#0}> (inlined)
+                                                {closure#0} (inlined)
+                                                compress_uninit (inlined)
+                                                compress_uninit<flate2::ffi::zlib_rs::Deflate> (inlined)
+                                                compress (inlined)
+                                                compress_uninit (inlined)
+                                                into<zlib_rs::ReturnCode, core::result::Result<zlib_rs::stable::Status, zlib_rs::stable::DeflateError>> (inlined)
+                                                from (inlined)
+                                                deflate (inlined)
+                                                deflate_medium (inlined)
+                                                |          
+                                                 --2.37%--flush_block_only (inlined)
+                                                           zng_tr_flush_block (inlined)
+                                                           |          
+                                                            --2.36%--build_tree<573> (inlined)
+                                                                      |          
+                                                                       --2.15%--gen_bitlen<573> (inlined)
+                                                                                 |          
+                                                                                  --2.14%--construct_huffman_tree (inlined)
+                                                                                            pqdownheap (inlined)
+
+     2.51%  litchi-perf-bas  libc.so.6             [.] __memmove_avx512_unaligned_erms
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --2.49%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+                          |          
+                          |--1.33%--branch<litchi_perf_baseline::Corpus, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          |          build_xlsx_cell_crud_corpus (inlined)
+                          |          |          
+                          |           --0.61%--branch<litchi_xlsx::workbook::model::Workbook, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          |                     build_xlsx_workbook (inlined)
+                          |          
+                           --1.08%--branch<(alloc::string::String, alloc::string::String, core::option::Option<litchi_perf_baseline::filesystem::XlsxSelectedCellEvidence>), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                                     verify_xlsx_operation (inlined)
+                                     |          
+                                      --0.65%--branch<litchi_perf_baseline::filesystem::XlsxRootSemanticProjection, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                                                |          
+                                                 --0.60%--xlsx_typed_semantic_oracle (inlined)
+
+     2.08%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::reader::ns_reader::NsReader<&[u8]>>::process_event
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --2.08%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+                          |          
+                          |--1.05%--branch<(alloc::string::String, alloc::string::String, core::option::Option<litchi_perf_baseline::filesystem::XlsxSelectedCellEvidence>), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          |          verify_xlsx_operation (inlined)
+                          |          
+                           --1.02%--branch<litchi_perf_baseline::Corpus, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                                     build_xlsx_cell_crud_corpus (inlined)
+                                     |          
+                                      --0.58%--branch<litchi_xlsx::workbook::model::Workbook, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                                                build_xlsx_workbook (inlined)
+                                                |          
+                                                 --0.58%--branch<litchi_xlsx::workbook::edit::model::Commit, litchi_xlsx::error::Error> (inlined)
+                                                           commit (inlined)
+
+     2.05%  litchi-perf-bas  libc.so.6             [.] __memcmp_evex_movbe
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --2.05%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+                          |          
+                          |--1.05%--branch<litchi_perf_baseline::Corpus, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          |          build_xlsx_cell_crud_corpus (inlined)
+                          |          |          
+                          |           --0.53%--branch<litchi_xlsx::workbook::model::Workbook, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          |                     build_xlsx_workbook (inlined)
+                          |                     |          
+                          |                      --0.52%--branch<litchi_xlsx::workbook::edit::model::Commit, litchi_xlsx::error::Error> (inlined)
+                          |                                commit (inlined)
+                          |          
+                           --0.96%--branch<(alloc::string::String, alloc::string::String, core::option::Option<litchi_perf_baseline::filesystem::XlsxSelectedCellEvidence>), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                                     verify_xlsx_operation (inlined)
+
+     1.90%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_ooxml_common::xml::unqualified_attribute_value
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --1.90%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+                          |          
+                          |--0.97%--branch<(alloc::string::String, alloc::string::String, core::option::Option<litchi_perf_baseline::filesystem::XlsxSelectedCellEvidence>), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          |          verify_xlsx_operation (inlined)
+                          |          
+                           --0.93%--branch<litchi_perf_baseline::Corpus, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                                     build_xlsx_cell_crud_corpus (inlined)
+
+     1.44%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::name::NamespaceResolver>::resolve_event
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --1.43%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+                          |          
+                          |--0.73%--branch<(alloc::string::String, alloc::string::String, core::option::Option<litchi_perf_baseline::filesystem::XlsxSelectedCellEvidence>), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          |          verify_xlsx_operation (inlined)
+                          |          
+                           --0.71%--branch<litchi_perf_baseline::Corpus, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                                     build_xlsx_cell_crud_corpus (inlined)
+
+     1.28%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_xlsx::raw::worksheet::parse::<<litchi_xlsx::workbook::model::Worksheet>::store::{closure#0}>
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --1.28%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+                          |          
+                          |--0.69%--branch<(alloc::string::String, alloc::string::String, core::option::Option<litchi_perf_baseline::filesystem::XlsxSelectedCellEvidence>), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          |          verify_xlsx_operation (inlined)
+                          |          |          
+                          |           --0.56%--branch<litchi_perf_baseline::filesystem::XlsxRootSemanticProjection, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          |                     xlsx_typed_semantic_oracle (inlined)
+                          |                     branch<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          |                     verify_xlsx_cells (inlined)
+                          |                     cells<&str> (inlined)
+                          |                     branch<&litchi_xlsx::cell::Store, litchi_xlsx::error::Error> (inlined)
+                          |                     store (inlined)
+                          |                     branch<litchi_xlsx::cell::Store, litchi_xlsx::error::Error> (inlined)
+                          |                     parse<litchi_xlsx::workbook::model::{impl#5}::store::{closure_env#0}> (inlined)
+                          |                     {closure#0}<litchi_xlsx::workbook::model::{impl#5}::store::{closure_env#0}> (inlined)
+                          |                     parse<litchi_xlsx::workbook::model::{impl#5}::store::{closure_env#0}> (inlined)
+                          |          
+                           --0.59%--branch<litchi_perf_baseline::Corpus, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                                     build_xlsx_cell_crud_corpus (inlined)
+                                     branch<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                                     verify_xlsx_cells (inlined)
+                                     cells<&str> (inlined)
+                                     branch<&litchi_xlsx::cell::Store, litchi_xlsx::error::Error> (inlined)
+                                     store (inlined)
+                                     branch<litchi_xlsx::cell::Store, litchi_xlsx::error::Error> (inlined)
+                                     parse<litchi_xlsx::workbook::model::{impl#5}::store::{closure_env#0}> (inlined)
+                                     {closure#0}<litchi_xlsx::workbook::model::{impl#5}::store::{closure_env#0}> (inlined)
+                                     parse<litchi_xlsx::workbook::model::{impl#5}::store::{closure_env#0}> (inlined)
+
+     1.14%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_xlsx::raw::worksheet::validation::optional_u32
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --1.14%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+                          |          
+                          |--0.60%--branch<(alloc::string::String, alloc::string::String, core::option::Option<litchi_perf_baseline::filesystem::XlsxSelectedCellEvidence>), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          |          verify_xlsx_operation (inlined)
+                          |          
+                           --0.54%--branch<litchi_perf_baseline::Corpus, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                                     build_xlsx_cell_crud_corpus (inlined)
+
+     1.07%  litchi-perf-bas  litchi-perf-baseline  [.] crc32fast::specialized::pclmulqdq::calculate
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --1.07%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+                          |          
+                          |--0.55%--branch<(alloc::string::String, alloc::string::String, core::option::Option<litchi_perf_baseline::filesystem::XlsxSelectedCellEvidence>), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          |          verify_xlsx_operation (inlined)
+                          |          
+                           --0.52%--branch<litchi_perf_baseline::Corpus, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                                     build_xlsx_cell_crud_corpus (inlined)
+
+     0.75%  litchi-perf-bas  [unknown]             [k] 0xffffffff8c800ef0
+            |          
+             --0.60%--_start
+                       __libc_start_main_impl (inlined)
+                       call_init (inlined)
+                       __libc_start_call_main
+                       main
+                       lang_start_internal (inlined)
+                       catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+                       catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+                       do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+                       {closure#0} (inlined)
+                       {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+                       report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                       __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+                       run (inlined)
+                       |          
+                        --0.59%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                                  run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+                                  |          
+                                   --0.52%--branch<litchi_perf_baseline::Corpus, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                                             |          
+                                              --0.52%--build_xlsx_cell_crud_corpus (inlined)
+
+     0.74%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_xlsx::raw::worksheet::model::Parser>::start_cell
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --0.74%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+
+     0.73%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::events::attributes::IterState>::next
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --0.72%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+
+     0.68%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::events::attributes::IterState>::check_for_duplicates
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+
+     0.57%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_xlsx::raw::worksheet::model::Parser>::finish
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --0.57%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+
+     0.57%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_xlsx::raw::worksheet::parse::<<litchi_xlsx::workbook::source::SourceWorksheet>::store::{closure#0}>
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+               branch<(alloc::string::String, alloc::string::String, core::option::Option<litchi_perf_baseline::filesystem::XlsxSelectedCellEvidence>), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               verify_xlsx_operation (inlined)
+               xlsx_deferred_semantic_projection (inlined)
+               xlsx_timed_names_count_text (inlined)
+               map_err<alloc::string::String, alloc::boxed::Box<(dyn core::error::Error + core::marker::Send + core::marker::Sync), alloc::alloc::Global>, alloc::string::String, litchi_perf_baseline::filesystem::xlsx_timed_names_count_text::{closure_env#2}> (inlined)
+               text (inlined)
+               {closure#0} (inlined)
+               rows (inlined)
+               dimensions_inner (inlined)
+               extent (inlined)
+               stored_extent (inlined)
+               branch<&litchi_xlsx::cell::Store, litchi_xlsx::error::Error> (inlined)
+               store (inlined)
+               branch<litchi_xlsx::cell::Store, litchi_xlsx::error::Error> (inlined)
+               parse<litchi_xlsx::workbook::source::{impl#2}::store::{closure_env#0}> (inlined)
+               {closure#0}<litchi_xlsx::workbook::source::{impl#2}::store::{closure_env#0}> (inlined)
+               parse<litchi_xlsx::workbook::source::{impl#2}::store::{closure_env#0}> (inlined)
+
+     0.53%  litchi-perf-bas  libc.so.6             [.] malloc
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --0.52%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+
+     0.53%  litchi-perf-bas  litchi-perf-baseline  [.] xml_minifier::audit::verify_with_policy
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --0.52%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+                          branch<litchi_perf_baseline::Corpus, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          build_xlsx_cell_crud_corpus (inlined)
+                          branch<alloc::vec::Vec<u8, alloc::alloc::Global>, litchi_xlsx::error::Error> (inlined)
+                          to_bytes (inlined)
+                          to_plain_bytes (inlined)
+                          to_bytes (inlined)
+                          branch<alloc::vec::Vec<u8, alloc::alloc::Global>, litchi_opc::error::OpcError> (inlined)
+                          to_bytes (inlined)
+                          branch<litchi_opc::pkgwriter::PublicationPlan, litchi_opc::error::OpcError> (inlined)
+                          from_package (inlined)
+                          branch<(), litchi_opc::error::OpcError> (inlined)
+                          validate_authored_xml (inlined)
+                          map<xml_minifier::audit::Report, xml_minifier::audit::Error, (), litchi_opc::pkgwriter::{impl#4}::validate_authored_xml::{closure_env#0}> (inlined)
+                          verify_authored (inlined)
+                          verify_with_policy (inlined)
+
+     0.52%  litchi-perf-bas  [unknown]             [k] 0xffffffff8cfed2d9
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --0.52%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          |          
+                           --0.51%--run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+
+     0.52%  litchi-perf-bas  litchi-perf-baseline  [.] <litchi_xlsx::cell::Store>::view
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+
+     0.50%  litchi-perf-bas  litchi-perf-baseline  [.] <quick_xml::reader::Reader<&[u8]>>::read_event_impl::<()>
+            |
+            ---_start
+               __libc_start_main_impl (inlined)
+               call_init (inlined)
+               __libc_start_call_main
+               main
+               lang_start_internal (inlined)
+               catch_unwind<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               catch_unwind<isize, std::rt::lang_start_internal::{closure_env#0}> (inlined)
+               do_call<std::rt::lang_start_internal::{closure_env#0}, isize> (inlined)
+               {closure#0} (inlined)
+               {closure#0}<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               report<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+               __rust_begin_short_backtrace<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>>> (inlined)
+               run (inlined)
+               |          
+                --0.50%--branch<bool, alloc::boxed::Box<dyn core::error::Error, alloc::alloc::Global>> (inlined)
+                          run_child_arguments<core::iter::adapters::skip::Skip<std::env::ArgsOs>> (inlined)
+
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

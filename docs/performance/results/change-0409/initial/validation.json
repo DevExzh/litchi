@@ -1,0 +1,67 @@
+{
+  "reports": [
+    {
+      "name": "selected-normal",
+      "case": "xlsx_file_selected_cell",
+      "samples": 500,
+      "warmup": 20,
+      "allocator": false,
+      "status": "passed"
+    },
+    {
+      "name": "selected-allocator",
+      "case": "xlsx_file_selected_cell",
+      "samples": 30,
+      "warmup": 3,
+      "allocator": true,
+      "status": "passed"
+    },
+    {
+      "name": "selected-perf-stat",
+      "case": "xlsx_file_selected_cell",
+      "samples": 100,
+      "warmup": 5,
+      "allocator": false,
+      "status": "passed"
+    },
+    {
+      "name": "selected-native-l2",
+      "case": "xlsx_file_selected_cell",
+      "samples": 100,
+      "warmup": 5,
+      "allocator": false,
+      "status": "passed"
+    },
+    {
+      "name": "selected-perf-record",
+      "case": "xlsx_file_selected_cell",
+      "samples": 300,
+      "warmup": 10,
+      "allocator": false,
+      "status": "passed"
+    },
+    {
+      "name": "source-edit",
+      "case": "xlsx_source_backed_cell_values_one_edit_save",
+      "samples": 500,
+      "warmup": 20,
+      "allocator": false,
+      "status": "passed"
+    },
+    {
+      "name": "eager-edit",
+      "case": "xlsx_eager_cell_values_one_edit_save",
+      "samples": 500,
+      "warmup": 20,
+      "allocator": false,
+      "status": "passed"
+    }
+  ],
+  "source_after": {
+    "revision": "abe38a9570129c6646bb1b1d7207c407fc86c3d6",
+    "status": "?? docs/GOAL.md",
+    "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+  },
+  "performance_claim": "none",
+  "note": "Whole-process attribution, PMU viability, and edit phase evidence require review; no comparison claim is authorized."
+}

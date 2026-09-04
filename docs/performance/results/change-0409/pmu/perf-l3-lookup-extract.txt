@@ -1,0 +1,38 @@
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2022-        / instructions]
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2023-
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2024-l3_cache:
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2025-  l3_cache_accesses
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2026-       [L3 cache accesses]
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt:2027:       [l3_lookup_state.all_coherent_accesses_to_l3]
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2028-  l3_misses
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2029-       [L3 misses (including cacheline state change requests)]
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt:2030:       [l3_lookup_state.l3_miss]
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2031-  l3_read_miss_latency
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2032-       [Average L3 read miss latency (in core clocks)]
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2033-       [l3_xi_sampled_latency.all * 10 / l3_xi_sampled_latency_requests.all]
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2034-  l3_read_miss_latency_for_local_dram
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2035-       [Average L3 read miss latency (in core clocks) for local DRAM]
+--
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2221-       [d_ratio(instructions,l2_itlb_misses)]
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2222-
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2223-lpm_l3: [L3 cache breakdown per CCX]
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2224-  lpm_l3_accesses
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2225-       [L3 victim cache accesses]
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt:2226:       [d_ratio(max(l3_lookup_state.all_coherent_accesses_to_l3,
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt:2227:        l3_lookup_state.l3_miss),duration_time)]
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2228-  lpm_l3_hits
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2229-       [L3 victim cache hit rate]
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt:2230:       [d_ratio(max(l3_lookup_state.all_coherent_accesses_to_l3,
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt:2231:        l3_lookup_state.l3_miss) - l3_lookup_state.l3_miss,
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt:2232:        max(l3_lookup_state.all_coherent_accesses_to_l3,
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt:2233:        l3_lookup_state.l3_miss))]
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2234-  lpm_l3_miss
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2235-       [L3 victim cache miss rate]
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt:2236:       [d_ratio(l3_lookup_state.l3_miss,
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt:2237:        max(l3_lookup_state.all_coherent_accesses_to_l3,
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt:2238:        l3_lookup_state.l3_miss))]
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2239-
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2240-lpm_ldst: [Breakdown of load/store instructions]
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2241-  lpm_ldst_insn_bt_ld
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2242-       [Number of instructions between loads]
+/tmp/litchi-goal-0409-pmu/perf-list-details.txt-2243-       [d_ratio(instructions,ls_dispatch.ld_dispatch)]

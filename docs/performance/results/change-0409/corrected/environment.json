@@ -1,0 +1,26 @@
+{
+  "source_before": {
+    "revision": "193ca7b4297ec35d07e5cdd5f64d144b822c5be9",
+    "status": "?? docs/GOAL.md",
+    "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+  },
+  "binary": {
+    "path": "/tmp/litchi-goal-0409-target/release/litchi-perf-baseline",
+    "bytes": 449447096,
+    "sha256": "5c263aa5531e8966e25502556c6f7bdb486a717556df5cf59fcbd339ff8c7553"
+  },
+  "runtime_environment": {
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "RUSTUP_TOOLCHAIN": "1.98.1"
+  },
+  "build_environment": {
+    "CARGO_TARGET_DIR": "/tmp/litchi-goal-0409-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes"
+  },
+  "cpu": 2,
+  "performance_claim": "none",
+  "note": "Corrected observer performs compressed member range intersections during timed source calls; old/new latency comparison is not authorized."
+}

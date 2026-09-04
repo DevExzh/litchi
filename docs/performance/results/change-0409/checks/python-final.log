@@ -1,0 +1,24 @@
+.....................................................................................................................................................................................................................................................................................................................................................................[check/first] $ cargo check first
+[check/second] $ cargo check second
+[check/third] $ cargo check third
+.[check/passed] $ cargo check passed
+[check/failed] $ cargo check failed
+.....[check/bulk/litchi-biff] $ cargo check --package litchi-biff --all-features --lib --tests
+non-iWork release gate: interrupted
+.[check/bulk/litchi-biff] $ cargo check --package litchi-biff --all-features --lib --tests
+non-iWork release gate: cannot execute Cargo: spawn denied
+.........non-iWork release gate: synthetic failure
+.................................................................................................................................................................................................................................................................................litchi-opc-overlay-abba-summary: exactly four positional reports are required
+.....................................................................................................................................................................................ssssssssssssssssssss...............
+----------------------------------------------------------------------
+Ran 862 tests in 94.574s
+
+OK (skipped=20)
+PASS: 1 matched results, 7 metrics, 0 regressions
+Worst latency movement: opc_open elapsed_ns.p50 +4.00% (limit +5.00%)
+REGRESSION: 1 matched results, 7 metrics, 3 regressions
+REGRESSION opc_open[tiny] elapsed_ns.p50: 100 -> 120 (+20.00%; limit +5.00%)
+REGRESSION opc_open[tiny] elapsed_ns.p95: 100 -> 120 (+20.00%; limit +8.00%)
+REGRESSION opc_open[tiny] elapsed_ns.p99: 100 -> 120 (+20.00%; limit +12.00%)
+INVALID: 0 matched results, 0 metrics, 0 regressions
+ERROR: cannot read /tmp/tmphmj132dh/current.json: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)

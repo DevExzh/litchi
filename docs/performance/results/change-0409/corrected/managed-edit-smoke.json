@@ -1,0 +1,832 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "binary": "litchi-perf-baseline",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "instrumentation": "none"
+  },
+  "binary_identity": {
+    "path": "/tmp/litchi-goal-0409-target/release/litchi-perf-baseline",
+    "binary_sha256": "5c263aa5531e8966e25502556c6f7bdb486a717556df5cf59fcbd339ff8c7553",
+    "binary_bytes": 449447096,
+    "mode_bits": 509,
+    "executable": true,
+    "profile": "release"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "git_revision": "193ca7b4297ec35d07e5cdd5f64d144b822c5be9",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 1,
+    "allocator": "Rust system allocator",
+    "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1011-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "2",
+    "storage_identifier": null
+  },
+  "configuration": {
+    "samples_per_case": 3,
+    "warmup_iterations_per_case": 1,
+    "filesystem_cache_states": [
+      "warm"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "cases": [
+      "xlsx_source_backed_managed_cell_values_one_edit_save"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "xlsb_shapes": [
+      "tiny",
+      "medium",
+      "large",
+      "sparse"
+    ],
+    "xlsx_cell_crud_shapes": [
+      "medium"
+    ],
+    "xlsx_row_visibility_shapes": [
+      "medium",
+      "large"
+    ],
+    "semantic_shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ],
+    "opc_cache_lock_diagnostics": false,
+    "xlsx_cell_values_range_accounting": "compressed-member-intersections-v1",
+    "xlsx_cell_values_managed_planning_memory_headroom": 65536
+  },
+  "parallel_metrics": {
+    "schema_version": 1,
+    "scope": "explicit_local_execution_only",
+    "claim": "descriptive",
+    "configured_worker_budget": {
+      "status": "measured",
+      "value": [
+        1
+      ],
+      "scope": "configuration.execution_workers"
+    },
+    "observed_process_thread_count": {
+      "status": "unavailable",
+      "scope": "process_thread_count",
+      "reason": "no process-global thread counter is collected; local worker boundaries only"
+    },
+    "cases": [
+      {
+        "case": "xlsx_source_backed_managed_cell_values_one_edit_save",
+        "corpus_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      }
+    ]
+  },
+  "results": [
+    {
+      "case": "xlsx_source_backed_managed_cell_values_one_edit_save",
+      "corpus": {
+        "name": "xlsx-cell-values-medium",
+        "generator": "litchi-xlsx-cell-values-source-edit-media-multi-sheet-v1",
+        "package_format": "XLSX/OPC/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-multi-sheet-scalar-grid-with-media",
+        "compression": "deflate",
+        "entry_count": 9216,
+        "archive_member_count": 17,
+        "entry_bytes": 4,
+        "uncompressed_payload_bytes": 4231168,
+        "archive_bytes": 4226429,
+        "archive_sha256": "dfff7ec0c749d9e404091776f15a8fb690985af7f58efdfe659dbeaed7145036",
+        "target_entry": "Sheet1!A1",
+        "target_payload_bytes": 1,
+        "target_payload_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "xlsx": {
+          "sheet_count": 4,
+          "rows_per_sheet": 48,
+          "columns_per_sheet": 48,
+          "one_percent_update_count": 93,
+          "source_members": {
+            "workbook": "xl/workbook.xml",
+            "worksheets": [
+              "xl/worksheets/sheet1.xml",
+              "xl/worksheets/sheet2.xml",
+              "xl/worksheets/sheet3.xml",
+              "xl/worksheets/sheet4.xml"
+            ],
+            "shared_strings": null,
+            "styles": "xl/styles.xml"
+          }
+        }
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          8102569,
+          8145389,
+          8263589
+        ],
+        "sample_order": [
+          2,
+          0,
+          1
+        ],
+        "min": 8102569,
+        "p50": 8145389,
+        "p95": 8263589,
+        "p99": 8263589,
+        "max": 8263589,
+        "mean": 8170515.666666667,
+        "standard_deviation": 83398.87369343372,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 7963324.658218969,
+          "upper": 8377706.675114365
+        }
+      },
+      "sink": {
+        "accepted_bytes": 4226480,
+        "write_calls": 201,
+        "largest_write": 32768,
+        "write_size_buckets": {
+          "bytes_0": 0,
+          "bytes_1_to_512": 69,
+          "bytes_513_to_4096": 0,
+          "bytes_4097_to_16384": 4,
+          "bytes_16385_to_65536": 128,
+          "bytes_over_65536": 0
+        }
+      },
+      "source": {
+        "read_calls": [
+          257,
+          257,
+          257
+        ],
+        "read_bytes": [
+          4233005,
+          4233005,
+          4233005
+        ],
+        "ordinary_payload_read_calls": [
+          143,
+          143,
+          143
+        ],
+        "ordinary_payload_read_bytes": [
+          4223551,
+          4223551,
+          4223551
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          3,
+          3,
+          3
+        ],
+        "xlsx_cell_values": {
+          "implementation": "managed-source-backed",
+          "cache_mode": "managed-budget",
+          "timing_scope": "open, selector planning, commit, and stream publication; reopen/verification is separate and excluded",
+          "update_count": 1,
+          "selected_worksheet_count": 1,
+          "open_ns": [
+            91861,
+            97270,
+            91451
+          ],
+          "plan_ns": [
+            2363758,
+            2537229,
+            2369448
+          ],
+          "commit_ns": [
+            3700463,
+            3705363,
+            3705623
+          ],
+          "publication_ns": [
+            1989307,
+            1923727,
+            1936047
+          ],
+          "reopen_ns": [
+            34574202,
+            33823719,
+            33913699
+          ],
+          "source_read_calls": [
+            257,
+            257,
+            257
+          ],
+          "source_read_bytes": [
+            4233005,
+            4233005,
+            4233005
+          ],
+          "workbook_read_calls": [
+            1,
+            1,
+            1
+          ],
+          "workbook_read_bytes": [
+            226,
+            226,
+            226
+          ],
+          "selected_worksheet_read_calls": [
+            1,
+            1,
+            1
+          ],
+          "selected_worksheet_read_bytes": [
+            6816,
+            6816,
+            6816
+          ],
+          "unselected_worksheet_read_calls": [
+            3,
+            3,
+            3
+          ],
+          "unselected_worksheet_read_bytes": [
+            20330,
+            20330,
+            20330
+          ],
+          "payload_materializations": [
+            3,
+            3,
+            3
+          ],
+          "cache_hits": [
+            0,
+            0,
+            0
+          ],
+          "cache_cold_loads": [
+            3,
+            3,
+            3
+          ],
+          "cache_waiter_joins": [
+            0,
+            0,
+            0
+          ],
+          "cache_successful_loads": [
+            3,
+            3,
+            3
+          ],
+          "cache_failed_loads": [
+            0,
+            0,
+            0
+          ],
+          "cache_evictions": [
+            0,
+            0,
+            0
+          ],
+          "cache_bypasses": [
+            0,
+            0,
+            0
+          ],
+          "cache_oversized_bypasses": [
+            0,
+            0,
+            0
+          ],
+          "cache_allocation_bypasses": [
+            0,
+            0,
+            0
+          ],
+          "cache_in_flight_loads": [
+            0,
+            0,
+            0
+          ],
+          "cache_retained_entries": [
+            3,
+            3,
+            3
+          ],
+          "cache_retained_bytes": [
+            64321,
+            64321,
+            64321
+          ],
+          "cache_budget_managed": true,
+          "payload_memory_limit": 64321,
+          "publication_planning_memory_headroom": 65536,
+          "cache_budget_memory_limit": 129857,
+          "cache_budget_memory_used": [
+            64321,
+            64321,
+            64321
+          ],
+          "cache_budget_reserved_bytes": [
+            64321,
+            64321,
+            64321
+          ],
+          "cache_budget_reservation_failures": [
+            0,
+            0,
+            0
+          ],
+          "pre_publication_budget": [
+            {
+              "input_bytes_used": 9594,
+              "input_bytes_limit": 18446744073709551615,
+              "output_bytes_used": 0,
+              "output_bytes_limit": 8518496,
+              "work_used": 64321,
+              "work_limit": 18446744073709551615,
+              "objects_used": 21,
+              "objects_limit": 1000000,
+              "catalog_reserved_objects": 18,
+              "cache_reserved_objects": 3
+            },
+            {
+              "input_bytes_used": 9594,
+              "input_bytes_limit": 18446744073709551615,
+              "output_bytes_used": 0,
+              "output_bytes_limit": 8518496,
+              "work_used": 64321,
+              "work_limit": 18446744073709551615,
+              "objects_used": 21,
+              "objects_limit": 1000000,
+              "catalog_reserved_objects": 18,
+              "cache_reserved_objects": 3
+            },
+            {
+              "input_bytes_used": 9594,
+              "input_bytes_limit": 18446744073709551615,
+              "output_bytes_used": 0,
+              "output_bytes_limit": 8518496,
+              "work_used": 64321,
+              "work_limit": 18446744073709551615,
+              "objects_used": 21,
+              "objects_limit": 1000000,
+              "catalog_reserved_objects": 18,
+              "cache_reserved_objects": 3
+            }
+          ],
+          "post_publication_budget": [
+            {
+              "input_bytes_used": 4233005,
+              "input_bytes_limit": 18446744073709551615,
+              "output_bytes_used": 4226480,
+              "output_bytes_limit": 8518496,
+              "work_used": 64321,
+              "work_limit": 18446744073709551615,
+              "objects_used": 3,
+              "objects_limit": 1000000,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 4233005,
+              "input_bytes_limit": 18446744073709551615,
+              "output_bytes_used": 4226480,
+              "output_bytes_limit": 8518496,
+              "work_used": 64321,
+              "work_limit": 18446744073709551615,
+              "objects_used": 3,
+              "objects_limit": 1000000,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            },
+            {
+              "input_bytes_used": 4233005,
+              "input_bytes_limit": 18446744073709551615,
+              "output_bytes_used": 4226480,
+              "output_bytes_limit": 8518496,
+              "work_used": 64321,
+              "work_limit": 18446744073709551615,
+              "objects_used": 3,
+              "objects_limit": 1000000,
+              "catalog_reserved_objects": null,
+              "cache_reserved_objects": null
+            }
+          ],
+          "budget_used_after_package_drop": [
+            64321,
+            64321,
+            64321
+          ],
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0
+          ],
+          "budget_objects_used_after_handles_drop": [
+            0,
+            0,
+            0
+          ],
+          "output_sha256": [
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+            "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1"
+          ],
+          "semantic_sha256": [
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de",
+            "3cd21160d4f74fa0f097ab40be08e211b3e460cea788aa2b6705a55fdece07de"
+          ],
+          "untouched_member_count": 15,
+          "untouched_member_sha256": [
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d",
+            "7105fcbce160328f666e69fcfd18da9e19fd71dd7b63961e7cddd29d5da1a17d"
+          ],
+          "output_budget_refusal": {
+            "successful_output_ceiling": 8518496,
+            "first_output_request_bytes": 361,
+            "one_under_output_limit": 360,
+            "accepted_output_bytes": 0,
+            "source_read_calls": 115,
+            "source_read_bytes": 15350,
+            "output_bytes_used": 0,
+            "typed_output_resource_refusal": true,
+            "zero_output_verified": true,
+            "source_identity_preserved": true
+          }
+        }
+      },
+      "output_sha256": "9b7b66a02007eeb63498fd5de4c6b7115ace0383ce37d97e1a9560ef7bfadec1",
+      "operation_metrics": {
+        "sample_count": 3,
+        "sample_indices": [
+          0,
+          1,
+          2
+        ],
+        "alignment": "elapsed_ns.samples_by_elapsed_then_sample_index",
+        "latency_claim": "comparable_timed_operation",
+        "source": {
+          "status": "not_applicable",
+          "counter_scope": "not_applicable_in_process_sink",
+          "logical_read_calls": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_requested_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_largest_returned_bytes": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          },
+          "logical_read_pattern": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at_range_order_not_physical_io"
+          },
+          "compressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_compressed_member_boundary"
+          },
+          "decompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_read_at_has_no_decompressed_byte_boundary"
+          },
+          "recompressed_bytes": {
+            "status": "not_applicable",
+            "scope": "unavailable_atomic_save_has_no_recompressed_byte_boundary"
+          },
+          "max_concurrent_reads": {
+            "status": "not_applicable",
+            "scope": "operation_logical_read_at"
+          }
+        },
+        "process": {
+          "status": "not_applicable",
+          "user_cpu_ticks": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "system_cpu_ticks": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "clock_ticks_per_second": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "minor_faults": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "major_faults": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "voluntary_context_switches": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "nonvoluntary_context_switches": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta"
+          },
+          "rss_delta_bytes": {
+            "status": "not_applicable",
+            "scope": "procfs_operation_delta_not_peak"
+          },
+          "peak_rss_bytes": {
+            "status": "not_applicable",
+            "scope": "process_lifetime_high_water_after_not_operation_peak"
+          },
+          "rchar": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "wchar": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "read_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "write_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "cancelled_write_bytes": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "syscr": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          },
+          "syscw": {
+            "status": "not_applicable",
+            "scope": "child_process_interval_delta_including_procfs_probe_overhead"
+          }
+        },
+        "sink": {
+          "status": "not_applicable",
+          "output_bytes": {
+            "status": "not_applicable",
+            "scope": "post_operation_output_length_not_sink_write_volume"
+          },
+          "write_status": "measured",
+          "accepted_bytes": {
+            "values": [
+              4226480,
+              4226480,
+              4226480
+            ],
+            "status": "measured",
+            "scope": "logical_sink_accepted_write_bytes"
+          },
+          "write_calls": {
+            "values": [
+              201,
+              201,
+              201
+            ],
+            "status": "measured",
+            "scope": "logical_sink_accepted_write_calls"
+          },
+          "largest_write": {
+            "values": [
+              32768,
+              32768,
+              32768
+            ],
+            "status": "measured",
+            "scope": "logical_sink_largest_accepted_write"
+          },
+          "write_size_buckets": {
+            "status": "measured",
+            "bytes_0": {
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_1_to_512": {
+              "values": [
+                69,
+                69,
+                69
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_513_to_4096": {
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_4097_to_16384": {
+              "values": [
+                4,
+                4,
+                4
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_16385_to_65536": {
+              "values": [
+                128,
+                128,
+                128
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            },
+            "bytes_over_65536": {
+              "values": [
+                0,
+                0,
+                0
+              ],
+              "status": "measured",
+              "scope": "logical_sink_accepted_write_size_bucket_counts"
+            }
+          }
+        },
+        "publication": {
+          "status": "not_applicable",
+          "changed_spans": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          },
+          "published_bytes": {
+            "status": "not_applicable",
+            "scope": "logical_publication_counter"
+          }
+        },
+        "materialization": {
+          "status": "not_applicable",
+          "opc_parts": {
+            "status": "not_applicable",
+            "scope": "logical_materialization_counter"
+          }
+        },
+        "cfb_phases": {
+          "status": "not_applicable",
+          "open": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "plan": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          },
+          "atomic_publication": {
+            "elapsed_ns": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_elapsed_ns"
+            },
+            "logical_read_calls": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_requested_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            },
+            "logical_read_returned_bytes": {
+              "status": "not_applicable",
+              "scope": "timed_cfb_phase_logical_read_at"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "corpus_catalog": {
+    "manifest_version": 2,
+    "catalog_id": "litchi-perf-corpus-v2",
+    "catalog_sha256": "35c4b78fbd86595946acc8c3482674494744185cbe31cf684d46d5c369bcc967",
+    "content_set_sha256": "1485196c4029e51b2d086511d55e452690f7c3c2843b8f61561e8339cf07e171"
+  }
+}

@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/tmp/litchi-goal-0409-recapture.py", line 38, in <module>
+    m=r['source']['xlsx_cell_values'];assert m['selected_worksheet_count']==sheets
+                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

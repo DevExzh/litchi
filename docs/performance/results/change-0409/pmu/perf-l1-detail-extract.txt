@@ -1,0 +1,77 @@
+932-       [Instruction TLB read misses. Unit: cpu]
+933-        cpu/legacy-cache-config=0x10004/
+934-  itlb-loads
+935-       [Instruction TLB read accesses. Unit: cpu]
+936-        cpu/legacy-cache-config=4/
+937:  l1-dcache-load-misses
+938-       [Level 1 data cache read misses. Unit: cpu]
+939-        cpu/legacy-cache-config=0x10000/
+940:  l1-dcache-loads
+941-       [Level 1 data cache read accesses. Unit: cpu]
+942-        cpu/legacy-cache-config=0/
+943:  l1-dcache-prefetches
+944-       [Level 1 data cache prefetch accesses. Unit: cpu]
+945-        cpu/legacy-cache-config=0x200/
+946:  l1-icache-load-misses
+947-       [Level 1 instruction cache read misses. Unit: cpu]
+948-        cpu/legacy-cache-config=0x10001/
+949:  l1-icache-loads
+950-       [Level 1 instruction cache read accesses. Unit: cpu]
+951-        cpu/legacy-cache-config=1/
+952-
+953-legacy hardware:
+954-  branch-instructions
+--
+1921-       [Instruction cache miss ratio for all fetches. An instruction cache
+1922-        miss will not be counted by this metric if it is an OC hit]
+1923-       [d_ratio(ic_tag_hit_miss.instruction_cache_miss,
+1924-        ic_tag_hit_miss.all_instruction_cache_accesses)]
+1925-
+1926:l1_dcache:
+1927-  all_data_cache_accesses_pti
+1928-       [All data cache accesses per thousand instructions]
+1929-       [ls_dispatch.all / instructions]
+1930-  all_l1_data_cache_fills_pti
+1931-       [All L1 data cache fills per thousand instructions]
+1932-       [ls_any_fills_from_sys.all / instructions]
+1933:  l1_data_cache_fills_from_different_ccx_pti
+1934-       [L1 data cache fills from another CCX cache in any NUMA node per
+1935-        thousand instructions]
+1936-       [ls_any_fills_from_sys.remote_cache / instructions]
+1937:  l1_data_cache_fills_from_memory_pti
+1938-       [L1 data cache fills from DRAM or MMIO in any NUMA node per thousand
+1939-        instructions]
+1940-       [ls_any_fills_from_sys.dram_io_all / instructions]
+1941:  l1_data_cache_fills_from_remote_node_pti
+1942-       [L1 data cache fills from a different NUMA node per thousand
+1943-        instructions]
+1944-       [ls_any_fills_from_sys.far_all / instructions]
+1945:  l1_data_cache_fills_from_same_ccx_pti
+1946-       [L1 data cache fills from within the same CCX per thousand instructions]
+1947-       [ls_any_fills_from_sys.local_all / instructions]
+1948:  l1_demand_data_cache_fills_from_far_cache_pti
+1949-       [L1 demand data cache fills from another CCX cache in a different NUMA
+1950-        node per thousand instructions]
+1951-       [ls_dmnd_fills_from_sys.far_cache / instructions]
+1952:  l1_demand_data_cache_fills_from_far_memory_pti
+1953-       [L1 demand data cache fills from DRAM or MMIO in a different NUMA node
+1954-        per thousand instructions]
+1955-       [ls_dmnd_fills_from_sys.dram_io_far / instructions]
+1956:  l1_demand_data_cache_fills_from_local_l2_pti
+1957-       [L1 demand data cache fills from local L2 cache per thousand
+1958-        instructions]
+1959-       [ls_dmnd_fills_from_sys.local_l2 / instructions]
+1960:  l1_demand_data_cache_fills_from_near_cache_pti
+1961-       [L1 demand data cache fills from another CCX cache in the same NUMA
+1962-        node per thousand instructions]
+1963-       [ls_dmnd_fills_from_sys.near_cache / instructions]
+1964:  l1_demand_data_cache_fills_from_near_memory_pti
+1965-       [L1 demand data cache fills from DRAM or MMIO in the same NUMA node per
+1966-        thousand instructions]
+1967-       [ls_dmnd_fills_from_sys.dram_io_near / instructions]
+1968:  l1_demand_data_cache_fills_from_same_ccx_pti
+1969-       [L1 demand data cache fills from within the same CCX per thousand
+1970-        instructions]
+1971-       [ls_dmnd_fills_from_sys.local_ccx / instructions]
+1972-
+1973-l2_cache:
