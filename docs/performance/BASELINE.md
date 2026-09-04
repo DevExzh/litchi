@@ -1,5 +1,31 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0398: unified XLSX worksheet and cell selectors
+
+The xlsx-gated unified `litchi::sheet::Workbook::sheet(name_or_zero_based
+position)` returns `Result<Option<SelectedWorksheet>>`. Case-insensitive names
+and zero-based positions select a lifetime-free `Clone + Send + Sync` handle
+with `name()` and `position()`. A missing name or out-of-bounds position is
+`Ok(None)`.
+
+The selected handle's `cell` accepts A1 (one-based lexical) or raw zero-based
+coordinates and returns owned `SelectedCellView::Missing`, `Covered`, or
+`Stored(Cell)` without erasing stored `Empty`, `Formula`, or `Unknown` states.
+Its `cells` accepts inclusive A1 ranges or zero-based half-open bounds and
+returns an owned sparse `Vec<SelectedCell>`. Source selection is catalog-only;
+the XLSX scanner/fallback/cache/freshness/limits/cancellation and typed source
+changes remain XLSX-owned, with eager bridge parity. Charts/non-grid sheets
+return typed XLSX `NotWorksheet`; non-XLSX runtimes return core `Unsupported`.
+Legacy 1-based dynamic traits remain unchanged.
+
+No selector is added: the registry remains **419** and the default remains
+**36 cases / 198 rows**. Focused validation is four XLSX public tests, five
+with XLSB, one owned/source bridge, one non-XLSX runtime check, and feature
+checks. This is correctness/API evidence only under stable rustc/Cargo/Rustdoc
+1.98.1 because pinned 1.95 lacks Cargo. `performance_claim: none`;
+`claim_authorized: false`; no latency, allocation, RSS, physical-I/O, cache,
+throughput, or generalization claim follows. See the [0398 change record](changes/0398-unified-xlsx-sheet-selectors.md).
+
 ## Change 0397: accepted OPC owned-open validation/index deduplication
 
 Production commit `f275d4566` is the measured candidate

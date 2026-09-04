@@ -1,5 +1,12 @@
 # Performance CRUD coverage
 
+## 2026-09-04: change 0398 adds unified XLSX selection coverage
+
+- The xlsx-gated `litchi::sheet::Workbook::sheet(name_or_zero_based_position)` returns `Result<Option<SelectedWorksheet>>`: names are case-insensitive, positions are zero-based, and missing/out-of-bounds selectors return `Ok(None)`. The lifetime-free `Clone + Send + Sync` handle exposes `name()` and `position()`.
+- Owned `cell` and sparse `cells` selection accepts A1 (one-based lexical) or raw zero-based cell/range inputs. It preserves exact `SelectedCellView` `Missing`/`Covered`/`Stored(Cell)` states, including stored `Empty`, `Formula`, and `Unknown`, and returns an owned `Vec<SelectedCell>` for ranges. Source selection is catalog-only; scanner/fallback/cache/freshness/limits/cancellation and typed source changes remain XLSX-owned. Eager bridge parity and legacy 1-based dynamic traits remain unchanged.
+- Charts/non-grid XLSX sheets return typed `NotWorksheet`; non-XLSX runtime workbooks return core `Unsupported`. No selector is added: the registry remains **419** and the default remains **36 cases / 198 rows**. Focused validation covers four XLSX public tests, five with XLSB, one owned/source bridge, one non-XLSX runtime check, and feature checks.
+- This is correctness/API coverage only: `performance_claim: none`; `claim_authorized: false`; stable rustc/Cargo/Rustdoc 1.98.1 was used because pinned 1.95 lacks Cargo. No latency, allocation, RSS, physical-I/O, cache, throughput, or generalization claim follows. See the [0398 change record](changes/0398-unified-xlsx-sheet-selectors.md).
+
 ## 2026-09-04: change 0397 adds OPC owned-open evidence
 
 - The opt-in `opc_casefold_owned_open` selector measures only the normal `OpcPackage::from_vec(owned)` constructor over fixed stored corpora with 256, 2,047, 2,048, and 16,384 ordinary 32-byte Parts. It raises the selectable registry from **418** to **419**; the default remains **36 cases / 198 rows**. This is open-path benchmark coverage, not a new CRUD semantic operation or a generalized format/facade claim.

@@ -72,6 +72,8 @@ mod adapters;
     feature = "numbers"
 ))]
 pub mod functions;
+#[cfg(feature = "xlsx")]
+mod selection;
 pub mod text;
 #[cfg(any(
     feature = "xls",
@@ -91,6 +93,8 @@ mod workbook;
 mod workbook_types;
 
 // Re-exports
+#[cfg(feature = "xlsx")]
+pub use crate::xlsx::{Address, Area, At, Rect};
 #[cfg(feature = "eval")]
 pub use eval::FormulaEvaluator;
 #[cfg(any(
@@ -101,6 +105,8 @@ pub use eval::FormulaEvaluator;
     feature = "numbers"
 ))]
 pub use functions::*;
+#[cfg(feature = "xlsx")]
+pub use selection::{SelectedCell, SelectedCellView, SelectedWorksheet, WorksheetSelector};
 pub use traits::{Cell, CellIterator, RowIterator, WorkbookTrait, Worksheet, WorksheetIterator};
 pub use types::{CellValue, Result};
 #[cfg(any(
