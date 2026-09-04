@@ -4,7 +4,7 @@
 
 [0409](changes/0409-xlsx-profile-and-range-accounting.md) extends current evidence to XLSX selected-cell queries
 and matched one-cell edit/save. It records selected-query p50 3.528 ms,
-81,918 operation allocations and 10,690,444 allocated bytes in separate
+81,918 operation allocation calls and 10,690,444 allocated bytes in separate
 normal/allocator runs. A harness fix configures workbook/worksheet compressed
 ranges from the actual edited sheets and versions the corrected observer;
 old unconfigured zeroes cannot establish unread members. The affected source

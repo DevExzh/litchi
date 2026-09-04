@@ -82,7 +82,7 @@ filesystem runs. Neither physical-cold nor scaling evidence is captured.
 | Run | Warmups / samples | Observation and scope |
 | --- | --- | --- |
 | Initial selected normal | 20 / 500 | Query p50/p95/p99 3,528,178 / 3,585,663 / 3,634,612 ns; mean 3,531,808.138 ns, 95% Student-t mean interval [3,529,089.610, 3,534,526.666] ns |
-| Initial selected allocator | 3 / 30 | Constant 81,918 allocations, 10,690,444 allocated bytes, 12 reallocations, zero failed allocations per query |
+| Initial selected allocator | 3 / 30 | Constant 81,918 allocation calls (including 12 reallocations), 10,690,444 allocated bytes, zero failed allocation calls per query |
 | Initial source one-cell save | 20 / 500 | p50/p95/p99 8,023,488 / 8,111,320 / 8,169,520 ns; member read vectors invalid as described above |
 | Initial eager one-cell save | 20 / 500 | p50/p95/p99 8,290,619 / 8,363,149 / 8,403,609 ns; same output as source case |
 | Corrected source one-cell save | 20 / 500 | p50/p95/p99 8,108,978 / 8,206,399 / 8,261,579 ns; mean 8,113,128.372 ns, 95% Student-t mean interval [8,109,376.922, 8,116,879.822] ns |
@@ -135,7 +135,8 @@ the library query using the exact `SelectedWorksheet::cell::<&str>` ancestor:
 2,528 blocks and 8,291,214,922 weighted event periods. Within that subset,
 `clone_bounded_name_part` is 16.22% leaf attribution. Of that helper's leaf
 weight, 75.50% comes directly through expanded-name cloning and 24.26%
-through namespace expansion. `parse_element` is 6.08% self and 23.31%
+through namespace expansion; the remaining 0.23% comes directly from
+`parse_element`. `parse_element` is 6.08% self and 23.31%
 inclusive. Lexical `clone_bounded_bytes` is only 0.038% self and 0.361%
 inclusive; inlining and shared allocation/copy routines limit finer attribution.
 

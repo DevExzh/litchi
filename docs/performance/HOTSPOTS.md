@@ -40,7 +40,7 @@ PMU events; the L1 aliases returned unvalidated zeroes and LLC aliases were
 unsupported. No production speedup is claimed by this batch.
 
 [Change 0409](changes/0409-xlsx-profile-and-range-accounting.md) extends the profile to the XLSX
-selected-cell path. Normal query p50 is 3.528 ms, with 81,918 allocations and
+selected-cell path. Normal query p50 is 3.528 ms, with 81,918 allocation calls and
 10,690,444 allocated bytes in the separate counting-allocator run. The exact
 `SelectedWorksheet::cell` ancestor contains 2,528 sampled stack blocks;
 `clone_bounded_name_part` is 16.22% of their period-weighted leaf attribution.
