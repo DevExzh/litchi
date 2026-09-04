@@ -1,0 +1,20 @@
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+error: using `chunks_exact` with a constant chunk size
+   --> crates/litchi-core/src/hex.rs:102:28
+    |
+102 |     for chunk in hex_bytes.chunks_exact(2) {
+    |                            ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<2>().0`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+    = note: `-D clippy::chunks-exact-to-as-chunks` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::chunks_exact_to_as_chunks)]`
+
+error: using `chunks_exact` with a constant chunk size
+   --> crates/litchi-core/src/patch.rs:105:46
+    |
+105 |         for (index, pair) in text.as_bytes().chunks_exact(2).enumerate() {
+    |                                              ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<2>().0.iter()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+
+error: could not compile `litchi-core` (lib) due to 2 previous errors

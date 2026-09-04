@@ -1,0 +1,49 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.06s
+     Running unittests src/bin/litchi-perf-baseline-alloc.rs (/tmp/litchi-goal-fp-target/release/deps/litchi_perf_baseline_alloc-4cf5c15fdfa46303)
+
+running 5 tests
+test allocator::tests::global_allocator_records_a_failed_allocation ... FAILED
+test allocator::tests::global_allocator_records_a_failed_realloc_without_losing_old_allocation ... FAILED
+test allocator::tests::global_allocator_records_realloc_grow_and_shrink ... FAILED
+test allocator::tests::global_allocator_records_successful_alloc_and_dealloc_with_live_peak ... FAILED
+test allocator::tests::global_allocator_records_zeroed_alloc_and_zeroes_memory ... FAILED
+
+failures:
+
+---- allocator::tests::global_allocator_records_a_failed_allocation stdout ----
+
+thread 'allocator::tests::global_allocator_records_a_failed_allocation' (1206943) panicked at src/bin/litchi-perf-baseline-alloc.rs:168:13:
+the maximal layout should be rejected
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- allocator::tests::global_allocator_records_a_failed_realloc_without_losing_old_allocation stdout ----
+
+thread 'allocator::tests::global_allocator_records_a_failed_realloc_without_losing_old_allocation' (1206944) panicked at src/bin/litchi-perf-baseline-alloc.rs:175:42:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- allocator::tests::global_allocator_records_realloc_grow_and_shrink stdout ----
+
+thread 'allocator::tests::global_allocator_records_realloc_grow_and_shrink' (1206945) panicked at src/bin/litchi-perf-baseline-alloc.rs:129:42:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- allocator::tests::global_allocator_records_successful_alloc_and_dealloc_with_live_peak stdout ----
+
+thread 'allocator::tests::global_allocator_records_successful_alloc_and_dealloc_with_live_peak' (1206946) panicked at src/bin/litchi-perf-baseline-alloc.rs:74:42:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+---- allocator::tests::global_allocator_records_zeroed_alloc_and_zeroes_memory stdout ----
+
+thread 'allocator::tests::global_allocator_records_zeroed_alloc_and_zeroes_memory' (1206947) panicked at src/bin/litchi-perf-baseline-alloc.rs:103:42:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+
+failures:
+    allocator::tests::global_allocator_records_a_failed_allocation
+    allocator::tests::global_allocator_records_a_failed_realloc_without_losing_old_allocation
+    allocator::tests::global_allocator_records_realloc_grow_and_shrink
+    allocator::tests::global_allocator_records_successful_alloc_and_dealloc_with_live_peak
+    allocator::tests::global_allocator_records_zeroed_alloc_and_zeroes_memory
+
+test result: FAILED. 0 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--bin litchi-perf-baseline-alloc`
