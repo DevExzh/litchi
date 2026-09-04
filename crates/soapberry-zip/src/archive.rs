@@ -11,7 +11,10 @@ use crate::reader_at::{
 };
 use crate::time::{ZipDateTimeKind, extract_best_timestamp};
 use crate::utils::{le_u16, le_u32, le_u64};
-use crate::{EndOfCentralDirectory, EndOfCentralDirectoryRecordFixed, ZipLocator};
+use crate::{
+    EndOfCentralDirectory, EndOfCentralDirectoryRecordFixed, ZIP64_END_OF_CENTRAL_DIR_LOCATOR_SIZE,
+    ZipLocator,
+};
 use std::io::{Read, Seek, Write};
 use std::ops::Range;
 
@@ -810,30 +813,32 @@ fn validate_single_disk_archive(data: &[u8], eocd: &EndOfCentralDirectory) -> Re
 
     let zip64_offset =
         usize::try_from(eocd.head_eocd_offset()).map_err(|_| Error::from(ErrorKind::Eof))?;
-    let zip64_end = zip64_offset
-        .checked_add(56)
+    let zip64_fixed_end = zip64_offset
+        .checked_add(Zip64EndOfCentralDirectoryRecord::SIZE)
         .ok_or_else(|| Error::from(ErrorKind::Eof))?;
     let zip64 = data
-        .get(zip64_offset..zip64_end)
+        .get(zip64_offset..zip64_fixed_end)
         .ok_or_else(|| Error::from(ErrorKind::Eof))?;
-    let signature = le_u32(zip64.get(..4).ok_or_else(|| Error::from(ErrorKind::Eof))?);
-    if signature != END_OF_CENTRAL_DIR_SIGNATURE64 {
-        return Err(Error::from(ErrorKind::InvalidSignature {
-            expected: END_OF_CENTRAL_DIR_SIGNATURE64,
-            actual: signature,
+    let zip64 = Zip64EndOfCentralDirectoryRecord::parse(zip64)?;
+    let locator_offset = eocd
+        .tail_eocd_offset()
+        .checked_sub(ZIP64_END_OF_CENTRAL_DIR_LOCATOR_SIZE as u64)
+        .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+    let zip64_offset_u64 = u64::try_from(zip64_offset).map_err(|_| Error::from(ErrorKind::Eof))?;
+    let record_end = zip64_offset_u64
+        .checked_add(12)
+        .and_then(|offset| offset.checked_add(zip64.size))
+        .ok_or_else(|| {
+            Error::from(ErrorKind::InvalidInput {
+                msg: "ZIP64 end-of-central-directory record length overflows".to_string(),
+            })
+        })?;
+    if record_end != locator_offset {
+        return Err(Error::from(ErrorKind::InvalidInput {
+            msg: "ZIP64 end-of-central-directory record is not adjacent to its locator".to_string(),
         }));
     }
-    let disk_number = le_u32(
-        zip64
-            .get(16..20)
-            .ok_or_else(|| Error::from(ErrorKind::Eof))?,
-    );
-    let central_directory_disk = le_u32(
-        zip64
-            .get(20..24)
-            .ok_or_else(|| Error::from(ErrorKind::Eof))?,
-    );
-    if disk_number != 0 || central_directory_disk != 0 {
+    if zip64.disk_number != 0 || zip64.cd_disk != 0 {
         return Err(Error::from(ErrorKind::InvalidInput {
             msg: "borrowed access refuses multi-disk archive metadata".to_string(),
         }));
@@ -2499,6 +2504,7 @@ struct Zip64ExtraValues {
     compressed_size: Option<u64>,
     local_header_offset: Option<u64>,
     disk_number_start: Option<u32>,
+    zip64_field_start: usize,
     local_header_offset_range: Option<(usize, usize)>,
 }
 
@@ -2525,11 +2531,18 @@ fn parse_zip64_extra_values(
 
     let mut zip64_data = None;
     let mut fields = ExtraFields::new(extra_field);
-    for (field_id, field_data) in fields.by_ref() {
+    while !fields.remaining_bytes().is_empty() {
+        let field_start = extra_field
+            .len()
+            .checked_sub(fields.remaining_bytes().len())
+            .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+        let Some((field_id, field_data)) = fields.next() else {
+            break;
+        };
         if field_id != ExtraFieldId::ZIP64 {
             continue;
         }
-        if zip64_data.replace(field_data).is_some() {
+        if zip64_data.replace((field_start, field_data)).is_some() {
             return Err(Error::from(ErrorKind::InvalidInput {
                 msg: "central header contains duplicate ZIP64 extra fields".to_string(),
             }));
@@ -2540,7 +2553,7 @@ fn parse_zip64_extra_values(
             msg: "central header contains malformed extra fields".to_string(),
         }));
     }
-    let zip64_data = zip64_data.ok_or_else(|| {
+    let (zip64_field_start, zip64_data) = zip64_data.ok_or_else(|| {
         Error::from(ErrorKind::InvalidInput {
             msg: "central header is missing its required ZIP64 extra field".to_string(),
         })
@@ -2619,6 +2632,7 @@ fn parse_zip64_extra_values(
         compressed_size,
         local_header_offset,
         disk_number_start,
+        zip64_field_start,
         local_header_offset_range,
     }))
 }
@@ -2698,10 +2712,13 @@ impl<'a> ZipFileHeaderRecord<'a> {
                 let width = end
                     .checked_sub(start)
                     .ok_or_else(|| Error::from(ErrorKind::Eof))?;
+                let zip64_field_start = u64::try_from(values.zip64_field_start)
+                    .map_err(|_| Error::from(ErrorKind::Eof))?;
                 let start = u64::try_from(start)
                     .map_err(|_| Error::from(ErrorKind::Eof))?
                     .checked_add(ZipFileHeaderFixed::SIZE as u64)
                     .and_then(|offset| offset.checked_add(u64::from(header.file_name_len)))
+                    .and_then(|offset| offset.checked_add(zip64_field_start))
                     .and_then(|offset| offset.checked_add(4))
                     .and_then(|offset| central_directory_offset.checked_add(offset))
                     .ok_or_else(|| Error::from(ErrorKind::Eof))?;
@@ -3283,6 +3300,14 @@ mod tests {
         extra
     }
 
+    fn custom_extra(id: u16, body: &[u8]) -> Vec<u8> {
+        let mut extra = Vec::with_capacity(4 + body.len());
+        extra.extend_from_slice(&id.to_le_bytes());
+        extra.extend_from_slice(&(body.len() as u16).to_le_bytes());
+        extra.extend_from_slice(body);
+        extra
+    }
+
     #[test]
     fn central_zip64_extra_resolves_sentinels_and_returns_offset_field_range() {
         let mut body = Vec::new();
@@ -3340,6 +3365,65 @@ mod tests {
             let start = usize::try_from(range.start).unwrap();
             let end = usize::try_from(range.end).unwrap();
             assert_eq!(&source[start..end], &body);
+        }
+    }
+
+    #[test]
+    fn central_zip64_offset_range_skips_preceding_extra_fields() {
+        let custom_fields = [
+            custom_extra(0xcafe, &[]),
+            custom_extra(0xbeef, &[1, 2, 3]),
+            {
+                let mut fields = custom_extra(0x4242, &[4, 5, 6, 7, 8]);
+                fields.extend_from_slice(&custom_extra(0x5151, &[9, 10]));
+                fields
+            },
+        ];
+        let name = b"raw-name";
+        let central_directory_offset = 211u64;
+        let mut body = Vec::new();
+        body.extend_from_slice(&0x0102_0304_0506_0708u64.to_le_bytes());
+        body.extend_from_slice(&0x1112_1314_1516_1718u64.to_le_bytes());
+        body.extend_from_slice(&0xa1a2_a3a4_a5a6_a7a8u64.to_le_bytes());
+        let zip64 = zip64_extra(&body);
+
+        for custom in custom_fields {
+            let mut extra = custom.clone();
+            extra.extend_from_slice(&zip64);
+            let header = central_fixed_with_zip64_extra_name_len(
+                u16::try_from(name.len()).unwrap(),
+                u32::MAX,
+                u32::MAX,
+                0,
+                u32::MAX,
+                &extra,
+            );
+            let record = ZipFileHeaderRecord::from_parts(
+                header,
+                name,
+                &extra,
+                b"",
+                central_directory_offset,
+            )
+            .unwrap();
+            let range = record
+                .zip64_local_header_offset_range()
+                .expect("ZIP64 local-header offset should have a patch range");
+            let range_start = central_directory_offset
+                + ZipFileHeaderFixed::SIZE as u64
+                + name.len() as u64
+                + custom.len() as u64
+                + 4
+                + 16;
+            assert_eq!(range, range_start..range_start + 8);
+
+            let central_start = usize::try_from(central_directory_offset).unwrap();
+            let extra_start = central_start + ZipFileHeaderFixed::SIZE + name.len();
+            let mut source = vec![0u8; extra_start + extra.len()];
+            source[extra_start..].copy_from_slice(&extra);
+            let start = usize::try_from(range.start).unwrap();
+            let end = usize::try_from(range.end).unwrap();
+            assert_eq!(&source[start..end], &body[16..24]);
         }
     }
 
