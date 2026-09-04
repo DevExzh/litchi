@@ -480,6 +480,18 @@ pub struct ArchiveReader<'data> {
     strict_layout_cache: StrictLayoutCache,
 }
 
+/// Reusable decoder state for one sequential operation over a slice-backed
+/// ZIP archive.
+///
+/// The session is intentionally mutable: one Deflate decoder is reset between
+/// members, while Store members bypass it. It is not a cache and does not
+/// change archive verification policy. Create a fresh session for each
+/// independent operation.
+pub struct ArchiveReadSession<'archive, 'data> {
+    archive: &'archive ArchiveReader<'data>,
+    decoder: Option<DeflateDecoder<CountingReader<&'data [u8]>>>,
+}
+
 /// Zero-allocation iterator over an [`ArchiveReader`] file-name order.
 pub struct ArchiveReaderNames<'a> {
     names: std::slice::Iter<'a, String>,
@@ -1766,6 +1778,15 @@ impl<'data> ArchiveReader<'data> {
         Ok(info.compression_method == CompressionMethod::Store)
     }
 
+    /// Start a sequential read operation that can reuse Deflate decoder state.
+    #[must_use]
+    pub fn read_session(&self) -> ArchiveReadSession<'_, 'data> {
+        ArchiveReadSession {
+            archive: self,
+            decoder: None,
+        }
+    }
+
     /// Read and decompress a file from the archive.
     ///
     /// Returns the decompressed contents of the file. Supports both stored
@@ -2299,6 +2320,152 @@ impl<'data> ArchiveReader<'data> {
             .iter()
             .map(|name| (name.clone(), self.read(name)))
             .collect()
+    }
+}
+
+impl<'archive, 'data> ArchiveReadSession<'archive, 'data> {
+    /// Read and verify one member by name.
+    ///
+    /// Deflate decoder state is reused only within this session. Store members
+    /// continue to use their independent source slice and never initialize
+    /// the decoder.
+    pub fn read(&mut self, name: &str) -> Result<Vec<u8>, Error> {
+        let mut accounting = ZipOperationAccounting::default();
+        self.read_with_accounting(name, &mut accounting)
+    }
+
+    /// Read and verify one member while recording actual payload work.
+    pub fn read_with_accounting(
+        &mut self,
+        name: &str,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<Vec<u8>, Error> {
+        let lookup = lookup_member_name(name)?;
+
+        let info = self
+            .archive
+            .index
+            .get(&lookup.name)
+            .filter(|_| !lookup.explicit_directory)
+            .ok_or_else(|| Error::from(ErrorKind::FileNotFound(lookup.name)))?;
+
+        let entry = self.archive.archive.get_entry_borrowed(info.wayfinder)?;
+        let data = entry.data();
+
+        match info.compression_method {
+            CompressionMethod::Store => {
+                // Stored (uncompressed) - verify and return directly.
+                let verifier = entry.claim_verifier();
+                let verification = verifier.valid(ZipVerification {
+                    crc: crate::crc32(data),
+                    uncompressed_size: usize_to_u64(data.len(), "stored payload length")?,
+                });
+                let accounting_result = accounting.add_stored_payload_bytes_read(usize_to_u64(
+                    data.len(),
+                    "stored payload bytes read",
+                )?);
+                if let Err(error) = verification {
+                    drop(accounting_result);
+                    return Err(error);
+                }
+                accounting_result?;
+                let mut output = Vec::new();
+                output.try_reserve_exact(data.len()).map_err(|source| {
+                    Error::from(ErrorKind::Allocation {
+                        resource: "archive entry output",
+                        source,
+                    })
+                })?;
+                output.extend_from_slice(data);
+                accounting.add_stored_payload_bytes_accepted(usize_to_u64(
+                    output.len(),
+                    "stored payload bytes accepted",
+                )?)?;
+                Ok(output)
+            },
+            CompressionMethod::Deflate => {
+                let size = usize::try_from(info.uncompressed_size).map_err(|_| {
+                    Error::from(ErrorKind::InvalidInput {
+                        msg: format!(
+                            "archive entry size {} does not fit this platform",
+                            info.uncompressed_size
+                        ),
+                    })
+                })?;
+                let read_limit = info.uncompressed_size.checked_add(1).ok_or_else(|| {
+                    Error::from(ErrorKind::InvalidInput {
+                        msg: format!(
+                            "archive entry size {} cannot be bounded with an overrun sentinel",
+                            info.uncompressed_size
+                        ),
+                    })
+                })?;
+                let read_capacity = usize::try_from(read_limit).map_err(|_| {
+                    Error::from(ErrorKind::InvalidInput {
+                        msg: format!(
+                            "archive entry size {} plus an overrun sentinel does not fit this platform",
+                            info.uncompressed_size
+                        ),
+                    })
+                })?;
+                let mut decompressed = Vec::new();
+                decompressed
+                    .try_reserve_exact(read_capacity)
+                    .map_err(|source| {
+                        Error::from(ErrorKind::Allocation {
+                            resource: "archive entry output",
+                            source,
+                        })
+                    })?;
+
+                let (result, compressed_read, produced) = {
+                    let decoder = match self.decoder.as_mut() {
+                        Some(decoder) => {
+                            let _previous = decoder.reset(CountingReader::new(data));
+                            decoder
+                        },
+                        None => self
+                            .decoder
+                            .insert(DeflateDecoder::new(CountingReader::new(data))),
+                    };
+                    let (result, produced_count) = {
+                        let mut produced_reader = CountingReader::new(&mut *decoder);
+                        let verifier = entry.verifying_reader(&mut produced_reader);
+                        let result = verifier
+                            .take(read_limit)
+                            .read_to_end(&mut decompressed)
+                            .map_err(Error::from);
+                        let produced_count = produced_reader.count();
+                        (result, produced_count)
+                    };
+                    let compressed_read = decoder.get_ref().count();
+                    (result, compressed_read, produced_count)
+                };
+                let accepted = usize_to_u64(decompressed.len(), "decompressed ZIP bytes accepted")?;
+                let accounting_result = accounting
+                    .add_compressed_deflate_payload_bytes_read(compressed_read)
+                    .and_then(|()| accounting.add_deflate_bytes_produced(produced))
+                    .and_then(|()| accounting.add_deflate_bytes_accepted(accepted));
+                if let Err(error) = result {
+                    // Keep the observed source count even when the stream failed. The
+                    // stream error remains primary if recording the count overflows.
+                    let _ = accounting_result;
+                    return Err(error);
+                }
+                accounting_result?;
+                if decompressed.len() != size {
+                    return Err(ErrorKind::InvalidSize {
+                        expected: info.uncompressed_size,
+                        actual: usize_to_u64(decompressed.len(), "decompressed ZIP bytes")?,
+                    }
+                    .into());
+                }
+                Ok(decompressed)
+            },
+            other => Err(Error::from(ErrorKind::UnsupportedCompressionMethod(
+                other.as_id().as_u16(),
+            ))),
+        }
     }
 }
 
@@ -6007,6 +6174,20 @@ impl<'data> LazyArchiveReader<'data> {
         name: &str,
         accounting: &mut ZipOperationAccounting,
     ) -> Result<std::sync::Arc<Vec<u8>>, Error> {
+        let mut read_member =
+            |member_name: &str, member_accounting: &mut ZipOperationAccounting| {
+                self.inner
+                    .read_with_accounting(member_name, member_accounting)
+            };
+        self.read_shared_with_reader(name, accounting, &mut read_member)
+    }
+
+    fn read_shared_with_reader(
+        &self,
+        name: &str,
+        accounting: &mut ZipOperationAccounting,
+        read_member: &mut dyn FnMut(&str, &mut ZipOperationAccounting) -> Result<Vec<u8>, Error>,
+    ) -> Result<std::sync::Arc<Vec<u8>>, Error> {
         if name.len() > self.cache_limits.max_flight_key_bytes() {
             return Err(lazy_flight_key_limit_error(
                 name.len(),
@@ -6074,10 +6255,7 @@ impl<'data> LazyArchiveReader<'data> {
             match cache_lookup {
                 LazyCacheLookup::Hit(data) => return Ok(data),
                 LazyCacheLookup::Bypass => {
-                    return self
-                        .inner
-                        .read_with_accounting(&normalized, accounting)
-                        .map(Arc::new);
+                    return read_member(&normalized, accounting).map(Arc::new);
                 },
                 LazyCacheLookup::Wait(flight) => {
                     // A failed flight carries no Error: the original owner
@@ -6088,10 +6266,7 @@ impl<'data> LazyArchiveReader<'data> {
                     }
                 },
                 LazyCacheLookup::Load(flight) => {
-                    let result = self
-                        .inner
-                        .read_with_accounting(&normalized, accounting)
-                        .map(Arc::new);
+                    let result = read_member(&normalized, accounting).map(Arc::new);
                     match result {
                         Ok(data) => {
                             let mut cache = lock_lazy_cache(&self.cache);
@@ -6119,6 +6294,35 @@ impl<'data> LazyArchiveReader<'data> {
                 },
             }
         }
+    }
+
+    /// Read multiple members serially, sharing the lazy cache and one
+    /// resettable Deflate decoder for cold members.
+    ///
+    /// Results retain caller input order and preserve the per-member error
+    /// behavior of [`Self::read_shared`]. Cache hits and same-member waiters
+    /// use the existing cache state machine; Store members bypass the decoder.
+    /// This API is intended for an owning serial load that has already
+    /// performed its structural and declared-size preflight.
+    pub fn read_many_serial_shared<'name>(
+        &self,
+        names: &'name [&'name str],
+    ) -> Vec<(&'name str, Result<std::sync::Arc<Vec<u8>>, Error>)> {
+        let mut session = self.inner.read_session();
+        names
+            .iter()
+            .map(|name| {
+                let mut accounting = ZipOperationAccounting::default();
+                let mut read_member =
+                    |member_name: &str, member_accounting: &mut ZipOperationAccounting| {
+                        session.read_with_accounting(member_name, member_accounting)
+                    };
+                (
+                    *name,
+                    self.read_shared_with_reader(name, &mut accounting, &mut read_member),
+                )
+            })
+            .collect()
     }
 
     /// Decompress and verify one member directly into a caller-owned sink.
@@ -7682,6 +7886,200 @@ mod tests {
     }
 
     #[test]
+    fn archive_read_session_reuses_deflate_state_with_accounting_parity() {
+        let stored_first = b"stored first descriptor-free payload";
+        let deflated_first = b"deflated first payload with a data descriptor";
+        let stored_second = b"stored second payload with a data descriptor";
+        let deflated_second = b"deflated second payload with a data descriptor";
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("stored-first", stored_first).unwrap();
+        writer
+            .write_deflated("deflated-first", deflated_first)
+            .unwrap();
+        writer
+            .write_stored_stream("stored-second", Cursor::new(stored_second.to_vec()))
+            .unwrap();
+        writer
+            .write_deflated("deflated-second", deflated_second)
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        assert!(local_member_has_data_descriptor(&bytes, b"deflated-first"));
+        assert!(local_member_has_data_descriptor(&bytes, b"stored-second"));
+        assert!(local_member_has_data_descriptor(&bytes, b"deflated-second"));
+
+        let reader = ArchiveReader::new(&bytes).unwrap();
+        let members = [
+            ("stored-first", stored_first.as_slice()),
+            ("deflated-first", deflated_first.as_slice()),
+            ("stored-second", stored_second.as_slice()),
+            ("deflated-second", deflated_second.as_slice()),
+        ];
+        let mut expected = Vec::new();
+        for (name, payload) in members {
+            let mut accounting = ZipOperationAccounting::default();
+            let decoded = reader.read_with_accounting(name, &mut accounting).unwrap();
+            assert_eq!(decoded, payload);
+            expected.push((decoded, accounting));
+        }
+
+        let mut session = reader.read_session();
+        for ((name, payload), (expected_payload, expected_accounting)) in
+            members.into_iter().zip(expected)
+        {
+            let mut accounting = ZipOperationAccounting::default();
+            let decoded = session.read_with_accounting(name, &mut accounting).unwrap();
+            assert_eq!(decoded, payload);
+            assert_eq!(decoded, expected_payload);
+            assert_eq!(accounting, expected_accounting);
+        }
+    }
+
+    #[test]
+    fn archive_read_session_resets_after_crc_and_corrupt_deflate_failures() {
+        const VALID: &[u8] = b"valid payload after a failed Deflate read";
+
+        let mut crc_writer = StreamingArchiveWriter::new();
+        crc_writer
+            .write_deflated_sized("bad-crc", b"payload with a bad CRC")
+            .unwrap();
+        crc_writer.write_deflated_sized("valid", VALID).unwrap();
+        let mut crc_bytes = crc_writer.finish_to_bytes().unwrap();
+        let crc_central = central_header_offset_for_name(&crc_bytes, b"bad-crc");
+        let crc = u32::from_le_bytes(
+            crc_bytes[crc_central + 16..crc_central + 20]
+                .try_into()
+                .unwrap(),
+        );
+        crc_bytes[crc_central + 16..crc_central + 20].copy_from_slice(&(crc ^ 1).to_le_bytes());
+        let crc_reader = ArchiveReader::new(&crc_bytes).unwrap();
+        let mut crc_session = crc_reader.read_session();
+        let error = crc_session.read("bad-crc").unwrap_err();
+        assert_materialized_checksum_error(error);
+        assert_eq!(crc_session.read("valid").unwrap(), VALID);
+
+        let mut corrupt_writer = StreamingArchiveWriter::new();
+        corrupt_writer
+            .write_deflated_sized("corrupt", b"payload with corrupt Deflate bytes")
+            .unwrap();
+        corrupt_writer.write_deflated_sized("valid", VALID).unwrap();
+        let mut corrupt_bytes = corrupt_writer.finish_to_bytes().unwrap();
+        let corrupt_local = local_header_offset_for_name(&corrupt_bytes, b"corrupt");
+        let name_len = usize::from(u16::from_le_bytes(
+            corrupt_bytes[corrupt_local + 26..corrupt_local + 28]
+                .try_into()
+                .unwrap(),
+        ));
+        let extra_len = usize::from(u16::from_le_bytes(
+            corrupt_bytes[corrupt_local + 28..corrupt_local + 30]
+                .try_into()
+                .unwrap(),
+        ));
+        let compressed_start = corrupt_local + 30 + name_len + extra_len;
+        corrupt_bytes[compressed_start] ^= 0xff;
+        let corrupt_reader = ArchiveReader::new(&corrupt_bytes).unwrap();
+        let mut corrupt_session = corrupt_reader.read_session();
+        assert!(corrupt_session.read("corrupt").is_err());
+        assert_eq!(corrupt_session.read("valid").unwrap(), VALID);
+
+        let mut truncated_writer = StreamingArchiveWriter::new();
+        truncated_writer
+            .write_deflated_sized("truncated", b"payload with a truncated Deflate stream")
+            .unwrap();
+        truncated_writer
+            .write_deflated_sized("valid", VALID)
+            .unwrap();
+        let mut truncated_bytes = truncated_writer.finish_to_bytes().unwrap();
+        let truncated_local = local_header_offset_for_name(&truncated_bytes, b"truncated");
+        let truncated_central = central_header_offset_for_name(&truncated_bytes, b"truncated");
+        let compressed_size = u32::from_le_bytes(
+            truncated_bytes[truncated_local + 18..truncated_local + 22]
+                .try_into()
+                .unwrap(),
+        );
+        assert!(compressed_size > 1);
+        truncated_bytes[truncated_local + 18..truncated_local + 22]
+            .copy_from_slice(&(compressed_size - 1).to_le_bytes());
+        truncated_bytes[truncated_central + 20..truncated_central + 24]
+            .copy_from_slice(&(compressed_size - 1).to_le_bytes());
+        let truncated_reader = ArchiveReader::new(&truncated_bytes).unwrap();
+        let mut truncated_session = truncated_reader.read_session();
+        assert!(truncated_session.read("truncated").is_err());
+        assert_eq!(truncated_session.read("valid").unwrap(), VALID);
+    }
+
+    #[test]
+    fn archive_read_session_recovers_after_store_and_unsupported_failures() {
+        const VALID: &[u8] = b"valid Deflate payload after a failed member";
+
+        let mut store_writer = StreamingArchiveWriter::new();
+        store_writer
+            .write_stored("bad-store", b"stored payload")
+            .unwrap();
+        store_writer.write_deflated_sized("valid", VALID).unwrap();
+        let mut store_bytes = store_writer.finish_to_bytes().unwrap();
+        let store_local = local_header_offset_for_name(&store_bytes, b"bad-store");
+        let store_name_len = usize::from(u16::from_le_bytes(
+            store_bytes[store_local + 26..store_local + 28]
+                .try_into()
+                .unwrap(),
+        ));
+        let store_extra_len = usize::from(u16::from_le_bytes(
+            store_bytes[store_local + 28..store_local + 30]
+                .try_into()
+                .unwrap(),
+        ));
+        store_bytes[store_local + 30 + store_name_len + store_extra_len] ^= 0xff;
+        let store_reader = ArchiveReader::new(&store_bytes).unwrap();
+        let mut store_session = store_reader.read_session();
+        let store_error = store_session.read("bad-store").unwrap_err();
+        assert_materialized_checksum_error(store_error);
+        assert_eq!(store_session.read("valid").unwrap(), VALID);
+
+        let mut unsupported_writer = StreamingArchiveWriter::new();
+        unsupported_writer
+            .write_deflated_sized("unsupported", b"unsupported method payload")
+            .unwrap();
+        unsupported_writer
+            .write_deflated_sized("valid", VALID)
+            .unwrap();
+        let mut unsupported_bytes = unsupported_writer.finish_to_bytes().unwrap();
+        let unsupported_local = local_header_offset_for_name(&unsupported_bytes, b"unsupported");
+        let unsupported_central =
+            central_header_offset_for_name(&unsupported_bytes, b"unsupported");
+        unsupported_bytes[unsupported_local + 8..unsupported_local + 10]
+            .copy_from_slice(&12_u16.to_le_bytes());
+        unsupported_bytes[unsupported_central + 10..unsupported_central + 12]
+            .copy_from_slice(&12_u16.to_le_bytes());
+        let unsupported_reader = ArchiveReader::new(&unsupported_bytes).unwrap();
+        let mut unsupported_session = unsupported_reader.read_session();
+        let unsupported_error = unsupported_session.read("unsupported").unwrap_err();
+        assert!(matches!(
+            unsupported_error.kind(),
+            ErrorKind::UnsupportedCompressionMethod(12)
+        ));
+        assert_eq!(unsupported_session.read("valid").unwrap(), VALID);
+    }
+
+    #[test]
+    fn archive_read_session_resets_after_declared_size_overrun_and_underrun() {
+        const ACTUAL: &[u8] = b"payload whose declared size is intentionally wrong";
+        const VALID: &[u8] = b"valid payload after a size failure";
+
+        for declared_size in [3_u32, 128_u32] {
+            let mut writer = StreamingArchiveWriter::new();
+            writer.write_deflated_sized("bad-size", ACTUAL).unwrap();
+            writer.write_deflated_sized("valid", VALID).unwrap();
+            let mut bytes = writer.finish_to_bytes().unwrap();
+            rewrite_uncompressed_size(&mut bytes, b"bad-size", declared_size);
+            let reader = ArchiveReader::new(&bytes).unwrap();
+            let mut session = reader.read_session();
+            let error = session.read("bad-size").unwrap_err();
+            assert_materialized_size_error(error);
+            assert_eq!(session.read("valid").unwrap(), VALID);
+        }
+    }
+
+    #[test]
     fn sized_deflated_members_declare_upfront_sizes_without_a_data_descriptor() {
         let mut writer = StreamingArchiveWriter::new();
         writer
@@ -8956,6 +9354,118 @@ mod tests {
         let shared_first = reader.read_shared("payload").unwrap();
         let shared_second = reader.read_shared("payload").unwrap();
         assert!(Arc::ptr_eq(&shared_first, &shared_second));
+    }
+
+    #[test]
+    fn lazy_serial_shared_batch_reuses_session_and_preserves_cache_identity() {
+        let stored = b"stored payload";
+        let first = b"first Deflate payload";
+        let second = b"second Deflate payload";
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("stored", stored).unwrap();
+        writer.write_deflated("first", first).unwrap();
+        writer.write_deflated("second", second).unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let names = ["second", "stored", "first", "second", "first"];
+        let expected = [
+            second.as_slice(),
+            stored.as_slice(),
+            first.as_slice(),
+            second.as_slice(),
+            first.as_slice(),
+        ];
+
+        let first_batch = reader.read_many_serial_shared(&names);
+        assert_eq!(first_batch.len(), names.len());
+        for (result, expected) in first_batch.iter().zip(expected) {
+            assert_eq!(result.1.as_ref().unwrap().as_slice(), expected);
+        }
+        assert_eq!(reader.cache_size(), 3);
+        let cold_loads = reader.cold_loads.load(Ordering::SeqCst);
+        assert_eq!(cold_loads, 3);
+
+        let second_batch = reader.read_many_serial_shared(&names);
+        assert_eq!(reader.cold_loads.load(Ordering::SeqCst), cold_loads);
+        for ((name, first_result), (_, second_result)) in first_batch.into_iter().zip(second_batch)
+        {
+            let first_arc = first_result.unwrap();
+            let second_arc = second_result.unwrap();
+            assert!(Arc::ptr_eq(&first_arc, &second_arc));
+            let cached = reader.read_shared(name).unwrap();
+            assert!(Arc::ptr_eq(&second_arc, &cached));
+        }
+    }
+
+    #[test]
+    fn lazy_serial_shared_batch_recovers_after_a_failed_cold_member() {
+        const VALID: &[u8] = b"valid payload after a failed serial batch member";
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_deflated_sized("bad", b"payload with corrupt Deflate bytes")
+            .unwrap();
+        writer.write_deflated_sized("valid", VALID).unwrap();
+        let mut bytes = writer.finish_to_bytes().unwrap();
+        let local = local_header_offset_for_name(&bytes, b"bad");
+        let name_len = usize::from(u16::from_le_bytes(
+            bytes[local + 26..local + 28].try_into().unwrap(),
+        ));
+        let extra_len = usize::from(u16::from_le_bytes(
+            bytes[local + 28..local + 30].try_into().unwrap(),
+        ));
+        bytes[local + 30 + name_len + extra_len] ^= 0xff;
+
+        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let names = ["bad", "valid"];
+        let first = reader.read_many_serial_shared(&names);
+        assert!(first[0].1.is_err());
+        assert_eq!(first[1].1.as_ref().unwrap().as_slice(), VALID);
+        assert_eq!(reader.cache_size(), 1);
+        let cold_loads = reader.cold_loads.load(Ordering::SeqCst);
+        assert_eq!(cold_loads, 2);
+
+        let retry = reader.read_many_serial_shared(&["bad"]);
+        assert!(retry[0].1.is_err());
+        assert_eq!(reader.cold_loads.load(Ordering::SeqCst), cold_loads + 1);
+        assert_eq!(reader.read_shared("valid").unwrap().as_slice(), VALID);
+        assert_eq!(reader.active_flight_count(), 0);
+    }
+
+    #[test]
+    fn lazy_serial_shared_batch_bypasses_full_flight_budget_and_recovers() {
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_deflated("payload", b"serial bypass payload")
+            .unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let cache_limits =
+            LazyArchiveCacheLimits::new_with_active_flight_limits(1024, 4, 1, 64).unwrap();
+        let reader = LazyArchiveReader::new_with_cache_limits(&bytes, cache_limits).unwrap();
+        let held = register_lazy_test_flight(&reader, "held");
+
+        let bypassed = reader.read_many_serial_shared(&["payload"]);
+        assert_eq!(bypassed.len(), 1);
+        assert_eq!(
+            bypassed[0].1.as_ref().unwrap().as_slice(),
+            b"serial bypass payload"
+        );
+        assert_eq!(reader.cold_loads.load(Ordering::SeqCst), 0);
+        assert_eq!(reader.cache_size(), 0);
+        assert_eq!(reader.active_flight_count(), 1);
+
+        held.complete_failure();
+        {
+            let mut cache = lock_lazy_cache(&reader.cache);
+            finish_lazy_flight(&mut cache, "held", &held);
+        }
+        let loaded = reader.read_many_serial_shared(&["payload"]);
+        assert_eq!(
+            loaded[0].1.as_ref().unwrap().as_slice(),
+            b"serial bypass payload"
+        );
+        assert_eq!(reader.cold_loads.load(Ordering::SeqCst), 1);
+        assert_eq!(reader.cache_size(), 1);
+        assert_eq!(reader.active_flight_count(), 0);
     }
 
     #[test]

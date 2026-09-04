@@ -593,12 +593,7 @@ impl PackageReader {
             &mut non_part_members,
             limits,
             &mut relationship_ledger,
-            |names| {
-                Ok(names
-                    .iter()
-                    .map(|name| (*name, archive.read_shared(name)))
-                    .collect())
-            },
+            |names| Ok(archive.read_many_serial_shared(names)),
         )?;
 
         Ok(Self {
@@ -1999,6 +1994,73 @@ mod tests {
         writer.finish_to_bytes().unwrap()
     }
 
+    fn package_with_mixed_physical_parts() -> Vec<u8> {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored("stored/second.xml", b"stored second")
+            .unwrap();
+        writer
+            .write_deflated("deflated/first.xml", b"deflated first")
+            .unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
+    fn package_with_corrupt_deflate_and_later_malformed_relationship() -> Vec<u8> {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_deflated("bad.xml", b"corrupt Deflate payload")
+            .unwrap();
+        writer.write_stored("later.xml", b"later payload").unwrap();
+        writer
+            .write_stored(
+                "_rels/later.xml.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:test" Target="later.xml""#,
+            )
+            .unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
+    fn corrupt_local_member_payload(bytes: &mut [u8], wanted_name: &[u8]) {
+        const LOCAL_HEADER: [u8; 4] = 0x0403_4b50_u32.to_le_bytes();
+        let local_offset = bytes
+            .windows(4)
+            .enumerate()
+            .find_map(|(offset, signature)| {
+                if signature != LOCAL_HEADER || offset.saturating_add(30) > bytes.len() {
+                    return None;
+                }
+                let name_len =
+                    u16::from_le_bytes([bytes[offset + 26], bytes[offset + 27]]) as usize;
+                let name_end = offset.saturating_add(30).saturating_add(name_len);
+                (name_end <= bytes.len() && &bytes[offset + 30..name_end] == wanted_name)
+                    .then_some(offset)
+            })
+            .expect("local member header");
+        let name_len = usize::from(u16::from_le_bytes(
+            bytes[local_offset + 26..local_offset + 28]
+                .try_into()
+                .unwrap(),
+        ));
+        let extra_len = usize::from(u16::from_le_bytes(
+            bytes[local_offset + 28..local_offset + 30]
+                .try_into()
+                .unwrap(),
+        ));
+        bytes[local_offset + 30 + name_len + extra_len] ^= 0xff;
+    }
+
     #[test]
     fn eager_serialized_parts_follow_physical_order_and_reuse_archive_payloads() {
         let bytes = package_with_physical_parts("z/second.xml", "a/first.xml");
@@ -2018,6 +2080,69 @@ mod tests {
                 .unwrap();
             assert!(Arc::ptr_eq(&archive_blob, &spart.blob));
         }
+    }
+
+    #[test]
+    fn eager_serialized_parts_preserve_mixed_storage_and_shared_identity() {
+        let bytes = package_with_mixed_physical_parts();
+        let physical = PhysPkgReader::new(&bytes).unwrap();
+        let reader = PackageReader::from_phys_reader(&physical).unwrap();
+
+        let names = reader
+            .iter_sparts()
+            .map(|spart| spart.partname.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(names, ["/stored/second.xml", "/deflated/first.xml"]);
+
+        for spart in reader.iter_sparts() {
+            let archive_blob = physical
+                .archive()
+                .read_shared(spart.partname.membername())
+                .unwrap();
+            assert!(Arc::ptr_eq(&archive_blob, &spart.blob));
+        }
+        assert_eq!(
+            physical
+                .archive()
+                .read_shared("deflated/first.xml")
+                .unwrap()
+                .as_slice(),
+            b"deflated first"
+        );
+    }
+
+    #[test]
+    fn serial_eager_payload_error_precedes_later_relationship_error_and_preflight() {
+        let mut corrupt_bytes = package_with_corrupt_deflate_and_later_malformed_relationship();
+        corrupt_local_member_payload(&mut corrupt_bytes, b"bad.xml");
+        let physical = PhysPkgReader::new(&corrupt_bytes).unwrap();
+        let Err(payload_error) = PackageReader::from_phys_reader(&physical) else {
+            panic!("corrupt eager payload unexpectedly loaded")
+        };
+        assert!(matches!(
+            &payload_error,
+            OpcError::IoError(error)
+                if error.kind() == io::ErrorKind::InvalidInput
+                    && error.to_string().contains("corrupt deflate")
+        ));
+
+        let bytes = package_with_corrupt_deflate_and_later_malformed_relationship();
+        let limits = ReadLimits::builder()
+            .max_part_bytes(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        let limited_physical = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
+        let Err(preflight_error) = PackageReader::from_phys_reader(&limited_physical) else {
+            panic!("declared eager payload limit unexpectedly accepted")
+        };
+        assert!(matches!(
+            preflight_error,
+            OpcError::ReadLimit {
+                resource: ReadResource::PartBytes,
+                ..
+            }
+        ));
     }
 
     #[test]

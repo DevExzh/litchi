@@ -201,6 +201,23 @@ mod tests {
         PackageWriter::to_bytes(&package).unwrap()
     }
 
+    fn cache_isolation_archive() -> Vec<u8> {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_deflated("first.xml", b"first payload")
+            .unwrap();
+        writer
+            .write_stored("second.xml", b"second payload")
+            .unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
     fn package_parts(package: &OpcPackage) -> Vec<(String, Vec<u8>)> {
         let mut parts = package
             .iter_parts()
@@ -221,6 +238,23 @@ mod tests {
             let package = session.from_bytes(&bytes, ReadLimits::default()).unwrap();
             assert_eq!(package_parts(&package), expected);
         }
+    }
+
+    #[test]
+    fn explicit_open_keeps_ordinary_payloads_out_of_lazy_cache() {
+        let bytes = cache_isolation_archive();
+        let (_source, context) = execution_context(16 * MIB);
+        let session = OpenSession::new(context).unwrap();
+        let physical = crate::phys_pkg::PhysPkgReader::new(&bytes).unwrap();
+        let _reader =
+            crate::pkgreader::PackageReader::from_phys_reader_with_session(&physical, &session)
+                .unwrap();
+        assert_eq!(physical.archive().cache_size(), 0);
+
+        let serial_physical = crate::phys_pkg::PhysPkgReader::new(&bytes).unwrap();
+        let _serial_reader =
+            crate::pkgreader::PackageReader::from_phys_reader(&serial_physical).unwrap();
+        assert_eq!(serial_physical.archive().cache_size(), 2);
     }
 
     #[test]
