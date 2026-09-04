@@ -54,9 +54,10 @@ use litchi_ooxml_common::xml::{
     OMML_NAMESPACE_URI, extract_omml_formulas, scan_omml_formula_ranges,
 };
 use litchi_opc::{
-    BlobPart, OpcError, OpcOperationAccounting, OpcPackage, OpenSession, PackURI, PackageWriter,
-    Part, PartData, ReadLimits, Relationships, SourceBackedPackage, SourceCacheCounterDelta,
-    SourceCacheDiagnostics, SourceCacheLimits, TargetMode,
+    BlobPart, DiagnosticSnapshot, OpcError, OpcOperationAccounting, OpcPackage, OpenSession,
+    Operation, PackURI, PackageWriter, Part, PartData, ReadLimits, Relationships,
+    SourceBackedPackage, SourceCacheCounterDelta, SourceCacheDiagnostics, SourceCacheLimits,
+    TargetMode,
     constants::{content_type as opc_content_type, relationship_type},
 };
 use litchi_pptx::shape::text::{
@@ -2141,9 +2142,7 @@ impl Case {
     const fn is_opc_casefold_open(self) -> bool {
         matches!(
             self,
-            Self::OpcCasefoldEagerOpen
-                | Self::OpcCasefoldOwnedOpen
-                | Self::OpcCasefoldSourceOpen
+            Self::OpcCasefoldEagerOpen | Self::OpcCasefoldOwnedOpen | Self::OpcCasefoldSourceOpen
         )
     }
 
@@ -3292,6 +3291,7 @@ struct Options {
     rtf_variants: Vec<RtfSemanticVariant>,
     range_simulation: RangeSimulationConfig,
     execution_workers: Vec<usize>,
+    opc_cache_lock_diagnostics: bool,
     output: Option<PathBuf>,
     corpus_manifest: Option<PathBuf>,
 }
@@ -3550,6 +3550,12 @@ struct Configuration {
     rtf_variants: Vec<&'static str>,
     range_simulation: RangeSimulationConfig,
     execution_workers: Vec<usize>,
+    opc_cache_lock_diagnostics: bool,
+    /// Configuration identity for the managed XLSX publication planning
+    /// allowance. Omitted when no managed XLSX cell-values case is selected so
+    /// unrelated historical reports retain their existing identity.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    xlsx_cell_values_managed_planning_memory_headroom: Option<u64>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -5323,6 +5329,8 @@ struct OpcCacheEvidenceSummary {
     timing_scope: &'static str,
     diagnostics: OpcCacheDiagnosticsSummary,
     #[serde(skip_serializing_if = "Option::is_none")]
+    lock_diagnostics: Option<OpcCacheLockDiagnosticsSummary>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     gate: Option<OpcCacheGateSummary>,
     budget_used_after_handles_drop: Vec<u64>,
     budget_used_after_package_drop: Vec<u64>,
@@ -5347,6 +5355,24 @@ struct OpcCacheDiagnosticsSummary {
     budget_memory_used: Vec<u64>,
     budget_cache_reserved_bytes: Vec<u64>,
     budget_memory_limit: Vec<Option<u64>>,
+}
+
+/// Direct cache/flight mutex acquisition observations for one contention cell.
+///
+/// These vectors are retained in elapsed-sample order. The OPC observer only
+/// surrounds the direct `Mutex::lock` calls exposed by the opt-in diagnostics
+/// seam; condition-variable waiting and mutex reacquisition are excluded.
+#[derive(Clone, Debug, Default, Serialize)]
+struct OpcCacheLockDiagnosticsSummary {
+    scope: &'static str,
+    excluded: &'static str,
+    coverage: &'static str,
+    cache_lock_acquisitions: Vec<u64>,
+    cache_lock_wait_ns: Vec<u64>,
+    flight_lock_acquisitions: Vec<u64>,
+    flight_lock_wait_ns: Vec<u64>,
+    total_lock_acquisitions: Vec<u64>,
+    total_lock_wait_ns: Vec<u64>,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -5576,6 +5602,12 @@ struct XlsxCellValuesSourceSummary {
     cache_retained_entries: Vec<usize>,
     cache_retained_bytes: Vec<usize>,
     cache_budget_managed: bool,
+    /// The source payload ceiling used to size the cache, before publication
+    /// planning metadata is accounted for.
+    payload_memory_limit: Option<u64>,
+    /// Bounded memory allowance for publication planning structures.
+    publication_planning_memory_headroom: Option<u64>,
+    /// The resulting managed Budget::Memory ceiling.
     cache_budget_memory_limit: Option<u64>,
     cache_budget_memory_used: Vec<u64>,
     cache_budget_reserved_bytes: Vec<u64>,
@@ -5770,6 +5802,8 @@ struct XlsxCellValuesIterationEvidence {
     semantic_sha256: String,
     untouched_member_count: usize,
     untouched_member_sha256: String,
+    payload_memory_limit: Option<u64>,
+    publication_planning_memory_headroom: Option<u64>,
     partial_sink_verified: Option<bool>,
     output_budget_refusal: XlsxCellValuesOutputRefusalEvidence,
 }
@@ -7708,6 +7742,8 @@ impl SourceSummary {
                 update_count: evidence.update_count,
                 selected_worksheet_count: evidence.selected_worksheet_count,
                 cache_budget_managed: evidence.diagnostics.budget_managed,
+                payload_memory_limit: evidence.payload_memory_limit,
+                publication_planning_memory_headroom: evidence.publication_planning_memory_headroom,
                 cache_budget_memory_limit: evidence.diagnostics.budget_memory_limit,
                 untouched_member_count: evidence.untouched_member_count,
                 partial_sink_verified: evidence.partial_sink_verified,
@@ -7720,6 +7756,9 @@ impl SourceSummary {
             || summary.update_count != evidence.update_count
             || summary.selected_worksheet_count != evidence.selected_worksheet_count
             || summary.cache_budget_managed != evidence.diagnostics.budget_managed
+            || summary.payload_memory_limit != evidence.payload_memory_limit
+            || summary.publication_planning_memory_headroom
+                != evidence.publication_planning_memory_headroom
             || summary.cache_budget_memory_limit != evidence.diagnostics.budget_memory_limit
             || summary.untouched_member_count != evidence.untouched_member_count
             || summary.partial_sink_verified != evidence.partial_sink_verified
@@ -8459,6 +8498,18 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     validate_docx_section_layout_options(&options.cases, &options.shapes, &options.payloads)?;
     validate_pptx_source_image_query_options(&options.cases, &options.shapes, &options.payloads)?;
     validate_opc_casefold_lookup_options(&options.cases, &options.shapes, &options.payloads)?;
+    if options.opc_cache_lock_diagnostics
+        && !options.cases.iter().any(|case| {
+            matches!(
+                case,
+                Case::OpcSourceCacheControlContention | Case::OpcSourceCacheManagedContention
+            )
+        })
+    {
+        return Err(
+            "--opc-cache-lock-diagnostics requires an OPC source-cache contention case".into(),
+        );
+    }
     validate_xls_source_options(
         &options.cases,
         &options.shapes,
@@ -8535,6 +8586,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                         options.samples,
                         &options.execution_workers,
                         OpcCacheMode::Control,
+                        options.opc_cache_lock_diagnostics,
                     )?)
                 },
                 Case::OpcSourceCacheManagedContention => {
@@ -8545,6 +8597,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
                         options.samples,
                         &options.execution_workers,
                         OpcCacheMode::Managed,
+                        options.opc_cache_lock_diagnostics,
                     )?)
                 },
                 _ => unreachable!("filtered OPC source-cache evidence case"),
@@ -10392,6 +10445,13 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             .collect(),
         range_simulation: options.range_simulation,
         execution_workers: options.execution_workers,
+        opc_cache_lock_diagnostics: options.opc_cache_lock_diagnostics,
+        xlsx_cell_values_managed_planning_memory_headroom: options
+            .cases
+            .iter()
+            .any(|case| case.is_xlsx_cell_values_managed())
+            .then(|| u64::try_from(XLSX_MANAGED_PUBLICATION_PLANNING_MEMORY_HEADROOM))
+            .transpose()?,
     };
     let parallel_metrics = parallel_metrics::collect(&configuration, &results)?;
 
@@ -10469,6 +10529,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
     let mut rtf_variants = vec![RtfSemanticVariant::Plain];
     let mut range_simulation = RangeSimulationConfig::default();
     let mut execution_workers = default_execution_workers()?;
+    let mut opc_cache_lock_diagnostics = false;
     let mut output = None;
     let mut corpus_manifest = None;
     let mut arguments = std::env::args().skip(1);
@@ -10559,6 +10620,9 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
             "--workers" => {
                 execution_workers = parse_execution_workers(arguments.next())?;
             },
+            "--opc-cache-lock-diagnostics" => {
+                opc_cache_lock_diagnostics = true;
+            },
             "--json" => {
                 let value = arguments.next().ok_or("--json requires PATH or -")?;
                 if value != "-" {
@@ -10595,6 +10659,7 @@ fn parse_options() -> Result<Options, Box<dyn Error>> {
         rtf_variants,
         range_simulation,
         execution_workers,
+        opc_cache_lock_diagnostics,
         output,
         corpus_manifest,
     })
@@ -11641,6 +11706,8 @@ fn usage_text() -> String {
            --range-max-physical-bytes N\n\
                                        Maximum physical range (default: {DEFAULT_RANGE_MAX_PHYSICAL_BYTES})\n\
            --workers LIST              Scaling workers: 1,2,4,8,available (capped/deduped)\n\
+           --opc-cache-lock-diagnostics\n\
+                                       Opt in to direct OPC cache/flight mutex acquisition samples\n\
            --json PATH                 Write JSON to PATH; use - or omit for stdout\n\
            --corpus-manifest PATH      Write schema-2 corpus catalog sidecar and\n\
                                        include its additive reference in the report\n\
@@ -14495,9 +14562,9 @@ fn build_pptx_source_image_query_corpus() -> Result<PptxSourceImageQueryCorpus, 
     let baseline = build_pptx_cross_copy_corpus(Case::PptxCrossCopyMediaRich)?;
     let archive = baseline.source_archive;
     let source_slide = baseline.source_slide;
-    let source = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(
-        OwnedSource::new(archive.clone()),
-    ))?;
+    let source = litchi_pptx::SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(
+        archive.clone(),
+    )))?;
     if source.slide_count() != PPTX_CROSS_COPY_SOURCE_SLIDE_COUNT {
         return Err("PPTX source image corpus changed its slide count".into());
     }
@@ -14520,8 +14587,10 @@ fn build_pptx_source_image_query_corpus() -> Result<PptxSourceImageQueryCorpus, 
     for (position, image) in expected_images.iter().enumerate() {
         let expected_name = format!("litchi-perf-cross-copy-picture-{position:02}");
         let expected_target = format!("/ppt/media/litchi-perf-cross-copy-media-{position:02}.png");
-        let expected_relationship_id =
-            format!("rId{}", PPTX_SOURCE_IMAGE_QUERY_FIRST_RELATIONSHIP_ID + position);
+        let expected_relationship_id = format!(
+            "rId{}",
+            PPTX_SOURCE_IMAGE_QUERY_FIRST_RELATIONSHIP_ID + position
+        );
         let expected_shape_position = PPTX_SOURCE_IMAGE_QUERY_FIRST_SHAPE_POSITION + position;
         let expected_shape_id = Some(
             PPTX_SOURCE_IMAGE_QUERY_FIRST_SHAPE_ID
@@ -14561,7 +14630,10 @@ fn build_pptx_source_image_query_corpus() -> Result<PptxSourceImageQueryCorpus, 
         .map(|(_name, range)| range.clone())
         .collect::<Vec<_>>();
     if media_ranges.len() != PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT {
-        return Err("PPTX source image corpus media-member count differs from its direct-picture count".into());
+        return Err(
+            "PPTX source image corpus media-member count differs from its direct-picture count"
+                .into(),
+        );
     }
     let selected_media_member = selected_media_part
         .strip_prefix('/')
@@ -14577,9 +14649,8 @@ fn build_pptx_source_image_query_corpus() -> Result<PptxSourceImageQueryCorpus, 
             .ok_or("PPTX source image corpus logical payload bytes overflow")
     })?;
     let expected_images_sha256 = pptx_source_image_metadata_sha256(&expected_images)?;
-    let selected_image_sha256 = pptx_source_image_metadata_sha256(std::slice::from_ref(
-        &selected_image,
-    ))?;
+    let selected_image_sha256 =
+        pptx_source_image_metadata_sha256(std::slice::from_ref(&selected_image))?;
     let selected_payload_sha256 = sha256_hex(&selected_payload);
     let manifest = CorpusManifest {
         name: "pptx-source-backed-image-query".to_owned(),
@@ -14630,9 +14701,9 @@ fn execute_pptx_source_image_query_raw(
 ) -> Result<PptxSourceImageQueryRaw, Box<dyn Error>> {
     match case {
         Case::PptxSourceBackedImagesQuery => Ok(PptxSourceImageQueryRaw::Images(slide.images()?)),
-        Case::PptxSourceBackedImageQuery => {
-            Ok(PptxSourceImageQueryRaw::Image(slide.image(selected_position)?))
-        },
+        Case::PptxSourceBackedImageQuery => Ok(PptxSourceImageQueryRaw::Image(
+            slide.image(selected_position)?,
+        )),
         Case::PptxSourceBackedReadImageQuery => Ok(PptxSourceImageQueryRaw::ReadImage(
             slide.read_image(selected_position)?,
         )),
@@ -14783,7 +14854,9 @@ fn run_pptx_source_image_query(
         }
         if let Some(images) = output.all_images.as_ref() {
             if images != &corpus.expected_images {
-                return Err("PPTX images query returned an unexpected ordered picture inventory".into());
+                return Err(
+                    "PPTX images query returned an unexpected ordered picture inventory".into(),
+                );
             }
         }
         if let Some(payload) = output.payload.as_ref() {
@@ -14822,7 +14895,9 @@ fn run_pptx_source_image_query(
         selected_image_metadata_sha256: corpus.selected_image_sha256.clone(),
         selected_media_part: corpus.selected_media_part.clone(),
         selected_media_compressed_range_bytes: u64::try_from(
-            corpus.selected_media_compressed_range.end
+            corpus
+                .selected_media_compressed_range
+                .end
                 .saturating_sub(corpus.selected_media_compressed_range.start),
         )?,
         selected_payload_bytes: u64::try_from(corpus.selected_payload.len())?,
@@ -14847,7 +14922,8 @@ fn run_pptx_source_image_query(
     let mut expected_source: Option<SourceSnapshot> = None;
     let mut expected_cache: Option<(OpcCacheCounterDelta, SourceCacheDiagnostics)> = None;
     for _sample in 0..samples {
-        let mut instrumented = InstrumentedSource::new(corpus.archive.clone(), corpus.media_ranges.clone());
+        let mut instrumented =
+            InstrumentedSource::new(corpus.archive.clone(), corpus.media_ranges.clone());
         instrumented.track_read_ranges = true;
         let source = Arc::new(instrumented);
         let read_at: Arc<dyn ReadAt> = source.clone();
@@ -14863,7 +14939,9 @@ fn run_pptx_source_image_query(
             return Err("PPTX source image replay left an in-flight cache load".into());
         }
         if output.selected_image != corpus.selected_image {
-            return Err("PPTX source image replay selected-image identity differs from corpus".into());
+            return Err(
+                "PPTX source image replay selected-image identity differs from corpus".into(),
+            );
         }
         let observed_images_sha256 = output
             .all_images
@@ -14877,9 +14955,8 @@ fn run_pptx_source_image_query(
         {
             return Err("PPTX images source replay disagrees with ordered metadata oracle".into());
         }
-        let observed_selected_sha256 = pptx_source_image_metadata_sha256(
-            std::slice::from_ref(&output.selected_image),
-        )?;
+        let observed_selected_sha256 =
+            pptx_source_image_metadata_sha256(std::slice::from_ref(&output.selected_image))?;
         let payload_digest = output.payload.as_ref().map(|payload| sha256_hex(payload));
         if case == Case::PptxSourceBackedReadImageQuery
             && payload_digest.as_deref() != Some(corpus.selected_payload_sha256.as_str())
@@ -14923,11 +15000,8 @@ fn run_pptx_source_image_query(
                 .slide(corpus.source_slide)
                 .ok_or("PPTX selected-media replay selected slide is missing")?;
             selected_source.reset();
-            let selected_output = execute_pptx_source_image_query(
-                case,
-                &selected_slide,
-                corpus.selected_position,
-            )?;
+            let selected_output =
+                execute_pptx_source_image_query(case, &selected_slide, corpus.selected_position)?;
             if selected_output.selected_image != corpus.selected_image
                 || selected_output
                     .payload
@@ -14958,7 +15032,9 @@ fn run_pptx_source_image_query(
         if let Some(previous) = expected_source {
             if previous != snapshot {
                 source_summary.exact_source_counters_verified = false;
-                return Err("PPTX source image query source counters changed across samples".into());
+                return Err(
+                    "PPTX source image query source counters changed across samples".into(),
+                );
             }
         } else {
             expected_source = Some(snapshot);
@@ -15070,19 +15146,12 @@ fn run_pptx_source_image_query(
         &mut source_summary.ordinary_payload_read_bytes,
         &sample_order,
     )?;
-    reorder_sample_vector(
-        &mut source_summary.selected_media_read_calls,
-        &sample_order,
-    )?;
-    reorder_sample_vector(
-        &mut source_summary.selected_media_read_bytes,
-        &sample_order,
-    )?;
+    reorder_sample_vector(&mut source_summary.selected_media_read_calls, &sample_order)?;
+    reorder_sample_vector(&mut source_summary.selected_media_read_bytes, &sample_order)?;
     reorder_sample_vector(&mut source_summary.max_in_flight_reads, &sample_order)?;
     reorder_pptx_source_image_cache(&mut source_summary.cache_diagnostics, &sample_order)?;
-    let operation_metrics = operation_metrics::from_in_process_observations_without_sink(
-        &observations,
-    )?;
+    let operation_metrics =
+        operation_metrics::from_in_process_observations_without_sink(&observations)?;
     let output_digest = match case {
         Case::PptxSourceBackedImagesQuery => corpus.expected_images_sha256.clone(),
         Case::PptxSourceBackedImageQuery => corpus.selected_image_sha256.clone(),
@@ -19140,15 +19209,32 @@ fn xlsx_row_visibility_variant_bytes(
 fn xlsx_row_visibility_variant_refused(
     corpus: &Corpus,
     variant: &str,
+    initially_hidden: bool,
 ) -> Result<bool, Box<dyn Error>> {
     let bytes = xlsx_row_visibility_variant_bytes(corpus, variant)?;
-    let editor = match litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(Arc::new(
-        OwnedSource::new(bytes),
-    )) {
-        Ok(editor) => editor,
-        Err(_) => return Ok(true),
-    };
-    Ok(editor.edit("Sheet1").is_err())
+    let source = Arc::new(OwnedSource::new(bytes));
+    let version = source.version()?;
+    let source_digest = sha256_hex(source.as_slice());
+    let mut output = Vec::new();
+    // Opening an edit is lazy. Exercise a real change before deciding whether
+    // the conservative source closure refused the operation.
+    let publication = (|| -> litchi_xlsx::Result<()> {
+        let editor = litchi_xlsx::row_visibility::SourceBackedEditor::from_read_at(source.clone())?;
+        let mut edit = editor.edit("Sheet1")?;
+        let row = RowIndex::new(0).expect("row zero is within the XLSX grid");
+        if initially_hidden {
+            edit.unhide(row)?;
+        } else {
+            edit.hide(row)?;
+        }
+        let commit = edit.commit()?;
+        editor.publish_commit_to_stream(&mut output, &commit)?;
+        Ok(())
+    })();
+    if version != source.version()? || source_digest != sha256_hex(source.as_slice()) {
+        return Err("XLSX row-visibility refusal probe changed its source".into());
+    }
+    Ok(publication.is_err() && output.is_empty())
 }
 
 fn xlsx_row_visibility_lifecycle_gates(
@@ -19239,20 +19325,24 @@ fn xlsx_row_visibility_lifecycle_gates(
     }
 
     let protected_source_refusal_verified =
-        xlsx_row_visibility_variant_refused(corpus, "protected")?;
-    let formula_source_refusal_verified = xlsx_row_visibility_variant_refused(corpus, "formula")?;
+        xlsx_row_visibility_variant_refused(corpus, "protected", initially_hidden)?;
+    let formula_source_refusal_verified =
+        xlsx_row_visibility_variant_refused(corpus, "formula", initially_hidden)?;
     let markup_compatibility_source_refusal_verified =
-        xlsx_row_visibility_variant_refused(corpus, "markup-compatibility")?;
-    let macro_source_refusal_verified = xlsx_row_visibility_variant_refused(corpus, "macro")?;
+        xlsx_row_visibility_variant_refused(corpus, "markup-compatibility", initially_hidden)?;
+    let macro_source_refusal_verified =
+        xlsx_row_visibility_variant_refused(corpus, "macro", initially_hidden)?;
     let relationship_source_refusal_verified =
-        xlsx_row_visibility_variant_refused(corpus, "relationship")?;
+        xlsx_row_visibility_variant_refused(corpus, "relationship", initially_hidden)?;
     if !protected_source_refusal_verified
         || !formula_source_refusal_verified
         || !markup_compatibility_source_refusal_verified
         || !macro_source_refusal_verified
         || !relationship_source_refusal_verified
     {
-        return Err("XLSX row-visibility semantic refusal gates failed".into());
+        return Err(format!(
+            "XLSX row-visibility semantic refusal gates failed: protected={protected_source_refusal_verified}, formula={formula_source_refusal_verified}, markup_compatibility={markup_compatibility_source_refusal_verified}, macro={macro_source_refusal_verified}, relationship={relationship_source_refusal_verified}"
+        ).into());
     }
 
     let signed_bytes = xlsx_row_visibility_variant_bytes(corpus, "signed")?;
@@ -39088,6 +39178,8 @@ fn run_xlsx_cell_lifecycle_edit_save(
                 semantic_sha256: expected_semantic.clone(),
                 untouched_member_count,
                 untouched_member_sha256: untouched_member_sha256.clone(),
+                payload_memory_limit: None,
+                publication_planning_memory_headroom: None,
                 partial_sink_verified,
                 output_budget_refusal: XlsxCellValuesOutputRefusalEvidence::default(),
             }
@@ -39144,6 +39236,8 @@ fn run_xlsx_cell_lifecycle_edit_save(
                 semantic_sha256: expected_semantic.clone(),
                 untouched_member_count: 0,
                 untouched_member_sha256: String::new(),
+                payload_memory_limit: None,
+                publication_planning_memory_headroom: None,
                 partial_sink_verified: None,
                 output_budget_refusal: XlsxCellValuesOutputRefusalEvidence::default(),
             }
@@ -39532,9 +39626,25 @@ fn run_xlsx_cell_values_edit_save(
     } else {
         None
     };
-    let expected_budget_limit = managed
+    let payload_memory_limit = managed
         .then(|| payload_budget_u64.ok_or("XLSX managed cell CRUD payload budget is missing"))
         .transpose()?;
+    let publication_planning_memory_headroom = managed
+        .then(|| u64::try_from(XLSX_MANAGED_PUBLICATION_PLANNING_MEMORY_HEADROOM))
+        .transpose()?;
+    let expected_budget_limit = if managed {
+        let payload =
+            payload_memory_limit.ok_or("XLSX managed cell CRUD payload memory limit is missing")?;
+        let headroom = publication_planning_memory_headroom
+            .ok_or("XLSX managed cell CRUD planning memory allowance is missing")?;
+        Some(
+            payload
+                .checked_add(headroom)
+                .ok_or("XLSX managed cell CRUD memory limit overflows u64")?,
+        )
+    } else {
+        None
+    };
     let output_budget_refusal = if managed {
         let payload_ranges = payload_ranges
             .as_ref()
@@ -39750,6 +39860,8 @@ fn run_xlsx_cell_values_edit_save(
                 semantic_sha256: String::new(),
                 untouched_member_count: 0,
                 untouched_member_sha256: String::new(),
+                payload_memory_limit,
+                publication_planning_memory_headroom,
                 partial_sink_verified,
                 output_budget_refusal: output_budget_refusal.clone().unwrap_or_default(),
             });
@@ -41082,11 +41194,42 @@ fn xlsx_cell_values_payload_budget(
     })
 }
 
+/// Publication planning retains bounded topology metadata in addition to the
+/// source payload reservation. Keep this allowance explicit in the managed
+/// evidence so it cannot be mistaken for payload/cache capacity.
+const XLSX_MANAGED_PUBLICATION_PLANNING_MEMORY_HEADROOM: usize = 64 * 1024;
+
+fn xlsx_cell_values_managed_memory_limit(payload_budget: usize) -> Result<usize, Box<dyn Error>> {
+    payload_budget
+        .checked_add(XLSX_MANAGED_PUBLICATION_PLANNING_MEMORY_HEADROOM)
+        .ok_or_else(|| "XLSX managed publication memory bound overflows usize".into())
+}
+
 fn xlsx_cell_values_managed_context(
     payload_budget: usize,
     output_budget: u64,
 ) -> Result<(Budget, ExecutionContext), Box<dyn Error>> {
-    let memory = u64::try_from(payload_budget.max(1))?;
+    let memory_budget = xlsx_cell_values_managed_memory_limit(payload_budget)?;
+    xlsx_cell_values_managed_context_with_memory(memory_budget, output_budget)
+}
+
+/// Build the managed context used only by the output refusal replay.
+///
+/// Publication also builds a physical-member lookup before it calls the sink;
+/// the same bounded planning allowance as the measured managed sample ensures
+/// that the first sink request remains observable.
+fn xlsx_cell_values_managed_probe_context(
+    payload_budget: usize,
+    output_budget: u64,
+) -> Result<(Budget, ExecutionContext), Box<dyn Error>> {
+    xlsx_cell_values_managed_context(payload_budget, output_budget)
+}
+
+fn xlsx_cell_values_managed_context_with_memory(
+    memory_budget: usize,
+    output_budget: u64,
+) -> Result<(Budget, ExecutionContext), Box<dyn Error>> {
+    let memory = u64::try_from(memory_budget.max(1))?;
     let workers = NonZeroUsize::new(1).ok_or("XLSX managed worker count is zero")?;
     let execution_limits = ExecutionLimits::new(
         workers,
@@ -41192,7 +41335,7 @@ fn xlsx_cell_values_output_refusal_replay(
     ));
     let probe_version = probe_source.version()?;
     let (probe_budget, probe_context) =
-        xlsx_cell_values_managed_context(payload_budget, successful_output_ceiling)?;
+        xlsx_cell_values_managed_probe_context(payload_budget, successful_output_ceiling)?;
     let probe_editor =
         litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             probe_source.clone(),
@@ -41241,7 +41384,7 @@ fn xlsx_cell_values_output_refusal_replay(
     ));
     let refusal_version = refusal_source.version()?;
     let (refusal_budget, refusal_context) =
-        xlsx_cell_values_managed_context(payload_budget, one_under_output_limit)?;
+        xlsx_cell_values_managed_probe_context(payload_budget, one_under_output_limit)?;
     let refusal_editor =
         litchi_xlsx::cell_values::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
             refusal_source.clone(),
@@ -41470,6 +41613,168 @@ impl OpcCacheDiagnosticsSummary {
     }
 }
 
+const OPC_CACHE_LOCK_DIAGNOSTICS_SCOPE: &str =
+    "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead";
+const OPC_CACHE_LOCK_DIAGNOSTICS_EXCLUDED: &str =
+    "same_part_condvar_wait_timeout_and_mutex_reacquisition";
+const OPC_CACHE_LOCK_DIAGNOSTICS_COVERAGE: &str =
+    "all_worker_part_data_requests_including_pre_admission_rendezvous";
+
+#[derive(Clone, Copy, Debug, Default)]
+struct OpcCacheLockSample {
+    cache_lock_acquisitions: u64,
+    cache_lock_wait_ns: u64,
+    flight_lock_acquisitions: u64,
+    flight_lock_wait_ns: u64,
+    total_lock_acquisitions: u64,
+    total_lock_wait_ns: u64,
+}
+
+impl OpcCacheLockSample {
+    fn checked_add(self, other: Self) -> Result<Self, Box<dyn Error>> {
+        Ok(Self {
+            cache_lock_acquisitions: self
+                .cache_lock_acquisitions
+                .checked_add(other.cache_lock_acquisitions)
+                .ok_or("OPC cache lock acquisition count overflows")?,
+            cache_lock_wait_ns: self
+                .cache_lock_wait_ns
+                .checked_add(other.cache_lock_wait_ns)
+                .ok_or("OPC cache-lock wait time overflows")?,
+            flight_lock_acquisitions: self
+                .flight_lock_acquisitions
+                .checked_add(other.flight_lock_acquisitions)
+                .ok_or("OPC cache flight lock acquisition count overflows")?,
+            flight_lock_wait_ns: self
+                .flight_lock_wait_ns
+                .checked_add(other.flight_lock_wait_ns)
+                .ok_or("OPC cache flight-lock wait time overflows")?,
+            total_lock_acquisitions: self
+                .total_lock_acquisitions
+                .checked_add(other.total_lock_acquisitions)
+                .ok_or("OPC cache total lock acquisition count overflows")?,
+            total_lock_wait_ns: self
+                .total_lock_wait_ns
+                .checked_add(other.total_lock_wait_ns)
+                .ok_or("OPC cache total lock wait time overflows")?,
+        })
+    }
+}
+
+impl OpcCacheLockDiagnosticsSummary {
+    fn record(&mut self, sample: OpcCacheLockSample) {
+        self.scope = OPC_CACHE_LOCK_DIAGNOSTICS_SCOPE;
+        self.excluded = OPC_CACHE_LOCK_DIAGNOSTICS_EXCLUDED;
+        self.coverage = OPC_CACHE_LOCK_DIAGNOSTICS_COVERAGE;
+        self.cache_lock_acquisitions
+            .push(sample.cache_lock_acquisitions);
+        self.cache_lock_wait_ns.push(sample.cache_lock_wait_ns);
+        self.flight_lock_acquisitions
+            .push(sample.flight_lock_acquisitions);
+        self.flight_lock_wait_ns.push(sample.flight_lock_wait_ns);
+        self.total_lock_acquisitions
+            .push(sample.total_lock_acquisitions);
+        self.total_lock_wait_ns.push(sample.total_lock_wait_ns);
+    }
+
+    fn reorder(&mut self, sample_order: &[usize]) -> Result<(), Box<dyn Error>> {
+        reorder_sample_vector(&mut self.cache_lock_acquisitions, sample_order)?;
+        reorder_sample_vector(&mut self.cache_lock_wait_ns, sample_order)?;
+        reorder_sample_vector(&mut self.flight_lock_acquisitions, sample_order)?;
+        reorder_sample_vector(&mut self.flight_lock_wait_ns, sample_order)?;
+        reorder_sample_vector(&mut self.total_lock_acquisitions, sample_order)?;
+        reorder_sample_vector(&mut self.total_lock_wait_ns, sample_order)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Default)]
+struct OpcCacheLockObserver {
+    active: Option<(Operation, Instant)>,
+    sample: OpcCacheLockSample,
+    error: Option<&'static str>,
+}
+
+impl OpcCacheLockObserver {
+    fn observe(&mut self, event: DiagnosticSnapshot) {
+        if self.error.is_some() {
+            return;
+        }
+        match event {
+            DiagnosticSnapshot::Started { operation } => {
+                if self.active.is_some() {
+                    self.error = Some("OPC cache lock diagnostics unexpectedly nested");
+                    return;
+                }
+                self.active = Some((operation, Instant::now()));
+            },
+            DiagnosticSnapshot::Finished { operation } => {
+                let Some((started_operation, started)) = self.active.take() else {
+                    self.error = Some("OPC cache lock diagnostics finished without a start");
+                    return;
+                };
+                if started_operation != operation {
+                    self.error = Some("OPC cache lock diagnostics operations were unbalanced");
+                    return;
+                }
+                let Ok(wait_ns) = u64::try_from(started.elapsed().as_nanos()) else {
+                    self.error = Some("OPC cache lock diagnostics wait time overflows u64");
+                    return;
+                };
+                self.record(operation, wait_ns);
+            },
+        }
+    }
+
+    fn record(&mut self, operation: Operation, wait_ns: u64) {
+        let (acquisitions, waits) = match operation {
+            Operation::Cache(_) => (
+                &mut self.sample.cache_lock_acquisitions,
+                &mut self.sample.cache_lock_wait_ns,
+            ),
+            Operation::Flight(_) => (
+                &mut self.sample.flight_lock_acquisitions,
+                &mut self.sample.flight_lock_wait_ns,
+            ),
+        };
+        let Some(acquisition_count) = acquisitions.checked_add(1) else {
+            self.error = Some("OPC cache lock acquisition count overflows u64");
+            return;
+        };
+        let Some(total_wait_ns) = waits.checked_add(wait_ns) else {
+            self.error = Some("OPC cache lock wait time overflows u64");
+            return;
+        };
+        *acquisitions = acquisition_count;
+        *waits = total_wait_ns;
+        self.sample.total_lock_acquisitions =
+            match self.sample.total_lock_acquisitions.checked_add(1) {
+                Some(value) => value,
+                None => {
+                    self.error = Some("OPC cache total lock acquisition count overflows u64");
+                    return;
+                },
+            };
+        self.sample.total_lock_wait_ns = match self.sample.total_lock_wait_ns.checked_add(wait_ns) {
+            Some(value) => value,
+            None => {
+                self.error = Some("OPC cache total lock wait time overflows u64");
+                return;
+            },
+        };
+    }
+
+    fn finish(self) -> Result<OpcCacheLockSample, String> {
+        if let Some(error) = self.error {
+            return Err(error.to_owned());
+        }
+        if self.active.is_some() {
+            return Err("OPC cache lock diagnostics ended with an open operation".to_owned());
+        }
+        Ok(self.sample)
+    }
+}
+
 #[derive(Debug, Default)]
 struct OpcCacheGateState {
     armed: bool,
@@ -41668,10 +41973,12 @@ enum OpcCacheWorkerCommand {
 }
 
 type OpcCacheWorkerResult = std::result::Result<Vec<(usize, PartData)>, String>;
+type OpcCacheLockResult = std::result::Result<OpcCacheLockSample, String>;
 
 struct OpcCacheWorkerTeam {
     senders: Vec<mpsc::Sender<OpcCacheWorkerCommand>>,
     results: mpsc::Receiver<OpcCacheWorkerResult>,
+    lock_results: mpsc::Receiver<OpcCacheLockResult>,
     workers: Vec<JoinHandle<()>>,
 }
 
@@ -41685,19 +41992,22 @@ struct OpcCacheCellConfig {
     worker_count: usize,
     warmup_iterations: usize,
     samples: usize,
+    observe_locks: bool,
 }
 
 impl OpcCacheWorkerTeam {
-    fn new(worker_count: usize) -> Result<Self, Box<dyn Error>> {
+    fn new(worker_count: usize, observe_locks: bool) -> Result<Self, Box<dyn Error>> {
         if worker_count == 0 {
             return Err("OPC cache worker team cannot be empty".into());
         }
         let (result_sender, results) = mpsc::channel();
+        let (lock_result_sender, lock_results) = mpsc::channel();
         let mut senders = Vec::with_capacity(worker_count);
         let mut workers = Vec::with_capacity(worker_count);
         for index in 0..worker_count {
             let (sender, receiver) = mpsc::channel();
             let result_sender = result_sender.clone();
+            let lock_result_sender = lock_result_sender.clone();
             let worker = std::thread::Builder::new()
                 .name(format!("litchi-opc-cache-{index}"))
                 .spawn(move || {
@@ -41711,18 +42021,41 @@ impl OpcCacheWorkerTeam {
                             requests,
                         } = job;
                         start.wait();
-                        let result: OpcCacheWorkerResult = requests
-                            .into_iter()
-                            .map(|request| {
-                                package
-                                    .part(&request.partname)
-                                    .and_then(|part| part.data())
-                                    .map(|data| (request.logical_index, data))
-                                    .map_err(|error| error.to_string())
-                            })
-                            .collect();
+                        let (result, lock_result) = if observe_locks {
+                            let mut observer = OpcCacheLockObserver::default();
+                            let result = requests
+                                .into_iter()
+                                .map(|request| {
+                                    package
+                                        .part(&request.partname)
+                                        .and_then(|part| {
+                                            part.data_with_observer(|event| observer.observe(event))
+                                        })
+                                        .map(|data| (request.logical_index, data))
+                                        .map_err(|error| error.to_string())
+                                })
+                                .collect::<Result<Vec<_>, _>>();
+                            (result, Some(observer.finish()))
+                        } else {
+                            let result = requests
+                                .into_iter()
+                                .map(|request| {
+                                    package
+                                        .part(&request.partname)
+                                        .and_then(|part| part.data())
+                                        .map(|data| (request.logical_index, data))
+                                        .map_err(|error| error.to_string())
+                                })
+                                .collect::<Result<Vec<_>, _>>();
+                            (result, None)
+                        };
                         drop(package);
                         if result_sender.send(result).is_err() {
+                            break;
+                        }
+                        if let Some(lock_result) = lock_result
+                            && lock_result_sender.send(lock_result).is_err()
+                        {
                             break;
                         }
                     }
@@ -41733,6 +42066,7 @@ impl OpcCacheWorkerTeam {
         Ok(Self {
             senders,
             results,
+            lock_results,
             workers,
         })
     }
@@ -41761,13 +42095,27 @@ impl OpcCacheWorkerTeam {
         Ok(())
     }
 
-    fn collect(&self) -> Result<Vec<(usize, PartData)>, Box<dyn Error>> {
+    fn collect(
+        &self,
+        observe_locks: bool,
+    ) -> Result<(Vec<(usize, PartData)>, Option<OpcCacheLockSample>), Box<dyn Error>> {
         let mut collected = Vec::new();
+        let mut lock_sample: Option<OpcCacheLockSample> = None;
         for _ in 0..self.senders.len() {
             let worker = self.results.recv()?;
             collected.extend(worker.map_err(|error| format!("OPC cache worker failed: {error}"))?);
+            if observe_locks {
+                let worker_sample = self
+                    .lock_results
+                    .recv()?
+                    .map_err(|error| format!("OPC cache lock observer failed: {error}"))?;
+                lock_sample = Some(match lock_sample {
+                    Some(sample) => sample.checked_add(worker_sample)?,
+                    None => worker_sample,
+                });
+            }
         }
-        Ok(collected)
+        Ok((collected, lock_sample))
     }
 }
 
@@ -42134,6 +42482,7 @@ fn run_opc_source_cache_budget_boundary(
                 fixed_source_delay_us: 0,
                 timing_scope: "single PartData request; package open and verification excluded",
                 diagnostics: diagnostics_summary,
+                lock_diagnostics: None,
                 gate: None,
                 budget_used_after_handles_drop: after_handles,
                 budget_used_after_package_drop: after_packages,
@@ -42240,6 +42589,7 @@ fn run_opc_source_cache_contention_cell(
         worker_count,
         warmup_iterations,
         samples,
+        observe_locks,
     } = config;
     let entry_bytes = corpus.manifest.entry_bytes;
     let working_set_bytes = u64::try_from(working_set_parts)?
@@ -42321,10 +42671,11 @@ fn run_opc_source_cache_contention_cell(
         0
     };
 
-    let worker_team = OpcCacheWorkerTeam::new(worker_count)?;
+    let worker_team = OpcCacheWorkerTeam::new(worker_count, observe_locks)?;
     let mut elapsed = Vec::with_capacity(samples);
     let mut source_summary = SourceSummary::default();
     let mut diagnostics_summary = OpcCacheDiagnosticsSummary::default();
+    let mut lock_diagnostics = observe_locks.then(OpcCacheLockDiagnosticsSummary::default);
     let mut gate_summary = OpcCacheGateSummary::default();
     let mut after_handles = Vec::with_capacity(samples);
     let mut after_packages = Vec::with_capacity(samples);
@@ -42369,7 +42720,7 @@ fn run_opc_source_cache_contention_cell(
         worker_team.dispatch(Arc::clone(&package), assignments)?;
         if let Err(error) = source.wait_for_initial_arrivals(OPC_CACHE_COHORT_TIMEOUT) {
             source.release();
-            let _ = worker_team.collect();
+            let _ = worker_team.collect(observe_locks);
             return Err(error);
         }
         let pre_release = match opc_cache_wait_for_cohort(
@@ -42384,13 +42735,13 @@ fn run_opc_source_cache_contention_cell(
             Ok(diagnostics) => diagnostics,
             Err(error) => {
                 source.release();
-                let _ = worker_team.collect();
+                let _ = worker_team.collect(observe_locks);
                 return Err(error);
             },
         };
         let started = Instant::now();
         source.release();
-        let mut outputs = worker_team.collect()?;
+        let (mut outputs, lock_sample) = worker_team.collect(observe_locks)?;
         let duration = started.elapsed();
 
         opc_cache_verify_outputs(
@@ -42449,6 +42800,10 @@ fn run_opc_source_cache_contention_cell(
             record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             source_summary.record_opc(source_snapshot, delta.successful_loads);
             diagnostics_summary.record(delta, after);
+            if let Some(lock_diagnostics) = lock_diagnostics.as_mut() {
+                lock_diagnostics
+                    .record(lock_sample.ok_or("OPC lock diagnostics worker sample was omitted")?);
+            }
             gate_summary.initial_arrivals.push(gate.initial_arrivals);
             gate_summary
                 .delayed_payload_arrivals
@@ -42470,6 +42825,11 @@ fn run_opc_source_cache_contention_cell(
         }
     }
 
+    if let Some(lock_diagnostics) = lock_diagnostics.as_mut() {
+        let sample_order = statistics(elapsed.clone()).sample_order;
+        lock_diagnostics.reorder(&sample_order)?;
+    }
+
     Ok(opc_cache_result(
         case,
         corpus,
@@ -42488,6 +42848,7 @@ fn run_opc_source_cache_contention_cell(
             fixed_source_delay_us: OPC_CACHE_SLOW_SOURCE_DELAY_US,
             timing_scope: "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
             diagnostics: diagnostics_summary,
+            lock_diagnostics,
             gate: Some(gate_summary),
             budget_used_after_handles_drop: after_handles,
             budget_used_after_package_drop: after_packages,
@@ -42578,6 +42939,7 @@ fn run_opc_source_cache_contention(
     samples: usize,
     worker_counts: &[usize],
     mode: OpcCacheMode,
+    observe_locks: bool,
 ) -> Result<Vec<CaseResult>, Box<dyn Error>> {
     validate_opc_cache_corpus(corpus)?;
     if !matches!(
@@ -42640,6 +43002,7 @@ fn run_opc_source_cache_contention(
                         worker_count,
                         warmup_iterations,
                         samples,
+                        observe_locks,
                     },
                     corpus,
                     &parts,
@@ -42954,7 +43317,8 @@ fn verify_opc_serial_eager_fixed_corpus_preflight(
     if corpus.archive.len() != oracle.archive_bytes {
         return Err(format!(
             "serial eager OPC archive byte size {} differs from fixed oracle {}",
-            corpus.archive.len(), oracle.archive_bytes
+            corpus.archive.len(),
+            oracle.archive_bytes
         )
         .into());
     }
@@ -43065,7 +43429,9 @@ fn verify_opc_serial_eager_package(
             return Err(format!("serial eager OPC Part {name} content type differs").into());
         }
         if !part.rels().iter().next().is_none() {
-            return Err(format!("serial eager OPC Part {name} unexpectedly has relationships").into());
+            return Err(
+                format!("serial eager OPC Part {name} unexpectedly has relationships").into(),
+            );
         }
         if part.blob() != expected {
             return Err(format!("serial eager OPC Part {name} payload differs").into());
@@ -43170,9 +43536,8 @@ fn run_opc_serial_eager_open(
         &mut observed_deterministic_payload_hashes_verified,
         &sample_order,
     )?;
-    let operation_metrics = operation_metrics::from_in_process_observations_without_sink(
-        &observations,
-    )?;
+    let operation_metrics =
+        operation_metrics::from_in_process_observations_without_sink(&observations)?;
     Ok(CaseResult {
         case: Case::OpcSerialEagerOpen.name(),
         cache_state: None,
@@ -43182,8 +43547,7 @@ fn run_opc_serial_eager_open(
         source: boxed_source(SourceSummary {
             opc_serial_eager_open: Some(OpcSerialEagerOpenSummary {
                 implementation: "OpcPackage::from_bytes",
-                timing_scope:
-                    "OpcPackage::from_bytes constructor only; ZIP preflight and all package semantic oracles excluded",
+                timing_scope: "OpcPackage::from_bytes constructor only; ZIP preflight and all package semantic oracles excluded",
                 performance_claim: "none",
                 predeclared_allocator_model: oracle.allocator_model,
                 worker_count: 1,
@@ -51060,8 +51424,7 @@ fn run_opc_casefold_lookup(
         observed_output_sha256: evidence.observed_output_sha256.clone(),
         owned_part_count_verified: owned_open.then_some(evidence.owned_part_count_verified.clone()),
         owned_payload_sha256: owned_open.then_some(evidence.owned_payload_sha256.clone()),
-        owned_exact_source_sha256: owned_open
-            .then_some(evidence.owned_exact_source_sha256.clone()),
+        owned_exact_source_sha256: owned_open.then_some(evidence.owned_exact_source_sha256.clone()),
         source_counter_scope,
         source_read_calls: evidence.source_read_calls.clone(),
         source_read_bytes: evidence.source_read_bytes.clone(),
@@ -54216,16 +54579,17 @@ mod tests {
         CountingSeekSink, CountingSink, HashingDiscardSink, InstrumentedSource,
         ODF_REPAIR_LOCAL_EXTRA, ODF_REPAIR_PUBLICATION_SCRATCH_BYTES, ODP_MEDIA_CORPUS_GENERATOR,
         ODP_SOURCE_BACKED_CATALOG_QUERY_INDEX, ODP_TEXT_BOX_BATCH_COUNT, ODS_MEDIA_ENTRY_COUNT,
-        ODT_RESOURCE_BATCH_COUNT, OOXML_TRACKER_CORPUS_GENERATOR, OpcCacheMode, PPT_PICTURE_BYTES,
-        PPT_PICTURE_COUNT, PPT_PICTURES_CORPUS_GENERATOR, PPT_REPEATED_QUERY_COUNT,
-        PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT, PPTX_MULTI_SLIDE_BATCH_COUNT, PayloadKind,
-        OPC_SERIAL_EAGER_OPEN_FIXED_MATRIX,
-        PPTX_SOURCE_IMAGE_QUERY_SELECTED_POSITION,
-        RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES, RangeSimulationConfig, RequestSizeBuckets,
-        RtfSemanticVariant, SemanticShape, SimulatedCursor, SimulatedRangeMetrics,
-        SimulatedRangeSource, SinkSummary, SourceBackedPackage, WindowedHashingSink, Workbook,
-        WriteSizeBuckets, WriterShape, XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT,
-        XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR, XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
+        ODT_RESOURCE_BATCH_COUNT, OOXML_TRACKER_CORPUS_GENERATOR,
+        OPC_CACHE_LOCK_DIAGNOSTICS_COVERAGE, OPC_CACHE_LOCK_DIAGNOSTICS_EXCLUDED,
+        OPC_CACHE_LOCK_DIAGNOSTICS_SCOPE, OPC_SERIAL_EAGER_OPEN_FIXED_MATRIX, OpcCacheMode,
+        PPT_PICTURE_BYTES, PPT_PICTURE_COUNT, PPT_PICTURES_CORPUS_GENERATOR,
+        PPT_REPEATED_QUERY_COUNT, PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT, PPTX_MULTI_SLIDE_BATCH_COUNT,
+        PPTX_SOURCE_IMAGE_QUERY_SELECTED_POSITION, PayloadKind, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES,
+        RangeSimulationConfig, RequestSizeBuckets, RtfSemanticVariant, SemanticShape,
+        SimulatedCursor, SimulatedRangeMetrics, SimulatedRangeSource, SinkSummary,
+        SourceBackedPackage, WindowedHashingSink, Workbook, WriteSizeBuckets, WriterShape,
+        XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT, XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR,
+        XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR,
         XLSX_ROW_VISIBILITY_SOURCE_EDIT_CORPUS_GENERATOR, XlsbShape, XlsxCellCrudShape,
         XlsxRowVisibilityShape, XlsxShape, build_cfb_corpus, build_cfb_selective_corpus,
         build_detection_corpus, build_docx_section_layout_corpus, build_docx_source_edit_corpus,
@@ -54233,10 +54597,9 @@ mod tests {
         build_ods_media_corpus, build_odt_media_corpus, build_odt_repeated_text_corpus,
         build_odt_resource_batch_corpus, build_ole_common_corpus, build_ooxml_tracker_corpus,
         build_opc_casefold_corpus, build_opc_corpus, build_opc_relationship_corpus,
-        build_ppt_pictures_corpus,
-        build_pptx_cross_copy_corpus, build_pptx_slide_name_index_corpus,
-        build_pptx_source_image_query_corpus,
-        build_pptx_source_backed_cross_copy_corpus, build_pptx_source_edit_corpus,
+        build_ppt_pictures_corpus, build_pptx_cross_copy_corpus,
+        build_pptx_slide_name_index_corpus, build_pptx_source_backed_cross_copy_corpus,
+        build_pptx_source_edit_corpus, build_pptx_source_image_query_corpus,
         build_rtf_lifecycle_corpus, build_rtf_picture_corpus, build_semantic_docx_corpus,
         build_semantic_odp_corpus, build_semantic_ods_corpus, build_semantic_odt_corpus,
         build_semantic_pptx_corpus, build_semantic_rtf_corpus, build_streaming_corpus,
@@ -54257,26 +54620,23 @@ mod tests {
         run_docx_source_backed_existing_section_layout_edit_save,
         run_docx_source_backed_one_edit_save, run_odf_content_cow, run_ooxml_tracker_case,
         run_opc_serial_eager_open, run_opc_source_cache_budget_boundary,
-        run_opc_source_cache_contention,
-        run_opc_source_overlay_one_part_save, run_ppt_pictures, run_pptx_batch_edit_save,
-        run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
+        run_opc_source_cache_contention, run_opc_source_overlay_one_part_save, run_ppt_pictures,
+        run_pptx_batch_edit_save, run_pptx_cross_copy, run_pptx_multi_slide_batch_edit_save,
         run_pptx_source_backed_cross_copy, run_pptx_source_backed_one_edit_save,
-        run_pptx_source_image_query,
-        run_rtf_picture_crud, run_scaling_case, run_streaming_creation, run_xls_comments_edit_save,
-        run_xls_visibility_edit_save, run_xlsx_auto_filter_edit_save,
-        run_xlsx_calculation_metadata_edit_save, run_xlsx_conditional_formatting_edit_save,
-        run_xlsx_data_validation_edit_save, run_xlsx_defined_names_edit_save,
-        run_xlsx_edit_composition, run_xlsx_page_break_edit_save, run_xlsx_page_break_projection,
-        run_xlsx_page_margin_edit_save, run_xlsx_page_setup_edit_save,
-        run_xlsx_print_options_edit_save, run_xlsx_sheet_protection_edit_save, sha256_hex,
-        simulated_request_delay, statistics, updated_writer_text, usage_text,
-        validate_opc_serial_eager_open_options, validate_xls_source_locality,
-        validate_xls_source_options, verify_xlsx_cells, writer_shape,
-        verify_opc_serial_eager_fixed_corpus_preflight,
-        zip_member_ranges,
-        validate_pptx_source_image_query_options,
-        xls_source_family_dispatch_cases, xls_writer_semantic_dispatch_selected, xlsb_cells_digest,
-        xlsb_expected_cells, xlsx_cell_count, xlsx_spec,
+        run_pptx_source_image_query, run_rtf_picture_crud, run_scaling_case,
+        run_streaming_creation, run_xls_comments_edit_save, run_xls_visibility_edit_save,
+        run_xlsx_auto_filter_edit_save, run_xlsx_calculation_metadata_edit_save,
+        run_xlsx_conditional_formatting_edit_save, run_xlsx_data_validation_edit_save,
+        run_xlsx_defined_names_edit_save, run_xlsx_edit_composition, run_xlsx_page_break_edit_save,
+        run_xlsx_page_break_projection, run_xlsx_page_margin_edit_save,
+        run_xlsx_page_setup_edit_save, run_xlsx_print_options_edit_save,
+        run_xlsx_sheet_protection_edit_save, sha256_hex, simulated_request_delay, statistics,
+        updated_writer_text, usage_text, validate_opc_serial_eager_open_options,
+        validate_pptx_source_image_query_options, validate_xls_source_locality,
+        validate_xls_source_options, verify_opc_serial_eager_fixed_corpus_preflight,
+        verify_xlsx_cells, writer_shape, xls_source_family_dispatch_cases,
+        xls_writer_semantic_dispatch_selected, xlsb_cells_digest, xlsb_expected_cells,
+        xlsx_cell_count, xlsx_spec, zip_member_ranges,
     };
 
     #[test]
@@ -54452,28 +54812,44 @@ mod tests {
         let corpus = build_pptx_source_image_query_corpus().unwrap();
         let again = build_pptx_source_image_query_corpus().unwrap();
         assert_eq!(corpus.archive, again.archive);
-        assert_eq!(corpus.manifest.archive_sha256, again.manifest.archive_sha256);
+        assert_eq!(
+            corpus.manifest.archive_sha256,
+            again.manifest.archive_sha256
+        );
         assert_eq!(corpus.manifest.target_entry, again.manifest.target_entry);
-        assert_eq!(corpus.manifest.target_payload_sha256, again.manifest.target_payload_sha256);
+        assert_eq!(
+            corpus.manifest.target_payload_sha256,
+            again.manifest.target_payload_sha256
+        );
         assert_eq!(corpus.expected_images, again.expected_images);
-        assert_eq!(corpus.expected_images.len(), PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT);
+        assert_eq!(
+            corpus.expected_images.len(),
+            PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT
+        );
         assert_eq!(
             corpus.selected_position,
             PPTX_SOURCE_IMAGE_QUERY_SELECTED_POSITION
         );
-        assert_eq!(corpus.selected_image, corpus.expected_images[corpus.selected_position]);
-        assert!(validate_pptx_source_image_query_options(
-            &[Case::PptxSourceBackedImagesQuery],
-            CorpusShape::ALL.as_slice(),
-            PayloadKind::ALL.as_slice(),
-        )
-        .is_ok());
-        assert!(validate_pptx_source_image_query_options(
-            &[Case::PptxSourceBackedImagesQuery],
-            &[CorpusShape::Tiny],
-            PayloadKind::ALL.as_slice(),
-        )
-        .is_err());
+        assert_eq!(
+            corpus.selected_image,
+            corpus.expected_images[corpus.selected_position]
+        );
+        assert!(
+            validate_pptx_source_image_query_options(
+                &[Case::PptxSourceBackedImagesQuery],
+                CorpusShape::ALL.as_slice(),
+                PayloadKind::ALL.as_slice(),
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_pptx_source_image_query_options(
+                &[Case::PptxSourceBackedImagesQuery],
+                &[CorpusShape::Tiny],
+                PayloadKind::ALL.as_slice(),
+            )
+            .is_err()
+        );
         assert_eq!(
             corpus.selected_payload_sha256,
             sha256_hex(&corpus.selected_payload)
@@ -54488,8 +54864,7 @@ mod tests {
             assert_eq!(parse_case(case.name()), Some(case));
             assert!(usage_text().contains(case.name()));
             assert!(case.is_pptx_source_image_query());
-            let measured =
-                run_pptx_source_image_query(case, &corpus, 0, RETAINED_SAMPLES).unwrap();
+            let measured = run_pptx_source_image_query(case, &corpus, 0, RETAINED_SAMPLES).unwrap();
             assert_eq!(measured.case, case.name());
             assert_eq!(measured.elapsed_ns.samples.len(), RETAINED_SAMPLES);
             let sample_order = measured.elapsed_ns.sample_order.clone();
@@ -54593,10 +54968,7 @@ mod tests {
                 .as_ref()
                 .expect("PPTX source image query publishes operation metrics");
             assert_eq!(operation.sample_count, RETAINED_SAMPLES);
-            assert_eq!(
-                operation.sample_indices,
-                sample_order
-            );
+            assert_eq!(operation.sample_indices, sample_order);
             assert!(operation.sink.output_bytes.values.is_none());
         }
     }
@@ -54734,24 +55106,30 @@ mod tests {
         assert!(usage_text().contains(case.name()));
         assert_eq!(parse_case("opc_serial_eager_open:tiny"), None);
 
-        assert!(validate_opc_serial_eager_open_options(
-            &[case],
-            CorpusShape::ALL.as_slice(),
-            PayloadKind::ALL.as_slice(),
-        )
-        .is_ok());
-        assert!(validate_opc_serial_eager_open_options(
-            &[case],
-            &[CorpusShape::Tiny],
-            PayloadKind::ALL.as_slice(),
-        )
-        .is_err());
-        assert!(validate_opc_serial_eager_open_options(
-            &[case],
-            CorpusShape::ALL.as_slice(),
-            &[PayloadKind::Compressible],
-        )
-        .is_err());
+        assert!(
+            validate_opc_serial_eager_open_options(
+                &[case],
+                CorpusShape::ALL.as_slice(),
+                PayloadKind::ALL.as_slice(),
+            )
+            .is_ok()
+        );
+        assert!(
+            validate_opc_serial_eager_open_options(
+                &[case],
+                &[CorpusShape::Tiny],
+                PayloadKind::ALL.as_slice(),
+            )
+            .is_err()
+        );
+        assert!(
+            validate_opc_serial_eager_open_options(
+                &[case],
+                CorpusShape::ALL.as_slice(),
+                &[PayloadKind::Compressible],
+            )
+            .is_err()
+        );
 
         let corpus = build_opc_corpus(CorpusShape::Tiny, PayloadKind::Compressible).unwrap();
         let error = match run_case(case, &corpus, 0, 1) {
@@ -54763,8 +55141,8 @@ mod tests {
 
     #[test]
     fn opc_serial_eager_open_preflight_rejects_wrong_fixed_identity() {
-        let mut wrong_shape = build_opc_corpus(CorpusShape::Tiny, PayloadKind::Compressible)
-            .unwrap();
+        let mut wrong_shape =
+            build_opc_corpus(CorpusShape::Tiny, PayloadKind::Compressible).unwrap();
         wrong_shape.manifest.shape = CorpusShape::ManySmall.name();
         assert!(verify_opc_serial_eager_fixed_corpus_preflight(&wrong_shape).is_err());
 
@@ -54801,7 +55179,10 @@ mod tests {
             assert_eq!(first.manifest.archive_bytes, oracle.archive_bytes);
             assert_eq!(first.manifest.archive_sha256, oracle.archive_sha256);
             assert_eq!(first.manifest.entry_count, oracle.part_count);
-            assert_eq!(first.manifest.archive_member_count, oracle.archive_member_count);
+            assert_eq!(
+                first.manifest.archive_member_count,
+                oracle.archive_member_count
+            );
             assert_eq!(
                 *verify_opc_serial_eager_fixed_corpus_preflight(&first).unwrap(),
                 oracle
@@ -54810,10 +55191,7 @@ mod tests {
             let measured = run_opc_serial_eager_open(&first, 1, 2).unwrap();
             assert_eq!(measured.case, "opc_serial_eager_open");
             assert_eq!(measured.elapsed_ns.samples.len(), 2);
-            assert_eq!(
-                measured.operation_metrics.as_ref().unwrap().sample_count,
-                2
-            );
+            assert_eq!(measured.operation_metrics.as_ref().unwrap().sample_count, 2);
             assert_eq!(
                 measured.operation_metrics.as_ref().unwrap().sample_indices,
                 measured.elapsed_ns.sample_order
@@ -57315,7 +57693,7 @@ mod tests {
             ),
         ] {
             let measured =
-                run_opc_source_cache_contention(case, &corpus, 0, 1, &[1, 2], mode).unwrap();
+                run_opc_source_cache_contention(case, &corpus, 0, 1, &[1, 2], mode, false).unwrap();
             assert_eq!(measured.len(), 12);
             for result in &measured {
                 assert_eq!(result.elapsed_ns.samples.len(), 1);
@@ -57327,6 +57705,7 @@ mod tests {
                     evidence.diagnostics.budget_memory_limit[0].is_some(),
                     managed
                 );
+                assert!(evidence.lock_diagnostics.is_none());
                 assert_eq!(evidence.budget_used_after_package_drop, vec![0]);
                 let gate = evidence.gate.as_ref().unwrap();
                 assert_eq!(gate.initial_arrivals.len(), 1);
@@ -57342,13 +57721,51 @@ mod tests {
     }
 
     #[test]
+    fn opc_source_cache_lock_diagnostics_are_explicit_and_sample_aligned() {
+        let corpus = build_opc_corpus(CorpusShape::ManySmall, PayloadKind::Incompressible).unwrap();
+        let measured = run_opc_source_cache_contention(
+            Case::OpcSourceCacheControlContention,
+            &corpus,
+            0,
+            1,
+            &[1, 2],
+            OpcCacheMode::Control,
+            true,
+        )
+        .unwrap();
+        assert_eq!(measured.len(), 12);
+        for result in &measured {
+            let evidence = result.source.as_ref().unwrap().opc_cache.as_ref().unwrap();
+            let lock = evidence
+                .lock_diagnostics
+                .as_ref()
+                .expect("opt-in lock diagnostics");
+            assert_eq!(lock.scope, OPC_CACHE_LOCK_DIAGNOSTICS_SCOPE);
+            assert_eq!(lock.excluded, OPC_CACHE_LOCK_DIAGNOSTICS_EXCLUDED);
+            assert_eq!(lock.coverage, OPC_CACHE_LOCK_DIAGNOSTICS_COVERAGE);
+            assert_eq!(lock.total_lock_wait_ns.len(), 1);
+            assert_eq!(lock.total_lock_acquisitions.len(), 1);
+            assert!(lock.total_lock_acquisitions[0] > 0);
+            assert_eq!(
+                lock.total_lock_acquisitions[0],
+                lock.cache_lock_acquisitions[0] + lock.flight_lock_acquisitions[0]
+            );
+            assert_eq!(
+                lock.total_lock_wait_ns[0],
+                lock.cache_lock_wait_ns[0] + lock.flight_lock_wait_ns[0]
+            );
+        }
+    }
+
+    #[test]
     fn docx_source_edit_is_deterministic_and_emits_complete_evidence() {
         let corpus = build_docx_source_edit_corpus().unwrap();
         let again = build_docx_source_edit_corpus().unwrap();
         assert_eq!(corpus.archive, again.archive);
+        // Includes the section XML emitted by the writer hardened in a260174e4.
         assert_eq!(
             corpus.manifest.archive_sha256,
-            "a4a2e4921235a6da6b38e31d26ddcca1301909885e37330ab4f83ecc0c4e04f4"
+            "cc3f3f836b0f1568caf24c35a011563eafda546021eba86a833e91b84560491d"
         );
         let measured = run_docx_source_backed_one_edit_save(&corpus, 0, 1).unwrap();
         assert_eq!(measured.case, "docx_source_backed_one_edit_save");
@@ -60205,9 +60622,10 @@ mod tests {
         );
         assert_eq!(
             batch.output_sha256.as_deref(),
-            Some("fa71c846111de90d5cfed8e6a95493126baad291f4ef4d9f4905bf65fc54e896")
+            Some("5873cd82cfc38a7d3fab22bc68025ec9ebb0224c71e0ee2cbc5dcb9493e141ba")
         );
-        for (measured, expected_bytes) in [(scalar, 17_336_931), (batch, 17_336_924)] {
+        // Sized Deflate framing introduced in 3df216b46 changed both outputs.
+        for (measured, expected_bytes) in [(scalar, 17_333_768), (batch, 17_333_761)] {
             assert_eq!(measured.elapsed_ns.samples.len(), 1);
             assert!(measured.source.is_none());
             assert!(measured.output_sha256.is_some());
@@ -61049,9 +61467,10 @@ mod tests {
         );
         assert_eq!(
             batch.output_sha256.as_deref(),
-            Some("fb4243a5433028d050ea97a5cb8db18c1af2ef66bb0d75071c95c2d9e83ec3cf")
+            Some("0dabfd310eabc2d0afee05aca5945aa065b4672928dcca82154fb71b4b0b1289")
         );
-        for (measured, expected_bytes) in [(scalar, 16_786_370), (batch, 16_786_368)] {
+        // Sized Deflate framing introduced in 3df216b46 changed both outputs.
+        for (measured, expected_bytes) in [(scalar, 16_786_152), (batch, 16_786_173)] {
             assert_eq!(measured.elapsed_ns.samples.len(), 1);
             assert!(measured.source.is_none());
             let sink = measured.sink.unwrap();
@@ -61503,6 +61922,31 @@ mod tests {
                     case.name()
                 );
                 if case.is_xlsx_cell_values_managed() {
+                    assert!(json_evidence["payload_memory_limit"].is_u64());
+                    assert!(json_evidence["publication_planning_memory_headroom"].is_u64());
+                    let expected_payload_memory_limit = u64::try_from(
+                        super::xlsx_cell_values_payload_budget(
+                            &first,
+                            &super::xlsx_cell_crud_updates_for_case(case, spec).unwrap(),
+                        )
+                        .unwrap(),
+                    )
+                    .unwrap();
+                    let planning_headroom =
+                        u64::try_from(super::XLSX_MANAGED_PUBLICATION_PLANNING_MEMORY_HEADROOM)
+                            .unwrap();
+                    assert_eq!(
+                        evidence.payload_memory_limit,
+                        Some(expected_payload_memory_limit)
+                    );
+                    assert_eq!(
+                        evidence.publication_planning_memory_headroom,
+                        Some(planning_headroom)
+                    );
+                    assert_eq!(
+                        evidence.cache_budget_memory_limit,
+                        Some(expected_payload_memory_limit + planning_headroom)
+                    );
                     for key in [
                         "input_bytes_used",
                         "input_bytes_limit",
@@ -61584,6 +62028,10 @@ mod tests {
                     assert!(refusal.source_read_calls > 0);
                     assert!(refusal.source_read_bytes > 0);
                 } else {
+                    assert!(json_evidence["payload_memory_limit"].is_null());
+                    assert!(json_evidence["publication_planning_memory_headroom"].is_null());
+                    assert_eq!(evidence.payload_memory_limit, None);
+                    assert_eq!(evidence.publication_planning_memory_headroom, None);
                     assert_eq!(evidence.pre_publication_budget.len(), 1);
                     assert_eq!(evidence.post_publication_budget.len(), 1);
                     let pre = evidence.pre_publication_budget[0];
@@ -61752,7 +62200,17 @@ mod tests {
         let mut mutated = super::OpcPackage::from_bytes(&first.archive).unwrap();
         let styles_uri = super::PackURI::new("/xl/styles.xml").unwrap();
         let mut styles = mutated.get_part(&styles_uri).unwrap().blob().to_vec();
-        styles.push(b' ');
+        // Keep the negative-control mutation publishable under the authored
+        // XML policy. A trailing space is formatting whitespace and is
+        // rejected before untouched-member evidence can inspect the changed
+        // member; an in-document comment still changes styles.xml while
+        // remaining valid compact XML.
+        let insertion = styles.len() - b"</styleSheet>".len();
+        assert_eq!(&styles[insertion..], b"</styleSheet>");
+        styles.splice(
+            insertion..insertion,
+            b"<!--litchi-fixture-mutation-->".iter().copied(),
+        );
         mutated.get_part_mut(&styles_uri).unwrap().set_blob(styles);
         let mutated_bytes = super::PackageWriter::to_bytes(&mutated).unwrap();
         assert!(
@@ -61788,7 +62246,19 @@ mod tests {
             .expect("vendor-extension managed source evidence");
         assert_eq!(
             managed_evidence.cache_budget_memory_limit,
+            Some(
+                vendor_budget as u64
+                    + u64::try_from(super::XLSX_MANAGED_PUBLICATION_PLANNING_MEMORY_HEADROOM)
+                        .unwrap()
+            )
+        );
+        assert_eq!(
+            managed_evidence.payload_memory_limit,
             Some(vendor_budget as u64)
+        );
+        assert_eq!(
+            managed_evidence.publication_planning_memory_headroom,
+            Some(u64::try_from(super::XLSX_MANAGED_PUBLICATION_PLANNING_MEMORY_HEADROOM).unwrap())
         );
         assert_eq!(managed_evidence.payload_materializations, vec![3]);
         assert_eq!(managed_evidence.untouched_member_count, untouched_count);

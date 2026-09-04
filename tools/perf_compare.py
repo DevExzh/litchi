@@ -693,6 +693,22 @@ _PARALLEL_CFB_OPEN_CHUNK_SCOPE = (
     "result.source.cfb_open_stream.simulation.samples.per_operation."
     "physical_request_count_sum"
 )
+_PARALLEL_LOCK_DIAGNOSTICS_SCOPE = (
+    "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead"
+)
+_PARALLEL_LOCK_DIAGNOSTICS_EXCLUDED = (
+    "same_part_condvar_wait_timeout_and_mutex_reacquisition"
+)
+_PARALLEL_LOCK_DIAGNOSTICS_COVERAGE = (
+    "all_worker_part_data_requests_including_pre_admission_rendezvous"
+)
+_PARALLEL_LOCK_WAIT_MEASURED_SCOPE = (
+    "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+)
+_PARALLEL_OPC_CACHE_CONTENTION_CASES = {
+    "opc_source_cache_control_contention",
+    "opc_source_cache_managed_contention",
+}
 
 
 def _parallel_exact_keys(
@@ -1080,6 +1096,157 @@ def _parallel_source_chunk_candidates(
     return candidates
 
 
+def _parallel_lock_wait_evidence(
+    result: dict[str, Any],
+    result_path: str,
+    sample_count: int,
+    instrumentation_enabled: Any,
+) -> int | None:
+    """Validate optional direct-mutex samples and return their p50 wait."""
+
+    contention_case = result.get("case") in _PARALLEL_OPC_CACHE_CONTENTION_CASES
+    requires_diagnostics = instrumentation_enabled is True and contention_case
+    source = result.get("source")
+    if source is None:
+        if requires_diagnostics:
+            raise ComparisonInputError(
+                f"{result_path}.source.opc_cache is required for an instrumented "
+                f"{result.get('case')} result"
+            )
+        return None
+    source_object = _require_object(source, f"{result_path}.source")
+    opc_cache = source_object.get("opc_cache")
+    if opc_cache is None:
+        if requires_diagnostics:
+            raise ComparisonInputError(
+                f"{result_path}.source.opc_cache is required for an instrumented "
+                f"{result.get('case')} result"
+            )
+        return None
+    opc_cache_object = _require_object(
+        opc_cache, f"{result_path}.source.opc_cache"
+    )
+    worker_teams = opc_cache_object.get("persistent_worker_teams_created")
+    one_worker_team = type(worker_teams) is int and worker_teams == 1
+    if requires_diagnostics and not one_worker_team:
+        raise ComparisonInputError(
+            f"{result_path}.source.opc_cache.persistent_worker_teams_created must "
+            "be 1 for an instrumented contention result"
+        )
+    lock_diagnostics = opc_cache_object.get("lock_diagnostics")
+    if lock_diagnostics is None:
+        if requires_diagnostics:
+            raise ComparisonInputError(
+                f"{result_path}.source.opc_cache.lock_diagnostics is required when "
+                "opc_cache_lock_diagnostics is enabled"
+            )
+        return None
+    if not one_worker_team:
+        raise ComparisonInputError(
+            f"{result_path}.source.opc_cache.lock_diagnostics requires "
+            "persistent_worker_teams_created=1"
+        )
+    if instrumentation_enabled is not True:
+        raise ComparisonInputError(
+            f"{result_path}.source.opc_cache.lock_diagnostics requires "
+            "configuration.opc_cache_lock_diagnostics=true"
+        )
+    diagnostics_path = f"{result_path}.source.opc_cache.lock_diagnostics"
+    diagnostics = _parallel_exact_keys(
+        lock_diagnostics,
+        diagnostics_path,
+        {
+            "scope",
+            "excluded",
+            "coverage",
+            "cache_lock_acquisitions",
+            "cache_lock_wait_ns",
+            "flight_lock_acquisitions",
+            "flight_lock_wait_ns",
+            "total_lock_acquisitions",
+            "total_lock_wait_ns",
+        },
+    )
+    if diagnostics["scope"] != _PARALLEL_LOCK_DIAGNOSTICS_SCOPE:
+        raise ComparisonInputError(
+            f"{diagnostics_path}.scope must be {_PARALLEL_LOCK_DIAGNOSTICS_SCOPE!r}"
+        )
+    if diagnostics["excluded"] != _PARALLEL_LOCK_DIAGNOSTICS_EXCLUDED:
+        raise ComparisonInputError(
+            f"{diagnostics_path}.excluded must be "
+            f"{_PARALLEL_LOCK_DIAGNOSTICS_EXCLUDED!r}"
+        )
+    if diagnostics["coverage"] != _PARALLEL_LOCK_DIAGNOSTICS_COVERAGE:
+        raise ComparisonInputError(
+            f"{diagnostics_path}.coverage must be "
+            f"{_PARALLEL_LOCK_DIAGNOSTICS_COVERAGE!r}"
+        )
+    vectors = {
+        field: _parallel_u64_vector(diagnostics[field], f"{diagnostics_path}.{field}")
+        for field in (
+            "cache_lock_acquisitions",
+            "cache_lock_wait_ns",
+            "flight_lock_acquisitions",
+            "flight_lock_wait_ns",
+            "total_lock_acquisitions",
+            "total_lock_wait_ns",
+        )
+    }
+    if sample_count == 0:
+        raise ComparisonInputError(
+            f"{diagnostics_path} cannot be emitted for an empty elapsed sample vector"
+        )
+    for field, values in vectors.items():
+        if len(values) != sample_count:
+            raise ComparisonInputError(
+                f"{diagnostics_path}.{field} has {len(values)} values; "
+                f"elapsed_ns.samples has {sample_count}"
+            )
+    for index in range(sample_count):
+        cache_acquisitions = vectors["cache_lock_acquisitions"][index]
+        flight_acquisitions = vectors["flight_lock_acquisitions"][index]
+        if cache_acquisitions > _PARALLEL_U64_MAX - flight_acquisitions:
+            raise ComparisonInputError(
+                f"{diagnostics_path} acquisition total overflows u64 at sample {index}"
+            )
+        if (
+            cache_acquisitions + flight_acquisitions
+            != vectors["total_lock_acquisitions"][index]
+        ):
+            raise ComparisonInputError(
+                f"{diagnostics_path}.total_lock_acquisitions does not equal "
+                f"cache plus flight acquisitions at sample {index}"
+            )
+        if requires_diagnostics and vectors["total_lock_acquisitions"][index] == 0:
+            raise ComparisonInputError(
+                f"{diagnostics_path}.total_lock_acquisitions must be positive "
+                f"at sample {index}"
+            )
+        cache_wait = vectors["cache_lock_wait_ns"][index]
+        flight_wait = vectors["flight_lock_wait_ns"][index]
+        if cache_wait > _PARALLEL_U64_MAX - flight_wait:
+            raise ComparisonInputError(
+                f"{diagnostics_path} wait total overflows u64 at sample {index}"
+            )
+        if cache_wait + flight_wait != vectors["total_lock_wait_ns"][index]:
+            raise ComparisonInputError(
+                f"{diagnostics_path}.total_lock_wait_ns does not equal cache plus "
+                f"flight wait at sample {index}"
+            )
+    values = sorted(vectors["total_lock_wait_ns"])
+    left = values[(len(values) - 1) // 2]
+    right = values[len(values) // 2]
+    return left // 2 + right // 2 + (left % 2 + right % 2) // 2
+
+
+def _parallel_configuration_identity(configuration: dict[str, Any]) -> dict[str, Any]:
+    """Treat the newly added opt-in flag as false in legacy reports."""
+
+    normalized = dict(configuration)
+    normalized.setdefault("opc_cache_lock_diagnostics", False)
+    return normalized
+
+
 def _validate_parallel_metrics(report: dict[str, Any], label: str) -> None:
     """Validate optional descriptive parallel metrics when a report emits them."""
     if "parallel_metrics" not in report:
@@ -1117,6 +1284,11 @@ def _validate_parallel_metrics(report: dict[str, Any], label: str) -> None:
         configuration.get("execution_workers"),
         f"{label}.configuration.execution_workers",
     )
+    instrumentation_enabled = configuration.get("opc_cache_lock_diagnostics", False)
+    if not isinstance(instrumentation_enabled, bool):
+        raise ComparisonInputError(
+            f"{label}.configuration.opc_cache_lock_diagnostics must be boolean"
+        )
     _, configured = _validate_parallel_metric(
         envelope["configured_worker_budget"],
         f"{label}.parallel_metrics.configured_worker_budget",
@@ -1204,6 +1376,12 @@ def _validate_parallel_metrics(report: dict[str, Any], label: str) -> None:
                 f"{case_path}.corpus_sha256 requires a non-empty result corpus digest"
             )
         sample_count, sample_order = _validate_parallel_sample_order(result, result_path)
+        lock_wait_value = _parallel_lock_wait_evidence(
+            result,
+            result_path,
+            sample_count,
+            instrumentation_enabled,
+        )
         if execution_worker is None and opc_worker is None:
             expected_configured_status = "not_applicable"
             expected_configured_value = None
@@ -1248,10 +1426,14 @@ def _validate_parallel_metrics(report: dict[str, Any], label: str) -> None:
                 f"{label}.configuration.execution_workers"
             )
 
-        if opc_worker is None or worker_teams is None or worker_teams == 0:
+        if (
+            opc_worker is None
+            or worker_teams is None
+            or (type(worker_teams) is int and worker_teams == 0)
+        ):
             expected_observed_status = "not_applicable"
             expected_observed_value = None
-        elif worker_teams == 1:
+        elif type(worker_teams) is int and worker_teams == 1:
             expected_observed_status = "measured"
             expected_observed_value = opc_worker
         else:
@@ -1328,13 +1510,27 @@ def _validate_parallel_metrics(report: dict[str, Any], label: str) -> None:
                 f"{case_path}.deterministic_chunk_count.value does not match "
                 f"{result_path}.{expected_chunk_scope} after sample_order alignment"
             )
-        _validate_parallel_metric(
-            case["lock_wait_ns"],
-            f"{case_path}.lock_wait_ns",
-            "lock_wait_ns",
-            expected_status="unavailable",
-            scalar_only=True,
-        )
+        if lock_wait_value is None:
+            lock_status, _ = _validate_parallel_metric(
+                case["lock_wait_ns"],
+                f"{case_path}.lock_wait_ns",
+                "lock_wait_ns",
+                expected_status="unavailable",
+                scalar_only=True,
+            )
+        else:
+            lock_status, reported_lock_wait = _validate_parallel_metric(
+                case["lock_wait_ns"],
+                f"{case_path}.lock_wait_ns",
+                _PARALLEL_LOCK_WAIT_MEASURED_SCOPE,
+                expected_status="measured",
+                scalar_only=True,
+            )
+            if lock_status != "measured" or reported_lock_wait != lock_wait_value:
+                raise ComparisonInputError(
+                    f"{case_path}.lock_wait_ns.value does not match "
+                    f"{result_path}.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+                )
 
 
 def validate_parallel_metrics(report: Any, label: str = "report") -> None:
@@ -1404,6 +1600,12 @@ def _validate_report_identity(
         configuration = _require_object(
             report.get("configuration"), f"{label}.configuration"
         )
+        if "opc_cache_lock_diagnostics" in configuration and not isinstance(
+            configuration["opc_cache_lock_diagnostics"], bool
+        ):
+            raise ComparisonInputError(
+                f"{label}.configuration.opc_cache_lock_diagnostics must be boolean"
+            )
         for field, expected in policy["expected_configuration"].items():
             actual = configuration.get(field)
             matches = (
@@ -1432,7 +1634,9 @@ def _validate_report_identity(
         raise ComparisonInputError(
             "baseline and current must either both emit binary_identity or both omit it"
         )
-    if baseline["configuration"] != current["configuration"]:
+    if _parallel_configuration_identity(baseline["configuration"]) != _parallel_configuration_identity(
+        current["configuration"]
+    ):
         raise ComparisonInputError("benchmark configuration mismatch between reports")
     for field in policy.get("filesystem_identity_fields", []):
         baseline_value = baseline["environment"][field]
