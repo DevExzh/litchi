@@ -194,8 +194,7 @@ fn locate_zip64_record_in_slice(
         let Ok(candidate_offset) = u64::try_from(candidate_start) else {
             continue;
         };
-        match validate_zip64_record_candidate(eocd, candidate_offset, &record, locator_offset_u64)
-        {
+        match validate_zip64_record_candidate(eocd, candidate_offset, &record, locator_offset_u64) {
             Ok(()) => {
                 if found_candidate.is_some() {
                     ambiguous = true;
@@ -1572,8 +1571,7 @@ mod tests {
         let mut data = central_directory_entry();
         let mut extensible_data = vec![0xa5; 80];
         let false_record = zip64_record_bytes(44, 0, 0, 1, 1, 46, 0);
-        extensible_data[..Zip64EndOfCentralDirectoryRecord::SIZE]
-            .copy_from_slice(&false_record);
+        extensible_data[..Zip64EndOfCentralDirectoryRecord::SIZE].copy_from_slice(&false_record);
 
         let real_offset = append_zip64_record(
             &mut data,
@@ -1604,8 +1602,7 @@ mod tests {
         // exactly, but its disk number makes it ineligible.  The real record
         // enclosing it remains a valid single-disk candidate.
         let false_record = zip64_record_bytes(68, 1, 0, 1, 1, 46, 0);
-        extensible_data[..Zip64EndOfCentralDirectoryRecord::SIZE]
-            .copy_from_slice(&false_record);
+        extensible_data[..Zip64EndOfCentralDirectoryRecord::SIZE].copy_from_slice(&false_record);
 
         let real_offset = append_zip64_record(
             &mut data,
@@ -1638,15 +1635,14 @@ mod tests {
         let mut data = central_directory_entry();
         let mut extensible_data = vec![0xc7; 180];
         let false_record = zip64_record_bytes(44, 0, 0, 1, 1, 46, 0);
-        extensible_data[..Zip64EndOfCentralDirectoryRecord::SIZE]
-            .copy_from_slice(&false_record);
+        extensible_data[..Zip64EndOfCentralDirectoryRecord::SIZE].copy_from_slice(&false_record);
 
         // This second valid-looking candidate is embedded after the false
         // hint.  Its 104-byte declared payload reaches the eventual locator.
         let second_record = zip64_record_bytes(104, 0, 0, 1, 1, 46, 0);
         let second_record_start = 64;
-        extensible_data[second_record_start
-            ..second_record_start + Zip64EndOfCentralDirectoryRecord::SIZE]
+        extensible_data
+            [second_record_start..second_record_start + Zip64EndOfCentralDirectoryRecord::SIZE]
             .copy_from_slice(&second_record);
 
         let real_offset = append_zip64_record(

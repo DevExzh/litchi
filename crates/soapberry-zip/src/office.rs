@@ -754,9 +754,8 @@ pub struct IndexedArchive<R> {
     /// Whether the located archive or any central-directory record uses ZIP64
     /// metadata.
     ///
-    /// The archive-level bit is retained separately from per-entry ZIP64
-    /// fields because either layout is intentionally uncertain to the
-    /// metadata-only Office catalog probes.
+    /// The archive-level bit is available directly from the retained ZIP
+    /// framing, separately from per-entry ZIP64 fields.
     has_zip64_metadata: bool,
     /// Whether every central record's declared local span ends before the
     /// located central directory.  This includes directory records and is
@@ -1207,10 +1206,12 @@ impl<'accounting, D> VerifiedEntryBufReader<'accounting, D> {
 
     fn problem_io(&self) -> io::Error {
         self.problem.as_ref().map_or_else(
-            || io::Error::new(
-                io::ErrorKind::Other,
-                "verified ZIP reader failed without a diagnostic",
-            ),
+            || {
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    "verified ZIP reader failed without a diagnostic",
+                )
+            },
             VerifiedReaderFailure::as_io_error,
         )
     }
@@ -2936,6 +2937,15 @@ where
     #[must_use]
     pub fn has_data_descriptor_entries(&self) -> bool {
         self.has_data_descriptor_entries
+    }
+
+    /// Whether the located archive uses ZIP64 end-of-central-directory
+    /// framing. This excludes projected ZIP64 per-entry fields in an
+    /// otherwise ZIP32 archive.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn archive_is_zip64(&self) -> bool {
+        self.archive.is_zip64()
     }
 
     /// Whether the located archive or any indexed central record uses ZIP64

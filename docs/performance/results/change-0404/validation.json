@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "kind": "correctness-only",
+  "performance_claim": "none",
+  "claim_authorized": false,
+  "base_revision": "291e90bf1e4232b808af8728cf8e64376c10f894",
+  "source_state": "source hashes bind the tested worktree; evidence committed with the ZIP64 integration",
+  "toolchain": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1\nLLVM version: 22.1.8\n",
+  "cargo_environment": {
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0"
+  },
+  "virtual_memory_limit_kib": 8388608,
+  "checks": [
+    {
+      "command": "cargo +1.98.1 test --locked -p soapberry-zip -p litchi-opc -p litchi-odf-common --all-features -- --test-threads=1",
+      "exit_code": 0,
+      "log": "integrated-final.log.gz",
+      "log_sha256": "c4984ee12fce05bbbfd611bbdb0a48a451b61dd1834396295246bfba3f1ac885"
+    },
+    {
+      "command": "cargo +1.98.1 clippy --locked -p soapberry-zip -p litchi-opc --all-features --lib --no-deps -- -D warnings",
+      "exit_code": 0,
+      "log": "zip-opc-clippy.log.gz",
+      "log_sha256": "30af196c8677e54eac1a99572dfbeee9488e12df5382719f553c251efee2ea6a"
+    },
+    {
+      "command": "cargo +1.98.1 clippy --locked -p soapberry-zip -p litchi-opc -p litchi-odf-common --all-features --lib --no-deps -- -D warnings",
+      "exit_code": 101,
+      "log": "clippy.log.gz",
+      "log_sha256": "ef53de406421cf888485dc30279c34ad4f70101e5121eb260a45c24154cb34b1"
+    },
+    {
+      "command": "RUSTDOCFLAGS='-D warnings' cargo +1.98.1 doc --locked -p soapberry-zip -p litchi-opc -p litchi-odf-common --all-features --no-deps",
+      "exit_code": 0,
+      "log": "doc.log.gz",
+      "log_sha256": "ad838111b299bf0f759709649b73b22632b04000e20aeeb218152e98dba94660"
+    },
+    {
+      "command": "RUSTUP_TOOLCHAIN=1.98.1 python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "log": "boundary-final.log.gz",
+      "log_sha256": "584fc0e33df73ebe5048f8245b56f6c9a11ce7f4ad53046138c0a891dce23ac2"
+    },
+    {
+      "command": "cargo +1.98.1 fmt -p soapberry-zip -p litchi-opc -p litchi-odf-common -- --check",
+      "exit_code": 0,
+      "log": "format.log.gz",
+      "log_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+    }
+  ],
+  "integrated_test_totals": {
+    "passed": 1227,
+    "failed": 0,
+    "ignored": 2
+  },
+  "source_sha256": {
+    "Cargo.lock": "c14b122a53a49b4c602353bf52ac2b77b7acf190030f11e859290958c80407ef",
+    "Cargo.toml": "a9fb5cb4544959d38bc0343abbaa46e5608ae74df38eebc5e88c9a2baa2789bd",
+    "crates/litchi-odf-common/src/core/source_publication.rs": "cdc4996cc12b1d98e046be9ee863c6b650fde52eeb704b9add40f34452778cb1",
+    "crates/litchi-odf-common/src/core/writer.rs": "3f3e5bde914e2c27bddb7e82c7e2c587157f23bd87fb0fdb2e9002e01aeb05a8",
+    "crates/litchi-odf-common/tests/encryption_authoring.rs": "f9b674479611725b10d2f0b6636cbf58df4715d3f00dd27ab1b14669de42baac",
+    "crates/litchi-odf-common/tests/source_zip64_publication.rs": "1fde99493e1f3ef9a546a1f204181b1f4bf0f946a7a4d389536005144a1ff96f",
+    "crates/litchi-odf-common/tests/streaming_package_writer.rs": "8fde974695bac942316f33c5b262bbfe4283b099c33c4e4feac08738ec564d59",
+    "crates/litchi-opc/src/pkgwriter.rs": "5a28a6276f6c4b84e8296b014076af33562d41a569e5e3e7c77d112127343038",
+    "crates/litchi-opc/src/source_backed.rs": "5851641019946c7dde7b85d9d22c8bb2b81ff15484267cf3b6146641cfa1c645",
+    "crates/soapberry-zip/src/archive.rs": "ad8ec8d7b425b1df90f1a0b3d66779ac4c301517b69e522bbb6466a9dfd72362",
+    "crates/soapberry-zip/src/locator.rs": "ab67a85a8cae9ce91861aad78263afa57648435e2eaa114826c7bfaef1a3bbac",
+    "crates/soapberry-zip/src/office.rs": "07f8541bda8f326e6087cb4250b3eba54d3e1f756cc51504e6cc771a9c5cfcaa",
+    "crates/soapberry-zip/src/preserve.rs": "fe45549f6f2b4a930a41295fc8916642d74a111eda432f61ce1ebcaa485554c7",
+    "rust-toolchain.toml": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310"
+  },
+  "fixture_binding": "Deterministic synthetic fixture generators are bound by the test-source hashes; no external native-producer fixture or large-offset certification.",
+  "limitations": [
+    "Existing ODF ArchiveReaderKind large_enum_variant blocks combined warning-denied Clippy.",
+    "The non_iwork_gate verify command checks dependency-tree scope, not the full build/test matrix.",
+    "No performance conclusion follows from correctness test elapsed times."
+  ]
+}

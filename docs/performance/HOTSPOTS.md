@@ -1,5 +1,18 @@
 # Performance hotspot inventory
 
+## Current non-iWork completion audit
+
+The [goal audit](GOAL_AUDIT.md) distinguishes the implemented paths from the
+remaining scenario, profiling, and validation requirements. The broad goal
+remains open. Hardware counters are available on the current Linux host;
+previous unavailable-counter observations must not prevent a fresh profile.
+
+[Change 0404](changes/0404-zip64-preservation-integration.md) connects the
+existing ZIP64 preservation writer to public ZIP and OPC publication. This
+closes a capability gap rather than establishing a latency improvement.
+Generated ZIP64 output promotion and representative large-file measurements
+remain separate work.
+
 ## Change 0402 update
 
 The selected-source validation loop in

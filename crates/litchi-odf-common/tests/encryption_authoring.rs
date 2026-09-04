@@ -161,7 +161,13 @@ fn rejects_invalid_profiles_and_late_configuration_without_mutation() {
 }
 
 #[test]
-fn encryption_authoring_uses_no_unsafe_code() {
-    assert!(!include_str!("../src/core/encryption.rs").contains("unsafe"));
-    assert!(!include_str!("../src/core/writer.rs").contains("unsafe"));
+fn encryption_authoring_is_covered_by_the_crate_unsafe_code_prohibition() {
+    // The compiler checks every compiled module under this non-overridable
+    // policy. Searching module text also matches harmless diagnostics such as
+    // "unsafe control characters", without proving the language-level rule.
+    assert!(
+        include_str!("../src/lib.rs")
+            .lines()
+            .any(|line| line.trim() == "#![forbid(unsafe_code)]")
+    );
 }

@@ -6648,7 +6648,7 @@ impl SourceBackedPackage {
                 .checked_add((bytes.len() as u64).saturating_mul(2))
                 .ok_or_else(|| overlay_unavailable("topology output bound overflows u64"))?;
         }
-        if output_bound > u64::from(u32::MAX) {
+        if output_bound > u64::from(u32::MAX) && !self.archive.archive_is_zip64() {
             return Err(overlay_unavailable(
                 "topology publication may require ZIP64 output",
             ));
@@ -7037,7 +7037,10 @@ impl SourceBackedPackage {
             .checked_add(replacement_bytes.saturating_mul(2))
             .and_then(|bytes| bytes.checked_add(appended_bytes))
             .and_then(|bytes| bytes.checked_add(SOURCE_PUBLICATION_CHUNK_BYTES as u64));
-        if conservative_output_bound.is_none_or(|bytes| bytes > u64::from(u32::MAX)) {
+        if conservative_output_bound.is_none()
+            || (!self.archive.archive_is_zip64()
+                && conservative_output_bound.is_some_and(|bytes| bytes > u64::from(u32::MAX)))
+        {
             return Err(overlay_unavailable(
                 "selected Part replacement may require ZIP64 output",
             ));
@@ -9300,6 +9303,64 @@ mod tests {
         writer.finish_to_bytes().unwrap()
     }
 
+    fn read_u16(bytes: &[u8], offset: usize) -> u16 {
+        u16::from_le_bytes(bytes[offset..offset + 2].try_into().unwrap())
+    }
+
+    fn read_u32(bytes: &[u8], offset: usize) -> u32 {
+        u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
+    }
+
+    fn promote_to_zip64(mut bytes: Vec<u8>) -> Vec<u8> {
+        let archive = soapberry_zip::ZipArchive::from_slice(&bytes).expect("parse ZIP");
+        let eocd = archive.eocd_offset() as usize;
+        let entries = u64::from(read_u16(&bytes, eocd + 10));
+        let central_size = u64::from(read_u32(&bytes, eocd + 12));
+        let central_offset = u64::from(read_u32(&bytes, eocd + 16));
+        let mut records = Vec::new();
+        records.extend_from_slice(&0x0606_4b50_u32.to_le_bytes());
+        records.extend_from_slice(&44_u64.to_le_bytes());
+        records.extend_from_slice(&45_u16.to_le_bytes());
+        records.extend_from_slice(&45_u16.to_le_bytes());
+        records.extend_from_slice(&0_u32.to_le_bytes());
+        records.extend_from_slice(&0_u32.to_le_bytes());
+        records.extend_from_slice(&entries.to_le_bytes());
+        records.extend_from_slice(&entries.to_le_bytes());
+        records.extend_from_slice(&central_size.to_le_bytes());
+        records.extend_from_slice(&central_offset.to_le_bytes());
+        records.extend_from_slice(&0x0706_4b50_u32.to_le_bytes());
+        records.extend_from_slice(&0_u32.to_le_bytes());
+        records.extend_from_slice(&(eocd as u64).to_le_bytes());
+        records.extend_from_slice(&1_u32.to_le_bytes());
+        bytes.splice(eocd..eocd, records);
+        let ordinary_eocd = eocd + 76;
+        bytes[ordinary_eocd + 8..ordinary_eocd + 12].fill(0xff);
+        bytes[ordinary_eocd + 12..ordinary_eocd + 20].fill(0xff);
+        bytes
+    }
+
+    fn add_zip64_tail_extension(mut bytes: Vec<u8>, extension: &[u8]) -> Vec<u8> {
+        let archive = soapberry_zip::ZipArchive::from_slice(&bytes).expect("parse ZIP64");
+        assert!(archive.is_zip64());
+        let head = archive.head_eocd_offset() as usize;
+        let old_size = u64::from_le_bytes(bytes[head + 4..head + 12].try_into().unwrap());
+        bytes.splice(head + 56..head + 56, extension.iter().copied());
+        bytes[head + 4..head + 12].copy_from_slice(
+            &old_size
+                .checked_add(extension.len() as u64)
+                .unwrap()
+                .to_le_bytes(),
+        );
+        bytes
+    }
+
+    fn zip64_tail_extensible_data(data: &[u8]) -> Vec<u8> {
+        let archive = soapberry_zip::ZipArchive::from_slice(data).expect("parse ZIP64");
+        let head = archive.head_eocd_offset() as usize;
+        let locator = archive.eocd_offset() as usize - 20;
+        data[head + 56..locator].to_vec()
+    }
+
     fn mixed_compression_archive() -> Vec<u8> {
         let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
         writer
@@ -9509,6 +9570,71 @@ mod tests {
             b"new payload"
         );
         assert_eq!(archive.read("custom/orphan.xml").unwrap(), b"<orphan/>");
+    }
+
+    #[test]
+    fn topology_zip64_add_remove_preserves_untouched_records_and_tail() {
+        let extension = [0x11, 0x22, 0x33, 0x44];
+        let source_bytes = add_zip64_tail_extension(
+            promote_to_zip64(archive_bytes(root_relationships(), b"<before/>", false)),
+            &extension,
+        );
+        let source_raw = raw_records(&source_bytes);
+        let source_archive = soapberry_zip::ZipArchive::from_slice(&source_bytes).unwrap();
+        assert!(source_archive.is_zip64());
+        assert_eq!(zip64_tail_extensible_data(&source_bytes), extension);
+
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let orphan = PackURI::new("/custom/orphan.xml").unwrap();
+        let added = PackURI::new("/custom/new.bin").unwrap();
+        let publish = || {
+            let source = Arc::new(CountingSource::new(source_bytes.clone()));
+            let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+            let mut plan = SourceTopologyPlan::new();
+            plan.try_remove_part(orphan.clone()).unwrap();
+            plan.try_add_part(
+                added.clone(),
+                "application/octet-stream",
+                b"new payload".to_vec(),
+            )
+            .unwrap();
+            let mut output = Vec::new();
+            package.write_topology_to_stream(&mut output, plan).unwrap();
+            assert_eq!(source.bytes.as_slice(), source_bytes.as_slice());
+            output
+        };
+
+        let output = publish();
+        assert_eq!(output, publish());
+        let output_archive = soapberry_zip::ZipArchive::from_slice(&output).unwrap();
+        assert!(output_archive.is_zip64());
+        assert_eq!(zip64_tail_extensible_data(&output), extension);
+
+        let output_raw = raw_records(&output);
+        assert_eq!(output_raw.len(), source_raw.len());
+        assert!(output_raw.contains_key(b"custom/new.bin".as_slice()));
+        assert!(!output_raw.contains_key(b"custom/orphan.xml".as_slice()));
+        for (name, source_record) in &source_raw {
+            if name.as_slice() == b"custom/orphan.xml" || name.as_slice() == b"[Content_Types].xml"
+            {
+                continue;
+            }
+            let output_record = output_raw.get(name).expect("untouched member retained");
+            assert_eq!(output_record.local, source_record.local, "{name:?}");
+            assert_eq!(
+                central_without_local_offset(&output_record.central),
+                central_without_local_offset(&source_record.central),
+                "{name:?}"
+            );
+        }
+
+        let reopened = OpcPackage::from_bytes(&output).expect("reopen ZIP64 topology output");
+        assert_eq!(reopened.get_part(&document).unwrap().blob(), b"<before/>");
+        assert_eq!(reopened.get_part(&added).unwrap().blob(), b"new payload");
+        assert!(matches!(
+            reopened.get_part(&orphan),
+            Err(OpcError::PartNotFound(_))
+        ));
     }
 
     #[test]
@@ -12965,6 +13091,69 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn zip64_one_part_overlay_preserves_raw_unknown_members_and_cold_work() {
+        let source_bytes =
+            promote_to_zip64(archive_bytes(root_relationships(), b"<before/>", true));
+        let source_raw = raw_records(&source_bytes);
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
+                .unwrap();
+        assert_eq!(package.cache_diagnostics().cold_loads, 0);
+
+        let target = PackURI::new("/word/document.xml").unwrap();
+        let replacement = b"<after zip64=\"true\"/>".to_vec();
+        let mut output = Vec::new();
+        let mut accounting = OpcOperationAccounting::default();
+        package
+            .write_part_overlay_to_stream_with_accounting(
+                &mut output,
+                &target,
+                replacement.clone(),
+                &mut accounting,
+            )
+            .unwrap();
+
+        let source_archive = soapberry_zip::ZipArchive::from_slice(&source_bytes).unwrap();
+        assert!(source_archive.is_zip64());
+        let output_archive = soapberry_zip::ZipArchive::from_slice(&output).unwrap();
+        assert!(output_archive.is_zip64());
+        assert_eq!(
+            accounting.stored_payload_bytes_read(),
+            b"<before/>".len() as u64
+        );
+        assert_eq!(accounting.compressed_deflate_payload_bytes_read(), 0);
+        assert_eq!(accounting.output_bytes_accepted(), output.len() as u64);
+        assert!(accounting.raw_unchanged_source_bytes_accepted() > 0);
+
+        let output_raw = raw_records(&output);
+        assert_eq!(output_raw.len(), source_raw.len());
+        for (name, source_record) in source_raw {
+            if name.as_slice() == b"word/document.xml" {
+                assert_ne!(output_raw[&name].local, source_record.local);
+            } else {
+                assert_eq!(output_raw[&name].local, source_record.local, "{name:?}");
+                assert_eq!(
+                    central_without_local_offset(&output_raw[&name].central),
+                    central_without_local_offset(&source_record.central),
+                    "{name:?}"
+                );
+            }
+        }
+
+        let reopened = OpcPackage::from_bytes(&output).unwrap();
+        assert_eq!(reopened.get_part(&target).unwrap().blob(), replacement);
+        assert_eq!(
+            reopened
+                .non_part_members()
+                .iter()
+                .find(|member| member.name() == "scratch.bin")
+                .unwrap()
+                .name(),
+            "scratch.bin"
+        );
     }
 
     #[test]
