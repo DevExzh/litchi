@@ -58,6 +58,33 @@ const EXPECTED_ARCHIVE_BYTES: usize = 9_900;
 const EXPECTED_ARCHIVE_SHA256: &str =
     "457421e8f86ec8eb52fbe181cebe7d0821ce1e794a08142ff01a4c4e03df0cac";
 
+/// Predeclared candidate-minus-control allocator deltas for the seven
+/// Deflate story relationship reads. These values are an expected model only;
+/// this correctness-only runner does not observe or claim allocator results.
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+struct StoryRelationshipAllocatorModel {
+    comparison: &'static str,
+    status: &'static str,
+    allocation_calls: i64,
+    deallocation_calls: i64,
+    reallocation_calls: i64,
+    failed_allocation_calls: i64,
+    allocated_bytes: i64,
+    deallocated_bytes: i64,
+}
+
+const STORY_RELATIONSHIP_ALLOCATOR_MODEL: StoryRelationshipAllocatorModel =
+    StoryRelationshipAllocatorModel {
+        comparison: "candidate-control",
+        status: "expected_not_observed",
+        allocation_calls: -12,
+        deallocation_calls: -12,
+        reallocation_calls: 0,
+        failed_allocation_calls: 0,
+        allocated_bytes: -481_920,
+        deallocated_bytes: -481_920,
+    };
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct StorySpec {
     kind: &'static str,
@@ -124,6 +151,9 @@ pub(super) struct DocxStoryHyperlinkPublicationSummary {
     implementation: &'static str,
     timing_scope: &'static str,
     performance_claim: &'static str,
+    /// Candidate-minus-control allocator model when this case performs the
+    /// seven Deflate relationship reads; no-op publication has no delta.
+    predeclared_allocator_model: Option<StoryRelationshipAllocatorModel>,
     story_kinds: Vec<String>,
     selected_target: String,
     selected_relationship_count: usize,
@@ -1149,6 +1179,8 @@ pub(super) fn run(
         implementation: "litchi-docx::source_backed::Package + story_hyperlinks::Plan",
         timing_scope: "fresh source and reserved sequential sink prepared outside; open + strict target plan + commit + sequential publication inside",
         performance_claim: "none: correctness-only end-to-end publication evidence",
+        predeclared_allocator_model: (case == Case::DocxStoryHyperlinkRedactionSave)
+            .then_some(STORY_RELATIONSHIP_ALLOCATOR_MODEL),
         story_kinds: STORIES.iter().map(|story| story.kind.to_owned()).collect(),
         selected_target: SHARED_TARGET.to_owned(),
         selected_relationship_count: STORIES.len(),
@@ -1234,6 +1266,10 @@ mod tests {
             assert_eq!(summary.story_kinds.len(), 7);
             assert_eq!(summary.selected_relationship_count, 7);
             assert_eq!(summary.unselected_relationship_count, 7);
+            let expected_allocator_model =
+                (case == Case::DocxStoryHyperlinkRedactionSave)
+                    .then_some(STORY_RELATIONSHIP_ALLOCATOR_MODEL);
+            assert_eq!(summary.predeclared_allocator_model, expected_allocator_model);
             assert!(summary.source_zip_oracle_verified);
             assert!(summary.source_hash_verified);
             assert!(summary.no_op_exact_bytes_verified);
