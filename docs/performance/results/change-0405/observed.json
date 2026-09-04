@@ -1,0 +1,6927 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "binary": "litchi-perf-baseline",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "instrumentation": "none"
+  },
+  "binary_identity": {
+    "path": "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+    "binary_sha256": "cc090aa6493a9686d8e9617c9577be06545f1fb5b2049ffa8320c51382a4cb0d",
+    "binary_bytes": 55025640,
+    "mode_bits": 509,
+    "executable": true,
+    "profile": "release"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "git_revision": "560e3503519cad061a37544c5265d7d47b425576",
+    "git_worktree_dirty": true,
+    "logical_cpus_available": 32,
+    "allocator": "Rust system allocator",
+    "rustflags": null,
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1011-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "0-31",
+    "storage_identifier": null
+  },
+  "configuration": {
+    "samples_per_case": 3,
+    "warmup_iterations_per_case": 1,
+    "filesystem_cache_states": [
+      "warm",
+      "cold-requested"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "cases": [
+      "opc_source_cache_control_contention",
+      "opc_source_cache_managed_contention"
+    ],
+    "corpus_shapes": [
+      "tiny",
+      "many-small",
+      "few-large",
+      "wide-root"
+    ],
+    "payload_kinds": [
+      "compressible",
+      "incompressible"
+    ],
+    "writer_shapes": [
+      "tiny",
+      "large",
+      "payload-heavy"
+    ],
+    "xlsx_shapes": [
+      "tiny",
+      "medium",
+      "dense-wide"
+    ],
+    "xlsb_shapes": [
+      "tiny",
+      "medium",
+      "large",
+      "sparse"
+    ],
+    "xlsx_cell_crud_shapes": [
+      "medium",
+      "dense-sparse"
+    ],
+    "xlsx_row_visibility_shapes": [
+      "medium",
+      "large"
+    ],
+    "semantic_shapes": [
+      "tiny",
+      "medium",
+      "large"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1,
+      2
+    ],
+    "opc_cache_lock_diagnostics": true
+  },
+  "parallel_metrics": {
+    "schema_version": 1,
+    "scope": "explicit_local_execution_only",
+    "claim": "descriptive",
+    "configured_worker_budget": {
+      "status": "measured",
+      "value": [
+        1,
+        2
+      ],
+      "scope": "configuration.execution_workers"
+    },
+    "observed_process_thread_count": {
+      "status": "unavailable",
+      "scope": "process_thread_count",
+      "reason": "no process-global thread counter is collected; local worker boundaries only"
+    },
+    "cases": [
+      {
+        "case": "opc_source_cache_control_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 550,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_control_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 710,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_control_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 410,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_control_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 680,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_control_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 520,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_control_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 680,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_control_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 710,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_control_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 1010,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_control_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 720,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_control_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 1040,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_control_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 650,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_control_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 1000,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_managed_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 510,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_managed_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 620,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_managed_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 500,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_managed_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 690,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_managed_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 410,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_managed_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 701,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_managed_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 690,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_managed_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 1090,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_managed_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 580,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_managed_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 1050,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_managed_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 1,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 690,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      },
+      {
+        "case": "opc_source_cache_managed_contention",
+        "corpus_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "configured_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count"
+        },
+        "observed_local_worker_count": {
+          "status": "measured",
+          "value": 2,
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "measured",
+          "value": 1820,
+          "scope": "result.source.opc_cache.lock_diagnostics.total_lock_wait_ns.p50"
+        }
+      }
+    ]
+  },
+  "results": [
+    {
+      "case": "opc_source_cache_control_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10080186,
+          10081277,
+          10081687
+        ],
+        "sample_order": [
+          2,
+          1,
+          0
+        ],
+        "min": 10080186,
+        "p50": 10081277,
+        "p95": 10081687,
+        "p99": 10081687,
+        "max": 10081687,
+        "mean": 10081050.0,
+        "standard_deviation": 775.8202111314193,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10079122.600206697,
+          "upper": 10082977.399793303
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          5,
+          5,
+          5
+        ],
+        "read_bytes": [
+          1082,
+          1082,
+          1082
+        ],
+        "ordinary_payload_read_calls": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_read_bytes": [
+          1036,
+          1036,
+          1036
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          1,
+          1,
+          1
+        ],
+        "opc_cache": {
+          "cache_mode": "finite-control",
+          "scenario": "same-part",
+          "capacity_ratio": "1/2x",
+          "capacity_entries": 1,
+          "capacity_bytes": 512,
+          "working_set_parts": 1,
+          "working_set_bytes": 1024,
+          "worker_count": 1,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              1,
+              1,
+              1
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              1,
+              1,
+              1
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              0,
+              0,
+              0
+            ],
+            "bypasses": [
+              1,
+              1,
+              1
+            ],
+            "oversized_bypasses": [
+              1,
+              1,
+              1
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              0,
+              0,
+              0
+            ],
+            "retained_bytes": [
+              0,
+              0,
+              0
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              0,
+              0,
+              0
+            ],
+            "budget_cache_reserved_bytes": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_limit": [
+              null,
+              null,
+              null
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              3,
+              3,
+              3
+            ],
+            "cache_lock_wait_ns": [
+              350,
+              340,
+              210
+            ],
+            "flight_lock_acquisitions": [
+              3,
+              3,
+              3
+            ],
+            "flight_lock_wait_ns": [
+              210,
+              210,
+              90
+            ],
+            "total_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "total_lock_wait_ns": [
+              560,
+              550,
+              300
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "throughput-only-variable-request-count",
+            "classification": "amdahl-not-applicable-variable-request-count",
+            "baseline_worker_count": 1,
+            "p50_requests_per_second": 99.19378269241089,
+            "relative_request_throughput": 1.0
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_control_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10096567,
+          10096617,
+          10106588
+        ],
+        "sample_order": [
+          1,
+          2,
+          0
+        ],
+        "min": 10096567,
+        "p50": 10096617,
+        "p95": 10106588,
+        "p99": 10106588,
+        "max": 10106588,
+        "mean": 10099924.0,
+        "standard_deviation": 5771.247438812514,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10085586.269478071,
+          "upper": 10114261.730521929
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          5,
+          5,
+          5
+        ],
+        "read_bytes": [
+          1082,
+          1082,
+          1082
+        ],
+        "ordinary_payload_read_calls": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_read_bytes": [
+          1036,
+          1036,
+          1036
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          1,
+          1,
+          1
+        ],
+        "opc_cache": {
+          "cache_mode": "finite-control",
+          "scenario": "same-part",
+          "capacity_ratio": "1/2x",
+          "capacity_entries": 1,
+          "capacity_bytes": 512,
+          "working_set_parts": 1,
+          "working_set_bytes": 1024,
+          "worker_count": 2,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              1,
+              1,
+              1
+            ],
+            "waiter_joins": [
+              1,
+              1,
+              1
+            ],
+            "successful_loads": [
+              1,
+              1,
+              1
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              0,
+              0,
+              0
+            ],
+            "bypasses": [
+              1,
+              1,
+              1
+            ],
+            "oversized_bypasses": [
+              1,
+              1,
+              1
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              0,
+              0,
+              0
+            ],
+            "retained_bytes": [
+              0,
+              0,
+              0
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              0,
+              0,
+              0
+            ],
+            "budget_cache_reserved_bytes": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_limit": [
+              null,
+              null,
+              null
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              4,
+              4,
+              4
+            ],
+            "cache_lock_wait_ns": [
+              480,
+              480,
+              540
+            ],
+            "flight_lock_acquisitions": [
+              4,
+              4,
+              4
+            ],
+            "flight_lock_wait_ns": [
+              100,
+              230,
+              220
+            ],
+            "total_lock_acquisitions": [
+              8,
+              8,
+              8
+            ],
+            "total_lock_wait_ns": [
+              580,
+              710,
+              760
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              1,
+              1,
+              1
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "throughput-only-variable-request-count",
+            "classification": "amdahl-not-applicable-variable-request-count",
+            "baseline_worker_count": 1,
+            "p50_requests_per_second": 198.0861510345495,
+            "relative_request_throughput": 1.99696135844313
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_control_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10100047,
+          10104287,
+          10105657
+        ],
+        "sample_order": [
+          1,
+          0,
+          2
+        ],
+        "min": 10100047,
+        "p50": 10104287,
+        "p95": 10105657,
+        "p99": 10105657,
+        "max": 10105657,
+        "mean": 10103330.333333334,
+        "standard_deviation": 2924.7962892024207,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10096064.150160506,
+          "upper": 10110596.516506162
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          5,
+          5,
+          5
+        ],
+        "read_bytes": [
+          1082,
+          1082,
+          1082
+        ],
+        "ordinary_payload_read_calls": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_read_bytes": [
+          1036,
+          1036,
+          1036
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          1,
+          1,
+          1
+        ],
+        "opc_cache": {
+          "cache_mode": "finite-control",
+          "scenario": "same-part",
+          "capacity_ratio": "1x",
+          "capacity_entries": 1,
+          "capacity_bytes": 1024,
+          "working_set_parts": 1,
+          "working_set_bytes": 1024,
+          "worker_count": 1,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              1,
+              1,
+              1
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              1,
+              1,
+              1
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              1,
+              1,
+              1
+            ],
+            "bypasses": [
+              0,
+              0,
+              0
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              1,
+              1,
+              1
+            ],
+            "retained_bytes": [
+              1024,
+              1024,
+              1024
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              0,
+              0,
+              0
+            ],
+            "budget_cache_reserved_bytes": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_limit": [
+              null,
+              null,
+              null
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              3,
+              3,
+              3
+            ],
+            "cache_lock_wait_ns": [
+              330,
+              310,
+              310
+            ],
+            "flight_lock_acquisitions": [
+              3,
+              3,
+              3
+            ],
+            "flight_lock_wait_ns": [
+              90,
+              70,
+              100
+            ],
+            "total_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "total_lock_wait_ns": [
+              420,
+              380,
+              410
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "throughput-only-variable-request-count",
+            "classification": "amdahl-not-applicable-variable-request-count",
+            "baseline_worker_count": 1,
+            "p50_requests_per_second": 98.96789352875666,
+            "relative_request_throughput": 1.0
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_control_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10106068,
+          10107267,
+          10112697
+        ],
+        "sample_order": [
+          2,
+          1,
+          0
+        ],
+        "min": 10106068,
+        "p50": 10107267,
+        "p95": 10112697,
+        "p99": 10112697,
+        "max": 10112697,
+        "mean": 10108677.333333334,
+        "standard_deviation": 3532.3774335893754,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10099901.71310885,
+          "upper": 10117452.953557817
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          5,
+          5,
+          5
+        ],
+        "read_bytes": [
+          1082,
+          1082,
+          1082
+        ],
+        "ordinary_payload_read_calls": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_read_bytes": [
+          1036,
+          1036,
+          1036
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          1,
+          1,
+          1
+        ],
+        "opc_cache": {
+          "cache_mode": "finite-control",
+          "scenario": "same-part",
+          "capacity_ratio": "1x",
+          "capacity_entries": 1,
+          "capacity_bytes": 1024,
+          "working_set_parts": 1,
+          "working_set_bytes": 1024,
+          "worker_count": 2,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              1,
+              1,
+              1
+            ],
+            "waiter_joins": [
+              1,
+              1,
+              1
+            ],
+            "successful_loads": [
+              1,
+              1,
+              1
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              1,
+              1,
+              1
+            ],
+            "bypasses": [
+              0,
+              0,
+              0
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              1,
+              1,
+              1
+            ],
+            "retained_bytes": [
+              1024,
+              1024,
+              1024
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              0,
+              0,
+              0
+            ],
+            "budget_cache_reserved_bytes": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_limit": [
+              null,
+              null,
+              null
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              4,
+              4,
+              4
+            ],
+            "cache_lock_wait_ns": [
+              460,
+              450,
+              510
+            ],
+            "flight_lock_acquisitions": [
+              4,
+              4,
+              4
+            ],
+            "flight_lock_wait_ns": [
+              220,
+              230,
+              240
+            ],
+            "total_lock_acquisitions": [
+              8,
+              8,
+              8
+            ],
+            "total_lock_wait_ns": [
+              680,
+              680,
+              750
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              1,
+              1,
+              1
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "throughput-only-variable-request-count",
+            "classification": "amdahl-not-applicable-variable-request-count",
+            "baseline_worker_count": 1,
+            "p50_requests_per_second": 197.87742819102334,
+            "relative_request_throughput": 1.9994103252639905
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_control_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10100027,
+          10106167,
+          10106777
+        ],
+        "sample_order": [
+          2,
+          0,
+          1
+        ],
+        "min": 10100027,
+        "p50": 10106167,
+        "p95": 10106777,
+        "p99": 10106777,
+        "max": 10106777,
+        "mean": 10104323.666666666,
+        "standard_deviation": 3733.501484308594,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10095048.386278369,
+          "upper": 10113598.947054964
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          5,
+          5,
+          5
+        ],
+        "read_bytes": [
+          1082,
+          1082,
+          1082
+        ],
+        "ordinary_payload_read_calls": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_read_bytes": [
+          1036,
+          1036,
+          1036
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          1,
+          1,
+          1
+        ],
+        "opc_cache": {
+          "cache_mode": "finite-control",
+          "scenario": "same-part",
+          "capacity_ratio": "2x",
+          "capacity_entries": 2,
+          "capacity_bytes": 2048,
+          "working_set_parts": 1,
+          "working_set_bytes": 1024,
+          "worker_count": 1,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              1,
+              1,
+              1
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              1,
+              1,
+              1
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              0,
+              0,
+              0
+            ],
+            "bypasses": [
+              0,
+              0,
+              0
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              2,
+              2,
+              2
+            ],
+            "retained_bytes": [
+              2048,
+              2048,
+              2048
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              0,
+              0,
+              0
+            ],
+            "budget_cache_reserved_bytes": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_limit": [
+              null,
+              null,
+              null
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              3,
+              3,
+              3
+            ],
+            "cache_lock_wait_ns": [
+              310,
+              110,
+              330
+            ],
+            "flight_lock_acquisitions": [
+              3,
+              3,
+              3
+            ],
+            "flight_lock_wait_ns": [
+              210,
+              120,
+              220
+            ],
+            "total_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "total_lock_wait_ns": [
+              520,
+              230,
+              550
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "throughput-only-variable-request-count",
+            "classification": "amdahl-not-applicable-variable-request-count",
+            "baseline_worker_count": 1,
+            "p50_requests_per_second": 98.94948302358353,
+            "relative_request_throughput": 1.0
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_control_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10091477,
+          10095317,
+          10112207
+        ],
+        "sample_order": [
+          0,
+          2,
+          1
+        ],
+        "min": 10091477,
+        "p50": 10095317,
+        "p95": 10112207,
+        "p99": 10112207,
+        "max": 10112207,
+        "mean": 10099667.0,
+        "standard_deviation": 11028.377033815992,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10072268.7815591,
+          "upper": 10127065.2184409
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          5,
+          5,
+          5
+        ],
+        "read_bytes": [
+          1082,
+          1082,
+          1082
+        ],
+        "ordinary_payload_read_calls": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_read_bytes": [
+          1036,
+          1036,
+          1036
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          1,
+          1,
+          1
+        ],
+        "opc_cache": {
+          "cache_mode": "finite-control",
+          "scenario": "same-part",
+          "capacity_ratio": "2x",
+          "capacity_entries": 2,
+          "capacity_bytes": 2048,
+          "working_set_parts": 1,
+          "working_set_bytes": 1024,
+          "worker_count": 2,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              1,
+              1,
+              1
+            ],
+            "waiter_joins": [
+              1,
+              1,
+              1
+            ],
+            "successful_loads": [
+              1,
+              1,
+              1
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              0,
+              0,
+              0
+            ],
+            "bypasses": [
+              0,
+              0,
+              0
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              2,
+              2,
+              2
+            ],
+            "retained_bytes": [
+              2048,
+              2048,
+              2048
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              0,
+              0,
+              0
+            ],
+            "budget_cache_reserved_bytes": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_limit": [
+              null,
+              null,
+              null
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              4,
+              4,
+              4
+            ],
+            "cache_lock_wait_ns": [
+              350,
+              470,
+              320
+            ],
+            "flight_lock_acquisitions": [
+              4,
+              4,
+              4
+            ],
+            "flight_lock_wait_ns": [
+              350,
+              210,
+              140
+            ],
+            "total_lock_acquisitions": [
+              8,
+              8,
+              8
+            ],
+            "total_lock_wait_ns": [
+              700,
+              680,
+              460
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              1,
+              1,
+              1
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "throughput-only-variable-request-count",
+            "classification": "amdahl-not-applicable-variable-request-count",
+            "baseline_worker_count": 1,
+            "p50_requests_per_second": 198.11165909896638,
+            "relative_request_throughput": 2.0021495115012238
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_control_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          20170694,
+          20181674,
+          20183294
+        ],
+        "sample_order": [
+          0,
+          1,
+          2
+        ],
+        "min": 20170694,
+        "p50": 20181674,
+        "p95": 20183294,
+        "p99": 20183294,
+        "max": 20183294,
+        "mean": 20178554.0,
+        "standard_deviation": 6854.983588601799,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 20161523.90235341,
+          "upper": 20195584.09764659
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          10,
+          10,
+          10
+        ],
+        "read_bytes": [
+          2164,
+          2164,
+          2164
+        ],
+        "ordinary_payload_read_calls": [
+          2,
+          2,
+          2
+        ],
+        "ordinary_payload_read_bytes": [
+          2072,
+          2072,
+          2072
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          2,
+          2,
+          2
+        ],
+        "opc_cache": {
+          "cache_mode": "finite-control",
+          "scenario": "disjoint-parts",
+          "capacity_ratio": "1/2x",
+          "capacity_entries": 1,
+          "capacity_bytes": 1024,
+          "working_set_parts": 2,
+          "working_set_bytes": 2048,
+          "worker_count": 1,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              2,
+              2,
+              2
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              2,
+              2,
+              2
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              1,
+              1,
+              1
+            ],
+            "bypasses": [
+              1,
+              1,
+              1
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              1,
+              1,
+              1
+            ],
+            "retained_bytes": [
+              1024,
+              1024,
+              1024
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              0,
+              0,
+              0
+            ],
+            "budget_cache_reserved_bytes": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_limit": [
+              null,
+              null,
+              null
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "cache_lock_wait_ns": [
+              270,
+              420,
+              400
+            ],
+            "flight_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "flight_lock_wait_ns": [
+              350,
+              290,
+              320
+            ],
+            "total_lock_acquisitions": [
+              12,
+              12,
+              12
+            ],
+            "total_lock_wait_ns": [
+              620,
+              710,
+              720
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "amdahl-fixed-request-count",
+            "classification": "baseline",
+            "baseline_worker_count": 1,
+            "p50_speedup": 1.0,
+            "p50_efficiency": 1.0,
+            "p50_requests_per_second": 99.09980708240555,
+            "relative_request_throughput": 1.0
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_control_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10092407,
+          10092917,
+          10104357
+        ],
+        "sample_order": [
+          2,
+          1,
+          0
+        ],
+        "min": 10092407,
+        "p50": 10092917,
+        "p95": 10104357,
+        "p99": 10104357,
+        "max": 10104357,
+        "mean": 10096560.333333334,
+        "standard_deviation": 6756.924842954057,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10079773.846775217,
+          "upper": 10113346.81989145
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          10,
+          10,
+          10
+        ],
+        "read_bytes": [
+          2164,
+          2164,
+          2164
+        ],
+        "ordinary_payload_read_calls": [
+          2,
+          2,
+          2
+        ],
+        "ordinary_payload_read_bytes": [
+          2072,
+          2072,
+          2072
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          2,
+          2,
+          2
+        ],
+        "opc_cache": {
+          "cache_mode": "finite-control",
+          "scenario": "disjoint-parts",
+          "capacity_ratio": "1/2x",
+          "capacity_entries": 1,
+          "capacity_bytes": 1024,
+          "working_set_parts": 2,
+          "working_set_bytes": 2048,
+          "worker_count": 2,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              2,
+              2,
+              2
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              2,
+              2,
+              2
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              1,
+              1,
+              1
+            ],
+            "bypasses": [
+              1,
+              1,
+              1
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              1,
+              1,
+              1
+            ],
+            "retained_bytes": [
+              1024,
+              1024,
+              1024
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              0,
+              0,
+              0
+            ],
+            "budget_cache_reserved_bytes": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_limit": [
+              null,
+              null,
+              null
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "cache_lock_wait_ns": [
+              610,
+              630,
+              640
+            ],
+            "flight_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "flight_lock_wait_ns": [
+              360,
+              400,
+              370
+            ],
+            "total_lock_acquisitions": [
+              12,
+              12,
+              12
+            ],
+            "total_lock_wait_ns": [
+              970,
+              1030,
+              1010
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "delayed_payload_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "max_concurrent_delays": [
+              2,
+              2,
+              2
+            ],
+            "pre_release_flights": [
+              2,
+              2,
+              2
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "amdahl-fixed-request-count",
+            "classification": "valid-amdahl-observation",
+            "baseline_worker_count": 1,
+            "p50_speedup": 1.9995878297621985,
+            "p50_efficiency": 0.9997939148810993,
+            "amdahl_serial_fraction": 0.0002061275987315092,
+            "p50_requests_per_second": 198.15876817375988,
+            "relative_request_throughput": 1.9995878297621987
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_control_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          20178655,
+          20180554,
+          20181204
+        ],
+        "sample_order": [
+          1,
+          0,
+          2
+        ],
+        "min": 20178655,
+        "p50": 20180554,
+        "p95": 20181204,
+        "p99": 20181204,
+        "max": 20181204,
+        "mean": 20180137.666666668,
+        "standard_deviation": 1324.5189063702867,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 20176847.113739926,
+          "upper": 20183428.21959341
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          10,
+          10,
+          10
+        ],
+        "read_bytes": [
+          2164,
+          2164,
+          2164
+        ],
+        "ordinary_payload_read_calls": [
+          2,
+          2,
+          2
+        ],
+        "ordinary_payload_read_bytes": [
+          2072,
+          2072,
+          2072
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          2,
+          2,
+          2
+        ],
+        "opc_cache": {
+          "cache_mode": "finite-control",
+          "scenario": "disjoint-parts",
+          "capacity_ratio": "1x",
+          "capacity_entries": 2,
+          "capacity_bytes": 2048,
+          "working_set_parts": 2,
+          "working_set_bytes": 2048,
+          "worker_count": 1,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              2,
+              2,
+              2
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              2,
+              2,
+              2
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              2,
+              2,
+              2
+            ],
+            "bypasses": [
+              0,
+              0,
+              0
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              2,
+              2,
+              2
+            ],
+            "retained_bytes": [
+              2048,
+              2048,
+              2048
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              0,
+              0,
+              0
+            ],
+            "budget_cache_reserved_bytes": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_limit": [
+              null,
+              null,
+              null
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "cache_lock_wait_ns": [
+              400,
+              410,
+              390
+            ],
+            "flight_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "flight_lock_wait_ns": [
+              390,
+              310,
+              300
+            ],
+            "total_lock_acquisitions": [
+              12,
+              12,
+              12
+            ],
+            "total_lock_wait_ns": [
+              790,
+              720,
+              690
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "amdahl-fixed-request-count",
+            "classification": "baseline",
+            "baseline_worker_count": 1,
+            "p50_speedup": 1.0,
+            "p50_efficiency": 1.0,
+            "p50_requests_per_second": 99.10530701981719,
+            "relative_request_throughput": 1.0
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_control_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10099878,
+          10107887,
+          10109438
+        ],
+        "sample_order": [
+          0,
+          2,
+          1
+        ],
+        "min": 10099878,
+        "p50": 10107887,
+        "p95": 10109438,
+        "p99": 10109438,
+        "max": 10109438,
+        "mean": 10105734.333333334,
+        "standard_deviation": 5130.680299271395,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10092987.988231163,
+          "upper": 10118480.678435504
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          10,
+          10,
+          10
+        ],
+        "read_bytes": [
+          2164,
+          2164,
+          2164
+        ],
+        "ordinary_payload_read_calls": [
+          2,
+          2,
+          2
+        ],
+        "ordinary_payload_read_bytes": [
+          2072,
+          2072,
+          2072
+        ],
+        "max_in_flight_reads": [
+          2,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          2,
+          2,
+          2
+        ],
+        "opc_cache": {
+          "cache_mode": "finite-control",
+          "scenario": "disjoint-parts",
+          "capacity_ratio": "1x",
+          "capacity_entries": 2,
+          "capacity_bytes": 2048,
+          "working_set_parts": 2,
+          "working_set_bytes": 2048,
+          "worker_count": 2,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              2,
+              2,
+              2
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              2,
+              2,
+              2
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              2,
+              2,
+              2
+            ],
+            "bypasses": [
+              0,
+              0,
+              0
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              2,
+              2,
+              2
+            ],
+            "retained_bytes": [
+              2048,
+              2048,
+              2048
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              0,
+              0,
+              0
+            ],
+            "budget_cache_reserved_bytes": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_limit": [
+              null,
+              null,
+              null
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "cache_lock_wait_ns": [
+              1520,
+              660,
+              530
+            ],
+            "flight_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "flight_lock_wait_ns": [
+              290,
+              380,
+              420
+            ],
+            "total_lock_acquisitions": [
+              12,
+              12,
+              12
+            ],
+            "total_lock_wait_ns": [
+              1810,
+              1040,
+              950
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "delayed_payload_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "max_concurrent_delays": [
+              2,
+              2,
+              2
+            ],
+            "pre_release_flights": [
+              2,
+              2,
+              2
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "amdahl-fixed-request-count",
+            "classification": "valid-amdahl-observation",
+            "baseline_worker_count": 1,
+            "p50_speedup": 1.996515592230107,
+            "p50_efficiency": 0.9982577961150535,
+            "amdahl_serial_fraction": 0.001745244456619055,
+            "p50_requests_per_second": 197.8652907378169,
+            "relative_request_throughput": 1.996515592230107
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_control_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          20170384,
+          20178734,
+          20182054
+        ],
+        "sample_order": [
+          0,
+          1,
+          2
+        ],
+        "min": 20170384,
+        "p50": 20178734,
+        "p95": 20182054,
+        "p99": 20182054,
+        "max": 20182054,
+        "mean": 20177057.333333332,
+        "standard_deviation": 6012.955457455009,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 20162119.118345432,
+          "upper": 20191995.548321232
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          10,
+          10,
+          10
+        ],
+        "read_bytes": [
+          2164,
+          2164,
+          2164
+        ],
+        "ordinary_payload_read_calls": [
+          2,
+          2,
+          2
+        ],
+        "ordinary_payload_read_bytes": [
+          2072,
+          2072,
+          2072
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          2,
+          2,
+          2
+        ],
+        "opc_cache": {
+          "cache_mode": "finite-control",
+          "scenario": "disjoint-parts",
+          "capacity_ratio": "2x",
+          "capacity_entries": 4,
+          "capacity_bytes": 4096,
+          "working_set_parts": 2,
+          "working_set_bytes": 2048,
+          "worker_count": 1,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              2,
+              2,
+              2
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              2,
+              2,
+              2
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              0,
+              0,
+              0
+            ],
+            "bypasses": [
+              0,
+              0,
+              0
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              4,
+              4,
+              4
+            ],
+            "retained_bytes": [
+              4096,
+              4096,
+              4096
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              0,
+              0,
+              0
+            ],
+            "budget_cache_reserved_bytes": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_limit": [
+              null,
+              null,
+              null
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "cache_lock_wait_ns": [
+              410,
+              390,
+              390
+            ],
+            "flight_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "flight_lock_wait_ns": [
+              190,
+              270,
+              260
+            ],
+            "total_lock_acquisitions": [
+              12,
+              12,
+              12
+            ],
+            "total_lock_wait_ns": [
+              600,
+              660,
+              650
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "amdahl-fixed-request-count",
+            "classification": "baseline",
+            "baseline_worker_count": 1,
+            "p50_speedup": 1.0,
+            "p50_efficiency": 1.0,
+            "p50_requests_per_second": 99.11424572027165,
+            "relative_request_throughput": 1.0
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_control_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10098567,
+          10099397,
+          10103497
+        ],
+        "sample_order": [
+          0,
+          1,
+          2
+        ],
+        "min": 10098567,
+        "p50": 10099397,
+        "p95": 10103497,
+        "p99": 10103497,
+        "max": 10103497,
+        "mean": 10100487.0,
+        "standard_deviation": 2639.564357995463,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10093929.429412104,
+          "upper": 10107044.570587896
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          10,
+          10,
+          10
+        ],
+        "read_bytes": [
+          2164,
+          2164,
+          2164
+        ],
+        "ordinary_payload_read_calls": [
+          2,
+          2,
+          2
+        ],
+        "ordinary_payload_read_bytes": [
+          2072,
+          2072,
+          2072
+        ],
+        "max_in_flight_reads": [
+          1,
+          2,
+          2
+        ],
+        "ordinary_payload_materializations": [
+          2,
+          2,
+          2
+        ],
+        "opc_cache": {
+          "cache_mode": "finite-control",
+          "scenario": "disjoint-parts",
+          "capacity_ratio": "2x",
+          "capacity_entries": 4,
+          "capacity_bytes": 4096,
+          "working_set_parts": 2,
+          "working_set_bytes": 2048,
+          "worker_count": 2,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              2,
+              2,
+              2
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              2,
+              2,
+              2
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              0,
+              0,
+              0
+            ],
+            "bypasses": [
+              0,
+              0,
+              0
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              4,
+              4,
+              4
+            ],
+            "retained_bytes": [
+              4096,
+              4096,
+              4096
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              0,
+              0,
+              0
+            ],
+            "budget_cache_reserved_bytes": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_limit": [
+              null,
+              null,
+              null
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "cache_lock_wait_ns": [
+              600,
+              620,
+              1170
+            ],
+            "flight_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "flight_lock_wait_ns": [
+              380,
+              380,
+              310
+            ],
+            "total_lock_acquisitions": [
+              12,
+              12,
+              12
+            ],
+            "total_lock_wait_ns": [
+              980,
+              1000,
+              1480
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "delayed_payload_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "max_concurrent_delays": [
+              2,
+              2,
+              2
+            ],
+            "pre_release_flights": [
+              2,
+              2,
+              2
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "amdahl-fixed-request-count",
+            "classification": "valid-amdahl-observation",
+            "baseline_worker_count": 1,
+            "p50_speedup": 1.9980137428006841,
+            "p50_efficiency": 0.9990068714003421,
+            "amdahl_serial_fraction": 0.0009941158845743203,
+            "p50_requests_per_second": 198.03162505642663,
+            "relative_request_throughput": 1.998013742800684
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_managed_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10092267,
+          10106387,
+          10109017
+        ],
+        "sample_order": [
+          2,
+          1,
+          0
+        ],
+        "min": 10092267,
+        "p50": 10106387,
+        "p95": 10109017,
+        "p99": 10109017,
+        "max": 10109017,
+        "mean": 10102557.0,
+        "standard_deviation": 9007.902086501606,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10080178.324669672,
+          "upper": 10124935.675330328
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          5,
+          5,
+          5
+        ],
+        "read_bytes": [
+          1082,
+          1082,
+          1082
+        ],
+        "ordinary_payload_read_calls": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_read_bytes": [
+          1036,
+          1036,
+          1036
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          1,
+          1,
+          1
+        ],
+        "opc_cache": {
+          "cache_mode": "budget-managed",
+          "scenario": "same-part",
+          "capacity_ratio": "1/2x",
+          "capacity_entries": 1,
+          "capacity_bytes": 512,
+          "working_set_parts": 1,
+          "working_set_bytes": 1024,
+          "worker_count": 1,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              1,
+              1,
+              1
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              1,
+              1,
+              1
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              0,
+              0,
+              0
+            ],
+            "bypasses": [
+              1,
+              1,
+              1
+            ],
+            "oversized_bypasses": [
+              1,
+              1,
+              1
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              0,
+              0,
+              0
+            ],
+            "retained_bytes": [
+              0,
+              0,
+              0
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              1024,
+              1024,
+              1024
+            ],
+            "budget_cache_reserved_bytes": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_limit": [
+              2048,
+              2048,
+              2048
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              3,
+              3,
+              3
+            ],
+            "cache_lock_wait_ns": [
+              320,
+              320,
+              330
+            ],
+            "flight_lock_acquisitions": [
+              3,
+              3,
+              3
+            ],
+            "flight_lock_wait_ns": [
+              190,
+              200,
+              90
+            ],
+            "total_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "total_lock_wait_ns": [
+              510,
+              520,
+              420
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "throughput-only-variable-request-count",
+            "classification": "amdahl-not-applicable-variable-request-count",
+            "baseline_worker_count": 1,
+            "p50_requests_per_second": 98.94732905043118,
+            "relative_request_throughput": 1.0
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_managed_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10100557,
+          10102047,
+          10107817
+        ],
+        "sample_order": [
+          2,
+          1,
+          0
+        ],
+        "min": 10100557,
+        "p50": 10102047,
+        "p95": 10107817,
+        "p99": 10107817,
+        "max": 10107817,
+        "mean": 10103473.666666666,
+        "standard_deviation": 3834.505617851584,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10093947.457850209,
+          "upper": 10112999.875483124
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          5,
+          5,
+          5
+        ],
+        "read_bytes": [
+          1082,
+          1082,
+          1082
+        ],
+        "ordinary_payload_read_calls": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_read_bytes": [
+          1036,
+          1036,
+          1036
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          1,
+          1,
+          1
+        ],
+        "opc_cache": {
+          "cache_mode": "budget-managed",
+          "scenario": "same-part",
+          "capacity_ratio": "1/2x",
+          "capacity_entries": 1,
+          "capacity_bytes": 512,
+          "working_set_parts": 1,
+          "working_set_bytes": 1024,
+          "worker_count": 2,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              1,
+              1,
+              1
+            ],
+            "waiter_joins": [
+              1,
+              1,
+              1
+            ],
+            "successful_loads": [
+              1,
+              1,
+              1
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              0,
+              0,
+              0
+            ],
+            "bypasses": [
+              1,
+              1,
+              1
+            ],
+            "oversized_bypasses": [
+              1,
+              1,
+              1
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              0,
+              0,
+              0
+            ],
+            "retained_bytes": [
+              0,
+              0,
+              0
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              1024,
+              1024,
+              1024
+            ],
+            "budget_cache_reserved_bytes": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_limit": [
+              2048,
+              2048,
+              2048
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              4,
+              4,
+              4
+            ],
+            "cache_lock_wait_ns": [
+              370,
+              470,
+              240
+            ],
+            "flight_lock_acquisitions": [
+              4,
+              4,
+              4
+            ],
+            "flight_lock_wait_ns": [
+              250,
+              260,
+              240
+            ],
+            "total_lock_acquisitions": [
+              8,
+              8,
+              8
+            ],
+            "total_lock_wait_ns": [
+              620,
+              730,
+              480
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              1,
+              1,
+              1
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            0,
+            0,
+            0
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "throughput-only-variable-request-count",
+            "classification": "amdahl-not-applicable-variable-request-count",
+            "baseline_worker_count": 1,
+            "p50_requests_per_second": 197.97967679223825,
+            "relative_request_throughput": 2.0008592317972784
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_managed_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10100947,
+          10101707,
+          10108227
+        ],
+        "sample_order": [
+          2,
+          0,
+          1
+        ],
+        "min": 10100947,
+        "p50": 10101707,
+        "p95": 10108227,
+        "p99": 10108227,
+        "max": 10108227,
+        "mean": 10103627.0,
+        "standard_deviation": 4001.7995951821476,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10093685.176363638,
+          "upper": 10113568.823636362
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          5,
+          5,
+          5
+        ],
+        "read_bytes": [
+          1082,
+          1082,
+          1082
+        ],
+        "ordinary_payload_read_calls": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_read_bytes": [
+          1036,
+          1036,
+          1036
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          1,
+          1,
+          1
+        ],
+        "opc_cache": {
+          "cache_mode": "budget-managed",
+          "scenario": "same-part",
+          "capacity_ratio": "1x",
+          "capacity_entries": 1,
+          "capacity_bytes": 1024,
+          "working_set_parts": 1,
+          "working_set_bytes": 1024,
+          "worker_count": 1,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              1,
+              1,
+              1
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              1,
+              1,
+              1
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              1,
+              1,
+              1
+            ],
+            "bypasses": [
+              0,
+              0,
+              0
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              1,
+              1,
+              1
+            ],
+            "retained_bytes": [
+              1024,
+              1024,
+              1024
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              1024,
+              1024,
+              1024
+            ],
+            "budget_cache_reserved_bytes": [
+              1024,
+              1024,
+              1024
+            ],
+            "budget_memory_limit": [
+              2048,
+              2048,
+              2048
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              3,
+              3,
+              3
+            ],
+            "cache_lock_wait_ns": [
+              310,
+              310,
+              300
+            ],
+            "flight_lock_acquisitions": [
+              3,
+              3,
+              3
+            ],
+            "flight_lock_wait_ns": [
+              200,
+              190,
+              190
+            ],
+            "total_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "total_lock_wait_ns": [
+              510,
+              500,
+              490
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            1024,
+            1024,
+            1024
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "throughput-only-variable-request-count",
+            "classification": "amdahl-not-applicable-variable-request-count",
+            "baseline_worker_count": 1,
+            "p50_requests_per_second": 98.99317016421087,
+            "relative_request_throughput": 1.0
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_managed_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10096507,
+          10104717,
+          10113067
+        ],
+        "sample_order": [
+          0,
+          2,
+          1
+        ],
+        "min": 10096507,
+        "p50": 10104717,
+        "p95": 10113067,
+        "p99": 10113067,
+        "max": 10113067,
+        "mean": 10104763.666666666,
+        "standard_deviation": 8280.098630652728,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10084193.101269852,
+          "upper": 10125334.23206348
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          5,
+          5,
+          5
+        ],
+        "read_bytes": [
+          1082,
+          1082,
+          1082
+        ],
+        "ordinary_payload_read_calls": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_read_bytes": [
+          1036,
+          1036,
+          1036
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          1,
+          1,
+          1
+        ],
+        "opc_cache": {
+          "cache_mode": "budget-managed",
+          "scenario": "same-part",
+          "capacity_ratio": "1x",
+          "capacity_entries": 1,
+          "capacity_bytes": 1024,
+          "working_set_parts": 1,
+          "working_set_bytes": 1024,
+          "worker_count": 2,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              1,
+              1,
+              1
+            ],
+            "waiter_joins": [
+              1,
+              1,
+              1
+            ],
+            "successful_loads": [
+              1,
+              1,
+              1
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              1,
+              1,
+              1
+            ],
+            "bypasses": [
+              0,
+              0,
+              0
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              1,
+              1,
+              1
+            ],
+            "retained_bytes": [
+              1024,
+              1024,
+              1024
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              1024,
+              1024,
+              1024
+            ],
+            "budget_cache_reserved_bytes": [
+              1024,
+              1024,
+              1024
+            ],
+            "budget_memory_limit": [
+              2048,
+              2048,
+              2048
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              4,
+              4,
+              4
+            ],
+            "cache_lock_wait_ns": [
+              490,
+              480,
+              500
+            ],
+            "flight_lock_acquisitions": [
+              4,
+              4,
+              4
+            ],
+            "flight_lock_wait_ns": [
+              230,
+              210,
+              120
+            ],
+            "total_lock_acquisitions": [
+              8,
+              8,
+              8
+            ],
+            "total_lock_wait_ns": [
+              720,
+              690,
+              620
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              1,
+              1,
+              1
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            1024,
+            1024,
+            1024
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "throughput-only-variable-request-count",
+            "classification": "amdahl-not-applicable-variable-request-count",
+            "baseline_worker_count": 1,
+            "p50_requests_per_second": 197.92736402216906,
+            "relative_request_throughput": 1.9994042386342932
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_managed_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10101357,
+          10104627,
+          10105548
+        ],
+        "sample_order": [
+          0,
+          2,
+          1
+        ],
+        "min": 10101357,
+        "p50": 10104627,
+        "p95": 10105548,
+        "p99": 10105548,
+        "max": 10105548,
+        "mean": 10103844.0,
+        "standard_deviation": 2202.4842791720444,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10098372.284152022,
+          "upper": 10109315.715847978
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          5,
+          5,
+          5
+        ],
+        "read_bytes": [
+          1082,
+          1082,
+          1082
+        ],
+        "ordinary_payload_read_calls": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_read_bytes": [
+          1036,
+          1036,
+          1036
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          1,
+          1,
+          1
+        ],
+        "opc_cache": {
+          "cache_mode": "budget-managed",
+          "scenario": "same-part",
+          "capacity_ratio": "2x",
+          "capacity_entries": 2,
+          "capacity_bytes": 2048,
+          "working_set_parts": 1,
+          "working_set_bytes": 1024,
+          "worker_count": 1,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              1,
+              1,
+              1
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              1,
+              1,
+              1
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              0,
+              0,
+              0
+            ],
+            "bypasses": [
+              0,
+              0,
+              0
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              2,
+              2,
+              2
+            ],
+            "retained_bytes": [
+              2048,
+              2048,
+              2048
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              2048,
+              2048,
+              2048
+            ],
+            "budget_cache_reserved_bytes": [
+              2048,
+              2048,
+              2048
+            ],
+            "budget_memory_limit": [
+              2048,
+              2048,
+              2048
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              3,
+              3,
+              3
+            ],
+            "cache_lock_wait_ns": [
+              320,
+              210,
+              220
+            ],
+            "flight_lock_acquisitions": [
+              3,
+              3,
+              3
+            ],
+            "flight_lock_wait_ns": [
+              230,
+              200,
+              180
+            ],
+            "total_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "total_lock_wait_ns": [
+              550,
+              410,
+              400
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            2048,
+            2048,
+            2048
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "throughput-only-variable-request-count",
+            "classification": "amdahl-not-applicable-variable-request-count",
+            "baseline_worker_count": 1,
+            "p50_requests_per_second": 98.96456346186751,
+            "relative_request_throughput": 1.0
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_managed_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10104787,
+          10105227,
+          10111777
+        ],
+        "sample_order": [
+          1,
+          0,
+          2
+        ],
+        "min": 10104787,
+        "p50": 10105227,
+        "p95": 10111777,
+        "p99": 10111777,
+        "max": 10111777,
+        "mean": 10107263.666666666,
+        "standard_deviation": 3914.8478046196683,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10097537.86068588,
+          "upper": 10116989.472647453
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          5,
+          5,
+          5
+        ],
+        "read_bytes": [
+          1082,
+          1082,
+          1082
+        ],
+        "ordinary_payload_read_calls": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_read_bytes": [
+          1036,
+          1036,
+          1036
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          1,
+          1,
+          1
+        ],
+        "opc_cache": {
+          "cache_mode": "budget-managed",
+          "scenario": "same-part",
+          "capacity_ratio": "2x",
+          "capacity_entries": 2,
+          "capacity_bytes": 2048,
+          "working_set_parts": 1,
+          "working_set_bytes": 1024,
+          "worker_count": 2,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              1,
+              1,
+              1
+            ],
+            "waiter_joins": [
+              1,
+              1,
+              1
+            ],
+            "successful_loads": [
+              1,
+              1,
+              1
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              0,
+              0,
+              0
+            ],
+            "bypasses": [
+              0,
+              0,
+              0
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              2,
+              2,
+              2
+            ],
+            "retained_bytes": [
+              2048,
+              2048,
+              2048
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              2048,
+              2048,
+              2048
+            ],
+            "budget_cache_reserved_bytes": [
+              2048,
+              2048,
+              2048
+            ],
+            "budget_memory_limit": [
+              2048,
+              2048,
+              2048
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              4,
+              4,
+              4
+            ],
+            "cache_lock_wait_ns": [
+              480,
+              481,
+              370
+            ],
+            "flight_lock_acquisitions": [
+              4,
+              4,
+              4
+            ],
+            "flight_lock_wait_ns": [
+              240,
+              220,
+              240
+            ],
+            "total_lock_acquisitions": [
+              8,
+              8,
+              8
+            ],
+            "total_lock_wait_ns": [
+              720,
+              701,
+              610
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              1,
+              1,
+              1
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            2048,
+            2048,
+            2048
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "throughput-only-variable-request-count",
+            "classification": "amdahl-not-applicable-variable-request-count",
+            "baseline_worker_count": 1,
+            "p50_requests_per_second": 197.91737483977352,
+            "relative_request_throughput": 1.9998812495750962
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_managed_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          20178784,
+          20180834,
+          20184564
+        ],
+        "sample_order": [
+          0,
+          2,
+          1
+        ],
+        "min": 20178784,
+        "p50": 20180834,
+        "p95": 20184564,
+        "p99": 20184564,
+        "max": 20184564,
+        "mean": 20181394.0,
+        "standard_deviation": 2930.409527694039,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 20174113.871644314,
+          "upper": 20188674.128355686
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          10,
+          10,
+          10
+        ],
+        "read_bytes": [
+          2164,
+          2164,
+          2164
+        ],
+        "ordinary_payload_read_calls": [
+          2,
+          2,
+          2
+        ],
+        "ordinary_payload_read_bytes": [
+          2072,
+          2072,
+          2072
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          2,
+          2,
+          2
+        ],
+        "opc_cache": {
+          "cache_mode": "budget-managed",
+          "scenario": "disjoint-parts",
+          "capacity_ratio": "1/2x",
+          "capacity_entries": 1,
+          "capacity_bytes": 1024,
+          "working_set_parts": 2,
+          "working_set_bytes": 2048,
+          "worker_count": 1,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              2,
+              2,
+              2
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              2,
+              2,
+              2
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              1,
+              1,
+              1
+            ],
+            "bypasses": [
+              1,
+              1,
+              1
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              1,
+              1,
+              1
+            ],
+            "retained_bytes": [
+              1024,
+              1024,
+              1024
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              2048,
+              2048,
+              2048
+            ],
+            "budget_cache_reserved_bytes": [
+              1024,
+              1024,
+              1024
+            ],
+            "budget_memory_limit": [
+              4096,
+              4096,
+              4096
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "cache_lock_wait_ns": [
+              400,
+              390,
+              390
+            ],
+            "flight_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "flight_lock_wait_ns": [
+              290,
+              390,
+              270
+            ],
+            "total_lock_acquisitions": [
+              12,
+              12,
+              12
+            ],
+            "total_lock_wait_ns": [
+              690,
+              780,
+              660
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            1024,
+            1024,
+            1024
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "amdahl-fixed-request-count",
+            "classification": "baseline",
+            "baseline_worker_count": 1,
+            "p50_speedup": 1.0,
+            "p50_efficiency": 1.0,
+            "p50_requests_per_second": 99.10393197823241,
+            "relative_request_throughput": 1.0
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_managed_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10108697,
+          10108758,
+          10114837
+        ],
+        "sample_order": [
+          0,
+          2,
+          1
+        ],
+        "min": 10108697,
+        "p50": 10108758,
+        "p95": 10114837,
+        "p99": 10114837,
+        "max": 10114837,
+        "mean": 10110764.0,
+        "standard_deviation": 3527.4533306622216,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10102000.61291256,
+          "upper": 10119527.38708744
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          10,
+          10,
+          10
+        ],
+        "read_bytes": [
+          2164,
+          2164,
+          2164
+        ],
+        "ordinary_payload_read_calls": [
+          2,
+          2,
+          2
+        ],
+        "ordinary_payload_read_bytes": [
+          2072,
+          2072,
+          2072
+        ],
+        "max_in_flight_reads": [
+          2,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          2,
+          2,
+          2
+        ],
+        "opc_cache": {
+          "cache_mode": "budget-managed",
+          "scenario": "disjoint-parts",
+          "capacity_ratio": "1/2x",
+          "capacity_entries": 1,
+          "capacity_bytes": 1024,
+          "working_set_parts": 2,
+          "working_set_bytes": 2048,
+          "worker_count": 2,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              2,
+              2,
+              2
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              2,
+              2,
+              2
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              1,
+              1,
+              1
+            ],
+            "bypasses": [
+              1,
+              1,
+              1
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              1,
+              1,
+              1
+            ],
+            "retained_bytes": [
+              1024,
+              1024,
+              1024
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              2048,
+              2048,
+              2048
+            ],
+            "budget_cache_reserved_bytes": [
+              1024,
+              1024,
+              1024
+            ],
+            "budget_memory_limit": [
+              4096,
+              4096,
+              4096
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "cache_lock_wait_ns": [
+              1200,
+              660,
+              670
+            ],
+            "flight_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "flight_lock_wait_ns": [
+              310,
+              390,
+              420
+            ],
+            "total_lock_acquisitions": [
+              12,
+              12,
+              12
+            ],
+            "total_lock_wait_ns": [
+              1510,
+              1050,
+              1090
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "delayed_payload_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "max_concurrent_delays": [
+              2,
+              2,
+              2
+            ],
+            "pre_release_flights": [
+              2,
+              2,
+              2
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            1024,
+            1024,
+            1024
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "amdahl-fixed-request-count",
+            "classification": "valid-amdahl-observation",
+            "baseline_worker_count": 1,
+            "p50_speedup": 1.9963712653918513,
+            "p50_efficiency": 0.9981856326959256,
+            "amdahl_serial_fraction": 0.0018176652164128004,
+            "p50_requests_per_second": 197.84824208869182,
+            "relative_request_throughput": 1.9963712653918515
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_managed_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          20178904,
+          20181515,
+          20182634
+        ],
+        "sample_order": [
+          2,
+          1,
+          0
+        ],
+        "min": 20178904,
+        "p50": 20181515,
+        "p95": 20182634,
+        "p99": 20182634,
+        "max": 20182634,
+        "mean": 20181017.666666668,
+        "standard_deviation": 1914.0873369132946,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 20176262.42636151,
+          "upper": 20185772.906971827
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          10,
+          10,
+          10
+        ],
+        "read_bytes": [
+          2164,
+          2164,
+          2164
+        ],
+        "ordinary_payload_read_calls": [
+          2,
+          2,
+          2
+        ],
+        "ordinary_payload_read_bytes": [
+          2072,
+          2072,
+          2072
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          2,
+          2,
+          2
+        ],
+        "opc_cache": {
+          "cache_mode": "budget-managed",
+          "scenario": "disjoint-parts",
+          "capacity_ratio": "1x",
+          "capacity_entries": 2,
+          "capacity_bytes": 2048,
+          "working_set_parts": 2,
+          "working_set_bytes": 2048,
+          "worker_count": 1,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              2,
+              2,
+              2
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              2,
+              2,
+              2
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              2,
+              2,
+              2
+            ],
+            "bypasses": [
+              0,
+              0,
+              0
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              2,
+              2,
+              2
+            ],
+            "retained_bytes": [
+              2048,
+              2048,
+              2048
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              2048,
+              2048,
+              2048
+            ],
+            "budget_cache_reserved_bytes": [
+              2048,
+              2048,
+              2048
+            ],
+            "budget_memory_limit": [
+              4096,
+              4096,
+              4096
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "cache_lock_wait_ns": [
+              390,
+              300,
+              290
+            ],
+            "flight_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "flight_lock_wait_ns": [
+              280,
+              280,
+              260
+            ],
+            "total_lock_acquisitions": [
+              12,
+              12,
+              12
+            ],
+            "total_lock_wait_ns": [
+              670,
+              580,
+              550
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            2048,
+            2048,
+            2048
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "amdahl-fixed-request-count",
+            "classification": "baseline",
+            "baseline_worker_count": 1,
+            "p50_speedup": 1.0,
+            "p50_efficiency": 1.0,
+            "p50_requests_per_second": 99.10058783991192,
+            "relative_request_throughput": 1.0
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_managed_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10094147,
+          10106527,
+          10108937
+        ],
+        "sample_order": [
+          0,
+          1,
+          2
+        ],
+        "min": 10094147,
+        "p50": 10106527,
+        "p95": 10108937,
+        "p99": 10108937,
+        "max": 10108937,
+        "mean": 10103203.666666666,
+        "standard_deviation": 7935.3281805692195,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10083489.627672097,
+          "upper": 10122917.705661235
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          10,
+          10,
+          10
+        ],
+        "read_bytes": [
+          2164,
+          2164,
+          2164
+        ],
+        "ordinary_payload_read_calls": [
+          2,
+          2,
+          2
+        ],
+        "ordinary_payload_read_bytes": [
+          2072,
+          2072,
+          2072
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          2
+        ],
+        "ordinary_payload_materializations": [
+          2,
+          2,
+          2
+        ],
+        "opc_cache": {
+          "cache_mode": "budget-managed",
+          "scenario": "disjoint-parts",
+          "capacity_ratio": "1x",
+          "capacity_entries": 2,
+          "capacity_bytes": 2048,
+          "working_set_parts": 2,
+          "working_set_bytes": 2048,
+          "worker_count": 2,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              2,
+              2,
+              2
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              2,
+              2,
+              2
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              2,
+              2,
+              2
+            ],
+            "bypasses": [
+              0,
+              0,
+              0
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              2,
+              2,
+              2
+            ],
+            "retained_bytes": [
+              2048,
+              2048,
+              2048
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              2048,
+              2048,
+              2048
+            ],
+            "budget_cache_reserved_bytes": [
+              2048,
+              2048,
+              2048
+            ],
+            "budget_memory_limit": [
+              4096,
+              4096,
+              4096
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "cache_lock_wait_ns": [
+              660,
+              650,
+              640
+            ],
+            "flight_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "flight_lock_wait_ns": [
+              420,
+              390,
+              410
+            ],
+            "total_lock_acquisitions": [
+              12,
+              12,
+              12
+            ],
+            "total_lock_wait_ns": [
+              1080,
+              1040,
+              1050
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "delayed_payload_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "max_concurrent_delays": [
+              2,
+              2,
+              2
+            ],
+            "pre_release_flights": [
+              2,
+              2,
+              2
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            2048,
+            2048,
+            2048
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "amdahl-fixed-request-count",
+            "classification": "valid-amdahl-observation",
+            "baseline_worker_count": 1,
+            "p50_speedup": 1.9968793434183671,
+            "p50_efficiency": 0.9984396717091836,
+            "amdahl_serial_fraction": 0.0015627667199415995,
+            "p50_requests_per_second": 197.89191677813753,
+            "relative_request_throughput": 1.996879343418367
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_managed_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          20152464,
+          20157604,
+          20162564
+        ],
+        "sample_order": [
+          1,
+          0,
+          2
+        ],
+        "min": 20152464,
+        "p50": 20157604,
+        "p95": 20162564,
+        "p99": 20162564,
+        "max": 20162564,
+        "mean": 20157544.0,
+        "standard_deviation": 5050.267319657446,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 20144997.42793553,
+          "upper": 20170090.57206447
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          10,
+          10,
+          10
+        ],
+        "read_bytes": [
+          2164,
+          2164,
+          2164
+        ],
+        "ordinary_payload_read_calls": [
+          2,
+          2,
+          2
+        ],
+        "ordinary_payload_read_bytes": [
+          2072,
+          2072,
+          2072
+        ],
+        "max_in_flight_reads": [
+          1,
+          1,
+          1
+        ],
+        "ordinary_payload_materializations": [
+          2,
+          2,
+          2
+        ],
+        "opc_cache": {
+          "cache_mode": "budget-managed",
+          "scenario": "disjoint-parts",
+          "capacity_ratio": "2x",
+          "capacity_entries": 4,
+          "capacity_bytes": 4096,
+          "working_set_parts": 2,
+          "working_set_bytes": 2048,
+          "worker_count": 1,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              2,
+              2,
+              2
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              2,
+              2,
+              2
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              0,
+              0,
+              0
+            ],
+            "bypasses": [
+              0,
+              0,
+              0
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              4,
+              4,
+              4
+            ],
+            "retained_bytes": [
+              4096,
+              4096,
+              4096
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              4096,
+              4096,
+              4096
+            ],
+            "budget_cache_reserved_bytes": [
+              4096,
+              4096,
+              4096
+            ],
+            "budget_memory_limit": [
+              4096,
+              4096,
+              4096
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "cache_lock_wait_ns": [
+              270,
+              390,
+              380
+            ],
+            "flight_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "flight_lock_wait_ns": [
+              280,
+              300,
+              390
+            ],
+            "total_lock_acquisitions": [
+              12,
+              12,
+              12
+            ],
+            "total_lock_wait_ns": [
+              550,
+              690,
+              770
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              1,
+              1,
+              1
+            ],
+            "delayed_payload_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "max_concurrent_delays": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_flights": [
+              1,
+              1,
+              1
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            4096,
+            4096,
+            4096
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "amdahl-fixed-request-count",
+            "classification": "baseline",
+            "baseline_worker_count": 1,
+            "p50_speedup": 1.0,
+            "p50_efficiency": 1.0,
+            "p50_requests_per_second": 99.21814120368671,
+            "relative_request_throughput": 1.0
+          }
+        }
+      }
+    },
+    {
+      "case": "opc_source_cache_managed_contention",
+      "corpus": {
+        "name": "many-small-incompressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "incompressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 303003,
+        "archive_sha256": "183178dec5b0fd578e5af04279032368598eec79da7caf0441fc979ce8fc14a0",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "05fd26cad1f538b7ed415a0f525a13896823b02abcf22ad1746172f035a2149d",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          10108477,
+          10111077,
+          10112747
+        ],
+        "sample_order": [
+          2,
+          1,
+          0
+        ],
+        "min": 10108477,
+        "p50": 10111077,
+        "p95": 10112747,
+        "p99": 10112747,
+        "max": 10112747,
+        "mean": 10110767.0,
+        "standard_deviation": 2151.8131889176625,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 10105421.168277599,
+          "upper": 10116112.831722401
+        }
+      },
+      "sink": null,
+      "source": {
+        "read_calls": [
+          10,
+          10,
+          10
+        ],
+        "read_bytes": [
+          2164,
+          2164,
+          2164
+        ],
+        "ordinary_payload_read_calls": [
+          2,
+          2,
+          2
+        ],
+        "ordinary_payload_read_bytes": [
+          2072,
+          2072,
+          2072
+        ],
+        "max_in_flight_reads": [
+          2,
+          1,
+          2
+        ],
+        "ordinary_payload_materializations": [
+          2,
+          2,
+          2
+        ],
+        "opc_cache": {
+          "cache_mode": "budget-managed",
+          "scenario": "disjoint-parts",
+          "capacity_ratio": "2x",
+          "capacity_entries": 4,
+          "capacity_bytes": 4096,
+          "working_set_parts": 2,
+          "working_set_bytes": 2048,
+          "worker_count": 2,
+          "persistent_worker_teams_created": 1,
+          "fixed_source_delay_us": 10000,
+          "timing_scope": "post-admission service completion; worker-team creation, package open, prefill, rendezvous, and verification excluded",
+          "diagnostics": {
+            "hits": [
+              0,
+              0,
+              0
+            ],
+            "cold_loads": [
+              2,
+              2,
+              2
+            ],
+            "waiter_joins": [
+              0,
+              0,
+              0
+            ],
+            "successful_loads": [
+              2,
+              2,
+              2
+            ],
+            "failed_loads": [
+              0,
+              0,
+              0
+            ],
+            "evictions": [
+              0,
+              0,
+              0
+            ],
+            "bypasses": [
+              0,
+              0,
+              0
+            ],
+            "oversized_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "allocation_bypasses": [
+              0,
+              0,
+              0
+            ],
+            "budget_reservation_failures": [
+              0,
+              0,
+              0
+            ],
+            "retained_entries": [
+              4,
+              4,
+              4
+            ],
+            "retained_bytes": [
+              4096,
+              4096,
+              4096
+            ],
+            "in_flight_loads": [
+              0,
+              0,
+              0
+            ],
+            "budget_memory_used": [
+              4096,
+              4096,
+              4096
+            ],
+            "budget_cache_reserved_bytes": [
+              4096,
+              4096,
+              4096
+            ],
+            "budget_memory_limit": [
+              4096,
+              4096,
+              4096
+            ]
+          },
+          "lock_diagnostics": {
+            "scope": "opc_cache_direct_mutex_lock_acquisition_including_observer_timer_overhead",
+            "excluded": "same_part_condvar_wait_timeout_and_mutex_reacquisition",
+            "coverage": "all_worker_part_data_requests_including_pre_admission_rendezvous",
+            "cache_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "cache_lock_wait_ns": [
+              1440,
+              730,
+              4210
+            ],
+            "flight_lock_acquisitions": [
+              6,
+              6,
+              6
+            ],
+            "flight_lock_wait_ns": [
+              380,
+              440,
+              390
+            ],
+            "total_lock_acquisitions": [
+              12,
+              12,
+              12
+            ],
+            "total_lock_wait_ns": [
+              1820,
+              1170,
+              4600
+            ]
+          },
+          "gate": {
+            "initial_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "delayed_payload_arrivals": [
+              2,
+              2,
+              2
+            ],
+            "max_concurrent_delays": [
+              2,
+              2,
+              2
+            ],
+            "pre_release_flights": [
+              2,
+              2,
+              2
+            ],
+            "pre_release_waiters": [
+              0,
+              0,
+              0
+            ]
+          },
+          "budget_used_after_handles_drop": [
+            4096,
+            4096,
+            4096
+          ],
+          "budget_used_after_package_drop": [
+            0,
+            0,
+            0
+          ],
+          "scaling": {
+            "model": "amdahl-fixed-request-count",
+            "classification": "valid-amdahl-observation",
+            "baseline_worker_count": 1,
+            "p50_speedup": 1.9936159125284083,
+            "p50_efficiency": 0.9968079562642042,
+            "amdahl_serial_fraction": 0.0032022655073489226,
+            "p50_requests_per_second": 197.80286511516033,
+            "relative_request_throughput": 1.993615912528408
+          }
+        }
+      }
+    }
+  ]
+}

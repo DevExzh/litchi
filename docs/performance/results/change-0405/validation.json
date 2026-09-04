@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "kind": "diagnostic smoke only",
+  "performance_claim": "none",
+  "claim_authorized": false,
+  "revision": "560e3503519cad061a37544c5265d7d47b425576",
+  "binary_sha256": "cc090aa6493a9686d8e9617c9577be06545f1fb5b2049ffa8320c51382a4cb0d",
+  "toolchain": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1\nLLVM version: 22.1.8\n",
+  "checks": [
+    {
+      "command": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+        "--case",
+        "opc_source_cache_control_contention,opc_source_cache_managed_contention",
+        "--workers",
+        "1,2",
+        "--warmup",
+        "1",
+        "--samples",
+        "3",
+        "--json",
+        "docs/performance/results/change-0405/normal.json"
+      ],
+      "exit_code": 0,
+      "report": "normal.json",
+      "result_rows": 24,
+      "parallel_metrics_validation": "passed"
+    },
+    {
+      "command": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+        "--case",
+        "opc_source_cache_control_contention,opc_source_cache_managed_contention",
+        "--workers",
+        "1,2",
+        "--warmup",
+        "1",
+        "--samples",
+        "3",
+        "--json",
+        "docs/performance/results/change-0405/observed.json",
+        "--opc-cache-lock-diagnostics"
+      ],
+      "exit_code": 0,
+      "report": "observed.json",
+      "result_rows": 24,
+      "parallel_metrics_validation": "passed"
+    },
+    {
+      "command": [
+        "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+        "--case",
+        "opc_open",
+        "--warmup",
+        "0",
+        "--samples",
+        "1",
+        "--opc-cache-lock-diagnostics"
+      ],
+      "exit_code": 1,
+      "expected_rejection": true
+    }
+  ],
+  "source_sha256": {
+    "tools/perf-baseline/Cargo.toml": "f636fc005101af6497abefcd8a3c006757547dfc646b32ec01ba85bd7e27b344",
+    "tools/perf-baseline/Cargo.lock": "239db7b24e2339f00ece02306bd4748329ca72fc870415906b4f54daa82fad8e",
+    "tools/perf-baseline/src/lib.rs": "d9c70a25bf4680fd207f3f3ba75e20ef599552519394841097f6c1f73a42054d",
+    "tools/perf-baseline/src/parallel_metrics.rs": "ea1e1a88349933d342b8aa24cbd1f5fd3b3949f72d54d9683d59e3fccb436355",
+    "tools/perf_compare.py": "bfaa81eb8dfd06fff4644b0acacc2a391e8b4e03de8c401beda35f4d043b8c2e",
+    "tools/test_perf_compare.py": "a2dbe605bbf3a6831e7e31076631a63c2f2c4ae976819915f81e3c3de7756810"
+  },
+  "git_status": "?? docs/GOAL.md\n?? docs/performance/changes/0405-opc-cache-lock-observation.md\n?? docs/performance/results/change-0405/\n",
+  "source_state": "committed tracked source; untracked goal and pending evidence are retained",
+  "clean_abba_claim_eligible": false,
+  "capture_driver": "capture-smoke.py"
+}
