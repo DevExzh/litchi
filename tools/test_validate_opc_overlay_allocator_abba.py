@@ -158,7 +158,7 @@ def _configuration() -> dict[str, object]:
     return {
         "samples_per_case": 30,
         "warmup_iterations_per_case": 3,
-        "filesystem_cache_states": ["warm"],
+        "filesystem_cache_states": ["warm", "cold-requested"],
         "filesystem_fresh_child_per_sample": True,
         "filesystem_process_isolated": True,
         "filesystem_root_selected": False,
@@ -485,6 +485,8 @@ class OpcOverlayAllocatorAbbaValidatorTests(unittest.TestCase):
         self.assertTrue(projection["validation"]["four_distinct_raw_report_byte_streams"])
         self.assertTrue(projection["validation"]["operation_vector_aligned_by_sample_indices_and_elapsed_order"])
         self.assertFalse(projection["claimability"]["independent_process_proof"]["claimable"])
+        self.assertEqual(projection["protocol"]["configuration_cache_states"], ["warm", "cold-requested"])
+        self.assertIn("does not imply a cold run", projection["protocol"]["cache_claim_scope"])
 
     def test_rejects_duplicate_json_keys(self) -> None:
         with tempfile.TemporaryDirectory(prefix="litchi-0402-overlay-validator-") as directory:
@@ -534,6 +536,13 @@ class OpcOverlayAllocatorAbbaValidatorTests(unittest.TestCase):
         reports = copy.deepcopy(self.reports)
         reports["B2"]["environment"]["cpu_affinity"] = "3"
         with self.assertRaisesRegex(ValidationError, "cpu_affinity"):
+            self._validate(reports=reports)
+
+    def test_accepts_real_global_cache_selector_list_but_rejects_mutation(self) -> None:
+        self._validate(reports=self.reports)
+        reports = copy.deepcopy(self.reports)
+        reports["B2"]["configuration"]["filesystem_cache_states"] = ["warm"]
+        with self.assertRaisesRegex(ValidationError, "filesystem_cache_states"):
             self._validate(reports=reports)
 
     def test_rejects_missing_matrix_row(self) -> None:

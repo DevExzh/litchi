@@ -12,6 +12,8 @@ only for alignment/cardinality and are explicitly non-claimable.  The only
 derived comparison is the exact operation-scoped six-counter delta required by
 the matrix contract.  These in-process reports do not carry per-sample
 envelopes or PIDs, so the projection does not claim independent-process proof.
+The report's global cache selector may name a cold request, but the selected
+no-op operation claim remains warm only.
 """
 
 from __future__ import annotations
@@ -31,6 +33,7 @@ SCHEMA_VERSION = 1
 VALIDATOR_NAME = "litchi-opc-overlay-allocator-abba"
 CASE = "opc_source_overlay_multi_part_noop"
 CACHE_STATE = "warm"
+GLOBAL_CACHE_STATES = ["warm", "cold-requested"]
 SAMPLE_COUNT = 30
 WARMUP_COUNT = 3
 WORKERS = [1]
@@ -701,10 +704,13 @@ def _validate_environment(value: Any, role: str, contract: Contract, context: st
 
 def _validate_configuration(value: Any, context: str) -> dict[str, Any]:
     configuration = _exact_keys(value, CONFIGURATION_KEYS, context)
+    # This is a global harness selector list. The selected no-op operation is
+    # claimed only at the warm cache state; naming cold-requested here does not
+    # establish that any cold run occurred.
     fixed = {
         "samples_per_case": SAMPLE_COUNT,
         "warmup_iterations_per_case": WARMUP_COUNT,
-        "filesystem_cache_states": [CACHE_STATE],
+        "filesystem_cache_states": GLOBAL_CACHE_STATES,
         "filesystem_fresh_child_per_sample": True,
         "filesystem_process_isolated": True,
         "filesystem_root_selected": False,
@@ -1161,6 +1167,8 @@ def _projection(reports: Mapping[str, ValidatedReport], contract: Contract) -> d
             "samples_per_leg": SAMPLE_COUNT,
             "warmup_iterations_per_leg": WARMUP_COUNT,
             "cache_state": CACHE_STATE,
+            "configuration_cache_states": GLOBAL_CACHE_STATES,
+            "cache_claim_scope": "warm/no-op operation only; global cold-requested selector does not imply a cold run",
             "execution_workers": WORKERS,
             "fixed_shapes": list(SHAPES),
             "overlay_counts": list(COUNTS),
