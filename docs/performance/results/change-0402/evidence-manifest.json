@@ -1,0 +1,515 @@
+{
+  "accepted_deliverable": "Warm normal in-process publication_ns latency claims only for the explicitly accepted matrix cells/statistics, plus exact operation-scoped allocator call/byte vectors.",
+  "allocator_projection": {
+    "bytes": 18984,
+    "contract": "allocator-contract.json",
+    "exact_counter_delta_only": true,
+    "path": "allocation-metrics.json",
+    "sha256": "467cbf635c537c1159fab33105206db12a2866830a9a448eda5f237fa0c4eea3",
+    "validator": "tools/validate_opc_overlay_allocator_abba.py"
+  },
+  "artifacts": [
+    {
+      "bytes": 10611,
+      "encoding": "utf-8",
+      "path": "README.md",
+      "role": "human_readme",
+      "sha256": "3c0e48e29da2a76faf34600bc0f02a1bf5d3190e56bb9719bf9b325ff6732a3c",
+      "text_format": "Markdown"
+    },
+    {
+      "bytes": 43399,
+      "canonical_bytes": 27984,
+      "canonical_sha256": "4f3a47ce63c3b3ef93e822a4e26ba2427d5290427344b49db75c7df0ac00de6e",
+      "path": "adjudication.json",
+      "role": "adjudication",
+      "sha256": "5eeef5267433decf90022ab09ab6641274b986fa09eb16d8c61d9a54a4715182"
+    },
+    {
+      "bytes": 4866,
+      "canonical_bytes": 3883,
+      "canonical_sha256": "62041f16c34a593e0e308eb5ac9fb6dae38a744bc19ec178382a8c0d8b005413",
+      "path": "allocator-contract.json",
+      "role": "allocator_contract",
+      "sha256": "d17db19aec82618c597ecdb2ab13ecc37d31645e0a8c6fb1d4a30bbce2c0ffb3"
+    },
+    {
+      "bytes": 18984,
+      "canonical_bytes": 18983,
+      "canonical_sha256": "8409a1150951033aee391aec7f8f3430f1e87f440692a6746bbd00d942541a83",
+      "path": "allocation-metrics.json",
+      "role": "allocator_projection",
+      "sha256": "467cbf635c537c1159fab33105206db12a2866830a9a448eda5f237fa0c4eea3"
+    },
+    {
+      "bytes": 17846,
+      "encoding": "utf-8",
+      "path": "latency-metrics.tsv",
+      "projection": "deterministic TSV",
+      "role": "normal_latency_projection",
+      "sha256": "8d4a478a6ad129b34194b4b0d8b0e791be35497026b3ba05584d33651f86f4ae"
+    },
+    {
+      "bytes": 406507,
+      "canonical_bytes": 390627,
+      "canonical_sha256": "efaa6dbe11daab25b636044bbab5b79a165f356bc94653a82f12055088bdd853",
+      "path": "summary.json",
+      "role": "normal_abba_summary",
+      "sha256": "65e78362e712f15d73383102dd129ce96ba4f07b7073e41b91e1ed92c9cd4085"
+    },
+    {
+      "bytes": 10955,
+      "canonical_bytes": 8937,
+      "canonical_sha256": "02444a697190c1e6f7317966d565054b334da1f91500faabb4d5dc7f00db9bfb",
+      "path": "0402-opc-source-overlay-abba-manifest.json",
+      "role": "package_manifest",
+      "sha256": "beb4953f45617c0925c4e7d44b20e7a86c75c0ea95ed20c3829cb42a491da5b7"
+    },
+    {
+      "bytes": 91234,
+      "canonical_bytes": 1048337,
+      "canonical_sha256": "b1ad858c3642047bdf3222d4136edc0b46625276bc495e94428f6737ca4d5ec2",
+      "compressed_bytes": 91234,
+      "compressed_sha256": "9d66f75ed84b777a860b2dfd9f53a0f82fd82ed27da056f87ba666612bdcd742",
+      "encoding": "zstd",
+      "path": "a1-normal.json.zst",
+      "profile": "normal",
+      "raw_bytes": 3385543,
+      "raw_sha256": "d908aad2512616e4de94dfa8c0fbf7807a18782c5bf8fbf63022551ab9d42c25",
+      "role": "normal_a1",
+      "sha256": "9d66f75ed84b777a860b2dfd9f53a0f82fd82ed27da056f87ba666612bdcd742"
+    },
+    {
+      "bytes": 93111,
+      "canonical_bytes": 1048271,
+      "canonical_sha256": "6890e1fbd181999a1510a7f7690a1b057d109c94ee9eab4056cca6c0cbcc4849",
+      "compressed_bytes": 93111,
+      "compressed_sha256": "825199a3380136ffe53969f08962a286e2a8480b78a90434e58e8eed547b0196",
+      "encoding": "zstd",
+      "path": "b1-normal.json.zst",
+      "profile": "normal",
+      "raw_bytes": 3385477,
+      "raw_sha256": "abbb02da7702645828ebda154c6bdd79a0437259b716585e7a4aa6a6b3d0d648",
+      "role": "normal_b1",
+      "sha256": "825199a3380136ffe53969f08962a286e2a8480b78a90434e58e8eed547b0196"
+    },
+    {
+      "bytes": 92542,
+      "canonical_bytes": 1048399,
+      "canonical_sha256": "563fb3979608e9da07497b44f9816a10e49c21b070886c99f792da7dcbaa60fc",
+      "compressed_bytes": 92542,
+      "compressed_sha256": "d221dc3b0bdffbfef8c21cfff53374436b56eeb918e10a46d06bec992e257691",
+      "encoding": "zstd",
+      "path": "b2-normal.json.zst",
+      "profile": "normal",
+      "raw_bytes": 3385605,
+      "raw_sha256": "f8b72c737d6d9b290f024ded3b465a15e11b8a113be6f63b5dc0c8b8984a14b7",
+      "role": "normal_b2",
+      "sha256": "d221dc3b0bdffbfef8c21cfff53374436b56eeb918e10a46d06bec992e257691"
+    },
+    {
+      "bytes": 93636,
+      "canonical_bytes": 1048442,
+      "canonical_sha256": "0f55db88719bf569010984bc04b4531deb5193f0c4be36df62e9c62f830aa4d4",
+      "compressed_bytes": 93636,
+      "compressed_sha256": "533cd0bc7b6ee11c2b16e327c311b52faf206e4f156e45ae912184a7a9dbb7e7",
+      "encoding": "zstd",
+      "path": "a2-normal.json.zst",
+      "profile": "normal",
+      "raw_bytes": 3385648,
+      "raw_sha256": "c7a2bfe1430d88afdf13adb3873a022b2d6311e7313815b84c4b820ea178d08c",
+      "role": "normal_a2",
+      "sha256": "533cd0bc7b6ee11c2b16e327c311b52faf206e4f156e45ae912184a7a9dbb7e7"
+    },
+    {
+      "bytes": 18203,
+      "canonical_bytes": 176609,
+      "canonical_sha256": "d655f97817fc97fdd98211ec6528794a40240395b52ae9ef12e72850fc8b8b46",
+      "compressed_bytes": 18203,
+      "compressed_sha256": "cc8425abf3c04abcdc5ae97f317d40cefe8dc57ecf69c8ebbfc0aa0e18f35afe",
+      "encoding": "zstd",
+      "path": "a1-allocator.json.zst",
+      "profile": "allocator",
+      "raw_bytes": 407905,
+      "raw_sha256": "b10c45412f68bfce0e64c1d56375d59687dd7162e7b5d3404e2458310ba943ec",
+      "role": "allocator_a1",
+      "sha256": "cc8425abf3c04abcdc5ae97f317d40cefe8dc57ecf69c8ebbfc0aa0e18f35afe"
+    },
+    {
+      "bytes": 18303,
+      "canonical_bytes": 176495,
+      "canonical_sha256": "866a75ac819198da0ab335864a4f06a00201ea81a59a16213129e843f3419d89",
+      "compressed_bytes": 18303,
+      "compressed_sha256": "0082bdf1373b1e764ef3a7656c30062baa80640c5ba03fa08d7823c2fbf6073b",
+      "encoding": "zstd",
+      "path": "b1-allocator.json.zst",
+      "profile": "allocator",
+      "raw_bytes": 407791,
+      "raw_sha256": "b74f62be542d5dc26590b7c4f3f4363299e11f46e03b71479c08fc951717a075",
+      "role": "allocator_b1",
+      "sha256": "0082bdf1373b1e764ef3a7656c30062baa80640c5ba03fa08d7823c2fbf6073b"
+    },
+    {
+      "bytes": 18247,
+      "canonical_bytes": 176491,
+      "canonical_sha256": "98e20ef5203a62090b0f9be0a9da315d26df0f3d0904e762107637c5c1bd4bea",
+      "compressed_bytes": 18247,
+      "compressed_sha256": "acc4d69820e2c2e9e2acea469d240720ee7cec902db34321a3b588ffea287918",
+      "encoding": "zstd",
+      "path": "b2-allocator.json.zst",
+      "profile": "allocator",
+      "raw_bytes": 407787,
+      "raw_sha256": "692b23b7e1a3ffdbfdacaed6f65e2898637b600fcc1bec123a25d4b367b7cf75",
+      "role": "allocator_b2",
+      "sha256": "acc4d69820e2c2e9e2acea469d240720ee7cec902db34321a3b588ffea287918"
+    },
+    {
+      "bytes": 18381,
+      "canonical_bytes": 176606,
+      "canonical_sha256": "e483317fbbe3e0d94469d60da8852dde4730ff7bb8883c5175981ef362a20fb2",
+      "compressed_bytes": 18381,
+      "compressed_sha256": "da941ac5b7fff34b1dd13c4266d2415309cad1ca3cede86423799ccfd62edb6d",
+      "encoding": "zstd",
+      "path": "a2-allocator.json.zst",
+      "profile": "allocator",
+      "raw_bytes": 407902,
+      "raw_sha256": "c0145af6bbf5e7e1bc900bbb5294b10f11f1735587807a6fa14025d29f784740",
+      "role": "allocator_a2",
+      "sha256": "da941ac5b7fff34b1dd13c4266d2415309cad1ca3cede86423799ccfd62edb6d"
+    }
+  ],
+  "binary_identities": {
+    "allocator": {
+      "candidate": {
+        "bytes": 54774424,
+        "mode_bits": 509,
+        "profile": "release",
+        "sha256": "be0ff5aed6cc07a416cd3a5db1a42df9fcf4a4b55905b3d251c924ba827c4db4"
+      },
+      "control": {
+        "bytes": 54794360,
+        "mode_bits": 509,
+        "profile": "release",
+        "sha256": "783a66cb3065c0bf3f00b956a27c366cc157a55d8d6690dc924b4ea00e38cd30"
+      }
+    },
+    "allocator_identity_policy": {
+      "file_rehashed": false,
+      "mode": "reported+contract-bound",
+      "reason": "allocator binary artifacts may be absent after collection"
+    },
+    "normal": {
+      "candidate": {
+        "bytes": 54772592,
+        "mode_bits": 509,
+        "profile": "release",
+        "sha256": "d594e03b59ae58c5aba06b21ab5f791f4e3f794767b20e8221ddb72b914ef6dc"
+      },
+      "control": {
+        "bytes": 54789696,
+        "mode_bits": 509,
+        "profile": "release",
+        "sha256": "a5eb445d3e5f57860336bb3477b49cee5164e9079eef7f05893dba15d412e3f2"
+      }
+    }
+  },
+  "change": "0402",
+  "claim_authorized": true,
+  "compression": {
+    "all_decompressed_raw_identities_verified": true,
+    "all_frames_tested": true,
+    "checksum": "XXH64",
+    "cli": "zstd 1.5.7",
+    "content_size": true,
+    "encoding": "zstd",
+    "executable": {
+      "bytes": 1037784,
+      "path": "/usr/bin/zstd",
+      "sha256": "35bfa0d33c03bc1d74ade24ceae006098fa2d5e7c9addc7be45640832f9384d6",
+      "version": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***"
+    },
+    "level": 3,
+    "threads": 1
+  },
+  "corpus": {
+    "archive_member_count": 34,
+    "compression": "deflate",
+    "entry_count": 32,
+    "fixed_shapes": [
+      "overlay-small",
+      "overlay-large",
+      "overlay-media-incompressible"
+    ],
+    "generator": "litchi-opc-source-overlay-multi-part-v1",
+    "identities": [
+      {
+        "archive_bytes": 7451,
+        "archive_member_count": 34,
+        "archive_sha256": "4338dea03f37b0ea2ad63a055fb5cfb7df79a5b0de864365e981e453e1a65509",
+        "compression": "deflate",
+        "entry_bytes": 1024,
+        "entry_count": 32,
+        "generator": "litchi-opc-source-overlay-multi-part-v1",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "compressible",
+        "shape": "overlay-small",
+        "target_entry": "benchmark/parts/00016.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "5b7b9793a43d08ca2c0670289d932541377407ed352ab9f6c145f63d19de9f98",
+        "uncompressed_payload_bytes": 32768,
+        "xlsx": null
+      },
+      {
+        "archive_bytes": 2103195,
+        "archive_member_count": 34,
+        "archive_sha256": "8356d7467215b04a3d1c3703f50fbd6322f2002ca7c3ead1f24414c5e550ef73",
+        "compression": "deflate",
+        "entry_bytes": 65536,
+        "entry_count": 32,
+        "generator": "litchi-opc-source-overlay-multi-part-v1",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "overlay-large",
+        "target_entry": "benchmark/parts/00016.bin",
+        "target_payload_bytes": 65536,
+        "target_payload_sha256": "e17b543eec6b4d3534978d7d59e7240dcbf0f2a2050fd80f32ea3daec266aa73",
+        "uncompressed_payload_bytes": 2097152,
+        "xlsx": null
+      },
+      {
+        "archive_bytes": 8396580,
+        "archive_member_count": 34,
+        "archive_sha256": "bf8c309af5306c6682b9df65b97246f81b022fe5e3b5e02cc2c4dcf3e1e87883",
+        "compression": "deflate",
+        "entry_bytes": 262144,
+        "entry_count": 32,
+        "generator": "litchi-opc-source-overlay-multi-part-v1",
+        "package_format": "OPC/ZIP",
+        "payload_kind": "incompressible",
+        "shape": "overlay-media-incompressible",
+        "target_entry": "benchmark/parts/00016.bin",
+        "target_payload_bytes": 262144,
+        "target_payload_sha256": "3ad07c7e34d3dd6d9ff75b696ccbdd702777b6e4dea04b19bbe3d0aa6d21cdeb",
+        "uncompressed_payload_bytes": 8388608,
+        "xlsx": null
+      }
+    ],
+    "overlay_counts": [
+      2,
+      8,
+      32
+    ],
+    "package_format": "OPC/ZIP",
+    "target_entry": "benchmark/parts/00016.bin"
+  },
+  "manifest_kind": "litchi-performance-evidence",
+  "mechanism": "Reuse one indexed decoder session for unmanaged multi-part source-overlay validation, with publication-only allocator evidence retained by the harness.",
+  "normal_summary": {
+    "bytes": 406507,
+    "canonical_bytes": 390627,
+    "canonical_sha256": "efaa6dbe11daab25b636044bbab5b79a165f356bc94653a82f12055088bdd853",
+    "path": "summary.json",
+    "publication_statistics_recomputed_from_nested_samples": true,
+    "report_identity": {
+      "a1": {
+        "canonical_sha256": "b1ad858c3642047bdf3222d4136edc0b46625276bc495e94428f6737ca4d5ec2"
+      },
+      "a2": {
+        "canonical_sha256": "0f55db88719bf569010984bc04b4531deb5193f0c4be36df62e9c62f830aa4d4"
+      },
+      "b1": {
+        "canonical_sha256": "6890e1fbd181999a1510a7f7690a1b057d109c94ee9eab4056cca6c0cbcc4849"
+      },
+      "b2": {
+        "canonical_sha256": "563fb3979608e9da07497b44f9816a10e49c21b070886c99f792da7dcbaa60fc"
+      }
+    },
+    "result_count": 9,
+    "sha256": "65e78362e712f15d73383102dd129ce96ba4f07b7073e41b91e1ed92c9cd4085",
+    "tool": {
+      "name": "litchi-opc-overlay-abba-summary",
+      "version": "0.1.0"
+    },
+    "top_level_elapsed_statistics_claimed": false
+  },
+  "outcome": "accepted_scoped_opc_source_overlay_change",
+  "protocol": {
+    "allocator": {
+      "cache_state": "warm",
+      "cpu_affinity": "2",
+      "elapsed_claimed": false,
+      "execution_workers": [
+        1
+      ],
+      "fresh_child_semantics_claimed": false,
+      "global_configuration_cache_states": [
+        "warm",
+        "cold-requested"
+      ],
+      "in_process_samples": true,
+      "instrumentation": "CountingSystemAllocator(std::alloc::System)",
+      "process_isolated_semantics_claimed": false,
+      "profile": "release",
+      "samples_per_leg": 30,
+      "warmups_per_leg": 3
+    },
+    "case": "opc_source_overlay_multi_part_noop",
+    "drift_ceiling_percent": {
+      "mean": 5.0,
+      "p50": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "normal": {
+      "accepted_statistics_by_cell": {
+        "overlay-large:2": [],
+        "overlay-large:32": [
+          "p50"
+        ],
+        "overlay-large:8": [],
+        "overlay-media-incompressible:2": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "overlay-media-incompressible:32": [],
+        "overlay-media-incompressible:8": [],
+        "overlay-small:2": [],
+        "overlay-small:32": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "overlay-small:8": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ]
+      },
+      "cache_state": "warm",
+      "cpu_affinity": "2",
+      "execution_workers": [
+        1
+      ],
+      "filesystem_root_selected": false,
+      "fresh_child_semantics_claimed": false,
+      "global_configuration_cache_states": [
+        "warm",
+        "cold-requested"
+      ],
+      "in_process_samples": true,
+      "instrumentation": "none",
+      "process_isolated_semantics_claimed": false,
+      "profile": "release",
+      "samples_per_leg": 500,
+      "timed_metric": "source.opc_source_overlay.publication_ns",
+      "top_level_elapsed_claimed": false,
+      "warmups_per_leg": 20
+    },
+    "order": [
+      "A1_control",
+      "B1_candidate",
+      "B2_candidate",
+      "A2_control"
+    ]
+  },
+  "revisions": {
+    "allocator_validator_lineage": "db29f7705b641829487bcdada98e50656d078aed",
+    "candidate": "51964019db3f6b0787645e3a56c2ecb83bdca65c",
+    "control": "46ef44966d5be16f153b1f3375ac14401b7139ac",
+    "normal_phase_validator": "8720c9f103243903fcb1047eaaf3d384e964bfa5"
+  },
+  "schema_version": 1,
+  "self_excluded": true,
+  "source_bindings": {
+    "candidate_revision_51964019d": {
+      "crates/litchi-opc/src/source_backed.rs": {
+        "bytes": 553729,
+        "sha256": "580b1025b161e81188edfd43520c93f7290174419ba10909e908ba909c760f95"
+      },
+      "tools/perf-baseline/src/lib.rs": {
+        "bytes": 2599280,
+        "sha256": "60e7f035714f37de10a27d96ba0a3727659e8ba989bd5e0090b3ef221c0b46e2"
+      }
+    },
+    "control_revision_46ef44966": {
+      "crates/litchi-opc/src/source_backed.rs": {
+        "bytes": 548077,
+        "sha256": "af43eafe9f287a7581a5e08ef4240840f967dce4d7764c12a3cd3fe32e493417"
+      },
+      "tools/perf-baseline/src/lib.rs": {
+        "bytes": 2599280,
+        "sha256": "60e7f035714f37de10a27d96ba0a3727659e8ba989bd5e0090b3ef221c0b46e2"
+      }
+    }
+  },
+  "toolchain": {
+    "cargo": "1.98.1",
+    "host": "AMD EPYC 9R45; Linux 7.0.0-1011-aws",
+    "logical_cpus_available": 1,
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "rustdoc": "1.98.1"
+  },
+  "validation": {
+    "all_four_allocator_raw_streams_distinct": true,
+    "all_four_normal_raw_streams_distinct": true,
+    "allocator_binary_file_rehashed": false,
+    "allocator_elapsed_time_evaluated": false,
+    "allocator_exact_vectors": 360,
+    "allocator_live_peak_rss_evaluated_as_claim": false,
+    "allocator_matrix_rows": 9,
+    "allocator_reports": 4,
+    "allocator_samples": 1080,
+    "allocator_validator_status": "passed",
+    "allocator_validator_tests": "22 passed",
+    "binary_identity_reported_and_contract_bound": true,
+    "normal_summary_command": "python3 tools/perf_opc_overlay_abba_summary.py --a1 A1 --b1 B1 --b2 B2 --a2 A2 --json-out summary.json",
+    "normal_summary_matches_retained_real_summary": true,
+    "normal_summary_matrix_rows": 9,
+    "normal_summary_publication_vectors": 18000,
+    "normal_summary_raw_reports": 4,
+    "normal_summary_top_level_elapsed_statistics_claimed": false,
+    "normal_validator_tests": "10 passed",
+    "phase_sum_oracle_verified": true,
+    "source_sink_oracle_identity_verified": true
+  },
+  "validator_bindings": {
+    "allocator": {
+      "bytes": 63485,
+      "lineage_commit": "db29f7705b641829487bcdada98e50656d078aed",
+      "path": "tools/validate_opc_overlay_allocator_abba.py",
+      "sha256": "57eba5ad085be18a5ec084cd2cf96ff0830eec89b595975db2e5f8c61007ba2a",
+      "test_path": "tools/test_validate_opc_overlay_allocator_abba.py",
+      "test_sha256": "0b223f3394954b573d5c48ca99d1bdd6c6e0fcff4d2b04999413cf2882dcaef3"
+    },
+    "generic_delegated_normal_validator": {
+      "bytes": 278201,
+      "lineage_commit": "8720c9f103243903fcb1047eaaf3d384e964bfa5",
+      "path": "tools/perf_abba_summary.py",
+      "sha256": "96720d73c26d80b1dfd19073a0630f87dfe9d6615b26f92095d4d4e48e3b35c5"
+    },
+    "normal_phase": {
+      "bytes": 65995,
+      "lineage_commit": "8720c9f103243903fcb1047eaaf3d384e964bfa5",
+      "path": "tools/perf_opc_overlay_abba_summary.py",
+      "sha256": "079d8c8272fa98f639d7ba5fa6dd257f60a7dc6f1702ad00f17be64e66c0a09e",
+      "test_path": "tools/test_perf_opc_overlay_abba_summary.py",
+      "test_sha256": "d82574e81753960161d14e46845f0c9b52ebbeebbe3dae1c897a265a876d9c38"
+    }
+  },
+  "withheld_claims": [
+    "Overall or generalized latency improvement across the matrix; only accepted cell/statistic entries are authorized.",
+    "Rejected normal cells/statistics, including cells with adverse paired directions or drift failure.",
+    "Top-level elapsed_ns latency or any aggregate phase-sum timing claim.",
+    "Allocator-instrumented elapsed latency.",
+    "RSS, live bytes, peak live bytes, total-memory behavior, or a memory-reduction claim.",
+    "Fresh-child, process-isolated, or independent-process proof for the in-process normal/allocator vectors.",
+    "Cold-cache, cold-verified, or cache-transition behavior; the global cold-requested selector is not a cold run.",
+    "Physical I/O, filesystem read volume, locality, throughput, concurrency, worker-count scaling, or other generalization.",
+    "Other OPC shapes, counts, payloads, formats, platforms, or broad unified-facade behavior.",
+    "Non-retained, stale, wrong-toolchain, or contaminated captures."
+  ]
+}
