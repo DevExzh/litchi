@@ -2541,7 +2541,7 @@ mod streaming_0400_numeric_scratch_tests {
     use super::super::selected::{
         NotEligibleReason, RangeScanOutcome, ScanOutcome, SelectedCell, scan, scan_range,
     };
-    use crate::cell::{Cell, Value};
+    use crate::cell::{Cell, Number, Value};
     use crate::formula::Cache;
 
     const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -2605,6 +2605,36 @@ mod streaming_0400_numeric_scratch_tests {
         match scan_xml(xml, "A1") {
             Ok(ScanOutcome::NotEligible(actual)) => assert_eq!(actual, expected),
             other => panic!("expected {expected:?}, got {other:?}"),
+        }
+    }
+
+    fn assert_number_error(xml: &str, expected: &str) {
+        let error = scan_xml(xml, "A1").expect_err("invalid worksheet number");
+        assert!(
+            error.to_string().contains(expected),
+            "expected error containing {expected:?}, got {error}"
+        );
+    }
+
+    fn assert_unselected_inline_error_matches_selected(inline: &str, expected: Option<&str>) {
+        let selected = worksheet(&format!(
+            r#"<sheetData><row r="1"><c r="A1">{inline}</c></row></sheetData>"#
+        ));
+        let unselected = worksheet(&format!(
+            r#"<sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1">{inline}</c></row></sheetData>"#
+        ));
+        let selected_error = scan_xml(&selected, "A1")
+            .expect_err("selected inline payload must fail")
+            .to_string();
+        let unselected_error = scan_xml(&unselected, "A1")
+            .expect_err("unselected inline payload must fail")
+            .to_string();
+        assert_eq!(unselected_error, selected_error);
+        if let Some(expected) = expected {
+            assert!(
+                unselected_error.contains(expected),
+                "expected error containing {expected:?}, got {unselected_error}"
+            );
         }
     }
 
@@ -2698,6 +2728,101 @@ mod streaming_0400_numeric_scratch_tests {
             )
         );
         assert_stream_xml_error(scan_xml(&xml, "B1"));
+    }
+
+    #[test]
+    fn streaming_0401_numeric_elision_preserves_selected_lexemes_and_unselected_validation() {
+        for (type_attribute, value) in [("", "  -0.000  "), (r#" t="n""#, "6.02E+23")] {
+            let xml = worksheet(&format!(
+                r#"<sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1"{type_attribute}><v>{value}</v></c></row></sheetData>"#
+            ));
+            assert_number(eligible(&xml, "A1"), "7");
+
+            let selected = eligible(
+                &worksheet(&format!(
+                    r#"<sheetData><row r="1"><c r="A1"{type_attribute}><v>{value}</v></c></row></sheetData>"#
+                )),
+                "A1",
+            );
+            assert_number(selected, value);
+        }
+
+        let whitespace = worksheet(
+            r#"<sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1"><v>   </v></c></row></sheetData>"#,
+        );
+        assert_number(eligible(&whitespace, "A1"), "7");
+        let selected_whitespace = eligible(
+            &worksheet(r#"<sheetData><row r="1"><c r="A1"><v>   </v></c></row></sheetData>"#),
+            "A1",
+        );
+        assert!(matches!(selected_whitespace.cell, Some(Cell::Empty)));
+    }
+
+    #[test]
+    fn streaming_0401_numeric_elision_keeps_selected_and_unselected_errors_exact() {
+        for (value, expected) in [
+            ("not-a-number", "invalid worksheet number 'not-a-number'"),
+            ("NaN", "non-finite worksheet number 'NaN'"),
+            ("1e999", "non-finite worksheet number '1e999'"),
+        ] {
+            let selected = worksheet(&format!(
+                r#"<sheetData><row r="1"><c r="A1"><v>{value}</v></c></row></sheetData>"#
+            ));
+            assert_number_error(&selected, expected);
+
+            let unselected = worksheet(&format!(
+                r#"<sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1"><v>{value}</v></c></row></sheetData>"#
+            ));
+            assert_number_error(&unselected, expected);
+
+            let error = Number::new(value)
+                .expect_err("owned constructor must reject invalid value")
+                .to_string();
+            assert!(
+                error.contains(expected),
+                "expected owned error containing {expected:?}, got {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn streaming_0401_numeric_elision_keeps_formula_cache_ownership_and_parity() {
+        let value = "  6.02E+23  ";
+        let xml = worksheet(&format!(
+            r#"<sheetData><row r="1"><c r="A1"><v>-0.000</v></c><c r="B1"><f>1+1</f><v>{value}</v></c></row></sheetData>"#
+        ));
+        assert_number(eligible(&xml, "A1"), "-0.000");
+
+        let selected = eligible(&xml, "B1");
+        match selected.cell {
+            Some(Cell::Formula(formula)) => {
+                assert_eq!(formula.text(), "1+1");
+                assert!(matches!(
+                    formula.cached().map(Cache::value),
+                    Some(Value::Number(number)) if number.as_str() == value
+                ));
+            },
+            other => panic!("expected cached formula, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn streaming_0401_numeric_elision_does_not_skip_unselected_inline_validation() {
+        let valid = worksheet(
+            r#"<sheetData><row r="1"><c r="A1"><v>7</v></c><c r="B1"><is><t>unselected inline</t></is></c></row></sheetData>"#,
+        );
+        assert_number(eligible(&valid, "A1"), "7");
+
+        assert_unselected_inline_error_matches_selected(r#"<is><t>broken</is>"#, None);
+        let overlong = "a".repeat(MAX_CELL_CHARACTERS + 1);
+        assert_unselected_inline_error_matches_selected(
+            &format!(r#"<is><t>{overlong}</t></is>"#),
+            Some("inline string exceeds"),
+        );
+        assert_unselected_inline_error_matches_selected(
+            r#"<is><t>_xD83D_</t></is>"#,
+            Some("unpaired high surrogate"),
+        );
     }
 
     #[test]

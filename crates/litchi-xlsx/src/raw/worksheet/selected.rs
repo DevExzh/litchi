@@ -1078,6 +1078,7 @@ impl Scanner {
             .take()
             .ok_or_else(|| invalid("missing worksheet cell"))?;
         let address = cell.address;
+        let selected = self.requested.contains(address);
         let effective_inline = cell.saw_inline || matches!(cell.kind, CellKind::InlineString);
         if effective_inline && cell.saw_value {
             return Err(invalid(
@@ -1117,13 +1118,24 @@ impl Scanner {
                 None
             };
         if let Some(index) = shared_string_index {
-            if self.requested.contains(address) {
+            if selected {
                 self.retain_selected(SelectedRecord {
                     address,
                     cell: None,
                     shared_string_index: Some(index),
                 })?;
             }
+            return Ok(());
+        }
+        if !selected
+            && !effective_inline
+            && formula.is_none()
+            && cell.kind.uses_numeric_value_scratch()
+        {
+            if cell.saw_value && !cell.value.trim().is_empty() {
+                Number::validate_lexical(&cell.value)?;
+            }
+            self.recycle_numeric_value(cell);
             return Ok(());
         }
         let inline = if effective_inline {
@@ -1157,7 +1169,7 @@ impl Scanner {
         } else {
             Cell::Empty
         };
-        if self.requested.contains(address) {
+        if selected {
             self.retain_selected(SelectedRecord {
                 address,
                 cell: Some(semantic),
