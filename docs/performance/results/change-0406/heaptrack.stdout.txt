@@ -1,0 +1,5 @@
+heaptrack output will be written to "/tmp/litchi-goal-profile-output/heaptrack-profile.zst"
+starting application, this might take some time...
+Heaptrack finished! Now run the following to investigate the data:
+
+  heaptrack --analyze "/tmp/litchi-goal-profile-output/heaptrack-profile.zst"

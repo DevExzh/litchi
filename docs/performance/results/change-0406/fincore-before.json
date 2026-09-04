@@ -1,0 +1,18 @@
+{
+   "fincore": [
+      {
+         "pages": 13434,
+         "size": 55025640,
+         "file": "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+         "res": 55025664,
+         "dirty_pages": 0,
+         "dirty": 0,
+         "writeback_pages": 0,
+         "writeback": 0,
+         "evicted_pages": 0,
+         "evicted": 0,
+         "recently_evicted_pages": 0,
+         "recently_evicted": 0
+      }
+   ]
+}

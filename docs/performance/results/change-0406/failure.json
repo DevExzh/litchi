@@ -1,0 +1,5 @@
+{
+  "captured_utc": "2026-09-04T21:23:55.147065+00:00",
+  "commands_completed": 28,
+  "error": "perf-report-inclusive failed with exit -15: /usr/bin/perf report --stdio --children --call-graph=none --percent-limit=0.5 -i /tmp/litchi-goal-profile-output/perf.data"
+}

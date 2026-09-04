@@ -1,0 +1,700 @@
+{
+  "artifacts": [
+    {
+      "bytes": 54685,
+      "path": "__pycache__/capture-driver.cpython-314.pyc",
+      "sha256": "15460a2ee0159d2f0c507c66fc7d3e32b4466da6b52f0d04c178021db708fd3e"
+    },
+    {
+      "bytes": 270434,
+      "path": "baseline.json",
+      "sha256": "947f5fed22de08e6b29c7bfbad1ee1f0c083d7ee5294ecd2d3b49a383aa92ae6"
+    },
+    {
+      "bytes": 5685,
+      "path": "baseline.json.zst",
+      "sha256": "ee3797d3a269180acf42509867a258b00359067be9e6aff7ad0a15ac774f0ed8"
+    },
+    {
+      "bytes": 0,
+      "path": "baseline.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "baseline.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "binary-readelf.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 407,
+      "path": "binary-readelf.txt",
+      "sha256": "769c9c9401401230ef97783457e034d380405b693f4d44a980945f5aba10cd3f"
+    },
+    {
+      "bytes": 41718,
+      "path": "capture-driver.py",
+      "sha256": "1b701508e85610496a49dbfba95cf26cfad948feb3e8d9e2eb7bfdc7b7740c84"
+    },
+    {
+      "bytes": 45650,
+      "path": "commands.json",
+      "sha256": "be443b40961f217e7d8c286e1e57743ab1a7730760acde7266e5f675ef151d85"
+    },
+    {
+      "bytes": 6721,
+      "path": "environment.json",
+      "sha256": "507e66e86f0afdeb5bce8bdc5268712950bb27787c9c10ee3c03b5ac0654edd8"
+    },
+    {
+      "bytes": 266,
+      "path": "failure.json",
+      "sha256": "3fc426871923043fcae98672c17ac66e895f53fd45119a1a8a4b12273b2a296e"
+    },
+    {
+      "bytes": 444,
+      "path": "fincore-after.json",
+      "sha256": "08404161503beed0b28f14c77606cd39bbd39a1b73d0fc2d9ba02d459f23129e"
+    },
+    {
+      "bytes": 0,
+      "path": "fincore-after.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 444,
+      "path": "fincore-before.json",
+      "sha256": "08404161503beed0b28f14c77606cd39bbd39a1b73d0fc2d9ba02d459f23129e"
+    },
+    {
+      "bytes": 0,
+      "path": "fincore-before.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 22,
+      "path": "heaptrack-capture-name.txt",
+      "sha256": "428db02722ad9a0c3a8eae32f2b1e5373087a6467fbddb3898cc5a73580b30ae"
+    },
+    {
+      "bytes": 0,
+      "path": "heaptrack-flamegraph-gzip.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 13699,
+      "path": "heaptrack-flamegraph.txt.gz",
+      "sha256": "bb23cf52073573ae7829134a62afc7ab71fe32e9d6e255a4887cb2bb1038f1fc"
+    },
+    {
+      "bytes": 936,
+      "path": "heaptrack-histogram.tsv",
+      "sha256": "5ca5912d36881f35342b6a376863b36286f9569746a87274ed57bc703633d871"
+    },
+    {
+      "bytes": 0,
+      "path": "heaptrack-print.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 216657,
+      "path": "heaptrack-print.txt",
+      "sha256": "300c0522470f712d773d5d3c63dff60f82ce909d0fc103d23fde09ccf3a0f29e"
+    },
+    {
+      "bytes": 29765,
+      "path": "heaptrack-profile.zst",
+      "sha256": "7c4e61ecf8c629d89bb840b2c4dac15fc08f85a45d7b37f004914f0351ddd9fa"
+    },
+    {
+      "bytes": 67849,
+      "path": "heaptrack.json",
+      "sha256": "f3f5a4d5f447d7864ce4ea544d42a2f9e7da8e7f17df21205b27b75d3161aa5e"
+    },
+    {
+      "bytes": 4007,
+      "path": "heaptrack.json.zst",
+      "sha256": "ddd55215b1d781bbeb4ef5a2f01e7fe1efb2bc7be00e0e0d0f5f2199924f6ed8"
+    },
+    {
+      "bytes": 293,
+      "path": "heaptrack.stderr.txt",
+      "sha256": "d7a07dd742dc0f7930f481251974d2180510824d06e7009e5839e9accd161b34"
+    },
+    {
+      "bytes": 289,
+      "path": "heaptrack.stdout.txt",
+      "sha256": "322450ef10ed7beba6882b14e347f8ccb37d1155bdc500233397989628fbe696"
+    },
+    {
+      "bytes": 0,
+      "path": "lscpu.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 3349,
+      "path": "lscpu.txt",
+      "sha256": "4d826275478731a864dde306239b23da7bdd12bf7e86a1a98fc96cfe032cbed2"
+    },
+    {
+      "bytes": 0,
+      "path": "memory-free.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 207,
+      "path": "memory-free.txt",
+      "sha256": "dec9c28a142f124492790837dd98698d0830e5d3110e777e928a5cbf8699fabc"
+    },
+    {
+      "bytes": 270428,
+      "path": "perf-record.json",
+      "sha256": "964c6c7a178188ee1a704691510fcb6a05809392e456976d34cecea9e4f838b3"
+    },
+    {
+      "bytes": 5662,
+      "path": "perf-record.json.zst",
+      "sha256": "de1c41347936e352f351aaa1857efa4246600799ba0bdc2b9d8698fd35f84718"
+    },
+    {
+      "bytes": 152,
+      "path": "perf-record.stderr.txt",
+      "sha256": "ab35a7e5c6de57340b69e60ac2b271552852ebbc8dbe06861f4542095f643958"
+    },
+    {
+      "bytes": 0,
+      "path": "perf-record.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 85,
+      "path": "perf-report-inclusive.failed-before-resume.txt",
+      "sha256": "6daeed63048ac069d798ba9f80f7ca173d959dc45e0bfd09d3d6531efe9a4767"
+    },
+    {
+      "bytes": 0,
+      "path": "perf-report-inclusive.stderr.failed-before-resume.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "perf-report-inclusive.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 3121,
+      "path": "perf-report-inclusive.txt",
+      "sha256": "420c1d944f4a98df7e3acbe37be1e4c6efc7538e4da4aee4927443b064280c60"
+    },
+    {
+      "bytes": 0,
+      "path": "perf-report-self.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1167,
+      "path": "perf-report-self.txt",
+      "sha256": "01fe259e20d74a6b918e92993aad411f7be23807924974588d45587656f64e7d"
+    },
+    {
+      "bytes": 0,
+      "path": "perf-script-gzip.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "perf-script.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 33753,
+      "path": "perf-script.txt.gz",
+      "sha256": "49b67be69c5d138513e7302ff21aa3dbef11dbe1c469249bbbf93befd0a59960"
+    },
+    {
+      "bytes": 301,
+      "path": "perf-stat.csv",
+      "sha256": "8f3d44852d4bbae7eafec3520216bf29a68eaaf1498ec165fb5a6bcc579c2626"
+    },
+    {
+      "bytes": 270434,
+      "path": "perf-stat.json",
+      "sha256": "f866abe42cf76355598c4cd7219242637fa79fe8854b9438db0fbbb87bf9ad1a"
+    },
+    {
+      "bytes": 5594,
+      "path": "perf-stat.json.zst",
+      "sha256": "d9fc9f7e0bb9ba915725871a3066fc5351508206bc05b3835eb8e3804fe5525b"
+    },
+    {
+      "bytes": 0,
+      "path": "perf-stat.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "perf-stat.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1713,
+      "path": "perf-summary.json",
+      "sha256": "5e5b76fd46320ee15fe727200abcb06cff74b34aea8a031d1496a4f4b24619a5"
+    },
+    {
+      "bytes": 22315384,
+      "path": "perf.data",
+      "sha256": "e3667ea7bfcde207a600e86e40317e8f9380c8de2cec08709967aa0843d2845b"
+    },
+    {
+      "bytes": 380,
+      "path": "resource-summary.json",
+      "sha256": "fc23656d29ccb20d39e5c7e79686f66d3020c0d6b648176194e079db92de5e72"
+    },
+    {
+      "bytes": 24188,
+      "path": "resume-driver.py",
+      "sha256": "7040fcb3dd8c98513e9e559fdc1d1928f3de9aa4257e8478e534ff36828642d5"
+    },
+    {
+      "bytes": 1497,
+      "path": "resume-recovery.json",
+      "sha256": "0efa7d6a9f1c3ef8f1e4250f12a8bba6206f988f4c9ea9d111ac38cddbd08bd7"
+    },
+    {
+      "bytes": 0,
+      "path": "strace-gzip.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 270935,
+      "path": "strace.json",
+      "sha256": "69f3dd750e482fab879bcf18b6079a124473265e5c66623f1dc1848d02edecdc"
+    },
+    {
+      "bytes": 5833,
+      "path": "strace.json.zst",
+      "sha256": "68f14b57cc31eaa22eb291b49e9b390b43f28b24f5902e1634430ca3c36a0134"
+    },
+    {
+      "bytes": 83274,
+      "path": "strace.log.gz",
+      "sha256": "9292cab614141d1eb4c1533e2c68c42802f2a00132ff6a7b6d667b87fb2ee514"
+    },
+    {
+      "bytes": 0,
+      "path": "strace.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "strace.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "taskset-self.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 42,
+      "path": "taskset-self.txt",
+      "sha256": "967fbf373c15d1e512273f7c9f719c235d5db681df5afb475287cfd4a5dad8f6"
+    },
+    {
+      "bytes": 947,
+      "path": "time-v.txt",
+      "sha256": "8aa89d859415d8f3b30abe93c4336db516ab0aed4eec84b18fa81edf303e8e77"
+    },
+    {
+      "bytes": 270436,
+      "path": "time.json",
+      "sha256": "5d8cfa8d5b906d08c2234f4eabd1e2c9d8ada36c434d55c4cf9ff223ee56c26b"
+    },
+    {
+      "bytes": 5624,
+      "path": "time.json.zst",
+      "sha256": "adbc9e3c2a1ac951a07d59c72545cd368815a6a2a6df2a6e5ceceeeae89d0a81"
+    },
+    {
+      "bytes": 0,
+      "path": "time.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "time.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "uname.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 107,
+      "path": "uname.txt",
+      "sha256": "0bb1e033d65ce2b6ffff5ad18f47c89d46dede0f8e54428efa8c479e66755a84"
+    },
+    {
+      "bytes": 0,
+      "path": "versions/cargo.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 338,
+      "path": "versions/cargo.stdout.txt",
+      "sha256": "cbaa13afbe8fe8c872923ef36e9e3391bb82167baab148257abd74636dfbb849"
+    },
+    {
+      "bytes": 0,
+      "path": "versions/fincore.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 31,
+      "path": "versions/fincore.stdout.txt",
+      "sha256": "17c795a5e28bd7fc17bc1d6832965f4d498171fc5fb63dd46e2299495e061e83"
+    },
+    {
+      "bytes": 0,
+      "path": "versions/gzip.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 330,
+      "path": "versions/gzip.stdout.txt",
+      "sha256": "ae720d255cf1557ee2dbb95b2dc7ed593493d90a086a6f4490438d92f621beea"
+    },
+    {
+      "bytes": 0,
+      "path": "versions/heaptrack.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 16,
+      "path": "versions/heaptrack.stdout.txt",
+      "sha256": "109462d8c8512384699f2ea9cd9adb4e87fd2c1aaf9a154fac3cf5f318de3665"
+    },
+    {
+      "bytes": 0,
+      "path": "versions/heaptrack_print.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 22,
+      "path": "versions/heaptrack_print.stdout.txt",
+      "sha256": "bb9d8eb8d60556343b86e6ebc0c4690773ae82d86ca377d57aee8416c88b2d5a"
+    },
+    {
+      "bytes": 0,
+      "path": "versions/perf.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 20,
+      "path": "versions/perf.stdout.txt",
+      "sha256": "511440c57e018672693dfd3a7e9428491e0f69da30548c8af2ff5227a2cde9c0"
+    },
+    {
+      "bytes": 0,
+      "path": "versions/python3.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 14,
+      "path": "versions/python3.stdout.txt",
+      "sha256": "63990b3ee50c49ab28d70e29c0f967f0c71330e39243ffeb4d3a8d5878c8a978"
+    },
+    {
+      "bytes": 0,
+      "path": "versions/rustc.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 196,
+      "path": "versions/rustc.stdout.txt",
+      "sha256": "778fbc643a806f0dd123c056e66201d7e8a56a61928ec0a33171be8d6c2d5a37"
+    },
+    {
+      "bytes": 0,
+      "path": "versions/strace.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 327,
+      "path": "versions/strace.stdout.txt",
+      "sha256": "ad6ab5ec84c6b4547b18865da3bd0597852266a391b21b0d6191ac0f76f19828"
+    },
+    {
+      "bytes": 0,
+      "path": "versions/taskset.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 31,
+      "path": "versions/taskset.stdout.txt",
+      "sha256": "d8d29e0b0569955957c2656bf445683df40b39ac571ad376f89cfa03c6b8d5a8"
+    },
+    {
+      "bytes": 0,
+      "path": "versions/time.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 336,
+      "path": "versions/time.stdout.txt",
+      "sha256": "a3b64288a651d40a18a243c43c871f7ae2886baa58b7e3c64a1061bfd651245f"
+    },
+    {
+      "bytes": 0,
+      "path": "versions/zstd.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 54,
+      "path": "versions/zstd.stdout.txt",
+      "sha256": "f6d344e585f9a9ceb9500ff65355ce23bcc39dec9e4164aceab9da0a5ac3113e"
+    },
+    {
+      "bytes": 0,
+      "path": "zstd-baseline.json.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "zstd-baseline.json.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "zstd-heaptrack.json.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "zstd-heaptrack.json.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "zstd-perf-record.json.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "zstd-perf-record.json.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "zstd-perf-stat.json.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "zstd-perf-stat.json.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "zstd-strace.json.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "zstd-strace.json.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "zstd-time.json.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "zstd-time.json.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "capture_driver_artifact": "capture-driver.py",
+  "change": "0406",
+  "claim_authorized": false,
+  "commands_artifact": "commands.json",
+  "environment_artifact": "environment.json",
+  "kind": "current_head_hardware_profile",
+  "limitations": [
+    "One current-state capture does not establish a speedup or regression.",
+    "The intentionally untracked docs/GOAL.md is retained and hash-bound; this run is ineligible for a clean ABBA claim.",
+    "External counters and profiles are process-total observations.",
+    "Uncompressed perf-script and strace intermediates are pruned after gzip; perf.data remains retained for standard perf report reruns.",
+    "Heaptrack uses 20 warmups and 100 measured samples and includes Heaptrack instrumentation overhead.",
+    "The harness operation_metrics allocator status is unavailable in the normal release binary.",
+    "fincore is retained as residency context; no cold-cache claim is made.",
+    "strace read/write counts are whole-process syscall observations, not decompressed or recompressed byte counts.",
+    "The first driver's pre-pause command timing was unavailable because it exited before commands.json; those records are explicitly marked reconstructed, while resumed commands retain exact timing."
+  ],
+  "outcome": "descriptive_baseline",
+  "parallel_metrics_validation": "tools.perf_compare.validate_parallel_metrics; report identity, revision, corpus, and sample checks are explicit in the driver",
+  "profiler_order": [
+    "fincore-before",
+    "baseline",
+    "time",
+    "perf-stat",
+    "perf-record",
+    "perf-report-self",
+    "perf-report-inclusive",
+    "perf-script",
+    "heaptrack",
+    "heaptrack-print",
+    "strace",
+    "fincore-after"
+  ],
+  "profiler_order_is_sequential": true,
+  "protocol": {
+    "allocation_scope": "Heaptrack process totals at 20 warmups and 100 measured samples; includes source construction/open/verification and Heaptrack overhead; not operation-local allocation attribution",
+    "claim": "descriptive current-state baseline only; no speedup, regression, throughput, RSS, or operation-local allocation claim",
+    "clean_abba_claim_eligible": false,
+    "clean_abba_claim_reason": "the run retains intentionally untracked docs/GOAL.md",
+    "external_scope": "whole process: executable startup, deterministic corpus construction, source-backed open, warmups, measured iterations, verification, and profiler instrumentation where applicable",
+    "harness_scope": "the harness elapsed_ns and operation_metrics rows; opc_source_materialize starts its operation timer after source-backed open and reset, then verifies each materialized package after timing",
+    "heaptrack_record_mode": "heaptrack --record-only records and interprets the capture; heaptrack 1.5.0 has no separate --interpret command",
+    "heaptrack_samples": 100,
+    "heaptrack_symbolized_trace": "heaptrack_print -F writes the symbolized allocation stacks; the uncompressed intermediate is gzip-compressed and pruned",
+    "heaptrack_warmup_iterations": 20,
+    "payload": "incompressible",
+    "perf_storage": "perf.data is retained for standard report reruns; raw perf script is gzip-compressed and its uncompressed intermediate is pruned",
+    "profiler_runs_sequential": true,
+    "samples": 500,
+    "selector": "opc_source_materialize",
+    "shape": "few-large",
+    "warmup_iterations": 20
+  },
+  "resume": {
+    "debuginfod_override": {
+      "DEBUGINFOD_URLS": ""
+    },
+    "driver": "resume-driver.py",
+    "failed_report_preserved": {
+      "perf-report-inclusive.stderr.txt": "perf-report-inclusive.stderr.failed-before-resume.txt",
+      "perf-report-inclusive.txt": "perf-report-inclusive.failed-before-resume.txt"
+    },
+    "recovery": "resume-recovery.json",
+    "reused_labels": [
+      "fincore-before",
+      "baseline",
+      "time",
+      "perf-stat",
+      "perf-record",
+      "perf-report-self"
+    ],
+    "started_labels": [
+      "perf-report-inclusive",
+      "perf-script",
+      "perf-script-gzip",
+      "heaptrack",
+      "heaptrack-print",
+      "heaptrack-flamegraph-gzip",
+      "strace",
+      "strace-gzip",
+      "fincore-after",
+      "zstd-baseline.json",
+      "zstd-time.json",
+      "zstd-perf-stat.json",
+      "zstd-perf-record.json",
+      "zstd-heaptrack.json",
+      "zstd-strace.json"
+    ],
+    "workload_rerun": false
+  },
+  "resume_driver_artifact": {
+    "bytes": 24188,
+    "path": "resume-driver.py",
+    "sha256": "7040fcb3dd8c98513e9e559fdc1d1928f3de9aa4257e8478e534ff36828642d5"
+  },
+  "resume_recovery_artifact": {
+    "bytes": 1497,
+    "path": "resume-recovery.json",
+    "sha256": "0efa7d6a9f1c3ef8f1e4250f12a8bba6206f988f4c9ea9d111ac38cddbd08bd7"
+  },
+  "retained_profile_artifacts": {
+    "heaptrack_capture": "heaptrack-profile.zst",
+    "heaptrack_symbolized_stacks": "heaptrack-flamegraph.txt.gz",
+    "perf_data": "perf.data",
+    "perf_script": "perf-script.txt.gz",
+    "strace": "strace.log.gz"
+  },
+  "schema_version": 1,
+  "selector": {
+    "case": "opc_source_materialize",
+    "entry_bytes": 4194304,
+    "entry_count": 4,
+    "payload": "incompressible",
+    "shape": "few-large",
+    "uncompressed_payload_bytes": 16777216
+  },
+  "source": {
+    "allowed_untracked": {
+      "bytes": 35839,
+      "path": "docs/GOAL.md",
+      "sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+    },
+    "binary": {
+      "bytes": 55025640,
+      "mode_bits": 509,
+      "path": "/home/zhuhe/code/litchi/tools/perf-baseline/target/release/litchi-perf-baseline",
+      "sha256": "cc090aa6493a9686d8e9617c9577be06545f1fb5b2049ffa8320c51382a4cb0d"
+    },
+    "binary_readelf_artifact": "binary-readelf.txt",
+    "capture_driver": {
+      "bytes": 41718,
+      "path": "capture-driver.py",
+      "sha256": "1b701508e85610496a49dbfba95cf26cfad948feb3e8d9e2eb7bfdc7b7740c84"
+    },
+    "clean_abba_claim_eligible": false,
+    "expected_revision": "9eff696b6421e6182e5a96418268a2d8016f0af9",
+    "repo": "/home/zhuhe/code/litchi",
+    "source_after": {
+      "allowed_untracked": {
+        "bytes": 35839,
+        "path": "docs/GOAL.md",
+        "sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+      },
+      "dirty": true,
+      "head": "9eff696b6421e6182e5a96418268a2d8016f0af9",
+      "status_entries": [
+        {
+          "code": "??",
+          "path": "docs/GOAL.md"
+        }
+      ],
+      "status_porcelain": "?? docs/GOAL.md\n",
+      "status_sha256": "b499df4a77a048818b3de3ff52108d54815f3f4941b4628d4233b590c8b7f1cd",
+      "status_z_sha256": "c3ce57888a5efbc494204abf76836d5a23cb154877db55a0efef9db13e2666ee",
+      "tree": "8aa6541cfedac248138f100cbdf1202ea495ea9a"
+    },
+    "source_before": {
+      "allowed_untracked": {
+        "bytes": 35839,
+        "path": "docs/GOAL.md",
+        "sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1"
+      },
+      "dirty": true,
+      "head": "9eff696b6421e6182e5a96418268a2d8016f0af9",
+      "status_entries": [
+        {
+          "code": "??",
+          "path": "docs/GOAL.md"
+        }
+      ],
+      "status_porcelain": "?? docs/GOAL.md\n",
+      "status_sha256": "b499df4a77a048818b3de3ff52108d54815f3f4941b4628d4233b590c8b7f1cd",
+      "status_z_sha256": "c3ce57888a5efbc494204abf76836d5a23cb154877db55a0efef9db13e2666ee",
+      "tree": "8aa6541cfedac248138f100cbdf1202ea495ea9a"
+    }
+  }
+}

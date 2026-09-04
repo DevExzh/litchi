@@ -1,0 +1,23 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 2K of event 'cycles:u'
+# Event count (approx.): 117776856820
+#
+# Overhead  Command          Shared Object         Symbol                                                                                      
+# ........  ...............  ....................  ............................................................................................
+#
+    65.50%  litchi-perf-bas  litchi-perf-baseline  [.] litchi_perf_baseline::payload_bytes
+    26.20%  litchi-perf-bas  litchi-perf-baseline  [.] sha2::sha256::x86_sha::compress
+     2.63%  litchi-perf-bas  litchi-perf-baseline  [.] crc32fast::specialized::pclmulqdq::calculate
+     2.55%  litchi-perf-bas  libc.so.6             [.] __memmove_avx512_unaligned_erms
+     0.91%  litchi-perf-bas  libc.so.6             [.] __memset_avx512_unaligned_erms
+     0.86%  litchi-perf-bas  [unknown]             [k] 0xffffffff8c800ef0
+     0.78%  litchi-perf-bas  litchi-perf-baseline  [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

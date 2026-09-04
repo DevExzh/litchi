@@ -1,0 +1,11 @@
+{
+  "elapsed": "0:26.38",
+  "involuntary_context_switches": "278",
+  "major_faults": "0",
+  "max_rss_kib": "82596",
+  "minor_faults": "51808",
+  "scope": "whole process under /usr/bin/time -v, including corpus construction, source open, warmups, measured iterations, and verification",
+  "system_seconds": "0.11",
+  "user_seconds": "26.26",
+  "voluntary_context_switches": "31"
+}
