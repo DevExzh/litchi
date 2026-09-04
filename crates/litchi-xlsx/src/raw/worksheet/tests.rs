@@ -2528,3 +2528,165 @@ mod streaming_0366_general_reference_tests {
         assert_mce_error(scan_xml(&late_tail, "A1"));
     }
 }
+
+#[cfg(test)]
+mod streaming_0400_numeric_scratch_tests {
+    use std::fmt::Debug;
+    use std::io::Cursor;
+
+    use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
+    use litchi_sheet::{Cell as Address, Rect};
+
+    use super::super::model::MAX_CELL_CHARACTERS;
+    use super::super::selected::{RangeScanOutcome, ScanOutcome, SelectedCell, scan, scan_range};
+    use crate::cell::{Cell, Value};
+    use crate::formula::Cache;
+
+    const SPREADSHEETML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+    type StreamResult<T> = super::super::selected::StreamResult<T>;
+
+    fn address(reference: &str) -> Address {
+        Address::from_a1(reference).expect("valid worksheet address")
+    }
+
+    fn worksheet(body: &str) -> String {
+        format!(r#"<worksheet xmlns="{SPREADSHEETML}">{body}</worksheet>"#)
+    }
+
+    fn scan_xml(xml: &str, target: &str) -> StreamResult<ScanOutcome> {
+        let mut input = Cursor::new(xml.as_bytes());
+        scan(
+            &mut input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            address(target),
+        )
+    }
+
+    fn scan_range_xml(xml: &str, reference: &str) -> StreamResult<RangeScanOutcome> {
+        let mut input = Cursor::new(xml.as_bytes());
+        scan_range(
+            &mut input,
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            Rect::from_a1(reference).expect("valid worksheet range"),
+        )
+    }
+
+    fn eligible(xml: &str, target: &str) -> SelectedCell {
+        match scan_xml(xml, target) {
+            Ok(ScanOutcome::Eligible(selected)) => selected,
+            other => panic!("expected eligible selection, got {other:?}"),
+        }
+    }
+
+    fn assert_number(selected: SelectedCell, expected: &str) {
+        match selected.cell {
+            Some(Cell::Value(Value::Number(value))) => assert_eq!(value.as_str(), expected),
+            other => panic!("expected number {expected}, got {other:?}"),
+        }
+    }
+
+    fn assert_stream_xml_error<T: Debug>(result: StreamResult<T>) {
+        match result {
+            Err(StreamError::Mce {
+                error: MceError::Xml(_) | MceError::NonConformant(_),
+                ..
+            }) => {},
+            other => panic!("expected typed XML stream error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn streaming_0400_numeric_scratch_preserves_long_to_short_and_exponent_lexemes() {
+        let long = "1234567890123456789012345678901234567890.123456789";
+        let xml = worksheet(&format!(
+            r#"<sheetData><row r="1"><c r="A1"><v>{long}</v></c><c r="B1"><v>-0.000</v></c><c r="C1" t="n"><v>6.02E+23</v></c></row></sheetData>"#
+        ));
+
+        assert_number(eligible(&xml, "B1"), "-0.000");
+        assert_number(eligible(&xml, "C1"), "6.02E+23");
+    }
+
+    #[test]
+    fn streaming_0400_numeric_scratch_handles_scalar_type_transitions() {
+        let xml = worksheet(
+            r#"<sheetData><row r="1">
+                <c r="A1"><v>1234567890123456789012345678901234567890.123456789</v></c>
+                <c r="B1" t="str"><v>text</v></c>
+                <c r="C1"><f>1+1</f><v>3.00e+2</v></c>
+                <c r="D1" t="inlineStr"><is><t>inline</t></is></c>
+                <c r="E1" t="e"><v>#N/A</v></c>
+                <c r="F1"/>
+            </row></sheetData>"#,
+        );
+        let selected = match scan_range_xml(&xml, "A1:F1").expect("scalar transition stream") {
+            RangeScanOutcome::Eligible(selected) => selected,
+            other => panic!("expected eligible scalar transition range, got {other:?}"),
+        };
+
+        assert_eq!(selected.cells.len(), 6);
+        assert!(matches!(
+            selected.cells[0].cell.as_ref(),
+            Some(Cell::Value(Value::Number(value)))
+                if value.as_str() == "1234567890123456789012345678901234567890.123456789"
+        ));
+        assert!(matches!(
+            selected.cells[1].cell.as_ref(),
+            Some(Cell::Value(Value::Text(value))) if value.as_str() == "text"
+        ));
+        match selected.cells[2].cell.as_ref() {
+            Some(Cell::Formula(formula)) => {
+                assert_eq!(formula.text(), "1+1");
+                assert!(matches!(
+                    formula.cached().map(Cache::value),
+                    Some(Value::Number(value)) if value.as_str() == "3.00e+2"
+                ));
+            },
+            other => panic!("expected cached numeric formula, got {other:?}"),
+        }
+        assert!(matches!(
+            selected.cells[3].cell.as_ref(),
+            Some(Cell::Value(Value::Text(value))) if value.as_str() == "inline"
+        ));
+        assert!(matches!(
+            selected.cells[4].cell.as_ref(),
+            Some(Cell::Value(Value::Error(value))) if value.as_str() == "#N/A"
+        ));
+        assert!(matches!(selected.cells[5].cell.as_ref(), Some(Cell::Empty)));
+    }
+
+    #[test]
+    fn streaming_0400_numeric_scratch_decodes_entity_and_cdata_numeric_fragments() {
+        let xml = worksheet(
+            r#"<sheetData><row r="1"><c r="A1"><v>&#x31;<![CDATA[.25E+3]]></v></c></row></sheetData>"#,
+        );
+        assert_number(eligible(&xml, "A1"), "1.25E+3");
+    }
+
+    #[test]
+    fn streaming_0400_numeric_scratch_rejects_oversized_selected_and_unselected_values() {
+        let oversized = "7".repeat(MAX_CELL_CHARACTERS + 1);
+        let selected = worksheet(&format!(
+            r#"<sheetData><row r="1"><c r="A1"><v>{oversized}</v></c></row></sheetData>"#
+        ));
+        assert!(scan_xml(&selected, "A1").is_err());
+
+        let unselected = worksheet(&format!(
+            r#"<sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>{oversized}</v></c></row></sheetData>"#
+        ));
+        assert!(scan_xml(&unselected, "A1").is_err());
+    }
+
+    #[test]
+    fn streaming_0400_numeric_scratch_does_not_publish_before_malformed_tail() {
+        let xml = format!(
+            r#"{}<tail>"#,
+            worksheet(
+                r#"<sheetData><row r="1"><c r="A1"><v>1234567890123456789012345678901234567890.123456789</v></c><c r="B1"><v>-0.000</v></c></row></sheetData>"#,
+            )
+        );
+        assert_stream_xml_error(scan_xml(&xml, "B1"));
+    }
+}

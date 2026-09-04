@@ -313,6 +313,10 @@ impl CellKind {
             Some(_) => Self::Unknown,
         }
     }
+
+    fn uses_numeric_value_scratch(self) -> bool {
+        matches!(self, Self::Untyped | Self::Numeric)
+    }
 }
 
 #[derive(Debug)]
@@ -333,12 +337,12 @@ struct PendingCell {
 }
 
 impl PendingCell {
-    fn new(address: Address, kind: CellKind) -> Self {
+    fn new(address: Address, kind: CellKind, value: String) -> Self {
         Self {
             address,
             kind,
             saw_value: false,
-            value: String::new(),
+            value,
             value_bytes: 0,
             value_characters: 0,
             formula: None,
@@ -434,6 +438,7 @@ struct Scanner {
     merge_count: Option<u32>,
     merges: Vec<Rect>,
     pending_cell: Option<PendingCell>,
+    numeric_value_scratch: String,
     selected: Vec<SelectedRecord>,
     selected_count: usize,
     dependencies: SelectedDependencies,
@@ -455,6 +460,7 @@ impl Scanner {
             merge_count: None,
             merges: Vec::new(),
             pending_cell: None,
+            numeric_value_scratch: String::new(),
             selected: Vec::new(),
             selected_count: 0,
             dependencies: SelectedDependencies::default(),
@@ -894,7 +900,14 @@ impl Scanner {
         }
         let address = Address::at(row - 1, column - 1)
             .map_err(|_error| invalid("worksheet cell address exceeds the grid"))?;
-        self.pending_cell = Some(PendingCell::new(address, kind));
+        let value = if kind.uses_numeric_value_scratch() {
+            let mut value = std::mem::take(&mut self.numeric_value_scratch);
+            value.clear();
+            value
+        } else {
+            String::new()
+        };
+        self.pending_cell = Some(PendingCell::new(address, kind, value));
         Ok(Some(Frame::Cell))
     }
 
@@ -1094,7 +1107,14 @@ impl Scanner {
                 shared_string_index: None,
             })?;
         }
+        self.recycle_numeric_value(cell);
         Ok(())
+    }
+
+    fn recycle_numeric_value(&mut self, cell: PendingCell) {
+        if cell.kind.uses_numeric_value_scratch() && cell.value.capacity() <= MAX_CELL_CHARACTERS {
+            self.numeric_value_scratch = cell.value;
+        }
     }
 
     fn retain_selected(&mut self, record: SelectedRecord) -> Result<()> {
