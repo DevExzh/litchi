@@ -1,5 +1,27 @@
 # Performance hotspot inventory
 
+## Change 0418: repeated owned PPTX candidate work
+
+[0418](changes/0418-pptx-cross-copy-candidate-reuse.md) retains a freshly proven
+reopened candidate for unmodified owned destinations. Required source, graph,
+patch, physical and publication checks remain; dirty/custom destinations keep
+their fallback. Media lifecycle p50 improves 38.27–38.69%, with about 8% more
+whole-process peak RSS, explicitly accepted as a scoped tradeoff.
+
+The paired whole-command profiles have zero lost samples. Deflate-family leaf
+weight falls from 71.89% to 57.32%; SHA-family weight changes from 20.69% to
+32.20%, with nearly unchanged absolute sampled weight. These include untimed
+setup and verification, so they do not assign elapsed lifecycle phase shares.
+PMU counters run 83% of the time; a zero cache-reference alias remains
+unvalidated and cannot establish a cache rate.
+
+Priorities are retained-artifact memory and near-limit behavior, attribution of
+the large cumulative allocator request volume, and a matched source-backed
+media lifecycle with the same corpus and timer boundary. The existing plain
+source-backed phase case is not a comparable media lifecycle. Additional
+changed/mixed OPC and scalar XLSX experiments are listed in
+[next-batches.md](results/change-0418/next-batches.md).
+
 ## Change 0417: media-rich PPTX investigation
 
 The [0417 representative baseline](changes/0417-representative-crud-baseline.md)

@@ -1,5 +1,22 @@
 # Performance CRUD coverage
 
+## 2026-09-05: change 0418 adds matched owned PPTX lifecycles
+
+[0418](changes/0418-pptx-cross-copy-candidate-reuse.md) adds opt-in plain and
+media-rich owned cross-copy lifecycle selectors. Their timers include owned
+ingress, snapshots, planning, atomic application and sequential publication;
+input clones, sink reservation, verification and teardown are outside. Both
+emit operation allocation metrics in the separate allocator lane. The existing
+phase selectors retain their original boundaries and unavailable operation
+allocation status.
+
+The registry is now **427 selectors**. The default remains **36 cases / 198
+rows**, and the index remains **15 categories / 30 representative selectors**
+with 10 measured and 20 correctness-only statuses. These additional opt-in
+lifecycles do not change that default-matrix contract. Generated owned PPTX
+evidence does not close native-producer, cold/remote, source-backed lifecycle,
+concurrency/scaling or full CRUD coverage gaps.
+
 ## 2026-09-05: change 0417 captures the representative index
 
 [0417](changes/0417-representative-crud-baseline.md) adds current opt-in timing

@@ -1,0 +1,21 @@
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0418/verify.py", line 2221, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0418/verify.py", line 2212, in main
+    result = verify(args.root, write=args.write)
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0418/verify.py", line 2198, in verify
+    return _verify(root, write=write)
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0418/verify.py", line 2174, in _verify
+    summary = build_summary(
+        protocol_artifact, protocol, roles_artifact, roles,
+        build_artifact, build, capture_artifact, evidence,
+        plan, selectors, allocation,
+    )
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0418/verify.py", line 2069, in build_summary
+    "control": source_projection(roles["control"]),
+               ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0418/verify.py", line 1921, in source_projection
+    "clean": source["clean"],
+             ~~~~~~^^^^^^^^^
+KeyError: 'clean'

@@ -1,0 +1,23 @@
+	Command being timed: "/tmp/litchi-goal-0418-control-allocator --case pptx_cross_copy_plain --shape many-small --payload compressible --writer-shape large --xlsx-shape medium --xlsx-cell-crud-shape medium --xlsx-row-visibility-shape medium --semantic-shape medium --workers 1 --filesystem-cache warm --samples 30 --warmup 3 --json /home/zhuhe/code/litchi/docs/performance/results/change-0418/allocator/a2-pptx_cross_copy_plain.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0418/allocator/a2-pptx_cross_copy_plain.catalog.json"
+	User time (seconds): 0.70
+	System time (seconds): 0.06
+	Percent of CPU this job got: 100%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.77
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 82732
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 6132
+	Voluntary context switches: 28
+	Involuntary context switches: 47
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 80
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

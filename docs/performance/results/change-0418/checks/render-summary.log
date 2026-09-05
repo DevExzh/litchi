@@ -1,0 +1,4 @@
+  File "/home/zhuhe/code/litchi/docs/performance/results/change-0418/render-summary.py", line 223
+    _integer(value, f"{selector}.{key}.samples[{index}"])
+                                                       ^
+SyntaxError: closing parenthesis ']' does not match opening parenthesis '('

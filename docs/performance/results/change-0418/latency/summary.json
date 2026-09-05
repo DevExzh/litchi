@@ -1,0 +1,473 @@
+{
+  "environment": {
+    "legs": {
+      "a1": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9R45",
+        "filesystem_type": null,
+        "git_revision": "79dfee5025276676d433a80b0b5475ae03f09db8",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-1011-aws",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "1",
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 132553797632
+      },
+      "a2": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9R45",
+        "filesystem_type": null,
+        "git_revision": "79dfee5025276676d433a80b0b5475ae03f09db8",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-1011-aws",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "1",
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 132553797632
+      },
+      "b1": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9R45",
+        "filesystem_type": null,
+        "git_revision": "f8f9e6667284ae28fdbf9b9313b2ff9583ec74fc",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-1011-aws",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "1",
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 132553797632
+      },
+      "b2": {
+        "allocator": "Rust system allocator",
+        "cargo_build_target": null,
+        "cpu_affinity": "2",
+        "cpu_model": "AMD EPYC 9R45",
+        "filesystem_type": null,
+        "git_revision": "f8f9e6667284ae28fdbf9b9313b2ff9583ec74fc",
+        "git_worktree_dirty": false,
+        "kernel": "Linux 7.0.0-1011-aws",
+        "logical_cpus_available": 1,
+        "os": "linux",
+        "page_size_bytes": 4096,
+        "perf_event_paranoid": "1",
+        "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+        "source_destination_same_device": null,
+        "storage_identifier": null,
+        "total_memory_bytes": 132553797632
+      }
+    },
+    "stable": {
+      "allocator": "Rust system allocator",
+      "cargo_build_target": null,
+      "cpu_affinity": "2",
+      "cpu_model": "AMD EPYC 9R45",
+      "filesystem_type": null,
+      "git_worktree_dirty": false,
+      "kernel": "Linux 7.0.0-1011-aws",
+      "logical_cpus_available": 1,
+      "os": "linux",
+      "page_size_bytes": 4096,
+      "perf_event_paranoid": "1",
+      "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+      "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+      "source_destination_same_device": null,
+      "storage_identifier": null,
+      "total_memory_bytes": 132553797632
+    }
+  },
+  "harness_identity": {
+    "configuration": {
+      "cases": [
+        "pptx_cross_copy_media_rich_lifecycle"
+      ],
+      "corpus_shapes": [
+        "many-small"
+      ],
+      "execution_workers": [
+        1
+      ],
+      "filesystem_cache_states": [
+        "warm"
+      ],
+      "filesystem_fresh_child_per_sample": true,
+      "filesystem_process_isolated": true,
+      "filesystem_root_selected": false,
+      "opc_cache_lock_diagnostics": false,
+      "payload_kinds": [
+        "compressible"
+      ],
+      "range_simulation": {
+        "bandwidth_bytes_per_second": 52428800,
+        "fixed_latency_us": 100,
+        "max_physical_range_bytes": 4096,
+        "request_overhead_us": 25
+      },
+      "rtf_variants": [
+        "plain"
+      ],
+      "samples_per_case": 500,
+      "semantic_shapes": [
+        "medium"
+      ],
+      "warmup_iterations_per_case": 20,
+      "writer_shapes": [
+        "large"
+      ],
+      "xlsb_shapes": [
+        "tiny",
+        "medium",
+        "large",
+        "sparse"
+      ],
+      "xlsx_cell_crud_shapes": [
+        "medium"
+      ],
+      "xlsx_row_visibility_shapes": [
+        "medium"
+      ],
+      "xlsx_shapes": [
+        "medium"
+      ]
+    },
+    "schema_version": 1,
+    "tool": {
+      "binary": "litchi-perf-baseline",
+      "instrumentation": "none",
+      "name": "litchi-perf-baseline",
+      "profile": "release",
+      "target_arch": "x86_64",
+      "target_os": "linux",
+      "version": "0.1.0"
+    }
+  },
+  "implementation_identity": {
+    "candidate": {
+      "binary_identity": {
+        "binary_bytes": 450203672,
+        "binary_sha256": "a84fa072680e0a8bf9690c6f3aecdf944122ba9bc68d032301cbe0bc7927de49",
+        "executable": true,
+        "mode_bits": 509,
+        "path": "/tmp/litchi-goal-0418-candidate-normal",
+        "profile": "release"
+      },
+      "binary_sha256": "a84fa072680e0a8bf9690c6f3aecdf944122ba9bc68d032301cbe0bc7927de49",
+      "git_revision": "f8f9e6667284ae28fdbf9b9313b2ff9583ec74fc",
+      "legs": [
+        "b1",
+        "b2"
+      ]
+    },
+    "control": {
+      "binary_identity": {
+        "binary_bytes": 450217976,
+        "binary_sha256": "1d4a47affdec36a16e906cdacc7dabd4631d24b4d1fce3cf0a20404212bac00b",
+        "executable": true,
+        "mode_bits": 509,
+        "path": "/tmp/litchi-goal-0418-control-normal",
+        "profile": "release"
+      },
+      "binary_sha256": "1d4a47affdec36a16e906cdacc7dabd4631d24b4d1fce3cf0a20404212bac00b",
+      "git_revision": "79dfee5025276676d433a80b0b5475ae03f09db8",
+      "legs": [
+        "a1",
+        "a2"
+      ]
+    },
+    "distinct": true
+  },
+  "protocol": {
+    "dispersion": "sample standard deviation via Rust Welford update",
+    "drift_ceiling_percent": {
+      "mean": 5.0,
+      "p50": 5.0,
+      "p95": 10.0,
+      "p99": 15.0
+    },
+    "order": [
+      "a1_control",
+      "b1_candidate",
+      "b2_candidate",
+      "a2_control"
+    ],
+    "percentiles": "p50 = Rust u64 floor midpoint; p95/p99 = integer nearest-rank",
+    "statistics": [
+      "p50",
+      "mean",
+      "p95",
+      "p99"
+    ],
+    "uncertainty": "95% two-sided Student's t interval for the mean; embedded harness critical-value table with Cornish-Fisher tail"
+  },
+  "report_identity": {
+    "a1": {
+      "canonical_sha256": "7e774ddcb80a850b046dacdb01590a937e7b1af7c767b3b3d5a6b16a1df3fffc"
+    },
+    "a2": {
+      "canonical_sha256": "07dbbe497a9d717cda984a9432b352497290462f12100e499dd0786724942a8e"
+    },
+    "b1": {
+      "canonical_sha256": "18848215759a5d037c14033c509e85d23b61fdd514522b6268382ed86d39efd0"
+    },
+    "b2": {
+      "canonical_sha256": "49ccf827476927da8066ec77dc0c60b6e909326f51efad50c05aa02c64994e6c"
+    }
+  },
+  "results": [
+    {
+      "case": "pptx_cross_copy_media_rich_lifecycle",
+      "corpus": {
+        "archive_bytes": 16814664,
+        "archive_member_count": 49,
+        "archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+        "compression": "deflate",
+        "entry_bytes": 76,
+        "entry_count": 31,
+        "generator": "litchi-pptx-cross-slide-copy-evidence-v1",
+        "name": "pptx_cross_copy_media_rich_lifecycle",
+        "package_format": "PPTX/OPC/ZIP",
+        "payload_kind": "deterministic-incompressible-media-and-slide-text",
+        "shape": "media-rich",
+        "target_entry": "source-slide:2/destination-slide:1/position:1",
+        "target_payload_bytes": 76,
+        "target_payload_sha256": "9ac62cfc7da10f3c8e81c97cbb04d527499792f9eb629336bc11378788f719aa",
+        "uncompressed_payload_bytes": 16866277,
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "accepted_statistics": [
+          "p50",
+          "mean",
+          "p95",
+          "p99"
+        ],
+        "adverse_both_statistics": [],
+        "candidate_reduction_percent": {
+          "a1_to_b1": {
+            "mean": 38.65276511882371,
+            "p50": 38.68742521790639,
+            "p95": 38.45225605287973,
+            "p99": 38.01026967662335
+          },
+          "a2_to_b2": {
+            "mean": 38.33114938978612,
+            "p50": 38.27172658467988,
+            "p95": 38.20650294442463,
+            "p99": 38.21299027908612
+          }
+        },
+        "drift_ceiling_percent": {
+          "mean": 5.0,
+          "p50": 5.0,
+          "p95": 10.0,
+          "p99": 15.0
+        },
+        "drift_within_ceiling": {
+          "candidate": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          },
+          "control": {
+            "mean": true,
+            "p50": true,
+            "p95": true,
+            "p99": true
+          }
+        },
+        "legs_ns": {
+          "a1": {
+            "confidence_interval_95": {
+              "lower": 1175171532.0889614,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1175403124.9710362
+            },
+            "max": 1180644706,
+            "mean": 1175287328.5299988,
+            "min": 1172209289,
+            "p50": 1175449339,
+            "p95": 1177533392,
+            "p99": 1178774215,
+            "sample_count": 500,
+            "standard_deviation": 1317884.8695571213
+          },
+          "a2": {
+            "confidence_interval_95": {
+              "lower": 1172497039.873463,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 1172655403.7825387
+            },
+            "max": 1177154833,
+            "mean": 1172576221.8280008,
+            "min": 1170840436,
+            "p50": 1172463108,
+            "p95": 1174220584,
+            "p99": 1175103714,
+            "sample_count": 500,
+            "standard_deviation": 901173.6361887081
+          },
+          "b1": {
+            "confidence_interval_95": {
+              "lower": 720778285.1749744,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 721234270.7490263
+            },
+            "max": 735360145,
+            "mean": 721006277.9620004,
+            "min": 717591048,
+            "p50": 720698255,
+            "p95": 724745237,
+            "p99": 730718957,
+            "sample_count": 500,
+            "standard_deviation": 2594796.88406274
+          },
+          "b2": {
+            "confidence_interval_95": {
+              "lower": 722868049.5509512,
+              "method": "two-sided Student's t interval for the mean",
+              "upper": 723360507.5090487
+            },
+            "max": 726631776,
+            "mean": 723114278.53,
+            "min": 707712775,
+            "p50": 723741233,
+            "p95": 725591962,
+            "p99": 726061446,
+            "sample_count": 500,
+            "standard_deviation": 2802343.8633134863
+          }
+        },
+        "rejected_statistics": {},
+        "same_implementation_drift_percent": {
+          "candidate": {
+            "mean": 0.2923692389972089,
+            "p50": 0.42222635879699755,
+            "p95": 0.11683070916132147,
+            "p99": -0.6373874600327359
+          },
+          "control": {
+            "mean": -0.23067607692060602,
+            "p50": -0.25405016625731414,
+            "p95": -0.2813345271146247,
+            "p99": -0.31138287157053224
+          }
+        },
+        "sample_count": 500
+      },
+      "identity": {
+        "corpus": "{\"archive_bytes\":16814664,\"archive_member_count\":49,\"archive_sha256\":\"a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d\",\"compression\":\"deflate\",\"entry_bytes\":76,\"entry_count\":31,\"generator\":\"litchi-pptx-cross-slide-copy-evidence-v1\",\"name\":\"pptx_cross_copy_media_rich_lifecycle\",\"package_format\":\"PPTX/OPC/ZIP\",\"payload_kind\":\"deterministic-incompressible-media-and-slide-text\",\"shape\":\"media-rich\",\"target_entry\":\"source-slide:2/destination-slide:1/position:1\",\"target_payload_bytes\":76,\"target_payload_sha256\":\"9ac62cfc7da10f3c8e81c97cbb04d527499792f9eb629336bc11378788f719aa\",\"uncompressed_payload_bytes\":16866277,\"xlsx\":null}",
+        "operation_metrics_canonical_json": "{\"alignment\":\"elapsed_ns.samples_by_elapsed_then_sample_index\",\"allocation\":{\"allocated_bytes\":{\"scope\":\"operation_global_system_allocator\",\"status\":\"unavailable\",\"values\":\"absent\"},\"allocation_calls\":{\"scope\":\"operation_global_system_allocator\",\"status\":\"unavailable\",\"values\":\"absent\"},\"deallocated_bytes\":{\"scope\":\"operation_global_system_allocator\",\"status\":\"unavailable\",\"values\":\"absent\"},\"deallocation_calls\":{\"scope\":\"operation_global_system_allocator\",\"status\":\"unavailable\",\"values\":\"absent\"},\"failed_allocation_calls\":{\"scope\":\"operation_global_system_allocator\",\"status\":\"unavailable\",\"values\":\"absent\"},\"live_bytes_after\":{\"scope\":\"operation_global_system_allocator\",\"status\":\"unavailable\",\"values\":\"absent\"},\"live_bytes_before\":{\"scope\":\"operation_global_system_allocator\",\"status\":\"unavailable\",\"values\":\"absent\"},\"peak_live_bytes_after\":{\"scope\":\"operation_global_system_allocator\",\"status\":\"unavailable\",\"values\":\"absent\"},\"peak_live_bytes_before\":{\"scope\":\"operation_global_system_allocator\",\"status\":\"unavailable\",\"values\":\"absent\"},\"reallocation_calls\":{\"scope\":\"operation_global_system_allocator\",\"status\":\"unavailable\",\"values\":\"absent\"},\"scope\":\"operation_global_system_allocator\",\"status\":\"unavailable\"},\"cfb_phases\":{\"atomic_publication\":{\"elapsed_ns\":{\"scope\":\"timed_cfb_phase_elapsed_ns\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_calls\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_requested_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_returned_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"}},\"open\":{\"elapsed_ns\":{\"scope\":\"timed_cfb_phase_elapsed_ns\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_calls\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_requested_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_returned_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"}},\"plan\":{\"elapsed_ns\":{\"scope\":\"timed_cfb_phase_elapsed_ns\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_calls\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_requested_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_returned_bytes\":{\"scope\":\"timed_cfb_phase_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"}},\"status\":\"not_applicable\"},\"latency_claim\":\"comparable_timed_operation\",\"materialization\":{\"opc_parts\":{\"scope\":\"logical_materialization_counter\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"status\":\"not_applicable\"},\"process\":{\"cancelled_write_bytes\":{\"scope\":\"procfs_in_process_operation_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"clock_ticks_per_second\":{\"scope\":\"procfs_in_process_operation_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"major_faults\":{\"scope\":\"procfs_in_process_operation_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"minor_faults\":{\"scope\":\"procfs_in_process_operation_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"nonvoluntary_context_switches\":{\"scope\":\"procfs_in_process_operation_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"peak_rss_bytes\":{\"scope\":\"process_lifetime_high_water_after_not_operation_peak\",\"status\":\"measured\",\"values\":\"present\"},\"rchar\":{\"scope\":\"procfs_in_process_operation_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"read_bytes\":{\"scope\":\"procfs_in_process_operation_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"rss_delta_bytes\":{\"scope\":\"procfs_in_process_rss_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"status\":\"measured\",\"syscr\":{\"scope\":\"procfs_in_process_operation_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"syscw\":{\"scope\":\"procfs_in_process_operation_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"system_cpu_ticks\":{\"scope\":\"procfs_in_process_operation_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"user_cpu_ticks\":{\"scope\":\"procfs_in_process_operation_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"voluntary_context_switches\":{\"scope\":\"procfs_in_process_operation_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"wchar\":{\"scope\":\"procfs_in_process_operation_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"},\"write_bytes\":{\"scope\":\"procfs_in_process_operation_delta_including_procfs_probe_overhead\",\"status\":\"measured\",\"values\":\"present\"}},\"publication\":{\"changed_spans\":{\"scope\":\"logical_publication_counter\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"published_bytes\":{\"scope\":\"logical_publication_counter\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"status\":\"not_applicable\"},\"sample_count\":500,\"sample_indices\":\"<permutation>\",\"sink\":{\"accepted_bytes\":{\"scope\":\"logical_sink_accepted_write_bytes\",\"status\":\"measured\",\"values\":\"present\"},\"largest_write\":{\"scope\":\"logical_sink_largest_accepted_write\",\"status\":\"measured\",\"values\":\"present\"},\"output_bytes\":{\"scope\":\"post_operation_output_length_not_sink_write_volume\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"status\":\"not_applicable\",\"write_calls\":{\"scope\":\"logical_sink_accepted_write_calls\",\"status\":\"measured\",\"values\":\"present\"},\"write_size_buckets\":{\"bytes_0\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"measured\",\"values\":\"present\"},\"bytes_16385_to_65536\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"measured\",\"values\":\"present\"},\"bytes_1_to_512\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"measured\",\"values\":\"present\"},\"bytes_4097_to_16384\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"measured\",\"values\":\"present\"},\"bytes_513_to_4096\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"measured\",\"values\":\"present\"},\"bytes_over_65536\":{\"scope\":\"logical_sink_accepted_write_size_bucket_counts\",\"status\":\"measured\",\"values\":\"present\"},\"status\":\"measured\"},\"write_status\":\"measured\"},\"source\":{\"compressed_bytes\":{\"scope\":\"unavailable_read_at_has_no_compressed_member_boundary\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"counter_scope\":\"not_applicable_in_process_sink\",\"decompressed_bytes\":{\"scope\":\"unavailable_read_at_has_no_decompressed_byte_boundary\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_calls\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_largest_requested_bytes\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_largest_returned_bytes\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_pattern\":{\"scope\":\"operation_logical_read_at_range_order_not_physical_io\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_requested_bytes\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"logical_read_returned_bytes\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"max_concurrent_reads\":{\"scope\":\"operation_logical_read_at\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"recompressed_bytes\":{\"scope\":\"unavailable_atomic_save_has_no_recompressed_byte_boundary\",\"status\":\"not_applicable\",\"values\":\"absent\"},\"status\":\"not_applicable\"}}",
+        "operation_metrics_status": "verified_equal",
+        "output_sha256_canonical_json": "\"6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f\"",
+        "output_sha256_status": "verified_equal",
+        "sink_canonical_json": "{\"accepted_bytes\":33599873}",
+        "sink_present": true,
+        "sink_status": "verified_equal",
+        "source_canonical_json": "{\"max_in_flight_reads\":[],\"ordinary_payload_read_bytes\":[],\"ordinary_payload_read_calls\":[],\"pptx_cross_copy\":{\"collision_remapped_parts\":9,\"destination_archive_sha256\":\"a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d\",\"destination_slide\":1,\"destination_slide_count_after\":3,\"destination_slide_count_before\":2,\"destination_slide_name\":\"Slide 257\",\"expected_output_sha256\":\"6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f\",\"external_relationship_count\":0,\"gates\":{\"borrowed_provenance_refusal_verified\":true,\"collision_remap_verified\":true,\"dependency_closure_verified\":true,\"durable_patch_round_trip_verified\":true,\"foreign_source_refusal_verified\":true,\"package_topology_verified\":true,\"semantic_output_verified\":true,\"source_immutability_verified\":true,\"stale_destination_refusal_verified\":true,\"stale_source_refusal_verified\":true},\"implementation\":\"Package::from_vec + opened::CrossSlideCopyPlan + Package::apply_cross_slide_copy_plan + OpcPackage::to_stream\",\"insertion_position\":1,\"performance_claim\":\"none: opt-in correctness, lifecycle, and operation-allocation evidence only; no release ABBA, speedup, RSS, physical-I/O, or full-retention memory claim\",\"planned_bytes\":16784397,\"planned_part_count\":9,\"source_archive_sha256\":\"830928aafdc3ec8a5995a0d84a82ea9e2acb7f190f45008ddc017e2edfbf684b\",\"source_slide\":2,\"source_slide_name\":\"Slide 258\",\"timing_scope\":\"lifecycle_ns and operation_metrics cover owned source/destination ingress, opened snapshots, plan, atomic cross-copy commit, and final OPC sequential publication; corpus clones and sink reservation are outside; plan/commit/publication are nested diagnostics; reopen and all semantic/package/closure/refusal/source checks are outside\"},\"read_bytes\":[],\"read_calls\":[]}",
+        "source_present": true,
+        "source_status": "verified_equal"
+      },
+      "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+      "shape": "media-rich",
+      "sink": {
+        "accepted_bytes": 33599873
+      },
+      "source": {
+        "max_in_flight_reads": [],
+        "ordinary_payload_read_bytes": [],
+        "ordinary_payload_read_calls": [],
+        "pptx_cross_copy": {
+          "collision_remapped_parts": 9,
+          "destination_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+          "destination_slide": 1,
+          "destination_slide_count_after": 3,
+          "destination_slide_count_before": 2,
+          "destination_slide_name": "Slide 257",
+          "expected_output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+          "external_relationship_count": 0,
+          "gates": {
+            "borrowed_provenance_refusal_verified": true,
+            "collision_remap_verified": true,
+            "dependency_closure_verified": true,
+            "durable_patch_round_trip_verified": true,
+            "foreign_source_refusal_verified": true,
+            "package_topology_verified": true,
+            "semantic_output_verified": true,
+            "source_immutability_verified": true,
+            "stale_destination_refusal_verified": true,
+            "stale_source_refusal_verified": true
+          },
+          "implementation": "Package::from_vec + opened::CrossSlideCopyPlan + Package::apply_cross_slide_copy_plan + OpcPackage::to_stream",
+          "insertion_position": 1,
+          "performance_claim": "none: opt-in correctness, lifecycle, and operation-allocation evidence only; no release ABBA, speedup, RSS, physical-I/O, or full-retention memory claim",
+          "planned_bytes": 16784397,
+          "planned_part_count": 9,
+          "source_archive_sha256": "830928aafdc3ec8a5995a0d84a82ea9e2acb7f190f45008ddc017e2edfbf684b",
+          "source_slide": 2,
+          "source_slide_name": "Slide 258",
+          "timing_scope": "lifecycle_ns and operation_metrics cover owned source/destination ingress, opened snapshots, plan, atomic cross-copy commit, and final OPC sequential publication; corpus clones and sink reservation are outside; plan/commit/publication are nested diagnostics; reopen and all semantic/package/closure/refusal/source checks are outside"
+        },
+        "read_bytes": [],
+        "read_calls": []
+      }
+    }
+  ],
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-abba-summary",
+    "version": "0.1.0"
+  },
+  "verification": {
+    "binary_hashes_distinct": true,
+    "binary_identity_verified": true,
+    "case_corpus_identity_verified": true,
+    "configuration_identity_verified": true,
+    "environment_legs_recorded": true,
+    "environment_stable_identity_verified": true,
+    "filesystem_evidence_identity_verified": true,
+    "operation_metrics_identity": {
+      "consistently_absent": 0,
+      "verified_equal": 1
+    },
+    "output_sha256_identity": {
+      "consistently_absent": 0,
+      "verified_equal": 1
+    },
+    "output_sha256_identity_verified": true,
+    "result_count": 1,
+    "sink_identity": {
+      "consistently_absent": 0,
+      "verified_equal": 1
+    },
+    "sink_identity_verified": true,
+    "source_identity": {
+      "consistently_absent": 0,
+      "verified_equal": 1
+    },
+    "source_identity_verified": true,
+    "statistics_recomputed_from_samples": true,
+    "tool_identity_verified": true
+  }
+}

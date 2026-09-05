@@ -1,0 +1,10 @@
+{
+  "control": {
+    "revision": "79dfee5025276676d433a80b0b5475ae03f09db8",
+    "worktree": "/tmp/litchi-goal-0418-control-worktree"
+  },
+  "candidate": {
+    "revision": "f8f9e6667284ae28fdbf9b9313b2ff9583ec74fc",
+    "worktree": "/tmp/litchi-goal-0418-candidate-worktree"
+  }
+}

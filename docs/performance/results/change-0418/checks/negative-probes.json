@@ -1,0 +1,96 @@
+{
+  "compressed_report_fallback": [
+    "normal/a1-pptx_cross_copy_media_rich_lifecycle.json",
+    "allocator/a1-pptx_cross_copy_media_rich_lifecycle.json"
+  ],
+  "path_rewritten_isolated_export_replays": 2,
+  "probes": [
+    {
+      "diagnostic": "0418 verification failed: capture.runs[32].report: strict PPTX/report validation rejected report: capture.runs[32].report.pptx_cross_copy_media_rich_lifecycle.source.pptx_cross_copy.plan_ns must contain exactly 500 samples",
+      "diagnostic_marker": "plan_ns",
+      "exit_code": 1,
+      "expected": "rejected",
+      "mutation": "normal-raw-vector"
+    },
+    {
+      "diagnostic": "0418 verification failed: capture.runs[48].report.results[0]: operation metrics rejected by perf_compare: capture.runs[48].report.results[0].operation_metrics.allocation.allocated_bytes.values has 29 samples; expected 30",
+      "diagnostic_marker": "allocated_bytes",
+      "exit_code": 1,
+      "expected": "rejected",
+      "mutation": "allocator-raw-vector"
+    },
+    {
+      "diagnostic": "0418 verification failed: capture.runs[32].report: parallel metrics rejected: capture.runs[32].report.results[0].elapsed_ns.sample_order must be a complete permutation",
+      "diagnostic_marker": "sample_order",
+      "exit_code": 1,
+      "expected": "rejected",
+      "mutation": "sample-order"
+    },
+    {
+      "diagnostic": "0418 verification failed: capture.runs[44].report: strict PPTX/report validation rejected report: capture.runs[44].report.pptx_cross_copy_media_rich.source.pptx_cross_copy plan/commit/publication total does not match elapsed_ns.samples",
+      "diagnostic_marker": "plan/commit/publication",
+      "exit_code": 1,
+      "expected": "rejected",
+      "mutation": "phase-order"
+    },
+    {
+      "diagnostic": "0418 verification failed: normal/A1/pptx_cross_copy_media_rich_lifecycle: preflight and formal source identity differs",
+      "diagnostic_marker": "source identity",
+      "exit_code": 1,
+      "expected": "rejected",
+      "mutation": "source"
+    },
+    {
+      "diagnostic": "0418 verification failed: capture.runs[32].report.binary_identity.binary_sha256: does not match build identity",
+      "diagnostic_marker": "binary_identity",
+      "exit_code": 1,
+      "expected": "rejected",
+      "mutation": "binary"
+    },
+    {
+      "diagnostic": "0418 verification failed: capture.runs[0].argv: case/flag/sample contract differs",
+      "diagnostic_marker": "capture.runs[0].argv",
+      "exit_code": 1,
+      "expected": "rejected",
+      "mutation": "argv"
+    },
+    {
+      "diagnostic": "0418 verification failed: capture.runs[32].report: strict PPTX/report validation rejected report: capture.runs[32].report.pptx_cross_copy_media_rich_lifecycle.source.pptx_cross_copy.expected_output_sha256 disagrees with result.output_sha256",
+      "diagnostic_marker": "output_sha256",
+      "exit_code": 1,
+      "expected": "rejected",
+      "mutation": "oracle"
+    },
+    {
+      "diagnostic": "0418 verification failed: capture.runs[32].report: strict PPTX/report validation rejected report: capture.runs[32].report.pptx_cross_copy_media_rich_lifecycle.source.pptx_cross_copy.gates.borrowed_provenance_refusal_verified must be true",
+      "diagnostic_marker": "gates",
+      "exit_code": 1,
+      "expected": "rejected",
+      "mutation": "gate"
+    },
+    {
+      "diagnostic": "0418 verification failed: capture.runs[32].report.corpus_catalog: does not match catalog sidecar",
+      "diagnostic_marker": "corpus_catalog",
+      "exit_code": 1,
+      "expected": "rejected",
+      "mutation": "catalog"
+    },
+    {
+      "diagnostic": "0418 verification failed: capture.runs[0].time_v: maximum RSS must be a positive integer",
+      "diagnostic_marker": "maximum RSS",
+      "exit_code": 1,
+      "expected": "rejected",
+      "mutation": "time-rss"
+    },
+    {
+      "diagnostic": "0418 verification failed: capture.runs[0].artifact_sha256.report: does not match artifact bytes",
+      "diagnostic_marker": "artifact_sha256",
+      "exit_code": 1,
+      "expected": "rejected",
+      "mutation": "artifacthash"
+    }
+  ],
+  "status": "passed",
+  "temporary_export_removed": true,
+  "unmodified_isolated_export_replay": true
+}

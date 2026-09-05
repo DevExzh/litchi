@@ -1,0 +1,77 @@
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-codepage v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-codepage)
+    Checking pathfinder_simd v0.5.6
+    Checking libloading v0.8.8
+    Checking log v0.4.29
+    Checking option-ext v0.2.0
+    Checking alloc-no-stdlib v2.0.4
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking alloc-stdlib v0.2.4
+    Checking dirs-sys v0.5.0
+    Checking pathfinder_geometry v0.5.1
+    Checking dlib v0.5.3
+    Checking unicode-normalization v0.1.25
+    Checking static_assertions v1.1.0
+    Checking aliasable v0.1.3
+    Checking same-file v1.0.6
+    Checking walkdir v2.5.0
+    Checking ouroboros v0.18.5
+    Checking enumflags2 v0.7.12
+    Checking caseless v0.2.2
+    Checking yeslogic-fontconfig-sys v6.0.1
+    Checking dirs v6.0.0
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking brotli-decompressor v5.0.3
+    Checking unicode-canonical-combining-class v1.0.0
+    Checking unicode-general-category v1.1.0
+    Checking unicode-joining-type v1.0.0
+    Checking freetype-sys v0.20.1
+    Checking itertools v0.14.0
+    Checking bitreader v0.3.11
+    Checking ucd-trie v0.1.7
+    Checking rustc-hash v2.1.3
+    Checking glyph-names v0.2.0
+    Checking float-ord v0.3.2
+    Checking bytemuck v1.25.2
+    Checking font-kit v0.14.3
+    Checking roaring v0.11.1
+    Checking allsorts v0.17.0
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+    Checking litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Checking litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+    Checking litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+    Checking litchi-fonts v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-fonts)
+    Checking litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+    Checking litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+error: using `clone` on type `SourceVersion` which implements the `Copy` trait
+   --> crates/litchi-pptx/src/presentation/order.rs:307:29
+    |
+307 |             source_version: self.source.source_version.clone(),
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `self.source.source_version`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#clone_on_copy
+    = note: `-D clippy::clone-on-copy` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::clone_on_copy)]`
+
+error: the following explicit lifetimes could be elided: 'a
+   --> crates/litchi-pptx/src/presentation/order.rs:672:17
+    |
+672 | fn binding_refs<'a>(bindings: &'a [SlideOrderBinding]) -> Result<Vec<(u32, &'a str)>> {
+    |                 ^^             ^^                                           ^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_lifetimes
+    = note: `-D clippy::needless-lifetimes` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::needless_lifetimes)]`
+help: elide the lifetimes
+    |
+672 - fn binding_refs<'a>(bindings: &'a [SlideOrderBinding]) -> Result<Vec<(u32, &'a str)>> {
+672 + fn binding_refs(bindings: &[SlideOrderBinding]) -> Result<Vec<(u32, &str)>> {
+    |
+
+error: could not compile `litchi-pptx` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-pptx` (lib test) due to 2 previous errors

@@ -1,0 +1,49 @@
+   Compiling der_derive v0.7.3
+   Compiling chrono v0.4.45
+   Compiling crypto-bigint v0.5.5
+   Compiling rand_chacha v0.3.1
+   Compiling signature v2.2.0
+   Compiling num-integer v0.1.47
+   Compiling num-iter v0.1.46
+   Compiling rand v0.8.8
+   Compiling der v0.7.10
+   Compiling litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling num-bigint-dig v0.8.6
+   Compiling spki v0.7.3
+   Compiling pkcs8 v0.10.2
+   Compiling sec1 v0.7.3
+   Compiling pkcs1 v0.7.5
+   Compiling elliptic-curve v0.13.8
+   Compiling rsa v0.9.10
+   Compiling x509-cert v0.2.5
+   Compiling primeorder v0.13.6
+   Compiling ecdsa v0.16.9
+   Compiling litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+   Compiling p256 v0.13.2
+   Compiling allsorts v0.17.0
+   Compiling font-kit v0.14.3
+   Compiling litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+   Compiling litchi-ole-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ole-common)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+   Compiling litchi-crypto v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-crypto)
+   Compiling litchi-vba v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-vba)
+   Compiling litchi-fonts v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-fonts)
+   Compiling litchi-ooxml-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-ooxml-common)
+   Compiling litchi-drawingml v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-drawingml)
+   Compiling litchi-pptx v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-pptx)
+error: unnecessary qualification
+   --> crates/litchi-pptx/src/opened/cross_copy_plan.rs:670:13
+    |
+670 |     patch: &super::patch::Patch,
+    |             ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: requested on the command line with `-D unused-qualifications`
+help: remove the unnecessary path segments
+    |
+670 -     patch: &super::patch::Patch,
+670 +     patch: &Patch,
+    |
+
+error: could not compile `litchi-pptx` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-pptx` (lib test) due to 1 previous error

@@ -1,0 +1,29 @@
+    Checking litchi-pptx v0.0.1 (/tmp/litchi-goal-0418-control-worktree/crates/litchi-pptx)
+error: using `clone` on type `SourceVersion` which implements the `Copy` trait
+   --> crates/litchi-pptx/src/presentation/order.rs:307:29
+    |
+307 |             source_version: self.source.source_version.clone(),
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `self.source.source_version`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#clone_on_copy
+    = note: `-D clippy::clone-on-copy` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::clone_on_copy)]`
+
+error: the following explicit lifetimes could be elided: 'a
+   --> crates/litchi-pptx/src/presentation/order.rs:672:17
+    |
+672 | fn binding_refs<'a>(bindings: &'a [SlideOrderBinding]) -> Result<Vec<(u32, &'a str)>> {
+    |                 ^^             ^^                                           ^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_lifetimes
+    = note: `-D clippy::needless-lifetimes` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::needless_lifetimes)]`
+help: elide the lifetimes
+    |
+672 - fn binding_refs<'a>(bindings: &'a [SlideOrderBinding]) -> Result<Vec<(u32, &'a str)>> {
+672 + fn binding_refs(bindings: &[SlideOrderBinding]) -> Result<Vec<(u32, &str)>> {
+    |
+
+error: could not compile `litchi-pptx` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `litchi-pptx` (lib test) due to 2 previous errors

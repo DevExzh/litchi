@@ -1,0 +1,25 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
+     Running tests/pptx_malformed_presentation.rs (/home/zhuhe/code/litchi/target/debug/deps/pptx_malformed_presentation-4b330436bd3d2d77)
+
+running 5 tests
+test malformed_presentation_children_are_reported_by_their_owner ... FAILED
+test slide_reference_owner_rejects_case_equivalent_target_parts ... ok
+test slide_reference_owner_rejects_duplicate_ids_and_out_of_range_ids ... ok
+test malformed_slide_accessors_do_not_panic ... ok
+test malformed_presentation_roots_return_typed_errors ... ok
+
+failures:
+
+---- malformed_presentation_children_are_reported_by_their_owner stdout ----
+
+thread 'malformed_presentation_children_are_reported_by_their_owner' (1723428) panicked at crates/litchi-pptx/tests/pptx_malformed_presentation.rs:72:5:
+assertion failed: references.is_ok()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    malformed_presentation_children_are_reported_by_their_owner
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+error: test failed, to rerun pass `-p litchi-pptx --test pptx_malformed_presentation`

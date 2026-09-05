@@ -1,0 +1,30 @@
+................................E........................................................
+======================================================================
+ERROR: test_pptx_lifecycle_identity_accepts_only_valid_sample_permutations (tools.test_perf_abba_summary.PerfAbbaSummaryTests.test_pptx_lifecycle_identity_accepts_only_valid_sample_permutations)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/tools/test_perf_abba_summary.py", line 2152, in test_pptx_lifecycle_identity_accepts_only_valid_sample_permutations
+    perf_abba_summary.summarize_reports(reports)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/zhuhe/code/litchi/tools/perf_abba_summary.py", line 7269, in summarize_reports
+    return _summarize_reports_impl(
+        a1,
+    ...<8 lines>...
+        profile=profile,
+    )
+  File "/home/zhuhe/code/litchi/tools/perf_abba_summary.py", line 7341, in _summarize_reports_impl
+    label: _validate_report(report, label, profile=profile)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/tools/perf_abba_summary.py", line 3060, in _validate_report
+    _validate_pptx_cross_copy_result_rows(indexed, configuration, label)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/tools/perf_abba_summary.py", line 5010, in _validate_pptx_cross_copy_result_rows
+    raise AbbaSummaryInputError(
+        f"{location}.lifecycle_ns[{index}] must equal elapsed_ns.samples[{index}]"
+    )
+tools.perf_abba_summary.AbbaSummaryInputError: b1.pptx_cross_copy_plain_lifecycle.source.pptx_cross_copy.lifecycle_ns[0] must equal elapsed_ns.samples[0]
+
+----------------------------------------------------------------------
+Ran 89 tests in 1.556s
+
+FAILED (errors=1)

@@ -1,0 +1,9 @@
+{
+  "status": "pass",
+  "byte_identical_after_cleanup": true,
+  "sha256": {
+    "result-table.md": "45d70df1c63e486f6a56113691cb1a07922cdad0a90290db5afd56513f0c1f16",
+    "uncertainty.json": "da4f3472d6ecfea70034c73354b538abdc552b9fb8625f5b09b5e4124aa36088"
+  },
+  "stdout": "{\"change\": \"0418\", \"outputs\": [\"result-table.md\", \"uncertainty.json\"], \"status\": \"pass\"}\n"
+}
