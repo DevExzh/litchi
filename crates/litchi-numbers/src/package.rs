@@ -26,6 +26,8 @@ mod extractor;
     reason = "Formula-name reverse lookup is retained with the native token registry for future write support."
 )]
 mod function_map;
+#[cfg(feature = "internal-iwork-source")]
+mod image_adjustments;
 #[allow(
     dead_code,
     reason = "The compact index retains type probes used by the complete native table decoder."
@@ -111,6 +113,11 @@ use extractor::TableDataExtractor;
 use index::{Index, Resolved};
 use sheet::DecodedSheet;
 
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub use image_adjustments::{
+    __decode_image_adjustments_payload, __rewrite_image_adjustments_payload, ImageAdjustmentsError,
+};
 pub use limits::{
     MAX_OBJECTS, MAX_REFERENCES, ReadOptions, SemanticLimitKind, SemanticLimits,
     SemanticLimitsError,

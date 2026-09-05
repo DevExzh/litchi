@@ -394,6 +394,11 @@ pub use package::__semantic_document_from_prepared_source;
 pub use package::{
     __CatalogTableAppearanceSource, __catalog_table_appearance, __catalog_table_style_edges,
 };
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub use package::{
+    __decode_image_adjustments_payload, __rewrite_image_adjustments_payload, ImageAdjustmentsError,
+};
 pub use package::{
     ChartArrangementCommit, ChartArrangementDiagnostics, ChartArrangementEdit,
     ChartArrangementError, ChartArrangementLimitKind, ChartArrangementPatch, ChartAxisTitleCommit,
@@ -409,7 +414,9 @@ pub use package::{
     SemanticLimitsError, SemanticPath, SlideBackgroundCommit, SlideBackgroundDiagnostics,
     SlideBackgroundEdit, SlideBackgroundError, SlideBackgroundLimitKind, SlideBackgroundPatch,
     SlideBuildOrderCommit, SlideBuildOrderDiagnostics, SlideBuildOrderEdit, SlideBuildOrderError,
-    SlideBuildOrderLimitKind, SlideBuildOrderPatch, SlideMovieCaptionCommit,
+    SlideBuildOrderLimitKind, SlideBuildOrderPatch, SlideImageAdjustmentsCommit,
+    SlideImageAdjustmentsDiagnostics, SlideImageAdjustmentsEdit, SlideImageAdjustmentsError,
+    SlideImageAdjustmentsLimitKind, SlideImageAdjustmentsPatch, SlideMovieCaptionCommit,
     SlideMovieCaptionDiagnostics, SlideMovieCaptionEdit, SlideMovieCaptionError,
     SlideMovieCaptionLimitKind, SlideMovieCaptionPatch, SlideMovieGeometryCommit,
     SlideMovieGeometryDiagnostics, SlideMovieGeometryEdit, SlideMovieGeometryError,
@@ -452,6 +459,7 @@ pub use package::{
     SlideTableCellNumberFormatPath,
 };
 pub use selector::{SlideSelector, SlideSelectorError, SlideSelectorResult};
+pub use slide::image::ImageSelector;
 pub use slide::media::{MediaInfo, MovieInfo, MovieKind};
 pub use slide::movie::MovieSelector;
 pub use slide::table::TableSelector;

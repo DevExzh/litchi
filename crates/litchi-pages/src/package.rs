@@ -19,6 +19,8 @@ mod drawable_order;
 mod footnote_text;
 mod header_footer_text;
 #[cfg(feature = "internal-iwork-source")]
+mod image_adjustments;
+#[cfg(feature = "internal-iwork-source")]
 mod movie_playback;
 mod page_layout;
 mod save;
@@ -111,6 +113,10 @@ pub use footnote_text::{
 pub use header_footer_text::{
     HeaderFooterTextCommit, HeaderFooterTextDiagnostics, HeaderFooterTextEdit,
     HeaderFooterTextError, HeaderFooterTextLimitKind, HeaderFooterTextPatch,
+};
+#[cfg(feature = "internal-iwork-source")]
+pub use image_adjustments::{
+    __decode_image_adjustments_payload, __rewrite_image_adjustments_payload, ImageAdjustmentsError,
 };
 #[cfg(feature = "internal-iwork-source")]
 pub use movie_playback::{

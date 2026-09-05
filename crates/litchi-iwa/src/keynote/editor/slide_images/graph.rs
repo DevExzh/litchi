@@ -1,7 +1,6 @@
 //! Typed construction and discovery of slide-owned image graphs.
 
 use super::*;
-use crate::image_adjustments::image_adjustments_from_archive;
 use crate::image_caption::{
     CAPTION_INFO_MESSAGE_TYPE, CaptionObjectIds, CaptionThemeStyle, DrawableCaptionKind,
     caption_objects, patch_drawable_caption_reference, replace_object_reference,
@@ -220,7 +219,7 @@ pub(super) fn image_infos(
     let graph = ObjectGraph::read(editor.package())?;
     image_root_ids(&graph, slide_id)?
         .into_iter()
-        .map(|identifier| image_info(&graph, slide_index, identifier))
+        .map(|identifier| image_info(editor, &graph, slide_index, identifier))
         .collect()
 }
 
@@ -523,7 +522,7 @@ pub(super) fn image_graph(
         slide_id,
         component_id,
         archive_name,
-        info: image_info(&graph, slide_index, drawable_object_id)?,
+        info: image_info(editor, &graph, slide_index, drawable_object_id)?,
         object_ids,
         uuid_object_ids,
         data_references,
@@ -531,6 +530,7 @@ pub(super) fn image_graph(
 }
 
 fn image_info(
+    editor: &KeynoteEditor,
     graph: &ObjectGraph,
     slide_index: usize,
     identifier: u64,
@@ -560,7 +560,16 @@ fn image_info(
                 "Keynote image {identifier} has an invalid thumbnail data identifier: {error}"
             ))
         })?;
-    let image_adjustments: ImageAdjustments = image_adjustments_from_archive(&image)?;
+    let raw = graph.message_data_type(identifier, IMAGE_MESSAGE_TYPE, "TSD.ImageArchive")?;
+    let image_adjustments: ImageAdjustments = litchi_keynote::__decode_image_adjustments_payload(
+        raw,
+        crate::keynote::editor::slide_movies::movie_playback_wire_limits(editor.package())?,
+    )
+    .map_err(|error| {
+        Error::InvalidFormat(format!(
+            "Keynote image {identifier} has invalid image adjustments: {error}"
+        ))
+    })?;
     Ok(KeynoteSlideImageInfo {
         slide_index,
         drawable_object_id: identifier,

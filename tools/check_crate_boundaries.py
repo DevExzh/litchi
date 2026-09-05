@@ -2006,6 +2006,114 @@ KEYNOTE_MOVIE_PLAYBACK_HIDDEN_SOURCE_SEAM_DECLARATION = re.compile(
     r"\bsource\s*:\s*&\s*\[\s*u8\s*\][^)]*\bWireLimits\b"
 )
 
+# Wave109 retires the last shared image-adjustment wire adapter.  The complete
+# ImageArchive remains a host-owned payload; only the bounded scalar edge is
+# routed through the neutral Buffa sidecar and the format-specific package
+# seams.  Keep this inventory exact so another editor module cannot satisfy the
+# ratchet merely by repeating an ``image_adjustments`` spelling.
+IWA_SHARED_IMAGE_ADJUSTMENTS_SOURCE = Path(
+    "crates/litchi-iwa/src/image_adjustments.rs"
+)
+IWA_SHARED_IMAGE_ADJUSTMENTS_ROOT_MODULE = re.compile(
+    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t]+"
+    r"(?:r#)?image_adjustments\b"
+)
+IWA_IMAGE_ADJUSTMENTS_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/image_adjustments_codec.rs"
+)
+IWA_IMAGE_ADJUSTMENTS_CODEC_PUBLIC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/lib.rs"
+)
+IWA_IMAGE_ADJUSTMENTS_CODEC_MODULE = re.compile(
+    r"(?ms)^\s*#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\]\s*\n"
+    r"\s*pub\s+mod\s+(?:r#)?image_adjustments_codec\s*;"
+)
+IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES = {
+    "Keynote": Path("crates/litchi-keynote/src/package/image_adjustments.rs"),
+    "Pages": Path("crates/litchi-pages/src/package/image_adjustments.rs"),
+    "Numbers": Path("crates/litchi-numbers/src/package/image_adjustments.rs"),
+}
+IWA_IMAGE_ADJUSTMENTS_OWNER_PACKAGE_SOURCES = {
+    "Keynote": Path("crates/litchi-keynote/src/package.rs"),
+    "Pages": Path("crates/litchi-pages/src/package.rs"),
+    "Numbers": Path("crates/litchi-numbers/src/package.rs"),
+}
+IWA_IMAGE_ADJUSTMENTS_OWNER_EXPORT_SOURCES = {
+    "Keynote": Path("crates/litchi-keynote/src/lib.rs"),
+    "Pages": Path("crates/litchi-pages/src/lib.rs"),
+    "Numbers": Path("crates/litchi-numbers/src/lib.rs"),
+}
+IWA_IMAGE_ADJUSTMENTS_OWNER_MODULES = {
+    # Keynote owns a selector-first semantic image API in its default package
+    # module.  Only the raw host bridge below is feature-gated.
+    "Keynote": re.compile(r"(?m)^\s*mod\s+(?:r#)?image_adjustments\s*;"),
+    "Pages": re.compile(
+        r"(?ms)^\s*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
+        r'"internal-iwork-source"\s*\)\s*\]\s*\n'
+        r"\s*mod\s+(?:r#)?image_adjustments\s*;"
+    ),
+    "Numbers": re.compile(
+        r"(?ms)^\s*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
+        r'"internal-iwork-source"\s*\)\s*\]\s*\n'
+        r"\s*mod\s+(?:r#)?image_adjustments\s*;"
+    ),
+}
+IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS = (
+    "__decode_image_adjustments_payload",
+    "__rewrite_image_adjustments_payload",
+)
+IWA_IMAGE_ADJUSTMENTS_HOST_ROOTS = {
+    "Keynote": Path("crates/litchi-iwa/src/keynote/editor"),
+    "Pages": Path("crates/litchi-iwa/src/pages/editor"),
+    "Numbers": Path("crates/litchi-iwa/src/numbers/editor"),
+}
+IWA_IMAGE_ADJUSTMENTS_HOST_CALLS = {
+    "Keynote": re.compile(
+        r"\blitchi_keynote\s*::\s*__decode_image_adjustments_payload\s*\("
+        r"|\blitchi_keynote\s*::\s*__rewrite_image_adjustments_payload\s*\("
+    ),
+    "Pages": re.compile(
+        r"\blitchi_pages\s*::\s*__decode_image_adjustments_payload\s*\("
+        r"|\blitchi_pages\s*::\s*__rewrite_image_adjustments_payload\s*\("
+    ),
+    "Numbers": re.compile(
+        r"\blitchi_numbers\s*::\s*__decode_image_adjustments_payload\s*\("
+        r"|\blitchi_numbers\s*::\s*__rewrite_image_adjustments_payload\s*\("
+    ),
+}
+IWA_IMAGE_ADJUSTMENTS_CODEC_REQUIRED_MARKERS = (
+    "DecodeOptions",
+    "ImageAdjustmentsSnapshot",
+    "ImageAdjustmentsWrite",
+    "decode_image_adjustments",
+    "rewrite_image_adjustments",
+)
+IWA_IMAGE_ADJUSTMENTS_CODEC_LAZY_MARKERS = (
+    "buffa",
+    "decode_view",
+    "WireView",
+    "visit",
+)
+IWA_IMAGE_ADJUSTMENTS_CODEC_DECODE_CALL = re.compile(
+    r"\bdecode_image_adjustments(?:_with_report)?\s*\("
+)
+IWA_IMAGE_ADJUSTMENTS_CODEC_REWRITE_CALL = re.compile(
+    r"\brewrite_image_adjustments\s*\("
+)
+IWA_IMAGE_ADJUSTMENTS_CODEC_GENERATED_LEAK = re.compile(
+    r"\b(?:[A-Za-z_][A-Za-z0-9_]*::)?ImageAdjustmentsArchive\s*::\s*decode\s*\("
+    r"|\b(?:[A-Za-z_][A-Za-z0-9_]*::)?ImageArchive\s*::\s*decode\s*\("
+    r"|\b(?:prost|buffa)\s*::\s*Message\b"
+)
+IWA_IMAGE_ADJUSTMENTS_GENERATED_TYPE_LEAK = re.compile(
+    r"\b(?:tsd|tsp)\s*::\s*(?:ImageArchive|ImageAdjustmentsArchive)\b"
+)
+IWA_IMAGE_ADJUSTMENTS_HOST_LEGACY_HELPER = re.compile(
+    # Pages keeps a focused editor-local ``image_adjustments`` adapter under
+    # ``editor``; only the crate-root module names the retired shared owner.
+    r"\bcrate\s*::\s*image_adjustments\b"
+)
+
 # Wave87 moves Keynote movie geometry behind a selector-first package facade.
 # Keep this separate from playback/title/caption and from generic image, shape,
 # or audio geometry. Geometry writes own preview invalidation as an explicit
@@ -10394,6 +10502,17 @@ IWA_NUMBERS_STORAGE_SOURCE = IWA_NUMBERS_SOURCE_ROOT / "editor" / "storage.rs"
 IWA_NUMBERS_MODEL_LOOKUP_FUNCTIONS = (
     "decode_table_info",
     "find_table_owner",
+)
+IWA_NUMBERS_ATTACHED_DESCRIPTOR_FUNCTIONS = (
+    "attached_table_descriptor",
+    "attached_table_descriptors",
+)
+IWA_NUMBERS_ATTACHED_ROLE_FUNCTION = "attached_table_info_model_identifier"
+IWA_NUMBERS_ATTACHED_ROLE_MARKERS = (
+    "TABLE_INFO_MESSAGE_TYPES",
+    "table_info_model_identifier",
+    "probe_candidate",
+    "CandidateProbe",
 )
 IWA_NUMBERS_STORAGE_CACHE_FUNCTIONS = (
     "table_models",
@@ -41268,6 +41387,20 @@ def audit_iwa_numbers_model_storage_source_topology(
         return functions
 
     model_functions = require_functions(model_path, IWA_NUMBERS_MODEL_LOOKUP_FUNCTIONS)
+    attached_functions: dict[str, tuple[str, int]] = {}
+    attached_role_function: tuple[str, int] | None = None
+    model_code = code_by_path.get(model_path, "")
+    if re.search(r"\battached_table_descriptor(?:s)?\b", model_code):
+        all_attached_functions = require_functions(
+            model_path, IWA_NUMBERS_ATTACHED_DESCRIPTOR_FUNCTIONS
+        )
+        attached_functions = {
+            name: all_attached_functions[name]
+            for name in IWA_NUMBERS_ATTACHED_DESCRIPTOR_FUNCTIONS
+            if name in all_attached_functions
+        }
+        role_functions = require_functions(model_path, (IWA_NUMBERS_ATTACHED_ROLE_FUNCTION,))
+        attached_role_function = role_functions.get(IWA_NUMBERS_ATTACHED_ROLE_FUNCTION)
     storage_functions = require_functions(
         storage_path, IWA_NUMBERS_STORAGE_CACHE_FUNCTIONS
     )
@@ -41328,6 +41461,64 @@ def audit_iwa_numbers_model_storage_source_topology(
             violations.append(
                 "legacy iwa Numbers find_table_owner performs a generated "
                 "TableInfo decode while probing candidates: "
+                f"{IWA_NUMBERS_MODEL_SOURCE}:{body_line(model_path, offset, match)}"
+            )
+
+    if attached_role_function is not None:
+        body, offset = attached_role_function
+        for marker in IWA_NUMBERS_ATTACHED_ROLE_MARKERS:
+            if re.search(rf"\b{re.escape(marker)}\b", body) is None:
+                violations.append(
+                    "legacy iwa Numbers attached-table role resolver is missing "
+                    f"strict marker {marker}: {IWA_NUMBERS_MODEL_SOURCE}"
+                )
+        if re.search(
+            r"\bif\s+message\.type_\s*!=\s*TABLE_INFO_MESSAGE_TYPES\s*"
+            r"\[\s*0\s*\]",
+            body,
+        ) is None:
+            violations.append(
+                "legacy iwa Numbers attached-table role resolver must keep the "
+                "legacy type-specific early return: "
+                f"{IWA_NUMBERS_MODEL_SOURCE}"
+            )
+        has_ambiguous_role_rejection = re.search(
+            r"\bmatch\s*\(\s*table_info_id\s*,\s*is_table_model\s*\)", body
+        ) is not None or (
+            re.search(r"\bif\s+matches!\s*\(", body) is not None
+            and re.search(r"\breturn\s+Err\s*\(", body) is not None
+        )
+        if not has_ambiguous_role_rejection:
+            violations.append(
+                "legacy iwa Numbers attached-table role resolver must reject "
+                "ambiguous table-info/table-model roles: "
+                f"{IWA_NUMBERS_MODEL_SOURCE}"
+            )
+        for match in re.finditer(
+            r"\b(?:[A-Za-z_][A-Za-z0-9_]*::)?TableInfoArchive\s*::\s*decode\s*\(",
+            body,
+        ):
+            violations.append(
+                "legacy iwa Numbers attached-table role resolver performs a "
+                "generated TableInfo decode: "
+                f"{IWA_NUMBERS_MODEL_SOURCE}:{body_line(model_path, offset, match)}"
+            )
+
+    for name, function in attached_functions.items():
+        body, offset = function
+        if re.search(r"\battached_table_info_model_identifier\s*\(", body) is None:
+            violations.append(
+                "legacy iwa Numbers attached-table descriptor must delegate "
+                "candidate ownership to its strict role resolver in "
+                f"{name}: {IWA_NUMBERS_MODEL_SOURCE}"
+            )
+        for match in re.finditer(
+            r"\b(?:[A-Za-z_][A-Za-z0-9_]*::)?TableInfoArchive\s*::\s*decode\s*\(",
+            body,
+        ):
+            violations.append(
+                "legacy iwa Numbers attached-table descriptor performs a "
+                "generated TableInfo decode: "
                 f"{IWA_NUMBERS_MODEL_SOURCE}:{body_line(model_path, offset, match)}"
             )
 
@@ -41536,6 +41727,266 @@ def audit_iwa_shared_media_playback_source_topology(
         violations.append(
             "retired shared litchi-iwa media-playback source was restored: "
             f"{IWA_SHARED_MEDIA_PLAYBACK_SOURCE}"
+        )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_shared_image_adjustments_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Retire the shared image-adjustment host after focused owners land.
+
+    The host retains archive lookup and transaction staging, while each
+    format package projects the three semantic inspector controls through the
+    neutral bounded Buffa codec.  The source payload remains authoritative, so
+    this audit checks the concrete seams and rejects generated archive ingress
+    without banning unrelated image-graph work elsewhere in the editor.
+    """
+
+    owner_paths = {
+        ecosystem: root / path
+        for ecosystem, path in IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES.items()
+    }
+    if not (root / IWA_IMAGE_ADJUSTMENTS_CODEC_SOURCE).is_file() or not all(
+        path.is_file() for path in owner_paths.values()
+    ):
+        return []
+
+    violations: list[str] = []
+
+    def source_for(path: Path) -> str:
+        if not path.is_file():
+            return ""
+        return _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+
+    def code_for(path: Path) -> str:
+        return _mask_rust_non_code(source_for(path))
+
+    def hidden_seam(
+        name: str,
+        *,
+        rewrite: bool,
+        feature_gated: bool,
+    ) -> re.Pattern[str]:
+        arguments = (
+            r"(?=[^)]*\bsource\s*:\s*&\s*\[\s*u8\s*\])"
+            r"(?=[^)]*\bWireLimits\b)"
+        )
+        if rewrite:
+            arguments += r"(?=[^)]*\bImageAdjustments\b)"
+        gate = (
+            r"#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
+            r'"internal-iwork-source"\s*\)\s*\]\s*\n'
+            if feature_gated
+            else ""
+        )
+        return re.compile(
+            rf"(?ms){gate}#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][^\n]*\n"
+            r"(?:\s*#\s*\[[^\]]+\]\s*\n)*"
+            rf"\s*pub\s+fn\s+{re.escape(name)}\s*\({arguments}[^)]*\)"
+        )
+
+    for ecosystem, owner_path in owner_paths.items():
+        owner_code = code_for(owner_path)
+        owner_declaration_source = (
+            _mask_rust_comments(source_for(owner_path))
+            if ecosystem == "Keynote"
+            else owner_code
+        )
+        for index, seam in enumerate(IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS):
+            if (
+                hidden_seam(
+                    seam,
+                    rewrite=index == 1,
+                    feature_gated=ecosystem == "Keynote",
+                ).search(owner_declaration_source)
+                is None
+            ):
+                violations.append(
+                    f"focused litchi-{ecosystem.lower()} image-adjustments owner is missing "
+                    f"hidden source seam {seam}: {IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]}"
+                )
+
+        required_owner_markers = (
+            "image_adjustments_codec",
+            "ImageAdjustment::new",
+            "WireLimits",
+            "DecodeOptions",
+        )
+        for marker in required_owner_markers:
+            if re.search(rf"\b{re.escape(marker)}\b", owner_code) is None:
+                violations.append(
+                    f"focused litchi-{ecosystem.lower()} image-adjustments owner is missing "
+                    f"bounded codec/semantic marker {marker}: "
+                    f"{IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]}"
+                )
+        for marker, pattern in (
+            ("decode_image_adjustments", IWA_IMAGE_ADJUSTMENTS_CODEC_DECODE_CALL),
+            ("rewrite_image_adjustments", IWA_IMAGE_ADJUSTMENTS_CODEC_REWRITE_CALL),
+        ):
+            if pattern.search(owner_code) is None:
+                violations.append(
+                    f"focused litchi-{ecosystem.lower()} image-adjustments owner is missing "
+                    f"bounded codec/semantic marker {marker}: "
+                    f"{IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]}"
+                )
+
+        for leak in (
+            IWA_IMAGE_ADJUSTMENTS_CODEC_GENERATED_LEAK,
+            IWA_IMAGE_ADJUSTMENTS_GENERATED_TYPE_LEAK,
+        ):
+            for match in leak.finditer(owner_code):
+                line_number = owner_code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    f"focused litchi-{ecosystem.lower()} image-adjustments owner retains "
+                    f"generated archive ingress {match.group(0).strip()}: "
+                    f"{IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]}:{line_number}"
+                )
+
+        package_path = root / IWA_IMAGE_ADJUSTMENTS_OWNER_PACKAGE_SOURCES[ecosystem]
+        package_source = source_for(package_path)
+        package_code = _mask_rust_comments(package_source)
+        if IWA_IMAGE_ADJUSTMENTS_OWNER_MODULES[ecosystem].search(package_code) is None:
+            violations.append(
+                f"focused litchi-{ecosystem.lower()} image-adjustments owner module is "
+                "missing its internal-iwork-source gate: "
+                f"{IWA_IMAGE_ADJUSTMENTS_OWNER_PACKAGE_SOURCES[ecosystem]}"
+            )
+
+        export_sources = [package_source]
+        export_path = root / IWA_IMAGE_ADJUSTMENTS_OWNER_EXPORT_SOURCES[ecosystem]
+        if export_path.is_file():
+            export_sources.append(_mask_rust_comments(source_for(export_path)))
+        export_sources[0] = _mask_rust_comments(export_sources[0])
+        for seam in IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS:
+            hidden_export = re.compile(
+                r"(?ms)^\s*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
+                r'"internal-iwork-source"\s*\)\s*\]\s*\n'
+                r"\s*#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\]\s*\n"
+                rf"\s*pub\s+use[^;]*\b{re.escape(seam)}\b[^;]*;"
+            )
+            if not any(hidden_export.search(source) for source in export_sources):
+                violations.append(
+                    f"focused litchi-{ecosystem.lower()} image-adjustments seam {seam} "
+                    "must use the hidden internal-iwork-source export: "
+                    f"{IWA_IMAGE_ADJUSTMENTS_OWNER_EXPORT_SOURCES[ecosystem]}"
+                )
+
+    codec_path = root / IWA_IMAGE_ADJUSTMENTS_CODEC_SOURCE
+    codec_code = code_for(codec_path)
+    for marker in IWA_IMAGE_ADJUSTMENTS_CODEC_REQUIRED_MARKERS:
+        if re.search(rf"\b{re.escape(marker)}\b", codec_code) is None:
+            violations.append(
+                "neutral image-adjustments codec is missing required bounded marker "
+                f"{marker}: {IWA_IMAGE_ADJUSTMENTS_CODEC_SOURCE}"
+            )
+    if not any(
+        re.search(rf"\b{re.escape(marker)}\b", codec_code)
+        for marker in IWA_IMAGE_ADJUSTMENTS_CODEC_LAZY_MARKERS
+    ):
+        violations.append(
+            "neutral image-adjustments codec must retain a private Buffa/lazy "
+            f"projection path: {IWA_IMAGE_ADJUSTMENTS_CODEC_SOURCE}"
+        )
+    for leak in (
+        IWA_IMAGE_ADJUSTMENTS_CODEC_GENERATED_LEAK,
+        IWA_IMAGE_ADJUSTMENTS_GENERATED_TYPE_LEAK,
+    ):
+        for match in leak.finditer(codec_code):
+            line_number = codec_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "neutral image-adjustments codec retains generated archive ingress "
+                f"{match.group(0).strip()}: {IWA_IMAGE_ADJUSTMENTS_CODEC_SOURCE}:{line_number}"
+            )
+
+    codec_public_path = root / IWA_IMAGE_ADJUSTMENTS_CODEC_PUBLIC_SOURCE
+    codec_public_code = _mask_rust_comments(source_for(codec_public_path))
+    if IWA_IMAGE_ADJUSTMENTS_CODEC_MODULE.search(codec_public_code) is None:
+        violations.append(
+            "neutral image-adjustments codec is missing its hidden public module "
+            f"declaration: {IWA_IMAGE_ADJUSTMENTS_CODEC_PUBLIC_SOURCE}"
+        )
+
+    # Each format editor may keep generated graph materialization for unrelated
+    # image fields.  Only reject the retired shared helper or generated
+    # adjustment ingress in files that participate in this edge.
+    for ecosystem, relative_root in IWA_IMAGE_ADJUSTMENTS_HOST_ROOTS.items():
+        host_root = root / relative_root
+        if not host_root.is_dir():
+            violations.append(
+                f"litchi-{ecosystem.lower()} image-adjustments host root is missing: "
+                f"{relative_root}"
+            )
+            continue
+        host_sources = sorted(host_root.rglob("*.rs"))
+        if not host_sources:
+            violations.append(
+                f"litchi-{ecosystem.lower()} image-adjustments host has no Rust adapter: "
+                f"{relative_root}"
+            )
+            continue
+        decode_seen = False
+        rewrite_seen = False
+        for host_path in host_sources:
+            source = source_for(host_path)
+            code = _mask_rust_non_code(source)
+            for match in IWA_IMAGE_ADJUSTMENTS_HOST_LEGACY_HELPER.finditer(code):
+                line_number = code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    f"litchi-{ecosystem.lower()} image-adjustments host retains the "
+                    f"shared helper {match.group(0).strip()}: "
+                    f"{host_path.relative_to(root)}:{line_number}"
+                )
+
+            if IWA_IMAGE_ADJUSTMENTS_HOST_CALLS[ecosystem].search(code) is not None:
+                decode_seen |= re.search(
+                    r"__decode_image_adjustments_payload\s*\(", code
+                ) is not None
+                rewrite_seen |= re.search(
+                    r"__rewrite_image_adjustments_payload\s*\(", code
+                ) is not None
+                # Limit generated-decoder checks to the small adapter
+                # functions that actually call the focused package seam.
+                # Image graph files may still decode unrelated generated
+                # geometry/metadata values elsewhere.
+                for body, offset in _rust_top_level_function_bodies(code).values():
+                    if IWA_IMAGE_ADJUSTMENTS_HOST_CALLS[ecosystem].search(body) is None:
+                        continue
+                    for match in IWA_IMAGE_ADJUSTMENTS_CODEC_GENERATED_LEAK.finditer(body):
+                        line_number = source.count(
+                            "\n", 0, offset + match.start()
+                        ) + 1
+                        violations.append(
+                            f"litchi-{ecosystem.lower()} image-adjustments host retains "
+                            f"generated adjustment ingress {match.group(0).strip()}: "
+                            f"{host_path.relative_to(root)}:{line_number}"
+                        )
+
+        if not decode_seen:
+            violations.append(
+                f"litchi-{ecosystem.lower()} image-adjustments host is missing its "
+                f"focused decode seam call: {relative_root}"
+            )
+        if not rewrite_seen:
+            violations.append(
+                f"litchi-{ecosystem.lower()} image-adjustments host is missing its "
+                f"focused rewrite seam call: {relative_root}"
+            )
+
+    root_lib = root / IWA_FACADE_SOURCE
+    if root_lib.is_file():
+        root_code = _mask_rust_non_code(source_for(root_lib))
+        for match in IWA_SHARED_IMAGE_ADJUSTMENTS_ROOT_MODULE.finditer(root_code):
+            line_number = root_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retired shared litchi-iwa image-adjustments module declaration: "
+                f"{IWA_FACADE_SOURCE}:{line_number}"
+            )
+    if (root / IWA_SHARED_IMAGE_ADJUSTMENTS_SOURCE).is_file():
+        violations.append(
+            "retired shared litchi-iwa image-adjustments source was restored: "
+            f"{IWA_SHARED_IMAGE_ADJUSTMENTS_SOURCE}"
         )
 
     return sorted(set(violations))
@@ -58072,6 +58523,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_table_extractor_no_eager_formula_source_topology()
         + audit_iwa_numbers_model_storage_source_topology()
         + audit_iwa_shared_media_playback_source_topology()
+        + audit_iwa_shared_image_adjustments_source_topology()
         + audit_iwa_keynote_slide_table_discovery_source_topology()
         + audit_iwa_keynote_slide_table_listing_appearance_source_topology()
         + audit_numbers_extractor_no_eager_table_data_list_source_topology()

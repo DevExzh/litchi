@@ -8,6 +8,7 @@
 mod catalog_table_appearance;
 mod chart_axis_support;
 mod edit;
+mod image_adjustments;
 mod limits;
 mod rendering_invalidation;
 mod save;
@@ -94,9 +95,18 @@ pub use catalog_table_appearance::{
     __CatalogTableAppearanceSource, __catalog_table_appearance, __catalog_table_style_edges,
 };
 #[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub use image_adjustments::{
+    __decode_image_adjustments_payload, __rewrite_image_adjustments_payload, ImageAdjustmentsError,
+};
+#[cfg(feature = "internal-iwork-source")]
 pub use slide_movie_playback::__decode_movie_playback_payload;
 
 pub use edit::{Commit, Diagnostics, Edit, EditError, Patch};
+pub use image_adjustments::{
+    SlideImageAdjustmentsCommit, SlideImageAdjustmentsDiagnostics, SlideImageAdjustmentsEdit,
+    SlideImageAdjustmentsError, SlideImageAdjustmentsLimitKind, SlideImageAdjustmentsPatch,
+};
 pub use limits::{
     MAX_OBJECTS, MAX_REFERENCES, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES,
     ReadOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsError,

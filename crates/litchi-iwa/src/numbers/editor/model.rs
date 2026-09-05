@@ -1,6 +1,8 @@
 //! Sheet, table, cell, formula, and comment model operations.
 
-use super::table_model_projection::{ProbeBudget, select_candidate};
+use super::table_model_projection::{
+    CandidateProbe, ProbeBudget, probe_candidate, select_candidate,
+};
 use super::*;
 use crate::application::Application;
 use crate::application_detection::detect;
@@ -3427,6 +3429,45 @@ fn cell_tile_location<'a>(
     Ok((tile_archive, tile_id, tile_row))
 }
 
+/// Select a `TableInfo` model reference for the compatibility descriptor path.
+///
+/// Type 6000 is shared with the legacy `TableModelArchive` role.  A payload
+/// that validates as both roles is ambiguous and fails closed; a payload that
+/// validates only as the legacy model remains a non-owner.  Invalid or
+/// untyped candidates retain the descriptor path's historical best-effort
+/// behavior and are ignored.
+fn attached_table_info_model_identifier(
+    object: &ArchiveObject,
+    message: &RawMessage,
+) -> Result<Option<u64>> {
+    if !TABLE_INFO_MESSAGE_TYPES.contains(&message.type_) {
+        return Ok(None);
+    }
+
+    let object_id = object.archive_info.identifier.unwrap_or_default();
+    let Ok(table_info_id) = super::storage::table_info_model_identifier(message, object_id) else {
+        return Ok(None);
+    };
+    if message.type_ != TABLE_INFO_MESSAGE_TYPES[0] {
+        return Ok(Some(table_info_id));
+    }
+
+    // Run the existing bounded model projection only after this message has
+    // passed strict TableInfo validation.  A sibling scan would change
+    // `.any()`'s early completion and error order; malformed candidates return
+    // above without opening a second budgeted decoder.
+    let mut budget = ProbeBudget::new();
+    if matches!(
+        probe_candidate(message.type_, message.data.as_slice(), &mut budget)?,
+        CandidateProbe::Valid
+    ) {
+        return Err(Error::InvalidFormat(format!(
+            "iWork object {object_id} has an ambiguous type-6000 table-info/table-model role"
+        )));
+    }
+    Ok(Some(table_info_id))
+}
+
 pub(super) fn attached_table_descriptor(
     package: &IWorkPackage,
     table_id: u64,
@@ -3457,10 +3498,13 @@ pub(super) fn attached_table_descriptor(
             if identifier == table_id {
                 continue;
             }
-            let owns_model = object.messages.iter().any(|message| {
-                tst::TableInfoArchive::decode(message.data.as_slice())
-                    .is_ok_and(|info| info.table_model.identifier == table_id)
-            });
+            let mut owns_model = false;
+            for message in &object.messages {
+                if attached_table_info_model_identifier(object, message)? == Some(table_id) {
+                    owns_model = true;
+                    break;
+                }
+            }
             if owns_model && table_info_id.replace(identifier).is_some() {
                 return Err(Error::InvalidFormat(format!(
                     "iWork table model {table_id} has multiple table-info owners"
@@ -3492,10 +3536,9 @@ pub(super) fn attached_table_descriptors(package: &IWorkPackage) -> Result<Vec<T
             };
             let mut owned_models = HashSet::new();
             for message in &object.messages {
-                let Ok(table_info) = tst::TableInfoArchive::decode(message.data.as_slice()) else {
+                let Some(model_id) = attached_table_info_model_identifier(object, message)? else {
                     continue;
                 };
-                let model_id = table_info.table_model.identifier;
                 let Some(model_archive_name) = locations.get(&model_id) else {
                     continue;
                 };
@@ -5536,6 +5579,75 @@ mod tests {
         let (index, info) = decode_table_info(&object).expect("legacy sparse TableInfo");
         assert_eq!(index, 0);
         assert_eq!(info.table_model.identifier, 41);
+    }
+
+    #[test]
+    fn attached_table_info_does_not_promote_a_legacy_table_model() {
+        let object = ArchiveObject::new(
+            7,
+            vec![RawMessage {
+                type_: TABLE_INFO_MESSAGE_TYPES[0],
+                data: SPARSE_TABLE_MODEL.to_vec(),
+            }],
+        )
+        .unwrap();
+
+        assert_eq!(
+            attached_table_info_model_identifier(&object, &object.messages[0]).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn attached_table_info_rejects_an_ambiguous_type_6000_role() {
+        let mut payload = table_info_payload(41);
+        payload.extend_from_slice(SPARSE_TABLE_MODEL);
+        let object = ArchiveObject::new(
+            7,
+            vec![RawMessage {
+                type_: TABLE_INFO_MESSAGE_TYPES[0],
+                data: payload,
+            }],
+        )
+        .unwrap();
+
+        let error = attached_table_info_model_identifier(&object, &object.messages[0])
+            .expect_err("ambiguous type-6000 role");
+        assert!(error.to_string().contains("ambiguous type-6000"));
+    }
+
+    #[test]
+    fn attached_table_info_requires_an_admitted_role() {
+        let object = ArchiveObject::new(
+            7,
+            vec![RawMessage {
+                type_: TABLE_MODEL_MESSAGE_TYPE,
+                data: table_info_payload(41),
+            }],
+        )
+        .unwrap();
+
+        assert_eq!(
+            attached_table_info_model_identifier(&object, &object.messages[0]).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn attached_table_info_skips_malformed_payloads() {
+        let object = ArchiveObject::new(
+            7,
+            vec![RawMessage {
+                type_: TABLE_INFO_MESSAGE_TYPES[1],
+                data: vec![0x80],
+            }],
+        )
+        .unwrap();
+
+        assert_eq!(
+            attached_table_info_model_identifier(&object, &object.messages[0]).unwrap(),
+            None
+        );
     }
 
     #[test]

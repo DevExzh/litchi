@@ -1,0 +1,18 @@
+// Private scalar projection of the selected edge of TSD.ImageArchive.
+//
+// The complete ImageArchive and the advanced ImageAdjustmentsArchive controls
+// remain caller-owned. This sidecar only forces the three public adjustment
+// controls through Buffa's borrowed lazy decoder.
+syntax = "proto2";
+
+package LitchiIwaImageAdjustmentsProjection;
+
+message ImageAdjustmentsArchive {
+  optional float exposure = 1;
+  optional float saturation = 2;
+  optional bool enhance = 13;
+}
+
+message ImageArchive {
+  optional ImageAdjustmentsArchive image_adjustments = 14;
+}

@@ -5,10 +5,10 @@ use std::collections::HashMap;
 use litchi_iwa_common::media::Type as MediaType;
 
 use super::*;
+use crate::archive::RawMessage;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
-use crate::image_adjustments::replace_image_adjustments;
 use crate::image_caption::{CaptionObjectIds, DrawableCaptionKind};
 use crate::media::MediaAssetId;
 use crate::shapes::{
@@ -385,11 +385,10 @@ impl KeynoteEditor {
     ) -> Result<()> {
         let source = require_file_image(self, slide_index, drawable_object_id)?;
         let mut staged = self.package().clone();
-        let expected = replace_image_adjustments(
+        let expected = replace_image_adjustments_focused(
             &mut staged,
             &source.archive_name,
             drawable_object_id,
-            "Keynote image",
             adjustments,
         )?;
         let verified = Self::from_package(staged)?;
@@ -617,6 +616,80 @@ impl KeynoteEditor {
             removed_data_identifiers,
         })
     }
+}
+
+fn replace_image_adjustments_focused(
+    package: &mut IWorkPackage,
+    archive_name: &str,
+    image_id: u64,
+    adjustments: ImageAdjustments,
+) -> Result<ImageAdjustments> {
+    let limits = crate::keynote::editor::slide_movies::movie_playback_wire_limits(package)?;
+    let archive_limits = package.limits().effective_archive_limits()?;
+    let mut verified_adjustments = None;
+    package.update_archive(archive_name, |archive| {
+        let object = archive.object_mut(image_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Keynote image object {image_id} is missing"))
+        })?;
+        let indexes = object
+            .messages
+            .iter()
+            .enumerate()
+            .filter_map(|(index, message)| (message.type_ == 3_005).then_some(index))
+            .collect::<Vec<_>>();
+        let [message_index] = indexes.as_slice() else {
+            return Err(Error::InvalidFormat(format!(
+                "Keynote image {image_id} must have exactly one ImageArchive payload"
+            )));
+        };
+        let message_index = *message_index;
+        let original = object.messages[message_index].data.as_slice();
+        let current = litchi_keynote::__decode_image_adjustments_payload(original, limits)
+            .map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "Keynote image {image_id} adjustments are invalid: {error}"
+                ))
+            })?;
+        // The focused reader is deliberately before the equality check: a
+        // malformed source must fail even when the requested value is equal.
+        if current == adjustments {
+            verified_adjustments = Some(current);
+            return Ok(());
+        }
+        let rewritten =
+            litchi_keynote::__rewrite_image_adjustments_payload(original, adjustments, limits)
+                .map_err(|error| {
+                    Error::InvalidFormat(format!(
+                        "Keynote image {image_id} adjustment rewrite failed: {error}"
+                    ))
+                })?;
+        let verified = litchi_keynote::__decode_image_adjustments_payload(&rewritten, limits)
+            .map_err(|error| {
+                Error::InvalidFormat(format!(
+                    "Keynote image {image_id} adjustment readback failed: {error}"
+                ))
+            })?;
+        if verified != adjustments {
+            return Err(Error::InvalidFormat(
+                "Keynote image adjustment patch failed validation".to_owned(),
+            ));
+        }
+        object
+            .replace_message_preserving_header_with_limits(
+                message_index,
+                RawMessage {
+                    type_: 3_005,
+                    data: rewritten,
+                },
+                archive_limits,
+            )
+            .map_err(Error::from)?;
+        verified_adjustments = Some(verified);
+        Ok(())
+    })?;
+    verified_adjustments.ok_or_else(|| {
+        Error::InvalidFormat("Keynote image adjustment update produced no result".to_owned())
+    })
 }
 
 fn set_slide_image_caption(

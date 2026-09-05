@@ -10,7 +10,6 @@ use super::*;
 use crate::data_reference_registry::{
     add_component_data_reference, remove_component_data_reference,
 };
-use crate::image_adjustments::replace_image_adjustments;
 use crate::image_caption::{CaptionObjectIds, DrawableCaptionKind};
 use crate::media::MediaAssetId;
 use crate::package_metadata::{add_component_external_reference, component_identifier_for_entry};
@@ -372,7 +371,7 @@ impl PagesEditor {
         let raw_drawable_object_id = drawable_object_id.get();
         let source = body_image_graph(self, raw_drawable_object_id)?;
         let mut staged = self.package().clone();
-        let expected = replace_image_adjustments(
+        let expected = super::image_adjustments::replace_image_adjustments(
             &mut staged,
             &source.archive_name,
             raw_drawable_object_id,
