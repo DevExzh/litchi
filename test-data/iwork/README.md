@@ -109,3 +109,37 @@ intact and no repair prompt, then closed it. The artifact's SHA-256 is
 The fixture verifies native body/section discovery across a UTF-16 surrogate
 pair and exact source preservation. It is native authoring and read evidence;
 it does not qualify a Litchi section mutation or hidden-axis operation.
+
+## Numbers Custom Number source (2026-09-06)
+
+`numbers/custom-number-native.numbers` was authored through Computer Use in
+Numbers 14.4 from Blank. Cell B2 contains the numeric value `42` and uses the
+native Custom Number format `Native Grouped`, created with the default integer
+token (`#,###`). Cell C2 contains `Native Custom marker`. Numbers saved,
+closed, and reopened the exact file path without a repair prompt. The Cell
+inspector confirmed `Native Grouped` and sample `42` after reopen; the marker
+remained visible. The document was then closed. SHA-256:
+`dc804f72667d8544f3209437232c70c3934b28ab86a9bd6718109f44a1cea342`.
+
+This source records native authoring and save/reopen behavior. It does not by
+itself qualify a Rust-generated Custom-format mutation.
+
+The focused Numbers API then replaced B2's format with `Rust Grouped`
+(`#,##0.00`). Numbers opened the candidate with B2 displayed as `42.00` and
+the Cell inspector naming `Rust Grouped`. After changing C2 to
+`Native Custom marker saved`, Numbers saved, closed, and reopened the exact
+candidate path with the format and marker intact and no repair prompt.
+`numbers/custom-number-native-resaved.numbers` retains that native-resaved
+candidate. SHA-256:
+`af1ccfdb5dfc1f28a4a8bce2daafd0e567c494ae5434935e361420edb22a859a`.
+
+The focused API also cleared B2's Custom format from the native-resaved
+candidate. Numbers displayed `42` with `Automatic` in the Cell inspector.
+After changing C2 to `Native Custom clear saved`, Numbers saved, closed, and
+reopened the exact clear candidate with the value, format, and marker intact.
+The temporary native-resaved clear artifact had SHA-256
+`432538800987ae78ee5a0d06a164d6f97abfa900bcbf4eb6dc73cbf2dda8b577`.
+Both focused mutations verified semantic reopen, byte-exact no-op behavior,
+and exact inverse restoration before native verification. This qualifies
+these Custom Number replacement and clear cases; Custom Text, Custom DateTime,
+and broader native format parity remain outside this evidence.

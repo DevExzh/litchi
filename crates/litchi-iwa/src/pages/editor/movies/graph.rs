@@ -332,7 +332,7 @@ pub(super) fn body_movie_graph(
         )));
     }
 
-    let document = root_document(editor.package())?;
+    let document = pages_document_root_facts(editor.package())?;
     let attachment_position = DrawablePoint {
         x: h_offset + document.left_margin.unwrap_or_default(),
         y: v_offset,
@@ -347,7 +347,7 @@ pub(super) fn body_movie_graph(
     })?;
     let z_order: tp::DrawablesZOrderArchive = decode_typed_package_object(
         editor.package(),
-        z_order_id.identifier,
+        z_order_id,
         DRAWABLE_Z_ORDER_MESSAGE_TYPE,
         "TP.DrawablesZOrderArchive",
     )?;

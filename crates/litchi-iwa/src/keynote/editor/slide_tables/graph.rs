@@ -205,17 +205,15 @@ pub(super) fn catalog_slide_context(
             |source| decode_catalog_slide_identifier(source, slide_index),
         )
         .map_err(map_catalog_error)?;
-    let node: kn::SlideNodeArchive = catalog
-        .decode_type(package, node_identifier, 4, "KN.SlideNodeArchive")
+    let slide_id = catalog
+        .with_message_data_type(
+            package,
+            node_identifier,
+            4,
+            "KN.SlideNodeArchive",
+            |source| decode_catalog_slide_node_identifier(source, slide_index, package),
+        )
         .map_err(map_catalog_error)?;
-    let slide_id = node
-        .slide
-        .ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "Keynote slide node {node_identifier} has no slide reference"
-            ))
-        })?
-        .identifier;
     let slide: kn::SlideArchive = catalog
         .decode_type(package, slide_id, 5, "KN.SlideArchive")
         .map_err(map_catalog_error)?;
@@ -225,6 +223,21 @@ pub(super) fn catalog_slide_context(
         slide,
         focused_table_appearance_package: focused_package,
     })
+}
+
+fn decode_catalog_slide_node_identifier(
+    source: &[u8],
+    slide_index: usize,
+    package: &IWorkPackage,
+) -> std::result::Result<u64, KeynoteObjectCatalogError> {
+    let wire_limits = keynote_slide_node_wire_limits(package.limits(), source)?;
+    litchi_keynote::__decode_slide_node_projection(source, wire_limits, slide_index)
+        .map(|(identifier, _is_skipped)| identifier)
+        .map_err(|error| {
+            KeynoteObjectCatalogError::InvalidSource(format!(
+                "malformed KN.SlideNodeArchive payload: {error}"
+            ))
+        })
 }
 
 fn decode_catalog_document_show_identifier(
@@ -800,6 +813,35 @@ fn keynote_show_options(source: &[u8]) -> keynote_show_codec::DecodeOptions {
         )
 }
 
+fn keynote_slide_node_wire_limits(
+    limits: crate::package::PackageLimits,
+    source: &[u8],
+) -> std::result::Result<WireLimits, KeynoteObjectCatalogError> {
+    let archive_limits = limits.archive_limits();
+    let source_bytes = source.len().max(1);
+    let max_input_bytes = archive_limits
+        .max_message_bytes()
+        .min(archive_limits.max_archive_bytes())
+        .min(limits.max_iwa_stream_bytes())
+        .min(WireLimits::MAX_INPUT_BYTES);
+    let input_bytes = source_bytes.min(max_input_bytes);
+    // Archive header budgets govern framing metadata, not protobuf payloads.
+    // Keep a separate source-sized field profile and the common bounded depth.
+    let fields = source_bytes.min(WireLimits::MAX_FIELDS);
+    let rewrite_work = source_bytes
+        .saturating_mul(8)
+        .clamp(1, WireLimits::MAX_REWRITE_WORK);
+    WireLimits::default()
+        .with_input_bytes(input_bytes)
+        .and_then(|limits| limits.with_fields(fields))
+        .and_then(|limits| limits.with_rewrite_work(rewrite_work))
+        .map_err(|error| {
+            KeynoteObjectCatalogError::InvalidSource(format!(
+                "invalid Keynote slide-node wire limits: {error}"
+            ))
+        })
+}
+
 fn table_model_options(source: &[u8]) -> table_model_discovery_codec::DecodeOptions {
     table_model_discovery_codec::DecodeOptions::for_source(source)
 }
@@ -963,6 +1005,86 @@ mod tests {
         let mut output = Vec::new();
         varint_field(1, identifier, &mut output);
         output
+    }
+
+    fn slide_node_payload(identifier: u64, is_skipped: bool) -> Vec<u8> {
+        let mut output = Vec::new();
+        bytes_field(2, &reference_payload(identifier), &mut output);
+        varint_field(4, u64::from(is_skipped), &mut output);
+        varint_field(6, 0, &mut output);
+        varint_field(7, 0, &mut output);
+        output
+    }
+
+    #[test]
+    fn catalog_slide_node_projection_matches_generated_identifier_without_retaining_source() {
+        let package = IWorkPackage::new();
+        let mut source = slide_node_payload(88, true);
+        let generated = kn::SlideNodeArchive::decode(source.as_slice()).expect("generated node");
+        let projected = decode_catalog_slide_node_identifier(&source, 3, &package)
+            .expect("focused slide-node projection");
+        assert_eq!(
+            projected,
+            generated.slide.expect("slide reference").identifier
+        );
+
+        // The catalog keeps the projected scalar, so its result remains valid
+        // after the source buffer is reused by the caller.
+        source.fill(0);
+        assert_eq!(projected, 88);
+
+        let alternate = slide_node_payload(99, false);
+        assert_eq!(
+            decode_catalog_slide_node_identifier(&alternate, 4, &package)
+                .expect("alternate focused projection"),
+            99
+        );
+    }
+
+    #[test]
+    fn catalog_slide_node_projection_rejects_missing_duplicate_and_malformed_references() {
+        let package = IWorkPackage::new();
+        let reference = reference_payload(88);
+        let mut missing_required = Vec::new();
+        bytes_field(2, &reference, &mut missing_required);
+        assert!(decode_catalog_slide_node_identifier(&missing_required, 0, &package).is_err());
+
+        let mut duplicate = slide_node_payload(88, false);
+        bytes_field(2, &reference_payload(89), &mut duplicate);
+        assert!(decode_catalog_slide_node_identifier(&duplicate, 0, &package).is_err());
+
+        let mut malformed_reference = Vec::new();
+        bytes_field(2, &[0x08, 0x80, 0x00], &mut malformed_reference);
+        varint_field(4, 0, &mut malformed_reference);
+        varint_field(6, 0, &mut malformed_reference);
+        varint_field(7, 0, &mut malformed_reference);
+        assert!(decode_catalog_slide_node_identifier(&malformed_reference, 0, &package).is_err());
+    }
+
+    #[test]
+    fn slide_node_payload_limits_are_independent_of_archive_header_budgets() {
+        let source = slide_node_payload(88, false);
+        let archive_limits = crate::package::PackageLimits::default()
+            .archive_limits()
+            .with_header_fields(1)
+            .unwrap()
+            .with_header_nesting(1)
+            .unwrap();
+        let limits = crate::package::PackageLimits::default()
+            .with_archive_limits(archive_limits)
+            .unwrap();
+        let wire = keynote_slide_node_wire_limits(limits, &source).unwrap();
+        assert_eq!(
+            litchi_keynote::__decode_slide_node_projection(&source, wire, 0)
+                .unwrap()
+                .0,
+            88
+        );
+        let limits = limits
+            .with_archive_limits(archive_limits.with_message_bytes(source.len() - 1).unwrap())
+            .unwrap();
+        let wire = keynote_slide_node_wire_limits(limits, &source).unwrap();
+        assert!(litchi_keynote::__decode_slide_node_projection(&source, wire, 0).is_err());
     }
 
     #[test]

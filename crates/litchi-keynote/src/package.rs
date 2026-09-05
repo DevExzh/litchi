@@ -3039,6 +3039,32 @@ fn decode_slide_node_projection(
     Ok((slide_identifier, is_skipped))
 }
 
+/// Decode the strict slide-node projection for the migration host.
+///
+/// This hidden seam keeps the selected slide identifier and skip state as
+/// owned scalars while the focused package remains the owner of the required
+/// native envelope and reference validation. The caller retains no generated
+/// `KN.SlideNodeArchive` value or payload borrow.
+///
+/// # Errors
+///
+/// Returns [`ReadError`] when the selected node is malformed, lacks one of its
+/// required envelope fields, exceeds `wire_limits`, or contains an invalid
+/// slide reference.
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub fn __decode_slide_node_projection(
+    payload: &[u8],
+    wire_limits: WireLimits,
+    slide_index: usize,
+) -> ReadResult<(u64, bool)> {
+    decode_slide_node_projection(
+        payload,
+        wire_limits,
+        SemanticPath::Slide { index: slide_index },
+    )
+}
+
 fn decode_slide_owner<'source>(
     payload: &'source [u8],
     wire_limits: WireLimits,

@@ -16326,3 +16326,69 @@ policy tests and a valid scanner census of 64 packages, 238 declarations, and
 11 ordered debts. No workspace package, manifest edge, ordered migration debt,
 migration-host item, or deletion gate is removed or closed by this follow-up;
 the monolithic `litchi-iwa` crate remains.
+
+## 2026-09-06 follow-up: bounded root and node discovery slices
+
+The direct focused Numbers owner now admits exact sources with either a rooted
+`TN.DocumentArchive` field-9 custom-registry edge or the native `TN.super`
+field-8 -> `TSA.custom_format_list` field-12 route. The migration-host
+dedicated `Custom` reset delegation remains restricted to the exact root-field-9
+route; the host's `TSA.custom_format_list` route and source-built packages
+retain compatibility-writer behavior. Route selection uses borrowed wire fields
+without a route-level `Vec` allocation; selected registry identity and
+cross-component ownership checks remain mandatory. Mixed routes, duplicate or
+null references,
+malformed references, and wrong registry shapes fail closed. The focused
+Numbers Custom suite reports 19 passing tests. The checked-in native source
+[`custom-number-native.numbers`](../../test-data/iwork/numbers/custom-number-native.numbers)
+was authored in Numbers 14.4 with B2 set to native Custom Number `Native
+Grouped` (`#,###`) and C2 set to `Native Custom marker`; Numbers saved,
+closed, and reopened the exact path with both the format and marker intact and
+no repair prompt. Its SHA-256 is
+`dc804f72667d8544f3209437232c70c3934b28ab86a9bd6718109f44a1cea342`.
+A focused Rust candidate changed B2 to `Rust Grouped` (`#,##0.00`) and passed
+read, no-op, reopen, exact inverse, three-component touch, and full-reparse
+checks. Its pre-application SHA-256 was
+`239b45ec96d7b88d83cc0c295c5f0f779cb03d17186061f45dba2f7d9d6ca072`; the
+inverse restored the original `dc804f72667d8544f3209437232c70c3934b28ab86a9bd6718109f44a1cea342`
+bytes. In Numbers 14.4, the candidate reopened with B2 displaying `42.00`,
+`Rust Grouped` selected, and the marker intact; C2 was changed to `Native
+Custom marker saved` to force a native save. After save, close, and reopen of
+the exact path, the inspector still showed `Rust Grouped` and `42.00` with no
+repair prompt. The resaved artifact's SHA-256 is
+`af1ccfdb5dfc1f28a4a8bce2daafd0e567c494ae5434935e361420edb22a859a`.
+The focused clear candidate then displayed B2 as numeric `42` with
+`Automatic`, changed C2 to `Native Custom clear saved` to force the native
+save, and after Cmd-S, close, and exact-path reopen retained both the
+`Automatic` format and marker with no repair prompt. Its post-clear SHA-256 is
+`432538800987ae78ee5a0d06a164d6f97abfa900bcbf4eb6dc73cbf2dda8b577`.
+The focused example reread the native-resaved clear artifact and performed an
+exact no-op clear with no bytes changed, zero touched components, and no full
+reparse. All five new native regression tests pass alongside the 19 existing
+focused Custom tests. This remains operation-specific native evidence and does
+not claim broad native parity.
+
+Keynote catalog slide-node lookup now uses a strict borrowed projection shared
+through the focused `litchi-keynote` `internal-iwork-source` seam. It validates
+the required envelope and slide reference under bounded wire limits, then
+retains only the owned slide identifier and skip state; it does not retain a
+generated `KN.SlideNodeArchive` or its payload. The seam is feature-gated and
+focused on migration-host discovery; optional graph payloads remain opaque,
+and this slice claims no whole-graph Prost acceptance parity or native
+mutation gate closure.
+
+Pages body-anchored graph discovery now consumes the narrow root facts needed
+by those readers: optional drawable z-order identifier, theme identifier, and
+left margin. The existing bounded Buffa body codec supplies the projection to
+five body graph read sites (audio, body shape, chart, image, and movie), with
+the chart path consuming the theme identifier; complete root decoding remains
+available for mutation and broader reachability operations. This reduces eager
+root materialization without changing mutation or native parity gates. The
+focused Keynote and Pages library suites report 193 and 150 passing tests,
+respectively, and `cargo test -p litchi-iwa --lib --locked` reports 1,711
+passing tests after the theme and message-limit fixes. Boundary verification
+reports 881 passing policy tests with a census of 64 packages, 238
+declarations, and 11 ordered debts. Workspace formatting, manifest sorting,
+library lint, all-feature library/integration tests, and documentation tests
+pass. No package, dependency edge, ordered debt, migration-host item, or
+ADR 0028 deletion gate is closed here.

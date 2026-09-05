@@ -10,7 +10,10 @@
 
 use std::borrow::Cow;
 
-use litchi_iwa_common::{decode_varint_from_bytes, wire::WireView};
+use litchi_iwa_common::{
+    decode_varint_from_bytes,
+    wire::{WireFieldView, WireView},
+};
 use litchi_iwa_protos::{
     numbers_table_cell_control_codec as control_codec,
     numbers_table_cell_currency_format_codec as currency_codec,
@@ -2750,25 +2753,54 @@ fn locate_custom_registry(
         native::unique_message_index(document_object, DOCUMENT_MESSAGE_TYPE, path)?;
     let root = &document_object.messages[document_index].data;
     let view = custom_wire_view(root, budget, 0, path)?;
-    let mut references = Vec::new();
-    for field in view
-        .fields()
-        .filter(|field| field.number() == CUSTOM_REGISTRY_REFERENCE_FIELD)
-    {
-        if field.wire_type() != 2 {
-            return Err(Error::InvalidSource { path });
+    let mut root_reference = None;
+    let mut legacy_reference = None;
+    let mut legacy_super_fields = 0usize;
+    for field in view.fields() {
+        match field.number() {
+            CUSTOM_REGISTRY_REFERENCE_FIELD => {
+                let reference = parse_custom_registry_reference(field, path)?;
+                if root_reference.replace(reference).is_some() {
+                    return Err(Error::InvalidSource { path });
+                }
+            },
+            DOCUMENT_LEGACY_SUPER_FIELD => {
+                legacy_super_fields = legacy_super_fields
+                    .checked_add(1)
+                    .ok_or(Error::InvalidSource { path })?;
+                if legacy_super_fields != 1 {
+                    return Err(Error::InvalidSource { path });
+                }
+                if field.wire_type() != 2 {
+                    return Err(Error::InvalidSource { path });
+                }
+                field
+                    .validate_canonical_framing()
+                    .map_err(|_| Error::InvalidSource { path })?;
+                let legacy = custom_wire_view(field.payload(), budget, 1, path)?;
+                for nested in legacy
+                    .fields()
+                    .filter(|nested| nested.number() == LEGACY_CUSTOM_REGISTRY_REFERENCE_FIELD)
+                {
+                    let reference = parse_custom_registry_reference(nested, path)?;
+                    if legacy_reference.replace(reference).is_some() {
+                        return Err(Error::InvalidSource { path });
+                    }
+                }
+            },
+            _ => {},
         }
-        field
-            .validate_canonical_framing()
-            .map_err(|_| Error::InvalidSource { path })?;
-        references.push(field.payload());
     }
-    if references.len() != 1 {
-        return Err(Error::InvalidSource { path });
-    }
-    let registry_identifier =
-        super::table_headers::resolve::local_reference_identifier(references[0])
-            .map_err(|_| Error::InvalidSource { path })?;
+    let (route, registry_identifier) = match (root_reference, legacy_reference) {
+        (Some(registry_identifier), None) => {
+            (CustomRegistryRoute::DocumentField9, registry_identifier)
+        },
+        (None, Some(registry_identifier)) => {
+            (CustomRegistryRoute::LegacySuperField12, registry_identifier)
+        },
+        (Some(_), Some(_)) => return Err(Error::UnsupportedDependency { path }),
+        (None, None) => return Err(Error::InvalidSource { path }),
+    };
     let resolved = source
         .state
         .index
@@ -2816,7 +2848,19 @@ fn locate_custom_registry(
         object_identifier: registry_identifier,
         message_index: 0,
         message_type: message.type_,
+        route,
     })
+}
+
+fn parse_custom_registry_reference(field: WireFieldView<'_>, path: Path) -> Result<u64, Error> {
+    if field.wire_type() != 2 {
+        return Err(Error::InvalidSource { path });
+    }
+    field
+        .validate_canonical_framing()
+        .map_err(|_| Error::InvalidSource { path })?;
+    super::table_headers::resolve::local_reference_identifier(field.payload())
+        .map_err(|_| Error::InvalidSource { path })
 }
 
 fn registry_payload(
@@ -4170,6 +4214,8 @@ fn parse_custom_reference(
 
 fn validate_custom_legacy_routes(
     source: &Package,
+    route: CustomRegistryRoute,
+    registry_identifier: u64,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<(), Error> {
@@ -4194,11 +4240,27 @@ fn validate_custom_legacy_routes(
             .validate_canonical_framing()
             .map_err(|_| Error::InvalidSource { path })?;
         let legacy = custom_wire_view(field.payload(), budget, 1, path)?;
-        if legacy
-            .fields()
-            .any(|nested| matches!(nested.number(), 7 | 12))
-        {
-            return Err(Error::UnsupportedDependency { path });
+        let mut native_references = 0usize;
+        for nested in legacy.fields() {
+            match nested.number() {
+                7 => return Err(Error::UnsupportedDependency { path }),
+                LEGACY_CUSTOM_REGISTRY_REFERENCE_FIELD => {
+                    if !matches!(route, CustomRegistryRoute::LegacySuperField12) {
+                        return Err(Error::UnsupportedDependency { path });
+                    }
+                    let nested_identifier = parse_custom_registry_reference(nested, path)?;
+                    if nested_identifier != registry_identifier {
+                        return Err(Error::InvalidSource { path });
+                    }
+                    native_references = native_references
+                        .checked_add(1)
+                        .ok_or(Error::InvalidSource { path })?;
+                },
+                _ => {},
+            }
+        }
+        if matches!(route, CustomRegistryRoute::LegacySuperField12) && native_references != 1 {
+            return Err(Error::InvalidSource { path });
         }
     }
     for component in source.state.components.catalog().iter() {
@@ -5088,12 +5150,12 @@ const FORMAT_LIST_TYPE: i32 = 2;
 // document registry's native message type (222).
 const CUSTOM_FORMAT_LIST_TYPE: i32 = 6;
 const DOCUMENT_MESSAGE_TYPE: u32 = 1;
-// TN.DocumentArchive.super is field 8, the legacy TSA envelope.  The
-// current document-scoped custom registry reference is field 9 (the
-// `CUSTOM_REGISTRY_REFERENCE_FIELD` above); keeping this legacy selector
-// separately prevents the required super envelope from becoming a registry
-// route by accident.
+// TN.DocumentArchive.super is field 8, the legacy TSA envelope.  Native
+// Numbers has been observed to store the document-scoped custom registry
+// reference as field 12 inside that envelope; the compact fixture route uses
+// field 9 directly.
 const DOCUMENT_LEGACY_SUPER_FIELD: u32 = 8;
+const LEGACY_CUSTOM_REGISTRY_REFERENCE_FIELD: u32 = 12;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum CustomFormatReadError {
@@ -5136,6 +5198,13 @@ struct CustomRegistryLocation {
     object_identifier: u64,
     message_index: usize,
     message_type: u32,
+    route: CustomRegistryRoute,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CustomRegistryRoute {
+    DocumentField9,
+    LegacySuperField12,
 }
 
 #[derive(Debug)]
@@ -5218,7 +5287,14 @@ pub(super) fn read_custom_format_with_budget(
         registry_payload(source, registry_location, path).map_err(CustomFormatReadError::Native)?;
     let registry = parse_custom_registry(registry_payload, budget, path)
         .map_err(CustomFormatReadError::Native)?;
-    validate_custom_legacy_routes(source, path, budget).map_err(CustomFormatReadError::Native)?;
+    validate_custom_legacy_routes(
+        source,
+        registry_location.route,
+        registry_location.object_identifier,
+        path,
+        budget,
+    )
+    .map_err(CustomFormatReadError::Native)?;
     validate_custom_graph_ownership(source, target, &graph, registry_location, path, budget)
         .map_err(CustomFormatReadError::Native)?;
     let custom = registry
@@ -5261,7 +5337,13 @@ pub(super) fn rewrite_custom_format(
     let registry_payload = registry_payload(source, registry_location, path)?;
     let mut registry = parse_custom_registry(registry_payload, budget, path)?;
     let mut registry_changed = false;
-    validate_custom_legacy_routes(source, path, budget)?;
+    validate_custom_legacy_routes(
+        source,
+        registry_location.route,
+        registry_location.object_identifier,
+        path,
+        budget,
+    )?;
     validate_custom_graph_ownership(source, target, &graph, registry_location, path, budget)?;
 
     let current = if let Some(key) = graph.format_identifier {

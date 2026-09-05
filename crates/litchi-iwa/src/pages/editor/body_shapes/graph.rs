@@ -214,13 +214,13 @@ fn body_shape_graph_from_text(
         )));
     }
 
-    let document = root_document(editor.package())?;
+    let document = pages_document_root_facts(editor.package())?;
     let z_order_id = document.drawables_zorder.ok_or_else(|| {
         Error::InvalidFormat("Pages document has no drawable z-order object".to_owned())
     })?;
     let z_order: tp::DrawablesZOrderArchive = decode_typed_package_object(
         editor.package(),
-        z_order_id.identifier,
+        z_order_id,
         DRAWABLE_Z_ORDER_MESSAGE_TYPE,
         "TP.DrawablesZOrderArchive",
     )?;

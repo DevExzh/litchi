@@ -4208,6 +4208,13 @@ IWA_KEYNOTE_SLIDE_DISCOVERY_FORBIDDEN_PATTERNS = (
             r"\bdecode_type\s*::<\s*ShowArchive\b"
         ),
     ),
+    (
+        "SlideNodeArchive::decode",
+        re.compile(
+            r"\bSlideNodeArchive\s*::\s*decode\s*\(|"
+            r"\bdecode_type\s*::<\s*SlideNodeArchive\b"
+        ),
+    ),
 )
 IWA_KEYNOTE_SLIDE_DISCOVERY_SELECTED_INFO_CALLBACKS = frozenset(
     {"decode_catalog_table_info"}
@@ -9544,6 +9551,55 @@ IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_LEGACY_CALL = re.compile(
     r"set_table_cell_number_format|reset_table_cell_number_format)"
     r"(?![A-Za-z0-9_])[ \t\r\n]*\("
 )
+
+# The migration host's Custom reset keeps a compatibility writer for source
+# built and legacy-registry packages while admitting the focused owner only
+# after both exact-source and rooted TN.DocumentArchive field-9 gates.  This
+# ratchet scopes those ordering and delegation requirements to the one host
+# method; the focused litchi-numbers package owns the physical rewrite.
+IWA_NUMBERS_CUSTOM_RESET_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "semantic" / "table.rs"
+)
+IWA_NUMBERS_CUSTOM_RESET_FUNCTION = "reset_table_cell_custom_format"
+IWA_NUMBERS_CUSTOM_RESET_COMPAT_MODULE_ALIAS = re.compile(
+    r"\bcell_data_format\b[ \t\r\n]+as[ \t\r\n]+(?:r#)?"
+    r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b"
+)
+IWA_NUMBERS_CUSTOM_RESET_REQUIRED_MARKERS = (
+    (
+        "current Custom read",
+        re.compile(
+            r"\bcell_data_format[ \t\r\n]*::[ \t\r\n]*"
+            r"cell_data_format[ \t\r\n]*\("
+        ),
+    ),
+    (
+        "exact-source gate",
+        re.compile(r"\bsource_is_exact[ \t\r\n]*\([ \t\r\n]*\)"),
+    ),
+    (
+        "focused registry gate",
+        re.compile(r"\bhas_focused_custom_registry_edge[ \t\r\n]*\("),
+    ),
+    (
+        "focused owner eligibility",
+        re.compile(r"\bfocused_data_format_owner_is_eligible[ \t\r\n]*\("),
+    ),
+    (
+        "focused owner commit",
+        re.compile(
+            r"\bcommit_exact_focused_data_format_with_location"
+            r"[ \t\r\n]*\("
+        ),
+    ),
+    (
+        "compatibility reset",
+        re.compile(
+            r"\bcell_data_format[ \t\r\n]*::[ \t\r\n]*"
+            r"reset_cell_data_format[ \t\r\n]*\("
+        ),
+    ),
+)
 IWA_NUMBERS_TABLE_CELL_NUMBER_FORMAT_README_CALL = re.compile(
     r"(?<![A-Za-z0-9_])(?:r#)?(?:numbers|numbers_editor|editor)"
     r"[ \t\r\n]*\.[ \t\r\n]*(?:r#)?(?P<method>"
@@ -12299,6 +12355,65 @@ IWA_PAGES_SECTION_TEMPLATE_DISCOVERY_FORBIDDEN_PATTERNS = (
             r"\bSectionTemplateArchive\b(?![ \t\r\n]*::"
             r"[ \t\r\n]*decode\b)"
         ),
+    ),
+)
+# Body-anchored drawable graph readers need only the two scalar facts exposed
+# by ``pages_document_root_facts``. Keep this inventory explicit: mutation and
+# theme helpers in the same modules may still use complete generated archives,
+# while these five read sites must not regress to ``root_document``.
+IWA_PAGES_ROOT_FACTS_GRAPH_SITES = (
+    (
+        IWA_PAGES_SOURCE_ROOT / "editor" / "audio" / "graph.rs",
+        "body_audio_graph",
+    ),
+    (
+        IWA_PAGES_SOURCE_ROOT / "editor" / "body_shapes" / "graph.rs",
+        "body_shape_graph_from_text",
+    ),
+    (
+        IWA_PAGES_SOURCE_ROOT / "editor" / "charts" / "graph.rs",
+        "body_chart_graph",
+    ),
+    (
+        IWA_PAGES_SOURCE_ROOT / "editor" / "images" / "graph.rs",
+        "body_image_graph",
+    ),
+    (
+        IWA_PAGES_SOURCE_ROOT / "editor" / "movies" / "graph.rs",
+        "body_movie_graph",
+    ),
+)
+IWA_PAGES_ROOT_FACTS_GRAPH_CALL = re.compile(
+    r"\bpages_document_root_facts[ \t\r\n]*\("
+)
+IWA_PAGES_ROOT_FACTS_GRAPH_ROOT_ALIAS = re.compile(
+    r"\b(?:r#)?(?:root_document|root_document_body)\b"
+    r"[ \t\r\n]+as[ \t\r\n]+(?:r#)?"
+    r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b"
+)
+IWA_PAGES_ROOT_FACTS_GRAPH_FORBIDDEN_PATTERNS = (
+    (
+        "root_document call",
+        re.compile(
+            r"\b(?:r#)?root_document[ \t\r\n]*\([ \t\r\n]*"
+        ),
+    ),
+    (
+        "root_document_body call",
+        re.compile(
+            r"\b(?:r#)?root_document_body[ \t\r\n]*\([ \t\r\n]*"
+        ),
+    ),
+    (
+        "DocumentArchive::decode",
+        re.compile(
+            r"\bDocumentArchive[ \t\r\n]*::[ \t\r\n]*decode"
+            r"[ \t\r\n]*\("
+        ),
+    ),
+    (
+        "generated DocumentArchive type",
+        re.compile(r"\bDocumentArchive\b"),
     ),
 )
 PAGES_PACKAGE_TEST_MODULE = re.compile(
@@ -25168,6 +25283,97 @@ def audit_iwa_numbers_table_cell_number_format_source_topology(
                 "unscoped litchi-iwa Numbers Number-format raw-ID production call "
                 f"{match.group('method')}: {path.relative_to(root)}:{line_number}"
             )
+
+    return sorted(set(violations))
+
+
+def audit_iwa_numbers_custom_reset_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the migration-host Custom reset behind both owner gates.
+
+    ``NumbersEditor::reset_table_cell_custom_format`` has two intentional
+    routes. Exact sources with the rooted TN.DocumentArchive field-9 edge use
+    the focused package owner; builder and legacy-registry sources retain the
+    compatibility writer. Inspect only this method so the generic Custom
+    helpers remain available while a future edit cannot move the legacy reset
+    ahead of focused admission or silently bypass either gate.
+    """
+
+    path = root / IWA_NUMBERS_CUSTOM_RESET_SOURCE
+    if not path.is_file():
+        return []
+
+    masked_source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    body = _rust_any_function_body(
+        masked_source, IWA_NUMBERS_CUSTOM_RESET_FUNCTION
+    )
+    if body is None:
+        return []
+    production_body = _mask_rust_non_code(body)
+    source_code = _mask_rust_non_code(masked_source)
+    line_number = next(
+        (
+            line
+            for name, line in _rust_function_declarations(masked_source)
+            if name == IWA_NUMBERS_CUSTOM_RESET_FUNCTION
+        ),
+        1,
+    )
+
+    violations: list[str] = []
+    for label, marker in IWA_NUMBERS_CUSTOM_RESET_REQUIRED_MARKERS:
+        if marker.search(production_body) is None:
+            violations.append(
+                "litchi-iwa Numbers Custom reset is missing its "
+                f"{label} marker: {path.relative_to(root)}:{line_number}"
+            )
+
+    focused_gate = re.search(
+        r"\bsource_is_exact[ \t\r\n]*\([ \t\r\n]*\)", production_body
+    )
+    registry_gate = re.search(
+        r"\bhas_focused_custom_registry_edge[ \t\r\n]*\(", production_body
+    )
+    focused_commit = re.search(
+        r"\bcommit_exact_focused_data_format_with_location"
+        r"[ \t\r\n]*\(",
+        production_body,
+    )
+    compatibility_reset = re.search(
+        r"\bcell_data_format[ \t\r\n]*::[ \t\r\n]*"
+        r"reset_cell_data_format[ \t\r\n]*\(",
+        production_body,
+    )
+    if focused_gate and registry_gate and focused_gate.start() > registry_gate.start():
+        violations.append(
+            "litchi-iwa Numbers Custom reset must check the exact-source gate "
+            f"before the focused registry gate: {path.relative_to(root)}:{line_number}"
+        )
+    if focused_commit and compatibility_reset:
+        if compatibility_reset.start() < focused_commit.start():
+            violations.append(
+                "litchi-iwa Numbers Custom reset must keep its compatibility "
+                "reset after focused owner admission: "
+                f"{path.relative_to(root)}:{line_number}"
+            )
+
+    # A module alias can hide the compatibility edge from the canonical marker
+    # while still reintroducing the same raw-ID writer into this method.
+    for alias_match in IWA_NUMBERS_CUSTOM_RESET_COMPAT_MODULE_ALIAS.finditer(
+        source_code
+    ):
+        alias = alias_match.group("alias")
+        aliased_reset = re.compile(
+            rf"\b(?:r#)?{re.escape(alias)}[ \t\r\n]*::"
+            r"[ \t\r\n]*reset_cell_data_format[ \t\r\n]*\("
+        )
+        if aliased_reset.search(production_body) is None:
+            continue
+        violations.append(
+            "litchi-iwa Numbers Custom reset bypasses the canonical compatibility "
+            f"edge through alias {alias}: {path.relative_to(root)}:{line_number}"
+        )
 
     return sorted(set(violations))
 
@@ -40387,7 +40593,8 @@ def audit_iwa_keynote_slide_table_discovery_source_topology(
     for source in production.values():
         code = _mask_rust_non_code(source)
         for match in re.finditer(
-            r"\b(?:DocumentArchive|ShowArchive|TableModelArchive|TableInfoArchive)\b"
+            r"\b(?:DocumentArchive|ShowArchive|SlideNodeArchive|"
+            r"TableModelArchive|TableInfoArchive)\b"
             r"[ \t\r\n]+as[ \t\r\n]+(?:r#)?"
             r"(?P<alias>[A-Za-z_][A-Za-z0-9_]*)\b",
             code,
@@ -40398,6 +40605,7 @@ def audit_iwa_keynote_slide_table_discovery_source_topology(
                 for name in (
                     "DocumentArchive",
                     "ShowArchive",
+                    "SlideNodeArchive",
                     "TableModelArchive",
                     "TableInfoArchive",
                 )
@@ -43670,6 +43878,72 @@ def audit_iwa_pages_section_template_discovery_source_topology(
                     "litchi-iwa Pages section-template discovery production source "
                     f"uses {label}: {IWA_PAGES_BODY_STORAGE_DISCOVERY_SOURCE}:{line_number}"
                 )
+    return sorted(set(violations))
+
+
+def audit_iwa_pages_root_facts_graph_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep five Pages graph readers on the compact root-facts projection.
+
+    The graph modules also contain mutation and theme paths that legitimately
+    retain generated Pages archives. Only the body-anchored read functions in
+    ``IWA_PAGES_ROOT_FACTS_GRAPH_SITES`` are inspected, so a complete archive
+    cannot slip back into these hot paths through a direct call or a renamed
+    ``root_document`` helper.
+    """
+
+    violations: list[str] = []
+    for relative, function_name in IWA_PAGES_ROOT_FACTS_GRAPH_SITES:
+        path = root / relative
+        if not path.is_file():
+            continue
+        masked_source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        function = _rust_named_function_body(masked_source, function_name)
+        if function is None:
+            continue
+        body, body_offset = function
+        production_body = _mask_rust_non_code(body)
+        line_number = next(
+            (
+                line
+                for name, line in _rust_function_declarations(masked_source)
+                if name == function_name
+            ),
+            1,
+        )
+        if IWA_PAGES_ROOT_FACTS_GRAPH_CALL.search(production_body) is None:
+            violations.append(
+                "litchi-iwa Pages graph reader is missing the compact root-facts "
+                f"projection call {function_name}: {relative}:{line_number}"
+            )
+
+        forbidden = list(IWA_PAGES_ROOT_FACTS_GRAPH_FORBIDDEN_PATTERNS)
+        source_code = _mask_rust_non_code(masked_source)
+        for alias_match in IWA_PAGES_ROOT_FACTS_GRAPH_ROOT_ALIAS.finditer(
+            source_code
+        ):
+            alias = alias_match.group("alias")
+            forbidden.append(
+                (
+                    f"root-document alias {alias} call",
+                    re.compile(
+                        rf"\b(?:r#)?{re.escape(alias)}[ \t\r\n]*"
+                        r"\([ \t\r\n]*"
+                    ),
+                )
+            )
+
+        for label, pattern in forbidden:
+            for match in pattern.finditer(production_body):
+                line = masked_source.count(
+                    "\n", 0, body_offset + match.start()
+                ) + 1
+                violations.append(
+                    "litchi-iwa Pages graph reader uses eager root data through "
+                    f"{label}: {relative}:{line}"
+                )
+
     return sorted(set(violations))
 
 
@@ -56416,6 +56690,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_numbers_table_cell_text_format_source_topology()
         + audit_numbers_table_cell_custom_format_codec_source_topology()
         + audit_numbers_table_cell_custom_format_facade_source_topology()
+        + audit_iwa_numbers_custom_reset_source_topology()
         + audit_numbers_table_cell_percentage_format_codec_source_topology()
         + audit_numbers_table_cell_percentage_format_facade_source_topology()
         + audit_iwa_numbers_table_cell_percentage_format_source_topology()
@@ -56446,6 +56721,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_pages_document_source_topology()
         + audit_iwa_pages_body_storage_discovery_source_topology()
         + audit_iwa_pages_section_template_discovery_source_topology()
+        + audit_iwa_pages_root_facts_graph_source_topology()
         + audit_pages_document_public_api()
         + audit_pages_package_output_api_source_topology()
         + audit_iwork_atomic_publication()

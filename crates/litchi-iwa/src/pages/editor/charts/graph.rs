@@ -140,13 +140,13 @@ pub(super) fn body_chart_graph(
         )));
     }
 
-    let document = root_document(editor.package())?;
+    let document = pages_document_root_facts(editor.package())?;
     let z_order_id = document.drawables_zorder.ok_or_else(|| {
         Error::InvalidFormat("Pages document has no drawable z-order object".into())
     })?;
     let z_order: tp::DrawablesZOrderArchive = decode_typed_package_object(
         editor.package(),
-        z_order_id.identifier,
+        z_order_id,
         DRAWABLE_Z_ORDER_MESSAGE_TYPE,
         "TP.DrawablesZOrderArchive",
     )?;
@@ -535,8 +535,6 @@ pub(super) fn body_chart_graph(
     }
     let theme_id = document
         .theme
-        .as_ref()
-        .map(|reference| reference.identifier)
         .filter(|identifier| *identifier != 0)
         .ok_or_else(|| Error::InvalidFormat("Pages document has no theme".into()))?;
     let theme = chart_theme_context(editor.package(), theme_id)?;

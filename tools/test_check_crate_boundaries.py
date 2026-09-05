@@ -22219,6 +22219,72 @@ fn rewrite_movie_title_operation(
                 violations,
             )
 
+    def test_iwa_keynote_slide_table_discovery_rejects_eager_slide_node_reads(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_table_discovery_scaffold(root)
+            graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES[1]
+            source = graph.read_text(encoding="utf-8").replace(
+                "    decode_table_projection(bytes);\n",
+                "    decode_table_projection(bytes);\n"
+                "    eager_slide_node_read(bytes);\n",
+                1,
+            )
+            source += (
+                "fn eager_slide_node_read(bytes: &[u8]) {\n"
+                "    let _ = SlideNodeArchive::decode(bytes);\n"
+                "}\n"
+            )
+            graph.write_text(source, encoding="utf-8")
+
+            violations = (
+                boundaries.audit_iwa_keynote_slide_table_discovery_source_topology(
+                    root
+                )
+            )
+
+            self.assertTrue(
+                any("SlideNodeArchive::decode" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_keynote_slide_table_discovery_rejects_eager_slide_node_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_table_discovery_scaffold(root)
+            graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES[1]
+            source = graph.read_text(encoding="utf-8").replace(
+                "    decode_table_projection(bytes);\n",
+                "    decode_table_projection(bytes);\n"
+                "    eager_slide_node_alias(bytes);\n",
+                1,
+            )
+            source += (
+                "use SlideNodeArchive as NodeAlias;\n"
+                "fn eager_slide_node_alias(bytes: &[u8]) {\n"
+                "    let _ = NodeAlias::decode(bytes);\n"
+                "}\n"
+            )
+            graph.write_text(source, encoding="utf-8")
+
+            violations = (
+                boundaries.audit_iwa_keynote_slide_table_discovery_source_topology(
+                    root
+                )
+            )
+
+            self.assertTrue(
+                any(
+                    "SlideNodeArchive alias NodeAlias::decode" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
     def test_iwa_keynote_slide_table_discovery_rejects_generated_decode_aliases(
         self,
     ) -> None:
@@ -23500,6 +23566,85 @@ fn rewrite_movie_title_operation(
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
             "+ audit_iwa_pages_section_template_discovery_source_topology()",
+            main_source,
+        )
+
+    def test_iwa_pages_root_facts_graph_readers_use_the_compact_projection(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative, function_name in boundaries.IWA_PAGES_ROOT_FACTS_GRAPH_SITES:
+                source = root / relative
+                source.parent.mkdir(parents=True, exist_ok=True)
+                source.write_text(
+                    f"fn {function_name}() {{\n"
+                    "    let _ = pages_document_root_facts(package);\n"
+                    "}\n",
+                    encoding="utf-8",
+                )
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_root_facts_graph_source_topology(root),
+                [],
+            )
+
+    def test_iwa_pages_root_facts_graph_readers_reject_eager_root_and_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative, function_name = boundaries.IWA_PAGES_ROOT_FACTS_GRAPH_SITES[0]
+            source = root / relative
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text(
+                f"fn {function_name}() {{\n"
+                "    let _ = pages_document_root_facts(package);\n"
+                "    let _ = DocumentArchive::decode(payload);\n"
+                "    let _ = root_document(package);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_pages_root_facts_graph_source_topology(root)
+            self.assertTrue(any("DocumentArchive::decode" in item for item in violations), violations)
+            self.assertTrue(any("root_document call" in item for item in violations), violations)
+
+            source.write_text(
+                "use root_document as eager_root;\n"
+                f"fn {function_name}() {{\n"
+                "    let _ = pages_document_root_facts(package);\n"
+                "    let _ = eager_root(package);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_pages_root_facts_graph_source_topology(root)
+            self.assertTrue(any("root-document alias eager_root call" in item for item in violations), violations)
+
+    def test_iwa_pages_root_facts_graph_readers_mask_non_code_markers(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative, function_name = boundaries.IWA_PAGES_ROOT_FACTS_GRAPH_SITES[0]
+            source = root / relative
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text(
+                f"fn {function_name}() {{\n"
+                "    // root_document(package); DocumentArchive::decode(payload);\n"
+                '    let note = "root_document DocumentArchive";\n'
+                "    let _ = pages_document_root_facts(package);\n"
+                "    let _ = note;\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_pages_root_facts_graph_source_topology(root),
+                [],
+            )
+
+    def test_iwa_pages_root_facts_graph_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_pages_root_facts_graph_source_topology()",
             main_source,
         )
 
@@ -36717,6 +36862,93 @@ fn rewrite_movie_title_operation(
                 "audit_iwa_numbers_table_cell_custom_format",
                 vars(boundaries),
             )
+
+    def test_iwa_numbers_custom_reset_requires_focused_and_compatibility_routes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_NUMBERS_CUSTOM_RESET_SOURCE
+            source.parent.mkdir(parents=True, exist_ok=True)
+            complete = (
+                "impl NumbersEditor {\n"
+                "    pub fn reset_table_cell_custom_format(&mut self) -> Result<bool> {\n"
+                "        let current = cell_data_format::cell_data_format(&self.package, table_id, row, column)?;\n"
+                "        if self.package.source_is_exact() && has_focused_custom_registry_edge(self)? {\n"
+                "            let location = focused_data_format_owner_is_eligible(self, table_id, row, column, &current, &DataFormat::Automatic)?;\n"
+                "            *self = commit_exact_focused_data_format_with_location(self, table_id, row, column, &current, &DataFormat::Automatic, location)?;\n"
+                "            return Ok(true);\n"
+                "        }\n"
+                "        let mut staged = self.package.clone();\n"
+                "        let changed = cell_data_format::reset_cell_data_format(&mut staged, table_id, row, column)?;\n"
+                "        Ok(changed)\n"
+                "    }\n"
+                "}\n"
+            )
+            source.write_text(complete, encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_custom_reset_source_topology(root),
+                [],
+            )
+
+            source.write_text(
+                complete.replace(
+                    "has_focused_custom_registry_edge(self)?",
+                    "legacy_registry_gate(self)?",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_custom_reset_source_topology(root)
+            self.assertTrue(
+                any("focused registry gate marker" in item for item in violations),
+                violations,
+            )
+
+            reversed_route = complete.replace(
+                "            *self = commit_exact_focused_data_format_with_location(self, table_id, row, column, &current, &DataFormat::Automatic, location)?;\n"
+                "            return Ok(true);\n",
+                "",
+                1,
+            )
+            reversed_route = reversed_route.replace(
+                "        let mut staged = self.package.clone();\n"
+                "        let changed = cell_data_format::reset_cell_data_format(&mut staged, table_id, row, column)?;\n",
+                "        let mut staged = self.package.clone();\n"
+                    "        let changed = cell_data_format::reset_cell_data_format(&mut staged, table_id, row, column)?;\n"
+                "        let _ = commit_exact_focused_data_format_with_location(self, table_id, row, column, &current, &DataFormat::Automatic, location)?;\n",
+                1,
+            )
+            source.write_text(reversed_route, encoding="utf-8")
+            violations = boundaries.audit_iwa_numbers_custom_reset_source_topology(root)
+            self.assertTrue(
+                any("after focused owner admission" in item for item in violations),
+                violations,
+            )
+
+            source.write_text(
+                complete.replace(
+                    "cell_data_format::reset_cell_data_format",
+                    "legacy::reset_cell_data_format",
+                ).replace(
+                    "impl NumbersEditor {",
+                    "use cell_data_format as legacy;\nimpl NumbersEditor {",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_custom_reset_source_topology(root)
+            self.assertTrue(
+                any("alias legacy" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_numbers_custom_reset_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_numbers_custom_reset_source_topology()",
+            main_source,
+        )
 
     def test_numbers_table_cell_custom_format_codec_rejects_decoys_and_bad_projection(
         self,
