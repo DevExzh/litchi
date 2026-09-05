@@ -8607,3 +8607,63 @@ tests. Boundary policy verification passes 895 tests; the scanner retains
 64 packages, 238 internal dependency declarations, and 11 ordered debts.
 Formatting, manifest sorting, and diff checks pass. Normal commit hooks enforce
 library lint, workspace all-feature library/integration tests, and doc tests.
+
+## 2026-09-06 follow-up: shared listing sources, batch appearance reads, and native Duration
+
+The migration host now hands its retained exact source allocation to the
+Numbers and Keynote owners through narrow, feature-gated shared-source
+constructors. The constructors retain the same physical and semantic ingress
+as the prior byte-slice routes; they avoid copying the complete ZIP source.
+The host's crate-private accessor returns no source after mutation or legacy
+normalization. Supported format facades gain no raw-ID or low-level object API.
+
+Keynote listing requests one position-ordered batch of appearances per slide.
+The batch and single-table operations share the same strict scanner, including
+role, metadata, ownership, inbound-reference, and full inheritance checks.
+The single-table path retains only the selected candidate; the batch retains
+only semantic appearances. Host listing no longer repeats the complete
+appearance scan for every table. Empty-slide listing retains exact ingress and
+classification but skips the new batch semantic scan. This removes repeated
+work without claiming that all remaining package-wide ownership scans are
+linear or that the host's physical catalog has been retired.
+
+Numbers exact-source listing builds one validated table-to-selector index
+instead of repeatedly resolving each table's sheet and drawable position.
+The index borrows cached archives and reuses strictly validated TableInfo
+descriptors; it retains archive names and compact object locations without
+cloning archive payloads or probing arbitrary messages as TableInfo.
+Source-built appearance reads retain their borrowed catalog route, and exact
+focused ingress/read failures remain terminal.
+
+The 137-line shared host `table_lock.rs` parser and its module declaration are
+deleted. Pages table discovery now derives the lock state from the strict
+TableInfo snapshot it already decoded, removing a second wire traversal.
+Absent locks still mean unlocked; canonical booleans, duplicate fields,
+malformed values, and unknown framing remain covered by the focused codec.
+
+Computer Use in Numbers 14.4 authored and reopened an explicit Duration source
+containing `1h 23m 45s` with abbreviated automatic hours-through-seconds units.
+Rust replaced it with colon/custom hours-through-seconds formatting. Numbers
+displayed `1:23:45` and retained the Duration/Custom Units inspector settings
+through save, close, and exact-path reopen. Rust clear restored Automatic and
+`1h 23m 45s`; the value and edited marker again survived native save, close,
+and reopen. Rust confirmed an exact no-op clear on that native-resaved result.
+The checked source/resaved fixtures and hashes are recorded in the
+[fixture README](../../test-data/iwork/README.md#numbers-duration-source-2026-09-06).
+Rust tests preserve the stored Duration, cached scalar, adjacent marker,
+two-component locality, exact no-op, and inverse restoration. This qualifies
+the recorded Duration replacement and clear profile only.
+
+These changes remove a host parser and improve focused read ownership and
+memory use. The remaining monolith, compatibility writers, ordered debts,
+and global native-parity/deletion gates remain open.
+
+Focused validation passes 1,715 host library tests, 453 Numbers library tests
+plus four ignored, 153 Pages library tests, 203 Keynote library tests, 21
+Keynote appearance integration tests, four native Duration tests, and 22
+TableInfo codec tests. Numbers and Keynote also pass default-feature library
+checks; migration-only Keynote helpers and their codec import are explicitly
+gated. Boundary policy tests pass 897 cases, with the scanner retaining
+64 packages, 238 internal dependency declarations, and 11 ordered debts.
+Normal commit hooks enforce formatting, workspace library lint, all-feature
+library/integration tests, and doc tests.

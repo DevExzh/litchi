@@ -617,6 +617,14 @@ impl IWorkPackage {
         self.source.as_deref()
     }
 
+    /// Share the immutable exact source with a focused format owner.
+    ///
+    /// This clones only the allocation handle. Mutated or normalized legacy
+    /// packages have no exact source and must retain compatibility admission.
+    pub(crate) fn exact_source_owner(&self) -> Option<Arc<[u8]>> {
+        self.source.clone()
+    }
+
     /// Discard an exact byte baseline after internally reopening a package
     /// that originated from the legacy source builder.
     ///
@@ -1317,6 +1325,9 @@ mod tests {
         let source: Arc<[u8]> = bytes.into();
         let package = IWorkPackage::from_shared_bytes(source.clone()).unwrap();
 
+        let retained = package.exact_source_owner().expect("exact source owner");
+        assert!(Arc::ptr_eq(&source, &retained));
+
         assert_eq!(package.to_bytes().unwrap(), source.as_ref());
         let mut written = Vec::new();
         package.write_to(&mut written).unwrap();
@@ -1464,6 +1475,7 @@ mod tests {
         assert!(!Arc::ptr_eq(&changed_state, &changed.state));
         assert_eq!(changed.mutation_revision(), changed_revision + 1);
         assert!(changed.source.is_none());
+        assert!(changed.exact_source_owner().is_none());
         assert_eq!(
             changed.entry("Index/Document.iwa"),
             Some(replacement.as_slice())

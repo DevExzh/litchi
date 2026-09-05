@@ -4,10 +4,11 @@
 //! `litchi_numbers`. Native object identifiers are resolved once here and are
 //! kept below the semantic API.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use super::NumbersEditor;
-use crate::{Error, Result};
+use crate::archive::ArchiveObject;
+use crate::{Error, IWorkPackage, Result};
 use litchi_numbers::{Dimensions, Document, Sheet, SheetSelector, Table, TableSelector};
 
 /// A private semantic sheet catalog used only at the legacy archive boundary.
@@ -140,6 +141,276 @@ impl TableSelectorAdapter {
                 "Numbers table selector catalog lost native entry at index {index}"
             ))
         })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FocusedObjectLocation {
+    archive_index: usize,
+    object_index: usize,
+}
+
+/// A borrowed archive-backed object index for one focused selector pass.
+///
+/// The index retains only archive names and object slots. Archive payloads and
+/// decoded objects remain in the package cache and are borrowed through
+/// `with_parsed_archive` for the duration of each read.
+struct FocusedObjectCatalog<'package> {
+    package: &'package IWorkPackage,
+    archive_names: Vec<String>,
+    objects: HashMap<u64, FocusedObjectLocation>,
+}
+
+impl<'package> FocusedObjectCatalog<'package> {
+    fn build(package: &'package IWorkPackage, required_ids: &HashSet<u64>) -> Result<Self> {
+        let archive_count = package.iwa_entry_names().count();
+        let mut archive_names = Vec::new();
+        archive_names
+            .try_reserve_exact(archive_count)
+            .map_err(|_| {
+                allocation_error("Numbers focused selector archive names", archive_count)
+            })?;
+        for name in package.iwa_entry_names() {
+            let mut owned = String::new();
+            owned.try_reserve_exact(name.len()).map_err(|_| {
+                allocation_error("Numbers focused selector archive name", name.len())
+            })?;
+            owned.push_str(name);
+            archive_names.push(owned);
+        }
+
+        let mut objects = HashMap::new();
+        objects.try_reserve(required_ids.len()).map_err(|_| {
+            allocation_error("Numbers focused selector object index", required_ids.len())
+        })?;
+        for (archive_index, archive_name) in archive_names.iter().enumerate() {
+            package.with_parsed_archive(archive_name, |archive| {
+                for (object_index, object) in archive.objects.iter().enumerate() {
+                    let Some(identifier) = object.archive_info.identifier else {
+                        continue;
+                    };
+                    if !required_ids.contains(&identifier) {
+                        continue;
+                    }
+                    objects.try_reserve(1).map_err(|_| {
+                        allocation_error("Numbers focused selector object index", 1)
+                    })?;
+                    if objects
+                        .insert(
+                            identifier,
+                            FocusedObjectLocation {
+                                archive_index,
+                                object_index,
+                            },
+                        )
+                        .is_some()
+                    {
+                        return Err(Error::InvalidFormat(format!(
+                            "Numbers focused selector object {identifier} is repeated"
+                        )));
+                    }
+                }
+                Ok(())
+            })?;
+        }
+
+        Ok(Self {
+            package,
+            archive_names,
+            objects,
+        })
+    }
+
+    fn with_object<T>(
+        &self,
+        identifier: u64,
+        read: impl FnOnce(&ArchiveObject) -> Result<T>,
+    ) -> Result<T> {
+        let location = self.objects.get(&identifier).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers focused selector object {identifier} is missing"
+            ))
+        })?;
+        let archive_name = self
+            .archive_names
+            .get(location.archive_index)
+            .ok_or_else(|| {
+                Error::InvalidFormat("Numbers focused selector archive is missing".to_owned())
+            })?;
+        self.package.with_parsed_archive(archive_name, |archive| {
+            let object = archive.objects.get(location.object_index).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Numbers focused selector object {identifier} is missing"
+                ))
+            })?;
+            if object.archive_info.identifier != Some(identifier) {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers focused selector object {identifier} location changed"
+                )));
+            }
+            read(object)
+        })
+    }
+}
+
+fn allocation_error(resource: &'static str, amount: usize) -> Error {
+    Error::IwaCommon(litchi_iwa_common::Error::Allocation { resource, amount })
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FocusedTableLocation {
+    sheet_index: usize,
+    table_index: usize,
+    table_info_id: u64,
+}
+
+/// One validated native-table-to-selector index for a workbook snapshot.
+///
+/// The public editor remains selector-first. This private catalog exists only
+/// to avoid repeating the sheet/drawable ownership traversal for every exact
+/// table appearance read.
+#[derive(Debug)]
+pub(super) struct FocusedTableSelectorIndex {
+    locations: HashMap<u64, FocusedTableLocation>,
+}
+
+impl FocusedTableSelectorIndex {
+    pub(super) fn from_descriptors(
+        editor: &NumbersEditor,
+        descriptors: &[super::model::TableDescriptor],
+    ) -> Result<Self> {
+        let mut table_info_models = HashMap::new();
+        table_info_models
+            .try_reserve(descriptors.len())
+            .map_err(|_| {
+                allocation_error(
+                    "Numbers focused selector table-info models",
+                    descriptors.len(),
+                )
+            })?;
+        for descriptor in descriptors {
+            if table_info_models
+                .insert(descriptor.table_info_id, descriptor.object_id)
+                .is_some()
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers table-info object {} has multiple models",
+                    descriptor.table_info_id
+                )));
+            }
+        }
+        if descriptors.is_empty() {
+            return Ok(Self {
+                locations: HashMap::new(),
+            });
+        }
+
+        // `table_models` has already decoded and validated each rooted
+        // TableInfo alias. Reuse that result here; this pass only needs the
+        // sheet projection order, so it must not reinterpret arbitrary
+        // drawable payloads as table ownership.
+        let document = super::numbers_document(editor.package())?;
+        let mut sheet_ids = HashSet::new();
+        sheet_ids.try_reserve(document.sheets.len()).map_err(|_| {
+            allocation_error(
+                "Numbers focused selector sheet identifiers",
+                document.sheets.len(),
+            )
+        })?;
+        for sheet_reference in &document.sheets {
+            sheet_ids.insert(sheet_reference.identifier);
+        }
+        let catalog = FocusedObjectCatalog::build(editor.package(), &sheet_ids)?;
+
+        let mut table_locations = HashMap::new();
+        table_locations
+            .try_reserve(descriptors.len())
+            .map_err(|_| {
+                allocation_error("Numbers focused selector locations", descriptors.len())
+            })?;
+        let mut seen_projections = HashSet::new();
+        seen_projections
+            .try_reserve(descriptors.len())
+            .map_err(|_| {
+                allocation_error("Numbers focused selector projections", descriptors.len())
+            })?;
+
+        for (sheet_index, sheet_reference) in document.sheets.iter().enumerate() {
+            let sheet_id = sheet_reference.identifier;
+            if !catalog.objects.contains_key(&sheet_id) {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers sheet {sheet_id} is missing"
+                )));
+            }
+            let (_, sheet) = catalog.with_object(sheet_id, super::decode_sheet)?;
+            let mut table_index = 0_usize;
+            for drawable in &sheet.drawable_infos {
+                let Some(&model_id) = table_info_models.get(&drawable.identifier) else {
+                    continue;
+                };
+                let current_table_index = table_index;
+                table_index = table_index.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat(
+                        "Numbers focused selector table index overflows".to_owned(),
+                    )
+                })?;
+                seen_projections
+                    .try_reserve(1)
+                    .map_err(|_| allocation_error("Numbers focused selector projections", 1))?;
+                if !seen_projections.insert((sheet_index, drawable.identifier)) {
+                    return Err(Error::InvalidFormat(format!(
+                        "Numbers table model {model_id} has an ambiguous focused sheet projection"
+                    )));
+                }
+                table_locations
+                    .try_reserve(1)
+                    .map_err(|_| allocation_error("Numbers focused selector locations", 1))?;
+                if table_locations
+                    .insert(
+                        model_id,
+                        FocusedTableLocation {
+                            sheet_index,
+                            table_index: current_table_index,
+                            table_info_id: drawable.identifier,
+                        },
+                    )
+                    .is_some()
+                {
+                    return Err(Error::InvalidFormat(format!(
+                        "Numbers table model {model_id} has multiple owning sheet drawables"
+                    )));
+                }
+            }
+        }
+
+        for descriptor in descriptors {
+            let Some(location) = table_locations.get(&descriptor.object_id) else {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers table model {} has no owning sheet drawable",
+                    descriptor.object_id
+                )));
+            };
+            debug_assert_eq!(location.table_info_id, descriptor.table_info_id);
+        }
+
+        Ok(Self {
+            locations: table_locations,
+        })
+    }
+
+    pub(super) fn selectors(
+        &self,
+        native_id: u64,
+    ) -> Result<(SheetSelector<'static>, TableSelector<'static>)> {
+        let location = self.locations.get(&native_id).ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "Numbers table model {native_id} has no owning sheet drawable"
+            ))
+        })?;
+        Ok((
+            SheetSelector::index(location.sheet_index),
+            TableSelector::index(location.table_index),
+        ))
     }
 }
 
@@ -376,5 +647,83 @@ mod tests {
                 .is_err()
         );
         assert_eq!(editor.to_bytes().unwrap(), before);
+    }
+
+    #[test]
+    fn focused_table_selector_index_preserves_native_table_order() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Summary")
+            .table_name("First")
+            .table_dimensions(2, 2)
+            .build()
+            .unwrap();
+        editor
+            .add_empty_table(SheetSelector::index(0), "Second", 3, 1)
+            .unwrap();
+        let exact = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let descriptors = super::super::table_models(exact.package()).unwrap();
+        let index = FocusedTableSelectorIndex::from_descriptors(&exact, &descriptors).unwrap();
+
+        assert_eq!(
+            descriptors
+                .iter()
+                .map(|descriptor| descriptor.model.table_name.as_str())
+                .collect::<Vec<_>>(),
+            ["First", "Second"]
+        );
+        assert_eq!(
+            index.selectors(descriptors[0].object_id).unwrap(),
+            (SheetSelector::index(0), TableSelector::index(0))
+        );
+        assert_eq!(
+            index.selectors(descriptors[1].object_id).unwrap(),
+            (SheetSelector::index(0), TableSelector::index(1))
+        );
+    }
+
+    #[test]
+    fn focused_table_selector_index_rejects_orphaned_descriptors() {
+        let editor = NumbersDocumentBuilder::new()
+            .sheet_name("Summary")
+            .table_name("First")
+            .table_dimensions(2, 2)
+            .build()
+            .unwrap();
+        let exact = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut descriptors = super::super::table_models(exact.package()).unwrap();
+        let descriptor = descriptors.pop().unwrap();
+        descriptors.push(super::super::model::TableDescriptor {
+            table_info_id: u64::MAX,
+            ..descriptor
+        });
+
+        assert!(FocusedTableSelectorIndex::from_descriptors(&exact, &descriptors).is_err());
+    }
+
+    #[test]
+    fn focused_table_selector_index_rejects_cross_sheet_ownership() {
+        let mut editor = NumbersDocumentBuilder::new()
+            .sheet_name("Summary")
+            .table_name("First")
+            .table_dimensions(2, 2)
+            .build()
+            .unwrap();
+        editor.add_empty_sheet("Archive").unwrap();
+        editor
+            .add_empty_table(SheetSelector::name("Archive"), "Second", 2, 2)
+            .unwrap();
+        let exact = NumbersEditor::from_bytes(&editor.to_bytes().unwrap()).unwrap();
+        let mut descriptors = super::super::table_models(exact.package()).unwrap();
+        assert_eq!(descriptors.len(), 2);
+        let first_model = descriptors[0].object_id;
+        descriptors[1].object_id = first_model;
+
+        let error = FocusedTableSelectorIndex::from_descriptors(&exact, &descriptors)
+            .expect_err("one model cannot own drawables on two sheets");
+        assert!(
+            error
+                .to_string()
+                .contains("multiple owning sheet drawables")
+        );
     }
 }

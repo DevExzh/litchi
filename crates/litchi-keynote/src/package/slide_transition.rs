@@ -1844,6 +1844,7 @@ fn settings_from_projection(
     Ok(settings)
 }
 
+#[cfg(any(test, feature = "internal-iwork-source"))]
 fn optional_settings_from_projection(
     snapshot: &TransitionSettingsSnapshot<'_>,
     limits: WireLimits,

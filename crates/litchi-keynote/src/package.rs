@@ -64,10 +64,11 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_detect::{Format, PreparedSource};
+#[cfg(any(test, feature = "internal-iwork-source"))]
+use litchi_iwa_protos::keynote_slide_drawables_codec;
 use litchi_iwa_protos::{
     keynote_document_codec, keynote_media_codec, keynote_placeholder_text_codec,
-    keynote_show_codec, keynote_slide_drawables_codec, keynote_slide_transition_codec,
-    keynote_speaker_notes_codec,
+    keynote_show_codec, keynote_slide_transition_codec, keynote_speaker_notes_codec,
 };
 use litchi_iwa_text::storage::Storage;
 use litchi_iwa_text_wire::{
@@ -676,6 +677,25 @@ impl Package {
             limits,
         )?;
         let source = copy_source(bytes)?;
+        Self::from_source_with_options(source, options)
+    }
+
+    /// Parse an already shared exact source without copying its byte
+    /// allocation. This is an unstable host migration seam; callers must
+    /// provide immutable bytes that have already crossed the owning package
+    /// boundary and must not use it as a raw-source public API.
+    #[cfg(feature = "internal-iwork-source")]
+    #[doc(hidden)]
+    pub fn __from_shared_source_with_options(
+        source: Arc<[u8]>,
+        options: ReadOptions,
+    ) -> ReadResult<Self> {
+        check_input_size(
+            u64::try_from(source.len()).map_err(|_error| {
+                ReadError::InvalidFormat("Keynote input length does not fit u64".to_owned())
+            })?,
+            options.archive(),
+        )?;
         Self::from_source_with_options(source, options)
     }
 
@@ -3053,6 +3073,7 @@ fn decode_slide_node_projection(
 /// The format adapter supplies package-derived limits to the focused Buffa
 /// codec. The codec performs strict canonical preflight before forcing its
 /// borrowed lazy repeated references, and returns only compact scalar lists.
+#[cfg(any(test, feature = "internal-iwork-source"))]
 fn decode_slide_drawable_projection(
     payload: &[u8],
     wire_limits: WireLimits,
@@ -3072,6 +3093,7 @@ fn decode_slide_drawable_projection(
         .map_err(|error| map_slide_drawables_projection_error(error, path))
 }
 
+#[cfg(any(test, feature = "internal-iwork-source"))]
 fn map_slide_drawables_projection_error(
     error: keynote_slide_drawables_codec::DecodeError,
     path: SemanticPath,
@@ -4953,6 +4975,18 @@ mod tests {
 
         let direct_package = Package::from_bytes(&source)?;
         assert_eq!(direct_package.state.source_classification_attempts, 1);
+        Ok(())
+    }
+
+    #[cfg(feature = "internal-iwork-source")]
+    #[test]
+    fn shared_source_ingress_reuses_exact_allocation() -> Result<(), Box<dyn std::error::Error>> {
+        let source: Arc<[u8]> = std::fs::read(native_fixture_path())?.into();
+        let package = Package::__from_shared_source_with_options(
+            Arc::clone(&source),
+            ReadOptions::default(),
+        )?;
+        assert!(Arc::ptr_eq(&source, &package.state.source.shared_source()));
         Ok(())
     }
 

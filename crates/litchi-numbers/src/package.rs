@@ -613,6 +613,21 @@ impl Package {
         Self::from_components_with_options(components, options)
     }
 
+    /// Parse an already-owned exact source without copying its bytes.
+    ///
+    /// This hidden migration handoff keeps the focused Numbers ingress and
+    /// semantic admission profile identical to [`Self::from_bytes_with_options`]
+    /// while allowing a coordinator that already owns the source allocation to
+    /// share it with this package owner.
+    #[cfg(feature = "internal-iwork-source")]
+    #[doc(hidden)]
+    pub fn __from_shared_source_with_options(
+        source: Arc<[u8]>,
+        options: ReadOptions,
+    ) -> Result<Self> {
+        Self::from_shared_bytes_with_options(source, options)
+    }
+
     fn from_shared_bytes_with_options(source: Arc<[u8]>, options: ReadOptions) -> Result<Self> {
         let components = Components::from_shared_bytes(source, options.archive())?;
         Self::from_components_with_options(components, options)
@@ -2404,6 +2419,20 @@ mod tests {
             .map_err(|error| Error::Io(error.into_io_error()))?;
 
         assert_eq!(written, bytes);
+        Ok(())
+    }
+
+    #[cfg(feature = "internal-iwork-source")]
+    #[test]
+    fn shared_source_handoff_preserves_the_input_allocation() -> Result<()> {
+        let source: Arc<[u8]> = package_bytes(&tn::DocumentArchive::default())?.into();
+        let source_pointer = source.as_ptr();
+        let package = Package::__from_shared_source_with_options(
+            Arc::clone(&source),
+            ReadOptions::default(),
+        )?;
+        assert_eq!(package.state.source.as_ref().as_ptr(), source_pointer);
+        assert_eq!(package.state.source.as_ref().len(), source.len());
         Ok(())
     }
 

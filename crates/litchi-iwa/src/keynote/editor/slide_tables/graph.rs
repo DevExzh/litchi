@@ -22,7 +22,7 @@ pub(super) struct SlideTableGraph {
     pub(super) slide_component_id: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(super) struct CatalogSlideContext {
     pub(super) slide_id: u64,
     /// Compact drawable ownership facts projected from `KN.SlideArchive`.
@@ -30,9 +30,10 @@ pub(super) struct CatalogSlideContext {
     /// The catalog callback borrows the decompressed payload only while the
     /// focused decoder runs.  These scalar identifiers are all the existing
     /// table-listing callers need; no generated archive or nested protobuf
-    /// allocation is retained.
+    /// allocation is retained. Focused exact sources additionally retain only
+    /// compact position-ordered appearances for this slide.
     pub(super) slide: CatalogSlideFacts,
-    pub(super) focused_table_appearance_package: Option<litchi_keynote::Package>,
+    pub(super) focused_table_appearances: Option<Vec<CommonTableAppearance>>,
 }
 
 #[derive(Debug, Clone)]
@@ -134,19 +135,23 @@ fn catalog_table_position(
 
 /// Build the focused package view once for a catalog-backed slide listing.
 ///
-/// Constructing this immutable view copies the host's exact source and builds
-/// a focused object index once per listing. Retaining it avoids repeating that
-/// copy and index construction for every table in the same listing.
+/// Constructing this immutable view shares the host's exact source allocation
+/// and builds a focused object index once per listing. Retaining it avoids
+/// repeating that index construction for every table in the same listing.
 fn focused_table_appearance_package(
     package: &IWorkPackage,
 ) -> Result<Option<litchi_keynote::Package>> {
     if !package.source_is_exact() {
         return Ok(None);
     }
-    let source = package.exact_source_bytes().ok_or_else(|| {
+    let source = package.exact_source_owner().ok_or_else(|| {
         Error::InvalidFormat("focused Keynote table appearance source is not exact".to_owned())
     })?;
-    let focused = litchi_keynote::Package::from_bytes(source).map_err(|error| {
+    let focused = litchi_keynote::Package::__from_shared_source_with_options(
+        source,
+        litchi_keynote::ReadOptions::default(),
+    )
+    .map_err(|error| {
         Error::InvalidFormat(format!(
             "focused Keynote table appearance source failed: {error}"
         ))
@@ -164,19 +169,26 @@ fn focused_table_appearance_package(
     Ok(Some(focused))
 }
 
-/// Read appearance through the focused Keynote package owner for an admitted
-/// exact physical source. The source provenance check above keeps synthetic
-/// and compatibility snapshots on their existing catalog path.
-fn focused_table_appearance(
-    package: &litchi_keynote::Package,
+/// Read all appearances through the focused Keynote package owner for an
+/// admitted exact physical source. The source provenance check above keeps
+/// synthetic and compatibility snapshots on their existing catalog path.
+fn focused_table_appearances(
+    package: &IWorkPackage,
     slide_index: usize,
-    table_position: usize,
-) -> Result<CommonTableAppearance> {
-    package
-        .slide_table_appearance(
-            litchi_keynote::SlideSelector::index(slide_index),
-            litchi_keynote::TableSelector::index(table_position),
-        )
+    has_table: bool,
+) -> Result<Option<Vec<CommonTableAppearance>>> {
+    let Some(focused) = focused_table_appearance_package(package)? else {
+        return Ok(None);
+    };
+    if !has_table {
+        // Preserve the exact-source ingress and compatibility classification
+        // performed for every catalog slide while avoiding a focused semantic
+        // selector scan when the slide has no table candidates.
+        return Ok(Some(Vec::new()));
+    }
+    focused
+        .__slide_table_appearances(slide_index)
+        .map(Some)
         .map_err(|error| {
             Error::InvalidFormat(format!(
                 "focused Keynote table appearance read failed: {error}"
@@ -227,14 +239,24 @@ pub(super) fn catalog_slide_context(
             decode_catalog_slide_drawables(source, slide_index, package)
         })
         .map_err(map_catalog_error)?;
-    let focused_package = focused_table_appearance_package(package)?;
+    let mut has_table = false;
+    for drawable_object_id in &drawables_z_order {
+        catalog
+            .object_descriptor(*drawable_object_id)
+            .map_err(map_catalog_error)?;
+        has_table |= catalog
+            .message_type_count(*drawable_object_id, TABLE_INFO_MESSAGE_TYPE)
+            .map_err(map_catalog_error)?
+            > 0;
+    }
+    let focused_appearances = focused_table_appearances(package, slide_index, has_table)?;
     Ok(CatalogSlideContext {
         slide_id,
         slide: CatalogSlideFacts {
             owned_drawables,
             drawables_z_order,
         },
-        focused_table_appearance_package: focused_package,
+        focused_table_appearances: focused_appearances,
     })
 }
 
@@ -380,8 +402,12 @@ pub(super) fn slide_table_graph_from_catalog_context(
             ))
         })?;
     let lock_state = TableLockState::from_locked(table_info_projection.locked().unwrap_or(false));
-    let appearance = if let Some(focused) = context.focused_table_appearance_package.as_ref() {
-        focused_table_appearance(focused, slide_index, table_position)?
+    let appearance = if let Some(focused) = context.focused_table_appearances.as_ref() {
+        focused.get(table_position).copied().ok_or_else(|| {
+            Error::InvalidFormat(format!(
+                "focused Keynote table appearance position {table_position} is missing"
+            ))
+        })?
     } else {
         catalog_table_appearance_with_limits(
             package,
@@ -1375,6 +1401,30 @@ mod tests {
                 "focused and compatibility routes diverged: focused={focused:?}, host={host:?}"
             ),
         }
+    }
+
+    #[test]
+    fn exact_fixture_listing_preserves_focused_batch_order() {
+        let fixture = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/keynote/table-discovery.key");
+        let source = std::fs::read(fixture).expect("native Keynote fixture");
+        let editor = KeynoteEditor::from_bytes(&source).expect("native Keynote editor");
+        let focused = litchi_keynote::Package::from_bytes(&source).expect("focused native package");
+        let expected = focused
+            .__slide_table_appearances(0)
+            .expect("focused batch appearances");
+        assert!(
+            !expected.is_empty(),
+            "fixture must exercise table appearances"
+        );
+        let listed = editor.slide_tables(0).expect("focused batch listing");
+        assert_eq!(listed.len(), expected.len());
+        assert!(
+            listed
+                .iter()
+                .zip(expected)
+                .all(|(table, appearance)| table.appearance == appearance)
+        );
     }
 
     fn append_varint(value: u64, output: &mut Vec<u8>) {

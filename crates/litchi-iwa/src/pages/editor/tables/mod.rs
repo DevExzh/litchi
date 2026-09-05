@@ -25,7 +25,6 @@ use super::*;
 use crate::bundle::Bundle;
 use crate::numbers::table_extractor::TableDataExtractor;
 use crate::object_index::ObjectIndex;
-use crate::table_lock::table_lock_state_from_message;
 use litchi_iwa_common::table::appearance::Appearance as TableAppearance;
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
 

@@ -846,6 +846,44 @@ impl SlideTableAppearanceEdit<'_> {
     }
 }
 
+#[derive(Clone)]
+struct TableSelectionCandidate {
+    table_info_identifier: u64,
+    model_identifier: u64,
+    table_info_component: Arc<str>,
+    model_component: Arc<str>,
+    table_info_message_index: usize,
+    model_message_index: usize,
+    model_style_identifier: u64,
+    style_preset_identifier: Option<u64>,
+    stylesheet_identifier: Option<u64>,
+    effective_style_identifier: Option<u64>,
+    style_ids: [u64; MAX_STYLE_INHERITANCE_DEPTH],
+    style_count: usize,
+    before: Appearance,
+    locked: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SlideSelectionContext {
+    slide_position: Position,
+    slide_identifier: u64,
+    slide_message_index: usize,
+    #[cfg(feature = "internal-iwork-source")]
+    table_count: usize,
+}
+
+enum TableScanMode<'a> {
+    Select {
+        table_position: usize,
+        selected: &'a mut Option<TableSelectionCandidate>,
+    },
+    #[cfg(feature = "internal-iwork-source")]
+    Batch {
+        appearances: &'a mut Vec<Appearance>,
+    },
+}
+
 #[derive(Clone, PartialEq, Eq)]
 struct AppearanceSelection {
     slide_position: Position,
@@ -1015,6 +1053,37 @@ impl Package {
         let catalog = physical_source(self)?;
         budget.source_catalog(self, catalog)?;
         Ok(select_table_with_budget(self, slide.into(), table.into(), &mut budget)?.before)
+    }
+
+    /// Resolve every native table appearance on one slide in z-order.
+    ///
+    /// This migration seam shares the exact selector validation and semantic
+    /// scan used by the single-table reader, while retaining only compact
+    /// appearance values. It is hidden because the supported facade remains
+    /// selector-first; the host uses it to avoid rescanning one package for
+    /// every table in a listing.
+    #[cfg(feature = "internal-iwork-source")]
+    #[doc(hidden)]
+    pub fn __slide_table_appearances(
+        &self,
+        slide_index: usize,
+    ) -> Result<Vec<Appearance>, SlideTableAppearanceError> {
+        let mut budget = AppearanceBudget::new(self)?;
+        let catalog = physical_source(self)?;
+        budget.source_catalog(self, catalog)?;
+        let mut appearances = Vec::new();
+        let context = scan_tables_with_budget(
+            self,
+            SlideSelector::index(slide_index),
+            &mut budget,
+            &mut TableScanMode::Batch {
+                appearances: &mut appearances,
+            },
+        )?;
+        if context.table_count != 0 {
+            find_metadata_component(self, &mut budget)?;
+        }
+        Ok(appearances)
     }
 
     /// Start a selector-first immutable appearance edit.
@@ -2975,16 +3044,80 @@ fn verify_candidate_locality(
     Ok(())
 }
 
-#[allow(
-    clippy::type_complexity,
-    reason = "the private selection tuple mirrors native graph routes"
-)]
 fn select_table_with_budget(
     package: &Package,
     slide_selector: SlideSelector<'_>,
     table_selector: TableSelector,
     budget: &mut AppearanceBudget,
 ) -> Result<AppearanceSelection, SlideTableAppearanceError> {
+    let table_position = table_selector.as_position();
+    let mut selected = None;
+    let context = scan_tables_with_budget(
+        package,
+        slide_selector,
+        budget,
+        &mut TableScanMode::Select {
+            table_position: table_position.get(),
+            selected: &mut selected,
+        },
+    )?;
+    let candidate = selected.ok_or(SlideTableAppearanceError::TablePositionNotFound {
+        position: table_position,
+    })?;
+    let metadata_component = find_metadata_component(package, budget)?;
+    Ok(appearance_selection_from_candidate(
+        package,
+        context,
+        table_position,
+        candidate,
+        metadata_component,
+    ))
+}
+
+fn appearance_selection_from_candidate(
+    package: &Package,
+    context: SlideSelectionContext,
+    table_position: Position,
+    candidate: TableSelectionCandidate,
+    metadata_component: Option<Arc<str>>,
+) -> AppearanceSelection {
+    let style_identifier = candidate
+        .effective_style_identifier
+        .unwrap_or(candidate.model_style_identifier);
+    AppearanceSelection {
+        slide_position: context.slide_position,
+        table_position,
+        slide_identifier: context.slide_identifier,
+        table_info_identifier: candidate.table_info_identifier,
+        model_identifier: candidate.model_identifier,
+        slide_message_index: context.slide_message_index,
+        table_info_message_index: candidate.table_info_message_index,
+        model_message_index: candidate.model_message_index,
+        model_component: candidate.model_component,
+        table_info_component: candidate.table_info_component,
+        style_component: candidate.effective_style_identifier.and_then(|identifier| {
+            package
+                .object_with_component(identifier)
+                .map(|(component, _)| Arc::from(component))
+        }),
+        metadata_component,
+        model_style_identifier: candidate.model_style_identifier,
+        style_identifier,
+        style_ids: candidate.style_ids,
+        style_count: candidate.style_count,
+        style_preset_identifier: candidate.style_preset_identifier,
+        stylesheet_identifier: candidate.stylesheet_identifier,
+        before: candidate.before,
+        locked: candidate.locked,
+    }
+}
+
+fn scan_tables_with_budget(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    budget: &mut AppearanceBudget,
+    mode: &mut TableScanMode<'_>,
+) -> Result<SlideSelectionContext, SlideTableAppearanceError> {
     physical_source(package)?;
     budget.items(1)?;
     let slide_position = resolve_slide_position(package, slide_selector, budget)?;
@@ -2994,7 +3127,7 @@ fn select_table_with_budget(
         .ok_or(SlideTableAppearanceError::SlidePositionNotFound {
             position: slide_position,
         })?;
-    let (slide_component, slide) = package
+    let (_slide_component, slide) = package
         .object_with_component(record.slide_identifier)
         .ok_or(SlideTableAppearanceError::InvalidSource)?;
     let (slide_message_index, slide_payload) = unique_message(slide, SLIDE_MESSAGE_TYPE)?;
@@ -3029,35 +3162,52 @@ fn select_table_with_budget(
         budget,
     )?;
 
-    budget.allocations(1)?;
-    budget.scratch(
-        z_order
-            .len()
-            .checked_mul(size_of::<(
-                u64,
-                u64,
-                Arc<str>,
-                Arc<str>,
-                Arc<str>,
-                usize,
-                usize,
-                u64,
-                Option<u64>,
-                Option<u64>,
-                Option<u64>,
-                [u64; MAX_STYLE_INHERITANCE_DEPTH],
-                usize,
-                Appearance,
-                bool,
-            )>())
-            .ok_or(SlideTableAppearanceError::InvalidSource)?,
-    )?;
-    let mut tables = Vec::new();
-    tables
-        .try_reserve_exact(z_order.len())
-        .map_err(|_| SlideTableAppearanceError::Allocation {
-            amount: z_order.len(),
-        })?;
+    match mode {
+        TableScanMode::Select { .. } => {
+            // Keep the old selection reservation in the operation ledger so
+            // stricter callers observe the same aggregate scratch ceiling,
+            // even though candidates are now released after each callback.
+            budget.allocations(1)?;
+            budget.scratch(
+                z_order
+                    .len()
+                    .checked_mul(size_of::<(
+                        u64,
+                        u64,
+                        Arc<str>,
+                        Arc<str>,
+                        Arc<str>,
+                        usize,
+                        usize,
+                        u64,
+                        Option<u64>,
+                        Option<u64>,
+                        Option<u64>,
+                        [u64; MAX_STYLE_INHERITANCE_DEPTH],
+                        usize,
+                        Appearance,
+                        bool,
+                    )>())
+                    .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            )?;
+        },
+        #[cfg(feature = "internal-iwork-source")]
+        TableScanMode::Batch { appearances } => {
+            budget.allocations(1)?;
+            budget.scratch(
+                z_order
+                    .len()
+                    .checked_mul(size_of::<Appearance>())
+                    .ok_or(SlideTableAppearanceError::InvalidSource)?,
+            )?;
+            appearances.try_reserve_exact(z_order.len()).map_err(|_| {
+                SlideTableAppearanceError::Allocation {
+                    amount: z_order.len(),
+                }
+            })?;
+        },
+    }
+    let mut table_count = 0usize;
     for table_info_identifier in z_order.iter().copied() {
         let Some((table_info_component, table_info_object)) =
             package.object_with_component(table_info_identifier)
@@ -3164,73 +3314,43 @@ fn select_table_with_budget(
             &resolved,
             budget,
         )?;
-        tables.push((
-            table_info_identifier,
-            model_identifier,
-            Arc::<str>::from(slide_component),
-            Arc::<str>::from(table_info_component),
-            Arc::<str>::from(model_component),
-            table_info_message_index,
-            model_message_index,
-            style_identifier,
-            style_preset_identifier,
-            resolved.stylesheet_identifier,
-            resolved.first_style_identifier,
-            resolved.style_ids,
-            resolved.style_count,
-            resolved.appearance,
-            info.locked().unwrap_or(false),
-        ));
+        match mode {
+            TableScanMode::Select {
+                table_position,
+                selected,
+            } => {
+                if table_count == *table_position {
+                    **selected = Some(TableSelectionCandidate {
+                        table_info_identifier,
+                        model_identifier,
+                        table_info_component: Arc::<str>::from(table_info_component),
+                        model_component: Arc::<str>::from(model_component),
+                        table_info_message_index,
+                        model_message_index,
+                        model_style_identifier: style_identifier,
+                        style_preset_identifier,
+                        stylesheet_identifier: resolved.stylesheet_identifier,
+                        effective_style_identifier: resolved.first_style_identifier,
+                        style_ids: resolved.style_ids,
+                        style_count: resolved.style_count,
+                        before: resolved.appearance,
+                        locked: info.locked().unwrap_or(false),
+                    });
+                }
+            },
+            #[cfg(feature = "internal-iwork-source")]
+            TableScanMode::Batch { appearances } => appearances.push(resolved.appearance),
+        }
+        table_count = table_count
+            .checked_add(1)
+            .ok_or(SlideTableAppearanceError::InvalidSource)?;
     }
-
-    let table_position = table_selector.as_position();
-    let (
-        table_info_identifier,
-        model_identifier,
-        _slide_component,
-        table_info_component,
-        model_component,
-        table_info_message_index,
-        model_message_index,
-        model_style_identifier,
-        style_preset_identifier,
-        stylesheet_identifier,
-        effective_style_identifier,
-        style_ids,
-        style_count,
-        before,
-        locked,
-    ) = tables.get(table_position.get()).cloned().ok_or(
-        SlideTableAppearanceError::TablePositionNotFound {
-            position: table_position,
-        },
-    )?;
-    let metadata_component = find_metadata_component(package, budget)?;
-    Ok(AppearanceSelection {
+    Ok(SlideSelectionContext {
         slide_position,
-        table_position,
         slide_identifier: record.slide_identifier,
-        table_info_identifier,
-        model_identifier,
         slide_message_index,
-        table_info_message_index,
-        model_message_index,
-        model_component,
-        table_info_component,
-        style_component: effective_style_identifier.and_then(|identifier| {
-            package
-                .object_with_component(identifier)
-                .map(|(component, _)| Arc::from(component))
-        }),
-        metadata_component,
-        model_style_identifier,
-        style_identifier: effective_style_identifier.unwrap_or(model_style_identifier),
-        style_ids,
-        style_count,
-        style_preset_identifier,
-        stylesheet_identifier,
-        before,
-        locked,
+        #[cfg(feature = "internal-iwork-source")]
+        table_count,
     })
 }
 
