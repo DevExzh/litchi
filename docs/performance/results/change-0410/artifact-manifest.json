@@ -170,6 +170,12 @@
       "path": "profile/selected-perf-record.json",
       "bytes": 793903,
       "sha256": "cbf0aac1fe81e24e2cc57a22696236bab46add19df061d43a239824481c3ca42"
+    },
+    {
+      "compressed_path": "profile/perf-all-self.stdout.zst",
+      "path": "profile/perf-all-self.stdout",
+      "bytes": 99386,
+      "sha256": "bbc0317dbca9ee3f491876c8ce5aaf64282d9c2b8ec82434e9dcb92e083927a0"
     }
   ],
   "files": [
@@ -800,8 +806,8 @@
     },
     {
       "path": "compressed-originals.json",
-      "bytes": 5858,
-      "sha256": "65ab01b82d062c2154e108b80151200a27a298aeeaddfb0657542fa6bafc664d"
+      "bytes": 6071,
+      "sha256": "543576ead29dc10d463f1b5b5016a7338f94e1d9e338ce7cee9862822439a493"
     },
     {
       "path": "guard-recheck/a1-checkout.stderr",
@@ -1134,9 +1140,9 @@
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "path": "profile/perf-all-self.stdout",
-      "bytes": 99386,
-      "sha256": "bbc0317dbca9ee3f491876c8ce5aaf64282d9c2b8ec82434e9dcb92e083927a0"
+      "path": "profile/perf-all-self.stdout.zst",
+      "bytes": 13201,
+      "sha256": "4cd2e04c303a7eae44b0fd406614fa68321bdcb011534eb24b6b6cad716112e3"
     },
     {
       "path": "profile/perf-script-no-inline.stderr",

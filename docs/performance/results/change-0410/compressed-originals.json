@@ -166,5 +166,11 @@
     "path": "profile/selected-perf-record.json",
     "bytes": 793903,
     "sha256": "cbf0aac1fe81e24e2cc57a22696236bab46add19df061d43a239824481c3ca42"
+  },
+  {
+    "compressed_path": "profile/perf-all-self.stdout.zst",
+    "path": "profile/perf-all-self.stdout",
+    "bytes": 99386,
+    "sha256": "bbc0317dbca9ee3f491876c8ce5aaf64282d9c2b8ec82434e9dcb92e083927a0"
   }
 ]
