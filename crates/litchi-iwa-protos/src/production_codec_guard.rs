@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 
 /// Generated-Prost decode/encode operations are retained only in the
-/// `cfg(test)` differential oracles. Keep this list deliberately narrower
+/// test-only differential oracles. Keep this list deliberately narrower
 /// than a blanket `encode` ban: the archive-header codec has a private Buffa
 /// encoder whose `try_encode_bounded` path is production-authorized.
 pub(crate) const FORBIDDEN_PROST_CODEC_MARKERS: &[&str] = &[
@@ -75,68 +75,419 @@ pub(crate) const FORBIDDEN_BUFFA_OWNERSHIP_MARKERS: &[&str] = &[
     "buffa().merge(",
 ];
 
-#[cfg(test)]
-fn has_forbidden_codec_marker(source: &str) -> bool {
+/// Return whether the production portion of a codec contains a forbidden
+/// generated-code ingress marker.
+///
+/// Search code bytes only.  A marker in a documentation comment or a fixture
+/// string must not turn an otherwise valid production codec into a false
+/// positive, while comments/strings are replaced with spaces so a marker
+/// cannot be assembled across a removed span.  The build script uses this
+/// same predicate for the focused Pages hidden-state boundary.
+pub(crate) fn has_forbidden_codec_marker(source: &str) -> bool {
     let production = production_codec_source(source);
+    let code = rust_code_only(production.as_ref());
     FORBIDDEN_PROST_CODEC_MARKERS
         .iter()
         .chain(FORBIDDEN_BUFFA_OWNERSHIP_MARKERS)
-        .any(|marker| production.contains(marker))
+        .any(|marker| {
+            code.windows(marker.len())
+                .any(|window| window == marker.as_bytes())
+        })
 }
 
-/// Return whether a source line is a test-only configuration attribute.
-///
-/// Rust permits comments after an attribute, including a block comment that
-/// continues on a later line. Treat those comments as part of the attribute
-/// so a test-only Prost oracle cannot evade the source slicer with a harmless
-/// trailing comment. Any non-comment token keeps the line in production;
-/// this is intentionally not a broad `contains("test")` check because
-/// `cfg(any(test, feature = ...))` can still be active in production.
-fn is_cfg_test_attribute(line: &str) -> bool {
-    let Some(mut rest) = line.trim().strip_prefix("#[cfg(test)]") else {
-        return false;
+/// Replace Rust comments and literals with spaces while preserving all code
+/// bytes.  This is intentionally a small lexical filter rather than a line
+/// or declaration-order heuristic: the ratchet only needs to know whether a
+/// marker occurs in executable/source code, and must remain stable when items
+/// are reordered or reformatted.
+fn rust_code_only(source: &str) -> Vec<u8> {
+    let bytes = source.as_bytes();
+    let mut code = bytes.to_vec();
+    let mut cursor = 0usize;
+    while cursor < bytes.len() {
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'/') {
+            let start = cursor;
+            cursor += 2;
+            while cursor < bytes.len() && bytes[cursor] != b'\n' {
+                cursor += 1;
+            }
+            blank_bytes(&mut code, start..cursor);
+            continue;
+        }
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'*') {
+            let start = cursor;
+            cursor = skip_block_comment(bytes, cursor);
+            blank_bytes(&mut code, start..cursor);
+            continue;
+        }
+        if let Some(end) = rust_literal_end(bytes, cursor) {
+            blank_bytes(&mut code, cursor..end);
+            cursor = end;
+            continue;
+        }
+        cursor += 1;
+    }
+    code
+}
+
+fn blank_bytes(bytes: &mut [u8], range: std::ops::Range<usize>) {
+    for byte in bytes.get_mut(range).into_iter().flatten() {
+        if *byte != b'\n' && *byte != b'\r' {
+            *byte = b' ';
+        }
+    }
+}
+
+fn skip_block_comment(bytes: &[u8], mut cursor: usize) -> usize {
+    let mut depth = 0usize;
+    while cursor < bytes.len() {
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'*') {
+            depth = depth.saturating_add(1);
+            cursor += 2;
+        } else if bytes.get(cursor) == Some(&b'*') && bytes.get(cursor + 1) == Some(&b'/') {
+            depth = depth.saturating_sub(1);
+            cursor += 2;
+            if depth == 0 {
+                return cursor;
+            }
+        } else {
+            cursor += 1;
+        }
+    }
+    cursor
+}
+
+/// Return the end of a Rust literal beginning at `cursor`.
+fn rust_literal_end(bytes: &[u8], cursor: usize) -> Option<usize> {
+    let (quote, hashes) = if bytes.get(cursor) == Some(&b'r')
+        || (bytes.get(cursor) == Some(&b'b') && bytes.get(cursor + 1) == Some(&b'r'))
+    {
+        let prefix = if bytes[cursor] == b'b' {
+            cursor + 2
+        } else {
+            cursor + 1
+        };
+        let mut quote = prefix;
+        while bytes.get(quote) == Some(&b'#') {
+            quote += 1;
+        }
+        (bytes.get(quote) == Some(&b'"')).then_some((quote, quote - prefix))?
+    } else if bytes.get(cursor) == Some(&b'"') {
+        (cursor, 0)
+    } else if bytes.get(cursor) == Some(&b'b') && bytes.get(cursor + 1) == Some(&b'"') {
+        (cursor + 1, 0)
+    } else if bytes.get(cursor) == Some(&b'\'') {
+        let end = char_literal_end(bytes, cursor)?;
+        return Some(end + 1);
+    } else if bytes.get(cursor) == Some(&b'b') && bytes.get(cursor + 1) == Some(&b'\'') {
+        let end = char_literal_end(bytes, cursor + 1)?;
+        return Some(end + 2);
+    } else {
+        return None;
     };
 
-    loop {
-        rest = rest.trim_start();
-        if rest.is_empty() || rest.starts_with("//") {
-            return true;
+    if hashes != 0 || bytes.get(quote) == Some(&b'"') && cursor != quote {
+        let mut probe = quote + 1;
+        while probe < bytes.len() {
+            if bytes[probe] == b'"'
+                && bytes
+                    .get(probe + 1..probe + 1 + hashes)
+                    .is_some_and(|tail| tail.iter().all(|byte| *byte == b'#'))
+            {
+                return Some(probe + 1 + hashes);
+            }
+            probe += 1;
         }
-        let Some(comment) = rest.strip_prefix("/*") else {
-            return false;
-        };
-        let Some(end) = comment.find("*/") else {
-            // The remainder of this line is an unterminated block comment;
-            // `skip_cfg_test_item` will continue lexing it across lines.
-            return true;
-        };
-        rest = &comment[end + 2..];
+        return Some(bytes.len());
     }
+
+    let mut probe = quote + 1;
+    while probe < bytes.len() {
+        if bytes[probe] == b'\\' {
+            probe = probe.saturating_add(2);
+        } else if bytes[probe] == b'"' {
+            return Some(probe + 1);
+        } else {
+            probe += 1;
+        }
+    }
+    Some(bytes.len())
+}
+
+/// Return the first byte of the item controlled by a test-only `cfg`
+/// attribute that starts on `cursor`'s source line.
+///
+/// The matcher accepts equivalent token spacing and predicates such as
+/// `cfg(any(test))` or `cfg(all(test, feature = "..."))`, but deliberately
+/// keeps `cfg(any(test, feature = "..."))` in production because that item can
+/// be active outside tests. Attribute and comment scanning is lexical, so a
+/// bracket in a string or comment cannot terminate the attribute early.
+fn cfg_test_attribute_item_start(source: &str, cursor: usize) -> Option<usize> {
+    let bytes = source.as_bytes();
+    let mut attribute_start = cursor;
+    while bytes
+        .get(attribute_start)
+        .is_some_and(|byte| matches!(byte, b' ' | b'\t' | b'\r'))
+    {
+        attribute_start += 1;
+    }
+    if bytes
+        .get(attribute_start..attribute_start.saturating_add(2))
+        .is_none_or(|prefix| prefix != b"#[")
+    {
+        return None;
+    }
+    let attribute_end = rust_attribute_end(bytes, attribute_start)?;
+    if !cfg_attribute_is_test_only(&source[attribute_start..attribute_end]) {
+        return None;
+    }
+    Some(skip_rust_trivia(source, attribute_end))
+}
+
+fn rust_attribute_end(bytes: &[u8], opening: usize) -> Option<usize> {
+    let mut depth = 1usize;
+    let mut cursor = opening.saturating_add(2);
+    while cursor < bytes.len() {
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'/') {
+            return None;
+        }
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'*') {
+            cursor = rust_block_comment_end(bytes, cursor);
+            if cursor >= bytes.len() {
+                return None;
+            }
+            continue;
+        }
+        if let Some(end) = rust_literal_end(bytes, cursor) {
+            cursor = end;
+            continue;
+        }
+        match bytes[cursor] {
+            b'[' => depth = depth.checked_add(1)?,
+            b']' => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    return cursor.checked_add(1);
+                }
+            },
+            _ => {},
+        }
+        cursor += 1;
+    }
+    None
+}
+
+fn cfg_attribute_is_test_only(attribute: &str) -> bool {
+    let Some(compact) = compact_cfg_attribute(attribute) else {
+        return false;
+    };
+    let Some(expression) = compact
+        .strip_prefix(b"#[cfg(")
+        .and_then(|value| value.strip_suffix(b")]"))
+    else {
+        return false;
+    };
+    cfg_expression_requires_test(expression)
+}
+
+fn compact_cfg_attribute(attribute: &str) -> Option<Vec<u8>> {
+    let bytes = attribute.as_bytes();
+    let mut compact = Vec::with_capacity(bytes.len());
+    let mut cursor = 0usize;
+    while cursor < bytes.len() {
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'/') {
+            return None;
+        }
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'*') {
+            cursor = rust_block_comment_end(bytes, cursor);
+            if cursor >= bytes.len() {
+                return None;
+            }
+            continue;
+        }
+        if let Some(end) = rust_literal_end(bytes, cursor) {
+            compact.extend_from_slice(&bytes[cursor..end]);
+            cursor = end;
+            continue;
+        }
+        if !bytes[cursor].is_ascii_whitespace() {
+            compact.push(bytes[cursor]);
+        }
+        cursor += 1;
+    }
+    Some(compact)
+}
+
+/// Return whether a cfg expression necessarily implies the `test` cfg.
+/// Unknown predicates are treated as ordinary production conditions. This
+/// gives `all(test, ...)` the useful test-only behavior while preventing an
+/// `any(test, feature = ...)` oracle from being masked.
+fn cfg_expression_requires_test(expression: &[u8]) -> bool {
+    let mut parser = CfgExpressionParser {
+        bytes: expression,
+        cursor: 0,
+    };
+    parser
+        .parse_expression()
+        .filter(|_| parser.cursor == expression.len())
+        .unwrap_or(false)
+}
+
+struct CfgExpressionParser<'source> {
+    bytes: &'source [u8],
+    cursor: usize,
+}
+
+impl CfgExpressionParser<'_> {
+    fn parse_expression(&mut self) -> Option<bool> {
+        let start = self.cursor;
+        while self
+            .bytes
+            .get(self.cursor)
+            .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'_')
+        {
+            self.cursor += 1;
+        }
+        if start == self.cursor {
+            return None;
+        }
+        let name = &self.bytes[start..self.cursor];
+        if self.bytes.get(self.cursor) == Some(&b'=') {
+            self.cursor += 1;
+            self.skip_cfg_value()?;
+            return Some(false);
+        }
+        if self.bytes.get(self.cursor) != Some(&b'(') {
+            return Some(name == b"test");
+        }
+
+        self.cursor += 1;
+        let mut saw_argument = false;
+        let mut any_requires_test = true;
+        let mut all_requires_test = false;
+        loop {
+            if self.bytes.get(self.cursor) == Some(&b')') {
+                self.cursor += 1;
+                break;
+            }
+            let requires_test = self.parse_expression()?;
+            saw_argument = true;
+            any_requires_test &= requires_test;
+            all_requires_test |= requires_test;
+            if self.bytes.get(self.cursor) == Some(&b',') {
+                self.cursor += 1;
+                if self.bytes.get(self.cursor) == Some(&b')') {
+                    self.cursor += 1;
+                    break;
+                }
+                continue;
+            }
+            if self.bytes.get(self.cursor) == Some(&b')') {
+                self.cursor += 1;
+                break;
+            }
+            return None;
+        }
+
+        match name {
+            b"any" => Some(saw_argument && any_requires_test),
+            b"all" => Some(saw_argument && all_requires_test),
+            b"not" => Some(false),
+            _ => Some(false),
+        }
+    }
+
+    fn skip_cfg_value(&mut self) -> Option<()> {
+        let mut nesting = 0usize;
+        while let Some(byte) = self.bytes.get(self.cursor).copied() {
+            if let Some(end) = rust_literal_end(self.bytes, self.cursor) {
+                self.cursor = end;
+                continue;
+            }
+            match byte {
+                b'(' | b'[' | b'{' => {
+                    nesting = nesting.checked_add(1)?;
+                    self.cursor += 1;
+                },
+                b')' | b',' if nesting == 0 => return Some(()),
+                b')' | b']' | b'}' => {
+                    nesting = nesting.checked_sub(1)?;
+                    self.cursor += 1;
+                },
+                _ => self.cursor += 1,
+            }
+        }
+        Some(())
+    }
+}
+
+fn skip_rust_trivia(source: &str, mut cursor: usize) -> usize {
+    let bytes = source.as_bytes();
+    loop {
+        while bytes.get(cursor).is_some_and(u8::is_ascii_whitespace) {
+            cursor += 1;
+        }
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'/') {
+            cursor = bytes[cursor..]
+                .iter()
+                .position(|byte| *byte == b'\n')
+                .map_or(bytes.len(), |offset| cursor + offset + 1);
+            continue;
+        }
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'*') {
+            let next = rust_block_comment_end(bytes, cursor);
+            if next == cursor {
+                return cursor;
+            }
+            cursor = next;
+            continue;
+        }
+        return cursor;
+    }
+}
+
+fn rust_block_comment_end(bytes: &[u8], mut cursor: usize) -> usize {
+    let mut depth = 0usize;
+    while cursor < bytes.len() {
+        if bytes.get(cursor) == Some(&b'/') && bytes.get(cursor + 1) == Some(&b'*') {
+            depth = depth.saturating_add(1);
+            cursor += 2;
+        } else if bytes.get(cursor) == Some(&b'*') && bytes.get(cursor + 1) == Some(&b'/') {
+            depth = depth.saturating_sub(1);
+            cursor += 2;
+            if depth == 0 {
+                return cursor;
+            }
+        } else {
+            cursor += 1;
+        }
+    }
+    cursor
 }
 
 /// Return the production portion of a focused codec source file.
 ///
 /// The generated-Prost builders and differential oracles intentionally live
-/// below `cfg(test)` items. Keep those fixtures out of the production ratchet
-/// while preserving every production item, including the small
-/// `cfg(test)` allocation probes that a few codecs place near their imports.
+/// below test-only `cfg` items. Keep those fixtures out of the production
+/// ratchet while preserving every production item, including the small
+/// test-only allocation probes that a few codecs place near their imports.
 pub(crate) fn production_codec_source(source: &str) -> Cow<'_, str> {
     let mut production = String::with_capacity(source.len());
     let mut cursor = 0;
     let mut removed_test_item = false;
 
     while cursor < source.len() {
+        if let Some(item_start) = cfg_test_attribute_item_start(source, cursor) {
+            removed_test_item = true;
+            cursor = skip_cfg_test_item(source, item_start);
+            continue;
+        }
         let line_end = source[cursor..]
             .find('\n')
             .map_or(source.len(), |offset| cursor + offset + 1);
         let line = &source[cursor..line_end];
-        if is_cfg_test_attribute(line) {
-            removed_test_item = true;
-            cursor = skip_cfg_test_item(source, line_end);
-        } else {
-            production.push_str(line);
-            cursor = line_end;
-        }
+        production.push_str(line);
+        cursor = line_end;
     }
 
     if removed_test_item {
@@ -146,7 +497,7 @@ pub(crate) fn production_codec_source(source: &str) -> Cow<'_, str> {
     }
 }
 
-/// Skip one Rust item immediately following a standalone `#[cfg(test)]`
+/// Skip one Rust item immediately following a standalone test-only `cfg`
 /// attribute. This intentionally handles the item forms used by the codecs:
 /// functions, modules, constants, and `thread_local!` blocks. Strings and
 /// comments are tokenized so fixture braces do not terminate the item early.
@@ -456,6 +807,10 @@ mod tests {
             include_str!("pages_section_background_codec.rs"),
         ),
         ("pages_body", include_str!("pages_body_codec.rs")),
+        (
+            "pages_hidden_state",
+            include_str!("pages_hidden_state_codec.rs"),
+        ),
         ("pages_media", include_str!("pages_media_codec.rs")),
         ("drawable_parent", include_str!("drawable_parent_codec.rs")),
         (
@@ -548,6 +903,37 @@ pub fn decode_projection(source: &[u8]) {
         assert!(production.contains("decode_projection"));
         assert!(!production.contains("line_commented_oracle"));
         assert!(!production.contains("block_commented_oracle"));
+    }
+
+    #[test]
+    fn production_ratchet_masks_equivalent_test_only_cfg_forms() {
+        let source = r###"
+#[ cfg ( any ( test ) )]
+fn spaced_oracle() {
+    let _ = prost::Message::decode(&[]);
+}
+
+#[cfg(
+    all(
+        test,
+        feature = "differential"
+    )
+)]
+fn multiline_oracle() {
+    let _ = prost::Message::decode(&[]);
+}
+
+#[cfg(any(test, feature = "production"))]
+fn feature_oracle() {
+    let _ = prost::Message::decode(&[]);
+}
+"###;
+
+        let production = production_codec_source(source);
+        assert!(!production.contains("spaced_oracle"));
+        assert!(!production.contains("multiline_oracle"));
+        assert!(production.contains("feature_oracle"));
+        assert!(has_forbidden_codec_marker(source));
     }
 
     #[test]
@@ -769,6 +1155,32 @@ pub fn decode_projection(source: &[u8], message: &mut Message) {
     }
 
     #[test]
+    fn production_ratchet_ignores_markers_in_comments_and_literals() {
+        let source = r####"
+// prost::Message::decode and OwnedView are documentation examples.
+pub fn decode_projection(source: &[u8]) {
+    let _ = "prost::Message::decode encode_to_vec OwnedView";
+    let _ = br##"crate::buffa_generated::OwnedView"##;
+    let _ = source;
+}
+"####;
+
+        assert!(!has_forbidden_codec_marker(source));
+    }
+
+    #[test]
+    fn production_ratchet_does_not_join_markers_across_comments() {
+        let source = r#"
+pub fn decode_projection(source: &[u8]) {
+    let _ = prost/* a comment */::Message;
+    let _ = source;
+}
+"#;
+
+        assert!(!has_forbidden_codec_marker(source));
+    }
+
+    #[test]
     fn production_ratchet_allows_private_buffa_encoder() {
         let source = r#"
 pub fn encode_projection(value: &Value, output: &mut Vec<u8>) {
@@ -855,6 +1267,48 @@ mod oracle {
             assert!(
                 build_script.contains(marker),
                 "build.rs lost Pages native footnote provenance marker: {marker}"
+            );
+        }
+    }
+
+    #[test]
+    fn build_script_pins_pages_hidden_state_projection_boundary() {
+        let build_script = include_str!("../build.rs");
+        let projection = include_str!("buffa-projections/TSTPagesHiddenStateProjection.proto");
+        let codec = include_str!("pages_hidden_state_codec.rs");
+        let library = include_str!("lib.rs");
+
+        assert_eq!(projection.len(), 3_043);
+        assert_eq!(
+            projection
+                .matches("optional bool needs_to_update_filter_set_for_import = 6;")
+                .count(),
+            1
+        );
+        assert!(
+            !projection
+                .lines()
+                .any(|line| line.trim().starts_with("repeated "))
+        );
+        assert!(!has_forbidden_codec_marker(codec));
+        assert!(library.contains("mod buffa_pages_hidden_state_generated {"));
+
+        for marker in [
+            "fn enforce_pages_hidden_state_projection_provenance(",
+            "const EXPECTED_PROJECTION_BYTES: usize = 3_043;",
+            "a95c09076d1d35556287828365a21049f37f839b1289f7f2f591457cf649b713",
+            "const EXPECTED_NATIVE_MESSAGE_DIGESTS: [(&str, &str); 13]",
+            "const PRIVATE_MODULE_DECLARATION: &str = \"mod buffa_pages_hidden_state_generated {\";",
+            "const STRICT_WRAPPER_CALLS: [(&str, &str); 8]",
+            "options.buffa().decode_lazy_view(",
+            "pub const COLUMN_ROW_UID_MAP_MESSAGE_TYPE: u32 = 6_267;",
+            "enforce_pages_hidden_state_projection_budget(",
+            "427_026",
+            "72c30b51bacf13de1e5948b6d2f7bf986e7a90131e93bc6bd63030d1d558d92a",
+        ] {
+            assert!(
+                build_script.contains(marker),
+                "build.rs lost Pages hidden-state provenance marker: {marker}"
             );
         }
     }

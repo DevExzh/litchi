@@ -6,6 +6,8 @@ pub mod appearance;
 pub mod dimension;
 /// Lossless header, footer, freeze, and print-repetition settings.
 pub mod headers;
+/// Archive-free hidden-row and hidden-column values.
+pub mod hidden_axes;
 /// Interactive lock state for a body-attached table.
 pub mod lock;
 /// Validated, archive-free names for Pages body tables.

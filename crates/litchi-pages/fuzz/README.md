@@ -51,3 +51,58 @@ CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
   -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
   -timeout=10 -rss_limit_mb=2048
 ```
+
+## `pages_body_table_hidden_axes`
+
+`pages_body_table_hidden_axes` exercises the focused body-table hidden-axes
+owner using bounded descriptors that construct a strict two-table IWA graph.
+Every input first reaches a valid selector/read setup and stages an edit; the
+same descriptor then selects an absent-owner nonempty-set refusal or an
+existing owner, empty/row/column/both-axis state, set/clear/reset/no-op,
+name/index selectors, filtered or pivot markers, lock state, shared
+Package/COW ownership, shared-owner locality, valid non-identity UID-map
+permutations, and exact field-path metadata ownership. A second probe mutates
+the native graph or wire framing to cover missing, duplicate, dangling,
+aliased, wrong-type, unknown-UUID, UID-map, active-state, direction,
+duplicate-singular, wrong metadata, unsupported filter dependency, wrong-wire,
+truncation, group, non-canonical, and invalid-UTF-8 cases.
+
+Malformed focused reads and edits assert the precise public error class:
+duplicate names are `AmbiguousTableName`, invalid filter metadata is
+`UnsupportedDependency`, count-overflow metadata is a `WireFields`
+`LimitExceeded` refusal before allocation, and the remaining malformed
+root/graph/wire/UID/metadata cases are `InvalidSource` when physical package
+ingress admits the fixture.
+
+Successful reads are checked for canonical sorted/deduplicated positions and
+table bounds. Existing-owner edits are reopened and checked for exact target
+semantics, one-time patch application, target conflict on replay, exact
+inverse restoration, inverse involution, no-op byte identity, diagnostics,
+preview invalidation, and unselected-graph-object/member preservation.
+Absent-owner nonempty sets must fail with an unchanged source, as must
+malformed edits and patch applications. A data-dependent physical limit
+profile runs on every input, while max/max+1 boundary sweeps and strict
+nested codec fields/work/allocations/retained/scratch checks run once per fuzz
+process.
+
+Run a bounded sanitizer smoke with mutable corpus, artifacts, and build output
+outside the checkout:
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-pages-hidden-axes-fuzz.XXXXXX")"
+fuzz_corpus="$fuzz_root/corpus"
+mkdir "$fuzz_corpus" "$fuzz_root/artifacts"
+cleanup_fuzz_corpus() {
+  if [ "${KEEP_FUZZ_CORPUS:-0}" = 1 ]; then
+    printf 'retained temporary fuzz root: %s\n' "$fuzz_root"
+  else
+    rm -rf "$fuzz_root"
+  fi
+}
+trap cleanup_fuzz_corpus EXIT
+cp corpus/pages_body_table_hidden_axes/*.hex "$fuzz_corpus/"
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  pages_body_table_hidden_axes "$fuzz_corpus" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -runs=100 -max_len=65536 \
+  -timeout=10 -rss_limit_mb=2048
+```

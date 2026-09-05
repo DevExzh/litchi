@@ -43,3 +43,30 @@ after native reopen; it is provenance evidence, not a package-format checksum.
 The read-only root directory adapter deliberately freezes only `Index.zip` or
 loose `Index/` semantics. It does not claim exact ZIP provenance, editing, or
 preservation of `Metadata/`, `Data/`, previews, or unknown sidecars.
+
+## Pages body-table native profile (2026-09-05)
+
+`pages/body-table-visible.pages` was authored through Computer Use in Pages
+14.4 from Blank with one Plain table (five rows, four columns). Its body marker is
+`Pages hidden-axis native oracle — 2026-09-05`; the table has no user-hidden
+rows or columns. SHA-256:
+`7af8179b1174c39d35d4f483c65a86e3801fcea9fba2123fbbf75861af1b3b8d`.
+
+Computer Use verification used disposable copies: Pages saved, closed, and
+reopened the visible table without repair UI, and the focused package save
+path produced byte-identical output for the visible-table/no-op operation. The
+checked-in fixture was restored to the SHA-256 above after those UI checks;
+native close/resave normalization of a disposable copy is not a hidden-axis
+parity result.
+
+This fixture verifies package ingress, exact no-op output, and the current
+focused hidden-axis refusal. Apple's table-info version is `[1, 0, 5]`, but
+its table-model version is `[3, 2, 10]`; the focused owner currently requires
+`[1, 0, 5]`. The native type-4008 formula owner also carries `owner_kind = 1`
+and lacks the focused profile's aggregate drawable reference. The table-model
+metadata lacks its required field-path declarations at 46, 34, and 35.
+The focused hidden-axis read/edit therefore returns `InvalidSource` before
+publication. This is a native package baseline and negative operation-profile
+regression, not evidence of native acceptance of a Litchi visibility mutation
+or successful hidden-axis parsing. Host compatibility must remain until the
+producer differences and native mutation gates are addressed.

@@ -8075,3 +8075,104 @@ item is removed by this slice. The authoritative topology remains 64 workspace
 packages, 238 internal dependency declarations, 227 canonical edges, 11
 development-only edges, 11 ordered migration debts with IDs `[1, 2, 4, 8, 10,
 12, 13, 14, 15, 16, 17]`, and one migration host.
+
+## 2026-09-05 amendment: Pages body-table hidden-axis owner and remaining monolith gates
+
+The focused Pages owner now provides bounded selector-first transactions
+through `litchi_pages::Package::{body_table_hidden_axes,
+edit_body_table_hidden_axes, apply_body_table_hidden_axes}` for one rooted
+body table. `BodyTableSelector` accepts a checked position or exact visible
+name, and the public `AxisIndex`/`HiddenAxes` values are archive free. The
+strict route proves the body/storage attachment and drawable path, one
+role-qualified current type-6000 or explicitly qualified legacy type-6003
+`TableInfoArchive`, and one role-qualified current type-6001 or explicitly
+qualified legacy type-6000 `TableModelArchive`. The model's base column/row
+UID reference (field 46) is required; the table-info view UID reference
+(field 6) is optional and, if present, must agree with it. The UID map is
+canonical type 6267, with legacy type 6200 admitted only when its archive
+metadata explicitly qualifies that legacy route; type 6005 is not a map
+owner. The strict route then proves canonical UID permutations, directional
+extents, and the selected dependency edges.
+
+The complete type-4008 -> type-6204/type-6220 dependency closure is admitted
+only for an existing hidden-state owner. An ownerless table reads empty and
+permits an exact empty no-op; it does not provide a basis for creating that
+closure. The `TableInfoArchive` active UUID selects one uniquely matching
+stored view for reads. A changed edit refuses
+multiple stored views, even when the active UUID is unambiguous, because the
+inactive views cannot yet be proven byte-preserved. It projects only
+user-hidden positions. The strict codec uses a singular-field Buffa sidecar
+plus bounded source-owned wire walking for repeated states; unknown
+fields/groups, unselected bytes, and admitted filtered/pivot markers remain
+preserved.
+
+Changed existing-owner edits support set/clear/reset, copy-on-write
+publication, one-component locality, canonical root-preview invalidation,
+candidate reopen/readback, exact apply/inverse patches, and source conflict
+fences. Malformed, duplicate, stale, dangling, ambiguous, out-of-bounds,
+finite-limit, pivot, and unsupported-dependency inputs fail closed. For an
+exact, unlocked source with no owner, an empty request remains an exact
+source no-op and a nonempty request is refused as `UnsupportedDependency`
+because owner creation is unsupported. A non-exact source reports
+`UnsupportedSource` before the absent-owner check. `TableLocked` takes
+precedence for a changed edit on a locked selected table; exact no-ops on a
+locked table remain allowed subject to read/graph admission. This is
+visibility metadata only and does not add cell/formula, filter/pivot, sort,
+or row/column topology CRUD.
+
+The focused graph/codec, identity/COW, and concurrency test files provide E1
+synthetic/self-round-trip coverage. A current locked rerun passed 435 Pages
+library/integration tests plus two Pages doctests (437 total) and 802 protocol
+library/integration tests (764 library and 38 integration); 170 generated
+protocol doctests were ignored. These are focused-package results only. Clippy,
+boundary, migration-host, sibling, and sanitizer status remain separate gates
+and are not inferred here. Fuzz verification remains tracked with ADR 0008.
+
+Scoped all-target strict Clippy for `litchi-pages` and `litchi-iwa-protos` is
+green. A fresh workspace/all-features lint still reports 111 diagnostics in
+`litchi-iwa`, chiefly deprecated legacy Keynote ID fields plus existing
+dead-code/style findings; no diagnostic path intersects this slice. This is a
+workspace gate limitation separate from the focused Pages/protobuf result.
+
+The checked-in [`body-table-visible.pages`](../../test-data/iwork/pages/body-table-visible.pages)
+fixture is a native Pages 14.4 baseline with a visible 5-by-4 body table and a
+body marker. Disposable copies were saved, closed, and reopened in the UI
+without repair; the `Package` exact no-op check succeeds, and the hidden-axis API returns
+`InvalidSource` for this native shape. The fixture contains no user-hidden axes,
+so it is native visible-table/no-op evidence and does not provide positive
+hidden-axis E2 or E3/E4 mutation evidence. An older exploratory Pages 14.4
+generated-candidate attempt logged an NSCocoa MissingObject/TSPersistence Import
+document error, timed out on save/close, and never reopened; AppleScript table
+creation stalled without GUI inspection. That attempt remains historical
+negative exploratory evidence only.
+
+A fresh Computer Use duplicate/save/close/reopen check showed the same body
+marker and visible table without repair UI. The checked-in fixture was restored
+at its recorded SHA-256 after the disposable UI checks, and the focused package
+save path produced identical bytes for the visible-table/no-op operation. This
+is native baseline evidence only; it does not establish hidden-axis parsing or
+a changed native visibility mutation.
+
+The Pages raw-ID `PagesEditor::{table_hidden_axes, set_table_hidden_axes}`
+route, its tests, and the mixed example remain migration-host compatibility.
+Retirement is deferred because the focused owner refuses absent-owner creation
+and has no native changed-edit parity evidence. The shared hidden-axis helper
+also preserves Numbers/Keynote compatibility, Numbers sort restoration, and
+row/column-deletion cleanup. Focused refusals remain terminal; supported format
+facades never fall back to the host. Existing functionality is retained until
+ADR 0028's parity and native gates permit removal.
+
+This advances only a focused Pages ownership/projection subgate. Deletion
+gate 1 remains closed and gate 5 remains passing; gates 2, 3, 4, and 6
+remain open. Gate 2 still has unowned modules/examples/fuzz/generated-
+schema/build paths, gate 3 still lacks complete semantic parity across the
+remaining table and cell graphs, gate 4 still lacks complete native
+open/save/close/reopen coverage across the remaining mutation paths, and
+gate 6 still contains migration-host/debt entry points. The monolithic
+`litchi-iwa` crate remains until those global gates close.
+
+No workspace package, manifest edge, ordered migration debt, migration-host
+item, or deletion gate is removed by this slice. The authoritative topology
+remains 64 workspace packages, 238 internal dependency declarations, 227
+canonical edges, 11 development-only edges, 11 ordered migration debts with
+IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.

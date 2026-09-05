@@ -1300,6 +1300,44 @@ mod buffa_pages_body_generated {
     ));
 }
 
+/// Private Buffa lazy-view projection for the Pages body-table hidden-state
+/// graph. Repeated state/dependency collections stay on handwritten bounded
+/// paths; generated views contain only singular envelopes and scalars.
+#[doc(hidden)]
+mod buffa_pages_hidden_state_generated {
+    #![allow(
+        elided_lifetimes_in_paths,
+        reason = "Buffa 0.9.1 generated views elide explicit lifetimes."
+    )]
+    #![allow(
+        unreachable_pub,
+        reason = "The hidden-state projection is intentionally private to this crate."
+    )]
+    #![allow(
+        clippy::allow_attributes_without_reason,
+        reason = "Buffa 0.9.1 generated source contains internal lint allowances."
+    )]
+    #![allow(
+        clippy::map_err_ignore,
+        clippy::shadow_reuse,
+        clippy::shadow_same,
+        reason = "Buffa 0.9.1 generated decoders use these implementation patterns."
+    )]
+    #![allow(
+        non_snake_case,
+        clippy::all,
+        clippy::arbitrary_source_item_ordering,
+        clippy::module_name_repetitions,
+        clippy::pedantic,
+        reason = "The generated projection is private implementation detail."
+    )]
+
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/buffa-pages-hidden-state/iwa_pages_hidden_state_buffa_protos.rs"
+    ));
+}
+
 /// Private Buffa lazy-view projection for the selected Pages media
 /// discriminator. The complete MovieArchive graph and unknown source fields
 /// remain caller-owned and outside generated storage.
@@ -1792,6 +1830,12 @@ pub mod pages_section_background_codec;
 /// lazy-view adapter. Generated types remain inaccessible downstream.
 #[doc(hidden)]
 pub mod pages_body_codec;
+
+/// Internal strict Pages body-table hidden-state graph projection. Generated
+/// Buffa types remain private and caller-owned source bytes remain the rewrite
+/// authority.
+#[doc(hidden)]
+pub mod pages_hidden_state_codec;
 
 /// Internal strict Pages media discriminator projection. Generated types
 /// remain private and caller-owned raw bytes remain authoritative.

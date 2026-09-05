@@ -13847,6 +13847,423 @@ PAGES_BODY_TABLE_APPEARANCE_EXPORT_SOURCES = PAGES_TABLE_APPEARANCE_EXPORT_SOURC
 PAGES_BODY_TABLE_APPEARANCE_PACKAGE_METHODS = PAGES_TABLE_APPEARANCE_PACKAGE_METHODS
 PAGES_BODY_TABLE_APPEARANCE_CANONICAL_TYPES = PAGES_TABLE_APPEARANCE_CANONICAL_TYPES
 
+# Pages body-table hidden rows/columns now have a focused package owner, but
+# the native changed-edit gate is still open.  Keep the migration-host route
+# until the focused owner can create an absent native hidden-state owner.  This
+# inventory remains separate from the shared ``table_hidden_axes`` helper:
+# Numbers and Keynote still use that helper and their selector-aware host
+# methods, while Pages keeps its raw-ID compatibility route as ordered debt.
+RETIRED_IWA_PAGES_TABLE_HIDDEN_AXES_SOURCE = (
+    IWA_PAGES_SOURCE_ROOT / "editor" / "tables" / "hidden_axes.rs"
+)
+RETIRED_IWA_PAGES_TABLE_HIDDEN_AXES_METHODS = (
+    "table_hidden_axes",
+    "set_table_hidden_axes",
+)
+RETIRED_IWA_PAGES_TABLE_HIDDEN_AXES_METHOD_SET = frozenset(
+    RETIRED_IWA_PAGES_TABLE_HIDDEN_AXES_METHODS
+)
+# ``RETIRED_IWA_*`` names are retained as compatibility constants for callers
+# of this checker.  The hidden-axis route itself is intentionally retained
+# until the native changed-edit gate closes.
+IWA_PAGES_TABLE_HIDDEN_AXES_HOST_SOURCE = RETIRED_IWA_PAGES_TABLE_HIDDEN_AXES_SOURCE
+IWA_PAGES_TABLE_HIDDEN_AXES_HOST_METHODS = RETIRED_IWA_PAGES_TABLE_HIDDEN_AXES_METHODS
+IWA_PAGES_TABLE_HIDDEN_AXES_HOST_METHOD_SET = RETIRED_IWA_PAGES_TABLE_HIDDEN_AXES_METHOD_SET
+IWA_PAGES_TABLE_HIDDEN_AXES_HOST_TEST_SOURCE = (
+    IWA_PAGES_SOURCE_ROOT / "editor" / "tables" / "tests.rs"
+)
+IWA_PAGES_TABLE_HIDDEN_AXES_HOST_EXAMPLE = Path(
+    "crates/litchi-iwa/examples/create_iwork_hidden_tables.rs"
+)
+IWA_PAGES_TABLE_HIDDEN_AXES_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?hidden_axes\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+# Imports in the retained Pages host are deliberately narrow.  Do not inspect
+# the shared ``crate::table_hidden_axes`` implementation itself: Numbers and
+# Keynote depend on that compatibility path by design.
+IWA_PAGES_TABLE_HIDDEN_AXES_IMPORTS = (
+    re.compile(
+        r"(?m)^[ \t]*(?:use|pub[ \t]+use)[^;\n]*"
+        r"(?:crate[ \t\r\n]*::[ \t\r\n]*table_hidden_axes|"
+        r"litchi_iwa_common[ \t\r\n]*::[ \t\r\n]*table[ \t\r\n]*::"
+        r"[ \t\r\n]*axis)[^;\n]*"
+    ),
+)
+IWA_PAGES_TABLE_HIDDEN_AXES_CALL = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:(?P<receiver>[A-Za-z_][A-Za-z0-9_]*)"
+    r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*)?"
+    r"(?:r#)?(?P<method>table_hidden_axes|set_table_hidden_axes)\b"
+    r"[ \t\r\n]*\(",
+)
+IWA_PAGES_TABLE_HIDDEN_AXES_EXAMPLE_ROOT = Path("crates/litchi-iwa/examples")
+IWA_PAGES_README_TABLE_HIDDEN_AXES_CALLS = (
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:r#)?(?:pages|pages_editor|PagesEditor|editor)"
+        r"[ \t\r\n]*(?:\.|::)[ \t\r\n]*(?:r#)?"
+        r"(?P<method>table_hidden_axes|set_table_hidden_axes)\b"
+        r"[ \t\r\n]*\(",
+    ),
+)
+# The focused package must remain a terminal semantic owner.  A new
+# ``litchi_iwa``/``PagesEditor`` call or a direct shared-helper call in its
+# owner would turn an unsupported focused operation into an implicit host
+# fallback.  These patterns are applied after comments, literals, and
+# cfg(test) items are masked.
+PAGES_TABLE_HIDDEN_AXES_FOCUSED_FALLBACK_PATTERNS = (
+    re.compile(r"\blitchi_iwa[ \t\r\n]*::"),
+    re.compile(r"\blitchi_pages[ \t\r\n]*::"),
+    re.compile(r"\b(?:PagesEditor|PagesPackage|FocusedPagesPackage)\b"),
+    re.compile(
+        r"(?<![A-Za-z0-9_])(?:crate[ \t\r\n]*::[ \t\r\n]*)?"
+        r"(?:table_hidden_axes|set_table_hidden_axes)[ \t\r\n]*\("
+    ),
+)
+
+PAGES_TABLE_HIDDEN_AXES_SEMANTIC_SOURCE = (
+    PAGES_SOURCE_ROOT / "table" / "hidden_axes.rs"
+)
+PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE = (
+    PAGES_SOURCE_ROOT / "package" / "body_table_hidden_axes.rs"
+)
+PAGES_TABLE_HIDDEN_AXES_OWNER_HELPER_ROOT = (
+    PAGES_SOURCE_ROOT / "package" / "body_table_hidden_axes"
+)
+PAGES_TABLE_HIDDEN_AXES_IMPLEMENTATION_SOURCES = (
+    PAGES_TABLE_HIDDEN_AXES_SEMANTIC_SOURCE,
+    PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE,
+)
+PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES = (
+    PAGES_SOURCE_ROOT / "lib.rs",
+    PAGES_SOURCE_ROOT / "package.rs",
+    PAGES_SOURCE_ROOT / "table" / "mod.rs",
+)
+PAGES_TABLE_HIDDEN_AXES_SELECTOR_SOURCE = PAGES_SOURCE_ROOT / "selector.rs"
+PAGES_TABLE_HIDDEN_AXES_SEMANTIC_TYPES = ("AxisIndex", "HiddenAxes")
+PAGES_TABLE_HIDDEN_AXES_TRANSACTION_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+    "Path",
+)
+PAGES_TABLE_HIDDEN_AXES_CANONICAL_TYPES = (
+    "BodyTableHiddenAxesEdit",
+    "BodyTableHiddenAxesPatch",
+    "BodyTableHiddenAxesCommit",
+    "BodyTableHiddenAxesDiagnostics",
+    "BodyTableHiddenAxesError",
+    "BodyTableHiddenAxesLimitKind",
+    "BodyTableHiddenAxesPath",
+)
+PAGES_TABLE_HIDDEN_AXES_SHORT_NAMES = frozenset(
+    PAGES_TABLE_HIDDEN_AXES_SEMANTIC_TYPES
+    + PAGES_TABLE_HIDDEN_AXES_TRANSACTION_TYPES
+)
+PAGES_TABLE_HIDDEN_AXES_PUBLIC_NAMES = frozenset(
+    PAGES_TABLE_HIDDEN_AXES_SEMANTIC_TYPES
+    + PAGES_TABLE_HIDDEN_AXES_CANONICAL_TYPES
+    + ("BodyTableSelector",)
+)
+PAGES_TABLE_HIDDEN_AXES_PACKAGE_METHODS = (
+    "body_table_hidden_axes",
+    "edit_body_table_hidden_axes",
+    "apply_body_table_hidden_axes",
+)
+PAGES_TABLE_HIDDEN_AXES_EDIT_METHODS = frozenset({"set", "clear", "reset", "commit"})
+PAGES_TABLE_HIDDEN_AXES_FLAT_METHODS = frozenset(
+    {
+        "table_hidden_axes",
+        "set_table_hidden_axes",
+        "edit_table_hidden_axes",
+        "apply_table_hidden_axes",
+        "clear_table_hidden_axes",
+        "reset_table_hidden_axes",
+    }
+)
+PAGES_TABLE_HIDDEN_AXES_FLAT_ALIASES = frozenset(
+    {
+        "BodyTableAxisIndex",
+        "BodyTableHiddenAxes",
+        "TableHiddenAxes",
+        "PagesTableHiddenAxes",
+        "HiddenAxesEdit",
+        "HiddenAxesPatch",
+        "HiddenAxesCommit",
+        "HiddenAxesDiagnostics",
+        "HiddenAxesError",
+        "HiddenAxesLimitKind",
+        "HiddenAxesPath",
+        "TableHiddenAxesEdit",
+        "TableHiddenAxesPatch",
+        "TableHiddenAxesCommit",
+        "TableHiddenAxesDiagnostics",
+        "TableHiddenAxesError",
+        "TableHiddenAxesLimitKind",
+        "TableHiddenAxesPath",
+        "PagesTableHiddenAxesEdit",
+        "PagesTableHiddenAxesPatch",
+        "PagesTableHiddenAxesCommit",
+        "PagesTableHiddenAxesDiagnostics",
+        "PagesTableHiddenAxesError",
+        "PagesTableHiddenAxesLimitKind",
+        "PagesTableHiddenAxesPath",
+    }
+)
+PAGES_TABLE_HIDDEN_AXES_ALIAS_TARGETS = frozenset(
+    PAGES_TABLE_HIDDEN_AXES_CANONICAL_TYPES
+    + PAGES_TABLE_HIDDEN_AXES_SEMANTIC_TYPES
+)
+PAGES_TABLE_HIDDEN_AXES_OWNER_PATH = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:r#)?(?:body_table_hidden_axes|table[ \t\r\n]*::"
+    r"[ \t\r\n]*(?:r#)?hidden_axes)(?=[ \t\r\n]*(?:::|as\b|;|=))"
+)
+PUBLIC_PAGES_PACKAGE_TABLE_HIDDEN_AXES_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?body_table_hidden_axes\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_PACKAGE_TABLE_HIDDEN_AXES_MODULE = re.compile(
+    r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+    r"mod[ \t\r\n]+(?:r#)?body_table_hidden_axes\b[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_TABLE_HIDDEN_AXES_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?hidden_axes\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PUBLIC_PAGES_TABLE_HIDDEN_AXES_TRANSACTION_MODULE = re.compile(
+    r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?transaction\b"
+    r"[ \t\r\n]*(?:;|\{)",
+    re.MULTILINE,
+)
+PAGES_TABLE_HIDDEN_AXES_PHYSICAL_TYPES = frozenset(
+    {
+        "Archive",
+        "ArchiveObject",
+        "ComponentCatalog",
+        "EntryEdit",
+        "ExactArtifacts",
+        "HiddenStateExtentArchive",
+        "HiddenStatesArchive",
+        "HiddenStatesOwnerArchive",
+        "IWorkPackage",
+        "RawMessage",
+        "Resolved",
+        "RowOrColumnState",
+        "SnappyStream",
+        "SourceCatalog",
+        "TableInfoArchive",
+        "TableModelArchive",
+    }
+)
+PAGES_TABLE_HIDDEN_AXES_WIRE_TYPES = frozenset(
+    {
+        "DecodeError",
+        "DecodeLimit",
+        "DecodeOptions",
+        "DecodeReport",
+        "NestedFieldEdit",
+        "NestedFieldReplacement",
+        "PreparedRewrite",
+        "RewriteExecutionLimits",
+        "RewriteExecutionRequirements",
+        "RewriteOutput",
+        "WireDescent",
+        "WireError",
+        "WireFieldView",
+        "WireLimits",
+        "WireResourceLimit",
+        "WireView",
+    }
+)
+PAGES_TABLE_HIDDEN_AXES_PROTO_ORIGINS = frozenset(
+    {"buffa", "prost", "prost_types", "litchi_iwa_protos", "tsp", "tst", "tsd", "tswp"}
+)
+PAGES_TABLE_HIDDEN_AXES_CODEC_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/pages_hidden_state_codec.rs"
+)
+PAGES_TABLE_HIDDEN_AXES_CODEC_PUBLIC_SOURCE = Path("crates/litchi-iwa-protos/src/lib.rs")
+PAGES_TABLE_HIDDEN_AXES_CODEC_MODULE = "pages_hidden_state_codec"
+PAGES_TABLE_HIDDEN_AXES_CODEC_ALIAS_MODULE = "pages_hidden_axes_codec"
+PAGES_TABLE_HIDDEN_AXES_CODEC_ALIAS_ROUTE = re.compile(
+    rf"(?<![A-Za-z0-9_#])(?:mod|use|pub[ \t\r\n]+use)[ \t\r\n]+"
+    rf"(?:r#)?{re.escape(PAGES_TABLE_HIDDEN_AXES_CODEC_ALIAS_MODULE)}\b"
+    rf"|\bas[ \t\r\n]+(?:r#)?{re.escape(PAGES_TABLE_HIDDEN_AXES_CODEC_ALIAS_MODULE)}\b"
+)
+PAGES_TABLE_HIDDEN_AXES_CODEC_PROJECTION_SOURCE = Path(
+    "crates/litchi-iwa-protos/src/buffa-projections/TSTPagesHiddenStateProjection.proto"
+)
+PAGES_TABLE_HIDDEN_AXES_CODEC_GENERATED_MODULE = (
+    "buffa_pages_hidden_state_generated"
+)
+PAGES_TABLE_HIDDEN_AXES_CODEC_GENERATED_INCLUDE = (
+    "/buffa-pages-hidden-state/iwa_pages_hidden_state_buffa_protos.rs"
+)
+# Pages' body table UID map is the 6267 native message.  6005 is a Numbers
+# table-data list and must never become a hidden-axis ownership shortcut.
+PAGES_TABLE_HIDDEN_AXES_UID_MAP_MESSAGE_TYPE = 6267
+PAGES_TABLE_HIDDEN_AXES_WRONG_UID_MAP_MESSAGE_TYPE = 6005
+PAGES_TABLE_HIDDEN_AXES_LEGACY_UID_MAP_MESSAGE_TYPE = 6200
+# Keep the native route proof close to the feature inventory.  The focused
+# owner and codec are the only places allowed to mention a UID-map routing
+# ID; a test can still exercise the wrong type through the adversarial
+# integration fixture below.
+PAGES_TABLE_HIDDEN_AXES_UID_MAP_OWNER_MARKER = re.compile(
+    r"\bUID_MAP_MESSAGE_TYPE\b[ \t\r\n]*:[ \t\r\n]*u32[ \t\r\n]*=[ \t\r\n]*6_?267\b"
+)
+PAGES_TABLE_HIDDEN_AXES_UID_MAP_CODEC_MARKER = re.compile(
+    r"\bCOLUMN_ROW_UID_MAP_MESSAGE_TYPE\b[ \t\r\n]*:[ \t\r\n]*u32[ \t\r\n]*=[ \t\r\n]*6_?267\b"
+)
+PAGES_TABLE_HIDDEN_AXES_LEGACY_OWNER_MARKER = re.compile(
+    r"\bLEGACY_UID_MAP_MESSAGE_TYPE\b[ \t\r\n]*:[ \t\r\n]*u32[ \t\r\n]*=[ \t\r\n]*6_?200\b"
+)
+PAGES_TABLE_HIDDEN_AXES_LEGACY_CODEC_MARKER = re.compile(
+    r"\bLEGACY_COLUMN_ROW_UID_MAP_MESSAGE_TYPE\b[ \t\r\n]*:[ \t\r\n]*u32[ \t\r\n]*=[ \t\r\n]*6_?200\b"
+)
+PAGES_TABLE_HIDDEN_AXES_FORBIDDEN_UID_MAP_LITERAL = re.compile(
+    r"(?<![A-Za-z0-9_])6_?005(?![A-Za-z0-9_])"
+)
+PAGES_TABLE_HIDDEN_AXES_LEGACY_OPT_IN_MARKER = re.compile(
+    r"\ballow_legacy\b"
+)
+# Owner creation was intentionally ruled out for this migration wave: an
+# absent hidden-state owner may be read as empty, but a changed non-empty edit
+# must fail rather than inventing a graph, IDs, or metadata objects.  Keep the
+# check on the known construction helpers rather than banning ordinary
+# collection ``insert`` calls used to validate an existing owner.
+PAGES_TABLE_HIDDEN_AXES_FORBIDDEN_CREATION_MARKERS = (
+    re.compile(r"\bNewIds\b"),
+    re.compile(r"\ballocate_ids\b"),
+    re.compile(r"\bowner_to_proto\b"),
+    re.compile(r"\binsert_object_with_limits\b"),
+)
+# The focused Pages adapter must continue consuming the shared compatibility
+# helper for Numbers and Keynote.  This is a retirement boundary, not a
+# permission to remove the common executor while deleting only the Pages
+# route.
+PAGES_TABLE_HIDDEN_AXES_SHARED_HELPER_SOURCE = IWA_CORE_SOURCE_ROOT / "table_hidden_axes.rs"
+PAGES_TABLE_HIDDEN_AXES_NUMBERS_HOST_SOURCE = (
+    IWA_NUMBERS_SOURCE_ROOT / "editor" / "table_hidden_axes.rs"
+)
+PAGES_TABLE_HIDDEN_AXES_KEYNOTE_HOST_SOURCE = (
+    IWA_KEYNOTE_SOURCE_ROOT / "editor" / "slide_tables" / "hidden_axes.rs"
+)
+PAGES_TABLE_HIDDEN_AXES_SHARED_HELPER_REQUIRED_MARKERS = (
+    "table_hidden_axes",
+    "set_table_hidden_axes",
+)
+PAGES_TABLE_HIDDEN_AXES_SHARED_IMPORT = re.compile(
+    r"\bcrate[ \t\r\n]*::[ \t\r\n]*table_hidden_axes[ \t\r\n]*::"
+)
+PAGES_TABLE_HIDDEN_AXES_CODEC_REQUIRED_APIS = (
+    "DecodeOptions",
+    "DecodeLimit",
+    "DecodeError",
+    "DecodeReport",
+    "UuidSnapshot",
+    "ReferenceSnapshot",
+    "AxisDirection",
+    "RowOrColumnStateSnapshot",
+    "HiddenStateExtentSnapshot",
+    "HiddenStatesSnapshot",
+    "HiddenStatesOwnerSnapshot",
+    "TableInfoSnapshot",
+    "TableModelSnapshot",
+    "RewriteExecutionLimits",
+    "RewriteExecutionRequirements",
+    "RewriteOutput",
+    "PreparedRewrite",
+    "decode_table_info",
+    "decode_table_info_with_report",
+    "decode_table_model",
+    "decode_table_model_with_report",
+    "decode_hidden_states_owner",
+    "decode_hidden_states_owner_with_report",
+    "decode_hidden_state_extent",
+    "decode_hidden_state_extent_with_report",
+    "decode_row_or_column_state",
+    "decode_row_or_column_state_with_report",
+    "prepare_table_info_rewrite",
+    "prepare_table_model_rewrite",
+    "prepare_hidden_states_owner_rewrite",
+    "prepare_hidden_state_extent_rewrite",
+    "prepare_row_or_column_state_rewrite",
+    "rewrite_table_info",
+    "rewrite_table_model",
+    "rewrite_hidden_states_owner",
+    "rewrite_hidden_state_extent",
+    "rewrite_row_or_column_state",
+)
+PAGES_TABLE_HIDDEN_AXES_CODEC_REQUIRED_MARKERS = (
+    "unknown",
+    "overlong",
+    "preflight",
+    "canonical",
+    "duplicate",
+    "decode_lazy_view",
+    "execution_requirements",
+    "execute",
+    "max_input_bytes",
+    "max_output_bytes",
+    "max_fields",
+    "max_work_bytes",
+    "max_allocations",
+    "max_retained_bytes",
+    "max_scratch_bytes",
+)
+PAGES_TABLE_HIDDEN_AXES_CODEC_FORBIDDEN_PATTERNS = (
+    re.compile(r"\bprost(?:_types)?\b"),
+    re.compile(r"\b(?:encode_to_vec|to_owned_message|try_encode|merge_from)\b"),
+    re.compile(r"\b(?:Message|prost::Message)[ \t\r\n]*::[ \t\r\n]*decode\b"),
+)
+PAGES_TABLE_HIDDEN_AXES_PROJECTION_MARKERS = (
+    'syntax = "proto2";',
+    "package LitchiIwaPagesHiddenStateProjection;",
+    "message Uuid",
+    "message Reference",
+    "message TableInfoArchive",
+    "message TableModelArchive",
+    "message HiddenStatesOwnerArchive",
+    "message HiddenStatesArchive",
+    "message HiddenStateExtentArchive",
+    "message RowOrColumnState",
+    "hidden_states_owner",
+    "hidden_states_uuid",
+    "row_or_column_direction",
+    "user_hidden",
+    "filtered",
+    "pivot_hidden",
+)
+PAGES_TABLE_HIDDEN_AXES_PUBLIC_RAW_ID_PARAMETER = re.compile(
+    r"(?<![A-Za-z0-9_])(?:r#)?(?:id|identifier|native_id|object_id|model_id|"
+    r"component_id|member_id|archive_id|message_id|uuid|source_bytes|bytes)"
+    r"[ \t\r\n]*:[ \t\r\n]*(?:u64|u32|usize|i64|i32|&\s*\[\s*u8\s*\])"
+    r"(?=$|[^A-Za-z0-9_])"
+)
+PAGES_TABLE_HIDDEN_AXES_TEST_SOURCES = (
+    Path("crates/litchi-pages/tests/body_table_hidden_axes.rs"),
+    Path("crates/litchi-pages/tests/body_table_hidden_axes_concurrency.rs"),
+)
+PAGES_TABLE_HIDDEN_AXES_FUZZ_SOURCES = (
+    Path("crates/litchi-pages/fuzz/fuzz_targets/pages_body_table_hidden_axes.rs"),
+)
+PAGES_TABLE_HIDDEN_AXES_FUZZ_CORPORA = (
+    Path("crates/litchi-pages/fuzz/corpus/pages_body_table_hidden_axes"),
+)
+
+# Longer body terminology aliases keep callers and boundary tests consistent
+# with the public owner names without maintaining duplicate inventories.
+PAGES_BODY_TABLE_HIDDEN_AXES_SEMANTIC_SOURCE = PAGES_TABLE_HIDDEN_AXES_SEMANTIC_SOURCE
+PAGES_BODY_TABLE_HIDDEN_AXES_OWNER_SOURCE = PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE
+PAGES_BODY_TABLE_HIDDEN_AXES_EXPORT_SOURCES = PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES
+PAGES_BODY_TABLE_HIDDEN_AXES_PACKAGE_METHODS = PAGES_TABLE_HIDDEN_AXES_PACKAGE_METHODS
+PAGES_BODY_TABLE_HIDDEN_AXES_CANONICAL_TYPES = PAGES_TABLE_HIDDEN_AXES_CANONICAL_TYPES
+
 RETIRED_IWA_PAGES_DOCUMENT_SETTINGS_METHODS = (
     "document_options",
     "set_document_options",
@@ -15744,10 +16161,20 @@ RUST_CFG_ATTRIBUTE_START = re.compile(
     r"^[ \t]*#[ \t]*\[[ \t]*cfg\b",
     re.MULTILINE,
 )
+# Keep the cfg(test) item recognizer deliberately broader than the public
+# declaration scanner.  A test-only item can be crate-visible, an ABI
+# qualified function, an extern block, or a macro.  Masking only ``pub fn``
+# would leave a production ratchet blind to a decoy hidden behind, for
+# example, ``#[cfg(test)] pub unsafe extern "C" fn ...`` or
+# ``#[cfg(test)] macro_rules! ...``.  The input is already passed through
+# ``_mask_rust_non_code``; the quoted ABI therefore appears as whitespace and
+# cannot make this recognizer inspect string contents.
 RUST_CFG_TEST_ITEM = re.compile(
-    r"(?:pub(?:[ \t\r\n]*\([^()]*\))?[ \t\r\n]+)?"
-    r"(?:(?:unsafe|async|const)[ \t\r\n]+)*"
-    r"(?P<kind>use|fn|mod|impl|struct|enum|trait|type|const|static)\b"
+    r"(?:pub(?:[ \t\r\n]*\([^()\r\n]*\))?[ \t\r\n]+)?"
+    r"(?:(?:unsafe|async|const|default)[ \t\r\n]+)*"
+    r"(?:(?:extern(?:[ \t\r\n]+\"[^\"]*\")?)[ \t\r\n]+)?"
+    r"(?P<kind>use|fn|mod|impl|struct|enum|trait|type|const|static|union|"
+    r"extern|macro_rules|macro)\b"
 )
 
 
@@ -16980,6 +17407,13 @@ def _audit_iwa_standalone_retired_routes(
         else "RETIRED_IWA_KEYNOTE_"
     )
     methods, helpers, tests = _retired_iwa_route_inventory(prefix)
+    # ``table_hidden_axes`` is intentionally shared by Numbers and Keynote.
+    # Its Pages retirement has a product-scoped classifier in
+    # ``audit_iwa_pages_table_hidden_axes_source_topology``; keeping it out of
+    # this broad legacy-route inventory prevents the Pages pass from treating
+    # valid Numbers/Keynote examples as Pages calls.
+    if ecosystem == "Pages":
+        methods -= RETIRED_IWA_PAGES_TABLE_HIDDEN_AXES_METHOD_SET
     if not methods and not helpers and not tests:
         return []
     method_pattern = re.compile(
@@ -18229,6 +18663,134 @@ def _pages_table_appearance_owner_present(root: Path) -> bool:
     )
     return owner_path.is_file() and (
         PAGES_PACKAGE_TABLE_APPEARANCE_MODULE.search(package_source) is not None
+    )
+
+
+def _pages_table_hidden_axes_public_leak(identifier: str) -> str | None:
+    """Classify implementation vocabulary forbidden in hidden-axis facades."""
+
+    if identifier in PAGES_TABLE_HIDDEN_AXES_PROTO_ORIGINS:
+        return "protobuf type"
+    if identifier in PAGES_TABLE_HIDDEN_AXES_PHYSICAL_TYPES:
+        return "archive/IWA type"
+    if identifier == "wire" or identifier in PAGES_TABLE_HIDDEN_AXES_WIRE_TYPES:
+        return "wire type"
+    # The semantic module intentionally re-exports the shared archive-free
+    # value implementation.  Its crate path is not a physical leak; the
+    # package/codec paths above are the only native boundary this ratchet
+    # permits.
+    if identifier == "litchi_iwa_common":
+        return None
+    reason = _iwork_public_leak(identifier)
+    if reason is not None:
+        return reason
+    words: list[str] = []
+    for part in identifier.split("_"):
+        words.extend(word.lower() for word in CAMEL_CASE_WORD.findall(part))
+    if any(word in {"buffa", "prost"} for word in words):
+        return "protobuf type"
+    if any(
+        words[index] in {"archive", "component", "entry", "member"}
+        and words[index + 1] in {"name", "names"}
+        for index in range(len(words) - 1)
+    ):
+        return "physical package name"
+    return None
+
+
+def _pages_table_hidden_axes_owner_declaration(declaration: str) -> bool:
+    identifiers = [
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    ]
+    return PAGES_TABLE_HIDDEN_AXES_OWNER_PATH.search(declaration) is not None or any(
+        identifier in PAGES_TABLE_HIDDEN_AXES_PACKAGE_METHODS for identifier in identifiers
+    )
+
+
+def _is_pages_table_hidden_axes_public_declaration(
+    declaration: str, *, dedicated_source: bool
+) -> bool:
+    if dedicated_source:
+        return True
+    identifiers = {
+        match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+    }
+    if bool(
+        identifiers
+        & (
+            PAGES_TABLE_HIDDEN_AXES_FLAT_ALIASES
+            | PAGES_TABLE_HIDDEN_AXES_PUBLIC_NAMES
+        )
+    ) or _pages_table_hidden_axes_owner_declaration(declaration):
+        return True
+    # A rogue public re-export need not use one of the canonical names (for
+    # example ``pub use litchi_iwa_protos::TableInfoArchive``).  Treat any
+    # recognized native/wire vocabulary or raw byte/ID parameter as evidence
+    # that the declaration must be inspected, so it cannot evade the facade
+    # leak ratchet by choosing a new alias.
+    # Limit the broad fallback to hidden-axis-specific wire/projection names.
+    # ``package.rs`` is also an export source and legitimately publishes the
+    # generic archive ingress (`Package::from_bytes`, `Archive`, etc.); those
+    # declarations must not be mistaken for this table owner.  A direct
+    # `litchi_iwa_protos`/Prost/generated projection route remains fail-closed.
+    native_identifiers = (
+        identifiers
+        & (
+            PAGES_TABLE_HIDDEN_AXES_PROTO_ORIGINS
+            | PAGES_TABLE_HIDDEN_AXES_WIRE_TYPES
+            | (
+                PAGES_TABLE_HIDDEN_AXES_PHYSICAL_TYPES
+                - {
+                    "Archive",
+                    "ArchiveObject",
+                    "ComponentCatalog",
+                    "EntryEdit",
+                    "ExactArtifacts",
+                    "IWorkPackage",
+                    "RawMessage",
+                    "Resolved",
+                    "SnappyStream",
+                    "SourceCatalog",
+                }
+            )
+        )
+    )
+    generated_or_codec = any(
+        any(word in identifier.lower() for word in ("buffa", "prost", "generated"))
+        for identifier in identifiers
+    )
+    if native_identifiers or generated_or_codec:
+        return True
+    hidden_context = bool(
+        identifiers
+        & (
+            PAGES_TABLE_HIDDEN_AXES_FLAT_ALIASES
+            | PAGES_TABLE_HIDDEN_AXES_PUBLIC_NAMES
+            | set(PAGES_TABLE_HIDDEN_AXES_PACKAGE_METHODS)
+        )
+    )
+    return (
+        hidden_context
+        and (
+            PAGES_TABLE_HIDDEN_AXES_PUBLIC_RAW_ID_PARAMETER.search(declaration)
+            is not None
+            or RUST_BYTE_SLICE.search(declaration) is not None
+        )
+    )
+
+
+def _pages_table_hidden_axes_owner_present(root: Path) -> bool:
+    """Activate the hidden-axis ratchets only after the private owner is wired."""
+
+    owner_path = root / PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE
+    package_path = root / PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES[1]
+    package_source = (
+        _mask_rust_non_code(package_path.read_text(encoding="utf-8"))
+        if package_path.is_file()
+        else ""
+    )
+    return owner_path.is_file() and (
+        PAGES_PACKAGE_TABLE_HIDDEN_AXES_MODULE.search(package_source) is not None
     )
 
 
@@ -34917,6 +35479,322 @@ def audit_iwa_pages_table_dimension_source_topology(root: Path = ROOT) -> list[s
     return sorted(set(violations))
 
 
+def _pages_table_hidden_axes_example_is_pages(
+    path: Path, source: str, match_start: int
+) -> bool:
+    """Identify Pages branches before applying the hidden-axis retirement."""
+
+    stem = path.stem.lower()
+    # Shared examples intentionally keep Numbers and Keynote hidden-axis
+    # compatibility.  A mixed filename is a Pages example only when it says
+    # so explicitly; a Numbers/Keynote-only filename is never Pages traffic.
+    line_start = source.rfind("\n", 0, match_start) + 1
+    line_end = source.find("\n", match_start)
+    if line_end < 0:
+        line_end = len(source)
+    line = source[line_start:line_end].lower()
+    if any(token in line for token in ("numbers", "keynote")) and not any(
+        token in line for token in ("pages", "pageseditor", "pages_editor")
+    ):
+        return False
+    if "pages" in line or "pageseditor" in line or "pages_editor" in line:
+        return True
+    function_matches = list(
+        re.finditer(
+            r"\bfn\s+(?:r#)?([A-Za-z_][A-Za-z0-9_]*)\b",
+            source[:match_start],
+        )
+    )
+    if not function_matches:
+        return "pages" in stem and not ("numbers" in stem or "keynote" in stem)
+    function_name = function_matches[-1].group(1).lower()
+    if "numbers" in function_name or "keynote" in function_name:
+        return False
+    if "pages" in function_name:
+        return True
+    if "numbers" in stem or "keynote" in stem:
+        return False
+    return "pages" in stem
+
+
+def audit_iwa_pages_table_hidden_axes_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Keep the Pages hidden-axis migration-host debt explicit.
+
+    The focused owner is selector-first and archive free, but it currently
+    refuses to create the native hidden-state closure for source-built Pages
+    tables.  Until the native changed-edit gate closes, the raw-ID
+    ``PagesEditor`` route, its test coverage, and the mixed iWork example are
+    required compatibility paths.  The host route must continue to use the
+    shared executor, while the focused owner remains terminal and cannot call
+    back into this compatibility seam.
+    """
+
+    # Until the complete focused owner is wired, the compatibility host is a
+    # deliberate migration baseline.  This gate also avoids reporting a
+    # partially assembled package from a concurrent source migration.
+    if not _pages_table_hidden_axes_owner_present(root):
+        return []
+
+    violations: list[str] = []
+
+    host_route_path = root / IWA_PAGES_TABLE_HIDDEN_AXES_HOST_SOURCE
+    if not host_route_path.is_file():
+        violations.append(
+            "retained litchi-iwa Pages table-hidden-axes migration-host source is missing: "
+            f"{IWA_PAGES_TABLE_HIDDEN_AXES_HOST_SOURCE}"
+        )
+    else:
+        host_source = _mask_rust_cfg_test_items(
+            host_route_path.read_text(encoding="utf-8")
+        )
+        host_code = _mask_rust_non_code(host_source)
+        for method in IWA_PAGES_TABLE_HIDDEN_AXES_HOST_METHODS:
+            declaration = re.search(
+                rf"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
+                rf"fn[ \t\r\n]+(?:r#)?{re.escape(method)}\b"
+                rf"(?P<signature>[^{{;]*)",
+                host_code,
+            )
+            if declaration is None:
+                violations.append(
+                    "retained litchi-iwa Pages table-hidden-axes migration-host method "
+                    f"{method} is missing: {IWA_PAGES_TABLE_HIDDEN_AXES_HOST_SOURCE}"
+                )
+            elif re.search(
+                r"\bmodel_object_id[ \t\r\n]*:[ \t\r\n]*u64\b",
+                declaration.group("signature"),
+            ) is None:
+                line_number = host_code.count("\n", 0, declaration.start()) + 1
+                violations.append(
+                    "retained litchi-iwa Pages table-hidden-axes migration-host method "
+                    f"{method} must retain raw model_object_id: u64: "
+                    f"{IWA_PAGES_TABLE_HIDDEN_AXES_HOST_SOURCE}:{line_number}"
+                )
+
+        for method in IWA_PAGES_TABLE_HIDDEN_AXES_HOST_METHODS:
+            if re.search(
+                rf"\bcrate[ \t\r\n]*::[ \t\r\n]*table_hidden_axes"
+                rf"[ \t\r\n]*::[ \t\r\n]*{re.escape(method)}\b"
+                rf"[ \t\r\n]*\(",
+                host_code,
+            ) is None:
+                violations.append(
+                    "retained litchi-iwa Pages table-hidden-axes migration-host method "
+                    f"{method} must call the shared table-hidden-axes executor: "
+                    f"{IWA_PAGES_TABLE_HIDDEN_AXES_HOST_SOURCE}"
+                )
+
+        # A host compatibility route may remain while the focused owner is
+        # incomplete, but it must not quietly delegate every refusal back to
+        # that owner.  Keep this check on executable source so the retained
+        # documentation can explain the migration debt without tripping it.
+        for pattern in PAGES_TABLE_HIDDEN_AXES_FOCUSED_FALLBACK_PATTERNS[:2]:
+            match = pattern.search(host_code)
+            if match is None:
+                continue
+            line_number = host_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "retained litchi-iwa Pages table-hidden-axes migration-host route must not "
+                "fallback through the focused litchi-pages facade: "
+                f"{IWA_PAGES_TABLE_HIDDEN_AXES_HOST_SOURCE}:{line_number}"
+            )
+
+    tables_module = root / IWA_PAGES_TABLES_MODULE_SOURCE
+    if not tables_module.is_file():
+        violations.append(
+            "retained litchi-iwa Pages table-hidden-axes migration-host module is missing: "
+            f"{IWA_PAGES_TABLES_MODULE_SOURCE}"
+        )
+    else:
+        module_code = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(tables_module.read_text(encoding="utf-8"))
+        )
+        if IWA_PAGES_TABLE_HIDDEN_AXES_MODULE.search(module_code) is None:
+            violations.append(
+                "retained litchi-iwa Pages table-hidden-axes migration-host module "
+                f"declaration is missing: {IWA_PAGES_TABLES_MODULE_SOURCE}"
+            )
+        elif re.search(
+            r"(?m)^\s*pub(?:\([^()]*\))?[ \t\r\n]+mod[ \t\r\n]+"
+            r"(?:r#)?hidden_axes\b",
+            module_code,
+        ):
+            violations.append(
+                "retained litchi-iwa Pages table-hidden-axes migration-host module "
+                f"must remain private: {IWA_PAGES_TABLES_MODULE_SOURCE}"
+            )
+
+    host_test_path = root / IWA_PAGES_TABLE_HIDDEN_AXES_HOST_TEST_SOURCE
+    if not host_test_path.is_file():
+        violations.append(
+            "retained litchi-iwa Pages table-hidden-axes migration-host test source is missing: "
+            f"{IWA_PAGES_TABLE_HIDDEN_AXES_HOST_TEST_SOURCE}"
+        )
+    else:
+        host_test_code = _mask_rust_non_code(
+            host_test_path.read_text(encoding="utf-8")
+        )
+        if re.search(r"(?m)#\s*\[\s*test\s*\]", host_test_code) is None:
+            violations.append(
+                "retained litchi-iwa Pages table-hidden-axes migration-host test source "
+                f"is missing #[test] coverage: {IWA_PAGES_TABLE_HIDDEN_AXES_HOST_TEST_SOURCE}"
+            )
+        for method in IWA_PAGES_TABLE_HIDDEN_AXES_HOST_METHODS:
+            if re.search(
+                rf"(?<![A-Za-z0-9_#])(?:r#)?{re.escape(method)}\b"
+                rf"[ \t\r\n]*\(",
+                host_test_code,
+            ) is None:
+                violations.append(
+                    "retained litchi-iwa Pages table-hidden-axes migration-host test source "
+                    f"must exercise {method}: {IWA_PAGES_TABLE_HIDDEN_AXES_HOST_TEST_SOURCE}"
+                )
+    shared_helper = root / PAGES_TABLE_HIDDEN_AXES_SHARED_HELPER_SOURCE
+    if not shared_helper.is_file():
+        violations.append(
+            "shared Numbers/Keynote table-hidden-axes helper is missing: "
+            f"{PAGES_TABLE_HIDDEN_AXES_SHARED_HELPER_SOURCE}"
+        )
+    else:
+        shared_code = _mask_rust_non_code(
+            shared_helper.read_text(encoding="utf-8")
+        )
+        for marker in PAGES_TABLE_HIDDEN_AXES_SHARED_HELPER_REQUIRED_MARKERS:
+            if re.search(
+                rf"\bfn[ \t\r\n]+(?:r#)?{re.escape(marker)}\b",
+                shared_code,
+            ):
+                continue
+            violations.append(
+                "shared Numbers/Keynote table-hidden-axes helper is missing "
+                f"{marker}: {PAGES_TABLE_HIDDEN_AXES_SHARED_HELPER_SOURCE}"
+            )
+    for host, host_path in (
+        ("Numbers", PAGES_TABLE_HIDDEN_AXES_NUMBERS_HOST_SOURCE),
+        ("Keynote", PAGES_TABLE_HIDDEN_AXES_KEYNOTE_HOST_SOURCE),
+    ):
+        absolute_host = root / host_path
+        if not absolute_host.is_file():
+            violations.append(
+                f"{host} table-hidden-axes host route is missing its shared-helper adapter: "
+                f"{host_path}"
+            )
+            continue
+        host_code = _mask_rust_non_code(
+            absolute_host.read_text(encoding="utf-8")
+        )
+        if PAGES_TABLE_HIDDEN_AXES_SHARED_IMPORT.search(host_code) is None:
+            violations.append(
+                f"{host} table-hidden-axes host must retain the shared helper import: "
+                f"{host_path}"
+            )
+
+    source_root = root / IWA_PAGES_SOURCE_ROOT
+    if source_root.is_dir():
+        for path in sorted(source_root.rglob("*.rs")):
+            # The canonical host source and the outer test module are the
+            # retained migration-host route.  Production siblings must not
+            # grow another raw-ID implementation or bypass the one shared
+            # executor.
+            if (
+                path == host_route_path
+                or path == host_test_path
+                or path.name == "tests.rs"
+            ):
+                continue
+            raw = path.read_text(encoding="utf-8")
+            source = _mask_rust_cfg_test_items(raw)
+            code = _mask_rust_non_code(source)
+            for name, line_number in _rust_function_declarations(source):
+                if name not in IWA_PAGES_TABLE_HIDDEN_AXES_HOST_METHOD_SET:
+                    continue
+                violations.append(
+                    "duplicate litchi-iwa Pages table-hidden-axes migration-host method "
+                    f"{name}: {path.relative_to(root)}:{line_number}"
+                )
+            for pattern in IWA_PAGES_TABLE_HIDDEN_AXES_IMPORTS:
+                for match in pattern.finditer(code):
+                    line_number = code.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        "duplicate litchi-iwa Pages table-hidden-axes migration-host import: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+            for match in IWA_PAGES_TABLE_HIDDEN_AXES_CALL.finditer(code):
+                method = match.group("method")
+                line_number = code.count("\n", 0, match.start("method")) + 1
+                violations.append(
+                    "duplicate litchi-iwa Pages table-hidden-axes migration-host call "
+                    f"{method}: {path.relative_to(root)}:{line_number}"
+                )
+
+    # Examples are shared by all three iWork hosts.  The mixed example must
+    # retain its Pages branch while Numbers and Keynote branches remain
+    # outside this Pages debt check.  Other Pages examples must not become a
+    # second compatibility recommendation.
+    example_root = root / IWA_PAGES_TABLE_HIDDEN_AXES_EXAMPLE_ROOT
+    retained_example_path = root / IWA_PAGES_TABLE_HIDDEN_AXES_HOST_EXAMPLE
+    if not retained_example_path.is_file():
+        violations.append(
+            "retained litchi-iwa Pages table-hidden-axes migration-host example is missing: "
+            f"{IWA_PAGES_TABLE_HIDDEN_AXES_HOST_EXAMPLE}"
+        )
+    if example_root.is_dir():
+        for example_path in sorted(example_root.rglob("*.rs")):
+            source = _mask_rust_cfg_test_items(
+                example_path.read_text(encoding="utf-8")
+            )
+            code = _mask_rust_non_code(source)
+            is_retained_example = example_path == retained_example_path
+            pages_matches = []
+            for match in IWA_PAGES_TABLE_HIDDEN_AXES_CALL.finditer(code):
+                if _pages_table_hidden_axes_example_is_pages(
+                    example_path, code, match.start()
+                ):
+                    pages_matches.append(match)
+                    if not is_retained_example:
+                        line_number = code.count(
+                            "\n", 0, match.start("method")
+                        ) + 1
+                        violations.append(
+                            "duplicate litchi-iwa Pages table-hidden-axes migration-host "
+                            f"example call {match.group('method')}: "
+                            f"{example_path.relative_to(root)}:{line_number}"
+                        )
+            if is_retained_example:
+                if not pages_matches:
+                    violations.append(
+                        "retained litchi-iwa Pages table-hidden-axes migration-host example "
+                        f"is missing a Pages branch: {IWA_PAGES_TABLE_HIDDEN_AXES_HOST_EXAMPLE}"
+                    )
+                for method in IWA_PAGES_TABLE_HIDDEN_AXES_HOST_METHODS:
+                    if not any(match.group("method") == method for match in pages_matches):
+                        violations.append(
+                            "retained litchi-iwa Pages table-hidden-axes migration-host example "
+                            f"must exercise {method}: {IWA_PAGES_TABLE_HIDDEN_AXES_HOST_EXAMPLE}"
+                        )
+            for pattern in IWA_PAGES_TABLE_HIDDEN_AXES_IMPORTS:
+                for match in pattern.finditer(code):
+                    if is_retained_example or not _pages_table_hidden_axes_example_is_pages(
+                        example_path, code, match.start()
+                    ):
+                        continue
+                    line_number = code.count("\n", 0, match.start()) + 1
+                    violations.append(
+                        "duplicate litchi-iwa Pages table-hidden-axes migration-host "
+                        "example import: "
+                        f"{example_path.relative_to(root)}:{line_number}"
+                    )
+
+    return sorted(set(violations))
+
+
+audit_iwa_pages_body_table_hidden_axes_source_topology = (
+    audit_iwa_pages_table_hidden_axes_source_topology
+)
+
+
 def _pages_table_sort_owner_present(root: Path) -> bool:
     owner_path = root / PAGES_TABLE_SORT_OWNER_SOURCE
     package_path = root / PAGES_TABLE_SORT_EXPORT_SOURCES[1]
@@ -35291,6 +36169,13 @@ def audit_pages_table_sort_facade_source_topology(root: Path = ROOT) -> list[str
     for path in sorted(dedicated_sources | export_sources):
         dedicated_source = path in dedicated_sources
         source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        for method, line_number in _rust_function_declarations(source):
+            if method not in PAGES_TABLE_HIDDEN_AXES_FLAT_METHODS:
+                continue
+            violations.append(
+                "focused litchi-pages body-table hidden-axes public API retains flat function "
+                f"{method}: {path.relative_to(root)}:{line_number}"
+            )
         declarations = [
             (declaration, line_number, True, dedicated_source)
             for declaration, line_number in _rust_public_declarations(source)
@@ -35909,6 +36794,568 @@ def audit_pages_table_appearance_facade_source_topology(
                         f"{alias} for {target}: {path.relative_to(root)}:{line_number}"
                     )
     return sorted(set(violations))
+
+
+def audit_pages_table_hidden_axes_facade_source_topology(
+    root: Path = ROOT,
+) -> list[str]:
+    """Enforce the selector-first, archive-free Pages hidden-axis owner."""
+
+    source_root = root / PAGES_SOURCE_ROOT
+    if not source_root.is_dir() or not _pages_table_hidden_axes_owner_present(root):
+        return []
+
+    owner_path = root / PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE
+    semantic_path = root / PAGES_TABLE_HIDDEN_AXES_SEMANTIC_SOURCE
+    selector_path = root / PAGES_TABLE_HIDDEN_AXES_SELECTOR_SOURCE
+    lib_path = root / PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES[0]
+    package_path = root / PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES[1]
+    table_path = root / PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES[2]
+    paths = (owner_path, semantic_path, selector_path, lib_path, package_path, table_path)
+    sources = {
+        path: _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        if path.is_file()
+        else ""
+        for path in paths
+    }
+    code = {path: _mask_rust_non_code(source) for path, source in sources.items()}
+    violations: list[str] = []
+
+    package_code = code[package_path]
+    package_raw = sources[package_path]
+    lib_code = code[lib_path]
+    if PUBLIC_PAGES_PACKAGE_TABLE_HIDDEN_AXES_MODULE.search(
+        package_raw + sources[lib_path]
+    ):
+        violations.append(
+            "focused litchi-pages body-table hidden-axes owner module must remain private: "
+            f"{PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES[1]}"
+        )
+    if PAGES_PACKAGE_TABLE_HIDDEN_AXES_MODULE.search(package_code) is None:
+        violations.append(
+            "focused litchi-pages body-table hidden-axes owner module is missing: "
+            f"{PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES[1]}"
+        )
+
+    semantic_exports = _rust_canonical_exports(
+        sources[semantic_path], frozenset(PAGES_TABLE_HIDDEN_AXES_SEMANTIC_TYPES)
+    )
+    for name in PAGES_TABLE_HIDDEN_AXES_SEMANTIC_TYPES:
+        if name not in semantic_exports:
+            violations.append(
+                "focused litchi-pages body-table hidden-axes semantic API is missing "
+                f"{name}: {PAGES_TABLE_HIDDEN_AXES_SEMANTIC_SOURCE}"
+            )
+    if PUBLIC_PAGES_TABLE_HIDDEN_AXES_TRANSACTION_MODULE.search(
+        code[semantic_path]
+    ) is None:
+        violations.append(
+            "focused litchi-pages body-table hidden-axes semantic API is missing "
+            f"table::hidden_axes::transaction: {PAGES_TABLE_HIDDEN_AXES_SEMANTIC_SOURCE}"
+        )
+    transaction_exports = _rust_canonical_exports(
+        sources[semantic_path], frozenset(PAGES_TABLE_HIDDEN_AXES_TRANSACTION_TYPES)
+    )
+    for name in PAGES_TABLE_HIDDEN_AXES_TRANSACTION_TYPES:
+        if name not in transaction_exports:
+            violations.append(
+                "focused litchi-pages body-table hidden-axes transaction API is missing "
+                f"{name}: {PAGES_TABLE_HIDDEN_AXES_SEMANTIC_SOURCE}"
+            )
+
+    if "BodyTableSelector" not in _rust_canonical_exports(
+        sources[selector_path], frozenset({"BodyTableSelector"})
+    ):
+        violations.append(
+            "focused litchi-pages body-table hidden-axes public API is missing canonical "
+            f"BodyTableSelector: {PAGES_TABLE_HIDDEN_AXES_SELECTOR_SOURCE}"
+        )
+    if "BodyTableSelector" not in _rust_canonical_exports(
+        sources[lib_path], frozenset({"BodyTableSelector"})
+    ):
+        violations.append(
+            "focused litchi-pages body-table hidden-axes public API is missing root "
+            f"BodyTableSelector re-export: {PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES[0]}"
+        )
+
+    owner_exports = _rust_canonical_exports(
+        sources[owner_path], frozenset(PAGES_TABLE_HIDDEN_AXES_CANONICAL_TYPES)
+    )
+    for name in PAGES_TABLE_HIDDEN_AXES_CANONICAL_TYPES:
+        if name not in owner_exports:
+            violations.append(
+                "focused litchi-pages body-table hidden-axes public API is missing canonical "
+                f"type {name}: {PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE}"
+            )
+        for export_path in (package_path, lib_path):
+            if name not in _rust_canonical_exports(
+                sources[export_path], frozenset({name})
+            ):
+                violations.append(
+                    "focused litchi-pages body-table hidden-axes public API is missing root "
+                    f"re-export {name}: {export_path.relative_to(root)}"
+                )
+
+    owner_methods = {
+        name: declaration
+        for name, declaration, _line_number in _rust_public_methods_in_impl(
+            sources[owner_path], "Package"
+        )
+    }
+    for method in PAGES_TABLE_HIDDEN_AXES_PACKAGE_METHODS:
+        declaration = owner_methods.get(method)
+        if declaration is None:
+            violations.append(
+                "focused litchi-pages body-table hidden-axes Package method is missing "
+                f"{method}: {PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE}"
+            )
+            continue
+        if method != "apply_body_table_hidden_axes" and "BodyTableSelector" not in declaration:
+            violations.append(
+                "focused litchi-pages body-table hidden-axes Package method "
+                f"{method} must accept selector-first BodyTableSelector: "
+                f"{PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE}"
+            )
+    apply_declaration = owner_methods.get("apply_body_table_hidden_axes")
+    if apply_declaration is not None and "BodyTableHiddenAxesPatch" not in apply_declaration:
+        violations.append(
+            "focused litchi-pages body-table hidden-axes apply method must accept "
+            f"BodyTableHiddenAxesPatch: {PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE}"
+        )
+
+    edit_methods = {
+        name
+        for edit_type in ("BodyTableHiddenAxesEdit", "Edit")
+        for name, _declaration, _line_number in _rust_public_methods_in_impl(
+            sources[owner_path], edit_type
+        )
+    }
+    for name in sorted(PAGES_TABLE_HIDDEN_AXES_EDIT_METHODS - edit_methods):
+        violations.append(
+            "focused litchi-pages body-table hidden-axes edit is missing "
+            f"{name}: {PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE}"
+        )
+    for method in sorted(PAGES_TABLE_HIDDEN_AXES_FLAT_METHODS & owner_methods.keys()):
+        violations.append(
+            "focused litchi-pages body-table hidden-axes public API retains flat Package "
+            f"method {method}: {PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE}"
+        )
+
+    if PUBLIC_PAGES_TABLE_MODULE.search(lib_code) is None:
+        violations.append(
+            "focused litchi-pages body-table hidden-axes public API is missing canonical root "
+            f"table module: {PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES[0]}"
+        )
+    if PUBLIC_PAGES_TABLE_HIDDEN_AXES_MODULE.search(code[table_path]) is None:
+        violations.append(
+            "focused litchi-pages body-table hidden-axes public API is missing canonical "
+            f"table::hidden_axes module: {PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES[2]}"
+        )
+
+    # The focused owner must not recover unsupported source-built edits by
+    # delegating to the migration host.  Keep this executable-source check
+    # separate from the public declaration leak scan below: a private helper
+    # can still create an implicit fallback without changing the facade type
+    # signatures.
+    for path in (owner_path, semantic_path):
+        for pattern in PAGES_TABLE_HIDDEN_AXES_FOCUSED_FALLBACK_PATTERNS:
+            match = pattern.search(code[path])
+            if match is None:
+                continue
+            line_number = code[path].count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-pages body-table hidden-axes owner must not fallback "
+                "through the migration host: "
+                f"{path.relative_to(root)}:{line_number}"
+            )
+
+    # Keep the Buffa sidecar wholly behind the protos crate's hidden module.
+    # The generated module must be private and use the expected OUT_DIR file;
+    # downstream Pages code may import the strict codec, never generated
+    # archive types or Prost's eager message API.
+    owner_code = code[owner_path]
+    if PAGES_TABLE_HIDDEN_AXES_UID_MAP_OWNER_MARKER.search(owner_code) is None:
+        violations.append(
+            "focused litchi-pages body-table hidden-axes owner is missing the "
+            f"canonical UID-map message type {PAGES_TABLE_HIDDEN_AXES_UID_MAP_MESSAGE_TYPE}: "
+            f"{PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE}"
+        )
+    if PAGES_TABLE_HIDDEN_AXES_LEGACY_OWNER_MARKER.search(owner_code) is None:
+        violations.append(
+            "focused litchi-pages body-table hidden-axes owner is missing its explicit "
+            f"legacy UID-map marker {PAGES_TABLE_HIDDEN_AXES_LEGACY_UID_MAP_MESSAGE_TYPE}: "
+            f"{PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE}"
+        )
+    if PAGES_TABLE_HIDDEN_AXES_LEGACY_OPT_IN_MARKER.search(owner_code) is None:
+        violations.append(
+            "focused litchi-pages body-table hidden-axes owner must qualify legacy "
+            "UID-map support through an explicit allow_legacy path: "
+            f"{PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE}"
+        )
+    for pattern in PAGES_TABLE_HIDDEN_AXES_FORBIDDEN_CREATION_MARKERS:
+        match = pattern.search(owner_code)
+        if match is None:
+            continue
+        line_number = owner_code.count("\n", 0, match.start()) + 1
+        violations.append(
+            "focused litchi-pages body-table hidden-axes owner retains forbidden "
+            f"owner-creation helper {match.group(0)}: "
+            f"{PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE}:{line_number}"
+        )
+
+    codec_path = root / PAGES_TABLE_HIDDEN_AXES_CODEC_SOURCE
+    codec_lib_path = root / PAGES_TABLE_HIDDEN_AXES_CODEC_PUBLIC_SOURCE
+    codec_code = ""
+    if not codec_path.is_file():
+        violations.append(
+            "focused litchi-pages body-table hidden-axes public API is missing strict hidden "
+            f"codec source: {PAGES_TABLE_HIDDEN_AXES_CODEC_SOURCE}"
+        )
+    else:
+        codec_raw = codec_path.read_text(encoding="utf-8")
+        codec_source = _mask_rust_cfg_test_items(codec_raw)
+        codec_code = _mask_rust_non_code(codec_source)
+        if PAGES_TABLE_HIDDEN_AXES_UID_MAP_CODEC_MARKER.search(codec_code) is None:
+            violations.append(
+                "focused litchi-pages body-table hidden-axes codec is missing the "
+                f"canonical UID-map message type {PAGES_TABLE_HIDDEN_AXES_UID_MAP_MESSAGE_TYPE}: "
+                f"{PAGES_TABLE_HIDDEN_AXES_CODEC_SOURCE}"
+            )
+        if PAGES_TABLE_HIDDEN_AXES_LEGACY_CODEC_MARKER.search(codec_code) is None:
+            violations.append(
+                "focused litchi-pages body-table hidden-axes codec is missing its explicit "
+                f"legacy UID-map marker {PAGES_TABLE_HIDDEN_AXES_LEGACY_UID_MAP_MESSAGE_TYPE}: "
+                f"{PAGES_TABLE_HIDDEN_AXES_CODEC_SOURCE}"
+            )
+        if PAGES_TABLE_HIDDEN_AXES_LEGACY_OPT_IN_MARKER.search(codec_code) is None:
+            violations.append(
+                "focused litchi-pages body-table hidden-axes codec must qualify legacy "
+                "UID-map support through an explicit allow_legacy path: "
+                f"{PAGES_TABLE_HIDDEN_AXES_CODEC_SOURCE}"
+            )
+        for api in PAGES_TABLE_HIDDEN_AXES_CODEC_REQUIRED_APIS:
+            if re.search(
+                rf"\b(?:pub\s+)?(?:fn|struct|enum|type)\s+{re.escape(api)}\b",
+                codec_code,
+            ) is None:
+                violations.append(
+                    "focused litchi-pages body-table hidden-axes hidden codec is missing "
+                    f"strict API {api}: {PAGES_TABLE_HIDDEN_AXES_CODEC_SOURCE}"
+                )
+        # Keep cfg(test) names visible for behavior markers (the overlong
+        # unknown-field case is intentionally named in the codec tests), but
+        # still mask comments so prose cannot satisfy the ratchet.
+        codec_markers = _mask_rust_comments(codec_raw)
+        for marker in PAGES_TABLE_HIDDEN_AXES_CODEC_REQUIRED_MARKERS:
+            if marker not in codec_markers:
+                violations.append(
+                    "focused litchi-pages body-table hidden-axes hidden codec is missing "
+                    f"strict marker {marker}: {PAGES_TABLE_HIDDEN_AXES_CODEC_SOURCE}"
+                )
+        for pattern in PAGES_TABLE_HIDDEN_AXES_CODEC_FORBIDDEN_PATTERNS:
+            match = pattern.search(codec_code)
+            if match is None:
+                continue
+            line_number = codec_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-pages body-table hidden-axes hidden codec retains forbidden "
+                f"generated/Prost encoding {match.group(0).strip()}: "
+                f"{PAGES_TABLE_HIDDEN_AXES_CODEC_SOURCE}:{line_number}"
+            )
+        if re.search(r"(?m)#\s*\[\s*cfg\(\s*test\s*\)\s*\]", codec_raw) is None or re.search(
+            r"(?m)#\s*\[\s*test\s*\]", codec_raw
+        ) is None:
+            violations.append(
+                "focused litchi-pages body-table hidden-axes hidden codec is missing cfg(test) #[test] coverage: "
+                f"{PAGES_TABLE_HIDDEN_AXES_CODEC_SOURCE}"
+            )
+    for path, source_code in (
+        (owner_path, owner_code),
+        (codec_path, codec_code),
+    ):
+        if not source_code:
+            continue
+        for match in PAGES_TABLE_HIDDEN_AXES_FORBIDDEN_UID_MAP_LITERAL.finditer(
+            source_code
+        ):
+            line_number = source_code.count("\n", 0, match.start()) + 1
+            violations.append(
+                "focused litchi-pages body-table hidden-axes source uses the forbidden "
+                f"Numbers table-data UID-map message type {PAGES_TABLE_HIDDEN_AXES_WRONG_UID_MAP_MESSAGE_TYPE}: "
+                f"{path.relative_to(root)}:{line_number}"
+            )
+
+    if not codec_lib_path.is_file():
+        codec_lib_source = ""
+    else:
+        codec_lib_source = _mask_rust_cfg_test_items(
+            codec_lib_path.read_text(encoding="utf-8")
+        )
+    codec_lib_code = _mask_rust_non_code(codec_lib_source)
+    alias_route = PAGES_TABLE_HIDDEN_AXES_CODEC_ALIAS_ROUTE.search(codec_lib_code)
+    if alias_route is not None:
+        line_number = codec_lib_code.count("\n", 0, alias_route.start()) + 1
+        violations.append(
+            "focused litchi-pages body-table hidden-axes codec retains its retired "
+            f"alias module {PAGES_TABLE_HIDDEN_AXES_CODEC_ALIAS_MODULE}: "
+            f"{PAGES_TABLE_HIDDEN_AXES_CODEC_PUBLIC_SOURCE}:{line_number}"
+        )
+    hidden_module_pattern = re.compile(
+        rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+        rf"pub\s+mod\s+{re.escape(PAGES_TABLE_HIDDEN_AXES_CODEC_MODULE)}\b"
+    )
+    if hidden_module_pattern.search(codec_lib_source) is None:
+        violations.append(
+            "focused litchi-pages body-table hidden-axes public API is missing hidden "
+            f"codec module {PAGES_TABLE_HIDDEN_AXES_CODEC_MODULE}: "
+            f"{PAGES_TABLE_HIDDEN_AXES_CODEC_PUBLIC_SOURCE}"
+        )
+    generated_module = re.compile(
+        rf"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][\s\r\n]*"
+        rf"mod\s+{re.escape(PAGES_TABLE_HIDDEN_AXES_CODEC_GENERATED_MODULE)}\b"
+    )
+    if generated_module.search(codec_lib_source) is None:
+        violations.append(
+            "focused litchi-pages body-table hidden-axes Buffa generated module must remain private: "
+            f"{PAGES_TABLE_HIDDEN_AXES_CODEC_PUBLIC_SOURCE}"
+        )
+    if PAGES_TABLE_HIDDEN_AXES_CODEC_GENERATED_INCLUDE not in codec_lib_source:
+        violations.append(
+            "focused litchi-pages body-table hidden-axes Buffa generated module has the wrong include: "
+            f"{PAGES_TABLE_HIDDEN_AXES_CODEC_PUBLIC_SOURCE}"
+        )
+    if re.search(
+        rf"(?m)^\s*pub\s+mod\s+{re.escape(PAGES_TABLE_HIDDEN_AXES_CODEC_GENERATED_MODULE)}\b",
+        codec_lib_source,
+    ):
+        violations.append(
+            "focused litchi-pages body-table hidden-axes Buffa generated module must not be public: "
+            f"{PAGES_TABLE_HIDDEN_AXES_CODEC_PUBLIC_SOURCE}"
+        )
+
+    projection_path = root / PAGES_TABLE_HIDDEN_AXES_CODEC_PROJECTION_SOURCE
+    if not projection_path.is_file():
+        violations.append(
+            "focused litchi-pages body-table hidden-axes boundary is missing Buffa projection: "
+            f"{PAGES_TABLE_HIDDEN_AXES_CODEC_PROJECTION_SOURCE}"
+        )
+    else:
+        projection_raw = projection_path.read_text(encoding="utf-8")
+        projection_code = _mask_rust_comments(projection_raw)
+        for marker in PAGES_TABLE_HIDDEN_AXES_PROJECTION_MARKERS:
+            if marker not in projection_code:
+                violations.append(
+                    "focused litchi-pages body-table hidden-axes Buffa projection is missing "
+                    f"marker {marker}: {PAGES_TABLE_HIDDEN_AXES_CODEC_PROJECTION_SOURCE}"
+                )
+        repeated = re.search(r"\brepeated\b", projection_code)
+        if repeated is not None:
+            line_number = projection_code.count("\n", 0, repeated.start()) + 1
+            violations.append(
+                "focused litchi-pages body-table hidden-axes Buffa projection must not expose repeated generated fields: "
+                f"{PAGES_TABLE_HIDDEN_AXES_CODEC_PROJECTION_SOURCE}:{line_number}"
+            )
+
+    # Positive owner tests/fuzz are part of the focused seam.  Keep these
+    # checks here (rather than a broad workspace scan) so shared Numbers and
+    # Keynote compatibility fixtures do not become accidental Pages routes.
+    for test_path in PAGES_TABLE_HIDDEN_AXES_TEST_SOURCES:
+        absolute = root / test_path
+        if not absolute.is_file():
+            violations.append(
+                "focused litchi-pages body-table hidden-axes boundary is missing integration test: "
+                f"{test_path}"
+            )
+        else:
+            test_code = _mask_rust_non_code(absolute.read_text(encoding="utf-8"))
+            if re.search(r"(?m)#\s*\[\s*test\s*\]", test_code) is None:
+                violations.append(
+                    "focused litchi-pages body-table hidden-axes integration test is missing #[test] coverage: "
+                    f"{test_path}"
+                )
+            if not re.search(
+                r"\b(?:body_table_hidden_axes|edit_body_table_hidden_axes|apply_body_table_hidden_axes)\b",
+                test_code,
+            ):
+                violations.append(
+                    "focused litchi-pages body-table hidden-axes integration test does not exercise the owner: "
+                    f"{test_path}"
+                )
+            if test_path == PAGES_TABLE_HIDDEN_AXES_TEST_SOURCES[0]:
+                expected_uid_map = str(PAGES_TABLE_HIDDEN_AXES_UID_MAP_MESSAGE_TYPE)
+                wrong_uid_map = str(PAGES_TABLE_HIDDEN_AXES_WRONG_UID_MAP_MESSAGE_TYPE)
+                if not re.search(
+                    rf"\b(?:MESSAGE_TYPE|message_type|uid_map)[A-Za-z0-9_]*\b"
+                    rf"[^;\n]*\b{re.escape(expected_uid_map[:1])}_?"
+                    rf"{re.escape(expected_uid_map[1:])}\b",
+                    test_code,
+                    re.IGNORECASE,
+                ):
+                    violations.append(
+                        "focused litchi-pages body-table hidden-axes integration test must use "
+                        f"UID-map message type {PAGES_TABLE_HIDDEN_AXES_UID_MAP_MESSAGE_TYPE}: {test_path}"
+                    )
+                if re.search(
+                    rf"\b(?:MESSAGE_TYPE|message_type|uid_map)[A-Za-z0-9_]*\b"
+                    rf"[^;\n]*\b{re.escape(wrong_uid_map[:1])}_?"
+                    rf"{re.escape(wrong_uid_map[1:])}\b",
+                    test_code,
+                    re.IGNORECASE,
+                ):
+                    violations.append(
+                        "focused litchi-pages body-table hidden-axes integration test must not use "
+                        f"Numbers table-data message type {PAGES_TABLE_HIDDEN_AXES_WRONG_UID_MAP_MESSAGE_TYPE}: {test_path}"
+                    )
+    for fuzz_path in PAGES_TABLE_HIDDEN_AXES_FUZZ_SOURCES:
+        absolute = root / fuzz_path
+        if not absolute.is_file():
+            violations.append(
+                "focused litchi-pages body-table hidden-axes boundary is missing fuzz target: "
+                f"{fuzz_path}"
+            )
+        elif "fuzz_target!" not in absolute.read_text(encoding="utf-8"):
+            violations.append(
+                "focused litchi-pages body-table hidden-axes fuzz target is missing fuzz_target! harness: "
+                f"{fuzz_path}"
+            )
+    for corpus in PAGES_TABLE_HIDDEN_AXES_FUZZ_CORPORA:
+        if not (root / corpus).is_dir():
+            violations.append(
+                "focused litchi-pages body-table hidden-axes boundary is missing fuzz corpus: "
+                f"{corpus}"
+            )
+
+    dedicated_sources = {
+        root / path
+        for path in PAGES_TABLE_HIDDEN_AXES_IMPLEMENTATION_SOURCES
+        if (root / path).is_file()
+    }
+    helper_root = root / PAGES_TABLE_HIDDEN_AXES_OWNER_HELPER_ROOT
+    if helper_root.is_dir():
+        dedicated_sources.update(helper_root.rglob("*.rs"))
+    export_sources = {
+        root / path
+        for path in PAGES_TABLE_HIDDEN_AXES_EXPORT_SOURCES
+        if (root / path).is_file()
+    }
+    for path in sorted(dedicated_sources | export_sources):
+        dedicated_source = path in dedicated_sources
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        declarations = [
+            (declaration, line_number, True, dedicated_source)
+            for declaration, line_number in _rust_public_declarations(source)
+        ]
+        if dedicated_source:
+            declarations.extend(
+                (declaration, line_number, False, False)
+                for declaration, line_number in _rust_impl_headers(source)
+            )
+        for declaration, line_number, public_declaration, complete_scope in declarations:
+            if not _is_pages_table_hidden_axes_public_declaration(
+                declaration, dedicated_source=complete_scope
+            ):
+                continue
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            }
+            if public_declaration and "pub use" in declaration and "*" in declaration:
+                violations.append(
+                    "focused litchi-pages body-table hidden-axes public API retains a glob re-export: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            for identifier in sorted(identifiers):
+                reason = _pages_table_hidden_axes_public_leak(identifier)
+                if reason is not None:
+                    violations.append(
+                        "focused litchi-pages body-table hidden-axes public API exposes "
+                        f"{reason} {identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+                if public_declaration and identifier in PAGES_TABLE_HIDDEN_AXES_FLAT_ALIASES:
+                    violations.append(
+                        "focused litchi-pages body-table hidden-axes public API retains flat alias "
+                        f"{identifier}: {path.relative_to(root)}:{line_number}"
+                    )
+            for match in PAGES_TABLE_HIDDEN_AXES_PUBLIC_RAW_ID_PARAMETER.finditer(declaration):
+                violations.append(
+                    "focused litchi-pages body-table hidden-axes public API exposes raw parameter "
+                    f"{match.group(0).strip()}: {path.relative_to(root)}:{line_number}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                byte_slice = re.sub(r"\s+", "", match.group(0))
+                violations.append(
+                    "focused litchi-pages body-table hidden-axes public API exposes raw byte slice "
+                    f"{byte_slice}: {path.relative_to(root)}:{line_number}"
+                )
+
+    # A second route in a sibling module defeats the package boundary even if
+    # the canonical package/table exports above look correct.
+    for path in sorted(source_root.rglob("*.rs")):
+        source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        for declaration, line_number in _rust_public_declarations(source):
+            identifiers = [
+                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
+            ]
+            if (
+                identifiers[:3] == ["pub", "mod", "body_table_hidden_axes"]
+                or (
+                    identifiers[:3] == ["pub", "mod", "hidden_axes"]
+                    and path != table_path
+                )
+            ):
+                violations.append(
+                    "focused litchi-pages body-table hidden-axes public API exposes duplicate module: "
+                    f"{path.relative_to(root)}:{line_number}"
+                )
+            if identifiers[:2] == ["pub", "use"] and "*" in declaration:
+                if {"body_table_hidden_axes", "hidden_axes", "package"} & set(identifiers):
+                    violations.append(
+                        "focused litchi-pages body-table hidden-axes public API retains root aliases via glob: "
+                        f"{path.relative_to(root)}:{line_number}"
+                    )
+            if identifiers[:2] == ["pub", "use"] and "as" in identifiers:
+                alias_index = identifiers.index("as")
+                target_identifiers = identifiers[2:alias_index]
+                target = target_identifiers[-1] if target_identifiers else ""
+                alias = (
+                    identifiers[alias_index + 1]
+                    if alias_index + 1 < len(identifiers)
+                    else ""
+                )
+                if (
+                    target in PAGES_TABLE_HIDDEN_AXES_ALIAS_TARGETS
+                    or "body_table_hidden_axes" in target_identifiers
+                    or "hidden_axes" in target_identifiers
+                ) and alias and alias != target:
+                    if path == semantic_path and alias in PAGES_TABLE_HIDDEN_AXES_TRANSACTION_TYPES:
+                        continue
+                    if alias in PAGES_TABLE_HIDDEN_AXES_PUBLIC_NAMES:
+                        continue
+                    violations.append(
+                        "focused litchi-pages body-table hidden-axes public API retains alternate alias "
+                        f"{alias} for {target}: {path.relative_to(root)}:{line_number}"
+                    )
+            if identifiers[:2] == ["pub", "type"] and len(identifiers) >= 4:
+                alias = identifiers[2]
+                target_identifiers = identifiers[3:]
+                target = target_identifiers[-1] if target_identifiers else ""
+                if (
+                    target in PAGES_TABLE_HIDDEN_AXES_ALIAS_TARGETS
+                    or "body_table_hidden_axes" in target_identifiers
+                    or "hidden_axes" in target_identifiers
+                ) and alias != target and alias not in PAGES_TABLE_HIDDEN_AXES_PUBLIC_NAMES:
+                    violations.append(
+                        "focused litchi-pages body-table hidden-axes public API retains alternate alias "
+                        f"{alias} for {target}: {path.relative_to(root)}:{line_number}"
+                    )
+
+    return sorted(set(violations))
+
+
+# Keep the longer body-table spelling available to callers that use the owner
+# terminology from the public API.
+audit_pages_body_table_hidden_axes_facade_source_topology = (
+    audit_pages_table_hidden_axes_facade_source_topology
+)
 
 
 def audit_pages_table_appearance_resource_source_topology(
@@ -54746,6 +56193,8 @@ def main(argv: list[str] | None = None) -> int:
         + audit_pages_table_headers_facade_source_topology()
         + audit_iwa_pages_table_dimension_source_topology()
         + audit_pages_table_dimension_facade_source_topology()
+        + audit_iwa_pages_table_hidden_axes_source_topology()
+        + audit_pages_table_hidden_axes_facade_source_topology()
         + audit_iwa_pages_table_sort_source_topology()
         + audit_pages_table_sort_facade_source_topology()
         + audit_iwa_pages_table_appearance_source_topology()

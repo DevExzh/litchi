@@ -16009,3 +16009,160 @@ current topology remains 64 workspace packages, 238 internal dependency
 declarations, 227 canonical edges, 11 development-only edges, 11 ordered
 migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one
 migration host.
+
+## 2026-09-05 amendment: Pages body-table hidden-axis owner and retained host compatibility
+
+The focused `litchi_pages::Package` now owns a bounded, selector-first
+body-table hidden-axis transaction through
+`Package::{body_table_hidden_axes, edit_body_table_hidden_axes,
+apply_body_table_hidden_axes}`. `BodyTableSelector` accepts a checked
+zero-based position or an exact visible name. The public values are the
+archive-free `table::hidden_axes::{AxisIndex, HiddenAxes}` and contain only
+typed row/column positions. An edit supports `set`, `clear`, `reset`, and
+exact-source `commit`; a changed commit returns an exact source-bound patch
+and inverse, while a semantic no-op returns the complete source unchanged.
+
+Admission starts with the strict rooted graph proof in [`body_table_hidden_axes.rs`](../../crates/litchi-pages/src/package/body_table_hidden_axes.rs):
+the Pages body/storage table attachment and drawable must resolve to one
+role-qualified `TableInfoArchive` (current type 6000, or the explicitly
+qualified legacy type 6003) and one role-qualified `TableModelArchive`
+(current type 6001, or the explicitly qualified legacy type 6000). A type
+number is not sufficient by itself, and the route does not treat the nearby
+type 6005 table-data message as either owner. The selected info/model
+references must agree. The model's base column/row UID reference in field 46
+is required; the table-info view UID reference in field 6 is optional, but
+when present it must identify the same map. The map itself is canonical type
+6267, with legacy type 6200 accepted only when its archive metadata supplies
+the required legacy qualification. Its bounded UID arrays are one-to-one
+physical permutations matching the model dimensions.
+
+The complete type-4008 -> type-6204/type-6220 dependency closure is admitted
+and validated only when an existing hidden-state owner is present. An
+ownerless table may contain an unrelated formula-owner record, but it is a
+valid empty read/no-op shape only; it is not treated as proof that this
+dependency closure can be created. An active UUID in `TableInfoArchive`
+selects one stored view for reads, and its matching state must be unique.
+Reads may follow a uniquely selected active view, but a changed edit refuses
+an owner containing multiple stored views, even when the active UUID is
+unambiguous, because preserving the
+inactive views byte-exactly is not proven. Only `user_hidden == true` is
+projected into the archive-free semantic value; filtered and pivot markers
+remain native state and are not silently converted into user-hidden axes.
+
+The private [`pages_hidden_state_codec`](../../crates/litchi-iwa-protos/src/pages_hidden_state_codec.rs)
+uses a narrow Buffa sidecar for singular envelopes/scalars and a bounded
+caller-owned wire walk for repeated states. Source bytes remain authoritative:
+selected table-info/model/owner fields may be rewritten, while unknown fields
+and groups, unselected fields and members, and admitted filtered/pivot markers
+remain preserved. Duplicate, stale, dangling, malformed, wrong-wire,
+ambiguous, out-of-bounds, locked, finite-limit, pivot, and unsupported
+dependency cases fail closed before publication. An absent owner reads as
+empty; an empty request is an exact source no-op. On an exact, unlocked
+source, a nonempty absent-owner request is refused as `UnsupportedDependency`
+because owner creation is not supported; a non-exact source reports
+`UnsupportedSource` before that owner check. For a changed edit, `TableLocked`
+takes precedence over the absent-owner dependency result, while exact no-ops
+on a locked table remain allowed subject to read/graph admission.
+Existing-owner changes use copy-on-write, touch one selected component,
+invalidate the three canonical root previews, reopen and read back the
+candidate, and enforce exact-source apply/inverse/conflict fences.
+
+The focused graph/codec, identity/COW, and concurrency test files establish
+the intended E1 synthetic/source self-round-trip coverage. A current locked
+rerun passed 435 Pages library/integration tests plus two Pages doctests
+(437 total) and 802 protocol library/integration tests (764 library and 38
+integration); 170 generated protocol doctests were ignored. These
+results cover the focused packages only and do not constitute workspace
+release certification. Strict Clippy, boundary, migration-host, and sanitizer
+status are intentionally recorded only when their corresponding current runs
+are available. The registered `pages_body_table_hidden_axes` fuzz target has
+checked-in valid, malformed, ownership, and limit descriptors; its current
+sanitizer status is not inferred from the corpus inventory.
+
+Scoped all-target strict Clippy for `litchi-pages` and `litchi-iwa-protos` is
+green. A fresh workspace/all-features lint still reports 111 diagnostics in
+`litchi-iwa`, chiefly deprecated legacy Keynote ID fields plus existing
+dead-code/style findings; no diagnostic path intersects this slice. This is a
+workspace gate limitation separate from the focused Pages/protobuf result.
+
+The transaction regression work also bounds codec scratch/retained memory
+against the configured output-byte allowance rather than the smaller encoded
+input length, reports byte-limit failures as byte limits, validates selected
+FieldInfo reference paths, and rejects unsupported formula-owner dependency
+envelopes even when empty. Exact inverse patches restore root previews while
+changed commits explicitly verify preview invalidation. The codec preserves
+unknown nested groups and accepts bounded canonical packed filter offsets.
+
+An earlier exploratory Pages 14.4 attempt logged an NSCocoa
+MissingObject/TSPersistence Import document error; save/close timed out and
+no reopen occurred. That attempt supplies only negative evidence. Computer
+Use subsequently authored a fresh Blank Pages body document with a 5-row,
+4-column Plain table and body marker
+`Pages hidden-axis native oracle — 2026-09-05`. Pages saved, closed, and
+reopened disposable copies without repair UI. The retained checked-in native baseline is
+[`body-table-visible.pages`](../../test-data/iwork/pages/body-table-visible.pages),
+with SHA-256
+`7af8179b1174c39d35d4f483c65a86e3801fcea9fba2123fbbf75861af1b3b8d`.
+The row context menu offered insertion/deletion but no hide command. The
+native regression verifies package ingress, body text, exact no-op output,
+and unchanged bytes after the focused hidden-axis read/edit refuses
+`BodyTableHiddenAxesError::InvalidSource`.
+
+The native table-info version is `[1, 0, 5]`, but its table-model version is
+`[3, 2, 10]`; the focused owner currently requires `[1, 0, 5]`. The native
+type-4008 owner carries `owner_kind = 1` and lacks the required aggregate
+drawable reference/FieldInfo. The model also lacks required FieldInfo paths
+46, 34, and 35. These producer differences remain explicit admission gaps.
+This native baseline contains no user-hidden rows or columns and supplies
+no positive E2 hidden-axis parsing evidence or E3/E4 acceptance of a Litchi
+visibility mutation. Creation and native mutation parity remain open.
+
+A fresh Computer Use duplicate/save/close/reopen check showed the same body
+marker and visible 5-by-4 table without repair UI. The checked-in fixture was
+restored at the recorded SHA-256 after the disposable UI checks; the focused
+package save path produced byte-identical output for the visible-table/no-op
+operation. This remains native baseline evidence only; it does not establish
+hidden-axis parsing or a changed native visibility mutation.
+
+The Pages raw-ID `PagesEditor::{table_hidden_axes, set_table_hidden_axes}`
+route, its tests, and the mixed example remain migration-host compatibility.
+Retirement is deferred because the focused owner refuses absent-owner creation
+and has no native changed-edit parity evidence. The shared hidden-axis helper
+also preserves Numbers/Keynote compatibility, Numbers sort restoration, and
+row/column-deletion cleanup. Focused refusals remain terminal; supported format
+facades never fall back to the host. Existing functionality is retained until
+ADR 0028's parity and native gates permit removal.
+
+Sibling regression verification passed `cargo test --locked -p litchi-numbers
+-p litchi-keynote --lib`: 441 Numbers tests and 192 Keynote tests passed; four
+pre-existing Numbers external-oracle tests remained ignored.
+
+No workspace package, manifest edge, ordered migration debt, migration-host
+item, or ADR 0028 deletion gate changes in this slice. The authoritative
+inventory remains 64 workspace packages, 238 internal dependency
+declarations, 227 canonical edges, 11 development-only edges, 11 ordered
+migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and
+one migration host.
+
+Final review verification completed the workspace library/integration command
+with 19,664 passing tests and 10 ignored, and the workspace doctest command
+with 399 passing tests and 283 ignored. After removing Keynote's public
+common-playback conversion, the affected suites were rerun: 192 Keynote
+library tests and all 1,681 migration-host library tests passed, including
+10 hidden-axis checks. The host audio regression constructs format-owned
+playback settings explicitly. The root and all three leaf compiled public-API
+checks pass, together with 23 API-checker unit tests, 860 boundary-checker
+unit tests, and the final full boundary scan. Final scoped all-target Clippy
+passes; workspace lint still reports the same 111 diagnostics outside changed
+files. That failing lint gate remains recorded for the continuing migration.
+
+The final AddressSanitizer campaign completed 1,000 runs in 12 seconds from
+a temporary copy of the 78 checked-in hidden-axis descriptors, with a maximum
+input length of 65,536 bytes and no crash. Harness corrections give the trusted
+nested fixture finite accounting budgets, isolate package-byte limits from
+fixed 64 KiB subordinate archive/stream ceilings, resolve stable UUIDs through
+the physical UID-map permutations, and preserve independent filtered/pivot and
+still-visible markers. The oversized-dimension descriptor specifically expects
+`WireFields` exhaustion before shape validation. The earlier harness assertion
+failures were explained and corrected; this result remains synthetic fuzz
+evidence, while native hidden-axis mutation parity stays open.
