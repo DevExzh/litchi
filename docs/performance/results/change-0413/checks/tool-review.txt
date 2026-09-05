@@ -1,0 +1,14 @@
+Independent review of the frozen ABBA tool extension found no blocking correctness issue.
+
+Non-XLS sample-index identity remains unchanged. Lifecycle normalization is
+gated by selector, exact Number corpus and declared alignment, after the
+repository comparator validates the full sample-index permutation and ties.
+The nine lifecycle contracts retain exact corpus/output/source topology,
+observer-v2 scope, source hashes and locality zeroes. Standalone semantic-open
+and native numeric edit/save contracts remain separate.
+
+The generic lifecycle tool permits arbitrary positive read-category counters
+provided identities match; the change-local capture verifier additionally
+requires the exact frozen per-selector logical counters, including structural,
+globals, selected/unselected, opaque, version and materialization values.
+The retained artifact claim therefore does not depend on arbitrary counters.

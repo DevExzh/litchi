@@ -1,0 +1,46 @@
+{
+  "revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+  "source_status": "",
+  "build_environment": {
+    "RUSTUP_TOOLCHAIN": "1.98.1",
+    "CARGO_TARGET_DIR": "/tmp/litchi-goal-0413-target",
+    "CARGO_BUILD_JOBS": "4",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "1",
+    "RUSTFLAGS": "-C force-frame-pointers=yes -C force-unwind-tables=yes"
+  },
+  "build_command": [
+    "cargo",
+    "+1.98.1",
+    "build",
+    "--locked",
+    "--manifest-path",
+    "tools/perf-baseline/Cargo.toml",
+    "--release",
+    "--features",
+    "allocator-metrics",
+    "--bin",
+    "litchi-perf-baseline",
+    "--bin",
+    "litchi-perf-baseline-alloc"
+  ],
+  "build_cwd": "/tmp/litchi-goal-0413-candidate-worktree",
+  "started_utc": "2026-09-05T01:49:50.869979+00:00",
+  "wall_seconds": 208.57895431300858,
+  "exit_code": 0,
+  "binaries": {
+    "litchi-perf-baseline": {
+      "bytes": 449703584,
+      "sha256": "1900fd9db502b9604f2e29b8f5ccdfb96e1b2f72f3f22a57b0d0a70ab56ce550"
+    },
+    "litchi-perf-baseline-alloc": {
+      "bytes": 449707528,
+      "sha256": "aacf8554cab913a1b82b04d3316682457b951eda7995457debdf85b1f6e9760b"
+    }
+  },
+  "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1\nLLVM version: 22.1.8\n",
+  "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)\n",
+  "kernel": "Linux ip-172-31-39-190 7.0.0-1011-aws #11-Ubuntu SMP PREEMPT Thu Aug  6 15:41:35 UTC 2026 x86_64 GNU/Linux\n",
+  "cpu": "Architecture:                            x86_64\nCPU op-mode(s):                          32-bit, 64-bit\nAddress sizes:                           48 bits physical, 48 bits virtual\nByte Order:                              Little Endian\nCPU(s):                                  32\nOn-line CPU(s) list:                     0-31\nVendor ID:                               AuthenticAMD\nModel name:                              AMD EPYC 9R45\nCPU family:                              26\nModel:                                   2\nThread(s) per core:                      1\nCore(s) per socket:                      32\nSocket(s):                               1\nStepping:                                1\nBogoMIPS:                                5200.00\nFlags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy cr8_legacy abm sse4a misalignsse 3dnowprefetch topoext perfctr_core ssbd perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 clzero xsaveerptr rdpru wbnoinvd arat avx512vbmi pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid movdiri movdir64b fsrm avx512_vp2intersect flush_l1d\nHypervisor vendor:                       KVM\nVirtualization type:                     full\nL1d cache:                               1.5 MiB (32 instances)\nL1i cache:                               1 MiB (32 instances)\nL2 cache:                                32 MiB (32 instances)\nL3 cache:                                128 MiB (4 instances)\nNUMA node(s):                            1\nNUMA node0 CPU(s):                       0-31\nVulnerability Gather data sampling:      Not affected\nVulnerability Ghostwrite:                Not affected\nVulnerability Indirect target selection: Not affected\nVulnerability Itlb multihit:             Not affected\nVulnerability L1tf:                      Not affected\nVulnerability Mds:                       Not affected\nVulnerability Meltdown:                  Not affected\nVulnerability Mmio stale data:           Not affected\nVulnerability Old microcode:             Not affected\nVulnerability Reg file data sampling:    Not affected\nVulnerability Retbleed:                  Not affected\nVulnerability Spec rstack overflow:      Mitigation; IBPB on VMEXIT only\nVulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl\nVulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization\nVulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP disabled; PBRSB-eIBRS Not affected; BHI Not affected\nVulnerability Srbds:                     Not affected\nVulnerability Tsa:                       Not affected\nVulnerability Tsx async abort:           Not affected\nVulnerability Vmscape:                   Not affected\n",
+  "perf": "perf version 7.0.12\n"
+}

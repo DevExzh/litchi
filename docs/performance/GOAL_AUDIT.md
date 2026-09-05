@@ -1,5 +1,12 @@
 # Non-iWork `docs/GOAL.md` audit
 
+Change [0413](changes/0413-cfb-chain-scratch-reservation.md) retains a scoped
+production CFB optimization with nine XLS ABBA comparisons, exact allocation
+and logical-I/O checks, a reviewed ~3% CFB guard cost, paired CPU/PMU evidence
+and eight strict registered claims. This is verified progress, not completion
+of the non-iWork program. Broad scenario, native/cold/remote and scaling gaps
+below remain open.
+
 **Audit date:** 2026-09-05
 **Audit basis:** the 0412 captured candidate at
 `63c95bc22d5883c8ecab0872030757e5584254f7`, with the verified 0411 baseline at

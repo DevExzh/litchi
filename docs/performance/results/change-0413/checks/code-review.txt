@@ -1,0 +1,69 @@
+0413 CFB scratch code review
+============================
+
+Scope: static read-only review of the `SectorChainScratch::collect_exact`
+change from control `ceba0345220c1ca6a7f61f3fac86145b5afc55ca` to candidate
+`bf5b7f50f61ba17091ef80dc509b64378b11aaa7`. No Cargo command, workload, or
+tracked-source edit was run by this reviewer.
+
+Finding: no concrete correctness blocker.
+
+Safety/resource proof
+---------------------
+- `collect_exact` calls `reset()` first, so `sectors.len() == 0` before the
+  walk. For nonzero counts it rejects an invalid start marker and rejects
+  `expected_count > allocation_table.len()` before allocation.
+- If capacity is insufficient, `try_reserve_exact(expected_count)` is called
+  while the vector length is zero. Otherwise existing capacity is already at
+  least `expected_count`. The loop performs exactly `expected_count` pushes
+  and no other vector operation can change capacity; therefore each new
+  `Vec::push` is within reserved capacity and cannot introduce an allocator
+  call or a panic under the safe Rust Vec contract.
+- Reservation remains fallible with the existing `sector-chain entries`
+  label. The visited map remains prepared fallibly afterward with the
+  existing `sector-chain map` label. This preserves the ADR 0005 / accepted
+  Change 0190 order: reject count first, reserve chain before map, then walk.
+- Count zero still requires `ENDOFCHAIN` and returns with empty scratch. The
+  count/table-length check bounds input-derived loop work. Sector conversion,
+  table bounds, cycle detection, intermediate markers, and exact terminal
+  marker checks are unchanged.
+- Any error from the closure, including a future/unreachable visited insertion
+  error, still invokes `reset()`. That clears vector length and sets
+  `visited.bit_len` to zero; retained capacity and stale word contents are
+  inaccessible until the next nonempty call fills the map. No partial scratch
+  result is exposed to a sink or public caller.
+
+Existing regression coverage reviewed
+--------------------------------------
+The focused tests cover successful reuse across lengths, reserve growth before
+walking, zero-length chains, reset after cycles, reuse after an error, early
+termination, late extra sectors, and malformed large declarations without
+unwinding. The existing allocation-validation path also exercises the scratch
+for MiniFAT and FAT stream declarations. There is no allocator-injection test
+that forces `try_reserve_exact` to fail, but the preflight/error path and
+malformed-declaration coverage are sufficient for this narrow replacement;
+that is an optional future evidence improvement, not a blocker.
+
+Guard recommendation
+--------------------
+The smallest shared-validation guards are selector `cfb_open` over:
+
+- `CorpusShape::Tiny`, 3 entries × 512 bytes, covering MiniFAT chains;
+- `CorpusShape::FewLarge`, 4 entries × 4 MiB, covering regular FAT chains.
+
+The 0413 protocol already binds these to the `incompressible` payload and
+ABBA normal/allocator orders. `ole_common_open` may be added as one owner
+layer check, but DOC/PPT semantic cases are unnecessary for this private CFB
+scratch change.
+
+ADR alignment
+-------------
+The change preserves accepted ADR 0005 bounded/fallible allocation and ADR
+0006 typed malformed-input rejection. It also matches Change 0190's explicit
+scratch cleanup, exact reservation, and marker/cycle validation contract.
+
+Conclusion
+----------
+Approve the isolated `Vec::push` replacement subject to the existing scoped
+Clippy exception and the recorded CFB Tiny/FewLarge guard results. No semantic,
+error-order, cleanup, or resource-accounting blocker was found.

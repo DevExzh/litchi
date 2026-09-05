@@ -1,0 +1,110 @@
+{
+  "change": "0413",
+  "purpose": "Remove redundant per-sector reservation checks from pre-reserved CFB chain scratch",
+  "control_revision": "ceba0345220c1ca6a7f61f3fac86145b5afc55ca",
+  "candidate_revision": "bf5b7f50f61ba17091ef80dc509b64378b11aaa7",
+  "cases": [
+    "xls_semantic_open",
+    "xls_source_backed_open",
+    "xls_eager_open_list_worksheets",
+    "xls_source_backed_open_list_worksheets",
+    "xls_eager_open_one_cell",
+    "xls_source_backed_open_one_cell",
+    "xls_owned_source_open",
+    "xls_owned_source_open_list_worksheets",
+    "xls_owned_source_open_one_cell"
+  ],
+  "normal": {
+    "order": [
+      "control",
+      "candidate",
+      "candidate",
+      "control"
+    ],
+    "samples": 1000,
+    "warmup": 50
+  },
+  "allocator": {
+    "order": [
+      "control",
+      "candidate",
+      "candidate",
+      "control"
+    ],
+    "samples": 30,
+    "warmup": 3
+  },
+  "profile": {
+    "case": "xls_owned_source_open_one_cell",
+    "samples": 10000,
+    "warmup": 20,
+    "event": "cycles:u",
+    "frequency": 999,
+    "call_graph": "fp,127",
+    "roles": [
+      "control",
+      "candidate"
+    ]
+  },
+  "cpu": 2,
+  "filesystem_cache": "warm",
+  "isolation": "Fresh sequential child per repetition; warmup and retained samples share process. No concurrent build/test/benchmark.",
+  "acceptance": "Identical corpus/output hashes, observer v2 scopes and logical I/O; allocation calls/bytes unchanged. Strict ABBA statistic acceptance requires both paired improvements and same-role drift ceilings p50/mean 5%, p95 10%, p99 15%. Review any paired latency statistic or whole-process peak RSS regression above 5%; no averages hide individual regressions. Retain only with practical production gain and correctness gates.",
+  "timer": "Existing open/query brackets, input clone and source construction outside; output semantic oracle and locality validation outside.",
+  "memory": "Allocation calls include reallocations; peak/live values are process snapshots; RSS is whole-process.",
+  "limitations": [
+    "Warm in-memory generated fixtures only",
+    "No cold-cache, filesystem, remote-source or scaling claim",
+    "Whole-process RSS and PMU include untimed setup and fixture work; no exact L1/LLC claim"
+  ],
+  "counters": {
+    "case": "xls_owned_source_open_one_cell",
+    "repetitions": 2,
+    "samples": 3000,
+    "warmup": 10,
+    "events": "task-clock,cycles,instructions,branches,branch-misses,page-faults,context-switches,cpu-migrations,l2_cache_req_stat.dc_access_in_l2,l2_cache_req_stat.dc_hit_in_l2",
+    "scope": "Whole process, scaled multiplexed events; not operation IPC or cache miss rate",
+    "roles": [
+      "control",
+      "candidate"
+    ]
+  },
+  "guards": {
+    "cases": [
+      "cfb_open"
+    ],
+    "shapes": [
+      "tiny",
+      "few-large"
+    ],
+    "payloads": [
+      "incompressible"
+    ],
+    "normal": {
+      "order": [
+        "control",
+        "candidate",
+        "candidate",
+        "control"
+      ],
+      "samples": 1000,
+      "warmup": 50
+    },
+    "allocator": {
+      "order": [
+        "control",
+        "candidate",
+        "candidate",
+        "control"
+      ],
+      "samples": 30,
+      "warmup": 3
+    }
+  },
+  "drift_ceilings_percent": {
+    "p50": 5,
+    "mean": 5,
+    "p95": 10,
+    "p99": 15
+  }
+}

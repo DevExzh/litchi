@@ -1,0 +1,47 @@
+{
+  "status": "passed",
+  "probes": [
+    {
+      "mutation": "duplicate-order",
+      "exit_code": 2,
+      "expected_diagnostic": "sample order is not a complete permutation",
+      "status": "passed"
+    },
+    {
+      "mutation": "opaque-read",
+      "exit_code": 2,
+      "expected_diagnostic": "frozen locality counter mismatch: opaque_payload_read_bytes",
+      "status": "passed"
+    },
+    {
+      "mutation": "plain-observer",
+      "exit_code": 2,
+      "expected_diagnostic": "plain/eager result fabricated source observer",
+      "status": "passed"
+    },
+    {
+      "mutation": "bad-oracle",
+      "exit_code": 2,
+      "expected_diagnostic": "output oracle mismatch",
+      "status": "passed"
+    },
+    {
+      "mutation": "bad-build",
+      "exit_code": 2,
+      "expected_diagnostic": "journal binary hash mismatch",
+      "status": "passed"
+    },
+    {
+      "mutation": "missing-build",
+      "exit_code": 2,
+      "expected_diagnostic": "missing candidate build identity sidecar",
+      "status": "passed"
+    },
+    {
+      "mutation": "observer-version",
+      "exit_code": 2,
+      "expected_diagnostic": "observer scope mismatch",
+      "status": "passed"
+    }
+  ]
+}

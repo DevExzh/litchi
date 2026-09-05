@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "reports": [
+    {
+      "label": "guard-normal-1",
+      "rows": 2,
+      "observations": 2000,
+      "status": "passed"
+    },
+    {
+      "label": "guard-normal-2",
+      "rows": 2,
+      "observations": 2000,
+      "status": "passed"
+    },
+    {
+      "label": "guard-normal-3",
+      "rows": 2,
+      "observations": 2000,
+      "status": "passed"
+    },
+    {
+      "label": "guard-normal-4",
+      "rows": 2,
+      "observations": 2000,
+      "status": "passed"
+    }
+  ]
+}

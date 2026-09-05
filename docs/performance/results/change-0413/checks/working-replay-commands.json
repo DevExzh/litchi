@@ -1,0 +1,162 @@
+[
+  {
+    "label": "inventory",
+    "argv": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413/verify-artifacts.py"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "capture",
+    "argv": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413/verify-capture.py",
+      "--root",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413/capture",
+      "--repo-root",
+      "/home/zhuhe/code/litchi",
+      "--output",
+      "/tmp/litchi-goal-0413-replay-working/capture.json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "schema",
+    "argv": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413/schema-check.py",
+      "--root",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413/capture",
+      "--repo-root",
+      "/home/zhuhe/code/litchi",
+      "--output",
+      "/tmp/litchi-goal-0413-replay-working/schema.json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "recheck-schema",
+    "argv": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413/recheck-schema.py",
+      "--root",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413/guard-recheck",
+      "--repo-root",
+      "/home/zhuhe/code/litchi",
+      "--output",
+      "/tmp/litchi-goal-0413-replay-working/recheck-schema.json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "resources",
+    "argv": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413/verify-resources.py",
+      "--root",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413/capture",
+      "--recheck",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413/guard-recheck",
+      "--output",
+      "/tmp/litchi-goal-0413-replay-working/resources.json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "profile",
+    "argv": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413/profile/attribute.py",
+      "--capture",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413/capture",
+      "--parser",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0412/attribution/attribute.py",
+      "--repo",
+      "/home/zhuhe/code/litchi",
+      "--control-repo",
+      "/home/zhuhe/code/litchi",
+      "--candidate-repo",
+      "/home/zhuhe/code/litchi",
+      "--output",
+      "/tmp/litchi-goal-0413-replay-working/profile.json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "negative",
+    "argv": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413/negative-probes.py",
+      "--root",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413",
+      "--repo-root",
+      "/home/zhuhe/code/litchi",
+      "--verifier",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413/verify-capture.py",
+      "--output",
+      "/tmp/litchi-goal-0413-replay-working/negative.json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "profile-negative",
+    "argv": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413/profile/negative-probes.py",
+      "--capture",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413/capture",
+      "--verifier",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0413/profile/attribute.py",
+      "--parser",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0412/attribution/attribute.py",
+      "--repo",
+      "/home/zhuhe/code/litchi",
+      "--output",
+      "/tmp/litchi-goal-0413-replay-working/profile-negative.json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "latency",
+    "argv": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/tools/perf_abba_summary.py",
+      "/tmp/litchi-goal-0413-abba-replay-3q745qnb/a1.json",
+      "/tmp/litchi-goal-0413-abba-replay-3q745qnb/b1.json",
+      "/tmp/litchi-goal-0413-abba-replay-3q745qnb/b2.json",
+      "/tmp/litchi-goal-0413-abba-replay-3q745qnb/a2.json",
+      "--json-out",
+      "/tmp/litchi-goal-0413-replay-working/latency-summary.json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "guards",
+    "argv": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/tools/perf_abba_summary.py",
+      "/tmp/litchi-goal-0413-abba-replay-l4wpm06j/a1.json",
+      "/tmp/litchi-goal-0413-abba-replay-l4wpm06j/b1.json",
+      "/tmp/litchi-goal-0413-abba-replay-l4wpm06j/b2.json",
+      "/tmp/litchi-goal-0413-abba-replay-l4wpm06j/a2.json",
+      "--json-out",
+      "/tmp/litchi-goal-0413-replay-working/guards-summary.json"
+    ],
+    "exit_code": 0
+  },
+  {
+    "label": "guard-recheck-latency",
+    "argv": [
+      "/usr/bin/python3",
+      "/home/zhuhe/code/litchi/tools/perf_abba_summary.py",
+      "/tmp/litchi-goal-0413-abba-replay-y49dffll/a1.json",
+      "/tmp/litchi-goal-0413-abba-replay-y49dffll/b1.json",
+      "/tmp/litchi-goal-0413-abba-replay-y49dffll/b2.json",
+      "/tmp/litchi-goal-0413-abba-replay-y49dffll/a2.json",
+      "--json-out",
+      "/tmp/litchi-goal-0413-replay-working/guard-recheck-latency-summary.json"
+    ],
+    "exit_code": 0
+  }
+]

@@ -1,0 +1,1130 @@
+{
+  "schema_version": 1,
+  "performance_claim": "none",
+  "median_intervals": {
+    "normal-1": {
+      "xls_semantic_open|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          569473,
+          571162
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_source_backed_open|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          179880,
+          180241
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_eager_open_list_worksheets|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          566972,
+          568623
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_source_backed_open_list_worksheets|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          180090,
+          180410
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_eager_open_one_cell|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          566302,
+          567922
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_source_backed_open_one_cell|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          181361,
+          181851
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_owned_source_open|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          170390,
+          170821
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_owned_source_open_list_worksheets|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          170071,
+          170480
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_owned_source_open_one_cell|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          173121,
+          173501
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      }
+    },
+    "normal-2": {
+      "xls_semantic_open|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          523952,
+          525643
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_source_backed_open|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          173720,
+          174110
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_eager_open_list_worksheets|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          527552,
+          529722
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_source_backed_open_list_worksheets|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          174761,
+          175050
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_eager_open_one_cell|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          517982,
+          520032
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_source_backed_open_one_cell|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          179651,
+          180071
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_owned_source_open|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          167041,
+          167501
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_owned_source_open_list_worksheets|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          167281,
+          167701
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_owned_source_open_one_cell|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          168890,
+          169290
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      }
+    },
+    "normal-3": {
+      "xls_semantic_open|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          523342,
+          525322
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_source_backed_open|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          176320,
+          176671
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_eager_open_list_worksheets|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          525162,
+          526872
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_source_backed_open_list_worksheets|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          176701,
+          177011
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_eager_open_one_cell|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          523662,
+          525902
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_source_backed_open_one_cell|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          179131,
+          179461
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_owned_source_open|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          163391,
+          163960
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_owned_source_open_list_worksheets|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          164461,
+          164831
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_owned_source_open_one_cell|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          166750,
+          167061
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      }
+    },
+    "normal-4": {
+      "xls_semantic_open|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          565043,
+          566763
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_source_backed_open|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          177871,
+          178230
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_eager_open_list_worksheets|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          569123,
+          570772
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_source_backed_open_list_worksheets|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          178491,
+          178871
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_eager_open_one_cell|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          572922,
+          574422
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_source_backed_open_one_cell|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          181151,
+          181510
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_owned_source_open|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          168851,
+          169201
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_owned_source_open_list_worksheets|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          168460,
+          168820
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "xls_owned_source_open_one_cell|xls-comments-opaque-heavy": {
+        "interval_ns": [
+          171280,
+          171591
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      }
+    },
+    "guard-normal-1": {
+      "cfb_open|cfb-tiny-incompressible": {
+        "interval_ns": [
+          2720,
+          2730
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "cfb_open|cfb-few-large-incompressible": {
+        "interval_ns": [
+          164291,
+          164401
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      }
+    },
+    "guard-normal-2": {
+      "cfb_open|cfb-tiny-incompressible": {
+        "interval_ns": [
+          2700,
+          2710
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "cfb_open|cfb-few-large-incompressible": {
+        "interval_ns": [
+          169050,
+          169081
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      }
+    },
+    "guard-normal-3": {
+      "cfb_open|cfb-tiny-incompressible": {
+        "interval_ns": [
+          2720,
+          2720
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "cfb_open|cfb-few-large-incompressible": {
+        "interval_ns": [
+          169551,
+          169590
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      }
+    },
+    "guard-normal-4": {
+      "cfb_open|cfb-tiny-incompressible": {
+        "interval_ns": [
+          2700,
+          2710
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      },
+      "cfb_open|cfb-few-large-incompressible": {
+        "interval_ns": [
+          164961,
+          165060
+        ],
+        "order_statistic": 469,
+        "iid_binomial_coverage": 0.9537088026395019,
+        "samples": 1000
+      }
+    }
+  },
+  "individual_review": [
+    {
+      "case": "xls_semantic_open|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p50",
+      "candidate_minus_control_percent": -7.972231768988514,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_semantic_open|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p95",
+      "candidate_minus_control_percent": -7.635996465985107,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_semantic_open|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p99",
+      "candidate_minus_control_percent": -7.9235578117550665,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_semantic_open|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "mean",
+      "candidate_minus_control_percent": -7.9722211601532145,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_semantic_open|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p50",
+      "candidate_minus_control_percent": -7.2991152694663715,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_semantic_open|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p95",
+      "candidate_minus_control_percent": -6.406603311690217,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_semantic_open|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p99",
+      "candidate_minus_control_percent": -5.903842390240721,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_semantic_open|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "mean",
+      "candidate_minus_control_percent": -7.304024887744564,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p50",
+      "candidate_minus_control_percent": -3.43992759216174,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p95",
+      "candidate_minus_control_percent": -2.449193073863032,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p99",
+      "candidate_minus_control_percent": -2.2350346968141754,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "mean",
+      "candidate_minus_control_percent": -2.8538238931374527,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p50",
+      "candidate_minus_control_percent": -0.8650178901427275,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p95",
+      "candidate_minus_control_percent": -1.0439841679294126,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p99",
+      "candidate_minus_control_percent": -0.744872488350512,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "mean",
+      "candidate_minus_control_percent": -1.2485222966169607,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p50",
+      "candidate_minus_control_percent": -6.951818919866093,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p95",
+      "candidate_minus_control_percent": -6.08422510082971,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p99",
+      "candidate_minus_control_percent": -5.712523260364,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "mean",
+      "candidate_minus_control_percent": -6.792933503750753,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p50",
+      "candidate_minus_control_percent": -7.671018432556986,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p95",
+      "candidate_minus_control_percent": -7.0799099201003575,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p99",
+      "candidate_minus_control_percent": -6.276691571758608,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "mean",
+      "candidate_minus_control_percent": -7.7015694208892205,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p50",
+      "candidate_minus_control_percent": -2.9795096293090517,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p95",
+      "candidate_minus_control_percent": -2.956411624231603,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p99",
+      "candidate_minus_control_percent": -2.1283778824841892,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "mean",
+      "candidate_minus_control_percent": -3.23707019413062,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p50",
+      "candidate_minus_control_percent": -1.0217613912965606,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p95",
+      "candidate_minus_control_percent": -0.5229727191027211,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p99",
+      "candidate_minus_control_percent": -0.9824839974197364,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "mean",
+      "candidate_minus_control_percent": -0.793539763743889,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p50",
+      "candidate_minus_control_percent": -8.501266108497385,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p95",
+      "candidate_minus_control_percent": -8.540908170653449,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p99",
+      "candidate_minus_control_percent": -8.443180547128948,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "mean",
+      "candidate_minus_control_percent": -8.474633404844322,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p50",
+      "candidate_minus_control_percent": -8.542644385851483,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p95",
+      "candidate_minus_control_percent": -8.17283605590793,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p99",
+      "candidate_minus_control_percent": -8.525914670098821,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_eager_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "mean",
+      "candidate_minus_control_percent": -8.50308866282693,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p50",
+      "candidate_minus_control_percent": -0.9690029180201454,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p95",
+      "candidate_minus_control_percent": -1.179744239413416,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p99",
+      "candidate_minus_control_percent": -2.1028613416738784,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "mean",
+      "candidate_minus_control_percent": -0.5197665307330124,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p50",
+      "candidate_minus_control_percent": -1.1161662117076143,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p95",
+      "candidate_minus_control_percent": -1.278155477418419,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p99",
+      "candidate_minus_control_percent": -1.1124610272699287,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_source_backed_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "mean",
+      "candidate_minus_control_percent": -1.4257808702949015,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p50",
+      "candidate_minus_control_percent": -1.9142262480579264,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p95",
+      "candidate_minus_control_percent": -1.61681785396518,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p99",
+      "candidate_minus_control_percent": -2.0828951216133706,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "mean",
+      "candidate_minus_control_percent": -1.8857083463233115,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p50",
+      "candidate_minus_control_percent": -3.180285190225429,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p95",
+      "candidate_minus_control_percent": -2.8791254147242262,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p99",
+      "candidate_minus_control_percent": -2.51079590146428,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "mean",
+      "candidate_minus_control_percent": -3.96820002414936,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p50",
+      "candidate_minus_control_percent": -1.6501747071086759,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p95",
+      "candidate_minus_control_percent": -1.5002543248331168,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p99",
+      "candidate_minus_control_percent": -0.687952110318768,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "mean",
+      "candidate_minus_control_percent": -1.4334682527341602,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p50",
+      "candidate_minus_control_percent": -2.3836206129818405,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p95",
+      "candidate_minus_control_percent": -2.5005176230748383,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p99",
+      "candidate_minus_control_percent": -1.739527783114636,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open_list_worksheets|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "mean",
+      "candidate_minus_control_percent": -2.590766761299368,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p50",
+      "candidate_minus_control_percent": -2.4213606015315303,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p95",
+      "candidate_minus_control_percent": -2.7245383865325934,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "p99",
+      "candidate_minus_control_percent": -2.644664665570584,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-1",
+      "candidate": "normal-2",
+      "metric": "mean",
+      "candidate_minus_control_percent": -3.024378469995337,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p50",
+      "candidate_minus_control_percent": -2.6770872823772995,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p95",
+      "candidate_minus_control_percent": -2.9898096018283193,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "p99",
+      "candidate_minus_control_percent": -2.086496822450934,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "xls_owned_source_open_one_cell|xls-comments-opaque-heavy",
+      "control": "normal-4",
+      "candidate": "normal-3",
+      "metric": "mean",
+      "candidate_minus_control_percent": -2.6435992723877533,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "cfb_open|cfb-tiny-incompressible",
+      "control": "guard-normal-1",
+      "candidate": "guard-normal-2",
+      "metric": "p50",
+      "candidate_minus_control_percent": -1.098901098901095,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "cfb_open|cfb-tiny-incompressible",
+      "control": "guard-normal-1",
+      "candidate": "guard-normal-2",
+      "metric": "p95",
+      "candidate_minus_control_percent": -0.3610108303249149,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "cfb_open|cfb-tiny-incompressible",
+      "control": "guard-normal-1",
+      "candidate": "guard-normal-2",
+      "metric": "p99",
+      "candidate_minus_control_percent": 0.0,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "cfb_open|cfb-tiny-incompressible",
+      "control": "guard-normal-1",
+      "candidate": "guard-normal-2",
+      "metric": "mean",
+      "candidate_minus_control_percent": -6.81642632065217,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "cfb_open|cfb-tiny-incompressible",
+      "control": "guard-normal-4",
+      "candidate": "guard-normal-3",
+      "metric": "p50",
+      "candidate_minus_control_percent": 0.36900369003689537,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "cfb_open|cfb-tiny-incompressible",
+      "control": "guard-normal-4",
+      "candidate": "guard-normal-3",
+      "metric": "p95",
+      "candidate_minus_control_percent": 0.36231884057971175,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "cfb_open|cfb-tiny-incompressible",
+      "control": "guard-normal-4",
+      "candidate": "guard-normal-3",
+      "metric": "p99",
+      "candidate_minus_control_percent": 0.3597122302158251,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "cfb_open|cfb-tiny-incompressible",
+      "control": "guard-normal-4",
+      "candidate": "guard-normal-3",
+      "metric": "mean",
+      "candidate_minus_control_percent": 0.5652662095319894,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "cfb_open|cfb-few-large-incompressible",
+      "control": "guard-normal-1",
+      "candidate": "guard-normal-2",
+      "metric": "p50",
+      "candidate_minus_control_percent": 2.868877395801639,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "cfb_open|cfb-few-large-incompressible",
+      "control": "guard-normal-1",
+      "candidate": "guard-normal-2",
+      "metric": "p95",
+      "candidate_minus_control_percent": 2.894704393726766,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "cfb_open|cfb-few-large-incompressible",
+      "control": "guard-normal-1",
+      "candidate": "guard-normal-2",
+      "metric": "p99",
+      "candidate_minus_control_percent": 5.018873850556327,
+      "exceeds_five_percent_review_trigger": true
+    },
+    {
+      "case": "cfb_open|cfb-few-large-incompressible",
+      "control": "guard-normal-1",
+      "candidate": "guard-normal-2",
+      "metric": "mean",
+      "candidate_minus_control_percent": 3.194713578686792,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "cfb_open|cfb-few-large-incompressible",
+      "control": "guard-normal-4",
+      "candidate": "guard-normal-3",
+      "metric": "p50",
+      "candidate_minus_control_percent": 2.7573919314469952,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "cfb_open|cfb-few-large-incompressible",
+      "control": "guard-normal-4",
+      "candidate": "guard-normal-3",
+      "metric": "p95",
+      "candidate_minus_control_percent": 2.6542152259211305,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "cfb_open|cfb-few-large-incompressible",
+      "control": "guard-normal-4",
+      "candidate": "guard-normal-3",
+      "metric": "p99",
+      "candidate_minus_control_percent": 2.8024777121685718,
+      "exceeds_five_percent_review_trigger": false
+    },
+    {
+      "case": "cfb_open|cfb-few-large-incompressible",
+      "control": "guard-normal-4",
+      "candidate": "guard-normal-3",
+      "metric": "mean",
+      "candidate_minus_control_percent": 3.0075221274318276,
+      "exceeds_five_percent_review_trigger": false
+    }
+  ],
+  "limitations": [
+    "Exact IID binomial order-statistic intervals describe within-child sample uncertainty only.",
+    "They exclude host drift, shared heap/cache dependence and between-process uncertainty; use retained repeat spread too.",
+    "Both roles use observer v2; plain source selectors omit source counters.",
+    "Review triggers are descriptive and do not prove equivalence."
+  ]
+}

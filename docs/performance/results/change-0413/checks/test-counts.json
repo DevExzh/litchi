@@ -1,0 +1,12 @@
+{
+  "cfb-legacy-tests": {
+    "suites": 179,
+    "passed": 4004,
+    "ignored": 5
+  },
+  "cfb-default-tests": {
+    "suites": 4,
+    "passed": 305,
+    "ignored": 1
+  }
+}

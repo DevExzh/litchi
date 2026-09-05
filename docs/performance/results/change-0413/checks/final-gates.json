@@ -1,0 +1,44 @@
+[
+  {
+    "argv": [
+      "python3",
+      "tools/check_crate_boundaries.py"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 30.268212449998828
+  },
+  {
+    "argv": [
+      "python3",
+      "tools/validate_crud_coverage_index.py"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.04348987000412308
+  },
+  {
+    "argv": [
+      "python3",
+      "tools/check_perf_claims.py",
+      "--registry",
+      "docs/performance/claim-registry-v1.json",
+      "--repo-root",
+      ".",
+      "--evidence-root",
+      ".",
+      "--mode",
+      "strict"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 71.30892906102235
+  },
+  {
+    "argv": [
+      "python3",
+      "tools/check_report_claim_classification.py",
+      "--repo-root",
+      "."
+    ],
+    "exit_code": 0,
+    "wall_seconds": 0.04904959301347844
+  }
+]

@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "reports": [
+    {
+      "label": "normal-1",
+      "rows": 9,
+      "observations": 9000,
+      "status": "passed"
+    },
+    {
+      "label": "normal-2",
+      "rows": 9,
+      "observations": 9000,
+      "status": "passed"
+    },
+    {
+      "label": "normal-3",
+      "rows": 9,
+      "observations": 9000,
+      "status": "passed"
+    },
+    {
+      "label": "normal-4",
+      "rows": 9,
+      "observations": 9000,
+      "status": "passed"
+    },
+    {
+      "label": "allocator-1",
+      "rows": 9,
+      "observations": 270,
+      "status": "passed"
+    },
+    {
+      "label": "allocator-2",
+      "rows": 9,
+      "observations": 270,
+      "status": "passed"
+    },
+    {
+      "label": "allocator-3",
+      "rows": 9,
+      "observations": 270,
+      "status": "passed"
+    },
+    {
+      "label": "allocator-4",
+      "rows": 9,
+      "observations": 270,
+      "status": "passed"
+    },
+    {
+      "label": "guard-normal-1",
+      "rows": 2,
+      "observations": 2000,
+      "status": "passed"
+    },
+    {
+      "label": "guard-normal-2",
+      "rows": 2,
+      "observations": 2000,
+      "status": "passed"
+    },
+    {
+      "label": "guard-normal-3",
+      "rows": 2,
+      "observations": 2000,
+      "status": "passed"
+    },
+    {
+      "label": "guard-normal-4",
+      "rows": 2,
+      "observations": 2000,
+      "status": "passed"
+    },
+    {
+      "label": "guard-allocator-1",
+      "rows": 2,
+      "observations": 60,
+      "status": "passed"
+    },
+    {
+      "label": "guard-allocator-2",
+      "rows": 2,
+      "observations": 60,
+      "status": "passed"
+    },
+    {
+      "label": "guard-allocator-3",
+      "rows": 2,
+      "observations": 60,
+      "status": "passed"
+    },
+    {
+      "label": "guard-allocator-4",
+      "rows": 2,
+      "observations": 60,
+      "status": "passed"
+    },
+    {
+      "label": "stat-1",
+      "rows": 1,
+      "observations": 3000,
+      "status": "passed"
+    },
+    {
+      "label": "stat-2",
+      "rows": 1,
+      "observations": 3000,
+      "status": "passed"
+    },
+    {
+      "label": "stat-3",
+      "rows": 1,
+      "observations": 3000,
+      "status": "passed"
+    },
+    {
+      "label": "stat-4",
+      "rows": 1,
+      "observations": 3000,
+      "status": "passed"
+    },
+    {
+      "label": "control-profile",
+      "rows": 1,
+      "observations": 10000,
+      "status": "passed"
+    },
+    {
+      "label": "candidate-profile",
+      "rows": 1,
+      "observations": 10000,
+      "status": "passed"
+    }
+  ]
+}

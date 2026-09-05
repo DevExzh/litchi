@@ -837,6 +837,82 @@ def xls_numeric_all_selector_legs():
     return legs
 
 
+def xls_lifecycle_legs():
+    """Build compact current-schema reports for all nine fixed XLS probes."""
+
+    legs = four_legs()
+    cases = list(perf_abba_summary.XLS_LIFECYCLE_CASE_CONTRACTS)
+    revisions = ("control-revision", "candidate-revision", "candidate-revision", "control-revision")
+    for leg_index, (leg, revision) in enumerate(zip(legs, revisions)):
+        results = []
+        for case in cases:
+            contract = perf_abba_summary.XLS_LIFECYCLE_CASE_CONTRACTS[case]
+            corpus = copy.deepcopy(
+                perf_abba_summary.XLS_NUMERIC_CORPUS_CONTRACTS["Number"]
+            )
+            samples = [100 + 10 * (leg_index % 2) + index for index in range(15)]
+            if leg_index in (1, 2):
+                samples = [80 + index for index in range(15)]
+            result = {
+                "case": case,
+                "corpus": corpus,
+                "elapsed_ns": elapsed(samples),
+                "output_sha256": perf_abba_summary.XLS_LIFECYCLE_OUTPUT_CONTRACTS[
+                    contract["operation"]
+                ],
+                "sink": None,
+            }
+            result["elapsed_ns"]["sample_order"] = list(range(15))
+            if contract["source_backed"]:
+                one_cell = contract["operation"] == "open+one-cell"
+                source_xls = {
+                    "implementation": "source-backed",
+                    "operation": contract["operation"],
+                    "timing_scope": contract["operation"],
+                    "source_counter_scope": perf_abba_summary.XLS_LIFECYCLE_SOURCE_COUNTER_SCOPE,
+                    "materialization_scope": perf_abba_summary.XLS_LIFECYCLE_MATERIALIZATION_SCOPE,
+                    "source_retained_bytes": [corpus["archive_bytes"]] * 15,
+                    "complete_archive_materialized_bytes": [0] * 15,
+                    "parsed_sheet_counts": [2] * 15,
+                    "parsed_cell_counts": [1 if one_cell else 0] * 15,
+                    "source_version_checks": [1] * 15,
+                    "source_version_stability_verified": [True] * 15,
+                    "cfb_structural_read_calls": [1] * 15,
+                    "cfb_structural_read_bytes": [1] * 15,
+                    "workbook_global_read_calls": [1] * 15,
+                    "workbook_global_read_bytes": [1] * 15,
+                    "selected_worksheet_read_calls": [1 if one_cell else 0] * 15,
+                    "selected_worksheet_read_bytes": [1 if one_cell else 0] * 15,
+                    "unselected_worksheet_read_calls": [0] * 15,
+                    "unselected_worksheet_read_bytes": [0] * 15,
+                    "opaque_payload_read_calls": [0] * 15,
+                    "opaque_payload_read_bytes": [0] * 15,
+                    "open_reads_zero_worksheet_payload": [not one_cell] * 15,
+                    "selected_query_reads_only_selected_worksheet": [one_cell] * 15,
+                    "archive_sha256": corpus["archive_sha256"],
+                    "workbook_stream_sha256": corpus["target_payload_sha256"],
+                }
+                result["source"] = {
+                    "read_calls": [1] * 15,
+                    "read_bytes": [1] * 15,
+                    "ordinary_payload_read_calls": [0] * 15,
+                    "ordinary_payload_read_bytes": [0] * 15,
+                    "max_in_flight_reads": [1] * 15,
+                    "xls": source_xls,
+                }
+            results.append(result)
+        leg["results"] = results
+        leg["configuration"]["cases"] = cases
+        leg["configuration"]["corpus_shapes"] = [
+            "tiny",
+            "many-small",
+            "few-large",
+            "wide-root",
+        ]
+        leg["environment"]["git_revision"] = revision
+    return legs
+
+
 def with_parallel_metrics(reports):
     reports = copy.deepcopy(reports)
     for report_value in reports:
@@ -1568,6 +1644,21 @@ class PerfAbbaSummaryTests(unittest.TestCase):
             operation_metrics
         )
         self.assertEqual(projected["sample_indices"], list(range(15)))
+
+    def test_xls_lifecycle_identity_normalizes_only_validated_permutations(self):
+        row = with_operation_metrics(four_legs())[0]["results"][0]
+        row["case"] = "xls_owned_source_open"
+        row["elapsed_ns"] = elapsed(list(range(100, 115)))
+        row["corpus"] = copy.deepcopy(perf_abba_summary.XLS_NUMERIC_CORPUS_CONTRACTS["Number"])
+        row["elapsed_ns"]["sample_order"] = list(range(15))
+        first = perf_abba_summary._operation_metrics_identity(row, "test", 1)
+        row["elapsed_ns"]["sample_order"].reverse()
+        row["operation_metrics"]["sample_indices"].reverse()
+        second = perf_abba_summary._operation_metrics_identity(row, "test", 1)
+        self.assertEqual(first, second)
+        row["operation_metrics"]["sample_indices"][0] = row["operation_metrics"]["sample_indices"][1]
+        with self.assertRaises(perf_abba_summary.AbbaSummaryInputError):
+            perf_abba_summary._operation_metrics_identity(row, "test", 1)
 
     def test_legacy_operation_metrics_use_exact_historical_schema(self):
         reports = with_legacy_operation_metrics(four_legs())
@@ -3934,6 +4025,90 @@ class PerfAbbaSummaryTests(unittest.TestCase):
             "native XLS numeric corpus|selector",
         ):
             perf_abba_summary.summarize_reports(renamed)
+
+    def test_xls_lifecycle_contracts_cover_all_nine_selectors(self):
+        reports = xls_lifecycle_legs()
+        summary = perf_abba_summary.summarize_reports(reports)
+        self.assertEqual(
+            {result["case"] for result in summary["results"]},
+            set(perf_abba_summary.XLS_LIFECYCLE_CASE_CONTRACTS),
+        )
+        for result in summary["results"]:
+            if result["case"] in {
+                "xls_source_backed_open",
+                "xls_source_backed_open_list_worksheets",
+                "xls_source_backed_open_one_cell",
+            }:
+                self.assertEqual(result["identity"]["source_status"], "verified_equal")
+            else:
+                self.assertEqual(result["identity"]["source_status"], "consistently_absent")
+            self.assertEqual(result["identity"]["output_sha256_status"], "verified_equal")
+
+    def test_xls_lifecycle_contract_rejects_corpus_output_and_observer_forgery(self):
+        mutations = (
+            (
+                "corpus",
+                lambda result: result["corpus"].update(shape="forged"),
+                "exact XLS lifecycle Number corpus manifest",
+            ),
+            (
+                "output",
+                lambda result: result.update(output_sha256="0" * 64),
+                "exact XLS lifecycle output",
+            ),
+            (
+                "observer",
+                lambda result: result["source"]["xls"].update(
+                    source_counter_scope="forged source scope"
+                ),
+                "source_counter_scope",
+            ),
+        )
+        for name, mutate, message in mutations:
+            malformed = xls_lifecycle_legs()
+            target = next(
+                result
+                for result in malformed[0]["results"]
+                if result["case"] == "xls_source_backed_open"
+            )
+            mutate(target)
+            with self.subTest(name=name), self.assertRaisesRegex(
+                perf_abba_summary.AbbaSummaryInputError, message
+            ):
+                perf_abba_summary.summarize_reports(malformed)
+
+        malformed = xls_lifecycle_legs()
+        target = next(
+            result
+            for result in malformed[0]["results"]
+            if result["case"] == "xls_owned_source_open"
+        )
+        target["source"] = {"forged": True}
+        with self.assertRaisesRegex(
+            perf_abba_summary.AbbaSummaryInputError,
+            "source must be omitted or null",
+        ):
+            perf_abba_summary.summarize_reports(malformed)
+
+    def test_semantic_open_with_declared_non_lifecycle_corpus_keeps_legacy_path(self):
+        reports = four_legs()
+        custom_case = "xls_semantic_open"
+        custom_corpus = {
+            "name": "legacy-semantic-open",
+            "generator": "legacy-semantic-open-v1",
+            "shape": "medium",
+        }
+        for report_value in reports:
+            result = report_value["results"][0]
+            result["case"] = custom_case
+            result["corpus"] = copy.deepcopy(custom_corpus)
+            result.pop("source", None)
+            result["sink"] = None
+            report_value["results"] = [result]
+            report_value["configuration"]["cases"] = [custom_case]
+            report_value["configuration"]["corpus_shapes"] = ["medium", "tiny"]
+        summary = perf_abba_summary.summarize_reports(reports)
+        self.assertEqual(summary["results"][0]["case"], custom_case)
 
     def test_tool_configuration_and_result_identity_mismatches_fail_closed(self):
         for mutation, message in (
