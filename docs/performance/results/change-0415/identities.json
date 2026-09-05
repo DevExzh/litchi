@@ -1,0 +1,44 @@
+{
+  "binaries_sha256": {
+    "candidate": "ba7d42d63c5737a5cde938c8b66516e3a15859a4d40c4d6d3771a9dcbdf7448c",
+    "control": "d0389c620f2f1c185b4c2ebcaba8fe6f2b6a2218ebdfe9574b6414749d9a4e3e",
+    "large-output": "3e9d9295818a549df092d02a837612d2390dd36ef27169040e1d255eb90907a4"
+  },
+  "candidate_revision": "caf0d939495d9b275d21c880958a8ca113510ce3",
+  "candidate_sources": {
+    "crates/litchi-opc/fuzz/Cargo.toml": "dadbd0fbadab636afb1ddcb284c73cf826fdf8f6c9131612a9bb92316d860cb9",
+    "crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs": "a30bb988fa1f01aa59773e0c816baf0fd3b84bc11a092861696def0e8da4b480",
+    "crates/litchi-opc/tests/external_zip64_source.rs": "15cde15263525c578a8fa93fe8f42ebba5bddd64f50cf2f4d207ac5291f49272",
+    "crates/soapberry-zip/fuzz/Cargo.toml": "b1696f274e03de35a81b0b6172b35ff03d0ea2b89931fe237b3f3554a6cab2e6",
+    "crates/soapberry-zip/fuzz/fuzz_targets/parse_zip.rs": "1aa393dae2717bd6e24478357d397fa23dcce7d5e7e1c9adb0d396f0f803d569",
+    "crates/soapberry-zip/src/archive.rs": "eb56e8145bde24a8d8ba0e08f9aa6ab0a7dff46936e3f3f30e809fc2760efcb8",
+    "crates/soapberry-zip/src/extra_fields.rs": "bb4a4fd8d8666140a37236a4fa4e81f442fb3b7edd8b7303a94f537f82dc4c8f",
+    "crates/soapberry-zip/src/office.rs": "bd78be8e99064c1b8e944416efe260b362990afd97da99983cefe79e077a01f7",
+    "crates/soapberry-zip/src/preserve.rs": "f8da65b97263fed59d917e784f30a404a0c77eeff36aeab042ed3d8ad88b436b",
+    "crates/soapberry-zip/src/writer.rs": "cb58b87ccba87871b10978fae0cd0b166e5771180c0207889eb9f5a16938b1d3",
+    "crates/soapberry-zip/tests/streaming_zip64_deflate.rs": "bd251f19bf21a861b356cc9e79715029f8283ab9f6ee3ca24a97fbb51dfed1f0"
+  },
+  "control_refused_output_bytes": 0,
+  "control_revision": "916f60c38f5c4bc3422386f2fa29060af8b41ffa",
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "probe_sources": {
+    "interop.py": "9f3d498a1f9efe21eb97dfdf82eeb5c8befe191207ffb546a86bb1661f824ffe",
+    "large_output.rs": "4be62e8be88cb0fb6c21e529a849155f5d4ea03832f97619c9b19714634537cd",
+    "probe.rs": "1dfb7e93d65ce73c462a65be78ea0fc09a5e007bfb863361bece574e9398f3f0"
+  },
+  "profile_originals": {
+    "perf-script.txt": {
+      "bytes": 2117520,
+      "sha256": "cdf05ce90d8ca47ce70e9073d64f90be0c8d81fb11c42721cbbded79a3064adf"
+    },
+    "perf.data": {
+      "bytes": 225664,
+      "sha256": "e0a4098f0a01b86f025a30abca1d6f39d41f1b3512127b300bbcfb7c95079f56"
+    }
+  },
+  "qualified_unchanged_sources": {
+    "crates/litchi-core/src/hex.rs": "8d970a678b7b28041a798b34c928043621e9e0ae01ab1e60f61611cabc7ad51d",
+    "crates/litchi-core/src/patch.rs": "08e7f8c2e06c777c02103bd2b9fd2df29163e9003c9bd82f5f789abf6ff73e46",
+    "crates/litchi-docx/tests/glossary_authoring.rs": "9cdb25c9b4721274198a9563b2c5190231b366bca94276c38e33ac78168cb564"
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "kind": "zip64-streaming-capability-and-bounded-memory-observation",
+  "control_revision": "916f60c38",
+  "performance_claim": "none",
+  "cpu": 2,
+  "toolchain": "1.98.1",
+  "profile": "release",
+  "build_jobs": 4,
+  "incremental": false,
+  "isolation": "Measurements run without concurrent builds, tests, or analysis workloads. Builds and tests are serialized; the KVM host is shared.",
+  "review_trigger": "Report every paired p50, p95, p99 or process peak-RSS regression above 5 percent, including follow-up captures.",
+  "scope": "ZIP transport streaming creation, with caller-owned sequential output. This does not certify semantic row/paragraph/slide streaming, append transactions, cold/remote/native paths, or worker scaling.",
+  "independent_producer": {
+    "generator": "interop.py",
+    "implementation": "Python standard-library zipfile and zlib",
+    "large_member_bytes": 4294967296,
+    "input_and_verification_buffer_bytes": 65536,
+    "members": [
+      "[Content_Types].xml",
+      "_rels/.rels",
+      "document.xml",
+      "large.bin"
+    ],
+    "payload": "large.bin consists entirely of zero bytes; XML members are literal generator inputs",
+    "output": "caller-selected temporary file",
+    "measurement_scope": "Generation and full independent verification together; descriptive only, not compared against Rust writer timing."
+  },
+  "guards": {
+    "modes": [
+      "borrowed",
+      "owned"
+    ],
+    "payloads": [
+      "zeros",
+      "mixed"
+    ],
+    "input_bytes": [
+      16384,
+      1048576
+    ],
+    "samples_per_row": 300,
+    "warmups_per_row": 30,
+    "order": [
+      "A1",
+      "B1",
+      "B2",
+      "A2"
+    ],
+    "sink": "io::sink with accepted-byte/write-count/CRC instrumentation; no retained payload",
+    "timed_scope": "archive construction, bounded source traversal, compression, local and central headers, descriptor, finalization; input block allocation and output-oracle comparison outside timer"
+  },
+  "memory_observations": {
+    "modes": [
+      "borrowed",
+      "owned"
+    ],
+    "input_bytes": [
+      67108864,
+      268435456,
+      4294967297
+    ],
+    "payload": "zeros",
+    "sink": "caller-selected file on /tmp tmpfs; one process per case",
+    "scope": "writer elapsed excludes file open and input block allocation; time-v RSS includes the whole process; independent readback is a separate process"
+  },
+  "release_debug": 1,
+  "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+  "cpu_profile": {
+    "scope": "candidate owned ZIP transport creation into observed io::sink; separate diagnostic run",
+    "input_bytes_per_operation": 4294967297,
+    "payload": "zeros",
+    "operations": 4,
+    "warmups_in_probe": 1,
+    "samples_in_probe": 3,
+    "frequency_hz": 199,
+    "call_graph": "frame pointers",
+    "performance_claim": "none; profiling timings excluded from unprofiled observations"
+  },
+  "followup": {
+    "trigger": "original candidate latency/RSS deltas above 5 percent",
+    "samples_per_row": 1000,
+    "warmups_per_row": 100,
+    "order": [
+      "A1",
+      "B1",
+      "B2",
+      "A2"
+    ],
+    "same_executables": true,
+    "retains_original": true
+  },
+  "physical_output_followup": {
+    "reason": "zero input does not exercise a compressed payload above ZIP32 size",
+    "source": "large_output.rs",
+    "input_bytes": 4294967297,
+    "input_buffer_bytes": 65536,
+    "payload": "repeated xorshift 64 KiB block, seed 0x03150415a9871234",
+    "sink": "caller-selected /tmp tmpfs file",
+    "writer": "owned Deflate",
+    "process_scope": "writing plus separate subsequent bounded Rust readback; independent Python process follows",
+    "speedup_claim": "none"
+  }
+}

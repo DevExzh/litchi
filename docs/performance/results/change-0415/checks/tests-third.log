@@ -1,0 +1,1474 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.29s
+     Running unittests src/lib.rs (target/debug/deps/litchi_odf_common-ffb4222723f76eb9)
+
+running 287 tests
+test annotation::tests::reads_legacy_annotation_metadata_attributes ... ok
+test annotation::tests::builder_enforces_annotation_nesting_limit ... ok
+test annotation::tests::builds_rich_annotation_and_escapes_values ... ok
+test calculation::tests::accepts_lossless_lexical_forms ... ok
+test annotation::tests::validates_custom_extension_namespaces ... ok
+test calculation::model::tests::accepts_lossless_lexical_forms ... ok
+test calculation::tests::chart_document_tests::rejects_calculation_settings_below_chart_chart ... ok
+test annotation::tests::rejects_names_that_could_inject_xml ... ok
+test calculation::tests::chart_document_tests::parses_calculation_settings_from_chart_document_body ... ok
+test calculation::tests::writes_nested_settings_in_schema_order ... ok
+test calculation::model::tests::rejects_oversized_lexical_values ... ok
+test calculation::tests::rejects_invalid_or_out_of_order_settings ... ok
+test calculation::tests::parses_all_settings_with_namespace_aliases ... ok
+test chart::class::tests::extension_and_unknown_are_bounded_and_explicit ... ok
+test chart::class::tests::recognizes_every_standard_class_without_normalizing_an_alias ... ok
+test chart::authoring::writer::tests::rejects_dangling_axis_and_zero_counts ... ok
+test calculation::tests::handler_tests::handler_matches_standalone_parse ... ok
+test compact_xml::tests::accepts_only_predefined_general_references ... ok
+test compact_xml::tests::accepts_compact_xml_and_semantic_whitespace ... ok
+test chart::reader::tests::resolves_namespace_aliases_and_rejects_expanded_duplicates ... ok
+test chart::reader::tests::retains_namespace_aware_extension_content ... ok
+test chart::authoring::writer::tests::extension_namespaces_are_stable_and_retained ... ok
+test compact_xml::tests::rejects_formatting_whitespace_and_spaced_empty_elements ... ok
+test chart::view::tests::validates_domains_at_access_time ... ok
+test chart::view::tests::provides_zero_copy_semantic_views ... ok
+test compact_xml::tests::reports_security_and_resource_failures ... ok
+test constants::tests::test_extension_to_mime ... ok
+test constants::tests::test_is_odf_extension ... ok
+test chart::authoring::writer::tests::canonical_content_roundtrip_retains_typed_data ... ok
+test constants::tests::test_is_odf_mime_type ... ok
+test chart::authoring::writer::tests::cached_formula_is_escaped_and_inert ... ok
+test chart::reader::tests::enforces_structure_depth_and_entity_rules ... ok
+test constants::tests::test_office_version ... ok
+test constants::tests::test_mime_to_extension ... ok
+test constants::tests::test_presentation_classes ... ok
+test constants::tests::test_standard_paths ... ok
+test coordinates::tests::alpha_to_digit_converts_columns_and_rejects_malformed_or_oversized_input ... ok
+test coordinates::tests::cell_coordinate_parsing_and_display_preserve_a1_behavior ... ok
+test coordinates::tests::cell_range_is_checked_and_keeps_inclusive_dimensions ... ok
+test core::binding_tracker::tests::built_in_xml_prefixes_resolve_without_declarations ... ok
+test coordinates::tests::digit_to_alpha_round_trips_the_representable_coordinate_domain ... ok
+test core::binding_tracker::tests::reserved_namespace_bindings_keep_quick_xml_errors ... ok
+test core::binding_tracker::tests::scope_and_deferred_pops_restore_outer_bindings ... ok
+test core::binding_tracker::tests::unbinding_shadows_outer_prefix_until_scope_pop ... ok
+test core::encryption::tests::w3c_padding_accepts_random_filler_bytes ... ok
+test core::family::tests::validates_detached_content_with_the_same_family_contract ... ok
+test core::manifest::tests::duplicate_entries_with_alternate_prefix_are_rejected_once ... ok
+test core::manifest::tests::ignores_wrong_namespace_encryption_children ... ok
+test core::manifest::tests::accepts_default_namespace_and_nested_manifest_prefix_scopes ... ok
+test core::manifest::tests::keeps_neutral_xml_errors_ahead_of_observer_errors ... ok
+test core::manifest::tests::accepts_checksumless_gcm_but_not_checksumless_cbc ... ok
+test core::binding_tracker::tests::declaration_limit_accepts_exactly_256_and_rejects_257 ... ok
+test core::manifest::tests::fused_scan_matches_neutral_index_and_typed_projection ... ok
+test core::metadata::tests::test_document_statistics_default ... ok
+test core::manifest::tests::preserves_exact_encryption_error_precedence_and_messages ... ok
+test core::manifest::tests::rejects_incomplete_and_excessive_encryption_metadata ... ok
+test core::metadata::tests::rejects_invalid_statistic_and_nested_simple_metadata ... ok
+test core::metadata::tests::parses_namespaces_entities_and_complete_metadata_without_annotation_leakage ... ok
+test core::family::tests::borrowing_validator_matches_oracle_on_synthetic_edge_cases ... ok
+test core::metadata::tests::test_into_metadata_no_keywords ... ok
+test core::metadata::tests::test_odf_metadata_default ... ok
+test core::metadata::tests::test_into_metadata_with_data ... ok
+test core::metadata::tests::test_odf_metadata_from_xml_creator ... ok
+test core::metadata::tests::test_odf_metadata_from_xml_dates ... ok
+test core::metadata::tests::test_odf_metadata_from_xml_empty ... ok
+test core::metadata::tests::test_odf_metadata_from_xml_description ... ok
+test core::family::tests::validator_error_messages_stay_pinned ... ok
+test core::metadata::tests::test_odf_metadata_from_xml_full ... ok
+test core::metadata::tests::test_odf_metadata_from_xml_generator ... ok
+test core::metadata::tests::test_odf_metadata_from_xml_keywords ... ok
+test core::metadata::tests::test_into_metadata_empty ... ok
+test core::metadata::tests::test_odf_metadata_from_xml_subject ... ok
+test core::manifest::tests::rejects_cipher_and_derived_key_size_mismatch ... ok
+test core::metadata::tests::test_odf_metadata_from_xml_title ... ok
+test core::metadata::tests::test_odf_metadata_from_xml_statistics ... ok
+test core::family::tests::validates_and_reuses_shared_package_state ... ok
+test core::manifest::tests::rejects_encrypted_entries_without_plaintext_size ... ok
+test core::metadata::tests::test_odf_metadata_from_xml_user_defined ... ok
+test core::metadata::tests::test_parse_date_none ... ok
+test core::manifest::tests::preserves_unterminated_encryption_and_duplicate_data_behavior ... ok
+test core::manifest::tests::validates_standard_argon2id_parameters_and_resource_limits ... ok
+test core::metadata::tests::test_odf_metadata_from_xml_language ... ok
+test core::metadata::tests::test_parse_date_invalid ... ok
+test core::package::tests::source_backed_maps_each_zip_limit_to_structured_resource_limit ... ok
+test core::metadata::tests::test_parse_date_rfc3339 ... ok
+test core::metadata::tests::test_parse_date_iso8601 ... ok
+test core::package::tests::source_backed_preserves_ordinary_zip_io_errors ... ok
+test core::manifest::tests::neutral_errors_keep_precedence_over_earlier_encryption_errors ... ok
+test core::family::tests::rejects_wrong_mime_and_body_marker ... ok
+test core::manifest::tests::parses_typed_encryption_with_an_arbitrary_prefix ... ok
+test core::package::tests::owned_password_ingress_handles_validation_read_and_archive_errors ... ok
+test core::package::tests::owned_reader_limits_apply_before_zip_indexing_and_match_password_path ... ok
+test core::package::tests::source_backed_manifest_fallback_accepts_legacy_only_location ... ok
+test core::binding_tracker::tests::depths_above_quick_xml_u16_limit_drain_without_panic ... ok
+test core::package::tests::source_backed_materialized_member_size_is_metadata_only_and_safe ... ok
+test core::package::tests::source_backed_open_is_lazy_for_unselected_payloads ... ok
+test core::package::tests::source_backed_encrypted_plaintext_ceiling_is_checked_before_payload_read ... ok
+test core::package::tests::source_backed_normalizes_safe_leading_slash_for_archive_and_manifest ... ok
+test core::package::tests::source_backed_rejects_unbounded_or_oversized_policies_before_reads ... ok
+test core::package::tests::source_backed_path_accepts_exact_limit_and_rejects_max_plus_one ... ok
+test core::package::tests::test_owned_package_invalid_data ... ok
+test core::package::tests::source_backed_strict_policy_requires_offset_zero_mimetype ... ok
+test core::package::tests::test_owned_package_as_bytes ... ok
+test core::package::tests::test_owned_package_from_bytes ... ok
+test core::package::tests::source_backed_rejects_oversized_mimetype_before_payload_read ... ok
+test core::package::tests::test_owned_package_files ... ok
+test core::package::tests::test_owned_package_from_reader ... ok
+test core::package::tests::source_backed_selected_read_defers_crc_validation ... ok
+test core::package::tests::test_owned_package_get_file ... ok
+test core::package::tests::test_owned_package_into_inner ... ok
+test core::package::tests::test_owned_package_get_file_not_found ... ok
+test core::package::tests::source_backed_enforces_exact_source_ceiling_and_materializes ... ok
+test core::package::tests::test_package_files ... ok
+test core::package::tests::test_package_get_file_not_found ... ok
+test core::package::tests::test_package_get_file ... ok
+test core::package::tests::test_owned_package_media_files ... ok
+test core::package::tests::test_owned_package_mimetype_odp ... ok
+test core::package::tests::test_package_has_file ... ok
+test core::package::tests::test_owned_package_mimetype ... ok
+test core::package::tests::test_owned_package_mimetype_ods ... ok
+test core::package::tests::test_owned_package_has_file ... ok
+test core::package::tests::test_package_has_media ... ok
+test core::package::tests::test_package_manifest ... ok
+test core::package::tests::test_owned_package_package_method ... ok
+test core::package::tests::test_package_media_files_various_formats ... ok
+test core::package::tests::source_backed_rejects_stale_sources_before_and_during_reads ... ok
+test core::manifest::tests::typed_manifest_truncation_and_mutation_never_panics ... ok
+test core::package::tests::test_package_new_invalid_data ... ok
+test core::package::tests::test_package_media_files ... ok
+test core::writer::tests::arbitrary_writer_bytes_are_refused_for_every_xml_classification ... ok
+test core::package::tests::test_package_mimetype ... ok
+test core::package::tests::test_package_new ... ok
+test core::writer::tests::default_meta_xml_rejects_invalid_explicit_metadata_dates ... ok
+test core::writer::tests::default_meta_xml_serializes_checked_explicit_metadata ... ok
+test core::writer::tests::source_manifest_accepts_loext_key_derivation_attributes ... ok
+test core::writer::tests::source_manifest_version_accepts_odf_1_4_and_rejects_unknown_versions ... ok
+test core::writer::tests::test_manifest_entry_debug ... ok
+test core::writer::tests::test_odf_structure_default_content_xml ... ok
+test core::writer::tests::test_odf_structure_default_meta_xml ... ok
+test core::writer::tests::test_odf_structure_default_settings_xml ... ok
+test core::writer::tests::copying_auxiliary_files_rejects_canonical_and_legacy_manifest_ambiguity ... ok
+test core::writer::tests::test_odf_structure_default_styles_xml ... ok
+test core::writer::tests::copying_auxiliary_files_rejects_encrypted_manifest_entries ... ok
+test core::family::tests::rejects_deep_content_with_a_typed_error_without_panicking ... ok
+test core::source_publication::tests::exact_no_op_copies_source_identity ... ok
+test core::writer::tests::test_guess_media_type ... ok
+test core::writer::tests::test_package_writer_add_file_without_mimetype ... ok
+test core::writer::tests::test_generate_manifest ... ok
+test core::writer::tests::test_package_writer_default ... ok
+test core::writer::tests::test_package_writer_add_mimetype_as_file ... ok
+test core::writer::tests::test_package_writer_finish_without_mimetype ... ok
+test core::writer::tests::test_package_writer_new ... ok
+test core::writer::tests::test_package_writer_set_mimetype ... ok
+test core::writer::tests::test_package_writer_set_mimetype_twice ... ok
+test core::xml::tests::content_preserves_xml ... ok
+test core::xml::tests::meta_preserves_xml ... ok
+test core::xml::tests::part_exposes_bytes_without_copying ... ok
+test core::writer::tests::auxiliary_copy_preserves_noncompact_source_rdf_exactly ... ok
+test core::xml::tests::part_from_bytes ... ok
+test core::writer::tests::test_package_writer_add_file_with_media_type ... ok
+test core::xml::tests::styles_preserve_xml ... ok
+test core::writer::tests::finalized_manifest_does_not_describe_itself_or_meta_inf ... ok
+test datatype::lexical::tests::validates_rgb_colors ... ok
+test core::xml::tests::part_rejects_invalid_utf8 ... ok
+test datatype::tests::duration_fractional_seconds_convert_and_encode_without_truncation ... ok
+test datatype::tests::duration_parser_rejects_malformed_component_grammar ... ok
+test datatype::lexical::tests::enforces_the_caller_owned_byte_limit ... ok
+test datatype::tests::exact_duration_preserves_calendar_and_arbitrary_width_components ... ok
+test datatype::tests::exact_duration_retains_precision_beyond_chrono ... ok
+test datatype::tests::test_boolean_decode ... ok
+test core::writer::tests::test_package_writer_finish_to_bytes ... ok
+test core::source_publication::tests::changed_publication_reports_output_and_raw_reopens ... ok
+test datatype::lexical::tests::validates_finite_numbers_with_context ... ok
+test core::xml::tests::meta_extracts_empty_common_metadata ... ok
+test datatype::tests::duration_chrono_conversion_reports_range_errors ... ok
+test datatype::tests::test_datetime_decode ... ok
+test datatype::tests::test_boolean_encode ... ok
+test datatype::tests::test_duration_encode ... ok
+test detect::tests::bounded_reader_uses_max_plus_one_and_restores_position ... ok
+test detect::tests::classifies_every_packaged_family_and_template_without_lossy_text ... ok
+test detect::tests::detector_preserves_zip_file_count_and_metadata_limits ... ok
+test datatype::tests::test_date_decode ... ok
+test core::writer::tests::real_package_enumeration_includes_rdf_and_manifest_declared_xml ... ok
+test detect::tests::central_catalog_probe_applies_caller_budgets ... ok
+test detect::tests::central_catalog_probe_is_exact_and_conservative ... ok
+test datatype::tests::test_datetime_encode ... ok
+test datatype::tests::test_duration_decode ... ok
+test detect::tests::neutral_catalog_probe_budget_sets_exact_byte_ceilings ... ok
+test datatype::tests::test_date_encode ... ok
+test detect::tests::detects_flat_documents_with_semantic_namespace_resolution ... ok
+test core::writer::tests::copying_auxiliary_files_rejects_unencrypted_manifest_sizes ... ok
+test core::writer::tests::test_package_writer_full_package ... ok
+test detect::tests::positional_catalog_probe_preserves_provider_errors_and_source_changes ... ok
+test detect::tests::reader_catalog_probe_handles_short_reads_and_restore_failures ... ok
+test detect::tests::reader_preparation_restores_after_short_read_and_seek_errors ... ok
+test core::writer::tests::default_meta_xml_is_byte_identical_without_ambient_time ... ok
+test drawing::authoring::model::tests::anchor_round_trip ... ok
+test detect::tests::rejects_non_flat_roots_and_unknown_mimetypes ... ok
+test drawing::authoring::model::tests::text_box_bound_is_shared ... ok
+test drawing::authoring::model::tests::frame_validates_identity_and_retains_geometry ... ok
+test core::writer::tests::preserved_manifest_requires_physical_inventory_equivalence ... ok
+test drawing::authoring::model::tests::length_construction_and_parsing ... ok
+test detect::tests::packaged_detection_rejects_nonconforming_local_mimetype_entries ... ok
+test detect::tests::detects_packaged_documents_and_restores_nonzero_reader_position ... ok
+test media::authoring::model::tests::parts_normalize_safe_paths_without_copying_on_borrow ... ok
+test media::authoring::model::tests::sniffs_supported_formats_and_rejects_others ... ok
+test media::tests::image_inventory_helpers_are_borrowed ... ok
+test namespace::tests::test_namespace_constants ... ok
+test embedded::reader::active_object_tests::rejects_invalid_active_object_metadata_and_nesting ... ok
+test namespace::tests::test_namespace_context_add_default_namespace ... ok
+test media::tests::flat_scan_keeps_external_links_inert_and_rejects_dtds ... ok
+test media::tests::malformed_inline_data_is_rejected_without_execution ... ok
+test namespace::tests::test_namespace_context_add_namespace ... ok
+test namespace::tests::test_namespace_context_default ... ok
+test embedded::reader::active_object_tests::retains_applets_plugins_and_floating_frames_inertly ... ok
+test namespace::tests::test_namespace_context_resolve_prefix ... ok
+test namespace::tests::test_prefix_to_uri_mapping ... ok
+test detect::tests::rejected_prepared_detection_returns_the_original_allocation ... ok
+test core::writer::tests::source_manifest_version_is_retained_during_auxiliary_copy ... ok
+test namespace::tests::test_qualified_name_display ... ok
+test namespace::tests::test_qualified_name_from_str ... ok
+test media::tests::package_scan_retains_frame_context_and_classifies_sources ... ok
+test namespace::tests::test_qualified_name_from_string_no_prefix ... ok
+test namespace::tests::test_qualified_name_from_string ... ok
+test namespace::tests::test_qualified_name_matches ... ok
+test namespace::tests::test_qualified_name_new ... ok
+test detect::tests::positional_packaged_probe_reuses_strict_local_mimetype_grammar ... ok
+test namespace::tests::test_qualified_name_new_no_namespace ... ok
+test namespace::tests::test_qualified_name_with_context ... ok
+test namespace::tests::test_qualified_name_with_default_namespace ... ok
+test namespace::tests::test_uri_to_prefix_mapping ... ok
+test detect::tests::prepared_detection_retains_one_bounded_index_and_rejects_hostile_archives ... ok
+test package::path::tests::classifies_non_package_links_without_fetching ... ok
+test package::path::tests::manifest_paths_keep_only_the_root_as_absolute_and_allow_directories ... ok
+test package::path::tests::normalizes_safe_relative_paths ... ok
+test package::tests::archive_rejects_invalid_zip_bytes ... ok
+test package::tests::media_path_classification_is_format_neutral ... ok
+test package::tests::model_remains_plain_and_cloneable ... ok
+test rdf::tests::codec_rejects_entity_expansion ... ok
+test package::tests::parses_neutral_entries_without_interpreting_encryption ... ok
+test repair::tests::repair_metadata_budget_accepts_exact_and_rejects_one_over ... ok
+test package::tests::rejects_duplicate_entries_and_invalid_sizes ... ok
+test rdf::tests::codec_round_trips_contextual_rdf_values ... ok
+test repair::tests::target_length_mismatch_never_invents_an_expected_fingerprint ... ok
+test package::tests::archive_reads_a_real_package_without_family_models ... ok
+test signature::model::tests::rejects_spoofed_incomplete_and_active_signature_xml ... ok
+test style::master::content::tests::accepts_empty_and_skipped_column_regions ... ok
+test style::data::tests::lossless_insert_replace_remove_preserves_unrelated_markup ... ok
+test style::master::content::tests::attributes_blocks_to_ordered_column_regions ... ok
+test style::data::tests::parses_yielddisc_n122_n126_n170 ... ok
+test style::master::content::tests::classifies_all_standard_sender_field_names ... ok
+test style::data::tests::reads_libreoffice_12_aliases_but_writes_them_only_as_standard_13 ... ok
+test style::data::tests::accepts_exact_xsd_integer_and_double_lexicals ... ok
+test style::data::tests::expands_empty_target_container_and_enforces_caps ... ok
+test style::master::content::tests::classifies_cached_conditional_dde_formula_and_metadata_fields ... ok
+test style::data::tests::rejects_wrong_namespace_order_cardinality_and_lexicals ... ok
+test style::master::content::tests::classifies_cached_page_navigation_and_statistic_fields ... ok
+test style::master::content::tests::classifies_cached_document_identity_and_revision_fields ... ok
+test style::data::tests::accepts_odfdo_default_style_shapes ... ok
+test style::master::content::tests::classifies_cached_reference_sequence_and_variable_fields ... ok
+test style::master::content::tests::parses_ordered_blocks_controls_and_fields_with_arbitrary_prefixes ... ok
+test style::master::content::tests::classifies_inert_database_field_metadata ... ok
+test detect::tests::reader_preparation_reuses_one_snapshot_and_index_for_odf_families ... ok
+test style::master::content::tests::retains_inert_script_and_macro_metadata ... ok
+test style::master::content::tests::parses_libreoffice_title_field_regression_fixture ... ok
+test style::master::content::tests::rejects_malformed_column_region_usage ... ok
+test style::master::reader::tests::rejects_duplicate_regions_and_unknown_direct_children ... ok
+test detect::tests::reader_preparation_retains_catalog_tri_state_and_conservative_fallbacks ... ok
+test style::master::reader::tests::reads_master_regions_and_lossless_attributes ... ok
+test style::master::content::tests::rejects_invalid_boolean_dtd_depth_and_cumulative_spaces ... ok
+test style::data::tests::parses_all_seven_containers_and_all_standard_tokens ... ok
+test style::master::writer::tests::authors_and_round_trips_a_master ... ok
+test core::package::tests::manifest_aliases_cannot_bypass_encryption_metadata ... ok
+test core::encryption::tests::decrypts_blowfish_cfb8_with_default_key_size ... ok
+test style::master::writer::tests::updates_only_the_requested_region ... ok
+test signature::model::tests::reads_libreoffice_document_signature_metadata_without_verification ... ok
+test core::package::tests::source_backed_manifest_fallback_requires_canonical_absence ... ok
+test core::encryption::tests::decrypts_libreoffice_argon2id_aes256_gcm ... ok
+test core::encryption::tests::decrypts_all_aes_gcm_profiles_and_rejects_nonce_tampering ... ok
+test core::encryption::tests::decrypts_all_aes_cbc_odf_entries_and_rejects_wrong_password ... ok
+test core::family::tests::borrowing_validator_matches_oracle_on_odf_corpus ... ok
+test media::authoring::model::tests::allocates_and_validates_picture_paths ... ok
+test core::package::tests::source_backed_member_errors_preserve_current_errors_and_stale_precedence ... ok
+test core::package::tests::source_backed_encrypted_preflight_rejects_without_payload_read ... ok
+test core::package::tests::source_backed_materialized_member_size_uses_encrypted_plaintext_metadata ... ok
+test core::manifest::tests::enforces_the_shared_manifest_entry_ceiling ... ok
+test core::writer::encrypted_copy_tests::encrypted_auxiliary_entries_require_plaintext_and_are_reencrypted ... ok
+
+test result: ok. 287 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.69s
+
+     Running tests/content_xml_raw_preservation.rs (target/debug/deps/content_xml_raw_preservation-0cf932e72207234b)
+
+running 4 tests
+test explicit_content_splice_preserves_raw_members_and_checks_provenance ... ok
+test shared_raw_path_does_not_inflate_opaque_members_but_opt_in_verification_does ... ok
+test content_replacement_raw_copies_every_untouched_member ... ok
+test signed_content_replacement_uses_the_signature_stripping_fallback ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.43s
+
+     Running tests/embedded_chart_mutation.rs (target/debug/deps/embedded_chart_mutation-a7c24ed06c712d6e)
+
+running 2 tests
+test inline_chart_is_inert_and_invalid_mutations_do_not_publish_bytes ... ok
+test packaged_chart_replacement_and_removal_use_common_package_primitives ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/embedded_object_package_mutation.rs (target/debug/deps/embedded_object_package_mutation-e9dafac84e485969)
+
+running 2 tests
+test external_targets_remain_inert_and_unsafe_package_paths_fail_atomically ... ok
+test shared_package_payload_is_removed_only_after_the_last_reference ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/encryption_authoring.rs (target/debug/deps/encryption_authoring-76ea8b9da96df327)
+
+running 5 tests
+test encryption_authoring_is_covered_by_the_crate_unsafe_code_prohibition ... ok
+test round_trips_every_cipher_with_both_kdfs ... ok
+test rejects_invalid_profiles_and_late_configuration_without_mutation ... ok
+test emits_typed_manifest_descriptors_and_fresh_randomness ... ok
+test rejects_wrong_password_and_ciphertext_tampering ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.68s
+
+     Running tests/form_package_mutation.rs (target/debug/deps/form_package_mutation-3a6827359a5be406)
+
+running 2 tests
+test invalid_form_splice_does_not_change_the_source_snapshot ... ok
+test neutral_rebuild_preserves_inert_forms_and_drops_stale_signatures ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/mimetype_repair.rs (target/debug/deps/mimetype_repair-7943f491a2b4dc93)
+
+running 19 tests
+test output_progress_type_remains_public_for_sink_failures ... ok
+test local_and_central_padding_are_refused_before_candidate_allocation ... ok
+test stale_or_foreign_reports_are_refused ... ok
+test central_extra_and_wrong_member_order_are_not_repair_targets ... ok
+test unsupported_unknown_and_malformed_extras_are_refused ... ok
+test raw_central_preflight_rejects_metadata_and_record_limits_before_indexing ... ok
+test plan_limits_are_enforced_before_publication ... ok
+test decoded_manifest_metadata_is_charged_at_exact_and_one_over_boundaries ... ok
+test directory_entries_are_preserved_while_digest_count_excludes_them ... ok
+test aggregate_metadata_budget_accepts_exact_and_rejects_one_over ... ok
+test short_writes_are_retried_without_losing_progress ... ok
+test zero_sink_reports_typed_uncommitted_output ... ok
+test untouched_data_descriptor_span_is_raw_preserved ... ok
+test valid_plan_is_bounded_deterministic_and_non_destructive ... ok
+test package_wide_xml_security_scan_accepts_safe_references_and_uppercase_xml_type ... ok
+test typed_preview_reports_effects_and_apply_inverse_restores_exact_source ... ok
+test interrupted_writes_are_retried_and_flush_failure_reports_complete_prefix ... ok
+test package_wide_xml_security_scan_blocks_dtd_external_and_plus_xml_members ... ok
+test package_wide_xml_security_scan_rejects_base_rdf_pi_and_invalid_characters ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/odf_corpus.rs (target/debug/deps/odf_corpus-ba52c421da2738da)
+
+running 2 tests
+test compact_xxe_probe_is_rejected_before_publication ... ok
+test compact_odt_exercises_shared_package_and_xml_parsers ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/parser_hardening.rs (target/debug/deps/parser_hardening-01cb6e5233e10974)
+
+running 4 tests
+test chart_malformed_inputs_yield_typed_errors ... ok
+test archive_and_manifest_malformed_sweeps_never_panic ... ok
+test chart_truncation_and_mutation_sweeps_never_panic ... ok
+test shared_media_and_object_scanners_are_hardened ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests/script_package_mutation.rs (target/debug/deps/script_package_mutation-90a0a10ef9148570)
+
+running 2 tests
+test executable_uris_stay_linked_and_unsafe_resource_paths_are_rejected ... ok
+test script_markup_and_resources_are_updated_as_inert_package_bytes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/semantic_embedded_objects.rs (target/debug/deps/semantic_embedded_objects-23cb97c12800d47d)
+
+running 6 tests
+test libreoffice_inline_math_and_chart_payloads_are_retained_without_recursion ... ok
+test libreoffice_remote_objects_remain_typed_and_inert_across_families ... ok
+test package_file_and_inline_ole_sources_are_inert_and_exact ... ok
+test malformed_active_content_and_unsafe_package_paths_are_rejected ... ok
+test package_subdocuments_are_exactly_classified ... ok
+test depth_count_and_inline_xml_byte_limits_are_enforced ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running tests/semantic_images.rs (target/debug/deps/semantic_images-343e1632a35d1f1b)
+
+running 8 tests
+test libreoffice_accessibility_metadata_is_typed_after_image_content ... ok
+test malformed_inline_base64_is_rejected ... ok
+test libreoffice_flat_links_are_typed_and_inert_across_families ... ok
+test libreoffice_inline_image_is_strictly_decoded_without_following_links ... ok
+test inline_data_wins_and_unsafe_package_traversal_is_rejected ... ok
+test accessibility_metadata_is_shared_and_deferred_to_frame_close ... ok
+test packaged_images_join_references_and_manifest_metadata ... ok
+test accessibility_metadata_is_direct_text_only_unique_and_bounded ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/signature_crypto.rs (target/debug/deps/signature_crypto-972c153e85f16956)
+
+running 8 tests
+test signature_implementation_contains_no_unsafe_code ... ok
+test rejects_a_private_key_that_does_not_match_the_leaf_certificate ... ok
+test late_signing_configuration_failure_is_atomic ... ok
+test verifies_the_bundled_libreoffice_xades_signature ... ok
+test rejects_spoofed_and_duplicate_package_reference_paths ... ok
+test reports_tampering_and_unsupported_algorithms ... ok
+test authors_and_verifies_rsa_and_ecdsa_with_both_canonicalizations ... ok
+test signing_composes_with_encrypt_first_packages ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.32s
+
+     Running tests/source_content_cow_publication.rs (target/debug/deps/source_content_cow_publication-ab97457df967bd01)
+
+running 24 tests
+test changed_publication_keeps_unsupported_manifest_refusal_before_output ... ok
+test changed_publication_keeps_signed_refusal_before_output ... ok
+test execution_context_refuses_typed_resources_and_releases_transient_memory ... ok
+test no_op_source_read_failure_after_output_reports_the_exact_prefix ... ok
+test flush_failure_reports_complete_unflushed_progress ... ok
+test cancellation_during_flush_reports_complete_progress ... ok
+test overreporting_sink_is_indeterminate ... ok
+test failed_source_reads_still_prefer_revision_and_length_races ... ok
+test preservation_io_source_failures_report_source_and_exact_prefix_progress ... ok
+test changed_publication_checks_stale_source_before_during_and_after_output ... ok
+test exact_no_op_preserves_signed_source_byte_for_byte ... ok
+test cancellation_and_output_limits_report_truthful_partial_progress ... ok
+test short_and_zero_sinks_are_safe_and_report_progress ... ok
+test zip_encryption_flags_are_refused_before_member_reads_or_output ... ok
+test changed_publication_roundtrips_changed_member ... ok
+test changed_publication_does_not_read_opaque_payload_before_output_begins ... ok
+test payload_verification_opt_in_reads_untouched_payload_before_output ... ok
+test streaming_descriptor_source_reopens_after_content_replacement ... ok
+test publication_report_and_reopen_payloads_match ... ok
+test changed_publication_rejects_prefix_suffix_zip64_and_unsupported_compression ... ok
+test changed_store_and_deflate_publications_preserve_untouched_raw_members_and_order ... ok
+test malformed_and_padded_data_descriptors_are_rejected_before_output ... ok
+test exact_no_op_encrypted_source_is_refused_before_decryption_or_output ... ok
+test changed_publication_rejects_signed_encrypted_sized_and_aliased_sources ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.24s
+
+     Running tests/source_zip64_publication.rs (target/debug/deps/source_zip64_publication-65ae5d96e9105c2d)
+
+running 1 test
+test public_zip64_source_content_replacement_preserves_untouched_spans_metadata_and_tail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/streaming_package_writer.rs (target/debug/deps/streaming_package_writer-830fbd65ea3f87bb)
+
+running 14 tests
+test typed_mimetype_and_reader_failures_preserve_archive_sources ... ok
+test reader_failure_preserves_nested_source_chain ... ok
+test streamed_entry_limit_is_typed_after_the_member_header_starts ... ok
+test encryption_and_signing_are_refused_before_streamed_member_output ... ok
+test manifest_collisions_and_finish_entry_limit_are_atomic_with_progress ... ok
+test duplicate_and_xml_refusals_do_not_emit_new_member_headers ... ok
+test finalization_sink_failure_preserves_nested_source_chain ... ok
+test finalization_failure_preserves_accepted_output_progress ... ok
+test exact_output_limit_succeeds_and_one_byte_under_reports_limit_progress ... ok
+test reader_failure_reports_incomplete_output_and_poisoned_writer ... ok
+test metadata_is_validated_and_bounded_before_member_output ... ok
+test manifest_only_paths_use_strict_odf_validation_and_reopen ... ok
+test canonical_paths_reopen_through_owned_indexed_and_family_packages ... ok
+test short_non_seek_sink_round_trips_exact_stream_and_is_deterministic ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/validation.rs (target/debug/deps/validation-c7cf5fa86283f475)
+
+running 12 tests
+test malformed_zip_stops_every_dependent_capability_without_panicking ... ok
+test reports_mimetype_catalog_and_hostile_path_failures ... ok
+test input_archive_manifest_xml_and_report_limits_are_distinguished ... ok
+test central_file_comments_are_charged_to_the_raw_metadata_ceiling ... ok
+test accepts_minimal_text_spreadsheet_and_presentation_packages ... ok
+test duplicate_normalized_member_names_are_an_ingress_rejection ... ok
+test mimetype_local_header_extra_fields_are_a_layout_error ... ok
+test one_valid_extended_timestamp_gets_the_narrow_repair_diagnostic ... ok
+test malformed_manifest_and_xml_are_content_free_deterministic_issues ... ok
+test mimetype_header_mismatches_never_advertise_the_repair ... ok
+test doctype_and_depth_limit_do_not_fetch_or_expand_entities ... ok
+test reports_encryption_signature_external_and_macro_presence_only ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s
+
+     Running tests/xml_splice_publication.rs (target/debug/deps/xml_splice_publication-5fdca8822571aeac)
+
+running 5 tests
+test explicit_fragment_classes_accept_compact_bytes_only ... ok
+test bounded_rebuild_refuses_to_materialize_an_oversized_archive ... ok
+test source_identity_stale_ranges_and_overlaps_are_rejected ... ok
+test every_raw_xml_part_class_requires_an_audited_fragment ... ok
+test rebuild_preserves_source_bytes_outside_splices_and_enumerates_every_member ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/litchi_opc-f403e31a48d42a4d)
+
+running 325 tests
+test accounting::tests::merge_copies_all_low_level_counters_without_retaining_the_source_type ... ok
+test accounting::tests::output_counter_overflow_is_typed_and_checked ... ok
+test atomic::tests::caller_owned_write_error_is_not_erased ... ok
+test atomic::tests::replacement_preserves_existing_file_permissions ... ok
+test atomic::tests::successful_finalization_replaces_the_destination ... ok
+test atomic::tests::directory_sync_failure_reports_that_replacement_already_committed ... ok
+test atomic::tests::symbolic_link_destinations_are_refused_without_touching_the_target ... ok
+test atomic::tests::failed_finalization_leaves_the_destination_untouched ... ok
+test content_type::tests::rejects_invalid_override_part_name ... ok
+test content_type::tests::requires_the_content_types_root_and_required_attributes ... ok
+test error::tests::accounting_overflow_is_not_misclassified_as_unsupported ... ok
+test content_type::tests::validates_mime_grammar_without_whitespace_or_comments ... ok
+test content_type::tests::honors_content_type_resource_limits_at_exact_boundaries ... ok
+test error::tests::execution_io_errors_survive_zip_error_conversion ... ok
+test content_type::tests::rejects_case_equivalent_defaults_and_overrides ... ok
+test content_type::tests::override_precedes_case_insensitive_extension_default ... ok
+test error::tests::publication_capability_errors_retain_typed_core_classification ... ok
+test error::tests::allocation_zip_errors_remain_typed ... ok
+test limits::tests::builder_rejects_zero_and_keeps_defaults_checked ... ok
+test execution::tests::explicit_owned_open_rejects_input_limit_before_zip_and_input_charge ... ok
+test members::tests::capacity_planning_is_fallible ... ok
+test members::tests::accepts_distinct_names_and_rejects_the_three_conflicts ... ok
+test execution::tests::explicit_owned_open_rejects_malformed_zip_before_input_charge ... ok
+test members::tests::maps_ordinary_members_and_rejects_junk_names ... ok
+test members::tests::sibling_folders_sharing_a_prefix_do_not_conflict ... ok
+test package::tests::owned_constructors_report_malformed_zip_after_bounded_read ... ok
+test package::tests::relationship_provenance_uses_empty_sentinel_and_exact_owned_bytes ... ok
+test package::tests::removing_origin_relationship_does_not_bypass_signature_detection ... ok
+test package::tests::resolves_one_internal_strict_main_document_part ... ok
+test package::tests::signature_detection_covers_orphans_and_relationship_targets ... ok
+test package::tests::bounded_package_constructors_reject_oversized_input ... ok
+test packuri::tests::resolves_internal_targets_without_allowing_root_escape ... ok
+test packuri::tests::test_filename ... ok
+test packuri::tests::test_ext ... ok
+test packuri::tests::test_idx ... ok
+test packuri::tests::test_membername ... ok
+test packuri::tests::test_packuri_new ... ok
+test part::tests::blob_part_new_shared_preserves_allocation ... ok
+test execution::tests::explicit_open_keeps_ordinary_payloads_out_of_lazy_cache ... ok
+test package::tests::font_embedding_policy_has_only_three_valid_states ... ok
+test part::tests::extract_text_ignores_self_closing_targets_and_nested_elements ... ok
+test packuri::tests::detects_equivalent_and_derived_part_names ... ok
+test members::tests::detects_derived_names_declared_in_either_order ... ok
+test package::tests::owned_constructors_check_input_limit_before_zip_validation ... ok
+test part::tests::part_factory_shared_load_preserves_allocation_for_xml_and_binary ... ok
+test packuri::tests::rejects_ambiguous_or_noncanonical_part_names ... ok
+test package::tests::package_clone_shares_clean_payloads_and_detaches_mutation ... ok
+test part::tests::test_blob_part ... ok
+test part::tests::test_is_xml_content_type ... ok
+test part::tests::test_xml_part ... ok
+test phys_pkg::tests::bounded_ingress_rejects_before_zip_parsing ... ok
+test phys_pkg::tests::parallel_result_reservation_rejects_capacity_overflow_without_allocating ... ok
+test packuri::tests::test_base_uri ... ok
+test phys_pkg::tests::owned_borrowed_readers_share_part_materialization_budget ... ok
+test phys_pkg::tests::owned_part_writer_reports_typed_partial_progress ... ok
+test phys_pkg::tests::corrupt_parallel_read_releases_part_count_and_byte_reservations ... ok
+test phys_pkg::tests::public_owned_reader_still_validates_zip_at_construction ... ok
+test phys_pkg::tests::target_limit_cannot_exceed_the_universal_xml_attribute_limit ... ok
+test package::tests::part_relationship_mutation_retains_signature_policy_tracking ... ok
+test package::tests::test_open_package ... ok
+test package::tests::clone_shares_owned_source_but_revocation_is_independent ... ok
+test phys_pkg::tests::parallel_part_reads_are_exact_or_fail_without_partial_results ... ok
+test phys_pkg::tests::owned_part_name_conflict_is_rejected_before_local_header_output ... ok
+test phys_pkg::tests::maps_zip_member_limit_to_opc_resource ... ok
+test phys_pkg::tests::part_reads_enforce_declared_per_part_and_total_budgets ... ok
+test package::tests::test_main_document_part ... ok
+test phys_pkg::tests::sequential_part_materializations_charge_distinct_and_repeated_uris ... ok
+test package::tests::try_add_part_rejects_conflicts_without_replacing_the_original ... ok
+test execution::tests::read_limits_reject_before_execution_input_is_charged ... ok
+test phys_pkg::tests::post_materialization_failure_releases_its_declared_reservation ... ok
+test pkgreader::tests::eager_declared_part_preflight_rejects_before_bulk_reader_invocation ... ok
+test phys_pkg::tests::corrupt_present_parts_stay_zip_errors_and_bulk_reads_do_not_hide_them ... ok
+test phys_pkg::tests::part_materializations_enforce_exact_max_parts_bound ... ok
+test phys_pkg::tests::repeated_single_item_parallel_batches_charge_max_parts ... ok
+test pkgreader::physical_part_tests::recognizes_only_reserved_relationship_members ... ok
+test phys_pkg::tests::relationship_reads_share_count_and_byte_budgets_without_charging_failures ... ok
+test phys_pkg::tests::physical_writer_rejects_duplicate_equivalent_and_derived_names ... ok
+test package::tests::moves_owned_archive_into_package_reader ... ok
+test execution::tests::explicit_open_observes_pre_cancellation ... ok
+test phys_pkg::tests::owned_part_writer_streams_and_recovers_the_physical_writer ... ok
+test package::tests::mutable_api_entries_revoke_owned_source_even_on_failure_or_noop ... ok
+test pkgreader::tests::eager_serialized_parts_follow_physical_order_and_reuse_archive_payloads ... ok
+test package::tests::relationship_and_option_mutable_apis_revoke_owned_source ... ok
+test phys_pkg::tests::test_round_trip ... ok
+test pkgreader::tests::invalid_internal_relationship_targets_are_rejected ... ok
+test pkgreader::tests::missing_relationship_parts_are_optional_but_malformed_xml_is_not ... ok
+test phys_pkg::tests::dedicated_xml_reads_do_not_consume_generic_part_budgets ... ok
+test package::tests::owned_constructors_preserve_mixed_storage_and_exact_source ... ok
+test execution::tests::explicit_owned_open_retains_exact_source_authorization ... ok
+test pkgreader::tests::relationships_manifest_requires_schema_root_and_direct_children ... ok
+test pkgreader::tests::relationship_targets_preserve_fragments_and_typed_modes ... ok
+test pkgreader::tests::relationships_require_attributes_ids_and_exact_target_modes ... ok
+test pkgreader::tests::package_rejects_multiple_core_properties_relationships ... ok
+test pkgreader::tests::corrupt_required_parts_report_zip_errors ... ok
+test pkgreader::tests::rejects_equivalent_and_derived_physical_part_names ... ok
+test pkgreader::tests::eager_serialized_parts_preserve_mixed_storage_and_shared_identity ... ok
+test pkgreader::physical_part_tests::eager_serialized_parts_retain_archive_payload_allocation ... ok
+test pkgreader::tests::read_limits_bound_physical_and_retained_parts_before_parallel_loading ... ok
+test execution::tests::explicit_open_refuses_insufficient_in_flight_memory ... ok
+test pkgreader::tests::rejects_poi_relationships_entity_fixture ... ok
+test pkgwriter::tests::invalid_packages_never_replace_an_existing_artifact ... ok
+test pkgreader::physical_part_tests::preserves_unreferenced_physical_part_across_round_trip ... ok
+test pkgwriter::tests::incomplete_stream_errors_report_accepted_bytes ... ok
+test pkgreader::tests::read_limits_bound_relationship_resources_at_exact_boundaries ... ok
+test pkgwriter::tests::incomplete_exact_source_stream_reports_accepted_bytes ... ok
+test pkgreader::tests::structural_member_keeps_stored_payload_borrowed ... ok
+test pkgreader::tests::public_reader_probe_rejects_overreported_reads_without_panicking ... ok
+test pkgreader::tests::test_content_type_map ... ok
+test phys_pkg::tests::test_multiple_parts ... ok
+test pkgwriter::tests::exact_source_xml_bytes_may_remain_opaque ... ok
+test pkgwriter::tests::rejects_invalid_part_content_type_before_writing ... ok
+test pkgwriter::tests::changed_owned_signed_source_refuses_before_output ... ok
+test pkgreader::tests::structural_member_uses_owned_fallback_for_indexed_archive ... ok
+test pkgwriter::tests::targeted_output_entry_count_checks_checked_arithmetic ... ok
+test pkgwriter::tests::publication_plan_failure_leaves_sequential_sink_untouched ... ok
+test pkgwriter::tests::refuses_arbitrary_authored_xml_bytes_before_publication ... ok
+test pkgwriter::tests::test_content_types_xml ... ok
+test pkgreader::tests::structural_member_reuses_lazy_shared_decompression_allocation ... ok
+test pkgreader::tests::serial_eager_payload_error_precedes_later_relationship_error_and_preflight ... ok
+test pkgwriter::tests::owned_source_round_trips_exactly_to_bytes_and_stream ... ok
+test pkgreader::tests::rejects_apache_poi_derived_part_name_fixture ... ok
+test pkgwriter::tests::filesystem_write_replaces_only_with_a_finalized_package ... ok
+test pkgwriter::tests::revoked_part_mutation_preserves_explicit_empty_relationship_member ... ok
+test pkgwriter::tests::real_package_enumeration_covers_all_xml_bearing_members ... ok
+test pkgwriter::tests::open_and_reader_retain_owned_source_but_borrowed_bytes_do_not ... ok
+test pkgwriter::tests::topology_add_rejects_packuri_prefix_conflict ... ok
+test pkgwriter::tests::topology_add_rejects_relationship_member_prefix_conflict ... ok
+test pkgwriter::tests::exact_source_streaming_respects_the_64_kib_chunk_bound ... ok
+test rel::tests::fallible_insertion_never_replaces_a_duplicate_id ... ok
+test rel::tests::fallible_relationship_xml_is_deterministic_across_insertion_order ... ok
+test pkgwriter::tests::part_edit_revokes_exact_source_and_republishes_edited_package ... ok
+test rel::tests::fallible_relationship_xml_matches_the_canonical_literal ... ok
+test rel::tests::target_components_are_preserved_while_the_path_resolves ... ok
+test rel::tests::test_get_or_add ... ok
+test rel::tests::test_next_r_id ... ok
+test pkgwriter::tests::topology_add_rejects_part_descending_from_existing_relationship_member ... ok
+test pkgwriter::tests::topology_add_rejects_packuri_derived_relationship_name_conflict ... ok
+test execution::tests::explicit_opens_match_serial_parts_deterministically ... ok
+test pkgwriter::tests::generic_signature_infrastructure_removal_stays_policy_gated ... ok
+test pkgwriter::tests::untouched_borrowed_signed_source_refuses_without_exact_bytes ... ok
+test rel::tests::fallible_relationship_xml_preserves_empty_output ... ok
+test rel::tests::test_relationship_creation ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_does_not_admit_payload_to_part_cache ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_checks_cancellation_before_callback_and_releases_memory ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_enforces_part_limit_before_callback ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_managed_accounting_is_precise_and_not_cached ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_preserves_typed_source_change_transport_error ... ok
+test source_backed::callback_scoped_verified_reader_tests::verified_reader_returns_custom_callback_error_after_verification ... ok
+test source_backed::selected_part_stream_api_tests::output_accounting_overflow_is_deferred_until_finalization ... ok
+test source_backed::selected_part_stream_api_tests::execution_io_error_round_trips_through_source_mapping ... ok
+test source_backed::selected_part_stream_api_tests::selected_part_stream_api_is_sink_oriented ... ok
+test sign::tests::safe_default_rejects_fixture_sha1 ... ok
+test source_backed::tests::aggregate_reservation_counter_overflow_fails_closed_through_wrapper ... ok
+test source_backed::tests::borrowed_materialization_preserves_source_and_matches_eager_graph ... ok
+test source_backed::tests::borrowed_materialization_rejects_cancellation_before_payload_reads ... ok
+test pkgwriter::tests::topology_add_with_unknown_non_part_refuses_normalization ... ok
+test pkgreader::tests::preserves_poi_special_relationship_targets_across_round_trip ... ok
+test source_backed::tests::borrowed_materialization_rejects_source_changed_during_payload_and_keeps_no_partial_result ... ok
+test source_backed::tests::borrowed_materialization_rejects_stale_source_before_payload_reads ... ok
+test source_backed::tests::borrowed_materialization_rejects_managed_package_before_payload_reads ... ok
+test source_backed::tests::borrowed_materialization_preserves_opaque_xml_like_eager_unmarshal ... ok
+test source_backed::tests::borrowed_materialization_reports_malformed_payload_without_partial_result ... ok
+test source_backed::tests::borrowed_materialization_retains_cached_payload_allocation_after_source_drop ... ok
+test source_backed::tests::borrowed_materialization_with_accounting_does_not_charge_preloaded_cache_hits ... ok
+test source_backed::tests::borrowed_signed_materialization_retains_publication_policy ... ok
+test source_backed::tests::cache_limits_reject_zero_bounds ... ok
+test source_backed::tests::cache_cleanup_is_exact_identity_scoped_and_late_success_cannot_resurrect ... ok
+test source_backed::tests::cache_evicts_by_byte_weight_and_entry_count_and_rejects_oversized_values ... ok
+test sign::tests::rejects_spoofs_duplicates_and_keeps_failed_edits_atomic ... ok
+test source_backed::tests::cancellation_takes_precedence_over_accounted_archive_failure_and_releases_flight ... ok
+test source_backed::tests::cache_hits_pin_payloads_and_failures_are_not_retained ... ok
+test source_backed::tests::casefold_lookup_index_handles_unsorted_parts_without_changing_iteration_order ... ok
+test source_backed::tests::checked_counter_delta_preserves_event_counts_without_gauge_subtraction ... ok
+test source_backed::tests::checked_counter_delta_rejects_a_regression ... ok
+test source_backed::tests::checked_counter_overflow_fails_closed_snapshot ... ok
+test source_backed::tests::catalog_entry_id_resolves_to_the_same_payload_as_its_member_name ... ok
+test pkgwriter::tests::targeted_save_preserves_comments_extras_descriptors_order_and_non_parts ... ok
+test source_backed::tests::catalog_reports_non_parts_and_conversion_matches_loaded_parts ... ok
+test source_backed::tests::consuming_materialization_rejects_managed_package_before_payload_reads ... ok
+test sign::tests::verifies_certificate_from_a_related_der_part ... ok
+test source_backed::tests::consuming_materialization_retains_cached_payload_allocation ... ok
+test source_backed::tests::content_type_override_insertion_uses_the_parsed_root_close_span ... ok
+test source_backed::tests::consuming_materialization_with_accounting_keeps_malformed_read_progress ... ok
+test source_backed::tests::consuming_materialization_with_accounting_refuses_managed_package_before_reads ... ok
+test source_backed::tests::consuming_materialization_with_accounting_keeps_source_change_read_progress ... ok
+test source_backed::tests::exact_source_publication_checks_one_fewer_version_per_copy_chunk ... ok
+test source_backed::tests::consuming_materialization_with_accounting_reports_mixed_cold_payload_work ... ok
+test sign::tests::signed_package_survives_zip_round_trip ... ok
+test source_backed::tests::managed_allocation_admission_bypass_returns_correct_bytes_without_retention ... ok
+test source_backed::tests::managed_budget_rejects_before_payload_io_and_reports_content_free_failure ... ok
+test source_backed::tests::managed_cache_does_not_evict_externally_pinned_entry_and_bypasses_retention ... ok
+test source_backed::tests::managed_cache_eviction_releases_unpinned_reservation_before_next_read ... ok
+test source_backed::tests::external_relationship_removal_overlay_changes_only_owner_and_rels_member ... ok
+test source_backed::tests::managed_cache_respects_hierarchical_parent_memory_limit ... ok
+test source_backed::tests::managed_cache_reserves_declared_payload_and_releases_on_package_drop ... ok
+test source_backed::tests::managed_cancellation_after_decompression_prevents_publication ... ok
+test source_backed::tests::managed_constructor_honors_pre_cancellation_without_source_reads ... ok
+test source_backed::tests::managed_cache_hit_honors_cancellation_without_releasing_cached_budget ... ok
+test source_backed::tests::managed_cancellation_between_cache_admission_and_source_read_is_typed ... ok
+test source_backed::tests::managed_cancellation_before_preservation_source_read_is_typed ... ok
+test source_backed::tests::managed_changed_overlay_charges_exact_accepted_output_bytes ... ok
+test source_backed::tests::managed_exact_noop_overlay_charges_physical_output_bytes ... ok
+test source_backed::tests::managed_exact_output_limit_accepts_exact_small_artifact ... ok
+test source_backed::tests::managed_cumulative_output_retry_exhaustion_refuses_second_exact_publication ... ok
+test source_backed::tests::managed_failed_cold_load_consumes_work_and_input_but_releases_retained_objects ... ok
+test source_backed::tests::managed_exact_noop_refuses_the_first_output_write_at_zero_limit ... ok
+test source_backed::tests::managed_exact_output_limit_one_under_refuses_before_small_artifact_output ... ok
+test source_backed::tests::managed_input_budget_refusal_counts_only_the_terminal_read_reservation ... ok
+test source_backed::tests::managed_input_reservation_counter_overflow_fails_closed_through_wrapper ... ok
+test source_backed::tests::managed_flush_failure_reports_exact_output_charge_as_incomplete ... ok
+test source_backed::tests::managed_input_bytes_are_exact_for_chunked_reads_and_cache_hits_are_free ... ok
+test source_backed::tests::managed_large_exact_publication_refuses_mid_stream_with_exact_partial_charge ... ok
+test source_backed::tests::managed_failed_loader_releases_reservations_before_waiter_retry ... ok
+test source_backed::tests::managed_open_checks_cancellation_after_indexing_before_catalog_publication ... ok
+test source_backed::tests::managed_output_charge_reaches_hierarchical_parent_and_child_budgets ... ok
+test source_backed::tests::external_relationship_removal_overlay_refuses_ids_and_limits_before_output ... ok
+test sign::tests::resource_limits_reject_hostile_signature_graphs_atomically ... ok
+test source_backed::tests::managed_object_one_under_refuses_payload_before_physical_io ... ok
+test source_backed::tests::managed_output_reservation_counter_overflow_fails_closed_through_wrapper ... ok
+test source_backed::tests::managed_overreporting_sink_does_not_commit_output_budget ... ok
+test source_backed::tests::managed_oversized_bypass_releases_comparison_memory_before_exact_publication ... ok
+test source_backed::tests::managed_short_interrupted_source_copy_charges_only_accepted_bytes ... ok
+test source_backed::tests::managed_source_change_drops_reservation_and_does_not_retain_payload ... ok
+test source_backed::tests::managed_source_change_after_accepted_output_preserves_partial_accounting ... ok
+test source_backed::tests::managed_publication_checks_before_output_and_between_copy_chunks ... ok
+test source_backed::tests::managed_sibling_caches_compete_for_parent_memory_before_payload_io ... ok
+test source_backed::tests::managed_work_one_under_refuses_payload_before_physical_io ... ok
+test source_backed::tests::mandatory_xml_is_opened_but_ordinary_payload_corruption_is_deferred ... ok
+test source_backed::tests::multi_part_overlay_changes_only_selected_raw_members_and_reopens ... ok
+test source_backed::tests::multi_part_overlay_all_noop_preserves_signed_source_identity ... ok
+test source_backed::tests::multi_part_overlay_checks_set_bounds_duplicates_and_aggregate_limits ... ok
+test source_backed::tests::normal_open_catalog_preserves_raw_source_io_errors ... ok
+test source_backed::tests::one_part_overlay_enforces_replacement_limits_without_output ... ok
+test source_backed::tests::one_part_overlay_bounds_writes_and_reports_partial_sink_failure ... ok
+test source_backed::tests::managed_partial_sink_failure_commits_only_accepted_output_bytes ... ok
+test source_backed::tests::one_part_overlay_exact_noop_preserves_every_source_byte ... ok
+test sign::tests::compatibility_reports_partial_coverage_and_strict_rejects_it ... ok
+test source_backed::tests::one_part_overlay_refuses_unsupported_physical_layout_before_output ... ok
+test source_backed::tests::one_part_overlay_raw_copies_every_unselected_member_and_reopens ... ok
+test source_backed::tests::owned_bytes_open_keeps_ordinary_payloads_deferred ... ok
+test source_backed::tests::one_part_overlay_reports_source_changes_before_and_during_output ... ok
+test source_backed::tests::one_part_overlay_rejects_invalid_xml_and_signed_changes_before_output ... ok
+test source_backed::tests::part_view_declared_size_is_metadata_only ... ok
+test source_backed::tests::part_lookup_prefers_exact_names_and_matches_ascii_case_insensitive_targets ... ok
+test source_backed::tests::performance_diagnostics_cache_and_flight_scopes_are_reported ... ok
+test source_backed::tests::part_view_declared_size_checks_source_and_cancellation ... ok
+test source_backed::tests::performance_diagnostics_finished_panic_drops_flight_guard ... ok
+test sign::tests::signs_resigns_and_unsigns_with_deterministic_names ... ok
+test source_backed::tests::multi_part_relationship_removal_checks_combined_part_and_archive_totals ... ok
+test source_backed::tests::performance_diagnostics_finished_panic_does_not_abandon_loader_flight ... ok
+test source_backed::tests::overlay_mixed_storage_has_semantic_parity_and_managed_cold_work ... ok
+test source_backed::tests::performance_diagnostics_poison_preserves_error_and_event_pair ... ok
+test source_backed::tests::performance_diagnostics_reentrancy_contract_refuses_before_lock ... ok
+test source_backed::tests::performance_diagnostics_failure_retry_and_cancellation_are_balanced ... ok
+test source_backed::tests::performance_diagnostics_finished_panic_drops_guard_and_cache_recovers ... ok
+test source_backed::tests::poisoned_cache_state_fails_closed_snapshot ... ok
+test source_backed::tests::performance_diagnostics_started_flight_panic_does_not_strand_waiter ... ok
+test source_backed::tests::performance_diagnostics_same_part_loader_and_waiter_are_balanced ... ok
+test source_backed::tests::performance_diagnostics_started_nested_publication_flight_panic_recovers ... ok
+test source_backed::tests::performance_diagnostics_started_panic_has_no_finished_and_cache_recovers ... ok
+test source_backed::tests::performance_diagnostics_uncontended_hit_reports_only_cache_lock ... ok
+test source_backed::tests::poisoned_cache_state_fails_closed_through_wrapper ... ok
+test source_backed::tests::provisional_publication_cancellation_rolls_back_everything ... ok
+test source_backed::tests::provisional_publication_source_change_rolls_back_everything ... ok
+test source_backed::tests::provisional_publication_waiter_joins_and_stable_hit_reuses_allocation ... ok
+test source_backed::tests::retained_gauge_aggregation_overflow_fails_closed_through_wrapper ... ok
+test source_backed::tests::preservation_index_propagates_typed_limit_allocation_and_io_errors ... ok
+test source_backed::tests::shared_overlay_preserves_duplicate_and_limit_refusals_before_output ... ok
+test source_backed::tests::source_artifact_copy_rejects_overreporting_sink_without_false_progress ... ok
+test source_backed::tests::shared_overlay_reports_partial_sink_failure_with_bounded_writes ... ok
+test source_backed::tests::source_artifact_paths_reject_overreported_read_counts_without_output ... ok
+test source_backed::tests::shared_multi_overlay_matches_vec_and_reopens ... ok
+test source_backed::tests::source_backed_catalog_matches_eager_part_admission ... ok
+test source_backed::tests::source_backed_catalog_open_does_not_read_ordinary_payloads ... ok
+test source_backed::tests::source_backed_catalog_enforces_part_limits_during_ordered_admission ... ok
+test source_backed::tests::source_backed_catalog_matches_eager_relationship_typing_and_non_parts ... ok
+test source_backed::tests::source_backed_part_limit_precedes_later_max_parts_error ... ok
+test source_backed::tests::source_change_takes_precedence_over_archive_failure_and_releases_flight ... ok
+test source_backed::tests::source_catalog_still_rejects_case_equivalent_part_names ... ok
+test source_backed::tests::source_backed_part_limit_precedes_later_derived_or_equivalent_conflicts ... ok
+test source_backed::tests::source_changes_reject_metadata_cache_and_conversion_access ... ok
+test source_backed::tests::shared_single_overlay_matches_vec_changed_and_signed_noop_publication ... ok
+test source_backed::tests::topology_exact_external_replacement_preserves_noncanonical_source ... ok
+test source_backed::tests::topology_changed_replacement_reads_source_payload_once ... ok
+test source_backed::tests::topology_add_part_inserts_lossless_content_type_override ... ok
+test source_backed::tests::topology_external_wrappers_refuse_internal_relationships_before_output ... ok
+test source_backed::tests::topology_adds_external_relationship_with_exact_uri_reference ... ok
+test source_backed::tests::topology_adds_package_relationship_to_new_part ... ok
+test source_backed::tests::topology_signed_part_noop_copies_and_mutation_refuses_before_output ... ok
+test source_backed::tests::topology_signed_noop_copies_and_mutation_refuses_before_output ... ok
+test source_backed::tests::topology_replaces_and_removes_external_relationships ... ok
+test source_backed::tests::validation_archive_index_preserves_raw_source_io_errors ... ok
+test source_backed::tests::topology_internal_replace_requires_and_preserves_internal_mode ... ok
+test source_backed::tests::topology_relationship_publication_honors_configured_reopen_limits ... ok
+test source_backed::tests::try_cache_diagnostics_matches_compatibility_snapshot_when_healthy ... ok
+test source_backed::tests::unmanaged_exact_source_publication_remains_unbudgeted ... ok
+test source_backed::tests::validation_catalog_preserves_raw_source_io_errors ... ok
+test source_backed::tests::topology_zip64_add_remove_preserves_untouched_records_and_tail ... ok
+test source_backed::tests::zip64_one_part_overlay_preserves_raw_unknown_members_and_cold_work ... ok
+test sign::tests::verifies_real_poi_and_microsoft_office_fixtures ... ok
+test pkgwriter::tests::package_relationship_edit_regenerates_using_raw_source_name ... ok
+test pkgwriter::tests::adding_relationship_member_to_existing_part_preserves_and_appends ... ok
+test pkgwriter::tests::revoked_noop_uses_preservation_copy_all ... ok
+test source_backed::tests::managed_open_omits_casefold_lookup_index_and_keeps_linear_fallback ... ok
+test pkgwriter::tests::projected_zip64_descriptor_targeted_save_preserves_untouched_member ... ok
+test pkgwriter::tests::non_suffix_part_and_relationship_removals_preserve_retained_members ... ok
+test pkgwriter::tests::unsupported_owned_source_revoked_noop_refuses_before_output ... ok
+test pkgwriter::tests::unsupported_prefixed_source_refuses_normalization_before_output ... ok
+test pkgwriter::tests::targeted_relationship_and_content_type_changes_regenerate_only_their_closure ... ok
+test pkgwriter::tests::zip64_source_targeted_save_preserves_untouched_records_and_tail ... ok
+test pkgwriter::tests::trailing_source_bytes_refuse_normalization_before_targeted_preservation ... ok
+test pkgwriter::tests::zip64_targeted_stream_failure_reports_partial_output ... ok
+test pkgwriter::tests::topology_part_add_preserves_source_and_appends_deterministic_members ... ok
+test pkgwriter::tests::appended_suffix_removal_restores_exact_source_bytes ... ok
+test source_backed::tests::casefold_lookup_index_is_retained_at_measured_large_catalog_threshold ... ok
+test pkgwriter::tests::targeted_part_mutation_raw_copies_every_other_member ... ok
+test pkgwriter::tests::targeted_streaming_keeps_generated_writes_bounded ... ok
+test pkgwriter::tests::targeted_partial_sink_failure_reports_accepted_bytes ... ok
+test source_backed::tests::concurrent_cold_reads_share_one_archive_load_and_one_arc ... ok
+test source_backed::tests::managed_same_part_waiters_share_one_reservation_and_flight ... ok
+test source_backed::tests::managed_waiter_cancellation_does_not_block_or_publish_loader_payload ... ok
+test source_backed::tests::multi_part_relationship_removal_has_exact_and_one_over_aggregate_bounds ... ok
+test pkgwriter::tests::streams_large_packages_to_a_non_seekable_bounded_chunk_sink ... ok
+test source_backed::tests::topology_add_at_zip32_entry_count_boundary_promotes_source_backed_source ... ok
+test pkgwriter::tests::topology_add_at_zip32_entry_count_boundary_promotes_owned_source ... ok
+
+test result: ok. 325 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.14s
+
+     Running tests/digital_signatures.rs (target/debug/deps/digital_signatures-c8a39ef9373a38d0)
+
+running 2 tests
+test digital_signature_mutable_opc_access_drops_stale_signatures ... ok
+test digital_signature_accessors_verify_real_microsoft_packages ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/external_zip64_source.rs (target/debug/deps/external_zip64_source-f57bcc3a37930887)
+
+running 1 test
+test independent_zip64_source_metadata_and_small_xml_edit_preserve_large_member ... ignored, requires an independently generated corpus at LITCHI_0415_PYTHON_ZIP
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/non_part_classification.rs (target/debug/deps/non_part_classification-d27ca84c0fb5fe20)
+
+running 8 tests
+test rejects_multiple_case_equivalent_content_types_members ... ok
+test reports_members_whose_names_cannot_denote_a_part ... ok
+test accepts_the_content_types_stream_under_a_case_variant_name ... ok
+test rejects_referenced_part_without_content_type_mapping ... ok
+test a_part_resolves_when_its_stored_name_differs_only_by_case ... ok
+test reports_unreferenced_untyped_member_without_losing_the_real_parts ... ok
+test keeps_dangling_relationships_without_inventing_their_target_part ... ok
+test types_relationship_parts_from_the_reserved_name_but_rejects_contradictions ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/operation_accounting.rs (target/debug/deps/operation_accounting-b388bd4bbc20b88b)
+
+running 13 tests
+test crc_failure_keeps_the_cold_read_counters_and_does_not_cache ... ok
+test exact_source_partial_sink_preserves_checked_progress ... ok
+test exact_source_publication_reports_actual_raw_and_output_acceptance ... ok
+test repeated_streaming_repeats_physical_work_without_cache_hits ... ok
+test changed_overlay_partial_sink_keeps_raw_and_output_progress ... ok
+test streaming_bypasses_cache_and_data_remains_cold ... ok
+test deflate_crc_failure_retains_accounting_and_retries_physical_work ... ok
+test cold_stored_and_deflated_part_reads_are_accounted_but_cache_hits_are_not ... ok
+test streamed_stored_and_deflated_parts_are_accounted_without_cache_materialization ... ok
+test streamed_partial_sink_preserves_physical_and_output_accounting ... ok
+test same_flight_loader_owns_physical_accounting ... ok
+test singular_changed_overlay_distinguishes_raw_and_generated_payloads ... ok
+test singular_exact_noop_overlay_accounts_raw_publication_and_cache_selection ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/package_catalog_probe.rs (target/debug/deps/package_catalog_probe-2ff352c2a67f8a4e)
+
+running 5 tests
+test reader_failure_restores_the_cursor_without_fabricating_a_catalog ... ok
+test malformed_probe_is_an_unknown_catalog_error_and_restores_the_cursor ... ok
+test default_probe_reads_zip_metadata_and_structural_members_only ... ok
+test probe_limit_errors_are_typed_and_restore_the_cursor ... ok
+test limited_probe_matches_eager_and_source_catalog_semantics ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/phys_pkg_borrowed.rs (target/debug/deps/phys_pkg_borrowed-363fa546b52466fd)
+
+running 8 tests
+test phys_pkg_borrowed_missing_part_is_typed_error ... ok
+test phys_pkg_borrowed_deflate_returns_none_and_owned_blob_is_exact ... ok
+test phys_pkg_borrowed_slice_lifetime_tracks_input_source ... ok
+test phys_pkg_borrowed_enforces_part_limit_without_materialization_charge ... ok
+test phys_pkg_borrowed_normalizes_pack_uri_to_zip_member_name ... ok
+test phys_pkg_borrowed_store_returns_source_slice_with_identity ... ok
+test phys_pkg_borrowed_rejects_corrupt_stored_payload_and_crc ... ok
+test phys_pkg_borrowed_rejects_encrypted_store_and_deflate ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_backed_path.rs (target/debug/deps/source_backed_path-2e8ccc226214d0e4)
+
+running 3 tests
+test path_default_catalog_and_selected_data_match_from_vec_without_eager_unselected_read ... ok
+test path_source_reports_external_change_without_retargeting_or_stale_hydration ... ok
+test path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_limits ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_backed_reader.rs (target/debug/deps/source_backed_reader-7dd34af374e04d19)
+
+running 6 tests
+test reader_ingress_rejects_invalid_read_count_without_panicking ... ok
+test reader_ingress_rejects_input_above_max_input_bytes ... ok
+test reader_ingress_retries_one_interrupted_read ... ok
+test reader_ingress_consumes_once_and_keeps_ordinary_payloads_cold ... ok
+test stream_to_keeps_raw_source_and_sink_io_errors_typed ... ok
+test indexed_archive_limits_remain_typed_for_vec_and_read_at_ingress ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source_backed_topology.rs (target/debug/deps/source_backed_topology-401bff85360bd75c)
+
+running 37 tests
+test managed_cancellation_before_topology_publication_writes_nothing ... ok
+test empty_topology_plan_is_an_exact_source_copy ... ok
+test empty_overlay_and_deletion_batch_is_an_exact_source_copy ... ok
+test topology_plan_rejects_duplicate_and_invalid_relationship_requests ... ok
+test malformed_exact_replacement_is_a_byte_exact_noop ... ok
+test signed_part_deletion_is_refused_before_sink_write ... ok
+test noncanonical_existing_relationships_are_refused_before_output ... ok
+test deletion_preserves_untouched_raw_records_and_compressed_payload_bytes ... ok
+test topology_plan_has_a_finite_exact_and_one_over_part_bound ... ok
+test deletion_does_not_rewrite_content_types_or_relationships ... ok
+test one_existing_part_can_be_deleted_without_affecting_reopenable_package ... ok
+test topology_addition_of_signature_content_type_spoof_is_refused_before_output ... ok
+test case_equivalent_physical_names_refuse_changed_publication ... ok
+test replacement_and_deletion_are_published_in_one_sequential_output ... ok
+test raw_signature_non_part_materialization_is_owned_mutation_locked ... ok
+test topology_publication_refuses_an_encrypted_entry_before_writing ... ok
+test signed_exact_noop_replacement_is_byte_exact_but_topology_change_is_refused ... ok
+test noncanonical_content_types_are_preserved_while_new_overrides_are_sorted ... ok
+test topology_publication_reports_sink_failures_with_partial_output_state ... ok
+test topology_addition_of_signature_relationship_or_target_is_refused_before_output ... ok
+test existing_canonical_relationships_are_regenerated_with_new_relationships ... ok
+test topology_publication_reports_incomplete_output_after_partial_sink_progress ... ok
+test topology_publish_rejects_invalid_xml_and_part_byte_limits_before_output ... ok
+test orphan_non_part_signature_member_is_mutation_locked ... ok
+test missing_duplicate_equivalent_and_overlapping_deletions_fail_before_sink_write ... ok
+test topology_publish_refuses_collisions_dangling_targets_and_duplicate_existing_ids ... ok
+test signature_content_type_spoof_is_mutation_locked ... ok
+test case_and_nested_signature_member_paths_are_mutation_locked ... ok
+test case_equivalent_relationship_owners_group_once_and_refuse_duplicate_ids ... ok
+test topology_output_is_deterministic_and_reopens_after_repeated_publication ... ok
+test topology_addition_of_root_signature_part_is_refused_before_output ... ok
+test topology_publication_refuses_trailing_data_before_writing ... ok
+test unsigned_source_empty_topology_plan_remains_an_exact_copy ... ok
+test topology_remove_part_refuses_dangling_inbound_relationship_before_output ... ok
+test topology_remove_part_detaches_inbound_relationship_and_omits_owned_members ... ok
+test untouched_zip_records_retain_extras_comments_and_payload_records ... ok
+test topology_publish_replaces_adds_and_links_parts_atomically ... ok
+
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/tolerated_archive_junk.rs (target/debug/deps/tolerated_archive_junk-9bbd265c43fcac54)
+
+running 4 tests
+test dangling_relationship_target_leaves_the_rest_of_the_document_intact ... ok
+test excel_trash_folder_does_not_block_the_workbook ... ok
+test ds_store_does_not_block_the_document ... ok
+test content_types_stream_stored_under_a_case_variant_name_still_opens ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/validation.rs (target/debug/deps/validation-4094320099b50625)
+
+running 13 tests
+test duplicate_physical_entries_are_reported_as_structural_rejection ... ok
+test physical_relationship_part_limits_belong_to_catalog_admission ... ok
+test macro_payload_is_inert_and_not_claimed_as_a_validation_capability ... ok
+test report_limits_are_fallible_errors_not_unbounded_retention ... ok
+test io_and_source_change_failures_remain_errors ... ok
+test relationship_part_source_topology_belongs_to_catalog_admission ... ok
+test signature_presence_is_information_not_signature_validity ... ok
+test loaded_relationship_capability_includes_admitted_unreferenced_parts ... ok
+test malformed_content_types_and_relationships_are_conclusive_issues ... ok
+test zip_and_relationship_ceilings_are_blocked_without_issues ... ok
+test parser_errors_and_invalid_uris_keep_exact_manifest_phase ... ok
+test shared_xml_limits_keep_content_type_and_relationship_phase ... ok
+test valid_catalog_is_complete_deterministic_and_does_not_read_payload ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/extract_part.rs (target/debug/examples/extract_part-c0e703760e3a1167)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/inspect_package.rs (target/debug/examples/inspect_package-16951e19a823a262)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/pack_uri_demo.rs (target/debug/examples/pack_uri_demo-0d6ae23a9914ad25)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/write_package.rs (target/debug/examples/write_package-37c9d1cfe05d1e8c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/soapberry_zip-3b0e2531d1986b26)
+
+running 381 tests
+test archive::tests::central_zip64_extra_resolves_sentinels_and_returns_offset_field_range ... ok
+test archive::tests::central_zip64_extra_rejects_duplicate_truncated_and_missing_values ... ok
+test accounting::tests::counted_writes_charge_only_accepted_bytes ... ok
+test accounting::tests::every_accounting_counter_add_reports_typed_overflow ... ok
+test archive::tests::central_zip64_offset_range_tracks_variable_raw_file_names ... ok
+test archive::tests::complete_descriptor_requires_zip64_width_for_zip64_size_sentinels ... ok
+test archive::tests::blank_zip_archive ... ok
+test archive::tests::complete_descriptor_uses_archive_zip64_context_without_changing_zip32_empty_entries ... ok
+test archive::tests::central_zip64_offset_range_skips_preceding_extra_fields ... ok
+test archive::tests::complete_descriptor_rejects_ambiguous_signature ... ok
+test archive::tests::complete_descriptor_rejects_malformed_and_ambiguous_width_candidates ... ok
+test archive::tests::strict_verification_compares_a_zero_crc ... ok
+test archive::tests::strict_layout_rejects_nonzero_mismatching_zip64_local_sizes ... ok
+test archive::tests::strict_layout_accepts_zero_zip64_local_placeholders_and_checks_descriptor ... ok
+test archive::tests::trunc_comment_zips ... ok
+test archive::tests::strict_layout_accepts_archive_zip64_descriptors_at_reader_boundaries ... ok
+test archive::tests::trunc_eocd64 ... ok
+test archive::tests::test_compressed_data_range ... ok
+test archive::tests::trunc_eocd_entry ... ok
+test crc::tests::test_crc ... ok
+test errors::tests::allocation_error_retains_original_try_reserve_source ... ok
+test archive::tests::verifier_wrappers_reject_overreported_reads_without_panicking ... ok
+test extra_fields::tests::test_partial_parsing_with_remaining_bytes ... ok
+test extra_fields::tests::test_extra_fields ... ok
+test extra_fields::tests::test_stack_vec_clone ... ok
+test extra_fields::tests::test_stack_vec_size_constraints ... ok
+test extra_fields::tests::test_stack_vec_u8_inline_operations ... ok
+test extra_fields::tests::test_stack_vec_u8_promote_to_heap ... ok
+test extra_fields::tests::test_unknown_field_id ... ok
+test headers::tests::test_header_bitflags_behavior ... ok
+test headers::tests::test_header_default ... ok
+test locator::tests::classic_eocd_rejects_mismatched_entry_counts ... ok
+test locator::tests::classic_eocd_zip64_detection_covers_each_count_size_and_offset_sentinel ... ok
+test locator::tests::classic_eocd_rejects_nonzero_disk_metadata ... ok
+test locator::tests::explicit_end_offset_preserves_archives_with_suffixes ... ok
+test locator::tests::explicit_end_offset_preserves_the_first_of_concatenated_archives ... ok
+test locator::tests::insufficient_search_space_uses_the_existing_search_path ... ok
+test locator::tests::fallback_rejects_ambiguous_valid_zip64_records_in_slice_and_reader ... ok
+test locator::tests::false_multidisk_hinted_record_does_not_mask_the_real_record ... ok
+test locator::tests::malformed_terminal_eocd_returns_the_existing_error_offset_without_rescanning ... ok
+test locator::tests::oversized_search_space_remains_bounded_by_the_source_without_panicking ... ok
+test locator::tests::opaque_embedded_zip64_signature_is_ignored_by_bounded_fallback ... ok
+test locator::tests::parseable_nonadjacent_hinted_record_falls_back_to_the_real_record ... ok
+test locator::tests::reader_zip64_rejects_nonzero_locator_disk_metadata ... ok
+test locator::tests::short_buffer_uses_the_existing_search_path ... ok
+test locator::tests::slice_locator_rejects_central_directory_range_past_eocd_without_panicking ... ok
+test locator::tests::prefixed_zip64_extensible_record_uses_checked_variable_size ... ok
+test locator::tests::terminal_comment_falls_back_to_backward_search ... ok
+test locator::tests::terminal_zero_comment_eocd_probe_reads_only_the_fixed_record_first ... ok
+test locator::tests::terminal_zip64_eocd_falls_back_to_backward_search ... ok
+test locator::tests::terminal_zip64_eocd_with_short_buffer_never_panics ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_01 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_02 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_03 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_04 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_05 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_06 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_07 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_08 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_09 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_10 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_11 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_12 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_13 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_14 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_15 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_16 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_17 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_18 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_19 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_20 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_21 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_22 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_23 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_24 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_25 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_26 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_27 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_28 ... ok
+test locator::tests::test_find_end_of_central_dir_signature_cases::case_29 ... ok
+test locator::tests::zip64_central_directory_must_end_at_or_before_the_zip64_eocd ... ok
+test locator::tests::zip64_archive_accepts_prefix_and_suffix_in_slice_and_reader ... ok
+test locator::tests::zip64_central_directory_range_overflow_is_a_typed_rejection ... ok
+test locator::tests::zip64_empty_archive_preserves_a_zero_eocd_offset ... ok
+test locator::tests::zip64_eocd_rejects_invalid_record_length ... ok
+test locator::tests::zip64_eocd_rejects_mismatched_entry_counts ... ok
+test locator::tests::zip64_eocd_rejects_nonadjacent_locator ... ok
+test locator::tests::zip64_eocd_rejects_nonzero_disk_metadata ... ok
+test locator::tests::zip64_invalid_offset_is_rejected_before_reader_access ... ok
+test locator::tests::zip64_locator_disk_metadata_precedes_invalid_offset ... ok
+test locator::tests::zip64_locator_rejects_non_single_disk_metadata ... ok
+test locator::tests::test_find_end_of_central_dir_signature ... ok
+test locator::tests::zip64_partial_classic_sentinels_resolve_through_the_zip64_record ... ok
+test office::tests::accepts_exact_and_rejects_over_aggregate_uncompressed_limits ... ok
+test office::tests::accepts_exact_and_rejects_over_file_count_limits ... ok
+test office::tests::accounted_stream_rejects_source_overreport_without_progress ... ok
+test office::tests::accepts_exact_and_rejects_over_uncompressed_entry_limits ... ok
+test office::tests::accounted_stream_retries_interrupted_source_and_sink ... ok
+test office::tests::borrowed_store_accepts_valid_local_zip64_size_extra ... ok
+test locator::tests::test_find_end_of_central_dir_signature_random ... ok
+test office::tests::borrowed_store_defers_zip64_eocd_to_owned_fallback ... ok
+test office::tests::borrowed_store_returns_none_for_nonempty_zero_crc_even_when_payload_is_corrupt ... ok
+test office::tests::archive_lookups_apply_the_same_normalization_as_ingress ... ok
+test office::tests::borrowed_store_refuses_overlapping_local_spans ... ok
+test office::tests::borrowed_store_refuses_an_overlapping_non_target_span ... ok
+test office::tests::cancellation_discards_batch_results_and_does_not_publish_lazy_cache_entries ... ok
+test office::tests::archive_readers_reject_lossy_utf8_name_collisions ... ok
+test office::tests::consuming_entry_writer_preserves_limits_and_poison_progress ... ok
+test office::tests::borrowed_store_validates_descriptors_after_a_nonzero_prelude ... ok
+test office::tests::borrowed_store_rejects_payload_corruption_with_a_nonzero_crc ... ok
+test office::tests::archive_read_session_recovers_after_store_and_unsupported_failures ... ok
+test office::tests::bounded_output_rejects_sink_overreport_before_progress_accounting ... ok
+test office::tests::archive_readers_reject_lossy_names_colliding_with_valid_replacement_names ... ok
+test office::tests::archive_readers_normalize_lossy_utf8_names_for_lookup ... ok
+test office::tests::consuming_entry_writer_retains_nested_sink_source ... ok
+test office::tests::consuming_entry_writer_reports_sink_failure_during_descriptor_finish ... ok
+test office::tests::consuming_entry_writer_recovers_bounded_archive_for_both_methods ... ok
+test office::tests::consuming_entry_writer_enforces_store_compressed_and_aggregate_boundaries ... ok
+test office::tests::consuming_entry_writer_enforces_deflate_and_output_exact_boundaries ... ok
+test office::tests::archive_read_session_reuses_deflate_state_with_accounting_parity ... ok
+test office::tests::borrowed_store_rejects_corrupt_descriptor_crc_and_sizes ... ok
+test office::tests::deflate_overrun_keeps_size_error_before_accounting_overflow ... ok
+test office::tests::directories_consume_metadata_but_not_payload_or_file_budgets ... ok
+test office::tests::callback_scoped_reader_defers_invalid_consume_and_retries_interrupts ... ok
+test office::tests::consuming_entry_writer_preflights_raw_names_and_drops_incomplete_publication ... ok
+test office::tests::consuming_entry_writer_rejects_duplicate_before_header_and_handles_short_sink ... ok
+test office::tests::accounting_preserves_partial_deflate_sink_progress ... ok
+test office::tests::enforces_compressed_member_limit_before_data_access ... ok
+test office::tests::enforces_member_name_limit_at_the_declared_boundary ... ok
+test office::tests::generated_central_zip64_extra_size_matches_size_and_offset_fields ... ok
+test office::tests::archive_readers_reject_duplicate_directories_and_file_directory_collisions ... ok
+test office::tests::accounting_distinguishes_store_deflate_and_lazy_cache_work ... ok
+test office::tests::indexed_archive_applies_zip64_sizes_from_one_located_archive ... ok
+test office::tests::borrowed_store_validates_signed_and_unsigned_descriptors_and_preserves_identity ... ok
+test office::tests::equal_local_header_offsets_keep_existing_reader_ordering ... ok
+test office::tests::deflate_borrowing_returns_none_and_owned_read_remains_available ... ok
+test office::tests::callback_scoped_reader_drains_after_prefix_and_callback_error ... ok
+test office::tests::indexed_archive_borrows_a_preservation_index_with_exact_raw_names ... ok
+test office::tests::archive_read_session_resets_after_declared_size_overrun_and_underrun ... ok
+test office::tests::indexed_archive_defers_crc_validation_until_payload_read ... ok
+test office::tests::indexed_and_lazy_read_to_stream_without_cache_population ... ok
+test office::tests::encrypted_deflate_borrowing_is_rejected_before_ineligible_fallback ... ok
+test office::tests::eager_bulk_reads_preserve_source_order_and_all_member_errors ... ok
+test office::tests::borrowed_store_rejects_local_central_metadata_mismatches ... ok
+test office::tests::indexed_read_to_supports_zip64_member_metadata_and_short_writes ... ok
+test office::tests::callback_scoped_reader_retains_callback_error_on_archive_failure ... ok
+test office::tests::indexed_archive_retains_the_located_archive_end_without_rescanning ... ok
+test office::tests::indexed_archive_can_use_an_explicit_local_session ... ok
+test office::tests::lazy_active_flight_limit_bypasses_and_recovers ... ok
+test office::tests::lazy_cache_limits_reject_zero_capacity ... ok
+test office::tests::indexed_archive_reads_stored_and_deflated_members_by_stable_id ... ok
+test office::tests::lazy_cache_limits_bound_weight_and_entries_with_exact_lru ... ok
+test office::tests::lazy_cache_skips_oversized_and_externally_pinned_payloads ... ok
+test office::tests::archive_read_session_resets_after_crc_and_corrupt_deflate_failures ... ok
+test office::tests::lazy_bulk_reads_propagate_errors_and_cache_only_successes ... ok
+test office::tests::lazy_flight_key_limit_is_typed_and_does_not_retain_state ... ok
+test office::tests::indexed_archive_rejects_duplicate_normalized_names_and_limits ... ok
+test office::tests::indexed_read_to_reports_typed_crc_failure_for_data_descriptor ... ok
+test office::tests::lazy_cache_take_fences_old_flights_and_wakes_waiters ... ok
+test office::tests::lazy_cache_uses_canonical_member_names_and_clear_fences_flights ... ok
+test office::tests::lazy_read_returns_fresh_vec_while_shared_reads_preserve_arc ... ok
+test office::tests::indexed_read_session_resets_after_declared_size_overrun_and_underrun ... ok
+test office::tests::metadata_lookup_uses_only_the_central_directory_index ... ok
+test office::tests::local_session_uses_its_explicit_worker_count ... ok
+test office::tests::indexed_strict_streams_reuse_the_bounded_layout_path ... ok
+test office::tests::indexed_read_session_reuses_deflate_state_with_accounting_parity ... ok
+test office::tests::owned_stream_output_rejects_duplicate_normalized_names_before_header ... ok
+test office::tests::lazy_serial_shared_batch_reuses_session_and_preserves_cache_identity ... ok
+test office::tests::owned_stream_output_accepts_short_non_seek_writes ... ok
+test office::tests::lazy_serial_shared_batch_bypasses_full_flight_budget_and_recovers ... ok
+test office::tests::owned_stream_entries_preserve_order_crc_and_descriptor_metadata ... ok
+test office::tests::indexed_read_to_reports_source_and_zero_progress_sink_errors ... ok
+test office::tests::indexed_archive_bounds_directory_metadata_before_layout_publication ... ok
+test office::tests::owned_stream_deflate_limit_applies_to_compressed_bytes_not_input_bytes ... ok
+test office::tests::indexed_strict_first_read_uses_one_single_flight_builder ... ok
+test office::tests::callback_scoped_reader_streams_store_and_deflate_with_fixed_reads ... ok
+test office::tests::enforces_aggregate_central_directory_metadata_limit ... ok
+test office::tests::lazy_serial_shared_batch_recovers_after_a_failed_cold_member ... ok
+test office::tests::local_sessions_with_one_two_and_four_workers_preserve_results_and_order ... ok
+test office::tests::pre_cancelled_session_reads_no_member_and_does_not_populate_lazy_cache ... ok
+test office::tests::owned_stream_output_reports_failing_sink_after_partial_output ... ok
+test office::tests::indexed_strict_zero_crc_handles_store_deflate_and_empty_members ... ok
+test office::tests::prefixed_zip64_uses_locator_resolved_central_size ... ok
+test office::tests::owned_stream_output_handles_interrupted_and_source_errors_with_poisoning ... ok
+test office::tests::owned_stream_output_is_deterministic_and_rejects_unsupported_methods_early ... ok
+test office::tests::owned_stream_output_enforces_exact_and_one_over_byte_limits ... ok
+test office::tests::owned_stream_output_enforces_finite_metadata_limits ... ok
+test office::tests::parallel_session_limits_are_finite_and_validated ... ok
+test office::tests::owned_stream_output_reports_write_zero_and_rejects_post_failure_finish ... ok
+test office::tests::positional_iterator_continues_from_ordinary_record_to_oversized_record ... ok
+test office::tests::positional_iterator_continues_from_oversized_record_to_ordinary_record ... ok
+test office::tests::lazy_missing_name_flight_wakes_waiter_and_releases_budget ... ok
+test office::tests::owned_stream_output_enforces_compressed_member_limits ... ok
+test office::tests::lazy_shared_failed_flight_wakes_waiters_and_allows_retry ... ok
+test office::tests::rejects_aggregate_uncompressed_size_overflow ... ok
+test office::tests::rejects_malformed_central_directory_variable_declarations ... ok
+test office::tests::materialized_reads_reject_truncated_and_overlong_store_and_deflate_members ... ok
+test office::tests::prefixed_positional_archive_applies_base_offset_to_oversized_records ... ok
+test office::tests::indexed_read_session_resets_after_crc_and_corrupt_deflate_failures ... ok
+test office::tests::read_to_retains_typed_integrity_errors_and_sink_failures ... ok
+test office::tests::streaming_limits_reject_oversized_member_name_before_output ... ok
+test office::tests::rejects_inflated_entry_count_before_reserving_across_central_gap ... ok
+test office::tests::preservation_ids_follow_central_records_not_office_entry_ordinals ... ok
+test office::tests::rejects_archives_exceeding_configured_resource_limits ... ok
+test office::tests::strict_read_to_accepts_prefix_and_rejects_span_intrusion_before_sink ... ok
+test office::tests::streaming_zip64_metadata_budget_includes_generated_central_extra ... ok
+test office::tests::sized_deflated_members_declare_upfront_sizes_without_a_data_descriptor ... ok
+test office::tests::streaming_zip64_admission_selects_framing_for_borrowed_and_owned_entries ... ok
+test office::tests::test_round_trip_stored ... ok
+test office::tests::strict_read_to_rejects_target_metadata_before_sink ... ok
+test path::tests::test_needs_utf8_encoding::case_01 ... ok
+test path::tests::test_needs_utf8_encoding::case_02 ... ok
+test path::tests::test_needs_utf8_encoding::case_03 ... ok
+test office::tests::unrelated_encrypted_store_does_not_block_an_unencrypted_target ... ok
+test path::tests::test_needs_utf8_encoding::case_04 ... ok
+test office::tests::truncated_oversized_variable_section_returns_typed_eof ... ok
+test path::tests::test_needs_utf8_encoding::case_05 ... ok
+test path::tests::test_needs_utf8_encoding::case_06 ... ok
+test path::tests::test_needs_utf8_encoding::case_07 ... ok
+test path::tests::test_needs_utf8_encoding::case_08 ... ok
+test office::tests::test_round_trip_deflated ... ok
+test path::tests::test_needs_utf8_encoding::case_09 ... ok
+test path::tests::test_needs_utf8_encoding::case_10 ... ok
+test path::tests::test_needs_utf8_encoding::case_11 ... ok
+test office::tests::strict_read_to_rejects_target_encryption_but_ignores_unrelated_encryption ... ok
+test office::tests::test_multiple_files ... ok
+test path::tests::test_needs_utf8_encoding::case_12 ... ok
+test path::tests::test_needs_utf8_encoding::case_13 ... ok
+test office::tests::strict_read_to_rejects_deflate_trailing_bytes_after_sink_prefix ... ok
+test path::tests::test_needs_utf8_encoding::case_14 ... ok
+test path::tests::test_needs_utf8_encoding::case_15 ... ok
+test path::tests::test_needs_utf8_encoding::case_19 ... ok
+test path::tests::test_needs_utf8_encoding::case_16 ... ok
+test path::tests::test_needs_utf8_encoding::case_20 ... ok
+test office::tests::sized_deflated_limit_breach_leaves_the_writer_usable ... ok
+test path::tests::test_needs_utf8_encoding::case_17 ... ok
+test path::tests::test_needs_utf8_encoding::case_21 ... ok
+test path::tests::test_needs_utf8_encoding::case_22 ... ok
+test path::tests::test_needs_utf8_encoding::case_24 ... ok
+test path::tests::test_needs_utf8_encoding::case_25 ... ok
+test path::tests::test_needs_utf8_encoding::case_23 ... ok
+test path::tests::test_needs_utf8_encoding::case_28 ... ok
+test path::tests::test_needs_utf8_encoding::case_26 ... ok
+test path::tests::test_needs_utf8_encoding::case_27 ... ok
+test path::tests::test_needs_utf8_encoding::case_29 ... ok
+test path::tests::test_needs_utf8_encoding::case_30 ... ok
+test path::tests::test_needs_utf8_encoding::case_18 ... ok
+test path::tests::test_needs_utf8_encoding::case_31 ... ok
+test path::tests::test_needs_utf8_encoding::case_32 ... ok
+test path::tests::test_path_lifetime_test ... ok
+test path::tests::test_raw_path_lifetime_preservation ... ok
+test office::tests::strict_verified_paths_reject_nonempty_zero_crc_and_accept_empty ... ok
+test path::tests::test_zip_path_normalized::case_01 ... ok
+test path::tests::test_zip_path_normalized::case_02 ... ok
+test office::tests::read_to_rejects_truncated_and_overlong_store_and_deflate_members ... ok
+test path::tests::test_zip_path_normalized::case_03 ... ok
+test path::tests::test_zip_path_normalized::case_04 ... ok
+test path::tests::test_zip_path_normalized::case_05 ... ok
+test office::tests::indexed_strict_layout_accepts_prefix_and_gaps_and_rejects_store_deflate_spans ... ok
+test path::tests::test_zip_path_normalized::case_06 ... ok
+test path::tests::test_zip_path_normalized::case_07 ... ok
+test path::tests::test_zip_path_normalized::case_09 ... ok
+test path::tests::test_zip_path_normalized::case_08 ... ok
+test path::tests::test_zip_path_normalized::case_10 ... ok
+test path::tests::test_zip_path_normalized::case_11 ... ok
+test path::tests::test_zip_path_normalized::case_13 ... ok
+test path::tests::test_zip_path_normalized::case_12 ... ok
+test path::tests::test_zip_path_normalized::case_14 ... ok
+test path::tests::test_zip_path_normalized::case_15 ... ok
+test path::tests::test_zip_path_normalized::case_16 ... ok
+test path::tests::test_zip_path_normalized::case_17 ... ok
+test path::tests::test_zip_path_normalized::case_18 ... ok
+test path::tests::test_zip_path_normalized::case_19 ... ok
+test path::tests::test_zip_path_normalized_invalid_utf8::case_1 ... ok
+test path::tests::test_zip_path_normalized_invalid_utf8::case_2 ... ok
+test office::tests::positional_index_handles_central_records_larger_than_recommended_scratch ... ok
+test preserve::tests::bounded_preservation_keeps_non_metadata_error_identity ... ok
+test preserve::tests::bounded_preservation_rejects_file_count_before_owned_entry_reservation ... ok
+test preserve::tests::bounded_preservation_includes_eocd_comment_in_metadata_and_unbounded_is_exact ... ok
+test preserve::tests::bounded_preservation_reports_member_and_metadata_limits_before_ownership ... ok
+test preserve::tests::accounting_counts_exact_raw_preservation_and_partial_sink_progress ... ok
+test preserve::tests::bounded_preservation_counts_files_not_directory_records ... ok
+test preserve::tests::copies_zip64_central_extras_and_tail_extensible_data_byte_for_byte ... ok
+test preserve::tests::generated_deflate_zip64_selector_covers_compression_boundaries ... ok
+test office::tests::read_to_streams_stored_and_deflated_members_with_short_writes ... ok
+test preserve::tests::accounting_charges_generated_payloads_on_partial_publication ... ok
+test preserve::tests::generated_deflate_zip64_selector_handles_usize_max_without_bound_overflow ... ok
+test preserve::tests::empty_archive_prefix_is_refused_before_publication ... ok
+test preserve::tests::copies_store_deflate_descriptor_and_directory_members_byte_for_byte ... ok
+test preserve::tests::accounting_distinguishes_changed_store_and_deflate_members ... ok
+test preserve::tests::copy_all_reads_each_local_span_once_during_write ... ok
+test preserve::tests::copies_zip64_sources_byte_for_byte_including_tail ... ok
+test preserve::tests::fallible_plan_reservations_and_preparation_errors_leave_sink_untouched ... ok
+test preserve::tests::layout_promotion_synthesizes_zip64_tail_without_sink_output ... ok
+test preserve::tests::exposes_compression_methods_and_excludes_trailing_source_suffix ... ok
+test preserve::tests::appends_store_and_deflate_members_after_preserved_source_order ... ok
+test preserve::tests::preserves_archive_comments_and_different_local_central_metadata ... ok
+test preserve::tests::promotes_fixed32_central_offsets_before_tail_and_retains_metadata ... ok
+test preserve::tests::regenerated_entry_can_retain_a_shared_payload ... ok
+test preserve::tests::public_policy_preserves_projected_zip64_descriptor_before_publication ... ok
+test preserve::tests::preserves_unsigned_data_descriptors ... ok
+test preserve::tests::preserves_physical_local_order_when_central_order_differs ... ok
+test preserve::tests::rejects_ambiguous_malformed_multidisk_and_truncated_zip64_sources ... ok
+test office::tests::indexed_strict_stream_validates_tiny_zip64_descriptors_and_resolution ... ok
+test preserve::tests::central_offset_promotion_rejects_ambiguous_or_unrepresentable_extras ... ok
+test preserve::tests::rejects_malformed_descriptor_at_exact_payload_end_before_writing ... ok
+test preserve::tests::rejects_fixed32_offsets_after_zip64_output_grows_past_their_range ... ok
+test preserve::tests::regenerating_a_zip64_member_keeps_zip64_framing ... ok
+test preserve::tests::non_sentinel_classic_zip64_fields_must_match_resolved_values ... ok
+test preserve::tests::public_policy_preserves_zip64_while_internal_zip32_policy_refuses_it ... ok
+test preserve::tests::rejects_reader_valid_zip64_local_and_disk_malformed_sources ... ok
+test preserve::tests::omitting_a_middle_source_member_reopens_and_preserves_retained_raw_records ... ok
+test preserve::tests::incomplete_or_unrepresentable_append_plan_leaves_sink_untouched ... ok
+test preserve::tests::regenerates_a_selected_member_with_writer_semantics ... ok
+test preserve::tests::zip64_incomplete_plan_leaves_sink_untouched ... ok
+test preserve::tests::shifted_zip64_local_offsets_patch_only_existing_zip64_values ... ok
+test reader_at::tests::byte_slice_u64_max_offset_is_eof ... ok
+test preserve::tests::propagates_sink_failure_after_preflight ... ok
+test preserve::tests::validates_signed_and_unsigned_32_and_64_descriptors_at_payload_end_with_decoy ... ok
+test reader_at::tests::reader_at_wrappers_reject_overreported_reads_without_panicking ... ok
+test preserve::tests::zip64_metadata_limit_reports_aggregate_comment_and_extension ... ok
+test reader_at::tests::test_byte_slice_implementation ... ok
+test reader_at::tests::test_cursor_implementation ... ok
+test reader_at::tests::test_range_reader_empty_range ... ok
+test reader_at::tests::test_range_reader_get_ref_and_into_inner ... ok
+test reader_at::tests::test_range_reader_multiple_reads ... ok
+test preserve::tests::rejects_overlapping_and_truncated_source_spans_before_writing ... ok
+test reader_at::tests::test_range_reader_range_exceeds_data ... ok
+test preserve::tests::generated_entry_reserves_both_long_member_name_copies ... ok
+test reader_at::tests::test_reference_implementations ... ok
+test reader_at::tests::test_smart_pointer_implementations ... ok
+test reader_at::tests::test_vec_implementation ... ok
+test time::tests::test_dos_datetime_zero_normalization ... ok
+test time::tests::test_negative_unix_timestamps ... ok
+test time::property_tests::prop_ntfs_timestamp_conversion ... ok
+test time::tests::test_parse_extended_timestamp ... ok
+test reader_at::tests::test_range_reader_basic ... ok
+test reader_at::tests::test_range_reader_clone ... ok
+test time::tests::test_parse_ntfs_timestamp ... ok
+test time::tests::test_parse_unix_timestamp ... ok
+test preserve::tests::omitting_an_appended_suffix_restores_the_exact_source_archive ... ok
+test time::tests::test_to_unix_accuracy ... ok
+test time::tests::test_to_unix_comprehensive ... ok
+test time::tests::test_zip_datetime_dos ... ok
+test time::tests::test_zip_datetime_display ... ok
+test time::property_tests::prop_unix_timestamp_conversion ... ok
+test time::tests::test_days_from_civil ... ok
+test time::tests::test_zip_datetime_ordering ... ok
+test time::property_tests::prop_dos_timestamp_always_valid ... ok
+test time::tests::test_dos_datetime ... ok
+test time::tests::test_zip_datetime_unix ... ok
+test time::tests::test_zip_to_dos_conversion ... ok
+test time::tests::test_zip_to_dos_year_saturation ... ok
+test writer::tests::automatic_zip64_rejects_a_central_zip64_extra_collision ... ok
+test writer::tests::explicit_zip64_rejects_user_zip64_extra_before_local_header ... ok
+test time::tests::test_dos_datetime_edge_cases ... ok
+test writer::tests::sized_header_local_zip64_extra_carries_both_sizes ... ok
+test writer::tests::precompressed_zip64_metadata_reopens_with_a_small_payload ... ok
+test writer::tests::sized_header_zip64_sizes_use_the_sentinel_boundary ... ok
+test time::tests::test_dos_datetime_odd_seconds ... ok
+test writer::tests::precompressed_accounting_charges_partial_payload_with_provenance ... ok
+test time::tests::test_zip_datetime_ntfs ... ok
+test writer::tests::test_deprecated_create_method ... ok
+test writer::tests::test_crc32_options ... ok
+test writer::tests::explicit_zip64_owned_streaming_deflate_reopens_with_a_small_payload ... ok
+test writer::tests::explicit_zip64_streaming_deflate_reopens_with_a_small_payload ... ok
+test writer::tests::test_name_lifetime_independence ... ok
+test office::tests::indexed_strict_preflight_rejects_local_central_mismatches ... ok
+test writer::tests::accounting_distinguishes_low_level_payload_kinds ... ok
+test writer::tests::test_stream_offset_methods ... ok
+test writer::tests::test_tuple_api ... ok
+test writer::tests::streaming_counters_reject_u64_overflow_before_sink_write ... ok
+test office::tests::indexed_read_entry_to_with_accounting_uses_strict_preflight ... ok
+test writer::tests::test_builder_with_offset_and_capacity ... ok
+test writer::tests::test_owned_entry_writer_recovers_archive_for_store_and_deflate ... ok
+test writer::tests::zip32_streaming_size_boundary_refuses_before_descriptor ... ok
+test preserve::tests::replacement_then_append_patches_source_and_appended_offsets ... ok
+test preserve::tests::rejects_the_zip32_entry_count_sentinel ... ok
+test preserve::tests::generated_entry_splits_large_local_and_central_spans ... ok
+test office::tests::lazy_shared_concurrent_cold_reads_share_one_flight ... ok
+test office::tests::owned_stream_entries_handle_empty_and_large_members ... ok
+
+test result: ok. 381 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/preservation_zip64_promotion.rs (target/debug/deps/preservation_zip64_promotion-64602a97dba5d2bb)
+
+running 3 tests
+test zero_run_crc_composition_matches_direct_reference ... ok
+test unsupported_generated_compression_refuses_before_sparse_output ... ok
+test generated_store_offset_promotes_at_each_zip32_boundary ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.18s
+
+     Running tests/streaming_zip64_deflate.rs (target/debug/deps/streaming_zip64_deflate-39926e481de49e5d)
+
+running 8 tests
+test one_bounded_zero_reader_crosses_zip64_size_boundary ... ignored, bounded multi-gigabyte ZIP64 traversal; run explicitly
+test zero_crc_composition_matches_small_direct_hashes ... ok
+test owned_stream_reports_sink_failure_with_progress ... ok
+test explicit_zip64_borrowed_stream_has_64_bit_descriptor_and_reopens ... FAILED
+test generated_offset_promotes_at_below_at_and_above_zip32_boundary ... FAILED
+test output_limit_boundary_is_reported_after_entry_publication ... FAILED
+test office_owned_entry_round_trips_through_short_borrowed_sink ... ok
+test default_office_streaming_bytes_are_readable_and_accounted ... ok
+
+failures:
+
+---- explicit_zip64_borrowed_stream_has_64_bit_descriptor_and_reopens stdout ----
+
+thread 'explicit_zip64_borrowed_stream_has_64_bit_descriptor_and_reopens' (1550015) panicked at crates/soapberry-zip/tests/streaming_zip64_deflate.rs:406:39:
+called `Result::unwrap()` on an `Err` value: Custom { kind: InvalidData, error: Error { inner: ErrorInner { kind: InvalidSize { expected: 36, actual: 44 }, eocd_offset: None } } }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- generated_offset_promotes_at_below_at_and_above_zip32_boundary stdout ----
+
+thread 'generated_offset_promotes_at_below_at_and_above_zip32_boundary' (1550016) panicked at crates/soapberry-zip/tests/streaming_zip64_deflate.rs:406:39:
+called `Result::unwrap()` on an `Err` value: Custom { kind: InvalidData, error: Error { inner: ErrorInner { kind: InvalidSize { expected: 15, actual: 23 }, eocd_offset: None } } }
+
+---- output_limit_boundary_is_reported_after_entry_publication stdout ----
+
+thread 'output_limit_boundary_is_reported_after_entry_publication' (1550018) panicked at crates/soapberry-zip/tests/streaming_zip64_deflate.rs:642:10:
+called `Result::unwrap()` on an `Err` value: Error { inner: ErrorInner { kind: InvalidInput { msg: "max_metadata_bytes exceeds max_output_bytes" }, eocd_offset: None } }
+
+
+failures:
+    explicit_zip64_borrowed_stream_has_64_bit_descriptor_and_reopens
+    generated_offset_promotes_at_below_at_and_above_zip32_boundary
+    output_limit_boundary_is_reported_after_entry_publication
+
+test result: FAILED. 4 passed; 3 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p soapberry-zip --test streaming_zip64_deflate`

@@ -1,0 +1,211 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+error[E0308]: mismatched types
+    --> crates/soapberry-zip/src/office.rs:5324:13
+     |
+5324 |         let (normalized_name, name_bytes) = self.validate_streaming_entry(name)?;
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^   ------------------------------------ this expression has type `StreamingEntryAdmission`
+     |             |
+     |             expected `StreamingEntryAdmission`, found `(_, _)`
+     |
+     = note: expected struct `StreamingEntryAdmission`
+                 found tuple `(_, _)`
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+    --> crates/soapberry-zip/src/office.rs:5404:14
+     |
+5404 |         self.record_streaming_entry(normalized_name, name_bytes);
+     |              ^^^^^^^^^^^^^^^^^^^^^^                  ---------- unexpected argument #2
+     |
+note: method defined here
+    --> crates/soapberry-zip/src/office.rs:5243:8
+     |
+5243 |     fn record_streaming_entry(&mut self, admission: StreamingEntryAdmission) {
+     |        ^^^^^^^^^^^^^^^^^^^^^^
+help: remove the extra argument
+     |
+5404 -         self.record_streaming_entry(normalized_name, name_bytes);
+5404 +         self.record_streaming_entry(normalized_name);
+     |
+
+error[E0308]: mismatched types
+    --> crates/soapberry-zip/src/office.rs:5421:13
+     |
+5421 |           let (normalized_name, name_bytes) = match self.validate_streaming_entry(name) {
+     |  _____________^^^^^^^^^^^^^^^^^^^^^^^^^^^^^___-
+     | |             |
+     | |             expected `StreamingEntryAdmission`, found `(_, _)`
+5422 | |             Ok(value) => value,
+5423 | |             Err(error) => {
+5424 | |                 return Err(StreamingArchiveFailure {
+...    |
+5429 | |             },
+5430 | |         };
+     | |_________- this expression has type `StreamingEntryAdmission`
+     |
+     = note: expected struct `StreamingEntryAdmission`
+                 found tuple `(_, _)`
+
+error[E0560]: struct `StreamingArchiveEntry<W>` has no field named `name_bytes`
+    --> crates/soapberry-zip/src/office.rs:5501:13
+     |
+5501 |             name_bytes,
+     |             ^^^^^^^^^^ `StreamingArchiveEntry<_>` does not have this field
+     |
+     = note: available fields are: `metadata_charge`
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+    --> crates/soapberry-zip/src/office.rs:5526:50
+     |
+5526 |         let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
+     |                                                  ^^^^^^^^^^^^^^^^^^^^------------------ argument #3 of type `u64` is missing
+     |
+note: method defined here
+    --> crates/soapberry-zip/src/office.rs:5221:8
+     |
+5221 |     fn validate_known_entry(
+     |        ^^^^^^^^^^^^^^^^^^^^
+...
+5225 |         compressed_bytes: u64,
+     |         ---------------------
+help: provide the argument
+     |
+5526 |         let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes, /* u64 */)?;
+     |                                                                                       +++++++++++
+
+error[E0308]: mismatched types
+    --> crates/soapberry-zip/src/office.rs:5526:13
+     |
+5526 |         let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^   -------------------------------------------- this expression has type `StreamingEntryAdmission`
+     |             |
+     |             expected `StreamingEntryAdmission`, found `(_, _)`
+     |
+     = note: expected struct `StreamingEntryAdmission`
+                 found tuple `(_, _)`
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+    --> crates/soapberry-zip/src/office.rs:5542:22
+     |
+5542 |                 self.record_streaming_entry(normalized_name, name_bytes);
+     |                      ^^^^^^^^^^^^^^^^^^^^^^                  ---------- unexpected argument #2
+     |
+note: method defined here
+    --> crates/soapberry-zip/src/office.rs:5243:8
+     |
+5243 |     fn record_streaming_entry(&mut self, admission: StreamingEntryAdmission) {
+     |        ^^^^^^^^^^^^^^^^^^^^^^
+help: remove the extra argument
+     |
+5542 -                 self.record_streaming_entry(normalized_name, name_bytes);
+5542 +                 self.record_streaming_entry(normalized_name);
+     |
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+    --> crates/soapberry-zip/src/office.rs:5570:50
+     |
+5570 |         let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
+     |                                                  ^^^^^^^^^^^^^^^^^^^^------------------ argument #3 of type `u64` is missing
+     |
+note: method defined here
+    --> crates/soapberry-zip/src/office.rs:5221:8
+     |
+5221 |     fn validate_known_entry(
+     |        ^^^^^^^^^^^^^^^^^^^^
+...
+5225 |         compressed_bytes: u64,
+     |         ---------------------
+help: provide the argument
+     |
+5570 |         let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes, /* u64 */)?;
+     |                                                                                       +++++++++++
+
+error[E0308]: mismatched types
+    --> crates/soapberry-zip/src/office.rs:5570:13
+     |
+5570 |         let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^   -------------------------------------------- this expression has type `StreamingEntryAdmission`
+     |             |
+     |             expected `StreamingEntryAdmission`, found `(_, _)`
+     |
+     = note: expected struct `StreamingEntryAdmission`
+                 found tuple `(_, _)`
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+    --> crates/soapberry-zip/src/office.rs:5605:14
+     |
+5605 |         self.record_streaming_entry(normalized_name, name_bytes);
+     |              ^^^^^^^^^^^^^^^^^^^^^^                  ---------- unexpected argument #2
+     |
+note: method defined here
+    --> crates/soapberry-zip/src/office.rs:5243:8
+     |
+5243 |     fn record_streaming_entry(&mut self, admission: StreamingEntryAdmission) {
+     |        ^^^^^^^^^^^^^^^^^^^^^^
+help: remove the extra argument
+     |
+5605 -         self.record_streaming_entry(normalized_name, name_bytes);
+5605 +         self.record_streaming_entry(normalized_name);
+     |
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+    --> crates/soapberry-zip/src/office.rs:5634:50
+     |
+5634 |         let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
+     |                                                  ^^^^^^^^^^^^^^^^^^^^------------------ argument #3 of type `u64` is missing
+     |
+note: method defined here
+    --> crates/soapberry-zip/src/office.rs:5221:8
+     |
+5221 |     fn validate_known_entry(
+     |        ^^^^^^^^^^^^^^^^^^^^
+...
+5225 |         compressed_bytes: u64,
+     |         ---------------------
+help: provide the argument
+     |
+5634 |         let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes, /* u64 */)?;
+     |                                                                                       +++++++++++
+
+error[E0308]: mismatched types
+    --> crates/soapberry-zip/src/office.rs:5634:13
+     |
+5634 |         let (normalized_name, name_bytes) = self.validate_known_entry(name, data_bytes)?;
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^   -------------------------------------------- this expression has type `StreamingEntryAdmission`
+     |             |
+     |             expected `StreamingEntryAdmission`, found `(_, _)`
+     |
+     = note: expected struct `StreamingEntryAdmission`
+                 found tuple `(_, _)`
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+    --> crates/soapberry-zip/src/office.rs:5677:22
+     |
+5677 |                 self.record_streaming_entry(normalized_name, name_bytes);
+     |                      ^^^^^^^^^^^^^^^^^^^^^^                  ---------- unexpected argument #2
+     |
+note: method defined here
+    --> crates/soapberry-zip/src/office.rs:5243:8
+     |
+5243 |     fn record_streaming_entry(&mut self, admission: StreamingEntryAdmission) {
+     |        ^^^^^^^^^^^^^^^^^^^^^^
+help: remove the extra argument
+     |
+5677 -                 self.record_streaming_entry(normalized_name, name_bytes);
+5677 +                 self.record_streaming_entry(normalized_name);
+     |
+
+error[E0599]: no method named `archive_is_zip64` found for struct `office::ArchiveReader<'data>` in the current scope
+    --> crates/soapberry-zip/src/office.rs:8090:24
+     |
+ 466 | pub struct ArchiveReader<'data> {
+     | ------------------------------- method `archive_is_zip64` not found for this struct
+...
+8090 |         assert!(reader.archive_is_zip64());
+     |                        ^^^^^^^^^^^^^^^^ method not found in `office::ArchiveReader<'_>`
+
+Some errors have detailed explanations: E0061, E0308, E0560.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `soapberry-zip` (lib) due to 13 previous errors
+warning: build failed, waiting for other jobs to finish...
+Some errors have detailed explanations: E0061, E0308, E0560, E0599.
+error: could not compile `soapberry-zip` (lib test) due to 14 previous errors

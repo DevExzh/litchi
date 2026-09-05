@@ -1,0 +1,101 @@
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+error: using `chunks_exact` with a constant chunk size
+   --> crates/litchi-core/src/hex.rs:102:28
+    |
+102 |     for chunk in hex_bytes.chunks_exact(2) {
+    |                            ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<2>().0`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+    = note: `-D clippy::chunks-exact-to-as-chunks` implied by `-D clippy::all`
+    = help: to override `-D clippy::all` add `#[allow(clippy::chunks_exact_to_as_chunks)]`
+
+error: using `chunks_exact` with a constant chunk size
+   --> crates/litchi-core/src/patch.rs:105:46
+    |
+105 |         for (index, pair) in text.as_bytes().chunks_exact(2).enumerate() {
+    |                                              ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<2>().0.iter()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#chunks_exact_to_as_chunks
+
+error: could not compile `litchi-core` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> crates/soapberry-zip/src/archive.rs:429:9
+    |
+429 |         &entry,
+    |         ^^^^^^ help: change this to: `entry`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#needless_borrow
+    = note: `-D clippy::needless-borrow` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrow)]`
+
+error: could not compile `soapberry-zip` (lib) due to 1 previous error
+error: called `.err().expect()` on a `Result` value
+     --> crates/soapberry-zip/src/office.rs:11823:14
+      |
+11823 |               .err()
+      |  ______________^
+11824 | |             .expect("inflated EOCD count must be rejected");
+      | |___________________^ help: try: `expect_err`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#err_expect
+      = note: `-D clippy::err-expect` implied by `-D warnings`
+      = help: to override `-D warnings` add `#[allow(clippy::err_expect)]`
+
+error: called `.err().expect()` on a `Result` value
+     --> crates/soapberry-zip/src/office.rs:11828:14
+      |
+11828 |               .err()
+      |  ______________^
+11829 | |             .expect("inflated EOCD count must be rejected");
+      | |___________________^ help: try: `expect_err`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#err_expect
+
+error: used `assert_eq!` with a literal bool
+    --> crates/soapberry-zip/src/preserve.rs:3071:13
+     |
+3071 |             assert_eq!(archive.is_zip64(), false);
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#bool_assert_comparison
+     = note: `-D clippy::bool-assert-comparison` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::bool_assert_comparison)]`
+help: replace it with `assert!(..)`
+     |
+3071 -             assert_eq!(archive.is_zip64(), false);
+3071 +             assert!(!archive.is_zip64());
+     |
+
+error: call to `std::mem::drop` with a value that does not implement `Drop`. Dropping such a type only extends its contained lifetimes
+    --> crates/soapberry-zip/src/writer.rs:2647:9
+     |
+2647 |         drop(count_writer);
+     |         ^^^^^^^^^^^^^^^^^^
+     |
+note: argument has type `writer::CountWriter<&mut std::vec::Vec<u8>>`
+    --> crates/soapberry-zip/src/writer.rs:2647:14
+     |
+2647 |         drop(count_writer);
+     |              ^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#drop_non_drop
+     = note: `-D clippy::drop-non-drop` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::drop_non_drop)]`
+
+error: call to `std::mem::drop` with a value that does not implement `Drop`. Dropping such a type only extends its contained lifetimes
+    --> crates/soapberry-zip/src/writer.rs:2674:9
+     |
+2674 |         drop(data_writer);
+     |         ^^^^^^^^^^^^^^^^^
+     |
+note: argument has type `writer::ZipDataWriter<&mut std::vec::Vec<u8>>`
+    --> crates/soapberry-zip/src/writer.rs:2674:14
+     |
+2674 |         drop(data_writer);
+     |              ^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#drop_non_drop
+
+error: could not compile `soapberry-zip` (lib test) due to 6 previous errors

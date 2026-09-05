@@ -1,0 +1,9 @@
+{
+  "elapsed_ns": 19586024,
+  "input_buffer_bytes": 65536,
+  "input_bytes": 67108864,
+  "mode": "owned",
+  "output_bytes": 65374,
+  "output_crc32": 1937711312,
+  "output_writes": 29
+}

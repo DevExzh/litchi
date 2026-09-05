@@ -1,0 +1,98 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+   Compiling litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+error[E0308]: mismatched types
+   --> crates/soapberry-zip/tests/streaming_zip64_deflate.rs:477:64
+    |
+477 |     let (_, raised_record_zip64, _, _, _, _, _) = first_record(&raised_archive);
+    |                                                   ------------ ^^^^^^^^^^^^^^^ expected `&ZipArchive<_>`, found `&ZipSliceArchive<&Vec<u8>>`
+    |                                                   |
+    |                                                   arguments to this function are incorrect
+    |
+    = note: expected reference `&ZipArchive<_>`
+               found reference `&ZipSliceArchive<&Vec<u8>>`
+note: function defined here
+   --> crates/soapberry-zip/tests/streaming_zip64_deflate.rs:362:4
+    |
+362 | fn first_record<R: ReaderAt>(
+    |    ^^^^^^^^^^^^
+363 |     archive: &ZipArchive<R>,
+    |     -----------------------
+
+error[E0061]: this method takes 0 arguments but 1 argument was supplied
+   --> crates/soapberry-zip/tests/streaming_zip64_deflate.rs:526:35
+    |
+526 |         let mut entries = archive.entries(&mut buffer);
+    |                                   ^^^^^^^ ----------- unexpected argument of type `&mut Vec<u8>`
+    |
+note: method defined here
+   --> crates/soapberry-zip/src/archive.rs:65:12
+    |
+ 65 |     pub fn entries(&self) -> ZipSliceEntries<'_> {
+    |            ^^^^^^^
+help: remove the extra argument
+    |
+526 -         let mut entries = archive.entries(&mut buffer);
+526 +         let mut entries = archive.entries();
+    |
+
+error[E0308]: mismatched types
+   --> crates/soapberry-zip/tests/streaming_zip64_deflate.rs:559:37
+    |
+559 |     assert_eq!(verified_entry_bytes(&archive, wayfinder), payload);
+    |                -------------------- ^^^^^^^^ expected `&ZipArchive<_>`, found `&ZipSliceArchive<Vec<u8>>`
+    |                |
+    |                arguments to this function are incorrect
+    |
+    = note: expected reference `&ZipArchive<_>`
+               found reference `&ZipSliceArchive<Vec<u8>>`
+note: function defined here
+   --> crates/soapberry-zip/tests/streaming_zip64_deflate.rs:398:4
+    |
+398 | fn verified_entry_bytes<R: ReaderAt>(
+    |    ^^^^^^^^^^^^^^^^^^^^
+399 |     archive: &ZipArchive<R>,
+    |     -----------------------
+
+error[E0277]: `StreamingArchiveWriter<&mut FailingSink>` doesn't implement `Debug`
+   --> crates/soapberry-zip/tests/streaming_zip64_deflate.rs:611:48
+    |
+611 |     let failure = entry.finish_with_progress().unwrap_err();
+    |                                                ^^^^^^^^^^ the trait `Debug` is not implemented for `StreamingArchiveWriter<&mut FailingSink>`
+    |
+    = help: the following other types implement trait `Debug`:
+              ()
+              (A, Z, Y, X, W, V, U, T)
+              (B, A, Z, Y, X, W, V, U, T)
+              (C, B, A, Z, Y, X, W, V, U, T)
+              (D, C, B, A, Z, Y, X, W, V, U, T)
+              (E, D, C, B, A, Z, Y, X, W, V, U, T)
+              (T,)
+              (U, T)
+            and 5 others
+    = note: required for `(StreamingArchiveWriter<&mut FailingSink>, StreamingArchiveProgress)` to implement `Debug`
+note: required by a bound in `Result::<T, E>::unwrap_err`
+   --> /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:1322:4
+
+error[E0308]: mismatched types
+   --> crates/soapberry-zip/tests/streaming_zip64_deflate.rs:682:86
+    |
+682 |     let (wayfinder, record_zip64, local_offset, size, crc, method, _) = first_record(&archive);
+    |                                                                         ------------ ^^^^^^^^ expected `&ZipArchive<_>`, found `&ZipSliceArchive<&Vec<u8>>`
+    |                                                                         |
+    |                                                                         arguments to this function are incorrect
+    |
+    = note: expected reference `&ZipArchive<_>`
+               found reference `&ZipSliceArchive<&Vec<u8>>`
+note: function defined here
+   --> crates/soapberry-zip/tests/streaming_zip64_deflate.rs:362:4
+    |
+362 | fn first_record<R: ReaderAt>(
+    |    ^^^^^^^^^^^^
+363 |     archive: &ZipArchive<R>,
+    |     -----------------------
+
+Some errors have detailed explanations: E0061, E0277, E0308.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `soapberry-zip` (test "streaming_zip64_deflate") due to 5 previous errors
+warning: build failed, waiting for other jobs to finish...
