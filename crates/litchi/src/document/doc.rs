@@ -2227,9 +2227,15 @@ mod tests {
 
     #[test]
     #[cfg(all(feature = "docx", feature = "odt"))]
-    fn owned_odt_bytes_do_not_hide_malformed_ooxml_catalog() {
+    fn owned_odt_bytes_keep_odt_owner_with_malformed_ooxml_catalog() {
         let bytes = add_odt_member(&minimal_odt(), "[Content_Types].xml", b"<Types><broken>");
-        assert!(Document::from_bytes(bytes).is_err());
+        let document =
+            Document::from_bytes(bytes).expect("malformed OOXML catalog must fall back to ODT");
+        assert!(matches!(&document.inner, DocumentImpl::Odt(_)));
+        assert_eq!(
+            document.text().expect("ODT text must remain readable"),
+            "Source-backed ODT"
+        );
     }
 
     #[test]
@@ -3201,7 +3207,7 @@ mod tests {
 
     #[test]
     #[cfg(all(feature = "docx", feature = "odt", any(unix, windows)))]
-    fn filesystem_odt_does_not_hide_malformed_ooxml_catalog() {
+    fn filesystem_odt_keeps_source_owner_with_malformed_ooxml_catalog() {
         let bytes = add_odt_member(&minimal_odt(), "[Content_Types].xml", b"<Types><broken>");
         let temporary = tempfile::Builder::new()
             .suffix(".odt")
@@ -3209,7 +3215,13 @@ mod tests {
             .expect("temporary malformed polyglot path");
         std::fs::write(temporary.path(), bytes).expect("write malformed OOXML/ODF package");
 
-        assert!(Document::open(temporary.path()).is_err());
+        let document = Document::open(temporary.path())
+            .expect("malformed OOXML catalog must fall back to ODT");
+        assert!(matches!(&document.inner, DocumentImpl::OdtSource(_)));
+        assert_eq!(
+            document.text().expect("ODT text must remain readable"),
+            "Source-backed ODT"
+        );
     }
 
     #[test]

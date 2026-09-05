@@ -2387,18 +2387,17 @@ fn formula_tokens(payload: &[u8]) -> Result<&[u8]> {
     if payload.len() < 22 {
         return Err(Error::InvalidData("Formula record is truncated".into()));
     }
-    let count = usize::from(binary::read_u16_le_at(payload, 20)?);
-    let token_end = 22_usize
-        .checked_add(count)
-        .ok_or_else(|| Error::InvalidData("Formula token range overflow".into()))?;
-    if token_end != payload.len() {
-        return Err(Error::InvalidData(
-            "Formula token count does not match its record".into(),
+    let (tokens, extra) = crate::formula_metadata::formula_payload_parts(payload)
+        .map_err(|error| Error::InvalidData(error.to_string()))?;
+    if !extra.is_empty() {
+        crate::formula_metadata::validate_formula_extra(tokens, extra).map_err(|error| {
+            Error::InvalidData(format!("Formula RgbExtra is malformed: {error}"))
+        })?;
+        return Err(Error::UnsafeEdit(
+            "row/column movement refuses Formula records with RgbExtra ancillary references".into(),
         ));
     }
-    payload
-        .get(22..token_end)
-        .ok_or_else(|| Error::InvalidData("Formula tokens are truncated".into()))
+    Ok(tokens)
 }
 
 fn certify_formula_owner(payload: &[u8]) -> Result<()> {

@@ -1,0 +1,31 @@
+{
+  "change": 426,
+  "argv": [
+    "rustup",
+    "run",
+    "1.98.1",
+    "rustc",
+    "--edition",
+    "2024",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0426/layout.rs",
+    "-L",
+    "dependency=/home/zhuhe/code/litchi/target/debug/deps",
+    "--extern",
+    "litchi_xls=/home/zhuhe/code/litchi/target/debug/deps/liblitchi_xls-0ab317c5a0de1e5b.rlib",
+    "-o",
+    "/tmp/litchi-0426-layout-orspnrbu/layout"
+  ],
+  "compiled_rlib": "target/debug/deps/liblitchi_xls-0ab317c5a0de1e5b.rlib",
+  "compiled_rlib_sha256": "923ac801eefef90a2f7a8eefe164b83e9e403c59057b7e22818a4f935a3015c7",
+  "source_model_sha256": "b36c9df1899c0028ff5948c9e701a5651152011d6c3a7a1aca386355469b7917",
+  "probe_source_sha256": "3f9d210cdbf7a0cfed512a267883c194831eed53303e3feb5552baae5bb4ee04",
+  "scope": "Rust static type layout; not operation allocations, RSS or performance",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T19:50:34.423648+00:00",
+  "sizes": {
+    "metadata_bytes": 32,
+    "cell_record_bytes": 88,
+    "cell_bytes": 160
+  },
+  "binary_sha256": "26df955b7ccea5aca4ffcc3102ca79ac4cf56dcf6264fa77023ef2fa92b4a974"
+}

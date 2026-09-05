@@ -817,7 +817,7 @@ fn validate_array_extra(extra: &[u8], array_count: usize) -> Result<()> {
     Ok(())
 }
 
-fn validate_ser_ar(extra: &[u8], position: usize) -> Result<usize> {
+pub(crate) fn validate_ser_ar(extra: &[u8], position: usize) -> Result<usize> {
     let kind = *extra
         .get(position)
         .ok_or_else(|| invalid("SerAr value is truncated"))?;

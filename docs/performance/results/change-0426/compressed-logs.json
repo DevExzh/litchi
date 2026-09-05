@@ -1,0 +1,146 @@
+{
+  "checks/boundaries.log.gz": {
+    "original_bytes": 684,
+    "original_sha256": "b6f38b040ac7308af6ec280e204ed817e3c708cdde84d2566f0b5d74758aeeaf",
+    "stored_bytes": 255,
+    "stored_sha256": "47bc24b362c2d527d2550fd6efef22751d4d4a4efba50b0b2f6d8f7b0fc8b443"
+  },
+  "checks/claims.log.gz": {
+    "original_bytes": 44,
+    "original_sha256": "33241d1f0ca4f8fba95a039a967f9a5bc41f100a24e94b576942d2e7c4615fc8",
+    "stored_bytes": 64,
+    "stored_sha256": "213fceee167de45140392729d792e56798bb0cf20777a6c69664d40c361352ec"
+  },
+  "checks/crud-index.log.gz": {
+    "original_bytes": 123,
+    "original_sha256": "8a6e2202ee0ae9691a0727a1a9f1ff420c32db2c4fbc4346ba6a57fe24c2220b",
+    "stored_bytes": 128,
+    "stored_sha256": "9ad6f851cc0c31766916e170175627691d3532529c9f2cde4db900b5c05d6ce0"
+  },
+  "checks/diff-check.log.gz": {
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/facade-fixture-corrections.log.gz": {
+    "original_bytes": 44606,
+    "original_sha256": "6e0d1e218e34846d349c138de2907b34ed2ddac14fde84fd6ff55d893b1d5b36",
+    "stored_bytes": 7580,
+    "stored_sha256": "149078a8768c5ba19f55a9f3bad2920b037ee2077a07835189e800145cc5fd0c"
+  },
+  "checks/facade-rustdoc.log.gz": {
+    "original_bytes": 281,
+    "original_sha256": "9193fbf7515769e18c585cec0e59b4dd8f9d63ae1769a5063618fff2ecb5f4c4",
+    "stored_bytes": 180,
+    "stored_sha256": "df7636e2f00fae08e4024e73ed71bf65e684c53a8844448630debde5cae9d2a0"
+  },
+  "checks/facade-strict.log.gz": {
+    "original_bytes": 16188,
+    "original_sha256": "c73bcbc3146770a7c455429deb5fbabd51f66bb87c98cdb92531d86ab7b0ad2d",
+    "stored_bytes": 2888,
+    "stored_sha256": "290c3f9b710f95952614236b5f81952d9d7c04504cbee8fa23a5eb8d6f28a091"
+  },
+  "checks/facade-tests-final.log.gz": {
+    "original_bytes": 44149,
+    "original_sha256": "d0e61ad4999068faa6b7fc831e1e1a52d10a90b50a3f4cb802bbab513bcb9984",
+    "stored_bytes": 7323,
+    "stored_sha256": "d76dd66150cfb3c7b126bd84c2714394f47f2e9a9b3bf629db36786bff4cceed"
+  },
+  "checks/layout-after.log.gz": {
+    "original_bytes": 62,
+    "original_sha256": "c60b611d26625d9cb1948297bc0c095714edfeb5ce00b3690c41c3a1e6116db8",
+    "stored_bytes": 65,
+    "stored_sha256": "a743df0c4eec58bb31b7e3c171a48a153bad60d018c132e6bd9a7b7f36aa878a"
+  },
+  "checks/layout-before-build.log.gz": {
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/perf-xls-tests.log.gz": {
+    "original_bytes": 1199,
+    "original_sha256": "931ba4da2689906aa669e3de12137a20399907eb121ec4a85f59cad0b0b07c28",
+    "stored_bytes": 535,
+    "stored_sha256": "7a76273bd4e164a60f7838b2b7c4765547dda45c3f72601db53c30e12865fe61"
+  },
+  "checks/rustfmt-final.log.gz": {
+    "original_bytes": 0,
+    "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stored_bytes": 20,
+    "stored_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64"
+  },
+  "checks/xls-ancillary-focused-final.log.gz": {
+    "original_bytes": 2198,
+    "original_sha256": "5b24615b8e5af4387c3b14e9038013333fe46cdbf9f8736d6b40c6849735a9ca",
+    "stored_bytes": 848,
+    "stored_sha256": "e1a38c30d8b9d018004b128e88f0cfabc8be767c53bce5b89d245fc68f190854"
+  },
+  "checks/xls-ancillary-focused-retry.log.gz": {
+    "original_bytes": 801,
+    "original_sha256": "c74f8bf51946a185e9a8c68c1ee1a232cb04a861a6dfd5e13d1c7a7a1d29dc51",
+    "stored_bytes": 423,
+    "stored_sha256": "94586afb6602eb3c45e8deab4ed208490f66e354570c50b26f0df6367b62d65a"
+  },
+  "checks/xls-ancillary-focused-reviewed.log.gz": {
+    "original_bytes": 1506,
+    "original_sha256": "b9be82d7f495667f93cce1d7e9553e25027ecebb75e781bb01ba3e1a462758b5",
+    "stored_bytes": 699,
+    "stored_sha256": "5f75642db90f6c82ddc5144b7c217ba16fd3fdad7face3acb7bbdc44a4480cef"
+  },
+  "checks/xls-ancillary-focused.log.gz": {
+    "original_bytes": 1190,
+    "original_sha256": "4b9927882e19d9870997c3785c42e3b3221dba1ac317206440a52e2b898ab089",
+    "stored_bytes": 403,
+    "stored_sha256": "64d9e5dea2f26167dd5999ebfd54f61c9169ca3fa578143f0090d9f432ce3df0"
+  },
+  "checks/xls-rustdoc.log.gz": {
+    "original_bytes": 928,
+    "original_sha256": "9ac8b088828a6a9c30891b01901dabd3b35a69b9613c940678fe2f003ab7186f",
+    "stored_bytes": 262,
+    "stored_sha256": "b1e00845de2c79daff04b6aec5518c0c77728bc2a506c973fd9b793fd725f79c"
+  },
+  "checks/xls-strict-final.log.gz": {
+    "original_bytes": 782,
+    "original_sha256": "d2678f25537999b6b43661c8b76ed64abf7e8448fa8e8bb894296e1b6366e5df",
+    "stored_bytes": 435,
+    "stored_sha256": "271ceefb6bd3791072b9bb4556eb4f9a39777eb7dd2e9c2ba7491648fb01709f"
+  },
+  "checks/xls-strict-verified.log.gz": {
+    "original_bytes": 147,
+    "original_sha256": "192010fe0960203c83be5dc9626ac1c8f158513ceaaac57a4c484a130cd081dc",
+    "stored_bytes": 140,
+    "stored_sha256": "7f76bc6678a46732d2a5970d1ae05f3641058bd4b660020c1f95d18e9bed581f"
+  },
+  "checks/xls-strict.log.gz": {
+    "original_bytes": 2125,
+    "original_sha256": "b14152e420640d21645aa21eb6c5ffda3ff4412a3d98e46549b7826b60324e8e",
+    "stored_bytes": 693,
+    "stored_sha256": "3fde88d232d0a8ee1d9be20431a117621c1c5a02bc6e1a88ba9de17ea38fe750"
+  },
+  "checks/xls-tests-accepted.log.gz": {
+    "original_bytes": 112245,
+    "original_sha256": "645fc9cc4aba235c9d449054acd697bb3398f6b77688172980bab69cb9da8847",
+    "stored_bytes": 22295,
+    "stored_sha256": "1a3e553b1ce21d3fd4aa0d3e19b1321f078c836d4350ae869f4b969e0c53edc1"
+  },
+  "checks/xls-tests-final.log.gz": {
+    "original_bytes": 112246,
+    "original_sha256": "35cf83a221c259cd0c8f1162dfa48475907714abd251ea87fb1c019b1edb062a",
+    "stored_bytes": 22300,
+    "stored_sha256": "975359142815a2440d7ead2d47c47069f66260286953df369bcbd80ac8f9dcb0"
+  },
+  "checks/xls-tests-verified.log.gz": {
+    "original_bytes": 112246,
+    "original_sha256": "15eb6282dbd2622945c4aa1875bd2210189df1d94b2660064f1ec047fa827c48",
+    "stored_bytes": 22296,
+    "stored_sha256": "9016fd6c223a193968f076833f094c479261765555663a2a805fc50d093b8b0d"
+  },
+  "checks/xls-tests.log.gz": {
+    "original_bytes": 2042,
+    "original_sha256": "552ec6c5857b49acb9a416e8e70bf9acafe2fb3fc0cb7e4ff81be65fcdeb1ef0",
+    "stored_bytes": 464,
+    "stored_sha256": "a204e9f6d6a243d4c59b6050c8443b81ac2ced6b43c75e9f2f336a22a8e94a49"
+  }
+}

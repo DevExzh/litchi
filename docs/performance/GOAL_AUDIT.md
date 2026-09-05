@@ -1,6 +1,6 @@
 # Non-iWork `docs/GOAL.md` audit
 
-## Current evidence through 0424 and the 0425 gate audit
+## Current evidence through 0426
 
 The latest completed performance batch is
 [0424](changes/0424-staged-pptx-payload-reuse.md), based on production revision
@@ -32,14 +32,21 @@ requires a measured ownership decision; its borrowed reader is retained inline.
 Mechanical constant-chunk and test setup findings are closed in the 45 leaf/shared
 packages, with strict Clippy passing for 44 and the ODF layout gate open.
 [0425](changes/0425-non-iwork-verification-maintenance.md) retains composite
-coverage of 15,778 passing tests and 98 ignored tests. The separate facade has
-six baseline-reproduced test failures and 18 unchanged strict lint findings.
+coverage of 15,778 passing tests and 98 ignored tests. The separate facade had
+six baseline-reproduced test failures, now closed by
+[0426](changes/0426-xls-formula-ancillary-preservation.md): five fixture/assertion
+corrections and bounded standard BIFF8 Formula ancillary preservation. The
+final facade suite passes 461 tests with 11 ignored; XLS passes 1,341 tests
+with one ignored doctest and its scoped strict gate passes. This is correctness
+evidence, with static metadata layout cost documented separately and no
+performance claim. The facade strict rerun retains the same 18 findings from
+the prior audit; no allowance is added.
 The standalone harness has 29 lint findings outside the modified code, and
 native-resave requires a lockfile refresh before its locked gate can run.
-These remain open; no blanket strict or facade correctness pass is claimed.
+These strict-gate debts remain open; no blanket strict pass is claimed.
 
-Resolve the baseline-reproduced facade detection/limit arbitration, deferred
-spreadsheet access and XLS extraction failures, and the scoped strict-gate debt.
+Resolve the remaining scoped strict-gate debt and return to the performance
+evidence program with facade correctness restored.
 Explicit caller-drop snapshots, near-limit memory/cache evidence, broad native
 producer matrices, cold/range sources, bounded semantic streaming and append,
 scaling/CPU counters, full CRUD coverage and final strict gates remain open.

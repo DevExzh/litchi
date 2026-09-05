@@ -5,6 +5,7 @@ use crate::utils;
 use crate::{Error, Result};
 
 use super::Metadata;
+use super::extra::retain_formula_extra;
 use super::validation::{
     FORMULA_FIXED_SIZE, FlagDefect, MAX_FORMULA_PAYLOAD, decode_flags, decode_flags_preserving,
     invalid,
@@ -55,13 +56,14 @@ fn parse_record_with(data: &[u8], preserve_defect: bool) -> Result<(Parsed, Opti
     let formula_end = FORMULA_FIXED_SIZE
         .checked_add(token_len)
         .ok_or_else(|| invalid("Formula token length overflows"))?;
-    if formula_end != data.len() {
+    if formula_end > data.len() {
         return Err(Error::InvalidLength {
             expected: formula_end,
             found: data.len(),
         });
     }
     let formula = data[FORMULA_FIXED_SIZE..formula_end].to_vec();
+    let ancillary = retain_formula_extra(row, col, &formula, &data[formula_end..])?;
     // A string-valued Formula deliberately carries no Rgce bytes: its
     // cached result is supplied by the immediately following String record.
     // All other FormulaValue variants require an actual token stream.
@@ -74,6 +76,9 @@ fn parse_record_with(data: &[u8], preserve_defect: bool) -> Result<(Parsed, Opti
         (decode_flags(flags, &formula)?, None)
     };
     metadata = metadata.with_calculation_cache(calculation_cache);
+    if let Some(ancillary) = ancillary {
+        metadata = metadata.with_ancillary(ancillary);
+    }
 
     Ok((
         Parsed {

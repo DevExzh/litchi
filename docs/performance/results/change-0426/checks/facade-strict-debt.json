@@ -1,0 +1,82 @@
+{
+  "change": 426,
+  "prior_log_sha256": "ce646bf59e173852e02a561fc9ae86e020472e09e6af1ffac13770d58a781e5e",
+  "current_log_sha256": "c73bcbc3146770a7c455429deb5fbabd51f66bb87c98cdb92531d86ab7b0ad2d",
+  "diagnostic_count": 18,
+  "same_message_and_source_file_multiset": true,
+  "diagnostics": [
+    [
+      "digits of hex, binary or octal literal not in groups of equal size",
+      "crates/litchi/src/sheet/workbook.rs"
+    ],
+    [
+      "unnecessary `>= y + 1` or `x - 1 >=`",
+      "crates/litchi/src/sheet/workbook.rs"
+    ],
+    [
+      "unneeded `return` statement",
+      "crates/litchi/src/detection_smart/detected.rs"
+    ],
+    [
+      "unneeded `return` statement",
+      "crates/litchi/src/detection_smart/detected.rs"
+    ],
+    [
+      "large size difference between variants",
+      "crates/litchi/src/detection_smart/detected.rs"
+    ],
+    [
+      "large size difference between variants",
+      "crates/litchi/src/detection_smart/detected.rs"
+    ],
+    [
+      "useless conversion to the same type: `litchi_core::Error`",
+      "crates/litchi/src/detection_smart/detected.rs"
+    ],
+    [
+      "unneeded `return` statement",
+      "crates/litchi/src/document/doc.rs"
+    ],
+    [
+      "this match expression is unnecessary",
+      "crates/litchi/src/presentation/prs.rs"
+    ],
+    [
+      "unneeded `return` statement",
+      "crates/litchi/src/presentation/prs.rs"
+    ],
+    [
+      "unneeded `return` statement",
+      "crates/litchi/src/sheet/functions.rs"
+    ],
+    [
+      "unneeded `return` statement",
+      "crates/litchi/src/sheet/functions.rs"
+    ],
+    [
+      "unneeded `return` statement",
+      "crates/litchi/src/sheet/functions.rs"
+    ],
+    [
+      "unneeded `return` statement",
+      "crates/litchi/src/sheet/functions.rs"
+    ],
+    [
+      "unneeded `return` statement",
+      "crates/litchi/src/sheet/functions.rs"
+    ],
+    [
+      "unneeded `return` statement",
+      "crates/litchi/src/sheet/functions.rs"
+    ],
+    [
+      "unneeded `return` statement",
+      "crates/litchi/src/detection_smart/detected.rs"
+    ],
+    [
+      "field assignment outside of initializer for an instance created with Default::default()",
+      "crates/litchi/src/document/doc.rs"
+    ]
+  ],
+  "status": "open; same prior findings, no allowances"
+}

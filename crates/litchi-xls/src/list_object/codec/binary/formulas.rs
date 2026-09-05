@@ -3,13 +3,8 @@
 use super::primitives::u16_at;
 use super::strings::parse_string;
 use crate::Result;
+use crate::formula_metadata::{FormulaExtraKind, scan_list_extra_kinds};
 use crate::list_object::{FEATURE11_RECORD_TYPE, invalid};
-
-#[derive(Clone, Copy)]
-pub(in crate::list_object) enum FormulaExtraKind {
-    Array,
-    Memory,
-}
 
 pub(in crate::list_object) fn parse_list_formula_extra_end(
     data: &[u8],
@@ -17,84 +12,19 @@ pub(in crate::list_object) fn parse_list_formula_extra_end(
     mut offset: usize,
     rt: u16,
 ) -> Result<usize> {
-    let mut extras = Vec::new();
-    let mut position = 0usize;
-    while position < tokens.len() {
-        let opcode = tokens[position];
-        let base = if opcode < 0x20 {
-            opcode
-        } else {
-            (opcode & 0x1f) | 0x20
-        };
-        let size = match base {
-            0x03..=0x16 => 1,
-            0x17 => {
-                let count = usize::from(
-                    *tokens
-                        .get(position + 1)
-                        .ok_or_else(|| invalid(rt, "truncated formula string token"))?,
-                );
-                let flags = *tokens
-                    .get(position + 2)
-                    .ok_or_else(|| invalid(rt, "truncated formula string flags"))?;
-                if flags & !1 != 0 {
-                    return Err(invalid(rt, "unsupported formula string flags"));
-                }
-                3usize
-                    .checked_add(
-                        count
-                            .checked_mul(if flags == 0 { 1 } else { 2 })
-                            .ok_or_else(|| invalid(rt, "formula string length overflows"))?,
-                    )
-                    .ok_or_else(|| invalid(rt, "formula string length overflows"))?
-            },
-            0x19 => {
-                let header = tokens
-                    .get(position..position + 4)
-                    .ok_or_else(|| invalid(rt, "truncated Attr token"))?;
-                if header[1] & 0x04 != 0 {
-                    4usize
-                        .checked_add(
-                            (usize::from(u16::from_le_bytes([header[2], header[3]])) + 1) * 2,
-                        )
-                        .ok_or_else(|| invalid(rt, "Attr token length overflows"))?
-                } else {
-                    4
-                }
-            },
-            0x1c | 0x1d => 2,
-            0x1e => 3,
-            0x1f => 9,
-            0x20 => {
-                extras.push(FormulaExtraKind::Array);
-                8
-            },
-            0x21 => 3,
-            0x22 => 4,
-            0x23 | 0x24 | 0x2a | 0x2c => 5,
-            0x25 | 0x2b | 0x2d => 9,
-            0x26 => {
-                extras.push(FormulaExtraKind::Memory);
-                7
-            },
-            0x27 => 7,
-            0x29 => 3,
-            0x39 | 0x3a | 0x3c => 7,
-            0x3b | 0x3d => 11,
-            _ => {
-                return Err(invalid(
+    let extras = scan_list_extra_kinds(tokens, rt).map_err(|error| match error {
+        crate::Error::InvalidRecord { message, .. } => {
+            if message.contains("unframeable token") {
+                invalid(rt, "invalid or forbidden token in list array formula")
+            } else {
+                invalid(
                     rt,
-                    "invalid or forbidden token in list array formula",
-                ));
-            },
-        };
-        position = position
-            .checked_add(size)
-            .ok_or_else(|| invalid(rt, "formula token length overflows"))?;
-        if position > tokens.len() {
-            return Err(invalid(rt, "truncated formula token"));
-        }
-    }
+                    message.replace("Formula RgbExtra", "list array formula"),
+                )
+            }
+        },
+        other => other,
+    })?;
     for extra in extras {
         match extra {
             FormulaExtraKind::Memory => {

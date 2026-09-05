@@ -1,0 +1,26 @@
+{
+  "change": 426,
+  "baseline_revision": "f22917bbe973709e93dba9d1d4bc85a4dc0778ce",
+  "classification": "close baseline-reproduced facade failures and preserve standard BIFF8 Formula ancillary data",
+  "performance_claim": null,
+  "serialization": "root owns all Cargo/build/test/profiling/analysis workloads; agents source-only",
+  "rust_toolchain": "1.98.1",
+  "cargo_jobs": 4,
+  "test_threads": 1,
+  "adr_tree": "c950b6c8be822561b498d7bbe87c460873dcbf49",
+  "prior_baseline_reproduction": "../change-0425/checks/facade-test-debt.json",
+  "prior_baseline_reproduction_sha256": "be33598bcadd9eacd04d0ef4e4e2c0547555f9d710d40aba586d5f7f675e8c30",
+  "normative_local_spec": "3rdparty/specs/[MS-XLS]/2 Structures/2.5 Structures.md",
+  "normative_local_spec_sha256": "cc97a37981f84bc979fbac7eff9da71560b239b4a3c3b8b57ce04827158ab0f1",
+  "normative_sections": [
+    "2.5.198.3 CellParsedFormula",
+    "2.5.198.61 PtgExtraMem",
+    "2.5.198.70 PtgMemArea",
+    "2.5.198.103 RgbExtra",
+    "2.5.209 Ref8U"
+  ],
+  "web_sources": [
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xls/7dd67f0a-671d-4905-b87b-4cc07295e442",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xls/70f743b2-a853-4c57-88be-8af637ac6e43"
+  ]
+}

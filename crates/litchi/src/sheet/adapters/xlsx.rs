@@ -774,6 +774,58 @@ mod tests {
         panic!("fixture member CRC was not found");
     }
 
+    fn corrupt_stored_payload_byte(mut bytes: Vec<u8>, member: &[u8]) -> Vec<u8> {
+        let signature = b"PK\x03\x04";
+        let marker = b"SECOND-WORKSHEET-PAYLOAD-MARKER";
+        let mut offset = 0;
+        while let Some(relative) = bytes[offset..]
+            .windows(signature.len())
+            .position(|window| window == signature)
+        {
+            let local = offset + relative;
+            if local + 30 > bytes.len() {
+                break;
+            }
+            let compressed_size = u32::from_le_bytes([
+                bytes[local + 18],
+                bytes[local + 19],
+                bytes[local + 20],
+                bytes[local + 21],
+            ]) as usize;
+            let name_len = u16::from_le_bytes([bytes[local + 26], bytes[local + 27]]) as usize;
+            let extra_len = u16::from_le_bytes([bytes[local + 28], bytes[local + 29]]) as usize;
+            let name_start = local + 30;
+            let Some(name_end) = name_start.checked_add(name_len) else {
+                break;
+            };
+            let Some(data_start) = name_end.checked_add(extra_len) else {
+                break;
+            };
+            let Some(data_end) = data_start.checked_add(compressed_size) else {
+                break;
+            };
+            if data_end > bytes.len() {
+                break;
+            }
+            if bytes.get(name_start..name_end) == Some(member) {
+                let marker_offset = bytes[data_start..data_end]
+                    .windows(marker.len())
+                    .position(|window| window == marker)
+                    .expect("stored worksheet payload marker");
+                // Keep local/central framing and CRC metadata unchanged. The
+                // strict archive-layout proof can therefore succeed, while
+                // the selected verified read owns the checksum failure.
+                bytes[data_start + marker_offset] ^= 1;
+                return bytes;
+            }
+            offset = data_end;
+            if offset >= bytes.len() {
+                break;
+            }
+        }
+        panic!("fixture member stored payload was not found");
+    }
+
     fn assert_workbook_trait_surface(workbook: &dyn WorkbookTrait) {
         assert_eq!(workbook.worksheet_names(), ["First", "Second"]);
         assert_eq!(workbook.worksheet_count(), 2);
@@ -852,7 +904,7 @@ mod tests {
 
     #[test]
     fn source_bytes_catalog_and_selection_defer_corrupt_unselected_payload() {
-        let bytes = corrupt_central_crc(fixture(false, false), b"xl/worksheets/sheet2.xml");
+        let bytes = corrupt_stored_payload_byte(fixture(false, false), b"xl/worksheets/sheet2.xml");
         let workbook = crate::sheet::open_workbook_from_bytes(&bytes)
             .expect("catalog-only source-backed bytes open");
 
@@ -861,7 +913,13 @@ mod tests {
         let first = workbook
             .worksheet_by_name("First")
             .expect("select valid worksheet");
-        assert!(first.cell_value(0, 0).is_ok());
+        assert_eq!(
+            first
+                .cell_value(0, 0)
+                .expect("read uncorrupted selected cell")
+                .as_ref(),
+            &CellValue::Int(7)
+        );
 
         let second = workbook
             .worksheet_by_name("Second")

@@ -1,0 +1,53 @@
+{
+  "fixture": "test-data/ole/xls/FormulaEvalTestData.xls",
+  "fixture_sha256": "c2040c1fac1088f1e112abef197ae1f9bcb03547861783b89c1d4281a42049d1",
+  "stream_sha256": "92a82b24d6093480c8d4d683b4a9c45ac7d1a97346920b0e0074d4191c5c3797",
+  "formula_count": 1416,
+  "records_with_extra": [
+    {
+      "stream_offset": 43084,
+      "row": 46,
+      "column": 3,
+      "payload_bytes": 58,
+      "token_bytes": 26,
+      "tokens_hex": "46101a05131300250800080006c00ac02506000b0008c008c00f",
+      "extra_hex": "01000800080008000800"
+    },
+    {
+      "stream_offset": 43146,
+      "row": 46,
+      "column": 4,
+      "payload_bytes": 62,
+      "token_bytes": 30,
+      "tokens_hex": "26701a05131300250000ffff07400740250700070007c008c00f19100000",
+      "extra_hex": "01000700070007000700"
+    },
+    {
+      "stream_offset": 43212,
+      "row": 46,
+      "column": 5,
+      "payload_bytes": 64,
+      "token_bytes": 32,
+      "tokens_hex": "46501c0513190024070003c024060004c0151124080004c01524070005c0110f",
+      "extra_hex": "01000700070004000400"
+    },
+    {
+      "stream_offset": 47984,
+      "row": 74,
+      "column": 3,
+      "payload_bytes": 51,
+      "token_bytes": 19,
+      "tokens_hex": "46701c05130c0024470001c015244d0001c011",
+      "extra_hex": "010047004d0001000100"
+    },
+    {
+      "stream_offset": 48055,
+      "row": 74,
+      "column": 4,
+      "payload_bytes": 55,
+      "token_bytes": 23,
+      "tokens_hex": "26901c05130c0024060009c024070008c0151119100000",
+      "extra_hex": "01000600070008000900"
+    }
+  ]
+}
