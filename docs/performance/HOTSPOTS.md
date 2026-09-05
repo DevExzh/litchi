@@ -1,5 +1,21 @@
 # Performance hotspot inventory
 
+## Change 0419: PPTX archive allocation requests
+
+[0419](changes/0419-pptx-bounded-archive-growth.md) traced the large cumulative
+allocation volume to exact per-chunk archive reservations. Capped geometric
+growth plus a final fallible compact copy reduces media-rich operation request
+volume by 98.995% and allocation calls by 3.288%. End-of-region live bytes are
+unchanged; RSS is effectively unchanged. Plain median timing is 0.38–2.07%
+slower in the 100-sample diagnostic, an accepted scoped tradeoff. No release
+latency claim or physical-copy reduction is inferred from request accounting.
+
+The remaining memory issue is decoded payload duplication alongside the
+retained generated archive. The [source review](results/change-0419/source-review.md)
+keeps storage adoption inside OPC and prohibits arbitrary source/graph
+reauthorization. Large near-limit memory behavior and matched source-backed
+lifecycles remain priorities in the [goal audit](results/change-0419/goal-audit.md).
+
 ## Change 0418: repeated owned PPTX candidate work
 
 [0418](changes/0418-pptx-cross-copy-candidate-reuse.md) retains a freshly proven

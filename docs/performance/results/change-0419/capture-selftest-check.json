@@ -1,0 +1,10 @@
+{
+  "change": 419,
+  "checks": {
+    "empty_report_rejected": true,
+    "empty_stdout_or_stderr_allowed": true,
+    "nonempty_report_accepted": true
+  },
+  "schema_version": 1,
+  "status": "pass"
+}

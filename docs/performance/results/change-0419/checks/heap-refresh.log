@@ -1,0 +1,2 @@
+{"role": "control", "status": "pass", "analysis": "/home/zhuhe/code/litchi/docs/performance/results/change-0419/heaptrack/control/analysis.json"}
+{"role": "candidate", "status": "pass", "analysis": "/home/zhuhe/code/litchi/docs/performance/results/change-0419/heaptrack/candidate/analysis.json"}

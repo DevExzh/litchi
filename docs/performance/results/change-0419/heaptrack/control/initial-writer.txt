@@ -1,0 +1,1256 @@
+reading file "docs/performance/results/change-0419/heaptrack/control/trace.zst" - please wait, this might take some time...
+Debuggee command was: /tmp/litchi-goal-0419-control-normal --case pptx_cross_copy_media_rich_lifecycle --shape many-small --payload compressible --writer-shape large --xlsx-shape medium --xlsx-cell-crud-shape medium --xlsx-row-visibility-shape medium --semantic-shape medium --workers 1 --filesystem-cache warm --samples 1 --warmup 0 --json /home/zhuhe/code/litchi/docs/performance/results/change-0419/heaptrack/control/report.json --corpus-manifest /home/zhuhe/code/litchi/docs/performance/results/change-0419/heaptrack/control/catalog.json
+finished reading file, now analyzing data:
+
+MOST CALLS TO ALLOCATION FUNCTIONS
+1082 calls to allocation functions with 0B peak consumption from
+  _RNvNtCs6i54tJFfzR_5alloc5alloc15realloc_nonnull
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:155
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global17grow_impl_runtime
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:259
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global9grow_impl
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:362
+  _RNvXs_NtCs6i54tJFfzR_5alloc5allocNtB4_6GlobalNtNtCsgxBkk5gSRhY_4core5alloc9Allocator4grow
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:474
+  _RNvMs5_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:557
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner10grow_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:801
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:729
+  _RNvMs0_NtCs6i54tJFfzR_5alloc7raw_vecINtB5_6RawVechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:384
+  _RNvMs_NtCs6i54tJFfzR_5alloc3vecINtB4_3VechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/vec/mod.rs:1579
+  _RNvXs4_NtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_planNtB5_16BoundedVecWriterNtNtCs9k3SxhrAWiO_3std2io5Write5write
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1948
+  _RNvXs_NtNtCs9k3SxhrAWiO_3std2io5implsQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterNtB6_5Write5writeBG_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/io/impls.rs:59
+  _RNvXs_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB4_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterENtNtCs9k3SxhrAWiO_3std2io5Write5writeB11_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:42
+  _RNvXNtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB2_7ChunkedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEENtNtCs9k3SxhrAWiO_3std2io5Write5writeB1d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:32
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip10accounting17write_all_countedINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB15_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2b_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/accounting.rs:265
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve10copy_rangeINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1G_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2M_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2123
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve20write_prepared_localINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1Q_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2W_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2062
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE24write_to_with_accountingINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB2o_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3u_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:690
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE8write_toINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB27_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:664
+  _RINvNtCsjgzN66wlxZX_10litchi_opc9pkgwriter19try_write_preservedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1k_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:704
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter13write_countedINtB6_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1C_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:933
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter15write_to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1q_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:906
+  _RINvMs0_NtCsjgzN66wlxZX_10litchi_opc7packageNtB6_10OpcPackage9to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1e_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/package.rs:1060
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan21bounded_package_bytes
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1965
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan15build_candidate
+    at src/opened/cross_copy_plan.rs:1061
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan35prepare_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:893
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan32plan_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:706
+    in /tmp/litchi-goal-0419-control-normal
+  _RNCNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan11apply_patchs_0B7_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:629
+  _RINvMNtCsgxBkk5gSRhY_4core6optionINtB3_6OptionNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened5model8SnapshotE8and_thenbNCNvNtBM_15cross_copy_plan11apply_patchs_0EBO_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/option.rs:1542
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan11apply_patch
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:626
+  _RNvMNtNtCsjg6XkOvy2Di_11litchi_pptx7package5modelNtB2_7Package28apply_cross_slide_copy_patch
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/package/model.rs:334
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline36verify_pptx_cross_copy_refusal_gates
+    at src/lib.rs:16232
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline28build_pptx_cross_copy_corpus
+    at src/lib.rs:14521
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline3run
+    at src/lib.rs:9431
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvYFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB9_5error5ErrorEL_EEINtNtNtB9_3ops8function6FnOnceuE9call_onceCslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB1e_5error5ErrorEL_EEB19_ECslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/backtrace.rs:166
+  _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtBI_5error5ErrorEL_EEE0CslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:206
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvXs0_NtNtNtCsgxBkk5gSRhY_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtNtBb_5panic11unwind_safe13RefUnwindSafeNtNtBb_6marker4SyncEL_INtB7_6FnOnceuE9call_onceCs9k3SxhrAWiO_3std
+    at library/core/src/ops/function.rs:287
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtB13_5panic11unwind_safe13RefUnwindSafeNtNtB13_6marker4SyncEL_lEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindlRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBU_5panic11unwind_safe13RefUnwindSafeNtNtBU_6marker4SyncEL_EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBP_5panic11unwind_safe13RefUnwindSafeNtNtBP_6marker4SyncEL_lEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNCNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal0B5_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:175
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:171
+  main
+    in /tmp/litchi-goal-0419-control-normal
+
+558 calls to allocation functions with 0B peak consumption from
+  _RNvNtCs6i54tJFfzR_5alloc5alloc15realloc_nonnull
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:155
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global17grow_impl_runtime
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:259
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global9grow_impl
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:362
+  _RNvXs_NtCs6i54tJFfzR_5alloc5allocNtB4_6GlobalNtNtCsgxBkk5gSRhY_4core5alloc9Allocator4grow
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:474
+  _RNvMs5_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:557
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner10grow_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:801
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:729
+  _RNvMs0_NtCs6i54tJFfzR_5alloc7raw_vecINtB5_6RawVechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:384
+  _RNvMs_NtCs6i54tJFfzR_5alloc3vecINtB4_3VechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/vec/mod.rs:1579
+  _RNvXs4_NtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_planNtB5_16BoundedVecWriterNtNtCs9k3SxhrAWiO_3std2io5Write5write
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1948
+  _RNvXs_NtNtCs9k3SxhrAWiO_3std2io5implsQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterNtB6_5Write5writeBG_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/io/impls.rs:59
+  _RNvXs_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB4_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterENtNtCs9k3SxhrAWiO_3std2io5Write5writeB11_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:42
+  _RNvXNtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB2_7ChunkedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEENtNtCs9k3SxhrAWiO_3std2io5Write5writeB1d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:32
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip10accounting17write_all_countedINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB15_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2b_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/accounting.rs:265
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve10copy_rangeINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1G_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2M_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2123
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve20write_prepared_localINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1Q_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2W_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2062
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE24write_to_with_accountingINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB2o_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3u_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:690
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE8write_toINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB27_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:664
+  _RINvNtCsjgzN66wlxZX_10litchi_opc9pkgwriter19try_write_preservedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1k_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:704
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter13write_countedINtB6_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1C_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:933
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter15write_to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1q_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:906
+  _RINvMs0_NtCsjgzN66wlxZX_10litchi_opc7packageNtB6_10OpcPackage9to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1e_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/package.rs:1060
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan21bounded_package_bytes
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1965
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan15build_candidate
+    at src/opened/cross_copy_plan.rs:1061
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan35prepare_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:893
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan10apply_plan
+    at src/opened/cross_copy_plan.rs:495
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtNtCsjg6XkOvy2Di_11litchi_pptx7package5modelNtB2_7Package27apply_cross_slide_copy_plan
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/package/model.rs:284
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline28build_pptx_cross_copy_corpus
+    at src/lib.rs:14493
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline3run
+    at src/lib.rs:9431
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvYFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB9_5error5ErrorEL_EEINtNtNtB9_3ops8function6FnOnceuE9call_onceCslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB1e_5error5ErrorEL_EEB19_ECslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/backtrace.rs:166
+  _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtBI_5error5ErrorEL_EEE0CslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:206
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvXs0_NtNtNtCsgxBkk5gSRhY_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtNtBb_5panic11unwind_safe13RefUnwindSafeNtNtBb_6marker4SyncEL_INtB7_6FnOnceuE9call_onceCs9k3SxhrAWiO_3std
+    at library/core/src/ops/function.rs:287
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtB13_5panic11unwind_safe13RefUnwindSafeNtNtB13_6marker4SyncEL_lEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindlRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBU_5panic11unwind_safe13RefUnwindSafeNtNtBU_6marker4SyncEL_EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBP_5panic11unwind_safe13RefUnwindSafeNtNtBP_6marker4SyncEL_lEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNCNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal0B5_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:175
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:171
+  main
+    in /tmp/litchi-goal-0419-control-normal
+
+558 calls to allocation functions with 0B peak consumption from
+  _RNvNtCs6i54tJFfzR_5alloc5alloc15realloc_nonnull
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:155
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global17grow_impl_runtime
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:259
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global9grow_impl
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:362
+  _RNvXs_NtCs6i54tJFfzR_5alloc5allocNtB4_6GlobalNtNtCsgxBkk5gSRhY_4core5alloc9Allocator4grow
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:474
+  _RNvMs5_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:557
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner10grow_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:801
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:729
+  _RNvMs0_NtCs6i54tJFfzR_5alloc7raw_vecINtB5_6RawVechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:384
+  _RNvMs_NtCs6i54tJFfzR_5alloc3vecINtB4_3VechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/vec/mod.rs:1579
+  _RNvXs4_NtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_planNtB5_16BoundedVecWriterNtNtCs9k3SxhrAWiO_3std2io5Write5write
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1948
+  _RNvXs_NtNtCs9k3SxhrAWiO_3std2io5implsQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterNtB6_5Write5writeBG_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/io/impls.rs:59
+  _RNvXs_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB4_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterENtNtCs9k3SxhrAWiO_3std2io5Write5writeB11_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:42
+  _RNvXNtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB2_7ChunkedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEENtNtCs9k3SxhrAWiO_3std2io5Write5writeB1d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:32
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip10accounting17write_all_countedINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB15_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2b_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/accounting.rs:265
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve10copy_rangeINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1G_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2M_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2123
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve20write_prepared_localINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1Q_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2W_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2062
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE24write_to_with_accountingINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB2o_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3u_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:690
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE8write_toINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB27_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:664
+  _RINvNtCsjgzN66wlxZX_10litchi_opc9pkgwriter19try_write_preservedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1k_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:704
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter13write_countedINtB6_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1C_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:933
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter15write_to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1q_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:906
+  _RINvMs0_NtCsjgzN66wlxZX_10litchi_opc7packageNtB6_10OpcPackage9to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1e_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/package.rs:1060
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan21bounded_package_bytes
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1965
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan15build_candidate
+    at src/opened/cross_copy_plan.rs:1061
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan35prepare_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:893
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan32plan_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:706
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs0_NtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_planNtNtB8_5model8Snapshot21plan_cross_slide_copyjjECs2VwJJX2MrhN_20litchi_perf_baseline
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:435
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline29run_pptx_cross_copy_lifecycle
+    at src/lib.rs:46707
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline3run
+    at src/lib.rs:9432
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvYFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB9_5error5ErrorEL_EEINtNtNtB9_3ops8function6FnOnceuE9call_onceCslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB1e_5error5ErrorEL_EEB19_ECslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/backtrace.rs:166
+  _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtBI_5error5ErrorEL_EEE0CslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:206
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvXs0_NtNtNtCsgxBkk5gSRhY_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtNtBb_5panic11unwind_safe13RefUnwindSafeNtNtBb_6marker4SyncEL_INtB7_6FnOnceuE9call_onceCs9k3SxhrAWiO_3std
+    at library/core/src/ops/function.rs:287
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtB13_5panic11unwind_safe13RefUnwindSafeNtNtB13_6marker4SyncEL_lEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindlRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBU_5panic11unwind_safe13RefUnwindSafeNtNtBU_6marker4SyncEL_EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBP_5panic11unwind_safe13RefUnwindSafeNtNtBP_6marker4SyncEL_lEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNCNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal0B5_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:175
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:171
+  main
+    in /tmp/litchi-goal-0419-control-normal
+
+558 calls to allocation functions with 0B peak consumption from
+  _RNvNtCs6i54tJFfzR_5alloc5alloc15realloc_nonnull
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:155
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global17grow_impl_runtime
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:259
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global9grow_impl
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:362
+  _RNvXs_NtCs6i54tJFfzR_5alloc5allocNtB4_6GlobalNtNtCsgxBkk5gSRhY_4core5alloc9Allocator4grow
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:474
+  _RNvMs5_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:557
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner10grow_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:801
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:729
+  _RNvMs0_NtCs6i54tJFfzR_5alloc7raw_vecINtB5_6RawVechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:384
+  _RNvMs_NtCs6i54tJFfzR_5alloc3vecINtB4_3VechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/vec/mod.rs:1579
+  _RNvXs4_NtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_planNtB5_16BoundedVecWriterNtNtCs9k3SxhrAWiO_3std2io5Write5write
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1948
+  _RNvXs_NtNtCs9k3SxhrAWiO_3std2io5implsQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterNtB6_5Write5writeBG_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/io/impls.rs:59
+  _RNvXs_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB4_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterENtNtCs9k3SxhrAWiO_3std2io5Write5writeB11_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:42
+  _RNvXNtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB2_7ChunkedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEENtNtCs9k3SxhrAWiO_3std2io5Write5writeB1d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:32
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip10accounting17write_all_countedINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB15_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2b_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/accounting.rs:265
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve10copy_rangeINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1G_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2M_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2123
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve20write_prepared_localINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1Q_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2W_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2062
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE24write_to_with_accountingINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB2o_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3u_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:690
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE8write_toINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB27_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:664
+  _RINvNtCsjgzN66wlxZX_10litchi_opc9pkgwriter19try_write_preservedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1k_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:704
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter13write_countedINtB6_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1C_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:933
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter15write_to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1q_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:906
+  _RINvMs0_NtCsjgzN66wlxZX_10litchi_opc7packageNtB6_10OpcPackage9to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1e_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/package.rs:1060
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan21bounded_package_bytes
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1965
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan15build_candidate
+    at src/opened/cross_copy_plan.rs:1061
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan35prepare_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:893
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan10apply_plan
+    at src/opened/cross_copy_plan.rs:495
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtNtCsjg6XkOvy2Di_11litchi_pptx7package5modelNtB2_7Package27apply_cross_slide_copy_plan
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/package/model.rs:284
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline29run_pptx_cross_copy_lifecycle
+    at src/lib.rs:46716
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline3run
+    at src/lib.rs:9432
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvYFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB9_5error5ErrorEL_EEINtNtNtB9_3ops8function6FnOnceuE9call_onceCslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB1e_5error5ErrorEL_EEB19_ECslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/backtrace.rs:166
+  _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtBI_5error5ErrorEL_EEE0CslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:206
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvXs0_NtNtNtCsgxBkk5gSRhY_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtNtBb_5panic11unwind_safe13RefUnwindSafeNtNtBb_6marker4SyncEL_INtB7_6FnOnceuE9call_onceCs9k3SxhrAWiO_3std
+    at library/core/src/ops/function.rs:287
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtB13_5panic11unwind_safe13RefUnwindSafeNtNtB13_6marker4SyncEL_lEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindlRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBU_5panic11unwind_safe13RefUnwindSafeNtNtBU_6marker4SyncEL_EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBP_5panic11unwind_safe13RefUnwindSafeNtNtBP_6marker4SyncEL_lEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNCNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal0B5_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:175
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:171
+  main
+    in /tmp/litchi-goal-0419-control-normal
+
+558 calls to allocation functions with 0B peak consumption from
+  _RNvNtCs6i54tJFfzR_5alloc5alloc15realloc_nonnull
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:155
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global17grow_impl_runtime
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:259
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global9grow_impl
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:362
+  _RNvXs_NtCs6i54tJFfzR_5alloc5allocNtB4_6GlobalNtNtCsgxBkk5gSRhY_4core5alloc9Allocator4grow
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:474
+  _RNvMs5_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:557
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner10grow_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:801
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:729
+  _RNvMs0_NtCs6i54tJFfzR_5alloc7raw_vecINtB5_6RawVechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:384
+  _RNvMs_NtCs6i54tJFfzR_5alloc3vecINtB4_3VechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/vec/mod.rs:1579
+  _RNvXs4_NtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_planNtB5_16BoundedVecWriterNtNtCs9k3SxhrAWiO_3std2io5Write5write
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1948
+  _RNvXs_NtNtCs9k3SxhrAWiO_3std2io5implsQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterNtB6_5Write5writeBG_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/io/impls.rs:59
+  _RNvXs_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB4_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterENtNtCs9k3SxhrAWiO_3std2io5Write5writeB11_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:42
+  _RNvXNtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB2_7ChunkedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEENtNtCs9k3SxhrAWiO_3std2io5Write5writeB1d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:32
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip10accounting17write_all_countedINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB15_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2b_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/accounting.rs:265
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve10copy_rangeINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1G_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2M_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2123
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve20write_prepared_localINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1Q_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2W_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2062
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE24write_to_with_accountingINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB2o_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3u_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:690
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE8write_toINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB27_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:664
+  _RINvNtCsjgzN66wlxZX_10litchi_opc9pkgwriter19try_write_preservedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1k_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:704
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter13write_countedINtB6_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1C_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:933
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter15write_to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1q_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:906
+  _RINvMs0_NtCsjgzN66wlxZX_10litchi_opc7packageNtB6_10OpcPackage9to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1e_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/package.rs:1060
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan21bounded_package_bytes
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1965
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan15build_candidate
+    at src/opened/cross_copy_plan.rs:1061
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan35prepare_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:893
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan32plan_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:706
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs0_NtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_planNtNtB8_5model8Snapshot21plan_cross_slide_copyjjECs2VwJJX2MrhN_20litchi_perf_baseline
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:435
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline36verify_pptx_cross_copy_refusal_gates
+    at src/lib.rs:16256
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline28build_pptx_cross_copy_corpus
+    at src/lib.rs:14521
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline3run
+    at src/lib.rs:9431
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvYFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB9_5error5ErrorEL_EEINtNtNtB9_3ops8function6FnOnceuE9call_onceCslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB1e_5error5ErrorEL_EEB19_ECslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/backtrace.rs:166
+  _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtBI_5error5ErrorEL_EEE0CslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:206
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvXs0_NtNtNtCsgxBkk5gSRhY_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtNtBb_5panic11unwind_safe13RefUnwindSafeNtNtBb_6marker4SyncEL_INtB7_6FnOnceuE9call_onceCs9k3SxhrAWiO_3std
+    at library/core/src/ops/function.rs:287
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtB13_5panic11unwind_safe13RefUnwindSafeNtNtB13_6marker4SyncEL_lEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindlRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBU_5panic11unwind_safe13RefUnwindSafeNtNtBU_6marker4SyncEL_EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBP_5panic11unwind_safe13RefUnwindSafeNtNtBP_6marker4SyncEL_lEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNCNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal0B5_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:175
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:171
+  main
+    in /tmp/litchi-goal-0419-control-normal
+
+
+
+PEAK MEMORY CONSUMERS
+33.60M peak memory consumed over 1 calls from
+  _RNvNtCs6i54tJFfzR_5alloc5alloc15realloc_nonnull
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:155
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global17grow_impl_runtime
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:259
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global9grow_impl
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:362
+  _RNvXs_NtCs6i54tJFfzR_5alloc5allocNtB4_6GlobalNtNtCsgxBkk5gSRhY_4core5alloc9Allocator4grow
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:474
+  _RNvMs5_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:557
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner10grow_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:801
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:729
+  _RNvMs0_NtCs6i54tJFfzR_5alloc7raw_vecINtB5_6RawVechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:384
+  _RNvMs_NtCs6i54tJFfzR_5alloc3vecINtB4_3VechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/vec/mod.rs:1579
+  _RNvXs4_NtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_planNtB5_16BoundedVecWriterNtNtCs9k3SxhrAWiO_3std2io5Write5write
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1948
+  _RNvXs_NtNtCs9k3SxhrAWiO_3std2io5implsQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterNtB6_5Write5writeBG_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/io/impls.rs:59
+  _RNvXs_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB4_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterENtNtCs9k3SxhrAWiO_3std2io5Write5writeB11_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:42
+  _RNvXNtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB2_7ChunkedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEENtNtCs9k3SxhrAWiO_3std2io5Write5writeB1d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:32
+  _RNvYINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB5_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEENtNtCs9k3SxhrAWiO_3std2io5Write9write_allB1a_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/io/mod.rs:1613
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve19write_prepared_tailINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB14_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2a_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:1190
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE24write_to_with_accountingINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB2o_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3u_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:735
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE8write_toINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB27_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:664
+  _RINvNtCsjgzN66wlxZX_10litchi_opc9pkgwriter19try_write_preservedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1k_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:704
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter13write_countedINtB6_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1C_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:933
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter15write_to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1q_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:906
+  _RINvMs0_NtCsjgzN66wlxZX_10litchi_opc7packageNtB6_10OpcPackage9to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1e_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/package.rs:1060
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan21bounded_package_bytes
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1965
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan15build_candidate
+    at src/opened/cross_copy_plan.rs:1061
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan35prepare_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:893
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan10apply_plan
+    at src/opened/cross_copy_plan.rs:495
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtNtCsjg6XkOvy2Di_11litchi_pptx7package5modelNtB2_7Package27apply_cross_slide_copy_plan
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/package/model.rs:284
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline28build_pptx_cross_copy_corpus
+    at src/lib.rs:14493
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline3run
+    at src/lib.rs:9431
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvYFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB9_5error5ErrorEL_EEINtNtNtB9_3ops8function6FnOnceuE9call_onceCslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB1e_5error5ErrorEL_EEB19_ECslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/backtrace.rs:166
+  _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtBI_5error5ErrorEL_EEE0CslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:206
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvXs0_NtNtNtCsgxBkk5gSRhY_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtNtBb_5panic11unwind_safe13RefUnwindSafeNtNtBb_6marker4SyncEL_INtB7_6FnOnceuE9call_onceCs9k3SxhrAWiO_3std
+    at library/core/src/ops/function.rs:287
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtB13_5panic11unwind_safe13RefUnwindSafeNtNtB13_6marker4SyncEL_lEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindlRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBU_5panic11unwind_safe13RefUnwindSafeNtNtBU_6marker4SyncEL_EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBP_5panic11unwind_safe13RefUnwindSafeNtNtBP_6marker4SyncEL_lEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNCNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal0B5_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:175
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:171
+  main
+    in /tmp/litchi-goal-0419-control-normal
+
+33.60M peak memory consumed over 1 calls from
+  _RNvNtCs6i54tJFfzR_5alloc5alloc15realloc_nonnull
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:155
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global17grow_impl_runtime
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:259
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global9grow_impl
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:362
+  _RNvXs_NtCs6i54tJFfzR_5alloc5allocNtB4_6GlobalNtNtCsgxBkk5gSRhY_4core5alloc9Allocator4grow
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:474
+  _RNvMs5_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:557
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner10grow_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:801
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:729
+  _RNvMs0_NtCs6i54tJFfzR_5alloc7raw_vecINtB5_6RawVechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:384
+  _RNvMs_NtCs6i54tJFfzR_5alloc3vecINtB4_3VechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/vec/mod.rs:1579
+  _RNvXs4_NtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_planNtB5_16BoundedVecWriterNtNtCs9k3SxhrAWiO_3std2io5Write5write
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1948
+  _RNvXs_NtNtCs9k3SxhrAWiO_3std2io5implsQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterNtB6_5Write5writeBG_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/io/impls.rs:59
+  _RNvXs_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB4_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterENtNtCs9k3SxhrAWiO_3std2io5Write5writeB11_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:42
+  _RNvXNtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB2_7ChunkedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEENtNtCs9k3SxhrAWiO_3std2io5Write5writeB1d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:32
+  _RNvYINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB5_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEENtNtCs9k3SxhrAWiO_3std2io5Write9write_allB1a_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/io/mod.rs:1613
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve19write_prepared_tailINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB14_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2a_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:1190
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE24write_to_with_accountingINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB2o_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3u_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:735
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE8write_toINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB27_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:664
+  _RINvNtCsjgzN66wlxZX_10litchi_opc9pkgwriter19try_write_preservedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1k_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:704
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter13write_countedINtB6_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1C_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:933
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter15write_to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1q_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:906
+  _RINvMs0_NtCsjgzN66wlxZX_10litchi_opc7packageNtB6_10OpcPackage9to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1e_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/package.rs:1060
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan21bounded_package_bytes
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1965
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan15build_candidate
+    at src/opened/cross_copy_plan.rs:1061
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan35prepare_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:893
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan11apply_patch
+    at src/opened/cross_copy_plan.rs:581
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtNtCsjg6XkOvy2Di_11litchi_pptx7package5modelNtB2_7Package28apply_cross_slide_copy_patch
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/package/model.rs:334
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline36verify_pptx_cross_copy_refusal_gates
+    at src/lib.rs:16229
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline28build_pptx_cross_copy_corpus
+    at src/lib.rs:14521
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline3run
+    at src/lib.rs:9431
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvYFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB9_5error5ErrorEL_EEINtNtNtB9_3ops8function6FnOnceuE9call_onceCslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB1e_5error5ErrorEL_EEB19_ECslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/backtrace.rs:166
+  _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtBI_5error5ErrorEL_EEE0CslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:206
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvXs0_NtNtNtCsgxBkk5gSRhY_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtNtBb_5panic11unwind_safe13RefUnwindSafeNtNtBb_6marker4SyncEL_INtB7_6FnOnceuE9call_onceCs9k3SxhrAWiO_3std
+    at library/core/src/ops/function.rs:287
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtB13_5panic11unwind_safe13RefUnwindSafeNtNtB13_6marker4SyncEL_lEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindlRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBU_5panic11unwind_safe13RefUnwindSafeNtNtBU_6marker4SyncEL_EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBP_5panic11unwind_safe13RefUnwindSafeNtNtBP_6marker4SyncEL_lEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNCNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal0B5_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:175
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:171
+  main
+    in /tmp/litchi-goal-0419-control-normal
+
+
+
+MOST TEMPORARY ALLOCATIONS
+1082 temporary allocations of 1082 allocations in total (100.00%) from
+  _RNvNtCs6i54tJFfzR_5alloc5alloc15realloc_nonnull
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:155
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global17grow_impl_runtime
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:259
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global9grow_impl
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:362
+  _RNvXs_NtCs6i54tJFfzR_5alloc5allocNtB4_6GlobalNtNtCsgxBkk5gSRhY_4core5alloc9Allocator4grow
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:474
+  _RNvMs5_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:557
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner10grow_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:801
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:729
+  _RNvMs0_NtCs6i54tJFfzR_5alloc7raw_vecINtB5_6RawVechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:384
+  _RNvMs_NtCs6i54tJFfzR_5alloc3vecINtB4_3VechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/vec/mod.rs:1579
+  _RNvXs4_NtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_planNtB5_16BoundedVecWriterNtNtCs9k3SxhrAWiO_3std2io5Write5write
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1948
+  _RNvXs_NtNtCs9k3SxhrAWiO_3std2io5implsQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterNtB6_5Write5writeBG_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/io/impls.rs:59
+  _RNvXs_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB4_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterENtNtCs9k3SxhrAWiO_3std2io5Write5writeB11_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:42
+  _RNvXNtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB2_7ChunkedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEENtNtCs9k3SxhrAWiO_3std2io5Write5writeB1d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:32
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip10accounting17write_all_countedINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB15_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2b_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/accounting.rs:265
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve10copy_rangeINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1G_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2M_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2123
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve20write_prepared_localINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1Q_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2W_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2062
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE24write_to_with_accountingINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB2o_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3u_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:690
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE8write_toINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB27_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:664
+  _RINvNtCsjgzN66wlxZX_10litchi_opc9pkgwriter19try_write_preservedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1k_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:704
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter13write_countedINtB6_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1C_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:933
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter15write_to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1q_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:906
+  _RINvMs0_NtCsjgzN66wlxZX_10litchi_opc7packageNtB6_10OpcPackage9to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1e_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/package.rs:1060
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan21bounded_package_bytes
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1965
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan15build_candidate
+    at src/opened/cross_copy_plan.rs:1061
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan35prepare_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:893
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan32plan_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:706
+    in /tmp/litchi-goal-0419-control-normal
+  _RNCNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan11apply_patchs_0B7_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:629
+  _RINvMNtCsgxBkk5gSRhY_4core6optionINtB3_6OptionNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened5model8SnapshotE8and_thenbNCNvNtBM_15cross_copy_plan11apply_patchs_0EBO_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/option.rs:1542
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan11apply_patch
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:626
+  _RNvMNtNtCsjg6XkOvy2Di_11litchi_pptx7package5modelNtB2_7Package28apply_cross_slide_copy_patch
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/package/model.rs:334
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline36verify_pptx_cross_copy_refusal_gates
+    at src/lib.rs:16232
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline28build_pptx_cross_copy_corpus
+    at src/lib.rs:14521
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline3run
+    at src/lib.rs:9431
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvYFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB9_5error5ErrorEL_EEINtNtNtB9_3ops8function6FnOnceuE9call_onceCslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB1e_5error5ErrorEL_EEB19_ECslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/backtrace.rs:166
+  _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtBI_5error5ErrorEL_EEE0CslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:206
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvXs0_NtNtNtCsgxBkk5gSRhY_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtNtBb_5panic11unwind_safe13RefUnwindSafeNtNtBb_6marker4SyncEL_INtB7_6FnOnceuE9call_onceCs9k3SxhrAWiO_3std
+    at library/core/src/ops/function.rs:287
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtB13_5panic11unwind_safe13RefUnwindSafeNtNtB13_6marker4SyncEL_lEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindlRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBU_5panic11unwind_safe13RefUnwindSafeNtNtBU_6marker4SyncEL_EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBP_5panic11unwind_safe13RefUnwindSafeNtNtBP_6marker4SyncEL_lEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNCNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal0B5_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:175
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:171
+  main
+    in /tmp/litchi-goal-0419-control-normal
+
+558 temporary allocations of 558 allocations in total (100.00%) from
+  _RNvNtCs6i54tJFfzR_5alloc5alloc15realloc_nonnull
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:155
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global17grow_impl_runtime
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:259
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global9grow_impl
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:362
+  _RNvXs_NtCs6i54tJFfzR_5alloc5allocNtB4_6GlobalNtNtCsgxBkk5gSRhY_4core5alloc9Allocator4grow
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:474
+  _RNvMs5_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:557
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner10grow_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:801
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:729
+  _RNvMs0_NtCs6i54tJFfzR_5alloc7raw_vecINtB5_6RawVechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:384
+  _RNvMs_NtCs6i54tJFfzR_5alloc3vecINtB4_3VechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/vec/mod.rs:1579
+  _RNvXs4_NtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_planNtB5_16BoundedVecWriterNtNtCs9k3SxhrAWiO_3std2io5Write5write
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1948
+  _RNvXs_NtNtCs9k3SxhrAWiO_3std2io5implsQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterNtB6_5Write5writeBG_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/io/impls.rs:59
+  _RNvXs_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB4_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterENtNtCs9k3SxhrAWiO_3std2io5Write5writeB11_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:42
+  _RNvXNtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB2_7ChunkedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEENtNtCs9k3SxhrAWiO_3std2io5Write5writeB1d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:32
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip10accounting17write_all_countedINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB15_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2b_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/accounting.rs:265
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve10copy_rangeINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1G_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2M_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2123
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve20write_prepared_localINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1Q_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2W_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2062
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE24write_to_with_accountingINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB2o_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3u_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:690
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE8write_toINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB27_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:664
+  _RINvNtCsjgzN66wlxZX_10litchi_opc9pkgwriter19try_write_preservedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1k_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:704
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter13write_countedINtB6_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1C_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:933
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter15write_to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1q_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:906
+  _RINvMs0_NtCsjgzN66wlxZX_10litchi_opc7packageNtB6_10OpcPackage9to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1e_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/package.rs:1060
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan21bounded_package_bytes
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1965
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan15build_candidate
+    at src/opened/cross_copy_plan.rs:1061
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan35prepare_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:893
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan10apply_plan
+    at src/opened/cross_copy_plan.rs:495
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtNtCsjg6XkOvy2Di_11litchi_pptx7package5modelNtB2_7Package27apply_cross_slide_copy_plan
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/package/model.rs:284
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline28build_pptx_cross_copy_corpus
+    at src/lib.rs:14493
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline3run
+    at src/lib.rs:9431
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvYFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB9_5error5ErrorEL_EEINtNtNtB9_3ops8function6FnOnceuE9call_onceCslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB1e_5error5ErrorEL_EEB19_ECslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/backtrace.rs:166
+  _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtBI_5error5ErrorEL_EEE0CslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:206
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvXs0_NtNtNtCsgxBkk5gSRhY_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtNtBb_5panic11unwind_safe13RefUnwindSafeNtNtBb_6marker4SyncEL_INtB7_6FnOnceuE9call_onceCs9k3SxhrAWiO_3std
+    at library/core/src/ops/function.rs:287
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtB13_5panic11unwind_safe13RefUnwindSafeNtNtB13_6marker4SyncEL_lEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindlRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBU_5panic11unwind_safe13RefUnwindSafeNtNtBU_6marker4SyncEL_EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBP_5panic11unwind_safe13RefUnwindSafeNtNtBP_6marker4SyncEL_lEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNCNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal0B5_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:175
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:171
+  main
+    in /tmp/litchi-goal-0419-control-normal
+
+558 temporary allocations of 558 allocations in total (100.00%) from
+  _RNvNtCs6i54tJFfzR_5alloc5alloc15realloc_nonnull
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:155
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global17grow_impl_runtime
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:259
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global9grow_impl
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:362
+  _RNvXs_NtCs6i54tJFfzR_5alloc5allocNtB4_6GlobalNtNtCsgxBkk5gSRhY_4core5alloc9Allocator4grow
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:474
+  _RNvMs5_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:557
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner10grow_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:801
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:729
+  _RNvMs0_NtCs6i54tJFfzR_5alloc7raw_vecINtB5_6RawVechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:384
+  _RNvMs_NtCs6i54tJFfzR_5alloc3vecINtB4_3VechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/vec/mod.rs:1579
+  _RNvXs4_NtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_planNtB5_16BoundedVecWriterNtNtCs9k3SxhrAWiO_3std2io5Write5write
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1948
+  _RNvXs_NtNtCs9k3SxhrAWiO_3std2io5implsQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterNtB6_5Write5writeBG_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/io/impls.rs:59
+  _RNvXs_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB4_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterENtNtCs9k3SxhrAWiO_3std2io5Write5writeB11_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:42
+  _RNvXNtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB2_7ChunkedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEENtNtCs9k3SxhrAWiO_3std2io5Write5writeB1d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:32
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip10accounting17write_all_countedINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB15_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2b_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/accounting.rs:265
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve10copy_rangeINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1G_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2M_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2123
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve20write_prepared_localINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1Q_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2W_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2062
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE24write_to_with_accountingINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB2o_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3u_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:690
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE8write_toINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB27_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:664
+  _RINvNtCsjgzN66wlxZX_10litchi_opc9pkgwriter19try_write_preservedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1k_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:704
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter13write_countedINtB6_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1C_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:933
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter15write_to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1q_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:906
+  _RINvMs0_NtCsjgzN66wlxZX_10litchi_opc7packageNtB6_10OpcPackage9to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1e_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/package.rs:1060
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan21bounded_package_bytes
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1965
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan15build_candidate
+    at src/opened/cross_copy_plan.rs:1061
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan35prepare_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:893
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan32plan_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:706
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs0_NtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_planNtNtB8_5model8Snapshot21plan_cross_slide_copyjjECs2VwJJX2MrhN_20litchi_perf_baseline
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:435
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline29run_pptx_cross_copy_lifecycle
+    at src/lib.rs:46707
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline3run
+    at src/lib.rs:9432
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvYFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB9_5error5ErrorEL_EEINtNtNtB9_3ops8function6FnOnceuE9call_onceCslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB1e_5error5ErrorEL_EEB19_ECslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/backtrace.rs:166
+  _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtBI_5error5ErrorEL_EEE0CslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:206
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvXs0_NtNtNtCsgxBkk5gSRhY_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtNtBb_5panic11unwind_safe13RefUnwindSafeNtNtBb_6marker4SyncEL_INtB7_6FnOnceuE9call_onceCs9k3SxhrAWiO_3std
+    at library/core/src/ops/function.rs:287
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtB13_5panic11unwind_safe13RefUnwindSafeNtNtB13_6marker4SyncEL_lEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindlRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBU_5panic11unwind_safe13RefUnwindSafeNtNtBU_6marker4SyncEL_EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBP_5panic11unwind_safe13RefUnwindSafeNtNtBP_6marker4SyncEL_lEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNCNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal0B5_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:175
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:171
+  main
+    in /tmp/litchi-goal-0419-control-normal
+
+558 temporary allocations of 558 allocations in total (100.00%) from
+  _RNvNtCs6i54tJFfzR_5alloc5alloc15realloc_nonnull
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:155
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global17grow_impl_runtime
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:259
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global9grow_impl
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:362
+  _RNvXs_NtCs6i54tJFfzR_5alloc5allocNtB4_6GlobalNtNtCsgxBkk5gSRhY_4core5alloc9Allocator4grow
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:474
+  _RNvMs5_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:557
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner10grow_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:801
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:729
+  _RNvMs0_NtCs6i54tJFfzR_5alloc7raw_vecINtB5_6RawVechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:384
+  _RNvMs_NtCs6i54tJFfzR_5alloc3vecINtB4_3VechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/vec/mod.rs:1579
+  _RNvXs4_NtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_planNtB5_16BoundedVecWriterNtNtCs9k3SxhrAWiO_3std2io5Write5write
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1948
+  _RNvXs_NtNtCs9k3SxhrAWiO_3std2io5implsQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterNtB6_5Write5writeBG_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/io/impls.rs:59
+  _RNvXs_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB4_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterENtNtCs9k3SxhrAWiO_3std2io5Write5writeB11_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:42
+  _RNvXNtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB2_7ChunkedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEENtNtCs9k3SxhrAWiO_3std2io5Write5writeB1d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:32
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip10accounting17write_all_countedINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB15_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2b_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/accounting.rs:265
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve10copy_rangeINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1G_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2M_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2123
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve20write_prepared_localINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1Q_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2W_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2062
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE24write_to_with_accountingINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB2o_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3u_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:690
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE8write_toINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB27_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:664
+  _RINvNtCsjgzN66wlxZX_10litchi_opc9pkgwriter19try_write_preservedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1k_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:704
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter13write_countedINtB6_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1C_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:933
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter15write_to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1q_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:906
+  _RINvMs0_NtCsjgzN66wlxZX_10litchi_opc7packageNtB6_10OpcPackage9to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1e_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/package.rs:1060
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan21bounded_package_bytes
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1965
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan15build_candidate
+    at src/opened/cross_copy_plan.rs:1061
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan35prepare_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:893
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan10apply_plan
+    at src/opened/cross_copy_plan.rs:495
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtNtCsjg6XkOvy2Di_11litchi_pptx7package5modelNtB2_7Package27apply_cross_slide_copy_plan
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/package/model.rs:284
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline29run_pptx_cross_copy_lifecycle
+    at src/lib.rs:46716
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline3run
+    at src/lib.rs:9432
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvYFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB9_5error5ErrorEL_EEINtNtNtB9_3ops8function6FnOnceuE9call_onceCslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB1e_5error5ErrorEL_EEB19_ECslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/backtrace.rs:166
+  _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtBI_5error5ErrorEL_EEE0CslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:206
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvXs0_NtNtNtCsgxBkk5gSRhY_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtNtBb_5panic11unwind_safe13RefUnwindSafeNtNtBb_6marker4SyncEL_INtB7_6FnOnceuE9call_onceCs9k3SxhrAWiO_3std
+    at library/core/src/ops/function.rs:287
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtB13_5panic11unwind_safe13RefUnwindSafeNtNtB13_6marker4SyncEL_lEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindlRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBU_5panic11unwind_safe13RefUnwindSafeNtNtBU_6marker4SyncEL_EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBP_5panic11unwind_safe13RefUnwindSafeNtNtBP_6marker4SyncEL_lEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNCNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal0B5_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:175
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:171
+  main
+    in /tmp/litchi-goal-0419-control-normal
+
+558 temporary allocations of 558 allocations in total (100.00%) from
+  _RNvNtCs6i54tJFfzR_5alloc5alloc15realloc_nonnull
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:155
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global17grow_impl_runtime
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:259
+  _RNvMNtCs6i54tJFfzR_5alloc5allocNtB2_6Global9grow_impl
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:362
+  _RNvXs_NtCs6i54tJFfzR_5alloc5allocNtB4_6GlobalNtNtCsgxBkk5gSRhY_4core5alloc9Allocator4grow
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/alloc.rs:474
+  _RNvMs5_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner11finish_growCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:557
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner10grow_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:801
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvMs2_NtCs6i54tJFfzR_5alloc7raw_vecNtB5_11RawVecInner17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:729
+  _RNvMs0_NtCs6i54tJFfzR_5alloc7raw_vecINtB5_6RawVechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/raw_vec/mod.rs:384
+  _RNvMs_NtCs6i54tJFfzR_5alloc3vecINtB4_3VechE17try_reserve_exactCsjg6XkOvy2Di_11litchi_pptx
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/alloc/src/vec/mod.rs:1579
+  _RNvXs4_NtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_planNtB5_16BoundedVecWriterNtNtCs9k3SxhrAWiO_3std2io5Write5write
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1948
+  _RNvXs_NtNtCs9k3SxhrAWiO_3std2io5implsQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterNtB6_5Write5writeBG_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/io/impls.rs:59
+  _RNvXs_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB4_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterENtNtCs9k3SxhrAWiO_3std2io5Write5writeB11_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:42
+  _RNvXNtCsjgzN66wlxZX_10litchi_opc9pkgwriterINtB2_7ChunkedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEENtNtCs9k3SxhrAWiO_3std2io5Write5writeB1d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:32
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip10accounting17write_all_countedINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB15_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2b_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/accounting.rs:265
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve10copy_rangeINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1G_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2M_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2123
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtCsjT1YEIVLpur_13soapberry_zip8preserve20write_prepared_localINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB1Q_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB2W_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:2062
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE24write_to_with_accountingINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB2o_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3u_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:690
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs3_NtCsjT1YEIVLpur_13soapberry_zip8preserveINtB6_17PreservationIndexINtNtNtCsgxBkk5gSRhY_4core2io6cursor6CursorRShEE8write_toINtNtCsjgzN66wlxZX_10litchi_opc9pkgwriter7ChunkedINtB27_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEEB3d_
+    at /tmp/litchi-goal-0419-control-worktree/crates/soapberry-zip/src/preserve.rs:664
+  _RINvNtCsjgzN66wlxZX_10litchi_opc9pkgwriter19try_write_preservedINtB2_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1k_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:704
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter13write_countedINtB6_7CountedQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEEB1C_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:933
+  _RINvMs2_NtCsjgzN66wlxZX_10litchi_opc9pkgwriterNtB6_13PackageWriter15write_to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1q_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/pkgwriter.rs:906
+  _RINvMs0_NtCsjgzN66wlxZX_10litchi_opc7packageNtB6_10OpcPackage9to_streamQNtNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan16BoundedVecWriterEB1e_
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-opc/src/package.rs:1060
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan21bounded_package_bytes
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:1965
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan15build_candidate
+    at src/opened/cross_copy_plan.rs:1061
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan35prepare_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:893
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvNtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_plan32plan_cross_slide_copy_for_slides
+    at src/opened/cross_copy_plan.rs:706
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvMs0_NtNtCsjg6XkOvy2Di_11litchi_pptx6opened15cross_copy_planNtNtB8_5model8Snapshot21plan_cross_slide_copyjjECs2VwJJX2MrhN_20litchi_perf_baseline
+    at /tmp/litchi-goal-0419-control-worktree/crates/litchi-pptx/src/opened/cross_copy_plan.rs:435
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline36verify_pptx_cross_copy_refusal_gates
+    at src/lib.rs:16256
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline28build_pptx_cross_copy_corpus
+    at src/lib.rs:14521
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvCs2VwJJX2MrhN_20litchi_perf_baseline3run
+    at src/lib.rs:9431
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvYFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB9_5error5ErrorEL_EEINtNtNtB9_3ops8function6FnOnceuE9call_onceCslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNtNtCs9k3SxhrAWiO_3std3sys9backtrace28___rust_begin_short_backtraceFEINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtB1e_5error5ErrorEL_EEB19_ECslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/sys/backtrace.rs:166
+  _RNCINvNtCs9k3SxhrAWiO_3std2rt10lang_startINtNtCsgxBkk5gSRhY_4core6result6ResultuINtNtCs6i54tJFfzR_5alloc5boxed3BoxDNtNtBI_5error5ErrorEL_EEE0CslbQ9L1bWObX_20litchi_perf_baseline
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:206
+    in /tmp/litchi-goal-0419-control-normal
+  _RNvXs0_NtNtNtCsgxBkk5gSRhY_4core3ops8function5implsRDINtB7_2FnuEp6OutputlNtNtNtBb_5panic11unwind_safe13RefUnwindSafeNtNtBb_6marker4SyncEL_INtB7_6FnOnceuE9call_onceCs9k3SxhrAWiO_3std
+    at library/core/src/ops/function.rs:287
+    in /tmp/litchi-goal-0419-control-normal
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtB13_5panic11unwind_safe13RefUnwindSafeNtNtB13_6marker4SyncEL_lEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindlRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBU_5panic11unwind_safe13RefUnwindSafeNtNtBU_6marker4SyncEL_EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindRDINtNtNtCsgxBkk5gSRhY_4core3ops8function2FnuEp6OutputlNtNtNtBP_5panic11unwind_safe13RefUnwindSafeNtNtBP_6marker4SyncEL_lEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNCNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal0B5_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:175
+  _RINvNvNtCs9k3SxhrAWiO_3std9panicking12catch_unwind7do_callNCNvNtB6_2rt19lang_start_internal0iEB6_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576
+  _RINvNtCs9k3SxhrAWiO_3std9panicking12catch_unwindiNCNvNtB4_2rt19lang_start_internal0EB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544
+  _RINvNtCs9k3SxhrAWiO_3std5panic12catch_unwindNCNvNtB4_2rt19lang_start_internal0iEB4_
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359
+  _RNvNtCs9k3SxhrAWiO_3std2rt19lang_start_internal
+    at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/rt.rs:171
+  main
+    in /tmp/litchi-goal-0419-control-normal
+
+
+
+total runtime: 4.87s.
+calls to allocation functions: 464634 (95407/s)
+temporary memory allocations: 137955 (28327/s)
+peak heap memory consumption: 896.68M
+peak RSS (including heaptrack overhead): 904.77M
+total memory leaked: 544B

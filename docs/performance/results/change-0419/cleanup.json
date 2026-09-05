@@ -1,0 +1,23 @@
+{
+  "classification": "task-owned temporary cleanup",
+  "bytecode_removed": [
+    "docs/performance/results/change-0419/__pycache__/verify-probes.cpython-314.pyc",
+    "docs/performance/results/change-0419/__pycache__/verify.cpython-314.pyc",
+    "docs/performance/results/change-0419/__pycache__/capture.cpython-314.pyc"
+  ],
+  "worktrees": [
+    "/tmp/litchi-goal-0419-control-worktree",
+    "/tmp/litchi-goal-0419-candidate-worktree"
+  ],
+  "binaries": [
+    "/tmp/litchi-goal-0419-control-normal",
+    "/tmp/litchi-goal-0419-control-allocator",
+    "/tmp/litchi-goal-0419-candidate-normal",
+    "/tmp/litchi-goal-0419-candidate-allocator"
+  ],
+  "shared_caches_retained": [
+    "target",
+    "tools/perf-baseline/target"
+  ],
+  "status": "pass"
+}

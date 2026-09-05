@@ -1,0 +1,43 @@
+{
+  "capture": null,
+  "change": 419,
+  "claim_authorized": false,
+  "claim_withheld_reason": "a four-leg ABBA comparison is required",
+  "classification": "matched allocation/resource diagnostic",
+  "lane": "normal",
+  "performance_claim": null,
+  "report_count": 1,
+  "reports": [
+    {
+      "allocation": {
+        "status": "unavailable"
+      },
+      "binary_sha256": "7327c1c68af2d36ee694b941281760b0d637a4cc35749fa299fac70964cecda5",
+      "corpus_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+      "elapsed": {
+        "confidence_interval_95": {
+          "lower": 710258812.8564283,
+          "method": "two-sided Student's t interval for the mean",
+          "upper": 710664633.0035716
+        },
+        "max": 714113681,
+        "mean": 710461722.93,
+        "min": 709373955,
+        "p50": 710067427,
+        "p95": 712713436,
+        "p99": 714043415,
+        "sample_count": 100,
+        "standard_deviation": 1022620.4100795973
+      },
+      "leg": "single",
+      "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+      "output_vector_sha256": "556c179874cf9b2bcce9f48ad03503920db58f8547df2c73c5cf57b60ce4c9c9",
+      "report_sha256": "56408521f548ef2f971208f8b18758da2416dc52722111d3949677d4ed773bfa",
+      "revision": "7c7561160bf1e8e93feb739a60e4bf8d36f28906",
+      "sample_order_sha256": "66144cc525dec11a01477aafe436c945ef8e3d833b9e36a779186d9a3d9d45e8"
+    }
+  ],
+  "samples": 100,
+  "selector": "pptx_cross_copy_media_rich_lifecycle",
+  "warmups": 10
+}

@@ -1,0 +1,42 @@
+{
+  "capture": {
+    "artifact_count": 5,
+    "path": "docs/performance/results/change-0419/heaptrack/candidate/capture.json",
+    "raw_sha256": "0b560ed38fc671a6597e60c7489498697741091e2d0c5caf42153945b3de1e40"
+  },
+  "change": 419,
+  "claim_authorized": false,
+  "claim_withheld_reason": "a four-leg ABBA comparison is required",
+  "classification": "matched allocation/resource diagnostic",
+  "lane": "normal",
+  "performance_claim": null,
+  "report_count": 1,
+  "reports": [
+    {
+      "allocation": {
+        "status": "unavailable"
+      },
+      "binary_sha256": "9569b66d031c63e01039cdda380b4d62eec86f03f5d3596445b0149efc12fca0",
+      "corpus_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+      "elapsed": {
+        "max": 768027524,
+        "mean": 768027524.0,
+        "min": 768027524,
+        "p50": 768027524,
+        "p95": 768027524,
+        "p99": 768027524,
+        "sample_count": 1,
+        "standard_deviation": 0.0
+      },
+      "leg": "single",
+      "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+      "output_vector_sha256": "62b9f5ec42b2321d347b499f4d080001dd8e4bda09528d258567c10f0d7af8d5",
+      "report_sha256": "328578ab2e8c92d660aaf7fb1ee87bd3e78d9d9892b6919ddabc498780ac6cb3",
+      "revision": "0320a6a889b71b0a44030734166df32971f5f7b6",
+      "sample_order_sha256": "d0bca111f8628137adc4c16f123496dcdd1d590d06cb5d9acd68b39fe656fb97"
+    }
+  ],
+  "samples": 1,
+  "selector": "pptx_cross_copy_media_rich_lifecycle",
+  "warmups": 0
+}

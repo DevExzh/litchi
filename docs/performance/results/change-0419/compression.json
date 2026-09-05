@@ -1,0 +1,21 @@
+{
+  "reason": "Preserve exact producer whitespace in gzip sidecars; raw hash/length bindings unchanged",
+  "files": [
+    {
+      "raw_path": "heaptrack/control/stderr.log",
+      "raw_bytes": 296,
+      "raw_sha256": "cba1012e0ba72e0b765a2f4f4af0ff7ee477d875001b0efe4921c5eee7817251",
+      "stored_path": "heaptrack/control/stderr.log.gz",
+      "stored_bytes": 227,
+      "stored_sha256": "d589ec08794237e41470b869f3c37ea1c0bce706b49a4ce7e1b7d948ffd7c9af"
+    },
+    {
+      "raw_path": "heaptrack/candidate/stderr.log",
+      "raw_bytes": 296,
+      "raw_sha256": "5b9e7386ad7cdb75b7c7c36589ea476d31e7b063f0554f94ef8aee1a6876ce24",
+      "stored_path": "heaptrack/candidate/stderr.log.gz",
+      "stored_bytes": 227,
+      "stored_sha256": "4cda61d9c7603a08ef7e4e901ae3232acd77b3565bbc8b4727120a3350e63b2e"
+    }
+  ]
+}
