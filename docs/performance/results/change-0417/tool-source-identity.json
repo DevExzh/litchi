@@ -1,0 +1,8 @@
+{
+  "revision": "4d5cdcdebe307b8e2aaf9f781ae9a127f389cebd",
+  "files": {
+    "tools/summarize_crud_baseline.py": "6a0cd76959df068e5b826bb58cb1f0ada80f3b7d58d81844be015c1860563c82",
+    "tools/perf_compare.py": "3051dd0ee89406949f396645bbed4f213570770f5dc1eb1b02b03b51d2c6c4e2",
+    "tools/validate_perf_corpus_binding.py": "e20abbd1220623f387283ff5cbb0cec95ea57edad2e320bd22d93b268cfa9558"
+  }
+}

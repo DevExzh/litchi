@@ -1,0 +1,249 @@
+{
+  "schema_version": 1,
+  "tool": {
+    "name": "litchi-perf-baseline",
+    "version": "0.1.0",
+    "binary": "litchi-perf-baseline-alloc",
+    "profile": "release",
+    "target_os": "linux",
+    "target_arch": "x86_64",
+    "instrumentation": "system_allocator_operation_scoped"
+  },
+  "binary_identity": {
+    "path": "/tmp/litchi-goal-0417-allocator",
+    "binary_sha256": "ff153a4b154c2770673ee166919a01a84f64eaa31aecba17e46f1d8c76bf7491",
+    "binary_bytes": 450143784,
+    "mode_bits": 509,
+    "executable": true,
+    "profile": "release"
+  },
+  "environment": {
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "git_revision": "b10d6c25a13242ca260a8c897946f4d80ae06c61",
+    "git_worktree_dirty": false,
+    "logical_cpus_available": 1,
+    "allocator": "CountingSystemAllocator(std::alloc::System)",
+    "rustflags": "-C force-frame-pointers=yes -C force-unwind-tables=yes",
+    "cargo_build_target": null,
+    "perf_event_paranoid": "1",
+    "os": "linux",
+    "kernel": "Linux 7.0.0-1011-aws",
+    "cpu_model": "AMD EPYC 9R45",
+    "total_memory_bytes": 132553797632,
+    "page_size_bytes": 4096,
+    "filesystem_type": null,
+    "source_destination_same_device": null,
+    "cpu_affinity": "2",
+    "storage_identifier": null
+  },
+  "configuration": {
+    "samples_per_case": 30,
+    "warmup_iterations_per_case": 3,
+    "filesystem_cache_states": [
+      "warm"
+    ],
+    "filesystem_fresh_child_per_sample": true,
+    "filesystem_process_isolated": true,
+    "filesystem_root_selected": false,
+    "cases": [
+      "cfb_read_one"
+    ],
+    "corpus_shapes": [
+      "many-small"
+    ],
+    "payload_kinds": [
+      "compressible"
+    ],
+    "writer_shapes": [
+      "large"
+    ],
+    "xlsx_shapes": [
+      "medium"
+    ],
+    "xlsb_shapes": [
+      "tiny",
+      "medium",
+      "large",
+      "sparse"
+    ],
+    "xlsx_cell_crud_shapes": [
+      "medium"
+    ],
+    "xlsx_row_visibility_shapes": [
+      "medium"
+    ],
+    "semantic_shapes": [
+      "medium"
+    ],
+    "rtf_variants": [
+      "plain"
+    ],
+    "range_simulation": {
+      "fixed_latency_us": 100,
+      "request_overhead_us": 25,
+      "bandwidth_bytes_per_second": 52428800,
+      "max_physical_range_bytes": 4096
+    },
+    "execution_workers": [
+      1
+    ],
+    "opc_cache_lock_diagnostics": false
+  },
+  "parallel_metrics": {
+    "schema_version": 1,
+    "scope": "explicit_local_execution_only",
+    "claim": "descriptive",
+    "configured_worker_budget": {
+      "status": "measured",
+      "value": [
+        1
+      ],
+      "scope": "configuration.execution_workers"
+    },
+    "observed_process_thread_count": {
+      "status": "unavailable",
+      "scope": "process_thread_count",
+      "reason": "no process-global thread counter is collected; local worker boundaries only"
+    },
+    "cases": [
+      {
+        "case": "cfb_read_one",
+        "corpus_sha256": "6475ba52d3a442956caa0ca08f0e3dfad4ae93729baa179eee13b1ba0176515f",
+        "configured_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.worker_count",
+          "reason": "result has no explicit worker-budget field"
+        },
+        "observed_local_worker_count": {
+          "status": "not_applicable",
+          "scope": "result.source.opc_cache.worker_count_with_one_created_local_worker_team",
+          "reason": "result does not create an explicit local worker team"
+        },
+        "deterministic_task_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.logical_tasks",
+          "reason": "result does not use an explicit execution context"
+        },
+        "deterministic_chunk_count": {
+          "status": "not_applicable",
+          "scope": "result.execution.deterministic_chunk_count",
+          "reason": "result has neither an explicit execution context nor range simulation"
+        },
+        "lock_wait_ns": {
+          "status": "unavailable",
+          "scope": "lock_wait_ns",
+          "reason": "no exact instrumented lock boundary is present; waiter counts are not timed"
+        }
+      }
+    ]
+  },
+  "results": [
+    {
+      "case": "cfb_read_one",
+      "corpus": {
+        "name": "cfb-many-small-compressible",
+        "generator": "litchi-cfb-synthetic-v1",
+        "package_format": "CFB/OLE2",
+        "shape": "many-small",
+        "payload_kind": "compressible",
+        "compression": "none",
+        "entry_count": 256,
+        "archive_member_count": 256,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 314880,
+        "archive_sha256": "6475ba52d3a442956caa0ca08f0e3dfad4ae93729baa179eee13b1ba0176515f",
+        "target_entry": "benchmark_stream_00255.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "80819dec96ac98d30a5ec79f20259e3030b1ab89b75209ef7bddba0b940ccd3b",
+        "xlsx": null
+      },
+      "elapsed_ns": {
+        "unit": "ns",
+        "samples": [
+          600,
+          610,
+          610,
+          610,
+          610,
+          620,
+          620,
+          620,
+          620,
+          620,
+          620,
+          630,
+          630,
+          630,
+          630,
+          630,
+          630,
+          630,
+          630,
+          640,
+          640,
+          640,
+          650,
+          650,
+          660,
+          660,
+          670,
+          680,
+          690,
+          710
+        ],
+        "sample_order": [
+          13,
+          1,
+          5,
+          12,
+          29,
+          14,
+          20,
+          23,
+          24,
+          26,
+          27,
+          6,
+          8,
+          17,
+          18,
+          19,
+          21,
+          22,
+          28,
+          4,
+          9,
+          16,
+          0,
+          7,
+          2,
+          11,
+          15,
+          25,
+          3,
+          10
+        ],
+        "min": 600,
+        "p50": 630,
+        "p95": 690,
+        "p99": 710,
+        "max": 710,
+        "mean": 636.3333333333334,
+        "standard_deviation": 25.52663697791578,
+        "confidence_interval_95": {
+          "method": "two-sided Student's t interval for the mean",
+          "lower": 626.8026006832827,
+          "upper": 645.8640659833841
+        }
+      },
+      "sink": null
+    }
+  ],
+  "corpus_catalog": {
+    "manifest_version": 2,
+    "catalog_id": "litchi-perf-corpus-v2",
+    "catalog_sha256": "b3c46c0b6b4b5af39a5b746f672a21f99067be2f73556b35641022956df19819",
+    "content_set_sha256": "277eaf90aef39acb63dc37db43b2d631bf635bb03dcc3220aef88b69c61d494b"
+  }
+}

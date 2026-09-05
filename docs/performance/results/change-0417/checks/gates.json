@@ -1,0 +1,77 @@
+[
+  {
+    "label": "python-tests",
+    "sequence": 1,
+    "argv": [
+      "python3",
+      "-m",
+      "unittest",
+      "tools.test_summarize_crud_baseline",
+      "tools.test_crud_coverage_index",
+      "tools.test_perf_compare",
+      "tools.test_perf_corpus_binding"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T06:19:27.888511+00:00",
+    "finished_utc": "2026-09-05T06:19:28.564445+00:00",
+    "exit_code": 1,
+    "log": "checks/python-tests-1.log"
+  },
+  {
+    "label": "python-tests",
+    "sequence": 2,
+    "argv": [
+      "python3",
+      "-m",
+      "unittest",
+      "tools.test_summarize_crud_baseline",
+      "tools.test_crud_coverage_index",
+      "tools.test_perf_compare",
+      "tools.test_perf_corpus_binding"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T06:20:25.037538+00:00",
+    "finished_utc": "2026-09-05T06:20:25.795628+00:00",
+    "exit_code": 0,
+    "log": "checks/python-tests-2.log"
+  },
+  {
+    "label": "crud-index",
+    "sequence": 1,
+    "argv": [
+      "python3",
+      "tools/validate_crud_coverage_index.py"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T06:20:25.795867+00:00",
+    "finished_utc": "2026-09-05T06:20:25.839777+00:00",
+    "exit_code": 0,
+    "log": "checks/crud-index-1.log"
+  },
+  {
+    "label": "boundaries",
+    "sequence": 1,
+    "argv": [
+      "python3",
+      "tools/check_crate_boundaries.py"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T06:20:25.839872+00:00",
+    "finished_utc": "2026-09-05T06:20:55.730743+00:00",
+    "exit_code": 0,
+    "log": "checks/boundaries-1.log"
+  },
+  {
+    "label": "classification",
+    "sequence": 1,
+    "argv": [
+      "python3",
+      "tools/check_report_claim_classification.py"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "started_utc": "2026-09-05T06:20:55.731039+00:00",
+    "finished_utc": "2026-09-05T06:20:55.778764+00:00",
+    "exit_code": 0,
+    "log": "checks/classification-1.log"
+  }
+]

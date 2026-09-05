@@ -1,0 +1,160 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "b36cbfd0f7cf9ba50cc6dafc373c1f56fb7ad589d89a956d888bae7e456f05bf",
+  "content_set_sha256": "1ba1023bb730e3f8d2062d1ce9902c430b6551849d04ec37f3b209d3322acc98",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "b10d6c25a13242ca260a8c897946f4d80ae06c61",
+    "git_worktree_dirty": false,
+    "source_files": []
+  },
+  "corpora": [
+    {
+      "id": "odt-odf-zip:sha256:7453460d06a512054f00d27e5cae0d4e7a72a1939f3150078679314a606fa90a",
+      "name": "odf-mimetype-repair-medium",
+      "legacy_v1": {
+        "name": "odf-mimetype-repair-medium",
+        "generator": "litchi-odf-mimetype-repair-v1",
+        "package_format": "ODT/ODF/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 200,
+        "archive_member_count": 5,
+        "entry_bytes": 49,
+        "uncompressed_payload_bytes": 9800,
+        "archive_bytes": 2566,
+        "archive_sha256": "7453460d06a512054f00d27e5cae0d4e7a72a1939f3150078679314a606fa90a",
+        "target_entry": "mimetype:local-extra:0x5455",
+        "target_payload_bytes": 9,
+        "target_payload_sha256": "872e41134416d98a6a5070ff0b90605697bc144fe29428ea129c75c24c660d04",
+        "xlsx": null
+      },
+      "format": "ODT/ODF/ZIP",
+      "size_class": "medium",
+      "categories": [
+        "legacy-migrated"
+      ],
+      "generator": {
+        "id": "litchi-odf-mimetype-repair-v1",
+        "kind": "unknown",
+        "revision": "v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "medium"
+        }
+      },
+      "provenance": {
+        "source_kind": "unknown",
+        "source_path": null,
+        "producer": null,
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": null,
+        "license_evidence": null,
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 2566,
+        "archive_sha256": "7453460d06a512054f00d27e5cae0d4e7a72a1939f3150078679314a606fa90a",
+        "logical_payload_bytes": 9800,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 49,
+        "entry_count": 200
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 2566,
+          "members": 5,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "mimetype:local-extra:0x5455",
+          "logical_bytes": 9,
+          "sha256": "872e41134416d98a6a5070ff0b90605697bc144fe29428ea129c75c24c660d04"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "odf_mimetype_repair_plan"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "odf_mimetype_repair_plan",
+      "corpus_id": "odt-odf-zip:sha256:7453460d06a512054f00d27e5cae0d4e7a72a1939f3150078679314a606fa90a",
+      "legacy_name": "odf-mimetype-repair-medium",
+      "legacy_archive_sha256": "7453460d06a512054f00d27e5cae0d4e7a72a1939f3150078679314a606fa90a",
+      "role": "timed"
+    }
+  ]
+}

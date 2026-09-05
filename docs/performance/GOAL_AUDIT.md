@@ -1,5 +1,21 @@
 # Non-iWork `docs/GOAL.md` audit
 
+Change [0417](changes/0417-representative-crud-baseline.md) broadens current
+descriptive evidence to all 30 representative selectors across 14 executable
+categories at clean revision `b10d6c25a13242ca260a8c897946f4d80ae06c61`.
+It retains 30,000 normal observations, 1,800 separate allocator observations,
+30 preflight checks, explicit timer boundaries, repeat uncertainty and portable
+verification. Five selectors have >5% repeat drift on at least one quantile;
+28 lack operation allocation attribution. This is progress on baseline coverage,
+with no speedup or completion claim.
+
+The index's default/full-run status contract is unchanged, and several cases
+time only an already-open query or commit. Aligned end-to-end workflows,
+operation allocation, broad corpus/producer matrices, cold/remote, native,
+failure and scaling evidence remain open. The media-rich PPTX path provides
+a concrete investigation target with an existing source-backed counterpart
+capability; matched timing boundaries and preservation checks are required.
+
 Change [0415](changes/0415-zip64-streaming-deflate.md) adds explicit streamed
 ZIP64 Deflate framing, automatic Office transport selection from raised limits,
 and strict support for descriptor-backed zero local-size placeholders. Its
@@ -38,7 +54,8 @@ of the non-iWork program. Broad scenario, native/cold/remote and scaling gaps
 below remain open.
 
 **Audit date:** 2026-09-05
-**Audit basis:** the 0416 local-framing candidate `d18cd04a2` and retained evidence,
+**Audit basis:** the 0417 representative baseline at `b10d6c25a` and retained evidence,
+with the 0416 local-framing candidate `d18cd04a2` and retained evidence,
 with the 0415 streaming source batch and its retained evidence,
 with the 0414 source batch and its retained verification evidence,
 with the 0413 committed control `6b632726b` and the 0412 captured candidate at

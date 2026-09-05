@@ -1,0 +1,68 @@
+[
+  {
+    "argv": [
+      "perf",
+      "report",
+      "--header-only",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0417/profile/record.data"
+    ],
+    "started_utc": "2026-09-05T06:23:51.599353+00:00",
+    "exit_code": 0,
+    "stdout": "header.txt",
+    "stderr": "header.txt.stderr"
+  },
+  {
+    "argv": [
+      "perf",
+      "report",
+      "--stdio",
+      "--no-inline",
+      "--no-children",
+      "--percent-limit",
+      "0.1",
+      "--sort",
+      "symbol,dso",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0417/profile/record.data"
+    ],
+    "started_utc": "2026-09-05T06:23:51.611955+00:00",
+    "exit_code": 0,
+    "stdout": "self.txt",
+    "stderr": "self.txt.stderr"
+  },
+  {
+    "argv": [
+      "perf",
+      "report",
+      "--stdio",
+      "--no-inline",
+      "--children",
+      "--percent-limit",
+      "1",
+      "--sort",
+      "symbol,dso",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0417/profile/record.data"
+    ],
+    "started_utc": "2026-09-05T06:23:52.162239+00:00",
+    "exit_code": 0,
+    "stdout": "children.txt",
+    "stderr": "children.txt.stderr"
+  },
+  {
+    "argv": [
+      "perf",
+      "script",
+      "--no-inline",
+      "-F",
+      "comm,pid,tid,time,period,event,ip,sym,dso",
+      "-i",
+      "/home/zhuhe/code/litchi/docs/performance/results/change-0417/profile/record.data"
+    ],
+    "started_utc": "2026-09-05T06:23:52.836643+00:00",
+    "exit_code": 0,
+    "stdout": "script.txt",
+    "stderr": "script.txt.stderr"
+  }
+]

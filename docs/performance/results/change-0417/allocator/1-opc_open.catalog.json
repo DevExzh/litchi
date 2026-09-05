@@ -1,0 +1,187 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "ac1533feee84d278ff23718ae9142d3bde5143c1afd229ccb0791a1da376fa7c",
+  "content_set_sha256": "304c0987e0b95216d0b6d0328aed9ef29dc1e9b0c80944d05fe496c39676ee7c",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "b10d6c25a13242ca260a8c897946f4d80ae06c61",
+    "git_worktree_dirty": false,
+    "source_files": []
+  },
+  "corpora": [
+    {
+      "id": "opc-zip:sha256:879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+      "name": "many-small-compressible",
+      "legacy_v1": {
+        "name": "many-small-compressible",
+        "generator": "litchi-opc-synthetic-v2",
+        "package_format": "OPC/ZIP",
+        "shape": "many-small",
+        "payload_kind": "compressible",
+        "compression": "deflate",
+        "entry_count": 256,
+        "archive_member_count": 258,
+        "entry_bytes": 1024,
+        "uncompressed_payload_bytes": 262144,
+        "archive_bytes": 54683,
+        "archive_sha256": "879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+        "target_entry": "benchmark/parts/00128.bin",
+        "target_payload_bytes": 1024,
+        "target_payload_sha256": "542a28aeba7353e6cee2a7aa13ade9c784bf7a1243c5a2cbb6fde74edfa49a53",
+        "xlsx": null
+      },
+      "format": "OPC/ZIP",
+      "size_class": "unknown",
+      "categories": [
+        "highly-compressible",
+        "legacy-migrated",
+        "many-small-parts",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-opc-synthetic-v2",
+        "kind": "synthetic",
+        "revision": "v2",
+        "algorithm_id": "litchi-perf.opc-payload-v1",
+        "seed_spec": "indexed-formula-v1",
+        "parameters": {
+          "archive_member_count": 258,
+          "compression": "deflate",
+          "entry_bytes": 1024,
+          "entry_count": 256,
+          "family": "opc",
+          "legacy_payload_kind": "compressible",
+          "legacy_shape": "many-small",
+          "package_format": "OPC/ZIP",
+          "payload_block_bytes": 45,
+          "payload_formula": "BLOCK[(offset + index) % 45], BLOCK=litchi-perf-baseline-compressible-payload-v1\\n",
+          "relationship": {
+            "id": "rIdBenchmarkMain",
+            "mode": "Internal",
+            "part_content_type": "application/octet-stream",
+            "target": "benchmark/parts/00128.bin",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+          },
+          "source_functions": [
+            "build_opc_corpus",
+            "entry_name",
+            "payload_bytes",
+            "CorpusShape",
+            "PayloadKind"
+          ],
+          "target_index": 128,
+          "target_name_pattern": "benchmark/parts/{index:05}.bin"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 54683,
+        "archive_sha256": "879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+        "logical_payload_bytes": 262144,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 1024,
+        "entry_count": 256
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 54683,
+          "members": 258,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "benchmark/parts/00128.bin",
+          "logical_bytes": 1024,
+          "sha256": "542a28aeba7353e6cee2a7aa13ade9c784bf7a1243c5a2cbb6fde74edfa49a53"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "opc_open"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "opc_open",
+      "corpus_id": "opc-zip:sha256:879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+      "legacy_name": "many-small-compressible",
+      "legacy_archive_sha256": "879fd74fed6342b1a9f3f695e550e740bd34e42554961edf490e6efef7a93ee4",
+      "role": "timed"
+    }
+  ]
+}

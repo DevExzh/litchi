@@ -1,0 +1,188 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "de0a6654511b821a0d4476e5654a65401a8931ef85da9958ecf22ec8d135cebc",
+  "content_set_sha256": "8243ee92be6b9d1c8c432d7eb543489896ead5aefe630cd749eef881766eca96",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "b10d6c25a13242ca260a8c897946f4d80ae06c61",
+    "git_worktree_dirty": false,
+    "source_files": []
+  },
+  "corpora": [
+    {
+      "id": "xls-cfb:sha256:228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb",
+      "name": "xls-large",
+      "legacy_v1": {
+        "name": "xls-large",
+        "generator": "litchi-legacy-writer-v1",
+        "package_format": "XLS/CFB",
+        "shape": "large",
+        "payload_kind": "not-applicable",
+        "compression": "none",
+        "entry_count": 8192,
+        "archive_member_count": 1,
+        "entry_bytes": 0,
+        "uncompressed_payload_bytes": 65536,
+        "archive_bytes": 163840,
+        "archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb",
+        "target_entry": "Workbook",
+        "target_payload_bytes": 161040,
+        "target_payload_sha256": "f806d23f52c978f5215b05fd232b055725a2605d52122ea74ce0cec357ea9386",
+        "xlsx": null
+      },
+      "format": "XLS/CFB",
+      "size_class": "large",
+      "categories": [
+        "legacy-migrated",
+        "synthetic"
+      ],
+      "generator": {
+        "id": "litchi-legacy-writer-v1",
+        "kind": "synthetic",
+        "revision": "v1",
+        "algorithm_id": "litchi-perf.legacy-writer-v1",
+        "seed_spec": "none",
+        "parameters": {
+          "archive_member_count": 1,
+          "compression": "none",
+          "dimensions": {
+            "columns": 16,
+            "rows": 128,
+            "sheets": 4
+          },
+          "entry_bytes": 0,
+          "entry_count": 8192,
+          "family": "legacy-writer",
+          "legacy_payload_kind": "not-applicable",
+          "legacy_shape": "large",
+          "numeric_value_formula": "(sheet * rows * columns + row * columns + column) as f64",
+          "package_format": "XLS/CFB",
+          "payload_heavy_bytes": 32700,
+          "payload_heavy_repeat_block": "litchi-perf-baseline-payload-heavy-v1 ",
+          "source_functions": [
+            "build_writer_corpus",
+            "write_fresh_doc",
+            "write_fresh_xls",
+            "write_fresh_ppt",
+            "WriterShape",
+            "writer_text",
+            "writer_payload_text"
+          ],
+          "target_stream": "Workbook",
+          "writer_format": "xls",
+          "writer_shape": "large",
+          "writer_text_template": "litchi-perf-baseline-{kind}-v1-{first:03}-{second:05}-{third:03} deterministic payload"
+        }
+      },
+      "provenance": {
+        "source_kind": "generated",
+        "source_path": "tools/perf-baseline/src/lib.rs",
+        "producer": "Litchi deterministic generator",
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": "Apache-2.0",
+        "license_evidence": "repository-license",
+        "redistributable": true
+      },
+      "bytes": {
+        "archive_bytes": 163840,
+        "archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb",
+        "logical_payload_bytes": 65536,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 0,
+        "entry_count": 8192
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 163840,
+          "members": 1,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "Workbook",
+          "logical_bytes": 161040,
+          "sha256": "f806d23f52c978f5215b05fd232b055725a2605d52122ea74ce0cec357ea9386"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "xls_validation_report"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "xls_validation_report",
+      "corpus_id": "xls-cfb:sha256:228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb",
+      "legacy_name": "xls-large",
+      "legacy_archive_sha256": "228c6585a4d26141aebfaf7b08844a2ee445b269d406006a1fdb0484619120fb",
+      "role": "timed"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "result": "pass",
+  "selectors": 30,
+  "report_rows": 30,
+  "catalogs": 30,
+  "validators": [
+    "validate_perf_corpus_binding.validate_paths",
+    "perf_compare.validate_parallel_metrics"
+  ],
+  "scope": "single-observation correctness preflight; no latency claim"
+}

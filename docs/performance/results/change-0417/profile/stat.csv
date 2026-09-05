@@ -1,0 +1,12 @@
+# started on Sat Sep  5 06:22:31 2026
+
+149675617732,,cycles,28837388496,83.00,,
+356866231769,,instructions,28833640491,83.00,,
+55830488489,,branches,28842731268,83.00,,
+1284393039,,branch-misses,28841566056,83.00,,
+0,,L1-dcache-loads,28839019488,83.00,,
+0,,L1-dcache-load-misses,28808924861,83.00,,
+<not supported>,,LLC-loads,0,100.00,,
+<not supported>,,LLC-load-misses,0,100.00,,
+1008024,,page-faults,34600654132,100.00,,
+34600.65,msec,task-clock,34600654132,100.00,,

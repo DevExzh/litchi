@@ -1,0 +1,182 @@
+...............E......................E...EEF....................................................................................................
+======================================================================
+ERROR: test_checked_index_has_all_fifteen_categories_and_real_selectors (tools.test_crud_coverage_index.CrudCoverageIndexTests.test_checked_index_has_all_fifteen_categories_and_real_selectors)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/tools/test_crud_coverage_index.py", line 148, in test_checked_index_has_all_fifteen_categories_and_real_selectors
+    self.assertEqual(self.validate(self.index), (15, 30))
+                     ~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/tools/test_crud_coverage_index.py", line 94, in validate
+    return validate_index(
+        index,
+    ...<5 lines>...
+        report=report,
+    )
+  File "/home/zhuhe/code/litchi/tools/validate_crud_coverage_index.py", line 1394, in validate_index
+    return _validate_index(
+        index,
+    ...<5 lines>...
+        report=report,
+    )
+  File "/home/zhuhe/code/litchi/tools/validate_crud_coverage_index.py", line 1326, in _validate_index
+    _validate_corpus_reference(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        scenario["corpus"],
+        ^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        cases,
+        ^^^^^^
+    )
+    ^
+  File "/home/zhuhe/code/litchi/tools/validate_crud_coverage_index.py", line 1120, in _validate_corpus_reference
+    raise ValidationError(
+        f"{context} shapes do not match the generated shape contract for {selector!r}"
+    )
+tools.validate_crud_coverage_index.ValidationError: index category 2 scenario 0 corpus shapes do not match the generated shape contract for 'rtf_semantic_text_to_sink'
+
+======================================================================
+ERROR: test_representative_report_binds_every_measured_row (tools.test_crud_coverage_index.CrudCoverageIndexTests.test_representative_report_binds_every_measured_row)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/tools/test_crud_coverage_index.py", line 411, in test_representative_report_binds_every_measured_row
+    self.assertEqual(self.validate(self.index, report=report), (15, 30))
+                     ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/tools/test_crud_coverage_index.py", line 94, in validate
+    return validate_index(
+        index,
+    ...<5 lines>...
+        report=report,
+    )
+  File "/home/zhuhe/code/litchi/tools/validate_crud_coverage_index.py", line 1394, in validate_index
+    return _validate_index(
+        index,
+    ...<5 lines>...
+        report=report,
+    )
+  File "/home/zhuhe/code/litchi/tools/validate_crud_coverage_index.py", line 1326, in _validate_index
+    _validate_corpus_reference(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        scenario["corpus"],
+        ^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        cases,
+        ^^^^^^
+    )
+    ^
+  File "/home/zhuhe/code/litchi/tools/validate_crud_coverage_index.py", line 1120, in _validate_corpus_reference
+    raise ValidationError(
+        f"{context} shapes do not match the generated shape contract for {selector!r}"
+    )
+tools.validate_crud_coverage_index.ValidationError: index category 2 scenario 0 corpus shapes do not match the generated shape contract for 'rtf_semantic_text_to_sink'
+
+======================================================================
+ERROR: test_unrelated_iwork_selector_in_registry_is_allowed (tools.test_crud_coverage_index.CrudCoverageIndexTests.test_unrelated_iwork_selector_in_registry_is_allowed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/tools/test_crud_coverage_index.py", line 337, in test_unrelated_iwork_selector_in_registry_is_allowed
+    self.assertEqual(self.validate(self.index, selector_source=selector_source), (15, 30))
+                     ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/zhuhe/code/litchi/tools/test_crud_coverage_index.py", line 94, in validate
+    return validate_index(
+        index,
+    ...<5 lines>...
+        report=report,
+    )
+  File "/home/zhuhe/code/litchi/tools/validate_crud_coverage_index.py", line 1394, in validate_index
+    return _validate_index(
+        index,
+    ...<5 lines>...
+        report=report,
+    )
+  File "/home/zhuhe/code/litchi/tools/validate_crud_coverage_index.py", line 1326, in _validate_index
+    _validate_corpus_reference(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        scenario["corpus"],
+        ^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        cases,
+        ^^^^^^
+    )
+    ^
+  File "/home/zhuhe/code/litchi/tools/validate_crud_coverage_index.py", line 1120, in _validate_corpus_reference
+    raise ValidationError(
+        f"{context} shapes do not match the generated shape contract for {selector!r}"
+    )
+tools.validate_crud_coverage_index.ValidationError: index category 2 scenario 0 corpus shapes do not match the generated shape contract for 'rtf_semantic_text_to_sink'
+
+======================================================================
+ERROR: test_validate_paths_binds_report_to_a_separate_run_catalog (tools.test_crud_coverage_index.CrudCoverageIndexTests.test_validate_paths_binds_report_to_a_separate_run_catalog)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/tools/test_crud_coverage_index.py", line 422, in test_validate_paths_binds_report_to_a_separate_run_catalog
+    validate_paths(
+    ~~~~~~~~~~~~~~^
+        INDEX_PATH,
+        ^^^^^^^^^^^
+    ...<4 lines>...
+        report_path=report_path,
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+    ),
+    ^
+  File "/home/zhuhe/code/litchi/tools/validate_crud_coverage_index.py", line 1425, in validate_paths
+    return validate_index(
+        index,
+    ...<5 lines>...
+        report=report,
+    )
+  File "/home/zhuhe/code/litchi/tools/validate_crud_coverage_index.py", line 1394, in validate_index
+    return _validate_index(
+        index,
+    ...<5 lines>...
+        report=report,
+    )
+  File "/home/zhuhe/code/litchi/tools/validate_crud_coverage_index.py", line 1326, in _validate_index
+    _validate_corpus_reference(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        scenario["corpus"],
+        ^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        cases,
+        ^^^^^^
+    )
+    ^
+  File "/home/zhuhe/code/litchi/tools/validate_crud_coverage_index.py", line 1120, in _validate_corpus_reference
+    raise ValidationError(
+        f"{context} shapes do not match the generated shape contract for {selector!r}"
+    )
+tools.validate_crud_coverage_index.ValidationError: index category 2 scenario 0 corpus shapes do not match the generated shape contract for 'rtf_semantic_text_to_sink'
+
+======================================================================
+FAIL: test_xls_validation_uses_supported_writer_shapes_only (tools.test_crud_coverage_index.CrudCoverageIndexTests.test_xls_validation_uses_supported_writer_shapes_only)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/zhuhe/code/litchi/tools/test_crud_coverage_index.py", line 268, in test_xls_validation_uses_supported_writer_shapes_only
+    self.assertEqual(scenario["corpus"]["shapes"], ["large", "tiny"])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: ['large', 'medium', 'tiny'] != ['large', 'tiny']
+
+First differing element 1:
+'medium'
+'tiny'
+
+First list contains 1 additional elements.
+First extra element 2:
+'tiny'
+
+- ['large', 'medium', 'tiny']
+?           ----------
+
++ ['large', 'tiny']
+
+----------------------------------------------------------------------
+Ran 145 tests in 0.609s
+
+FAILED (failures=1, errors=4)
+PASS: 1 matched results, 7 metrics, 0 regressions
+Worst latency movement: opc_open elapsed_ns.p50 +4.00% (limit +5.00%)
+REGRESSION: 1 matched results, 7 metrics, 3 regressions
+REGRESSION opc_open[tiny] elapsed_ns.p50: 100 -> 120 (+20.00%; limit +5.00%)
+REGRESSION opc_open[tiny] elapsed_ns.p95: 100 -> 120 (+20.00%; limit +8.00%)
+REGRESSION opc_open[tiny] elapsed_ns.p99: 100 -> 120 (+20.00%; limit +12.00%)
+INVALID: 0 matched results, 0 metrics, 0 regressions
+ERROR: cannot read /tmp/tmpp38nrl8b/current.json: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)

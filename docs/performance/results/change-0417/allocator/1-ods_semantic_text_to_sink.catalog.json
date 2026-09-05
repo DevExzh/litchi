@@ -1,0 +1,160 @@
+{
+  "manifest_version": 2,
+  "manifest_kind": "corpus-catalog",
+  "catalog_id": "litchi-perf-corpus-v2",
+  "canonicalization": {
+    "algorithm": "sorted-json-utf8-compact-v1",
+    "hash": "sha256"
+  },
+  "catalog_sha256": "b243c25da3ac33931714f084e457b5e0da6743cc4a3a61d027f6825cfcb17a32",
+  "content_set_sha256": "6f224f047f9e7129e19f81179075e7f2e08877dff9f06981aed699df4cbbaa28",
+  "build": {
+    "tool": "litchi-perf-baseline",
+    "tool_version": "0.1.0",
+    "git_revision": "b10d6c25a13242ca260a8c897946f4d80ae06c61",
+    "git_worktree_dirty": false,
+    "source_files": []
+  },
+  "corpora": [
+    {
+      "id": "ods-odf-zip:sha256:e07b100ecbb6146844218ab5587b80b7f466f866df0d8e8cdaea633601874bc3",
+      "name": "ods-semantic-medium",
+      "legacy_v1": {
+        "name": "ods-semantic-medium",
+        "generator": "litchi-ods-semantic-v1",
+        "package_format": "ODS/ODF/ZIP",
+        "shape": "medium",
+        "payload_kind": "deterministic-semantic-text",
+        "compression": "deflate",
+        "entry_count": 2048,
+        "archive_member_count": 3,
+        "entry_bytes": 54,
+        "uncompressed_payload_bytes": 110592,
+        "archive_bytes": 7011,
+        "archive_sha256": "e07b100ecbb6146844218ab5587b80b7f466f866df0d8e8cdaea633601874bc3",
+        "target_entry": "Sheet 0!R0C0",
+        "target_payload_bytes": 54,
+        "target_payload_sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02",
+        "xlsx": null
+      },
+      "format": "ODS/ODF/ZIP",
+      "size_class": "medium",
+      "categories": [
+        "legacy-migrated"
+      ],
+      "generator": {
+        "id": "litchi-ods-semantic-v1",
+        "kind": "unknown",
+        "revision": "v1",
+        "algorithm_id": null,
+        "seed_spec": null,
+        "parameters": {
+          "legacy_payload_kind": "deterministic-semantic-text",
+          "legacy_shape": "medium"
+        }
+      },
+      "provenance": {
+        "source_kind": "unknown",
+        "source_path": null,
+        "producer": null,
+        "producer_version": null,
+        "source_sha256": null,
+        "license_spdx": null,
+        "license_evidence": null,
+        "redistributable": null
+      },
+      "bytes": {
+        "archive_bytes": 7011,
+        "archive_sha256": "e07b100ecbb6146844218ab5587b80b7f466f866df0d8e8cdaea633601874bc3",
+        "logical_payload_bytes": 110592,
+        "text_bytes": null,
+        "media_bytes": null,
+        "metadata_bytes": null
+      },
+      "shape_parameters": {
+        "entry_bytes": 54,
+        "entry_count": 2048
+      },
+      "relationships": {
+        "status": "unknown",
+        "relationship_count": null,
+        "dependency_closure_nodes": null,
+        "dependency_closure_edges": null,
+        "max_depth": null,
+        "max_out_degree": null
+      },
+      "security": {
+        "encryption": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "signature": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "protection": {
+          "state": "unknown",
+          "scopes": [],
+          "evidence": "not-recorded"
+        },
+        "macros": {
+          "state": "unknown",
+          "kind": null,
+          "evidence": "not-recorded"
+        },
+        "external_links": {
+          "state": "unknown",
+          "count": null,
+          "targets_sha256": null,
+          "evidence": "not-recorded"
+        }
+      },
+      "input": {
+        "validity": "unknown",
+        "malformation_kind": null,
+        "expected_behavior": "unknown",
+        "within_limits": null,
+        "evidence": "not-recorded"
+      },
+      "limits": {
+        "profile_id": null,
+        "profile_sha256": null,
+        "observed": {
+          "input_bytes": 7011,
+          "members": 3,
+          "relationships": null,
+          "materialized_bytes": null
+        }
+      },
+      "members": {
+        "status": "unavailable",
+        "items": []
+      },
+      "targets": [
+        {
+          "entry": "Sheet 0!R0C0",
+          "logical_bytes": 54,
+          "sha256": "df7ce48fc58e88d5db56d2b3e286d5a61e50fde7ec89f563cd3b4c129c04bd02"
+        }
+      ],
+      "coverage": {
+        "timed_cases": [
+          "ods_semantic_text_to_sink"
+        ],
+        "guard_cases": [],
+        "inventory_only": false
+      }
+    }
+  ],
+  "case_bindings": [
+    {
+      "case": "ods_semantic_text_to_sink",
+      "corpus_id": "ods-odf-zip:sha256:e07b100ecbb6146844218ab5587b80b7f466f866df0d8e8cdaea633601874bc3",
+      "legacy_name": "ods-semantic-medium",
+      "legacy_archive_sha256": "e07b100ecbb6146844218ab5587b80b7f466f866df0d8e8cdaea633601874bc3",
+      "role": "timed"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "disposition": "progress; non-iWork goal remains open",
+  "runtime_revision": "b10d6c25a13242ca260a8c897946f4d80ae06c61",
+  "tooling_revision": "4d5cdcdebe307b8e2aaf9f781ae9a127f389cebd",
+  "normal_reports": 60,
+  "normal_observations": 30000,
+  "allocator_reports": 60,
+  "allocator_observations": 1800,
+  "preflight_reports": 30,
+  "profile_reports": 2,
+  "python_tests_passed": 145,
+  "isolated_export_positive_replays": 2,
+  "corruptions_rejected": 12,
+  "operation_allocation_unavailable_selectors": 28,
+  "repeat_drift_flagged_selectors": 5,
+  "temporary_artifacts_removed": true
+}
