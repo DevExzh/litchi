@@ -77,14 +77,6 @@ fn read_table_header_settings(
     Ok(settings)
 }
 
-pub(super) fn read_attached_table_header_settings(
-    package: &IWorkPackage,
-    table_id: u64,
-) -> Result<Settings> {
-    let descriptor = attached_table_descriptor(package, table_id)?;
-    read_table_header_settings(package, &descriptor)
-}
-
 pub(super) fn set_attached_table_header_settings(
     package: &mut IWorkPackage,
     table_id: u64,

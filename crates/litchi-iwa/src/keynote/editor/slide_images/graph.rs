@@ -124,6 +124,7 @@ pub(super) fn image_creation_context(
             slides.len()
         ))
     })?;
+    let slide_id = slide.native_ids()?.slide.get();
     let graph = ObjectGraph::read(editor.package())?;
     let document: kn::DocumentArchive = graph.decode(1, "KN.DocumentArchive")?;
     let show: kn::ShowArchive = graph.decode(document.show.identifier, "KN.ShowArchive")?;
@@ -149,7 +150,7 @@ pub(super) fn image_creation_context(
                 "Keynote stylesheet {stylesheet_id} has no media style"
             ))
         })?;
-    let archive_name = graph.archive_name(slide.slide_id)?.to_owned();
+    let archive_name = graph.archive_name(slide_id)?.to_owned();
     let component_id = component_identifier_for_entry(editor.package(), &archive_name)?
         .ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -165,7 +166,7 @@ pub(super) fn image_creation_context(
         })?;
     let caption_theme = caption_theme_style(&graph, show.theme.identifier, stylesheet_id)?;
     Ok(ImageCreationContext {
-        slide_id: slide.slide_id,
+        slide_id,
         component_id,
         archive_name,
         style_id,
@@ -215,8 +216,9 @@ pub(super) fn image_infos(
             slides.len()
         ))
     })?;
+    let slide_id = slide.native_ids()?.slide.get();
     let graph = ObjectGraph::read(editor.package())?;
-    image_root_ids(&graph, slide.slide_id)?
+    image_root_ids(&graph, slide_id)?
         .into_iter()
         .map(|identifier| image_info(&graph, slide_index, identifier))
         .collect()
@@ -456,13 +458,14 @@ pub(super) fn image_graph(
             slides.len()
         ))
     })?;
+    let slide_id = slide.native_ids()?.slide.get();
     let graph = ObjectGraph::read(editor.package())?;
-    if !image_root_ids(&graph, slide.slide_id)?.contains(&drawable_object_id) {
+    if !image_root_ids(&graph, slide_id)?.contains(&drawable_object_id) {
         return Err(Error::ParseError(format!(
             "Keynote image {drawable_object_id} is not owned by slide {slide_index}"
         )));
     }
-    let archive_name = graph.archive_name(slide.slide_id)?.to_owned();
+    let archive_name = graph.archive_name(slide_id)?.to_owned();
     if graph.archive_name(drawable_object_id)? != archive_name {
         return Err(Error::InvalidFormat(format!(
             "Keynote image {drawable_object_id} is outside slide component {archive_name}"
@@ -474,7 +477,7 @@ pub(super) fn image_graph(
         [drawable_object_id],
         "slide image",
     )?;
-    if object_ids.contains(&slide.slide_id) {
+    if object_ids.contains(&slide_id) {
         return Err(Error::InvalidFormat(
             "Keynote image private graph reaches its owning slide".to_owned(),
         ));
@@ -517,7 +520,7 @@ pub(super) fn image_graph(
         );
     }
     Ok(SlideImageGraph {
-        slide_id: slide.slide_id,
+        slide_id,
         component_id,
         archive_name,
         info: image_info(&graph, slide_index, drawable_object_id)?,

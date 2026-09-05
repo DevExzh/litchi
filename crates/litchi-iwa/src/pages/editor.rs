@@ -2732,12 +2732,12 @@ impl PagesEditor {
             litchi_pages::SectionSelector::Name(name) => {
                 let mut found = None;
                 for section in &self.sections {
-                    if section.name.as_deref() == Some(name) {
-                        if found.replace(section.object_id).is_some() {
-                            return Err(Error::ParseError(
-                                "Pages header/footer section selector is ambiguous".to_owned(),
-                            ));
-                        }
+                    if section.name.as_deref() == Some(name)
+                        && found.replace(section.object_id).is_some()
+                    {
+                        return Err(Error::ParseError(
+                            "Pages header/footer section selector is ambiguous".to_owned(),
+                        ));
                     }
                 }
                 found

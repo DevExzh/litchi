@@ -235,10 +235,11 @@ pub(super) fn find_note_source(
 ) -> Result<NoteSource> {
     let mut best = None;
     for slide in slides {
-        let archive_name = graph.archive_name(slide.slide_id)?.to_owned();
+        let slide_id = slide.native_ids()?.slide.get();
+        let archive_name = graph.archive_name(slide_id)?.to_owned();
         let archive = editor.package().archive(&archive_name)?;
         let decoded: kn::SlideArchive =
-            graph.decode_type(slide.slide_id, SLIDE_MESSAGE_TYPE, "KN.SlideArchive")?;
+            graph.decode_type(slide_id, SLIDE_MESSAGE_TYPE, "KN.SlideArchive")?;
         let Some(note_id) = decoded.note.map(|reference| reference.identifier) else {
             continue;
         };

@@ -49,7 +49,7 @@ fn native_pages_fixture_opens_from_path_and_bytes() -> Result<(), Box<dyn std::e
 }
 
 #[test]
-fn native_visible_body_table_is_preserved_without_claiming_hidden_axis_support()
+fn native_visible_body_table_reads_empty_and_preserves_exact_noop()
 -> Result<(), Box<dyn std::error::Error>> {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork/pages/body-table-visible.pages");
@@ -59,16 +59,35 @@ fn native_visible_body_table_is_preserved_without_claiming_hidden_axis_support()
     let mut output = Vec::new();
     package.write_to(&mut output)?;
     assert_eq!(output, bytes);
-    // Apple's current model version and formula-owner metadata differ from
-    // the focused operation's admitted profile. Keep that refusal explicit
-    // until native changed-edit parity justifies widening the profile.
+    assert_eq!(
+        package.body_table_hidden_axes(0usize)?,
+        litchi_pages::table::hidden_axes::HiddenAxes::empty()
+    );
+    let noop = package
+        .edit_body_table_hidden_axes(0usize)?
+        .clear()
+        .commit()?;
+    assert!(noop.patch().is_noop());
+    let mut noop_bytes = Vec::new();
+    noop.package().write_to(&mut noop_bytes)?;
+    assert_eq!(noop_bytes, bytes);
+    let replay = package.apply_body_table_hidden_axes(noop.patch())?;
+    let inverse = replay
+        .package()
+        .apply_body_table_hidden_axes(&noop.patch().inverse())?;
+    let mut replay_bytes = Vec::new();
+    inverse.package().write_to(&mut replay_bytes)?;
+    assert_eq!(replay_bytes, bytes);
+
+    let changed = package
+        .edit_body_table_hidden_axes(0usize)?
+        .set(litchi_pages::table::hidden_axes::HiddenAxes::new([
+            litchi_pages::table::hidden_axes::AxisIndex::row(0),
+        ])?)
+        .commit();
     assert!(matches!(
-        package.body_table_hidden_axes(0usize),
-        Err(litchi_pages::BodyTableHiddenAxesError::InvalidSource)
-    ));
-    assert!(matches!(
-        package.edit_body_table_hidden_axes(0usize),
-        Err(litchi_pages::BodyTableHiddenAxesError::InvalidSource)
+        changed,
+        Err(litchi_pages::BodyTableHiddenAxesError::UnsupportedDependency)
     ));
     let mut after_refusal = Vec::new();
     package.write_to(&mut after_refusal)?;

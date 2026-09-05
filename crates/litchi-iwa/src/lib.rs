@@ -177,6 +177,14 @@ pub mod shapes;
 
 // Internal modules use short aliases while the native bundle and package
 // implementations remain private to this migration host.
+#[deprecated(
+    since = "0.0.1",
+    note = "legacy migration-host drawable-comment editor; use focused format-semantic comment owners where available; direct-drawable comment migration remains pending"
+)]
+#[expect(
+    deprecated,
+    reason = "retain the deprecated migration-host export until drawable-comment parity permits its removal"
+)]
 pub use comments::IWorkDrawableCommentEditor;
 pub use document::Document;
 pub use drawable_order::DrawableLayerMove;

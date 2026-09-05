@@ -225,7 +225,8 @@ impl KeynoteEditor {
                 "Created Keynote slide is missing from its insertion point".to_owned(),
             )
         })?;
-        if created.slide_id != new_slide_id || created.node_id != new_node_id {
+        let created_ids = created.native_ids()?;
+        if created_ids.slide.get() != new_slide_id || created_ids.node.get() != new_node_id {
             return Err(Error::InvalidFormat(
                 "Keynote slide creation produced the wrong graph identity".to_owned(),
             ));

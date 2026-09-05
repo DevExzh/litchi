@@ -108,6 +108,13 @@ it is not a general Keynote package editor.
 | Existing chart legend visibility | 🟡 | ✅ | 🟡 | The focused owner reads the effective legend-visibility bit (an absent native field means `false`) and source-boundedly replaces it for an existing chart through selector-first `Package::{slide_chart_legend_visible,edit_slide_chart_legend,apply_slide_chart_legend}`. Native field presence, IDs, and raw records stay private; strict wire validation precedes the lazy Buffa projection, with exact no-op/change/inverse, locality, candidate readback, and preview invalidation on changed writes. This does not own legend layout, fill/frame/font/stroke/shadow styling, chart data, or CRUD. ADR 0008 records operation-specific native open/save/close/reopen evidence ([legend API](../src/package/slide_chart_legend.rs#L1), [tests](../tests/slide_chart_legend.rs#L1), [ADR 0008](../../../docs/adr/0008-migration-and-verification.md#2026-08-31-amendment-wave117-keynote-chart-legend-visibility-verification)). |
 | Chart data, series, types, legend layout/styles, formulas, and chart CRUD | ❌ | 🟡 | ❌ | No focused chart data graph or create/replace/remove transaction exists. Arrange flags and legend visibility are separate bounded owners; broader chart authoring remains in the migration host ([legacy charts](../../litchi-iwa/src/keynote/editor/slide_charts.rs#L1)). |
 
+The checked-in [`table-discovery.key`](../../../test-data/iwork/keynote/table-discovery.key)
+fixture is a native Keynote 14.4 producer sample derived from `basic.key`; it
+contains a Plain 5-by-4 table with `Buffa discovery` in A1. The migration-host
+listing path uses its bounded table-model discovery projection for name and
+dimensions only. This fixture does not promote focused physical sorting,
+Litchi table mutation, native byte parity, or broader table support.
+
 ## Movies, images, audio, and soundtrack
 
 | Feature | Status | Read | Write | Notes |

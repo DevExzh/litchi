@@ -1,7 +1,7 @@
 //! Exact-source hidden-row/hidden-column transactions for Pages tables.
 //!
 //! The public value is deliberately archive free.  This adapter resolves the
-//! rooted table through `table_lock`, proves the complete native closure, and
+//! rooted table through `table_lock`, proves its hidden-state dependency closure, and
 //! only then crosses into the strict hidden-state codec.  Payload surgery is
 //! limited to the selected table-info/model fields; all unrelated wire bytes
 //! and all unrelated package members remain source authoritative.
@@ -34,9 +34,48 @@ const HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE: u32 = 6_204;
 const FILTER_SET_MESSAGE_TYPE: u32 = 6_220;
 const UID_MAP_MESSAGE_TYPE: u32 = 6_267;
 const LEGACY_UID_MAP_MESSAGE_TYPE: u32 = 6_200;
-const NATIVE_MESSAGE_VERSIONS: &[u32] = &[1, 0, 5];
+const CURRENT_MESSAGE_VERSIONS: &[u32] = &[1, 0, 5];
+const NATIVE_TABLE_MODEL_MESSAGE_VERSIONS: &[u32] = &[3, 2, 10];
+const NATIVE_FORMULA_OWNER_MESSAGE_VERSIONS: &[u32] = &[3, 2, 10];
 const FORMULA_OWNER_REFERENCE_PATH: &[u32] = &[11];
 const MODEL_PIVOT_OWNER_FIELD: u32 = 85;
+
+/// The selected Pages producer profile determines which archive-header
+/// version tuples and dependency metadata are authoritative.  The qualified
+/// current profile remains the default; the native visible profile is
+/// admitted only for the exact 6000/6001 role pair observed in the checked-in
+/// Pages document.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum GraphProfile {
+    Indexed,
+    NativeVisible,
+}
+
+impl GraphProfile {
+    const fn is_native(self) -> bool {
+        matches!(self, Self::NativeVisible)
+    }
+
+    const fn info_versions(self) -> &'static [u32] {
+        // Both admitted profiles use the current TableInfoArchive header.
+        let _ = self;
+        CURRENT_MESSAGE_VERSIONS
+    }
+
+    const fn model_versions(self) -> &'static [u32] {
+        match self {
+            Self::Indexed => CURRENT_MESSAGE_VERSIONS,
+            Self::NativeVisible => NATIVE_TABLE_MODEL_MESSAGE_VERSIONS,
+        }
+    }
+
+    const fn formula_owner_versions(self) -> &'static [u32] {
+        match self {
+            Self::Indexed => CURRENT_MESSAGE_VERSIONS,
+            Self::NativeVisible => NATIVE_FORMULA_OWNER_MESSAGE_VERSIONS,
+        }
+    }
+}
 
 /// A content-free location associated with one hidden-axis operation.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -470,6 +509,7 @@ struct InfoValues {
 
 #[derive(Clone)]
 struct Graph {
+    profile: GraphProfile,
     target: table_lock::BodyTableTarget,
     model: ModelValues,
     info: InfoValues,
@@ -602,6 +642,12 @@ impl Package {
                 diagnostics: BodyTableHiddenAxesDiagnostics::unchanged(),
             });
         }
+        if graph.profile.is_native() {
+            // The native visible profile is read/no-op only until a Pages
+            // producer round-trip proves that its kind-1 dependency envelope
+            // can be rewritten without changing unrelated native state.
+            return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+        }
         if graph.target.explicit_locked == Some(true) {
             return Err(BodyTableHiddenAxesError::TableLocked);
         }
@@ -691,6 +737,11 @@ fn commit_edit(
     if graph.before != edit.before {
         return Err(BodyTableHiddenAxesError::InvalidSource);
     }
+    if graph.profile.is_native() {
+        // Native kind-1 formula ownership is qualified for reads and exact
+        // no-ops only.  Refuse before any candidate allocation or publication.
+        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+    }
     if graph.model.pivot || graph.info.pivot {
         return Err(BodyTableHiddenAxesError::UnsupportedDependency);
     }
@@ -765,6 +816,7 @@ fn resolve_graph(
     {
         return Err(BodyTableHiddenAxesError::InvalidSource);
     }
+    let profile = classify_graph_profile(package, &target)?;
     let model_raw = message_at(
         package,
         target.model_component_index,
@@ -772,6 +824,7 @@ fn resolve_graph(
         target.model_message_index,
         target.model_identifier,
         target.model_message_type,
+        profile.model_versions(),
     )?;
     let info_raw = message_at(
         package,
@@ -780,6 +833,7 @@ fn resolve_graph(
         target.info_message_index,
         target.drawable_identifier,
         target.message_type,
+        profile.info_versions(),
     )?;
     let model = decode_model(&model_raw.data, budget)?;
     let info = decode_info(&info_raw.data, budget)?;
@@ -796,38 +850,48 @@ fn resolve_graph(
         validate_reference_shape(reference)?;
     }
     if let Some(map) = model.map {
-        validate_reference_metadata(
+        validate_reference_metadata_for_profile(
             package,
             target.model_component_index,
             target.model_object_index,
             target.model_message_index,
             map,
             &[46],
+            profile.model_versions(),
+            profile,
             budget,
         )?;
     }
     if let Some(map) = info.map {
-        validate_reference_metadata(
+        validate_reference_metadata_for_profile(
             package,
             target.component_index,
             target.object_index,
             target.info_message_index,
             map,
             &[6],
+            profile.info_versions(),
+            profile,
             budget,
         )?;
     }
     for (reference, path) in [(model.formula_columns, [34]), (model.formula_rows, [35])] {
         if let Some(reference) = reference {
-            validate_reference_metadata(
+            validate_reference_metadata_for_profile(
                 package,
                 target.model_component_index,
                 target.model_object_index,
                 target.model_message_index,
                 reference,
                 &path,
+                profile.model_versions(),
+                profile,
                 budget,
             )?;
+        } else if profile.is_native() {
+            // The native visible profile carries both dependency roots.  An
+            // absent root cannot be interpreted as an ownerless empty table.
+            return Err(BodyTableHiddenAxesError::InvalidSource);
         } else {
             reject_reference_path_metadata(
                 package,
@@ -846,13 +910,15 @@ fn resolve_graph(
     if info.model != target.model_identifier {
         return Err(BodyTableHiddenAxesError::InvalidSource);
     }
-    validate_reference_metadata(
+    validate_reference_metadata_for_profile(
         package,
         target.component_index,
         target.object_index,
         target.info_message_index,
         info.model,
         &[2],
+        profile.info_versions(),
+        profile,
         budget,
     )?;
     if info.map.is_none() {
@@ -867,6 +933,9 @@ fn resolve_graph(
     }
     if let Some(hidden_uuid) = info.hidden_uuid {
         validate_uuid(hidden_uuid)?;
+    }
+    if profile.is_native() && model.owner.is_none() {
+        return Err(BodyTableHiddenAxesError::InvalidSource);
     }
     let (rows, columns, objects) = if model.owner.is_none() {
         // An ownerless table still proves its mandatory UID map, but does not
@@ -893,6 +962,7 @@ fn resolve_graph(
         // not scan unrelated package-wide formula records or allocate axis
         // indexes that no changed operation can use.
         return Ok(Graph {
+            profile,
             target,
             model,
             info,
@@ -925,6 +995,7 @@ fn resolve_graph(
         &formula_owner_messages,
         drawable_location,
         model_location,
+        profile,
         budget,
     )?;
     if model.owner.is_some() && formula_owner_uid.is_none() {
@@ -948,6 +1019,9 @@ fn resolve_graph(
             return Err(BodyTableHiddenAxesError::InvalidSource);
         }
     }
+    if profile.is_native() {
+        validate_native_visible_owner(&model, &info)?;
+    }
     validate_dependencies(
         package,
         &objects,
@@ -956,11 +1030,13 @@ fn resolve_graph(
         info.hidden_uuid,
         &row_indices,
         &column_indices,
+        profile,
         budget,
     )?;
     validate_model_counts(&model, info.hidden_uuid, budget)?;
     let before = hidden_axes(&model, &info, &row_indices, &column_indices, budget)?;
     Ok(Graph {
+        profile,
         target,
         model,
         info,
@@ -979,6 +1055,7 @@ fn message_at(
     message_index: usize,
     identifier: NonZeroU64,
     type_: u32,
+    versions: &[u32],
 ) -> Result<RawMessage, BodyTableHiddenAxesError> {
     let object = package
         .state
@@ -995,8 +1072,56 @@ fn message_at(
         .get(message_index)
         .filter(|m| m.type_ == type_)
         .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-    validate_message_metadata(object, message_index, type_)?;
+    validate_message_metadata_with_versions(object, message_index, type_, versions)?;
     Ok(message.clone())
+}
+
+fn classify_graph_profile(
+    package: &Package,
+    target: &table_lock::BodyTableTarget,
+) -> Result<GraphProfile, BodyTableHiddenAxesError> {
+    let info_object = package
+        .state
+        .source
+        .components()
+        .get_index(target.component_index)
+        .and_then(|component| component.archive().objects.get(target.object_index))
+        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    let info = info_object
+        .archive_info
+        .message_infos
+        .get(target.info_message_index)
+        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    let model_object = package
+        .state
+        .source
+        .components()
+        .get_index(target.model_component_index)
+        .and_then(|component| component.archive().objects.get(target.model_object_index))
+        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    let model = model_object
+        .archive_info
+        .message_infos
+        .get(target.model_message_index)
+        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+
+    if target.message_type == 6_000
+        && target.model_message_type == 6_001
+        && info.type_ == 6_000
+        && info.versions.as_slice() == CURRENT_MESSAGE_VERSIONS
+        && model.type_ == 6_001
+        && model.versions.as_slice() == NATIVE_TABLE_MODEL_MESSAGE_VERSIONS
+    {
+        return Ok(GraphProfile::NativeVisible);
+    }
+
+    if info.versions.as_slice() == CURRENT_MESSAGE_VERSIONS
+        && model.versions.as_slice() == CURRENT_MESSAGE_VERSIONS
+    {
+        return Ok(GraphProfile::Indexed);
+    }
+
+    Err(BodyTableHiddenAxesError::InvalidSource)
 }
 
 /// Validate the physical metadata paired with one selected raw payload.
@@ -1011,6 +1136,20 @@ fn validate_message_metadata(
     message_index: usize,
     expected_type: u32,
 ) -> Result<&MessageInfo, BodyTableHiddenAxesError> {
+    validate_message_metadata_with_versions(
+        object,
+        message_index,
+        expected_type,
+        CURRENT_MESSAGE_VERSIONS,
+    )
+}
+
+fn validate_message_metadata_with_versions<'object>(
+    object: &'object ArchiveObject,
+    message_index: usize,
+    expected_type: u32,
+    versions: &[u32],
+) -> Result<&'object MessageInfo, BodyTableHiddenAxesError> {
     let message = object
         .messages
         .get(message_index)
@@ -1022,7 +1161,7 @@ fn validate_message_metadata(
         .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
     if message.type_ != expected_type
         || info.type_ != message.type_
-        || info.versions.as_slice() != NATIVE_MESSAGE_VERSIONS
+        || info.versions.as_slice() != versions
         || usize::try_from(info.length).ok() != Some(message.data.len())
         || object.header_length == 0
     {
@@ -1108,6 +1247,87 @@ fn validate_formula_owner_metadata(
     Ok(())
 }
 
+/// Native Pages' type-4008 owner keeps the selected drawable edge in the
+/// payload while omitting both aggregate and FieldInfo declarations.  Accept
+/// that omission only for the qualified native profile; a declaration that is
+/// present still has to identify the payload-selected drawable at field 11.
+fn validate_native_formula_owner_metadata(
+    object: &ArchiveObject,
+    message_index: usize,
+    drawable_identifier: u64,
+    versions: &[u32],
+    budget: &mut table_lock::WireBudget,
+) -> Result<(), BodyTableHiddenAxesError> {
+    if object.messages.len() != 1
+        || object.archive_info.message_infos.len() != 1
+        || message_index != 0
+    {
+        return Err(BodyTableHiddenAxesError::InvalidSource);
+    }
+    let info = validate_message_metadata_with_versions(
+        object,
+        message_index,
+        FORMULA_OWNER_MESSAGE_TYPE,
+        versions,
+    )?;
+    charge_metadata_scan(info, 2, budget)?;
+    if !info.data_references.is_empty() {
+        return Err(BodyTableHiddenAxesError::InvalidSource);
+    }
+    if info
+        .object_references
+        .iter()
+        .any(|identifier| *identifier != drawable_identifier)
+    {
+        return Err(BodyTableHiddenAxesError::InvalidSource);
+    }
+    let aggregate_occurrences = info
+        .object_references
+        .iter()
+        .filter(|identifier| **identifier == drawable_identifier)
+        .count();
+    if aggregate_occurrences > 1 {
+        return Err(BodyTableHiddenAxesError::InvalidSource);
+    }
+    let mut field_occurrences = 0usize;
+    for field in &info.field_infos {
+        if !field.data_references.is_empty() {
+            return Err(BodyTableHiddenAxesError::InvalidSource);
+        }
+        if field
+            .object_references
+            .iter()
+            .any(|identifier| *identifier != drawable_identifier)
+        {
+            return Err(BodyTableHiddenAxesError::InvalidSource);
+        }
+        let occurrences = field
+            .object_references
+            .iter()
+            .filter(|identifier| **identifier == drawable_identifier)
+            .count();
+        if occurrences != 0 {
+            if occurrences != 1 || field.path.as_slice() != FORMULA_OWNER_REFERENCE_PATH {
+                return Err(BodyTableHiddenAxesError::InvalidSource);
+            }
+            field_occurrences = field_occurrences
+                .checked_add(1)
+                .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        }
+        if field.path.as_slice() == FORMULA_OWNER_REFERENCE_PATH
+            && !field.object_references.is_empty()
+            && (field.object_references.as_slice() != [drawable_identifier]
+                || !field.data_references.is_empty())
+        {
+            return Err(BodyTableHiddenAxesError::InvalidSource);
+        }
+    }
+    if field_occurrences > 1 || field_occurrences > aggregate_occurrences {
+        return Err(BodyTableHiddenAxesError::InvalidSource);
+    }
+    Ok(())
+}
+
 /// Model metadata carries filter-set ownership as aggregate-only edges.  No
 /// current Pages field path is proven for these nested extent references, so
 /// a FieldInfo declaration (or a data-reference alias) is rejected rather
@@ -1121,6 +1341,84 @@ fn validate_aggregate_only_reference_edge(
         || ReferenceInventory::occurrences(&inventory.field_references, identifier) != 0
     {
         return Err(BodyTableHiddenAxesError::InvalidSource);
+    }
+    Ok(())
+}
+
+/// Validate the native model's filter-set declarations.  Pages 14.4 emits
+/// each filter identifier once in the model aggregate and once in the
+/// `hidden_states_owner` field (field 70), while the indexed profile uses
+/// aggregate-only declarations.  The path and identifier set are both
+/// checked so an unrelated FieldInfo entry cannot be used to bypass the
+/// dependency proof. Other model references belong to unrelated table state
+/// and remain opaque; they cannot substitute for a selected filter edge.
+fn validate_native_filter_metadata(
+    info: &MessageInfo,
+    filter_identifiers: &[NonZeroU64],
+) -> Result<(), BodyTableHiddenAxesError> {
+    for identifier in filter_identifiers {
+        let identifier = identifier.get();
+        if info
+            .object_references
+            .iter()
+            .filter(|candidate| **candidate == identifier)
+            .count()
+            != 1
+            || info.data_references.contains(&identifier)
+        {
+            return Err(BodyTableHiddenAxesError::InvalidSource);
+        }
+    }
+    let mut owner_field_count = 0usize;
+    let mut owner_field_reference_count = 0usize;
+    for field in &info.field_infos {
+        let at_hidden_states_owner = field.path.as_slice() == [70];
+        if at_hidden_states_owner && !field.data_references.is_empty() {
+            return Err(BodyTableHiddenAxesError::InvalidSource);
+        }
+        if field
+            .data_references
+            .iter()
+            .any(|reference| filter_identifiers.iter().any(|id| id.get() == *reference))
+        {
+            return Err(BodyTableHiddenAxesError::InvalidSource);
+        }
+        if at_hidden_states_owner {
+            owner_field_count = owner_field_count
+                .checked_add(1)
+                .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+            owner_field_reference_count = owner_field_reference_count
+                .checked_add(field.object_references.len())
+                .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        }
+        for reference in &field.object_references {
+            let is_filter = filter_identifiers
+                .iter()
+                .any(|identifier| identifier.get() == *reference);
+            if is_filter != at_hidden_states_owner {
+                return Err(BodyTableHiddenAxesError::InvalidSource);
+            }
+        }
+    }
+    if owner_field_count > 1 {
+        return Err(BodyTableHiddenAxesError::InvalidSource);
+    }
+    if owner_field_count == 1 {
+        if owner_field_reference_count != filter_identifiers.len() {
+            return Err(BodyTableHiddenAxesError::InvalidSource);
+        }
+        for identifier in filter_identifiers {
+            let occurrences = info
+                .field_infos
+                .iter()
+                .filter(|field| field.path.as_slice() == [70])
+                .flat_map(|field| field.object_references.iter())
+                .filter(|candidate| **candidate == identifier.get())
+                .count();
+            if occurrences != 1 {
+                return Err(BodyTableHiddenAxesError::InvalidSource);
+            }
+        }
     }
     Ok(())
 }
@@ -1162,6 +1460,105 @@ fn validate_reference_metadata(
             .iter()
             .any(|field| field.data_references.contains(&identifier.get()))
     {
+        return Err(BodyTableHiddenAxesError::InvalidSource);
+    }
+    Ok(())
+}
+
+/// Validate one selected payload edge under a producer profile whose
+/// `FieldInfo` declarations are optional.  Native Pages 14.4 keeps the
+/// aggregate object reference for the model's selected edges but omits the
+/// corresponding field-local declarations.  The payload decoder remains the
+/// authority for the selected identifier; metadata is accepted only when any
+/// declaration that is present agrees with that identifier and path.
+fn validate_reference_metadata_for_profile(
+    package: &Package,
+    component_index: usize,
+    object_index: usize,
+    message_index: usize,
+    identifier: NonZeroU64,
+    path: &[u32],
+    versions: &[u32],
+    profile: GraphProfile,
+    budget: &mut table_lock::WireBudget,
+) -> Result<(), BodyTableHiddenAxesError> {
+    if !profile.is_native() {
+        return validate_reference_metadata(
+            package,
+            component_index,
+            object_index,
+            message_index,
+            identifier,
+            path,
+            budget,
+        );
+    }
+    let object = package
+        .state
+        .source
+        .components()
+        .get_index(component_index)
+        .and_then(|component| component.archive().objects.get(object_index))
+        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    let info = object
+        .archive_info
+        .message_infos
+        .get(message_index)
+        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    charge_metadata_scan(info, 2, budget)?;
+    budget
+        .charge_payload_work(path.len().saturating_add(1))
+        .map_err(map_lock_error)?;
+    validate_message_metadata_with_versions(
+        object,
+        message_index,
+        object
+            .messages
+            .get(message_index)
+            .ok_or(BodyTableHiddenAxesError::InvalidSource)?
+            .type_,
+        versions,
+    )?;
+
+    let identifier = identifier.get();
+    let aggregate_occurrences = info
+        .object_references
+        .iter()
+        .filter(|candidate| **candidate == identifier)
+        .count();
+    if aggregate_occurrences != 1 || info.data_references.contains(&identifier) {
+        return Err(BodyTableHiddenAxesError::InvalidSource);
+    }
+    let mut field_occurrences = 0usize;
+    for field in &info.field_infos {
+        if field.data_references.contains(&identifier) {
+            return Err(BodyTableHiddenAxesError::InvalidSource);
+        }
+        let occurrences = field
+            .object_references
+            .iter()
+            .filter(|candidate| **candidate == identifier)
+            .count();
+        if field.path.as_slice() == path && !field.data_references.is_empty() {
+            return Err(BodyTableHiddenAxesError::InvalidSource);
+        }
+        if occurrences != 0 {
+            if occurrences != 1 || field.path.as_slice() != path {
+                return Err(BodyTableHiddenAxesError::InvalidSource);
+            }
+            field_occurrences = field_occurrences
+                .checked_add(1)
+                .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        }
+        if field.path.as_slice() == path && !field.object_references.is_empty() {
+            if field.object_references.as_slice() != [identifier]
+                || !field.data_references.is_empty()
+            {
+                return Err(BodyTableHiddenAxesError::InvalidSource);
+            }
+        }
+    }
+    if field_occurrences > 1 || field_occurrences > aggregate_occurrences {
         return Err(BodyTableHiddenAxesError::InvalidSource);
     }
     Ok(())
@@ -1510,6 +1907,47 @@ impl ReferenceInventory {
                 observed: u64::MAX,
                 maximum: u64::try_from(budget.maximum_payload_references()).unwrap_or(u64::MAX),
             })?;
+        let retained_references = info
+            .object_references
+            .len()
+            .checked_add(info.data_references.len())
+            .and_then(|count| count.checked_add(field_reference_count))
+            .ok_or(BodyTableHiddenAxesError::LimitExceeded {
+                kind: BodyTableHiddenAxesLimitKind::PayloadReferences,
+                observed: u64::MAX,
+                maximum: u64::try_from(budget.maximum_payload_references()).unwrap_or(u64::MAX),
+            })?;
+        // Source-catalog accounting covers the original metadata. These are
+        // additional retained copies, so admit their storage and sorting work
+        // before any allocation, copying, or sort takes place.
+        budget
+            .charge_payload_references(retained_references)
+            .map_err(map_lock_error)?;
+        let sorting_work = [
+            info.object_references.len(),
+            info.data_references.len(),
+            field_reference_count,
+        ]
+        .into_iter()
+        .try_fold(0usize, |total, count| {
+            total
+                .checked_add(reference_inventory_sort_work(count)?)
+                .ok_or(BodyTableHiddenAxesError::LimitExceeded {
+                    kind: BodyTableHiddenAxesLimitKind::TransactionWork,
+                    observed: u64::MAX,
+                    maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
+                        .unwrap_or(u64::MAX),
+                })
+        })?;
+        let work = metadata_scan_work(info)?
+            .checked_mul(2)
+            .and_then(|scan| scan.checked_add(sorting_work))
+            .ok_or(BodyTableHiddenAxesError::LimitExceeded {
+                kind: BodyTableHiddenAxesLimitKind::TransactionWork,
+                observed: u64::MAX,
+                maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
+            })?;
+        budget.charge_payload_work(work).map_err(map_lock_error)?;
         let mut object_references = Vec::new();
         object_references
             .try_reserve_exact(info.object_references.len())
@@ -1534,34 +1972,9 @@ impl ReferenceInventory {
             field_references.extend_from_slice(&field.object_references);
             field_references.extend_from_slice(&field.data_references);
         }
-        let object_sorting_work = sort_reference_inventory(&mut object_references)?;
-        let data_sorting_work = sort_reference_inventory(&mut data_references)?;
-        let field_sorting_work = sort_reference_inventory(&mut field_references)?;
-        let sorting_work = object_sorting_work
-            .checked_add(data_sorting_work)
-            .and_then(|value| value.checked_add(field_sorting_work))
-            .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::TransactionWork,
-                observed: u64::MAX,
-                maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-            })?;
-        let scan_work = metadata_scan_work(info)?.checked_mul(2).ok_or(
-            BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::TransactionWork,
-                observed: u64::MAX,
-                maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-            },
-        )?;
-        budget
-            .charge_payload_work(scan_work.checked_add(sorting_work).ok_or(
-                BodyTableHiddenAxesError::LimitExceeded {
-                    kind: BodyTableHiddenAxesLimitKind::TransactionWork,
-                    observed: u64::MAX,
-                    maximum:
-                        u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-                },
-            )?)
-            .map_err(map_lock_error)?;
+        object_references.sort_unstable();
+        data_references.sort_unstable();
+        field_references.sort_unstable();
         Ok(Self {
             object_references,
             data_references,
@@ -1576,17 +1989,15 @@ impl ReferenceInventory {
     }
 }
 
-fn sort_reference_inventory(values: &mut [u64]) -> Result<usize, BodyTableHiddenAxesError> {
-    values.sort_unstable();
-    let levels = if values.len() <= 1 {
+fn reference_inventory_sort_work(count: usize) -> Result<usize, BodyTableHiddenAxesError> {
+    let levels = if count <= 1 {
         0
     } else {
-        (usize::BITS - (values.len() - 1).leading_zeros()) as usize
+        (usize::BITS - (count - 1).leading_zeros()) as usize
     };
-    values
-        .len()
+    count
         .checked_mul(levels)
-        .and_then(|value| value.checked_add(values.len()))
+        .and_then(|value| value.checked_add(count))
         .ok_or(BodyTableHiddenAxesError::LimitExceeded {
             kind: BodyTableHiddenAxesLimitKind::TransactionWork,
             observed: u64::MAX,
@@ -1859,7 +2270,7 @@ fn decode_uid_map_at(
     // a supported ingress shape.
     let allow_legacy = message.type_ == LEGACY_UID_MAP_MESSAGE_TYPE
         && message_info.type_ == LEGACY_UID_MAP_MESSAGE_TYPE
-        && message_info.versions.as_slice() == NATIVE_MESSAGE_VERSIONS;
+        && message_info.versions.as_slice() == CURRENT_MESSAGE_VERSIONS;
     page_layout::validate_selected_metadata(object, message_index)
         .map_err(map_page_layout_error)?;
     codec::validate_column_row_uid_map_message_type(message.type_, allow_legacy)
@@ -2080,8 +2491,19 @@ fn formula_owner_for(
     formula_messages: &[MessageLocation],
     drawable: ObjectLocation,
     model: ObjectLocation,
+    profile: GraphProfile,
     budget: &mut table_lock::WireBudget,
 ) -> Result<Option<codec::UuidSnapshot>, BodyTableHiddenAxesError> {
+    if profile.is_native() {
+        return native_formula_owner_for(
+            package,
+            formula_messages,
+            drawable,
+            model,
+            profile.formula_owner_versions(),
+            budget,
+        );
+    }
     let mut result = None;
     for location in formula_messages {
         budget.charge_payload_work(1).map_err(map_lock_error)?;
@@ -2158,6 +2580,90 @@ fn formula_owner_for(
     Ok(result)
 }
 
+fn native_formula_owner_for(
+    package: &Package,
+    formula_messages: &[MessageLocation],
+    drawable: ObjectLocation,
+    model: ObjectLocation,
+    versions: &[u32],
+    budget: &mut table_lock::WireBudget,
+) -> Result<Option<codec::UuidSnapshot>, BodyTableHiddenAxesError> {
+    let mut result = None;
+    for location in formula_messages {
+        budget.charge_payload_work(1).map_err(map_lock_error)?;
+        let object = package
+            .state
+            .source
+            .components()
+            .get_index(location.object.component_index)
+            .and_then(|component| {
+                component
+                    .archive()
+                    .objects
+                    .get(location.object.object_index)
+            })
+            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        if object.archive_info.identifier != Some(location.object.identifier) {
+            return Err(BodyTableHiddenAxesError::InvalidSource);
+        }
+        let message = object
+            .messages
+            .get(location.message_index)
+            .filter(|message| message.type_ == FORMULA_OWNER_MESSAGE_TYPE)
+            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        validate_message_metadata_with_versions(
+            object,
+            location.message_index,
+            FORMULA_OWNER_MESSAGE_TYPE,
+            versions,
+        )?;
+        let (owner, report) = codec::decode_formula_owner_dependencies_with_report(
+            message.data.as_slice(),
+            codec_options(budget, message.data.len(), message.data.len())?,
+        )
+        .map_err(map_codec_error)?;
+        charge_codec(budget, report)?;
+        let Some(reference) = owner.formula_owner() else {
+            continue;
+        };
+        validate_reference_shape(reference)?;
+        if reference.identifier().get() != drawable.identifier {
+            continue;
+        }
+        if owner.internal_formula_owner_id() == 0
+            || owner.owner_kind() != Some(1)
+            || !owner.has_dependencies()
+            || owner.base_owner_uid().is_some()
+        {
+            return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+        }
+        // A forged aggregate edge is not sufficient provenance.  The
+        // selected 4008 and drawable must be sibling objects in the same
+        // component, and a helper cannot be embedded in the model object.
+        if location.object.component_index != drawable.component_index
+            || location.object.identifier == drawable.identifier
+            || location.object.identifier == model.identifier
+        {
+            return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+        }
+        validate_native_formula_owner_metadata(
+            object,
+            location.message_index,
+            drawable.identifier,
+            versions,
+            budget,
+        )?;
+        if result.replace(owner.formula_owner_uid()).is_some() {
+            return Err(BodyTableHiddenAxesError::InvalidSource);
+        }
+    }
+    let result = result.map(|uid| codec::UuidSnapshot::new(uid.lower(), uid.upper()));
+    if let Some(uid) = result {
+        validate_uuid(uid)?;
+    }
+    Ok(result)
+}
+
 fn validate_dependencies(
     package: &Package,
     objects: &[ObjectLocation],
@@ -2166,6 +2672,7 @@ fn validate_dependencies(
     active_uuid: Option<codec::UuidSnapshot>,
     row_indices: &UidIndex,
     column_indices: &UidIndex,
+    profile: GraphProfile,
     budget: &mut table_lock::WireBudget,
 ) -> Result<(), BodyTableHiddenAxesError> {
     let Some(owner) = model.owner.as_ref() else {
@@ -2296,7 +2803,7 @@ fn validate_dependencies(
     {
         return Err(BodyTableHiddenAxesError::UnsupportedDependency);
     }
-    validate_extent_filters(package, target, owner, objects, model, budget)?;
+    validate_extent_filters(package, target, owner, objects, model, profile, budget)?;
     let col_ref = model
         .formula_columns
         .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
@@ -2389,6 +2896,7 @@ fn validate_extent_filters(
     owner: &codec::HiddenStatesOwnerSnapshot,
     objects: &[ObjectLocation],
     model: &ModelValues,
+    profile: GraphProfile,
     budget: &mut table_lock::WireBudget,
 ) -> Result<(), BodyTableHiddenAxesError> {
     let model_location = object_location(objects, target.model_identifier)?;
@@ -2399,10 +2907,11 @@ fn validate_extent_filters(
         .get_index(model_location.component_index)
         .and_then(|component| component.archive().objects.get(model_location.object_index))
         .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-    let model_info = validate_message_metadata(
+    let model_info = validate_message_metadata_with_versions(
         model_object,
         target.model_message_index,
         target.model_message_type,
+        profile.model_versions(),
     )?;
     let model_references = ReferenceInventory::new(model_info, budget)?;
     let mut filter_identifiers = Vec::new();
@@ -2450,8 +2959,17 @@ fn validate_extent_filters(
             },
         )?)
         .map_err(map_lock_error)?;
+    if profile.is_native() {
+        // The visible profile has one state and at most two filter edges.
+        // Admit its aggregate, field-path, and per-filter consistency scans
+        // separately from constructing the sorted reference inventory.
+        charge_metadata_scan(model_info, 8, budget)?;
+        validate_native_filter_metadata(model_info, &filter_identifiers)?;
+    }
     for identifier in filter_identifiers {
-        validate_aggregate_only_reference_edge(&model_references, identifier.get())?;
+        if !profile.is_native() {
+            validate_aggregate_only_reference_edge(&model_references, identifier.get())?;
+        }
         let location = object_location(objects, identifier)?;
         let object = &package
             .state
@@ -2664,6 +3182,42 @@ fn read_extent(
         }
     }
     Ok(())
+}
+
+fn validate_native_visible_owner(
+    model: &ModelValues,
+    info: &InfoValues,
+) -> Result<(), BodyTableHiddenAxesError> {
+    let owner = model
+        .owner
+        .as_ref()
+        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    if owner.hidden_states().len() != 1
+        || info.hidden_uuid != Some(owner.owner_uid())
+        || model.formula_columns.is_none()
+        || model.formula_rows.is_none()
+        || model.pivot
+        || info.pivot
+    {
+        return Err(BodyTableHiddenAxesError::InvalidSource);
+    }
+    let state = owner
+        .hidden_states()
+        .first()
+        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    if state
+        .row_hidden_state_extent()
+        .base_hidden_states()
+        .is_empty()
+        && state
+            .column_hidden_state_extent()
+            .base_hidden_states()
+            .is_empty()
+    {
+        Ok(())
+    } else {
+        Err(BodyTableHiddenAxesError::InvalidSource)
+    }
 }
 
 fn validate_axis_bounds(graph: &Graph, axes: &HiddenAxes) -> Result<(), BodyTableHiddenAxesError> {
@@ -3941,5 +4495,83 @@ fn map_package_error(error: PackageError) -> BodyTableHiddenAxesError {
             maximum: limit as u64,
         },
         _ => BodyTableHiddenAxesError::InvalidSource,
+    }
+}
+
+#[cfg(test)]
+mod reference_inventory_tests {
+    use super::*;
+    use litchi_iwa_core::{FieldInfo, FieldPath};
+
+    fn budget(references: usize) -> table_lock::WireBudget {
+        let archive = litchi_iwa_core::Limits::default()
+            .with_archive_bytes(4096)
+            .expect("archive byte limit")
+            .with_metadata_items(references)
+            .expect("metadata item limit");
+        let physical = litchi_iwa_archive::Limits::new(4096, 1, 4096, 4096, 4096)
+            .expect("physical limits")
+            .with_archive_limits(archive)
+            .expect("archive limits");
+        table_lock::WireBudget::new(physical).expect("wire budget")
+    }
+
+    fn metadata() -> MessageInfo {
+        let mut info = MessageInfo::new(6001, 0);
+        info.object_references = vec![9, 3];
+        info.data_references = vec![5];
+        let mut field = FieldInfo::new(FieldPath::new(vec![46]));
+        field.object_references = vec![3];
+        info.field_infos.push(field);
+        info
+    }
+
+    #[test]
+    fn retained_reference_copies_obey_inclusive_and_exceeded_limits() {
+        let info = metadata();
+        let mut exact = budget(4);
+        let inventory = ReferenceInventory::new(&info, &mut exact).expect("inclusive limit");
+        assert_eq!(inventory.object_references, [3, 9]);
+        assert_eq!(inventory.data_references, [5]);
+        assert_eq!(inventory.field_references, [3]);
+        assert_eq!(exact.remaining_payload_references(), 0);
+
+        assert!(matches!(
+            ReferenceInventory::new(&info, &mut budget(3)),
+            Err(BodyTableHiddenAxesError::LimitExceeded {
+                kind: BodyTableHiddenAxesLimitKind::PayloadReferences,
+                observed: 4,
+                maximum: 3,
+            })
+        ));
+        assert_eq!(info.object_references, [9, 3]);
+    }
+
+    #[test]
+    fn sorting_work_is_admitted_before_building_reference_copies() {
+        let info = metadata();
+        // Nine metadata items scanned twice, plus sort/copy bounds of 4, 1,
+        // and 1 for the three inventories. Retained references use the
+        // separate total-work counter.
+        let required_work = 9 * 2 + 4 + 1 + 1;
+        let mut exact = budget(4);
+        let available = 4096 * 16;
+        exact
+            .charge_payload_work(available - required_work)
+            .expect("leave exact work allowance");
+        ReferenceInventory::new(&info, &mut exact).expect("inclusive work limit");
+        assert!(exact.charge_payload_work(1).is_err());
+
+        let mut exhausted = budget(4);
+        exhausted
+            .charge_payload_work(available - required_work + 1)
+            .expect("leave one fewer work unit");
+        assert!(matches!(
+            ReferenceInventory::new(&info, &mut exhausted),
+            Err(BodyTableHiddenAxesError::LimitExceeded {
+                kind: BodyTableHiddenAxesLimitKind::WireWork,
+                ..
+            })
+        ));
     }
 }

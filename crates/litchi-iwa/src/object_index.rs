@@ -55,7 +55,6 @@ impl ArchiveObjectPosition {
 #[derive(Debug, Clone, Copy)]
 struct PendingObjectMetadata {
     id: ObjectId,
-    fragment_id: FragmentId,
     source_position: ArchiveObjectPosition,
     object_type: u32,
 }
@@ -303,7 +302,6 @@ impl ObjectIndex {
         {
             metadata.push(PendingObjectMetadata {
                 id: record.id(),
-                fragment_id: record.fragment(),
                 source_position: object_metadata.source_position,
                 object_type: object_metadata.object_type,
             });
@@ -864,7 +862,6 @@ fn append_archive(
         object_fragments.insert(object_id, fragment_id);
         metadata.push(PendingObjectMetadata {
             id: object_id,
-            fragment_id,
             source_position: ArchiveObjectPosition::new(object_position),
             object_type,
         });

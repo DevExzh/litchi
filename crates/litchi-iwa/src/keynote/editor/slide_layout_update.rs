@@ -40,6 +40,9 @@ impl KeynoteEditor {
                 slides.len()
             ))
         })?;
+        let before_ids = before.native_ids()?;
+        let before_slide_id = before_ids.slide.get();
+        let before_node_id = before_ids.node.get();
         if before.layout.as_ref().map(|current| current.id) == Some(layout) {
             return Ok(());
         }
@@ -65,9 +68,9 @@ impl KeynoteEditor {
             "KN.SlideNodeArchive",
         )?;
         let current_slide: kn::SlideArchive =
-            graph.decode_type(before.slide_id, SLIDE_MESSAGE_TYPE, "KN.SlideArchive")?;
+            graph.decode_type(before_slide_id, SLIDE_MESSAGE_TYPE, "KN.SlideArchive")?;
         let current_node: kn::SlideNodeArchive = graph.decode_type(
-            before.node_id,
+            before_node_id,
             SLIDE_NODE_MESSAGE_TYPE,
             "KN.SlideNodeArchive",
         )?;
@@ -105,7 +108,7 @@ impl KeynoteEditor {
         patch_slide_relationship(
             &mut staged,
             &graph,
-            before.slide_id,
+            before_slide_id,
             &current_slide,
             &target,
         )?;
@@ -113,8 +116,8 @@ impl KeynoteEditor {
             if plan.current_visible != plan.target_visible {
                 placeholder_ownership::patch(
                     &mut staged,
-                    graph.archive_name(before.slide_id)?,
-                    before.slide_id,
+                    graph.archive_name(before_slide_id)?,
+                    before_slide_id,
                     plan.reference_field,
                     plan.current_id,
                     plan.target_visible,
@@ -125,21 +128,21 @@ impl KeynoteEditor {
         slide_layout_media::materialize(
             &mut staged,
             &graph,
-            before.slide_id,
+            before_slide_id,
             &current_slide,
             &target,
         )?;
         patch_node_template_uuid(
             &mut staged,
             &graph,
-            before.node_id,
+            before_node_id,
             &current_node,
             &target_node,
         )?;
         slide_preview::invalidate(
             &mut staged,
-            graph.archive_name(before.node_id)?,
-            before.node_id,
+            graph.archive_name(before_node_id)?,
+            before_node_id,
         )?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
@@ -239,18 +242,20 @@ fn verify_slide_semantics(
     title: &Option<PlaceholderPlan>,
     body: &Option<PlaceholderPlan>,
 ) -> Result<()> {
+    let before_ids = before.native_ids()?;
+    let after_ids = after.native_ids()?;
     if after.layout.as_ref().map(|current| current.id) != Some(layout)
-        || after.node_id != before.node_id
-        || after.slide_id != before.slide_id
+        || after_ids.node != before_ids.node
+        || after_ids.slide != before_ids.slide
         || after.name != before.name
         || after.is_skipped != before.is_skipped
         || after.is_slide_number_visible != before.is_slide_number_visible
         || after.transition != before.transition
-        || after.title_storage_id != before.title_storage_id
+        || after_ids.title_storage != before_ids.title_storage
         || after.title != before.title
-        || after.body_storage_id != before.body_storage_id
+        || after_ids.body_storage != before_ids.body_storage
         || after.body != before.body
-        || after.notes_storage_id != before.notes_storage_id
+        || after_ids.notes_storage != before_ids.notes_storage
         || after.notes != before.notes
         || title
             .as_ref()

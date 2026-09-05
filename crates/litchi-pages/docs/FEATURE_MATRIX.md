@@ -158,10 +158,17 @@ The focused Pages graph, codec, identity/COW, and concurrency tests cover E1
 source/self-round-trip behavior. The checked-in [`body-table-visible.pages`](../../../test-data/iwork/pages/body-table-visible.pages)
 fixture is a native Pages 14.4 baseline with a visible 5-by-4 body table and a body marker.
 Disposable Computer Use copies were saved, closed, and reopened without repair UI; the focused
-package save path produced byte-identical output for the visible-table/no-op operation. The
-checked-in fixture was restored after those UI checks. Its hidden-axis API returns `InvalidSource`
-for this native shape, and the fixture has no user-hidden axes, so it supplies native
-visible-table/no-op baseline evidence rather than positive hidden-axis E2 or E3/E4 mutation
+package save path produced byte-identical output for the visible-table/no-op operation. A separate
+disposable copy was edited in Pages by entering `Native profile read back` in cell A2, then saved,
+closed, and reopened with the body marker, visible five-by-four table, and new cell text intact and
+without a repair prompt. Its post-close SHA-256 was
+`5094270c73ea9a2eec6f6d5d12d8ad388787d8f2a24d77504ad905794e14be65`; this is native
+authoring/save/reopen evidence for the visible profile only. The checked-in fixture was restored
+after those UI checks. The native hidden-state envelope is ownerful with one state, but both row
+and column state lists are empty. The native visible profile admits this exact producer shape for
+an empty read and exact empty no-op; a changed hidden-axis request is refused as
+`UnsupportedDependency` before publication. The fixture has no user-hidden axes, so it supplies
+native visible-table/read/no-op evidence rather than positive hidden-axis E2 or E3/E4 mutation
 evidence. An older exploratory Pages 14.4 attempt logged an NSCocoa MissingObject/TSPersistence
 Import document error for a generated candidate; save/close timed out and no reopen occurred.
 AppleScript table creation also stalled without GUI inspection. That attempt remains historical

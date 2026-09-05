@@ -46,26 +46,6 @@ pub(super) fn set_attached_table_dimension_size(
     )
 }
 
-pub(super) fn read_attached_table_dimension_size(
-    package: &IWorkPackage,
-    table_id: u64,
-    dimension: Dimension,
-) -> Result<Size> {
-    let descriptor = attached_table_descriptor(package, table_id)?;
-    validate_dimension_index(&descriptor.model, dimension)?;
-    let locations = object_locations(package)?;
-    match read_dimension_size(package, &locations, &descriptor.model, dimension)? {
-        None => Ok(Size::Default),
-        Some(points) => Ok(Size::Points(Points::new(points).map_err(|_| {
-            Error::InvalidFormat(format!(
-                "Numbers table {} {} has invalid size {points}",
-                dimension.noun(),
-                dimension.index()
-            ))
-        })?)),
-    }
-}
-
 pub(super) fn attached_table_size_points(
     package: &IWorkPackage,
     table_id: u64,

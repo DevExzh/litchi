@@ -93,7 +93,14 @@ graph, codec, identity/COW, and concurrency tests cover the E1 source/self-round
 checked-in [`body-table-visible.pages`](../test-data/iwork/pages/body-table-visible.pages) fixture
 is a native Pages 14.4 baseline: its visible body table is 5 by 4 with a body marker. Disposable
 Computer Use copies were saved, closed, and reopened without repair; the focused package save path
-also produced byte-identical output for the visible-table/no-op operation. The checked-in fixture
+also produced byte-identical output for the visible-table/no-op operation. A separate disposable
+copy was edited in Pages by entering `Native profile read back` in cell A2, then saved, closed,
+and reopened with the body marker, visible five-by-four table, and new cell text intact and
+without a repair prompt. Its post-close SHA-256 was
+`5094270c73ea9a2eec6f6d5d12d8ad388787d8f2a24d77504ad905794e14be65`; this is native
+authoring/save/reopen evidence for the visible profile only. The checked-in fixture
+contains one native hidden-state owner with empty row and column state lists; no hidden positions
+are present for the focused route to project. The checked-in fixture
 contains no user-hidden axes, so it supplies native visible-table/no-op baseline evidence, not
 positive hidden-axis E2 or E3/E4 mutation evidence. The registered hidden-axis fuzz target
 exercises bounded descriptors with checked-in valid, malformed, ownership, and limit seeds; current
@@ -173,6 +180,13 @@ and [ADR 0008](adr/0008-migration-and-verification.md#2026-09-02-amendment-keyno
 For exact packages, focused physical-sort refusals are terminal. The legacy host
 retains only the explicitly source-built compatibility route and broader
 table/cell graph work; it is not a general physical-sort fallback.
+
+The legacy Keynote table listing also has a separate native discovery fixture,
+[`table-discovery.key`](../test-data/iwork/keynote/table-discovery.key), derived
+from `basic.key` with a native Plain 5-by-4 table and `Buffa discovery` in A1.
+Its bounded Buffa reader extracts only table name and dimensions; the fixture
+does not promote physical sorting, Litchi table mutation, native byte parity,
+or broader Keynote table support.
 
 For XLSB sparklines, the detailed XLSB matrix records the strict, bounded Worksheet-ABNF support
 for [MS-XLSB] §2.1.7.62 and records §2.4.228-230, §2.4.581-583, and §2.4.806. The common

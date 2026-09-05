@@ -44,10 +44,9 @@ const FOOTNOTE_CONTENT_PREFIX: &str = "\u{fffc} ";
 const FOOTNOTE_REFERENCE_CODEC_RECURSION_LIMIT: u32 = 64;
 const MAX_BODY_FOOTNOTES: usize = 4096;
 
-/// Native Pages footnote data plus the private objects it owns.
+/// Validated native Pages footnote objects retained for cleanup.
 #[derive(Debug, Clone)]
 pub(super) struct BodyFootnoteGraph {
-    pub(super) footnote: Footnote,
     reference_id: u64,
     storage_id: u64,
     marker_id: u64,
@@ -177,7 +176,7 @@ fn footnote_cleanup_identifier_count(removed_count: usize) -> Result<usize> {
 /// storage, and marker payloads.  This coordinator carries the checked
 /// counters across the complete graph and charges the borrowed `WireView`
 /// scans before any generated projection is allowed to run.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 struct FootnoteGraphBudget {
     limits: WireLimits,
     input_bytes: usize,
@@ -185,19 +184,6 @@ struct FootnoteGraphBudget {
     work: usize,
     max_depth: usize,
     allocations: usize,
-}
-
-impl Default for FootnoteGraphBudget {
-    fn default() -> Self {
-        Self {
-            limits: WireLimits::default(),
-            input_bytes: 0,
-            fields: 0,
-            work: 0,
-            max_depth: 0,
-            allocations: 0,
-        }
-    }
 }
 
 impl FootnoteGraphBudget {
@@ -671,11 +657,12 @@ fn decode_footnote_graph(
         Error::ParseError("Pages footnote position exceeds the platform index range".to_owned())
     })?)
     .map_err(|error| Error::ParseError(format!("invalid Pages footnote position: {error}")))?;
-    let footnote = Footnote::with_custom_mark(position, text, custom_mark)
+    // Preserve semantic admission before reclaiming objects, but do not retain
+    // unused text and custom-mark allocations across the cleanup snapshot.
+    Footnote::with_custom_mark(position, text, custom_mark)
         .map_err(|error| Error::ParseError(format!("invalid Pages footnote value: {error}")))?;
 
     Ok(BodyFootnoteGraph {
-        footnote,
         reference_id,
         storage_id,
         marker_id,

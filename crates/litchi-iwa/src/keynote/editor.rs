@@ -153,6 +153,104 @@ pub struct KeynoteSlideInfo {
     pub notes: Option<String>,
 }
 
+/// Validated native identities carried by the migration-host slide snapshot.
+///
+/// The public fields on [`KeynoteSlideInfo`] remain only as deprecated
+/// compatibility data. Object identifiers are validated at the compatibility
+/// boundary, while text-storage identifiers retain their dedicated type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct KeynoteSlideNativeIds {
+    node: ObjectId,
+    slide: ObjectId,
+    title_storage: Option<TextStorageId>,
+    body_storage: Option<TextStorageId>,
+    notes_storage: Option<TextStorageId>,
+}
+
+#[derive(Debug)]
+struct KeynoteSlideProjection {
+    layout: Option<KeynoteSlideLayoutInfo>,
+    is_title_visible: Option<bool>,
+    is_body_visible: Option<bool>,
+    transition: Option<TransitionSettings>,
+    title: Option<String>,
+    body: Option<String>,
+    notes: Option<String>,
+}
+
+impl KeynoteSlideNativeIds {
+    fn from_raw(
+        node: u64,
+        slide: u64,
+        title_storage: Option<TextStorageId>,
+        body_storage: Option<TextStorageId>,
+        notes_storage: Option<TextStorageId>,
+    ) -> Result<Self> {
+        let node = ObjectId::new(node).ok_or_else(|| {
+            Error::InvalidFormat("Keynote slide node has a null object identifier".to_owned())
+        })?;
+        let slide = ObjectId::new(slide).ok_or_else(|| {
+            Error::InvalidFormat("Keynote slide has a null object identifier".to_owned())
+        })?;
+        Ok(Self {
+            node,
+            slide,
+            title_storage,
+            body_storage,
+            notes_storage,
+        })
+    }
+}
+
+impl KeynoteSlideInfo {
+    /// Construct the public compatibility snapshot from validated identities.
+    #[expect(
+        deprecated,
+        reason = "the deprecated native fields are populated once at the migration-host compatibility boundary"
+    )]
+    fn from_native_parts(
+        index: usize,
+        ids: KeynoteSlideNativeIds,
+        node: kn::SlideNodeArchive,
+        slide: kn::SlideArchive,
+        projection: KeynoteSlideProjection,
+    ) -> Self {
+        Self {
+            index,
+            node_id: ids.node.get(),
+            slide_id: ids.slide.get(),
+            name: slide.name.filter(|name| !name.is_empty()),
+            layout: projection.layout,
+            is_skipped: node.is_skipped,
+            is_slide_number_visible: node.is_slide_number_visible,
+            is_title_visible: projection.is_title_visible,
+            is_body_visible: projection.is_body_visible,
+            transition: projection.transition,
+            title_storage_id: ids.title_storage,
+            title: projection.title,
+            body_storage_id: ids.body_storage,
+            body: projection.body,
+            notes_storage_id: ids.notes_storage,
+            notes: projection.notes,
+        }
+    }
+
+    /// Borrow the validated native identities needed by compatibility routes.
+    #[expect(
+        deprecated,
+        reason = "the deprecated native fields are read only at the migration-host compatibility boundary"
+    )]
+    fn native_ids(&self) -> Result<KeynoteSlideNativeIds> {
+        KeynoteSlideNativeIds::from_raw(
+            self.node_id,
+            self.slide_id,
+            self.title_storage_id,
+            self.body_storage_id,
+            self.notes_storage_id,
+        )
+    }
+}
+
 /// Stable identity of a slide layout in the presentation theme.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct KeynoteSlideLayoutId(ObjectId);
@@ -201,6 +299,43 @@ pub struct KeynoteSlideTextInfo {
     pub drawable_object_id: u64,
     pub role: KeynoteSlideTextRole,
     pub storage: TextStorageInfo,
+}
+
+impl KeynoteSlideTextInfo {
+    /// Construct the public compatibility snapshot from a validated drawable ID.
+    #[expect(
+        deprecated,
+        reason = "the deprecated native drawable field is populated once at the migration-host compatibility boundary"
+    )]
+    fn from_native_parts(
+        slide_index: usize,
+        drawable: ObjectId,
+        role: KeynoteSlideTextRole,
+        storage: TextStorageInfo,
+    ) -> Self {
+        Self {
+            slide_index,
+            drawable_object_id: drawable.get(),
+            role,
+            storage,
+        }
+    }
+
+    /// Return the validated drawable identity for a compatibility route.
+    #[expect(
+        deprecated,
+        reason = "the deprecated native drawable field is read only at the migration-host compatibility boundary"
+    )]
+    fn drawable_id(&self) -> Result<ObjectId> {
+        ObjectId::new(self.drawable_object_id).ok_or_else(|| {
+            Error::InvalidFormat("Keynote drawable has a null object identifier".to_owned())
+        })
+    }
+
+    fn matches_drawable(&self, identifier: u64) -> bool {
+        self.drawable_id()
+            .is_ok_and(|drawable| drawable.get() == identifier)
+    }
 }
 
 /// A Keynote text box removed from a slide with its final text state.
@@ -1690,6 +1825,11 @@ impl KeynoteEditor {
         let mut slides = Vec::with_capacity(node_identifiers.len());
         let mut layout_catalog = None;
         for (index, node_identifier) in node_identifiers.iter().copied().enumerate() {
+            let node_id = ObjectId::new(node_identifier).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Keynote slide node {node_identifier} has a null object identifier"
+                ))
+            })?;
             let node: kn::SlideNodeArchive = operation
                 .graph
                 .decode(node_identifier, "KN.SlideNodeArchive")?;
@@ -1699,12 +1839,24 @@ impl KeynoteEditor {
                     node_identifier
                 ))
             })?;
+            let slide_id = ObjectId::new(slide_reference.identifier).ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "Keynote slide node {node_identifier} points to a null slide identifier"
+                ))
+            })?;
+            let native_ids = KeynoteSlideNativeIds {
+                node: node_id,
+                slide: slide_id,
+                title_storage: None,
+                body_storage: None,
+                notes_storage: None,
+            };
             let transition = {
-                let snapshot = operation.transition_snapshot(slide_reference.identifier)?;
+                let snapshot = operation.transition_snapshot(slide_id.get())?;
                 settings_from_projection(&snapshot.settings)?
             };
-            let slide = operation.decode_slide(slide_reference.identifier)?;
-            operation.remember_slide(slide_reference.identifier, &slide);
+            let slide = operation.decode_slide(slide_id.get())?;
+            operation.remember_slide(slide_id.get(), &slide);
             let layout = match slide.template_slide.as_ref() {
                 Some(template_slide) => {
                     let catalog = match layout_catalog.as_ref() {
@@ -1774,24 +1926,27 @@ impl KeynoteEditor {
             let notes = notes_storage_id
                 .map(|identifier| operation.graph.storage_text(identifier.get()))
                 .transpose()?;
-            slides.push(KeynoteSlideInfo {
+            let native_ids = KeynoteSlideNativeIds {
+                title_storage: title_storage_id,
+                body_storage: body_storage_id,
+                notes_storage: notes_storage_id,
+                ..native_ids
+            };
+            slides.push(KeynoteSlideInfo::from_native_parts(
                 index,
-                node_id: node_identifier,
-                slide_id: slide_reference.identifier,
-                name: slide.name.filter(|name| !name.is_empty()),
-                layout,
-                is_skipped: node.is_skipped,
-                is_slide_number_visible: node.is_slide_number_visible,
-                is_title_visible,
-                is_body_visible,
-                transition,
-                title_storage_id,
-                title,
-                body_storage_id,
-                body,
-                notes_storage_id,
-                notes,
-            });
+                native_ids,
+                node,
+                slide,
+                KeynoteSlideProjection {
+                    layout,
+                    is_title_visible,
+                    is_body_visible,
+                    transition,
+                    title,
+                    body,
+                    notes,
+                },
+            ));
         }
         Ok(slides)
     }
@@ -1814,7 +1969,8 @@ impl KeynoteEditor {
         let mut storage_owners = HashMap::<u64, (usize, u64)>::new();
         let mut result = Vec::new();
         for (owner_slide_index, owner) in slides.iter().enumerate() {
-            let slide = operation.slide(owner.slide_id)?;
+            let owner_ids = owner.native_ids()?;
+            let slide = operation.slide(owner_ids.slide.get())?;
             let title = slide.title_placeholder;
             let body = slide.body_placeholder;
             let mut seen_drawables = HashSet::with_capacity(slide.owned_drawables.len());
@@ -1863,12 +2019,17 @@ impl KeynoteEditor {
                         },
                     }
                 };
-                result.push(KeynoteSlideTextInfo {
+                let drawable_id = ObjectId::new(drawable_id).ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "Keynote slide {slide_index} has a null drawable identifier"
+                    ))
+                })?;
+                result.push(KeynoteSlideTextInfo::from_native_parts(
                     slide_index,
-                    drawable_object_id: drawable_id,
+                    drawable_id,
                     role,
                     storage,
-                });
+                ));
             }
         }
         Ok(result)
@@ -3978,7 +4139,7 @@ impl KeynoteEditor {
         let created = verified
             .slide_text_storages(slide_index)?
             .into_iter()
-            .find(|item| item.drawable_object_id == new_drawable_id)
+            .find(|item| item.matches_drawable(new_drawable_id))
             .ok_or_else(|| {
                 Error::InvalidFormat("Keynote text-box duplication failed validation".to_owned())
             })?;
@@ -3997,7 +4158,6 @@ impl KeynoteEditor {
     }
 
     /// Remove an ordinary slide-owned text box and its private object graph.
-    #[allow(deprecated)]
     pub fn remove_slide_text_box(
         &mut self,
         slide_index: usize,
@@ -4007,13 +4167,17 @@ impl KeynoteEditor {
         let text = self
             .slide_text_storages(slide_index)?
             .into_iter()
-            .find(|item| item.drawable_object_id == drawable_object_id)
+            .find(|item| item.matches_drawable(drawable_object_id))
             .ok_or_else(|| {
                 Error::InvalidFormat(format!(
                     "Keynote text box {drawable_object_id} lost its writable storage"
                 ))
             })?;
 
+        #[expect(
+            deprecated,
+            reason = "legacy direct-drawable comment cleanup remains on the migration-host compatibility path"
+        )]
         let mut comments = IWorkDrawableCommentEditor::from_package(self.package().clone())?;
         comments.clear_comment(DrawableId::from_raw(drawable_object_id)?)?;
         let mut staged = comments.into_package();
@@ -4041,7 +4205,7 @@ impl KeynoteEditor {
         if verified
             .slide_text_storages(slide_index)?
             .iter()
-            .any(|item| item.drawable_object_id == drawable_object_id)
+            .any(|item| item.matches_drawable(drawable_object_id))
         {
             return Err(Error::InvalidFormat(
                 "Keynote text-box deletion failed validation".to_owned(),
@@ -4209,7 +4373,6 @@ impl KeynoteEditor {
     }
 
     /// List semantic object builds and their timing chunks for one slide.
-    #[allow(deprecated)]
     pub fn slide_builds(&self, slide_index: usize) -> Result<Vec<KeynoteBuildInfo>> {
         let slides = self.slides()?;
         let slide_info = slides.get(slide_index).ok_or_else(|| {
@@ -4218,9 +4381,11 @@ impl KeynoteEditor {
                 slides.len()
             ))
         })?;
+        let slide_ids = slide_info.native_ids()?;
+        let slide_id = slide_ids.slide.get();
         let graph = ObjectGraph::read(self.package())?;
-        let slide: kn::SlideArchive = graph.decode(slide_info.slide_id, "KN.SlideArchive")?;
-        let archive_name = graph.archive_name(slide_info.slide_id)?;
+        let slide: kn::SlideArchive = graph.decode(slide_id, "KN.SlideArchive")?;
+        let archive_name = graph.archive_name(slide_id)?;
         let owned_drawables = slide
             .owned_drawables
             .iter()
@@ -4410,6 +4575,9 @@ impl KeynoteEditor {
         self.require_slide_drawable(slide_index, drawable_object_id)?;
         let slides = self.slides()?;
         let slide = &slides[slide_index];
+        let slide_ids = slide.native_ids()?;
+        let slide_id = slide_ids.slide.get();
+        let node_id = slide_ids.node.get();
         let existing = self.slide_builds(slide_index)?;
         let existing_chunk_count = existing
             .iter()
@@ -4417,7 +4585,7 @@ impl KeynoteEditor {
             .sum::<usize>();
         validate_build_start_position(settings.start, existing_chunk_count)?;
         let graph = ObjectGraph::read(self.package())?;
-        let archive_name = graph.archive_name(slide.slide_id)?.to_owned();
+        let archive_name = graph.archive_name(slide_id)?.to_owned();
         let build_id = next_object_identifier(self.package())?;
         let chunk_id = build_id
             .checked_add(1)
@@ -4447,14 +4615,14 @@ impl KeynoteEditor {
         patch_slide_build_references(
             &mut staged,
             &archive_name,
-            slide.slide_id,
+            slide_id,
             &[],
             &[],
             &[(build_id, chunk_id)],
         )?;
-        add_component_object_uuids(&mut staged, slide.slide_id, &[build_id])?;
+        add_component_object_uuids(&mut staged, slide_id, &[build_id])?;
         set_package_last_object_identifier(&mut staged, chunk_id)?;
-        patch_slide_build_cache(&mut staged, &graph, slide.node_id, existing_chunk_count + 1)?;
+        patch_slide_build_cache(&mut staged, &graph, node_id, existing_chunk_count + 1)?;
 
         let verified = Self::from_bytes(&staged.to_bytes()?)?;
         let created = verified
@@ -4492,6 +4660,8 @@ impl KeynoteEditor {
                 slides.len()
             ))
         })?;
+        let slide_ids = slide.native_ids()?;
+        let slide_id = slide_ids.slide.get();
         let build = self
             .slide_builds(slide_index)?
             .into_iter()
@@ -4535,7 +4705,7 @@ impl KeynoteEditor {
             )));
         }
         let graph = ObjectGraph::read(self.package())?;
-        let native_slide: kn::SlideArchive = graph.decode(slide.slide_id, "KN.SlideArchive")?;
+        let native_slide: kn::SlideArchive = graph.decode(slide_id, "KN.SlideArchive")?;
         let build_chunk_ids = build
             .chunks
             .iter()
@@ -4551,7 +4721,7 @@ impl KeynoteEditor {
                 ))
             })?;
         validate_build_start_position(settings.start, event_index)?;
-        let archive_name = graph.archive_name(slide.slide_id)?.to_owned();
+        let archive_name = graph.archive_name(slide_id)?.to_owned();
         let mut staged = self.package().clone();
         staged.update_archive(&archive_name, |archive| {
             let object = archive.object_mut(build_object_id).ok_or_else(|| {
@@ -4599,6 +4769,9 @@ impl KeynoteEditor {
                 slides.len()
             ))
         })?;
+        let slide_ids = slide.native_ids()?;
+        let slide_id = slide_ids.slide.get();
+        let node_id = slide_ids.node.get();
         let builds = self.slide_builds(slide_index)?;
         let removed = builds
             .iter()
@@ -4627,7 +4800,7 @@ impl KeynoteEditor {
             }
         }
         let graph = ObjectGraph::read(self.package())?;
-        let archive_name = graph.archive_name(slide.slide_id)?.to_owned();
+        let archive_name = graph.archive_name(slide_id)?.to_owned();
         let chunk_ids = removed
             .chunks
             .iter()
@@ -4637,7 +4810,7 @@ impl KeynoteEditor {
         patch_slide_build_references(
             &mut staged,
             &archive_name,
-            slide.slide_id,
+            slide_id,
             &[build_object_id],
             &chunk_ids,
             &[],
@@ -4656,12 +4829,12 @@ impl KeynoteEditor {
             )));
         }
         remove_object(&mut staged, &archive_name, build_object_id)?;
-        if component_uuid_identifiers(&staged, slide.slide_id)?
+        if component_uuid_identifiers(&staged, slide_id)?
             .is_some_and(|identifiers| identifiers.contains(&build_object_id))
         {
-            remove_component_object_uuids(&mut staged, slide.slide_id, &[build_object_id])?;
+            remove_component_object_uuids(&mut staged, slide_id, &[build_object_id])?;
         }
-        patch_slide_build_cache(&mut staged, &graph, slide.node_id, remaining_chunk_count)?;
+        patch_slide_build_cache(&mut staged, &graph, node_id, remaining_chunk_count)?;
         let mut released = chunk_ids;
         released.push(build_object_id);
         release_package_identifier_suffix(&mut staged, &released)?;
@@ -4693,13 +4866,16 @@ impl KeynoteEditor {
                 slides.len()
             ))
         })?;
+        let source_ids = source.native_ids()?;
+        let source_slide_id = source_ids.slide.get();
+        let source_node_id = source_ids.node.get();
         let graph = ObjectGraph::read(self.text.package())?;
-        let source_archive_name = graph.archive_name(source.slide_id)?.to_owned();
-        let expected_archive_name = format!("Index/Slide-{}.iwa", source.slide_id);
+        let source_archive_name = graph.archive_name(source_slide_id)?.to_owned();
+        let expected_archive_name = format!("Index/Slide-{source_slide_id}.iwa");
         if source_archive_name != expected_archive_name {
             return Err(Error::InvalidFormat(format!(
                 "Keynote slide {} is not stored in its dedicated component {expected_archive_name}",
-                source.slide_id
+                source_slide_id
             )));
         }
         let source_archive = self.text.package().archive(&source_archive_name)?;
@@ -4718,7 +4894,7 @@ impl KeynoteEditor {
                 .checked_add(1)
                 .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
         }
-        let new_slide_id = *remap.get(&source.slide_id).ok_or_else(|| {
+        let new_slide_id = *remap.get(&source_slide_id).ok_or_else(|| {
             Error::InvalidFormat(
                 "Keynote slide component does not contain its slide object".to_owned(),
             )
@@ -4742,12 +4918,12 @@ impl KeynoteEditor {
             },
         )?;
 
-        let node_archive_name = graph.archive_name(source.node_id)?.to_owned();
+        let node_archive_name = graph.archive_name(source_node_id)?.to_owned();
         let node_archive = self.text.package().archive(&node_archive_name)?;
-        let source_node = node_archive.object(source.node_id).ok_or_else(|| {
-            Error::InvalidFormat(format!("Keynote slide node {} is missing", source.node_id))
+        let source_node = node_archive.object(source_node_id).ok_or_else(|| {
+            Error::InvalidFormat(format!("Keynote slide node {source_node_id} is missing"))
         })?;
-        let new_node = clone_slide_node(source_node, new_node_id, source.slide_id, new_slide_id)?;
+        let new_node = clone_slide_node(source_node, new_node_id, source_slide_id, new_slide_id)?;
         staged.update_archive(&node_archive_name, |archive| {
             archive.insert_object(new_node)?;
             Ok(())
@@ -4774,11 +4950,11 @@ impl KeynoteEditor {
                 .slide_tree
                 .slides
                 .iter()
-                .position(|reference| reference.identifier == source.node_id)
+                .position(|reference| reference.identifier == source_node_id)
                 .ok_or_else(|| {
                     Error::InvalidFormat(format!(
                         "Keynote show does not reference source node {}",
-                        source.node_id
+                        source_node_id
                     ))
                 })?;
             let mut desired = show
@@ -4807,7 +4983,7 @@ impl KeynoteEditor {
                 references.push(new_node_id);
             }
             for field in &mut object.archive_info.message_infos[message_index].field_infos {
-                if field.object_references.contains(&source.node_id)
+                if field.object_references.contains(&source_node_id)
                     && !field.object_references.contains(&new_node_id)
                 {
                     field.object_references.push(new_node_id);
@@ -4839,7 +5015,11 @@ impl KeynoteEditor {
         let created = verified
             .slides()?
             .into_iter()
-            .find(|slide| slide.slide_id == new_slide_id)
+            .find(|slide| {
+                slide
+                    .native_ids()
+                    .is_ok_and(|ids| ids.slide.get() == new_slide_id)
+            })
             .ok_or_else(|| {
                 Error::InvalidFormat("Keynote slide duplication failed validation".to_owned())
             })?;
@@ -4870,7 +5050,11 @@ impl KeynoteEditor {
                 slides.len()
             ))
         })?;
-        reachable_embedded_assets(self.package(), [slide.node_id, slide.slide_id])
+        let slide_ids = slide.native_ids()?;
+        reachable_embedded_assets(
+            self.package(),
+            [slide_ids.node.get(), slide_ids.slide.get()],
+        )
     }
 
     /// Extract one reachable, materialized media asset by its validated identifier.
@@ -4931,7 +5115,7 @@ impl KeynoteEditor {
     ) -> Result<TextStorageId> {
         self.slide_text_storages(slide_index)?
             .into_iter()
-            .find(|text| text.drawable_object_id == drawable_object_id)
+            .find(|text| text.matches_drawable(drawable_object_id))
             .map(|text| text.storage.id)
             .ok_or_else(|| {
                 Error::ParseError(format!(
@@ -4940,7 +5124,6 @@ impl KeynoteEditor {
             })
     }
 
-    #[allow(deprecated)]
     fn text_box_graph(
         &self,
         slide_index: usize,
@@ -4953,10 +5136,12 @@ impl KeynoteEditor {
                 slides.len()
             ))
         })?;
+        let slide_ids = slide_info.native_ids()?;
+        let slide_id = slide_ids.slide.get();
         let text = self
             .slide_text_storages(slide_index)?
             .into_iter()
-            .find(|item| item.drawable_object_id == drawable_object_id)
+            .find(|item| item.matches_drawable(drawable_object_id))
             .ok_or_else(|| {
                 Error::ParseError(format!(
                     "drawable object {drawable_object_id} does not own writable text on Keynote slide {slide_index}"
@@ -4970,8 +5155,7 @@ impl KeynoteEditor {
         }
 
         let object_graph = ObjectGraph::read(self.package())?;
-        let slide: kn::SlideArchive =
-            object_graph.decode(slide_info.slide_id, "KN.SlideArchive")?;
+        let slide: kn::SlideArchive = object_graph.decode(slide_id, "KN.SlideArchive")?;
         for (name, references) in [
             ("owned_drawables", &slide.owned_drawables),
             ("drawables_z_order", &slide.drawables_z_order),
@@ -4983,12 +5167,12 @@ impl KeynoteEditor {
             if matches != 1 {
                 return Err(Error::InvalidFormat(format!(
                     "Keynote slide {} {name} must contain text box {drawable_object_id} exactly once",
-                    slide_info.slide_id
+                    slide_id
                 )));
             }
         }
 
-        let archive_name = object_graph.archive_name(slide_info.slide_id)?.to_owned();
+        let archive_name = object_graph.archive_name(slide_id)?.to_owned();
         if object_graph.archive_name(drawable_object_id)? != archive_name {
             return Err(Error::InvalidFormat(format!(
                 "Keynote text box {drawable_object_id} is outside slide component {archive_name}"
@@ -5023,6 +5207,10 @@ impl KeynoteEditor {
                     "Keynote text box {drawable_object_id} has no owned storage"
                 ))
             })?;
+        #[expect(
+            deprecated,
+            reason = "legacy Keynote text-box storage is checked for compatibility with older native archives"
+        )]
         if shape
             .deprecated_storage
             .as_ref()
@@ -5122,7 +5310,7 @@ impl KeynoteEditor {
                 let owner = object.archive_info.identifier.ok_or_else(|| {
                     Error::Archive(format!("Object in {name} has no archive identifier"))
                 })?;
-                if required.contains(&owner) || owner == slide_info.slide_id {
+                if required.contains(&owner) || owner == slide_id {
                     continue;
                 }
                 if object.archive_info.message_infos.iter().any(|info| {
@@ -5141,21 +5329,21 @@ impl KeynoteEditor {
                 }
             }
         }
-        let uuid_object_ids = component_uuid_identifiers(self.package(), slide_info.slide_id)?
+        let uuid_object_ids = component_uuid_identifiers(self.package(), slide_id)?
             .map(|mapped| {
                 if required.iter().all(|identifier| mapped.contains(identifier)) {
                     Ok(object_ids.clone())
                 } else {
                     Err(Error::InvalidFormat(format!(
                         "Keynote slide {} UUID map does not cover text-box graph {drawable_object_id}",
-                        slide_info.slide_id
+                        slide_id
                     )))
                 }
             })
             .transpose()?
             .unwrap_or_default();
         Ok(KeynoteTextBoxGraph {
-            slide_id: slide_info.slide_id,
+            slide_id,
             archive_name,
             drawable_id: drawable_object_id,
             storage_id: crate::text::native_storage_id(storage_id)?,
@@ -5173,7 +5361,8 @@ impl KeynoteEditor {
             ))
         })?;
         let graph = ObjectGraph::read(self.package())?;
-        let archive: kn::SlideArchive = graph.decode(slide.slide_id, "KN.SlideArchive")?;
+        let slide_ids = slide.native_ids()?;
+        let archive: kn::SlideArchive = graph.decode(slide_ids.slide.get(), "KN.SlideArchive")?;
         Ok(archive
             .owned_drawables
             .into_iter()

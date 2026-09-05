@@ -135,7 +135,7 @@ impl KeynoteEditor {
         let created = verified
             .slide_text_storages(slide_index)?
             .into_iter()
-            .find(|item| item.drawable_object_id == ids.drawable)
+            .find(|item| item.matches_drawable(ids.drawable))
             .ok_or_else(|| {
                 Error::InvalidFormat("Keynote text-box creation failed validation".to_owned())
             })?;

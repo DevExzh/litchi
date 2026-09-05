@@ -49,6 +49,9 @@ const FILTER_SET_MESSAGE_TYPE: u32 = 6_220;
 const ROOT_MESSAGE_TYPE: u32 = 10_000;
 const BODY_MESSAGE_TYPE: u32 = 2_001;
 const ATTACHMENT_MESSAGE_TYPE: u32 = 2_003;
+const NATIVE_TABLE_MODEL_IDENTIFIER: u64 = 1_733_258;
+const NATIVE_FORMULA_OWNER_IDENTIFIER: u64 = 1_733_486;
+const NATIVE_COLUMN_FILTER_IDENTIFIER: u64 = 1_733_511;
 const TABLE_ROWS: u32 = 4;
 const TABLE_COLUMNS: u32 = 4;
 const PREVIEWS: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"];
@@ -838,6 +841,13 @@ fn normal_package() -> TestResult<Vec<u8>> {
     Ok(source)
 }
 
+fn native_visible_package() -> TestResult<Vec<u8>> {
+    Ok(std::fs::read(
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/pages/body-table-visible.pages"),
+    )?)
+}
+
 fn filtered_package() -> TestResult<Vec<u8>> {
     synthetic_package(
         [
@@ -1063,6 +1073,50 @@ fn rewrite_model_payload(package: &[u8], index: usize, payload: Vec<u8>) -> Test
         message.data = payload;
         Ok(())
     })
+}
+
+fn rewrite_native_model_payload(package: &[u8], payload: Vec<u8>) -> TestResult<Vec<u8>> {
+    rewrite_native_archive(package, |archive| {
+        let model = archive
+            .object_mut(NATIVE_TABLE_MODEL_IDENTIFIER)
+            .ok_or("missing native table model")?;
+        let message = model
+            .messages
+            .iter_mut()
+            .find(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
+            .ok_or("missing native table-model message")?;
+        message.data = payload;
+        Ok(())
+    })
+}
+
+fn rewrite_native_archive(
+    package: &[u8],
+    mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
+) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    let entry_name = catalog
+        .iter()
+        .find(|entry| {
+            SnappyStream::decompress(entry.data())
+                .ok()
+                .and_then(|bytes| Archive::parse(bytes.as_bytes()).ok())
+                .is_some_and(|archive| archive.object(NATIVE_TABLE_MODEL_IDENTIFIER).is_some())
+        })
+        .map(|entry| entry.name().to_owned())
+        .ok_or("missing native table-model archive")?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == entry_name)
+        .ok_or("missing native table-model archive")?;
+    let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
+    let mut archive = Archive::parse(&decompressed)?;
+    mutate(&mut archive)?;
+    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    Ok(catalog.reassemble_to_bytes(
+        &[EntryEdit::new(&entry_name, &component)],
+        Limits::default(),
+    )?)
 }
 
 fn replace_first_raw_field(source: &[u8], number: u32, replacement: &[u8]) -> TestResult<Vec<u8>> {
@@ -3206,6 +3260,191 @@ fn rewrite_object_metadata(
     })
 }
 
+fn rewrite_native_object_metadata(
+    package: &[u8],
+    identifier: u64,
+    message_type: u32,
+    mutate: impl FnOnce(&mut ArchiveObject, usize) -> TestResult<()>,
+) -> TestResult<Vec<u8>> {
+    rewrite_native_archive(package, |archive| {
+        let object = archive
+            .object_mut(identifier)
+            .ok_or_else(|| format!("missing native object {identifier}"))?;
+        let message_index = object
+            .messages
+            .iter()
+            .position(|message| message.type_ == message_type)
+            .ok_or_else(|| format!("missing native message type {message_type}"))?;
+        mutate(object, message_index)
+    })
+}
+
+fn native_model_filter_field_mismatch(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_native_object_metadata(
+        package,
+        NATIVE_TABLE_MODEL_IDENTIFIER,
+        TABLE_MODEL_MESSAGE_TYPE,
+        |object, message_index| {
+            let field = object.archive_info.message_infos[message_index]
+                .field_infos
+                .iter_mut()
+                .find(|field| field.path.as_slice() == [70])
+                .ok_or("missing native hidden-state-owner metadata")?;
+            let reference = field
+                .object_references
+                .first_mut()
+                .ok_or("native filter field has no object reference")?;
+            *reference = NATIVE_TABLE_MODEL_IDENTIFIER;
+            Ok(())
+        },
+    )
+}
+
+fn native_model_filter_aggregate_duplicate(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_native_object_metadata(
+        package,
+        NATIVE_TABLE_MODEL_IDENTIFIER,
+        TABLE_MODEL_MESSAGE_TYPE,
+        |object, message_index| {
+            let info = &mut object.archive_info.message_infos[message_index];
+            info.object_references.push(NATIVE_COLUMN_FILTER_IDENTIFIER);
+            Ok(())
+        },
+    )
+}
+
+fn native_model_filter_aggregate_missing(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_native_object_metadata(
+        package,
+        NATIVE_TABLE_MODEL_IDENTIFIER,
+        TABLE_MODEL_MESSAGE_TYPE,
+        |object, message_index| {
+            object.archive_info.message_infos[message_index]
+                .object_references
+                .retain(|identifier| *identifier != NATIVE_COLUMN_FILTER_IDENTIFIER);
+            Ok(())
+        },
+    )
+}
+
+fn native_model_filter_metadata_unsorted(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_native_object_metadata(
+        package,
+        NATIVE_TABLE_MODEL_IDENTIFIER,
+        TABLE_MODEL_MESSAGE_TYPE,
+        |object, message_index| {
+            let references =
+                &mut object.archive_info.message_infos[message_index].object_references;
+            let position = references
+                .iter()
+                .position(|identifier| *identifier == NATIVE_COLUMN_FILTER_IDENTIFIER)
+                .ok_or("missing native column filter reference")?;
+            let reference = references.remove(position);
+            references.insert(0, reference);
+            Ok(())
+        },
+    )
+}
+
+fn native_model_filter_wrong_path(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_native_object_metadata(
+        package,
+        NATIVE_TABLE_MODEL_IDENTIFIER,
+        TABLE_MODEL_MESSAGE_TYPE,
+        |object, message_index| {
+            let field = object.archive_info.message_infos[message_index]
+                .field_infos
+                .iter_mut()
+                .find(|field| field.path.as_slice() == [70])
+                .ok_or("missing native hidden-state-owner metadata")?;
+            field.path = FieldPath::new(vec![71]);
+            Ok(())
+        },
+    )
+}
+
+fn native_model_filter_unrelated_data_reference(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_native_object_metadata(
+        package,
+        NATIVE_TABLE_MODEL_IDENTIFIER,
+        TABLE_MODEL_MESSAGE_TYPE,
+        |object, message_index| {
+            let field = object.archive_info.message_infos[message_index]
+                .field_infos
+                .iter_mut()
+                .find(|field| field.path.as_slice() == [70])
+                .ok_or("missing native hidden-state-owner metadata")?;
+            field.data_references.push(NATIVE_TABLE_MODEL_IDENTIFIER);
+            Ok(())
+        },
+    )
+}
+
+fn native_formula_owner_version_mismatch(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_native_object_metadata(
+        package,
+        NATIVE_FORMULA_OWNER_IDENTIFIER,
+        FORMULA_OWNER_MESSAGE_TYPE,
+        |object, message_index| {
+            object.archive_info.message_infos[message_index].versions = vec![1, 0, 5];
+            Ok(())
+        },
+    )
+}
+
+fn native_model_filter_data_alias_at_unrelated_path(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_native_object_metadata(
+        package,
+        NATIVE_TABLE_MODEL_IDENTIFIER,
+        TABLE_MODEL_MESSAGE_TYPE,
+        |object, message_index| {
+            let info = &mut object.archive_info.message_infos[message_index];
+            let filter = *info
+                .field_infos
+                .iter()
+                .find(|field| field.path.as_slice() == [70])
+                .and_then(|field| field.object_references.first())
+                .ok_or("missing native filter reference")?;
+            let mut alias = FieldInfo::new(FieldPath::new(vec![71]));
+            alias.data_references.push(filter);
+            info.field_infos.push(alias);
+            Ok(())
+        },
+    )
+}
+
+fn native_formula_owner_unrelated_metadata(package: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_native_object_metadata(
+        package,
+        NATIVE_FORMULA_OWNER_IDENTIFIER,
+        FORMULA_OWNER_MESSAGE_TYPE,
+        |object, message_index| {
+            object.archive_info.message_infos[message_index]
+                .object_references
+                .push(NATIVE_TABLE_MODEL_IDENTIFIER);
+            Ok(())
+        },
+    )
+}
+
+fn native_nonempty_hidden_state(package: &[u8]) -> TestResult<Vec<u8>> {
+    let payload = native_object_message_payload(
+        package,
+        NATIVE_TABLE_MODEL_IDENTIFIER,
+        TABLE_MODEL_MESSAGE_TYPE,
+    )?;
+    let state = tst::hidden_state_extent_archive::RowOrColumnState {
+        row_or_column_uid: uuid(0xffff, 0xffff),
+        user_hidden: Some(true),
+        ..tst::hidden_state_extent_archive::RowOrColumnState::default()
+    }
+    .encode_to_vec();
+    let mut raw_state = Vec::new();
+    append_message_field(&mut raw_state, 2, &state)?;
+    let payload = insert_raw_after_nested_path(&payload, &[70, 2, 3], 1, &raw_state)?;
+    rewrite_native_model_payload(package, payload)
+}
+
 fn rewrite_formula_owner_payload(
     package: &[u8],
     index: usize,
@@ -3482,6 +3721,34 @@ fn object_message_payload(package: &[u8], identifier: u64, type_: u32) -> TestRe
         .clone())
 }
 
+fn native_object_message_payload(
+    package: &[u8],
+    identifier: u64,
+    type_: u32,
+) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(package)?;
+    let entry = catalog
+        .iter()
+        .find(|entry| {
+            SnappyStream::decompress(entry.data())
+                .ok()
+                .and_then(|bytes| Archive::parse(bytes.as_bytes()).ok())
+                .is_some_and(|archive| archive.object(identifier).is_some())
+        })
+        .ok_or_else(|| format!("missing native object archive for {identifier}"))?;
+    let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
+    let archive = Archive::parse(&decompressed)?;
+    Ok(archive
+        .object(identifier)
+        .ok_or_else(|| format!("missing native object {identifier}"))?
+        .messages
+        .iter()
+        .find(|message| message.type_ == type_)
+        .ok_or_else(|| format!("missing native message type {type_}"))?
+        .data
+        .clone())
+}
+
 fn contains_field_at_path(source: &[u8], path: &[u32], number: u32) -> TestResult<bool> {
     let fields = raw_wire_fields(source)?;
     if path.is_empty() {
@@ -3624,6 +3891,88 @@ fn assert_rejected_without_mutation(
         "malformed or unsupported graph was accepted (case {case_index}): {result:?}"
     );
     assert_eq!(package.exact_bytes(), before);
+}
+
+#[test]
+fn native_profile_mixes_are_rejected_before_graph_admission() -> TestResult {
+    let source = normal_package()?;
+    let mixed = rewrite_model_metadata(&source, 0, |model, message_index| {
+        model.archive_info.message_infos[message_index].versions = vec![3, 2, 10];
+        Ok(())
+    })?;
+    let package = Package::from_bytes(&mixed)?;
+    let before = package.exact_bytes();
+    assert!(matches!(
+        package.body_table_hidden_axes(0usize),
+        Err(Error::InvalidSource)
+    ));
+    assert!(matches!(
+        package.edit_body_table_hidden_axes(0usize),
+        Err(Error::InvalidSource)
+    ));
+    assert_eq!(package.exact_bytes(), before);
+    Ok(())
+}
+
+#[test]
+fn native_metadata_contradictions_remain_terminal() -> TestResult {
+    let source = native_visible_package()?;
+    for malformed in [
+        native_model_filter_aggregate_duplicate(&source)?,
+        native_model_filter_aggregate_missing(&source)?,
+        native_model_filter_field_mismatch(&source)?,
+        native_model_filter_wrong_path(&source)?,
+        native_model_filter_unrelated_data_reference(&source)?,
+        native_model_filter_data_alias_at_unrelated_path(&source)?,
+        native_formula_owner_version_mismatch(&source)?,
+        native_formula_owner_unrelated_metadata(&source)?,
+    ] {
+        let package = Package::from_bytes(&malformed)?;
+        let before = package.exact_bytes();
+        assert!(matches!(
+            package.body_table_hidden_axes(0usize),
+            Err(Error::InvalidSource)
+        ));
+        assert!(matches!(
+            package.edit_body_table_hidden_axes(0usize),
+            Err(Error::InvalidSource)
+        ));
+        assert_eq!(package.exact_bytes(), before);
+    }
+    Ok(())
+}
+
+#[test]
+fn native_unsorted_filter_metadata_preserves_qualified_read() -> TestResult {
+    let source = native_visible_package()?;
+    let unsorted = native_model_filter_metadata_unsorted(&source)?;
+    let package = Package::from_bytes(&unsorted)?;
+    assert_eq!(package.body_table_hidden_axes(0usize)?, HiddenAxes::empty());
+    let noop = package
+        .edit_body_table_hidden_axes(0usize)?
+        .clear()
+        .commit()?;
+    assert!(noop.patch().is_noop());
+    assert_eq!(noop.package().exact_bytes(), unsorted);
+    Ok(())
+}
+
+#[test]
+fn native_nonempty_hidden_state_is_not_admitted() -> TestResult {
+    let source = native_visible_package()?;
+    let malformed = native_nonempty_hidden_state(&source)?;
+    let package = Package::from_bytes(&malformed)?;
+    let before = package.exact_bytes();
+    assert!(matches!(
+        package.body_table_hidden_axes(0usize),
+        Err(Error::InvalidSource)
+    ));
+    assert!(matches!(
+        package.edit_body_table_hidden_axes(0usize),
+        Err(Error::InvalidSource)
+    ));
+    assert_eq!(package.exact_bytes(), before);
+    Ok(())
 }
 
 #[test]
