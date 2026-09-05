@@ -1,0 +1,14 @@
+{
+  "input_bytes": 4294967297,
+  "mode": "owned",
+  "output_bytes": 4174773,
+  "output_crc32": 3335114661,
+  "output_writes": 1046,
+  "payload": "zeros",
+  "samples_ns": [
+    1251806579,
+    1251861218,
+    1251702408
+  ],
+  "warmup": 1
+}

@@ -1,0 +1,9 @@
+    Checking soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Checking litchi-core v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-core)
+   Compiling xml-minifier-macros v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier-macros)
+    Checking litchi-cfb v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-cfb)
+    Checking xml-minifier v0.1.0 (/home/zhuhe/code/litchi/crates/xml-minifier)
+    Checking litchi-sign v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-sign)
+    Checking litchi-odf-common v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-odf-common)
+    Checking litchi-opc v0.0.1 (/home/zhuhe/code/litchi/crates/litchi-opc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.36s

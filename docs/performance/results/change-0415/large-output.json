@@ -1,0 +1,14 @@
+{
+  "archive_zip64": true,
+  "compressed_bytes": 4296277865,
+  "descriptor": true,
+  "elapsed_read_ns": 489655948,
+  "elapsed_write_ns": 57217205622,
+  "input_buffer_bytes": 65536,
+  "input_bytes": 4294967297,
+  "input_crc32": 4097186040,
+  "measurement_scope": "write includes input CRC observer; process RSS includes separate subsequent bounded readback",
+  "output_bytes": 4296278125,
+  "payload": "repeated 65536-byte xorshift block; seed 0x03150415a9871234",
+  "verified": true
+}

@@ -1,0 +1,18 @@
+{
+  "archive_bytes": 4174773,
+  "archive_sha256": "62848801f3d4f67b412d01ce7cdaf4912605790f2cf55f2844e1eeec0c751b43",
+  "buffer_bytes": 65536,
+  "entries": [
+    {
+      "compressed_bytes": 4174513,
+      "crc32": 1104745215,
+      "flags": 8,
+      "name": "payload.bin",
+      "sha256": "fbb82f7b353676bb562eb82157fcf0ea42c36492ca13ee56dbf82c08b6802c5c",
+      "uncompressed_bytes": 4294967297,
+      "version_needed": 45
+    }
+  ],
+  "python": "3.14.4",
+  "zlib": "1.3.1"
+}

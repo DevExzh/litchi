@@ -1,0 +1,51 @@
+[
+  {
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0415-replay/docs/performance/results/change-0415/verify.py"
+    ],
+    "exit_code": 0,
+    "stdout": "OK: source/capture bindings, 64 guard processes, 18 size observations, physical ZIP64 output and independent OPC readback\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0415-replay/docs/performance/results/change-0415/summarize.py",
+      "--root",
+      "/tmp/litchi-goal-0415-replay/docs/performance/results/change-0415",
+      "--output",
+      "/tmp/litchi-goal-0415-replay/summary.json"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "python3",
+      "/tmp/litchi-goal-0415-replay/docs/performance/results/change-0415/summarize.py",
+      "--root",
+      "/tmp/litchi-goal-0415-replay/docs/performance/results/change-0415/followup",
+      "--samples",
+      "1000",
+      "--warmups",
+      "100",
+      "--output",
+      "/tmp/litchi-goal-0415-replay/followup.json"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "negative": "changed candidate output CRC rejected",
+    "exit_code": 1,
+    "stderr": "error: owned/mixed/1048576: output oracle differs in B1\n"
+  },
+  {
+    "negative": "changed exported source rejected",
+    "exit_code": 1,
+    "stderr": "Traceback (most recent call last):\n  File \"/tmp/litchi-goal-0415-replay/docs/performance/results/change-0415/verify.py\", line 112, in <module>\n    main()\n    ~~~~^^\n  File \"/tmp/litchi-goal-0415-replay/docs/performance/results/change-0415/verify.py\", line 35, in main\n    assert sha(actual) == expected, name\n           ^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: crates/litchi-opc/fuzz/Cargo.toml\n"
+  }
+]

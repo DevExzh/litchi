@@ -1,0 +1,170 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 1K of event 'cpu/cycles/P'
+# Event count (approx.): 22296273160
+#
+# Overhead  Command          Shared Object                     Symbol                                                  
+# ........  ...............  ................................  ........................................................
+#
+    48.05%  litchi-goal-041  litchi-goal-0415-candidate-probe  [.] zlib_rs::deflate::longest_match::longest_match
+            |
+            ---zlib_rs::deflate::longest_match::longest_match
+               |          
+                --47.95%--zlib_rs::deflate::algorithm::medium::deflate_medium
+                          zlib_rs::deflate::deflate
+                          <zlib_rs::stable::Deflate>::compress_uninit
+                          <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+                          <flate2::zio::Writer<soapberry_zip::writer::OwnedCompressedEntry<soapberry_zip::office::BoundedOutput<zip64_stream_probe::Observe<core::io::util::Sink>>>, flate2::mem::Compress>>::write_with_status
+                          <soapberry_zip::writer::ZipOwnedEntryWriter<soapberry_zip::office::BoundedOutput<zip64_stream_probe::Observe<core::io::util::Sink>>> as std::io::Write>::write
+                          <soapberry_zip::office::StreamingArchiveEntry<zip64_stream_probe::Observe<core::io::util::Sink>> as std::io::Write>::write_all
+                          zip64_stream_probe::main
+                          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                          std::rt::lang_start_internal
+                          main
+                          __libc_start_call_main
+                          __libc_start_main@@GLIBC_2.34
+                          _start
+
+    20.99%  litchi-goal-041  litchi-goal-0415-candidate-probe  [.] zlib_rs::deflate::slide_hash::rust::slide_hash_chain
+            |
+            ---zlib_rs::deflate::slide_hash::rust::slide_hash_chain
+               zlib_rs::deflate::fill_window
+               zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               <zlib_rs::stable::Deflate>::compress_uninit
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               <flate2::zio::Writer<soapberry_zip::writer::OwnedCompressedEntry<soapberry_zip::office::BoundedOutput<zip64_stream_probe::Observe<core::io::util::Sink>>>, flate2::mem::Compress>>::write_with_status
+               <soapberry_zip::writer::ZipOwnedEntryWriter<soapberry_zip::office::BoundedOutput<zip64_stream_probe::Observe<core::io::util::Sink>>> as std::io::Write>::write
+               <soapberry_zip::office::StreamingArchiveEntry<zip64_stream_probe::Observe<core::io::util::Sink>> as std::io::Write>::write_all
+               zip64_stream_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+    11.54%  litchi-goal-041  litchi-goal-0415-candidate-probe  [.] zlib_rs::deflate::algorithm::medium::deflate_medium
+            |
+            ---zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               <zlib_rs::stable::Deflate>::compress_uninit
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               <flate2::zio::Writer<soapberry_zip::writer::OwnedCompressedEntry<soapberry_zip::office::BoundedOutput<zip64_stream_probe::Observe<core::io::util::Sink>>>, flate2::mem::Compress>>::write_with_status
+               <soapberry_zip::writer::ZipOwnedEntryWriter<soapberry_zip::office::BoundedOutput<zip64_stream_probe::Observe<core::io::util::Sink>>> as std::io::Write>::write
+               <soapberry_zip::office::StreamingArchiveEntry<zip64_stream_probe::Observe<core::io::util::Sink>> as std::io::Write>::write_all
+               zip64_stream_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+    10.34%  litchi-goal-041  libc.so.6                         [.] __memmove_avx512_unaligned_erms
+            |
+            ---__memmove_avx512_unaligned_erms
+               |          
+               |--4.72%--std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          std::rt::lang_start_internal
+               |          main
+               |          __libc_start_call_main
+               |          __libc_start_main@@GLIBC_2.34
+               |          _start
+               |          
+               |--3.11%--zlib_rs::deflate::fill_window
+               |          zlib_rs::deflate::algorithm::medium::deflate_medium
+               |          zlib_rs::deflate::deflate
+               |          <zlib_rs::stable::Deflate>::compress_uninit
+               |          <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               |          <flate2::zio::Writer<soapberry_zip::writer::OwnedCompressedEntry<soapberry_zip::office::BoundedOutput<zip64_stream_probe::Observe<core::io::util::Sink>>>, flate2::mem::Compress>>::write_with_status
+               |          <soapberry_zip::writer::ZipOwnedEntryWriter<soapberry_zip::office::BoundedOutput<zip64_stream_probe::Observe<core::io::util::Sink>>> as std::io::Write>::write
+               |          <soapberry_zip::office::StreamingArchiveEntry<zip64_stream_probe::Observe<core::io::util::Sink>> as std::io::Write>::write_all
+               |          zip64_stream_probe::main
+               |          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               |          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               |          std::rt::lang_start_internal
+               |          main
+               |          __libc_start_call_main
+               |          __libc_start_main@@GLIBC_2.34
+               |          _start
+               |          
+                --2.51%--zlib_rs::deflate::algorithm::medium::deflate_medium
+                          zlib_rs::deflate::deflate
+                          <zlib_rs::stable::Deflate>::compress_uninit
+                          <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+                          <flate2::zio::Writer<soapberry_zip::writer::OwnedCompressedEntry<soapberry_zip::office::BoundedOutput<zip64_stream_probe::Observe<core::io::util::Sink>>>, flate2::mem::Compress>>::write_with_status
+                          <soapberry_zip::writer::ZipOwnedEntryWriter<soapberry_zip::office::BoundedOutput<zip64_stream_probe::Observe<core::io::util::Sink>>> as std::io::Write>::write
+                          <soapberry_zip::office::StreamingArchiveEntry<zip64_stream_probe::Observe<core::io::util::Sink>> as std::io::Write>::write_all
+                          zip64_stream_probe::main
+                          std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+                          std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+                          std::rt::lang_start_internal
+                          main
+                          __libc_start_call_main
+                          __libc_start_main@@GLIBC_2.34
+                          _start
+
+     4.94%  litchi-goal-041  litchi-goal-0415-candidate-probe  [.] crc32fast::specialized::pclmulqdq::calculate_avx512
+            |
+            ---crc32fast::specialized::pclmulqdq::calculate_avx512
+               <crc32fast::Hasher>::update
+               <soapberry_zip::writer::ZipOwnedEntryWriter<soapberry_zip::office::BoundedOutput<zip64_stream_probe::Observe<core::io::util::Sink>>> as std::io::Write>::write
+               <soapberry_zip::office::StreamingArchiveEntry<zip64_stream_probe::Observe<core::io::util::Sink>> as std::io::Write>::write_all
+               zip64_stream_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     2.61%  litchi-goal-041  litchi-goal-0415-candidate-probe  [.] zlib_rs::deflate::flush_block_only
+            |
+            ---zlib_rs::deflate::flush_block_only
+               zlib_rs::deflate::algorithm::medium::deflate_medium
+               zlib_rs::deflate::deflate
+               <zlib_rs::stable::Deflate>::compress_uninit
+               <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+               <flate2::zio::Writer<soapberry_zip::writer::OwnedCompressedEntry<soapberry_zip::office::BoundedOutput<zip64_stream_probe::Observe<core::io::util::Sink>>>, flate2::mem::Compress>>::write_with_status
+               <soapberry_zip::writer::ZipOwnedEntryWriter<soapberry_zip::office::BoundedOutput<zip64_stream_probe::Observe<core::io::util::Sink>>> as std::io::Write>::write
+               <soapberry_zip::office::StreamingArchiveEntry<zip64_stream_probe::Observe<core::io::util::Sink>> as std::io::Write>::write_all
+               zip64_stream_probe::main
+               std::sys::backtrace::__rust_begin_short_backtrace::<fn() -> core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>, core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>
+               std::rt::lang_start::<core::result::Result<(), alloc::boxed::Box<dyn core::error::Error>>>::{closure#0}
+               std::rt::lang_start_internal
+               main
+               __libc_start_call_main
+               __libc_start_main@@GLIBC_2.34
+               _start
+
+     0.60%  litchi-goal-041  [unknown]                         [k] 0xffffffff8c800ef0
+            |
+            ---0xffffffff8c800ef0
+
+     0.40%  litchi-goal-041  libc.so.6                         [.] __memset_avx512_unaligned_erms
+     0.10%  litchi-goal-041  [unknown]                         [k] 0xffffffff8cc0c2a4
+     0.10%  litchi-goal-041  litchi-goal-0415-candidate-probe  [.] <crc32fast::Hasher>::internal_new_specialized
+     0.10%  litchi-goal-041  litchi-goal-0415-candidate-probe  [.] <flate2::mem::Compress as flate2::zio::Ops>::run_vec
+     0.10%  litchi-goal-041  litchi-goal-0415-candidate-probe  [.] zlib_rs::deflate::fill_window
+     0.10%  litchi-goal-041  [unknown]                         [k] 0xffffffff8cd7954c
+     0.02%  taskset          [unknown]                         [k] 0xffffffff8d0effdf
+     0.00%  perf-exec        [unknown]                         [k] 0xffffffff8dbdc57a
+     0.00%  taskset          [unknown]                         [k] 0xffffffff8cc1cd9a
+     0.00%  perf-exec        [unknown]                         [k] 0xffffffff8df2edc0
+     0.00%  taskset          [unknown]                         [k] 0xffffffff8df2edc0
+     0.00%  perf-exec        [unknown]                         [k] 0xffffffff8cc0c45f
+     0.00%  taskset          [unknown]                         [k] 0xffffffff8cf59d60
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

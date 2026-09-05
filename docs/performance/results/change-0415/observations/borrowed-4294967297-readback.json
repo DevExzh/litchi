@@ -1,0 +1,13 @@
+{
+  "archive_bytes": 4174773,
+  "archive_zip64": true,
+  "entries": [
+    {
+      "compressed_bytes": 4174513,
+      "crc32": 1104745215,
+      "name": "payload.bin",
+      "uncompressed_bytes": 4294967297
+    }
+  ],
+  "has_data_descriptors": true
+}

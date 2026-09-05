@@ -1,0 +1,365 @@
+{
+  "binary_sha256": "ba7d42d63c5737a5cde938c8b66516e3a15859a4d40c4d6d3771a9dcbdf7448c",
+  "runs": [
+    {
+      "name": "borrowed-67108864-write",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/borrowed-67108864-write.time.txt",
+        "/tmp/litchi-goal-0415-candidate-probe",
+        "write",
+        "borrowed",
+        "67108864",
+        "/tmp/litchi-goal-0415-output-borrowed-67108864.zip"
+      ],
+      "started": "2026-09-05T03:56:22.577591+00:00",
+      "finished": "2026-09-05T03:56:22.599479+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "name": "borrowed-67108864-readback",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/borrowed-67108864-readback.time.txt",
+        "/tmp/litchi-goal-0415-candidate-probe",
+        "verify",
+        "/tmp/litchi-goal-0415-output-borrowed-67108864.zip"
+      ],
+      "started": "2026-09-05T03:56:22.599579+00:00",
+      "finished": "2026-09-05T03:56:22.605588+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "name": "borrowed-67108864-python",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/borrowed-67108864-python.time.txt",
+        "/usr/bin/python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/interop.py",
+        "verify",
+        "/tmp/litchi-goal-0415-output-borrowed-67108864.zip"
+      ],
+      "started": "2026-09-05T03:56:22.605701+00:00",
+      "finished": "2026-09-05T03:56:22.793781+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "name": "borrowed-268435456-write",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/borrowed-268435456-write.time.txt",
+        "/tmp/litchi-goal-0415-candidate-probe",
+        "write",
+        "borrowed",
+        "268435456",
+        "/tmp/litchi-goal-0415-output-borrowed-268435456.zip"
+      ],
+      "started": "2026-09-05T03:56:22.793905+00:00",
+      "finished": "2026-09-05T03:56:22.876405+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "name": "borrowed-268435456-readback",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/borrowed-268435456-readback.time.txt",
+        "/tmp/litchi-goal-0415-candidate-probe",
+        "verify",
+        "/tmp/litchi-goal-0415-output-borrowed-268435456.zip"
+      ],
+      "started": "2026-09-05T03:56:22.876520+00:00",
+      "finished": "2026-09-05T03:56:22.895466+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "name": "borrowed-268435456-python",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/borrowed-268435456-python.time.txt",
+        "/usr/bin/python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/interop.py",
+        "verify",
+        "/tmp/litchi-goal-0415-output-borrowed-268435456.zip"
+      ],
+      "started": "2026-09-05T03:56:22.895574+00:00",
+      "finished": "2026-09-05T03:56:23.552014+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "name": "borrowed-4294967297-write",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/borrowed-4294967297-write.time.txt",
+        "/tmp/litchi-goal-0415-candidate-probe",
+        "write",
+        "borrowed",
+        "4294967297",
+        "/tmp/litchi-goal-0415-output-borrowed-4294967297.zip"
+      ],
+      "started": "2026-09-05T03:56:23.552128+00:00",
+      "finished": "2026-09-05T03:56:24.836118+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "name": "borrowed-4294967297-readback",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/borrowed-4294967297-readback.time.txt",
+        "/tmp/litchi-goal-0415-candidate-probe",
+        "verify",
+        "/tmp/litchi-goal-0415-output-borrowed-4294967297.zip"
+      ],
+      "started": "2026-09-05T03:56:24.836387+00:00",
+      "finished": "2026-09-05T03:56:25.120777+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "name": "borrowed-4294967297-python",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/borrowed-4294967297-python.time.txt",
+        "/usr/bin/python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/interop.py",
+        "verify",
+        "/tmp/litchi-goal-0415-output-borrowed-4294967297.zip"
+      ],
+      "started": "2026-09-05T03:56:25.120913+00:00",
+      "finished": "2026-09-05T03:56:35.183190+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "name": "owned-67108864-write",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/owned-67108864-write.time.txt",
+        "/tmp/litchi-goal-0415-candidate-probe",
+        "write",
+        "owned",
+        "67108864",
+        "/tmp/litchi-goal-0415-output-owned-67108864.zip"
+      ],
+      "started": "2026-09-05T03:56:35.183447+00:00",
+      "finished": "2026-09-05T03:56:35.205246+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "name": "owned-67108864-readback",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/owned-67108864-readback.time.txt",
+        "/tmp/litchi-goal-0415-candidate-probe",
+        "verify",
+        "/tmp/litchi-goal-0415-output-owned-67108864.zip"
+      ],
+      "started": "2026-09-05T03:56:35.205339+00:00",
+      "finished": "2026-09-05T03:56:35.211260+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "name": "owned-67108864-python",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/owned-67108864-python.time.txt",
+        "/usr/bin/python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/interop.py",
+        "verify",
+        "/tmp/litchi-goal-0415-output-owned-67108864.zip"
+      ],
+      "started": "2026-09-05T03:56:35.211341+00:00",
+      "finished": "2026-09-05T03:56:35.398655+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "name": "owned-268435456-write",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/owned-268435456-write.time.txt",
+        "/tmp/litchi-goal-0415-candidate-probe",
+        "write",
+        "owned",
+        "268435456",
+        "/tmp/litchi-goal-0415-output-owned-268435456.zip"
+      ],
+      "started": "2026-09-05T03:56:35.398823+00:00",
+      "finished": "2026-09-05T03:56:35.477665+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "name": "owned-268435456-readback",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/owned-268435456-readback.time.txt",
+        "/tmp/litchi-goal-0415-candidate-probe",
+        "verify",
+        "/tmp/litchi-goal-0415-output-owned-268435456.zip"
+      ],
+      "started": "2026-09-05T03:56:35.477801+00:00",
+      "finished": "2026-09-05T03:56:35.497687+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "name": "owned-268435456-python",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/owned-268435456-python.time.txt",
+        "/usr/bin/python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/interop.py",
+        "verify",
+        "/tmp/litchi-goal-0415-output-owned-268435456.zip"
+      ],
+      "started": "2026-09-05T03:56:35.497822+00:00",
+      "finished": "2026-09-05T03:56:36.153884+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "name": "owned-4294967297-write",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/owned-4294967297-write.time.txt",
+        "/tmp/litchi-goal-0415-candidate-probe",
+        "write",
+        "owned",
+        "4294967297",
+        "/tmp/litchi-goal-0415-output-owned-4294967297.zip"
+      ],
+      "started": "2026-09-05T03:56:36.154027+00:00",
+      "finished": "2026-09-05T03:56:37.393974+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "name": "owned-4294967297-readback",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/owned-4294967297-readback.time.txt",
+        "/tmp/litchi-goal-0415-candidate-probe",
+        "verify",
+        "/tmp/litchi-goal-0415-output-owned-4294967297.zip"
+      ],
+      "started": "2026-09-05T03:56:37.394148+00:00",
+      "finished": "2026-09-05T03:56:37.679499+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    },
+    {
+      "name": "owned-4294967297-python",
+      "argv": [
+        "taskset",
+        "-c",
+        "2",
+        "/usr/bin/time",
+        "-v",
+        "-o",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/observations/owned-4294967297-python.time.txt",
+        "/usr/bin/python3",
+        "/home/zhuhe/code/litchi/docs/performance/results/change-0415/interop.py",
+        "verify",
+        "/tmp/litchi-goal-0415-output-owned-4294967297.zip"
+      ],
+      "started": "2026-09-05T03:56:37.679654+00:00",
+      "finished": "2026-09-05T03:56:47.741015+00:00",
+      "exit_code": 0,
+      "stderr": ""
+    }
+  ]
+}

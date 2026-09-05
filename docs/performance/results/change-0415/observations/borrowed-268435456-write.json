@@ -1,0 +1,9 @@
+{
+  "elapsed_ns": 80947186,
+  "input_buffer_bytes": 65536,
+  "input_bytes": 268435456,
+  "mode": "borrowed",
+  "output_bytes": 261059,
+  "output_crc32": 91077246,
+  "output_writes": 77
+}

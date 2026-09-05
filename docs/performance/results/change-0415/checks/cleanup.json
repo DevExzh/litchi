@@ -1,0 +1,36 @@
+{
+  "worktrees_removed": [
+    "/tmp/litchi-goal-0415-control",
+    "/tmp/litchi-goal-0415-candidate"
+  ],
+  "removed": [
+    "crates/soapberry-zip/fuzz/Cargo.lock",
+    "crates/litchi-opc/fuzz/Cargo.lock",
+    "/tmp/litchi-goal-0415-candidate-probe",
+    "/tmp/litchi-goal-0415-capture.log",
+    "/tmp/litchi-goal-0415-control-output.zip",
+    "/tmp/litchi-goal-0415-control-probe",
+    "/tmp/litchi-goal-0415-followup.log",
+    "/tmp/litchi-goal-0415-fuzz-corpus",
+    "/tmp/litchi-goal-0415-fuzz-target",
+    "/tmp/litchi-goal-0415-large-output-probe",
+    "/tmp/litchi-goal-0415-large-output.zip",
+    "/tmp/litchi-goal-0415-observations.log",
+    "/tmp/litchi-goal-0415-opc-fuzz-corpus",
+    "/tmp/litchi-goal-0415-output-borrowed-268435456.zip",
+    "/tmp/litchi-goal-0415-output-borrowed-4294967297.zip",
+    "/tmp/litchi-goal-0415-output-borrowed-67108864.zip",
+    "/tmp/litchi-goal-0415-output-owned-268435456.zip",
+    "/tmp/litchi-goal-0415-output-owned-4294967297.zip",
+    "/tmp/litchi-goal-0415-output-owned-67108864.zip",
+    "/tmp/litchi-goal-0415-probe",
+    "/tmp/litchi-goal-0415-probe-target",
+    "/tmp/litchi-goal-0415-profile-script.txt",
+    "/tmp/litchi-goal-0415-profile.data",
+    "/tmp/litchi-goal-0415-python.zip",
+    "/tmp/litchi-goal-0415-replay"
+  ],
+  "task_scratch_remaining": 0,
+  "shared_targets_retained": true,
+  "user_goal_unchanged": true
+}

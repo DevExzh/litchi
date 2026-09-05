@@ -1,0 +1,31 @@
+{
+  "archive_bytes": 4175373,
+  "archive_zip64": false,
+  "entries": [
+    {
+      "compressed_bytes": 156,
+      "crc32": 1517392563,
+      "name": "[Content_Types].xml",
+      "uncompressed_bytes": 303
+    },
+    {
+      "compressed_bytes": 132,
+      "crc32": 3696663013,
+      "name": "_rels/.rels",
+      "uncompressed_bytes": 177
+    },
+    {
+      "compressed_bytes": 38,
+      "crc32": 956610985,
+      "name": "document.xml",
+      "uncompressed_bytes": 45
+    },
+    {
+      "compressed_bytes": 4174507,
+      "crc32": 3523407757,
+      "name": "large.bin",
+      "uncompressed_bytes": 4294967296
+    }
+  ],
+  "has_data_descriptors": true
+}

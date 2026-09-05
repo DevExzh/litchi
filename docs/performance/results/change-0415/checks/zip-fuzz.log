@@ -1,0 +1,93 @@
+    Updating crates.io index
+     Locking 20 packages to latest Rust 1.98.1 compatible versions
+ Downloading crates ...
+  Downloaded find-msvc-tools v0.1.12
+  Downloaded cc v1.4.5
+   Compiling libc v0.2.189
+   Compiling crossbeam-utils v0.8.22
+   Compiling crossbeam-epoch v0.9.20
+   Compiling crossbeam-deque v0.8.7
+   Compiling rayon-core v1.13.0
+   Compiling shlex v2.0.1
+   Compiling find-msvc-tools v0.1.12
+   Compiling crc32fast v1.5.1
+   Compiling zlib-rs v0.6.7
+   Compiling either v1.18.0
+   Compiling cfg-if v1.0.4
+   Compiling arbitrary v1.4.2
+   Compiling jobserver v0.1.35
+   Compiling cc v1.4.5
+   Compiling rayon v1.12.0
+   Compiling libfuzzer-sys v0.4.13
+   Compiling flate2 v1.1.10
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+   Compiling soapberry-zip-fuzz v0.0.0 (/home/zhuhe/code/litchi/crates/soapberry-zip/fuzz)
+    Finished `release` profile [optimized + debuginfo] target(s) in 17.42s
+     Running `/tmp/litchi-goal-0415-fuzz-target/x86_64-unknown-linux-gnu/release/parse_zip /tmp/litchi-goal-0415-fuzz-corpus -runs=1000 -seed=415 -max_len=5000000 -timeout=10`
+INFO: Running with entropic power schedule (0xFF, 100).
+INFO: Seed: 415
+INFO: Loaded 1 modules   (1752 inline 8-bit counters): 1752 [0x63ececd0c423, 0x63ececd0cafb), 
+INFO: Loaded 1 PC tables (1752 PCs): 1752 [0x63ececd0cb00,0x63ececd13880), 
+INFO:        3 files found in /tmp/litchi-goal-0415-fuzz-corpus
+INFO: seed corpus: files: 3 min: 65374b max: 4175373b total: 8415520b rss: 34Mb
+#4	INITED cov: 319 ft: 380 corp: 3/8218Kb exec/s: 0 rss: 72Mb
+	NEW_FUNC[1/2]: 0x63ececc6aea0  (/tmp/litchi-goal-0415-fuzz-target/x86_64-unknown-linux-gnu/release/parse_zip+0x135ea0) (BuildId: d4e87c6641faf5a5245d8de8843e8850aa668e57)
+	NEW_FUNC[2/2]: 0x63ececc74eb0  (/tmp/litchi-goal-0415-fuzz-target/x86_64-unknown-linux-gnu/release/parse_zip+0x13feb0) (BuildId: d4e87c6641faf5a5245d8de8843e8850aa668e57)
+#5	NEW    cov: 367 ft: 447 corp: 4/12295Kb lim: 4175373 exec/s: 0 rss: 89Mb L: 4174868/4175373 MS: 1 InsertRepeatedBytes-
+#11	NEW    cov: 368 ft: 448 corp: 5/16372Kb lim: 4175373 exec/s: 0 rss: 129Mb L: 4174927/4175373 MS: 1 InsertRepeatedBytes-
+	NEW_FUNC[1/1]: 0x63ececc60cb0  (/tmp/litchi-goal-0415-fuzz-target/x86_64-unknown-linux-gnu/release/parse_zip+0x12bcb0) (BuildId: d4e87c6641faf5a5245d8de8843e8850aa668e57)
+#30	NEW    cov: 378 ft: 458 corp: 6/18Mb lim: 4175373 exec/s: 0 rss: 223Mb L: 3066333/4175373 MS: 4 ChangeBit-CMP-ChangeByte-EraseBytes- DE: "\370\377\377\377\377\377\377\377"-
+#32	NEW    cov: 381 ft: 461 corp: 7/21Mb lim: 4175373 exec/s: 0 rss: 239Mb L: 2571179/4175373 MS: 2 CopyPart-EraseBytes-
+#33	NEW    cov: 382 ft: 469 corp: 8/21Mb lim: 4175373 exec/s: 0 rss: 240Mb L: 108167/4175373 MS: 1 CrossOver-
+#34	NEW    cov: 384 ft: 472 corp: 9/22Mb lim: 4175373 exec/s: 0 rss: 248Mb L: 1096312/4175373 MS: 1 CrossOver-
+#35	NEW    cov: 387 ft: 475 corp: 10/26Mb lim: 4175373 exec/s: 0 rss: 265Mb L: 4174904/4175373 MS: 1 CrossOver-
+#63	NEW    cov: 388 ft: 476 corp: 11/30Mb lim: 4175373 exec/s: 63 rss: 387Mb L: 3996064/4175373 MS: 3 ShuffleBytes-CopyPart-CrossOver-
+	NEW_FUNC[1/1]: 0x63ececc74cb0  (/tmp/litchi-goal-0415-fuzz-target/x86_64-unknown-linux-gnu/release/parse_zip+0x13fcb0) (BuildId: d4e87c6641faf5a5245d8de8843e8850aa668e57)
+#108	NEW    cov: 391 ft: 479 corp: 12/34Mb lim: 4175373 exec/s: 108 rss: 387Mb L: 3996072/4175373 MS: 5 ChangeByte-PersAutoDict-ChangeBit-PersAutoDict-CMP- DE: "\370\377\377\377\377\377\377\377"-"\370\377\377\377\377\377\377\377"-"PK\005\006"-
+#117	REDUCE cov: 391 ft: 479 corp: 12/33Mb lim: 4175373 exec/s: 117 rss: 387Mb L: 2425006/4175373 MS: 4 PersAutoDict-PersAutoDict-ChangeByte-EraseBytes- DE: "PK\005\006"-"PK\005\006"-
+#129	REDUCE cov: 391 ft: 479 corp: 12/32Mb lim: 4175373 exec/s: 129 rss: 387Mb L: 2821412/4175373 MS: 2 ChangeBit-EraseBytes-
+#145	NEW    cov: 391 ft: 480 corp: 13/33Mb lim: 4175373 exec/s: 72 rss: 387Mb L: 792626/4175373 MS: 1 CrossOver-
+#161	REDUCE cov: 391 ft: 480 corp: 13/32Mb lim: 4175373 exec/s: 80 rss: 388Mb L: 2385735/4175373 MS: 1 EraseBytes-
+#184	REDUCE cov: 391 ft: 480 corp: 13/32Mb lim: 4175373 exec/s: 92 rss: 388Mb L: 3305078/4175373 MS: 3 InsertByte-PersAutoDict-EraseBytes- DE: "PK\005\006"-
+	NEW_FUNC[1/1]: 0x63ececc77b50  (/tmp/litchi-goal-0415-fuzz-target/x86_64-unknown-linux-gnu/release/parse_zip+0x142b50) (BuildId: d4e87c6641faf5a5245d8de8843e8850aa668e57)
+#214	NEW    cov: 396 ft: 486 corp: 14/35Mb lim: 4175373 exec/s: 107 rss: 388Mb L: 3320860/4175373 MS: 5 CopyPart-CrossOver-InsertRepeatedBytes-ShuffleBytes-CMP- DE: "\000\000\000\000\000\000\000\002"-
+#256	pulse  cov: 396 ft: 486 corp: 14/35Mb lim: 4175373 exec/s: 85 rss: 388Mb
+#291	REDUCE cov: 396 ft: 486 corp: 14/35Mb lim: 4175373 exec/s: 97 rss: 388Mb L: 105139/4175373 MS: 2 ChangeBinInt-EraseBytes-
+#339	NEW    cov: 396 ft: 487 corp: 15/35Mb lim: 4175373 exec/s: 113 rss: 388Mb L: 627474/4175373 MS: 3 CrossOver-CrossOver-EraseBytes-
+#360	REDUCE cov: 396 ft: 487 corp: 15/35Mb lim: 4175373 exec/s: 90 rss: 388Mb L: 741819/4175373 MS: 1 EraseBytes-
+#386	REDUCE cov: 396 ft: 488 corp: 16/35Mb lim: 4175373 exec/s: 96 rss: 388Mb L: 349491/4175373 MS: 1 CrossOver-
+#421	REDUCE cov: 396 ft: 488 corp: 16/34Mb lim: 4175373 exec/s: 105 rss: 388Mb L: 2542960/4175373 MS: 5 InsertByte-ChangeBit-PersAutoDict-EraseBytes-InsertByte- DE: "PK\005\006"-
+#444	REDUCE cov: 396 ft: 488 corp: 16/33Mb lim: 4175373 exec/s: 88 rss: 388Mb L: 1998478/4175373 MS: 3 CrossOver-CrossOver-EraseBytes-
+#481	REDUCE cov: 396 ft: 488 corp: 16/33Mb lim: 4175373 exec/s: 96 rss: 388Mb L: 238225/4175373 MS: 2 ChangeBinInt-EraseBytes-
+#485	REDUCE cov: 396 ft: 488 corp: 16/32Mb lim: 4175373 exec/s: 97 rss: 388Mb L: 2144110/4175373 MS: 4 ChangeBinInt-InsertByte-PersAutoDict-EraseBytes- DE: "PK\005\006"-
+#503	REDUCE cov: 396 ft: 488 corp: 16/32Mb lim: 4175373 exec/s: 100 rss: 388Mb L: 3781151/4175373 MS: 3 CrossOver-ChangeBinInt-EraseBytes-
+#512	pulse  cov: 396 ft: 488 corp: 16/32Mb lim: 4175373 exec/s: 102 rss: 388Mb
+#513	REDUCE cov: 396 ft: 488 corp: 16/32Mb lim: 4175373 exec/s: 102 rss: 388Mb L: 104581/4175373 MS: 5 CopyPart-ShuffleBytes-ShuffleBytes-PersAutoDict-EraseBytes- DE: "\000\000\000\000\000\000\000\002"-
+#551	REDUCE cov: 396 ft: 488 corp: 16/31Mb lim: 4175373 exec/s: 110 rss: 388Mb L: 1877623/4175373 MS: 3 ChangeASCIIInt-ChangeASCIIInt-EraseBytes-
+#558	REDUCE cov: 396 ft: 488 corp: 16/30Mb lim: 4175373 exec/s: 111 rss: 388Mb L: 1222635/4175373 MS: 2 ChangeBit-EraseBytes-
+#564	REDUCE cov: 396 ft: 488 corp: 16/30Mb lim: 4175373 exec/s: 112 rss: 388Mb L: 1664991/4175373 MS: 1 EraseBytes-
+#590	REDUCE cov: 396 ft: 488 corp: 16/29Mb lim: 4175373 exec/s: 98 rss: 388Mb L: 806145/4175373 MS: 1 EraseBytes-
+#598	REDUCE cov: 396 ft: 488 corp: 16/29Mb lim: 4175373 exec/s: 99 rss: 388Mb L: 1293195/4175373 MS: 3 InsertRepeatedBytes-ChangeBinInt-EraseBytes-
+#601	REDUCE cov: 396 ft: 488 corp: 16/28Mb lim: 4175373 exec/s: 100 rss: 388Mb L: 506747/4175373 MS: 3 InsertByte-ShuffleBytes-EraseBytes-
+#669	REDUCE cov: 396 ft: 488 corp: 16/28Mb lim: 4175373 exec/s: 111 rss: 388Mb L: 469890/4175373 MS: 3 PersAutoDict-ChangeBinInt-EraseBytes- DE: "\000\000\000\000\000\000\000\002"-
+#677	REDUCE cov: 396 ft: 488 corp: 16/28Mb lim: 4175373 exec/s: 96 rss: 388Mb L: 78802/4175373 MS: 3 ChangeBit-InsertByte-EraseBytes-
+#733	REDUCE cov: 396 ft: 488 corp: 16/28Mb lim: 4175373 exec/s: 104 rss: 388Mb L: 582614/4175373 MS: 1 EraseBytes-
+#781	REDUCE cov: 396 ft: 488 corp: 16/28Mb lim: 4175373 exec/s: 111 rss: 388Mb L: 1154716/4175373 MS: 3 InsertByte-PersAutoDict-EraseBytes- DE: "PK\005\006"-
+#788	REDUCE cov: 396 ft: 488 corp: 16/27Mb lim: 4175373 exec/s: 112 rss: 388Mb L: 780783/4175373 MS: 2 CMP-EraseBytes- DE: "\003\322\000\000\000\000\000\000"-
+#789	REDUCE cov: 396 ft: 488 corp: 16/26Mb lim: 4175373 exec/s: 112 rss: 388Mb L: 1223870/4175373 MS: 1 EraseBytes-
+#863	REDUCE cov: 396 ft: 488 corp: 16/26Mb lim: 4175373 exec/s: 107 rss: 388Mb L: 304507/4175373 MS: 4 CopyPart-ShuffleBytes-CrossOver-EraseBytes-
+#877	REDUCE cov: 396 ft: 488 corp: 16/26Mb lim: 4175373 exec/s: 109 rss: 388Mb L: 66236/4175373 MS: 4 ShuffleBytes-ChangeBinInt-CopyPart-EraseBytes-
+#880	REDUCE cov: 396 ft: 488 corp: 16/26Mb lim: 4175373 exec/s: 110 rss: 388Mb L: 649445/4175373 MS: 3 InsertByte-CMP-EraseBytes- DE: "PK\005\006"-
+#900	REDUCE cov: 397 ft: 489 corp: 17/26Mb lim: 4175373 exec/s: 112 rss: 388Mb L: 7300/4175373 MS: 5 ShuffleBytes-EraseBytes-InsertByte-CrossOver-PersAutoDict- DE: "PK\005\006"-
+#901	REDUCE cov: 397 ft: 489 corp: 17/25Mb lim: 4175373 exec/s: 112 rss: 388Mb L: 1013960/4175373 MS: 1 EraseBytes-
+#905	REDUCE cov: 397 ft: 489 corp: 17/25Mb lim: 4175373 exec/s: 113 rss: 388Mb L: 204794/4175373 MS: 4 ChangeASCIIInt-InsertRepeatedBytes-ChangeByte-EraseBytes-
+#931	REDUCE cov: 397 ft: 489 corp: 17/25Mb lim: 4175373 exec/s: 116 rss: 388Mb L: 621296/4175373 MS: 1 EraseBytes-
+#991	REDUCE cov: 397 ft: 489 corp: 17/25Mb lim: 4175373 exec/s: 123 rss: 388Mb L: 5207/4175373 MS: 5 ChangeBit-ChangeBit-ChangeBit-ChangeBinInt-EraseBytes-
+#1000	DONE   cov: 397 ft: 489 corp: 17/25Mb lim: 4175373 exec/s: 125 rss: 388Mb
+###### Recommended dictionary. ######
+"\370\377\377\377\377\377\377\377" # Uses: 29
+"PK\005\006" # Uses: 31
+"\000\000\000\000\000\000\000\002" # Uses: 23
+"\003\322\000\000\000\000\000\000" # Uses: 3
+###### End of recommended dictionary. ######
+Done 1000 runs in 8 second(s)

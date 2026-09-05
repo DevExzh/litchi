@@ -1,0 +1,33 @@
+{
+  "toolchain": "1.98.1",
+  "rustc_bootstrap": "1",
+  "rustflags": "-C passes=sancov-module -C llvm-args=-sanitizer-coverage-level=4 -C llvm-args=-sanitizer-coverage-inline-8bit-counters -C llvm-args=-sanitizer-coverage-pc-table -C llvm-args=-sanitizer-coverage-trace-compares -Z sanitizer=address --cfg fuzzing",
+  "target": "x86_64-unknown-linux-gnu",
+  "build_jobs": 4,
+  "runs_each": 1000,
+  "seed": 415,
+  "max_len": 5000000,
+  "timeout_seconds": 10,
+  "targets": [
+    "crates/soapberry-zip/fuzz/fuzz_targets/parse_zip.rs",
+    "crates/litchi-opc/fuzz/fuzz_targets/parse_opc.rs"
+  ],
+  "initial_corpus": [
+    {
+      "name": "litchi-goal-0415-python.zip",
+      "bytes": 4175373,
+      "sha256": "141f56b2ab081bf82a8284ff501978fe1412f31ad009db7f9a134164e00c5453"
+    },
+    {
+      "name": "litchi-goal-0415-output-owned-67108864.zip",
+      "bytes": 65374,
+      "sha256": "465a6eb560425761ef6c0381fccfe8772a48bc16b520018d2935129cbefca468"
+    },
+    {
+      "name": "litchi-goal-0415-output-owned-4294967297.zip",
+      "bytes": 4174773,
+      "sha256": "62848801f3d4f67b412d01ce7cdaf4912605790f2cf55f2844e1eeec0c751b43"
+    }
+  ],
+  "scope": "bounded existing-target AddressSanitizer and sanitizer-coverage smoke; no exhaustive or performance claim"
+}

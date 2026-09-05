@@ -1,0 +1,16 @@
+   Compiling soapberry-zip v0.0.1 (/home/zhuhe/code/litchi/crates/soapberry-zip)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.38s
+     Running tests/streaming_zip64_deflate.rs (target/debug/deps/streaming_zip64_deflate-aa255337ba4502e5)
+
+running 8 tests
+test one_bounded_zero_reader_crosses_zip64_size_boundary ... ignored, bounded multi-gigabyte ZIP64 traversal; run explicitly
+test zero_crc_composition_matches_small_direct_hashes ... ok
+test owned_stream_reports_sink_failure_with_progress ... ok
+test explicit_zip64_borrowed_stream_has_64_bit_descriptor_and_reopens ... ok
+test output_limit_boundary_is_reported_after_entry_publication ... ok
+test generated_offset_promotes_at_below_at_and_above_zip32_boundary ... ok
+test office_owned_entry_round_trips_through_short_borrowed_sink ... ok
+test default_office_streaming_bytes_are_readable_and_accounted ... ok
+
+test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
