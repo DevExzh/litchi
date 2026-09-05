@@ -9,9 +9,7 @@ use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::comment::{
     DrawableComment, DrawableId, DrawableInfo, DrawableReply, StorageId,
 };
-use litchi_iwa_protos::{
-    keynote_document_codec, keynote_show_codec, keynote_slide_transition_codec,
-};
+use litchi_iwa_protos::{keynote_document_codec, keynote_show_codec};
 use litchi_iwa_text::columns::Columns;
 use litchi_iwa_text::paragraph::drop_cap::{DropCap, Placement};
 use litchi_iwa_text::position::TextPosition;
@@ -1708,41 +1706,38 @@ impl KeynoteOperation {
         })
     }
 
-    /// Project one slide transition through the strict, borrowed codec.
+    /// Project one slide transition through the focused Keynote owner.
     ///
     /// The editor still materializes the complete slide archive for the
     /// unrelated slide graph fields it exposes. Transition semantics are
     /// selected before that broad decode, however, so duplicate or
     /// non-canonical transition fields cannot be accepted by Prost's eager
-    /// last-one-wins behavior. The projection borrows the graph-owned payload;
-    /// only the semantic adapter allocates settings, and unknown source fields
-    /// remain in the original graph for any later rewrite.
-    fn transition_snapshot(
-        &self,
-        identifier: u64,
-    ) -> Result<keynote_slide_transition_codec::SlideTransitionSnapshot<'_>> {
+    /// last-one-wins behavior. The focused owner borrows this graph-owned
+    /// payload and allocates only the public semantic settings; unknown source
+    /// fields remain in the original graph for any later rewrite.
+    fn transition_settings(&self, identifier: u64) -> Result<Option<TransitionSettings>> {
         let payload = self
             .graph
             .message_data_type(identifier, 5, "KN.SlideArchive")?;
-        let max_payload_bytes = payload.len().clamp(1, WireLimits::MAX_INPUT_BYTES);
-        let max_fields = payload.len().clamp(1, WireLimits::MAX_FIELDS);
-        let max_work_bytes = payload
-            .len()
-            .saturating_mul(8)
-            .clamp(1, WireLimits::MAX_REWRITE_WORK);
-        let recursion_limit = u32::try_from(WireLimits::MAX_NESTING).map_err(|_error| {
-            Error::InvalidFormat("Keynote transition nesting limit does not fit u32".to_owned())
-        })?;
-        keynote_slide_transition_codec::decode_slide_transition(
-            payload,
-            keynote_slide_transition_codec::DecodeOptions::new(max_payload_bytes, recursion_limit)
-                .with_resource_limits(max_fields, max_work_bytes),
+        let limits = WireLimits::default()
+            .with_input_bytes(payload.len().clamp(1, WireLimits::MAX_INPUT_BYTES))
+            .and_then(|limits| limits.with_fields(payload.len().clamp(1, WireLimits::MAX_FIELDS)))
+            .and_then(|limits| {
+                limits.with_rewrite_work(
+                    payload
+                        .len()
+                        .saturating_mul(8)
+                        .clamp(1, WireLimits::MAX_REWRITE_WORK),
+                )
+            })
+            .map_err(|error| Error::InvalidFormat(format!("invalid transition limits: {error}")))?;
+        litchi_keynote::Package::__transition_settings_from_source(payload, limits).map_err(
+            |error| {
+                Error::InvalidFormat(format!(
+                    "Keynote transition projection is malformed: {error}"
+                ))
+            },
         )
-        .map_err(|error| {
-            Error::InvalidFormat(format!(
-                "Keynote transition projection is malformed: {error}"
-            ))
-        })
     }
 
     fn remember_slide(&mut self, identifier: u64, slide: &kn::SlideArchive) {
@@ -1851,10 +1846,7 @@ impl KeynoteEditor {
                 body_storage: None,
                 notes_storage: None,
             };
-            let transition = {
-                let snapshot = operation.transition_snapshot(slide_id.get())?;
-                settings_from_projection(&snapshot.settings)?
-            };
+            let transition = operation.transition_settings(slide_id.get())?;
             let slide = operation.decode_slide(slide_id.get())?;
             operation.remember_slide(slide_id.get(), &slide);
             let layout = match slide.template_slide.as_ref() {
@@ -5410,7 +5402,6 @@ mod slide_preview;
 mod slide_shapes;
 mod slide_tables;
 mod text_box_create;
-mod transition;
 
 use builds::*;
 pub use litchi_keynote::Seconds;
@@ -5445,7 +5436,6 @@ pub use slide_tables::{
     KeynoteTableCellValue, KeynoteTableCellVerticalAlignment, KeynoteTableDimension,
     KeynoteTableDimensionSize, KeynoteTablePoints, RemovedKeynoteSlideTable,
 };
-use transition::settings_from_projection;
 #[cfg(test)]
 mod operation_cache_tests;
 #[cfg(test)]

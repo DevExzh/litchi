@@ -6,7 +6,6 @@ use crate::image_caption::DrawableCaptionKind;
 use crate::shapes::{shape_line_segment, shape_path_kind, shape_preset};
 
 const THEME_MESSAGE_TYPE: u32 = 10_001;
-const DRAWABLE_Z_ORDER_MESSAGE_TYPE: u32 = 10_015;
 pub(super) const DEFAULT_DRAWABLE_FLAGS: u32 = 3;
 const DEFAULT_ROTATION_DEGREES: f32 = 0.0;
 
@@ -218,17 +217,8 @@ fn body_shape_graph_from_text(
     let z_order_id = document.drawables_zorder.ok_or_else(|| {
         Error::InvalidFormat("Pages document has no drawable z-order object".to_owned())
     })?;
-    let z_order: tp::DrawablesZOrderArchive = decode_typed_package_object(
-        editor.package(),
-        z_order_id,
-        DRAWABLE_Z_ORDER_MESSAGE_TYPE,
-        "TP.DrawablesZOrderArchive",
-    )?;
-    let z_order_count = z_order
-        .drawables
-        .iter()
-        .filter(|reference| reference.identifier == drawable_object_id)
-        .count();
+    let z_order_count =
+        pages_drawable_z_order_count(editor.package(), z_order_id, drawable_object_id)?;
     if z_order_count != 1 {
         return Err(Error::InvalidFormat(format!(
             "Pages shape {drawable_object_id} occurs {z_order_count} times in drawable z-order"

@@ -1,0 +1,29 @@
+// Focused read-only Buffa projection for the drawable ownership and z-order
+// facts needed by Keynote table discovery.
+//
+// The native archive remains the preservation source.  This projection keeps
+// only the required slide envelope and the two repeated reference fields that
+// the catalog consumes; all other KN.SlideArchive fields stay opaque.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}
+
+message TransitionAttributesArchive {}
+
+message TransitionArchive {
+  required .LitchiIwaProjection.TransitionAttributesArchive attributes = 2;
+}
+
+message SlideArchive {
+  required .LitchiIwaProjection.Reference style = 1;
+  required .LitchiIwaProjection.TransitionArchive transition = 4;
+  repeated .LitchiIwaProjection.Reference owned_drawables = 7;
+  required bool in_document = 19;
+  repeated .LitchiIwaProjection.Reference drawables_z_order = 42;
+}

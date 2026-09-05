@@ -64,7 +64,8 @@ use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_detect::{Format, PreparedSource};
 use litchi_iwa_protos::{
     keynote_document_codec, keynote_media_codec, keynote_placeholder_text_codec,
-    keynote_show_codec, keynote_slide_transition_codec, keynote_speaker_notes_codec,
+    keynote_show_codec, keynote_slide_drawables_codec, keynote_slide_transition_codec,
+    keynote_speaker_notes_codec,
 };
 use litchi_iwa_text::storage::Storage;
 use litchi_iwa_text_wire::{
@@ -3039,6 +3040,93 @@ fn decode_slide_node_projection(
     Ok((slide_identifier, is_skipped))
 }
 
+/// Decode only the drawable ownership and z-order facts needed by the IWA
+/// migration host's read-only table graph discovery.
+///
+/// The format adapter supplies package-derived limits to the focused Buffa
+/// codec. The codec performs strict canonical preflight before forcing its
+/// borrowed lazy repeated references, and returns only compact scalar lists.
+fn decode_slide_drawable_projection(
+    payload: &[u8],
+    wire_limits: WireLimits,
+    path: SemanticPath,
+) -> ReadResult<(Vec<u64>, Vec<u64>)> {
+    let recursion_limit = u32::try_from(wire_limits.max_nesting()).map_err(|_error| {
+        ReadError::InvalidFormat("Keynote slide drawable nesting limit does not fit u32".to_owned())
+    })?;
+    let options = keynote_slide_drawables_codec::DecodeOptions::new(
+        payload.len().min(wire_limits.max_input_bytes()),
+        wire_limits.max_fields(),
+        wire_limits.max_rewrite_work(),
+        recursion_limit,
+    );
+    keynote_slide_drawables_codec::decode_slide_drawables(payload, options)
+        .map(|snapshot| snapshot.into_parts())
+        .map_err(|error| map_slide_drawables_projection_error(error, path))
+}
+
+fn map_slide_drawables_projection_error(
+    error: keynote_slide_drawables_codec::DecodeError,
+    path: SemanticPath,
+) -> ReadError {
+    match error.resource_limit() {
+        Some(keynote_slide_drawables_codec::DecodeLimit::Bytes { observed, maximum }) => {
+            ReadError::PayloadLimit {
+                kind: PayloadLimitKind::Bytes,
+                observed,
+                maximum,
+                path,
+            }
+        },
+        Some(keynote_slide_drawables_codec::DecodeLimit::Fields { observed, maximum }) => {
+            ReadError::PayloadLimit {
+                kind: PayloadLimitKind::Fields,
+                observed,
+                maximum,
+                path,
+            }
+        },
+        Some(keynote_slide_drawables_codec::DecodeLimit::Work { observed, maximum }) => {
+            ReadError::PayloadLimit {
+                kind: PayloadLimitKind::Work,
+                observed,
+                maximum,
+                path,
+            }
+        },
+        Some(keynote_slide_drawables_codec::DecodeLimit::Nesting { observed, maximum }) => {
+            ReadError::PayloadLimit {
+                kind: PayloadLimitKind::Nesting,
+                observed: usize::try_from(observed).unwrap_or(usize::MAX),
+                maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+                path,
+            }
+        },
+        None => ReadError::InvalidFormat(format!(
+            "Keynote slide drawable projection is malformed: {error}"
+        )),
+    }
+}
+
+/// Decode the strict drawable projection for the migration host.
+///
+/// This hidden seam retains only the two repeated identifier lists required by
+/// read-only table graph discovery. It deliberately does not expose a
+/// generated slide archive or payload lifetime to the host crate.
+#[cfg(feature = "internal-iwork-source")]
+#[doc(hidden)]
+pub fn __decode_slide_drawable_projection(
+    payload: &[u8],
+    wire_limits: WireLimits,
+    slide_index: usize,
+) -> ReadResult<(Vec<u64>, Vec<u64>)> {
+    decode_slide_drawable_projection(
+        payload,
+        wire_limits,
+        SemanticPath::Slide { index: slide_index },
+    )
+}
+
 /// Decode the strict slide-node projection for the migration host.
 ///
 /// This hidden seam keeps the selected slide identifier and skip state as
@@ -5266,6 +5354,103 @@ mod tests {
         assert!(matches!(error, ReadError::InvalidFormat(_)));
     }
 
+    fn slide_drawables_payload_for_test(owned: &[u64], z_order: &[u64]) -> Vec<u8> {
+        let mut output = length_delimited_for_test(1, &[0x08, 0x01]);
+        // TransitionArchive.attributes is the required nested envelope.  The
+        // focused projection validates its framing while leaving transition
+        // semantics to the full semantic slide decoder.
+        output.extend(length_delimited_for_test(4, &[0x12, 0x00]));
+        for &identifier in owned {
+            let reference = varint_field_for_test(1, identifier);
+            output.extend(length_delimited_for_test(7, &reference));
+        }
+        output.extend(varint_field_for_test(19, 0));
+        for &identifier in z_order {
+            let reference = varint_field_for_test(1, identifier);
+            output.extend(length_delimited_for_test(42, &reference));
+        }
+        output
+    }
+
+    #[test]
+    fn slide_drawable_projection_matches_generated_and_owns_only_identifiers()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut source = slide_drawables_payload_for_test(&[5, 6], &[6, 5]);
+        let generated = kn::SlideArchive::decode(source.as_slice())?;
+        let projected = decode_slide_drawable_projection(
+            &source,
+            WireLimits::default(),
+            SemanticPath::Slide { index: 2 },
+        )?;
+        assert_eq!(
+            projected.0,
+            generated
+                .owned_drawables
+                .iter()
+                .map(|reference| reference.identifier)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            projected.1,
+            generated
+                .drawables_z_order
+                .iter()
+                .map(|reference| reference.identifier)
+                .collect::<Vec<_>>()
+        );
+
+        source.fill(0);
+        assert_eq!(projected, (vec![5, 6], vec![6, 5]));
+        Ok(())
+    }
+
+    #[test]
+    fn slide_drawable_projection_rejects_invalid_envelopes_and_references() {
+        let mut missing_transition = slide_drawables_payload_for_test(&[5], &[5]);
+        missing_transition.drain(0..4);
+        assert!(matches!(
+            decode_slide_drawable_projection(
+                &missing_transition,
+                WireLimits::default(),
+                SemanticPath::Slide { index: 0 },
+            ),
+            Err(ReadError::InvalidFormat(_))
+        ));
+
+        let mut duplicate_style = slide_drawables_payload_for_test(&[5], &[5]);
+        duplicate_style.extend(length_delimited_for_test(1, &[0x08, 0x02]));
+        assert!(matches!(
+            decode_slide_drawable_projection(
+                &duplicate_style,
+                WireLimits::default(),
+                SemanticPath::Slide { index: 0 },
+            ),
+            Err(ReadError::InvalidFormat(_))
+        ));
+
+        let mut malformed_reference = slide_drawables_payload_for_test(&[], &[]);
+        malformed_reference.extend(length_delimited_for_test(7, &[0x08, 0x80, 0x00]));
+        assert!(matches!(
+            decode_slide_drawable_projection(
+                &malformed_reference,
+                WireLimits::default(),
+                SemanticPath::Slide { index: 0 },
+            ),
+            Err(ReadError::InvalidFormat(_))
+        ));
+
+        let mut wrong_z_order_wire = slide_drawables_payload_for_test(&[], &[]);
+        wrong_z_order_wire.extend(varint_field_for_test(42, 5));
+        assert!(matches!(
+            decode_slide_drawable_projection(
+                &wrong_z_order_wire,
+                WireLimits::default(),
+                SemanticPath::Slide { index: 0 },
+            ),
+            Err(ReadError::InvalidFormat(_))
+        ));
+    }
+
     #[test]
     fn movie_projection_is_ordered_id_free_and_preserves_audio_semantics()
     -> Result<(), Box<dyn std::error::Error>> {
@@ -5365,6 +5550,13 @@ mod tests {
             u64::try_from(payload.len()).expect("test payload fits u64"),
         );
         output.extend_from_slice(payload);
+        output
+    }
+
+    fn varint_field_for_test(number: u32, value: u64) -> Vec<u8> {
+        let mut output = Vec::new();
+        litchi_iwa_common::encode_varint_into(&mut output, u64::from(number) << 3);
+        litchi_iwa_common::encode_varint_into(&mut output, value);
         output
     }
 

@@ -4069,6 +4069,8 @@ def add_iwa_keynote_slide_table_discovery_scaffold(root: Path) -> None:
         "fn slide_table_graph_from_catalog_context(bytes: &[u8]) {\n"
         "    let _catalog = KeynoteObjectCatalog;\n"
         "    decode_table_projection(bytes);\n"
+        "    litchi_keynote::__decode_slide_node_projection(bytes);\n"
+        "    litchi_keynote::__decode_slide_drawable_projection(bytes);\n"
         "    decode_catalog_table_info(bytes);\n"
         "}\n"
         "fn decode_table_projection(bytes: &[u8]) {\n"
@@ -9190,11 +9192,14 @@ class BoundaryPolicyTests(unittest.TestCase):
         )
         self.assertEqual(
             boundaries.RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_SOURCES,
-            (Path("crates/litchi-iwa/src/keynote/editor/transition_lifecycle.rs"),),
+            (
+                Path("crates/litchi-iwa/src/keynote/editor/transition.rs"),
+                Path("crates/litchi-iwa/src/keynote/editor/transition_lifecycle.rs"),
+            ),
         )
         self.assertEqual(
             boundaries.RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_MODULES,
-            ("transition_lifecycle",),
+            ("transition", "transition_lifecycle"),
         )
         self.assertEqual(
             boundaries.RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_EXAMPLES,
@@ -9340,6 +9345,10 @@ class BoundaryPolicyTests(unittest.TestCase):
                 path = root / retired
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text("// retired owner returned\n", encoding="utf-8")
+            retained.write_text(
+                "pub(in crate::keynote) async unsafe fn set_slide_transition() {}\n",
+                encoding="utf-8",
+            )
             for retired in boundaries.RETIRED_IWA_KEYNOTE_SLIDE_TRANSITION_EXAMPLES:
                 path = root / retired
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -9397,6 +9406,32 @@ class BoundaryPolicyTests(unittest.TestCase):
                         [
                             "retired litchi-iwa Keynote slide-transition module "
                             "transition_lifecycle: "
+                            "crates/litchi-iwa/src/keynote/editor.rs:1"
+                        ],
+                    )
+
+    def test_retired_iwa_keynote_slide_transition_owner_module_variants(self) -> None:
+        for declaration in (
+            "mod transition;",
+            "pub(crate) mod transition;",
+            "pub(super) mod r#transition {}",
+            "pub(in crate::keynote)\nmod\nr#transition\n{}",
+            "pub mod transition { pub struct Legacy; }",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+                    editor.parent.mkdir(parents=True)
+                    editor.write_text(declaration + "\n", encoding="utf-8")
+
+                    self.assertEqual(
+                        boundaries.audit_iwa_keynote_slide_transition_source_topology(
+                            root
+                        ),
+                        [
+                            "retired litchi-iwa Keynote slide-transition module "
+                            "transition: "
                             "crates/litchi-iwa/src/keynote/editor.rs:1"
                         ],
                     )
@@ -9544,6 +9579,108 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertEqual(
                 boundaries.audit_iwa_keynote_slide_transition_source_topology(root),
                 [],
+            )
+
+    def test_iwa_keynote_slide_transition_host_converter_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            editor.parent.mkdir(parents=True)
+            editor.write_text(
+                "fn read_transition() {\n"
+                "    settings_from_projection(snapshot);\n"
+                "    validate_transition_settings(settings);\n"
+                "    keynote_slide_transition_codec::decode_slide_transition(\n"
+                "        payload, options);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_transition_source_topology(root),
+                sorted(
+                    [
+                        "retired litchi-iwa Keynote slide-transition duplicate host "
+                        "converter settings_from_projection: "
+                        "crates/litchi-iwa/src/keynote/editor.rs:2",
+                        "retired litchi-iwa Keynote slide-transition duplicate host "
+                        "converter validate_transition_settings: "
+                        "crates/litchi-iwa/src/keynote/editor.rs:3",
+                        "retired litchi-iwa Keynote slide-transition host codec "
+                        "reference: crates/litchi-iwa/src/keynote/editor.rs:4",
+                        "focused litchi-keynote Package transition source seam is "
+                        "not used by the migration host: "
+                        "crates/litchi-iwa/src/keynote/editor.rs",
+                    ]
+                ),
+            )
+
+    def test_iwa_keynote_slide_transition_host_uses_hidden_package_seam(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            editor.parent.mkdir(parents=True)
+            editor.write_text(
+                "fn read_transition(payload: &[u8], limits: WireLimits) {\n"
+                "    let _ = litchi_keynote::Package::__transition_settings_from_source(\n"
+                "        payload, limits);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES[1]
+            package.parent.mkdir(parents=True)
+            package.write_text(
+                "impl Package {\n"
+                "    #[cfg(feature = \"internal-iwork-source\")]\n"
+                "    #[doc(hidden)]\n"
+                "    pub fn __transition_settings_from_source(\n"
+                "        payload: &[u8], limits: WireLimits\n"
+                "    ) -> Result<Option<Settings>, crate::transition::Error> {\n"
+                "        todo!()\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_transition_source_topology(root),
+                [],
+            )
+
+    def test_iwa_keynote_slide_transition_hidden_package_seam_requires_attributes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            editor = root / boundaries.IWA_KEYNOTE_EDITOR_SOURCE
+            editor.parent.mkdir(parents=True)
+            editor.write_text(
+                "fn read_transition(payload: &[u8], limits: WireLimits) {\n"
+                "    let _ = litchi_keynote::Package::__transition_settings_from_source(\n"
+                "        payload, limits);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES[1]
+            package.parent.mkdir(parents=True)
+            package.write_text(
+                "impl Package {\n"
+                "    pub fn __transition_settings_from_source(\n"
+                "        payload: &[u8], limits: WireLimits\n"
+                "    ) -> Result<Option<Settings>, crate::transition::Error> {\n"
+                "        todo!()\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_transition_source_topology(root),
+                [
+                    "focused litchi-keynote Package transition source seam is "
+                    "missing or not feature-gated/hidden: "
+                    "crates/litchi-keynote/src/package/slide_transition.rs"
+                ],
             )
 
     def test_focused_keynote_slide_transition_public_api_rejects_physical_leaks(
@@ -22159,6 +22296,7 @@ fn rewrite_movie_title_operation(
                 "fn eager_root_show_reads(bytes: &[u8]) {\n"
                 "    let _ = DocumentArchive::decode(bytes);\n"
                 "    let _ = ShowArchive::decode(bytes);\n"
+                "    let _ = SlideArchive::decode(bytes);\n"
                 "}\n"
             )
             graph.write_text(source, encoding="utf-8")
@@ -22175,6 +22313,10 @@ fn rewrite_movie_title_operation(
             )
             self.assertTrue(
                 any("ShowArchive::decode" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("SlideArchive::decode" in item for item in violations),
                 violations,
             )
 
@@ -22194,9 +22336,11 @@ fn rewrite_movie_title_operation(
             source += (
                 "use DocumentArchive as DocumentAlias;\n"
                 "use ShowArchive as ShowAlias;\n"
+                "use SlideArchive as SlideAlias;\n"
                 "fn eager_root_show_aliases(bytes: &[u8]) {\n"
                 "    let _ = DocumentAlias::decode(bytes);\n"
                 "    let _ = ShowAlias::decode(bytes);\n"
+                "    let _ = SlideAlias::decode(bytes);\n"
                 "}\n"
             )
             graph.write_text(source, encoding="utf-8")
@@ -22216,6 +22360,10 @@ fn rewrite_movie_title_operation(
             )
             self.assertTrue(
                 any("ShowArchive alias ShowAlias::decode" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("SlideArchive alias SlideAlias::decode" in item for item in violations),
                 violations,
             )
 
@@ -22316,6 +22464,27 @@ fn rewrite_movie_title_operation(
                     for item in violations
                 ),
                 violations,
+            )
+
+    def test_iwa_keynote_slide_table_discovery_accepts_focused_buffa_slide_codec(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_keynote_slide_table_discovery_scaffold(root)
+            graph = root / boundaries.IWA_KEYNOTE_SLIDE_TABLE_DISCOVERY_SOURCES[1]
+            source = graph.read_text(encoding="utf-8").replace(
+                "    litchi_keynote::__decode_slide_drawable_projection(bytes);\n",
+                "    litchi_iwa_protos::keynote_slide_drawable_order_codec::"
+                "decode_slide_drawable_order(bytes);\n",
+                1,
+            )
+            graph.write_text(source, encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_iwa_keynote_slide_table_discovery_source_topology(
+                    root
+                ),
+                [],
             )
 
     def test_iwa_keynote_slide_table_discovery_allows_only_selected_info_parse(
@@ -23645,6 +23814,90 @@ fn rewrite_movie_title_operation(
         main_source = inspect.getsource(boundaries.main)
         self.assertIn(
             "+ audit_iwa_pages_root_facts_graph_source_topology()",
+            main_source,
+        )
+
+    def test_iwa_pages_drawable_order_read_uses_borrowed_codec(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PAGES_DRAWABLE_ORDER_READ_SOURCE
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text(
+                "use litchi_iwa_protos::pages_drawable_order_codec;\n"
+                "fn extend_reachable_drawable_order(package: &Package) {\n"
+                "    let _ = pages_drawable_order_codec::decode_drawable_order(\n"
+                "        bytes, options,\n"
+                "    );\n"
+                "    let _ = package;\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_drawable_order_read_source_topology(root),
+                [],
+            )
+
+    def test_iwa_pages_drawable_order_read_rejects_generated_decodes_and_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PAGES_DRAWABLE_ORDER_READ_SOURCE
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text(
+                "use tp::DrawablesZOrderArchive as EagerOrder;\n"
+                "use litchi_iwa_protos::pages_drawable_order_codec;\n"
+                "fn extend_reachable_drawable_order(package: &Package) {\n"
+                "    let _ = pages_drawable_order_codec::decode_drawable_order(bytes, options);\n"
+                "    let _ = EagerOrder::decode(bytes);\n"
+                "    let _ = decode_typed_package_object::<tp::DrawablesZOrderArchive>(package);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_pages_drawable_order_read_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("generated DrawablesZOrderArchive type" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("generic generated message decode" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("DrawablesZOrderArchive alias EagerOrder" in item for item in violations),
+                violations,
+            )
+
+    def test_iwa_pages_drawable_order_read_masks_non_code_and_cfg_test(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.IWA_PAGES_DRAWABLE_ORDER_READ_SOURCE
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text(
+                "fn extend_reachable_drawable_order(package: &Package) {\n"
+                "    // DrawablesZOrderArchive::decode(bytes);\n"
+                '    let note = "DrawablesZOrderArchive";\n'
+                "    let _ = pages_drawable_order_codec::decode_drawable_order(bytes, options);\n"
+                "    let _ = note;\n"
+                "    let _ = package;\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "fn eager_decoy() {\n"
+                "    let _ = tp::DrawablesZOrderArchive::decode(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_pages_drawable_order_read_source_topology(root),
+                [],
+            )
+
+    def test_iwa_pages_drawable_order_read_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_pages_drawable_order_read_source_topology()",
             main_source,
         )
 
@@ -36874,7 +37127,7 @@ fn rewrite_movie_title_operation(
                 "impl NumbersEditor {\n"
                 "    pub fn reset_table_cell_custom_format(&mut self) -> Result<bool> {\n"
                 "        let current = cell_data_format::cell_data_format(&self.package, table_id, row, column)?;\n"
-                "        if self.package.source_is_exact() && has_focused_custom_registry_edge(self)? {\n"
+                "        if self.package.source_is_exact() {\n"
                 "            let location = focused_data_format_owner_is_eligible(self, table_id, row, column, &current, &DataFormat::Automatic)?;\n"
                 "            *self = commit_exact_focused_data_format_with_location(self, table_id, row, column, &current, &DataFormat::Automatic, location)?;\n"
                 "            return Ok(true);\n"
@@ -36894,14 +37147,15 @@ fn rewrite_movie_title_operation(
 
             source.write_text(
                 complete.replace(
-                    "has_focused_custom_registry_edge(self)?",
-                    "legacy_registry_gate(self)?",
+                    "        if self.package.source_is_exact() {\n",
+                    "        if self.package.source_is_exact() && has_focused_custom_registry_edge(self)? {\n",
+                    1,
                 ),
                 encoding="utf-8",
             )
             violations = boundaries.audit_iwa_numbers_custom_reset_source_topology(root)
             self.assertTrue(
-                any("focused registry gate marker" in item for item in violations),
+                any("retired root-field registry gate" in item for item in violations),
                 violations,
             )
 

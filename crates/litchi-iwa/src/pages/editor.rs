@@ -150,8 +150,18 @@ impl PagesEditor {
     }
 
     pub fn from_package(package: IWorkPackage) -> Result<Self> {
-        let body_storage_id = body_storage_id(&package)?;
-        let (sections, header_footers) = discover_structure(&package, body_storage_id.get())?;
+        // Decode the focused root-body projection once.  Structure discovery
+        // also needs the initial section edge, so passing this value through
+        // avoids a second bounded wire scan during package ingress.
+        let document = root_document_body(&package)?;
+        let body_storage_id = document
+            .body_storage()
+            .map(|reference| reference.identifier().get())
+            .map(crate::text::native_storage_id)
+            .transpose()?
+            .ok_or_else(|| Error::InvalidFormat("Pages document has no body storage".to_owned()))?;
+        let (sections, header_footers) =
+            discover_structure(&package, body_storage_id.get(), document)?;
         let text = IWorkTextEditor::from_package(package);
         Ok(Self {
             text,
@@ -3131,46 +3141,110 @@ fn extend_reachable_drawable_order(
     object_identifier: u64,
     reachable: &mut HashSet<u64>,
 ) -> Result<()> {
-    let mut found = false;
-    for name in package.iwa_entry_names() {
-        let archive = package.archive(name)?;
-        let Some(object) = archive.object(object_identifier) else {
-            continue;
-        };
-        if found {
-            return Err(Error::InvalidFormat(format!(
-                "object {object_identifier} occurs in more than one Pages component"
-            )));
-        }
-        found = true;
-        let mut payloads = object
-            .messages
-            .iter()
-            .filter(|message| message.type_ == PAGES_DRAWABLE_ORDER_MESSAGE_TYPE);
-        let message = payloads.next().ok_or_else(|| {
-            Error::InvalidFormat(format!(
-                "object {object_identifier} has no type-{PAGES_DRAWABLE_ORDER_MESSAGE_TYPE} TP.DrawablesZOrderArchive payload"
-            ))
-        })?;
-        if payloads.next().is_some() {
-            return Err(Error::InvalidFormat(format!(
-                "object {object_identifier} has multiple type-{PAGES_DRAWABLE_ORDER_MESSAGE_TYPE} TP.DrawablesZOrderArchive payloads"
-            )));
-        }
-        let options = pages_drawable_order_decode_options(package.limits(), &message.data);
-        let snapshot = pages_drawable_order_codec::decode_drawable_order(&message.data, options)
+    with_pages_drawable_order_source(package, object_identifier, |source| {
+        let options = pages_drawable_order_decode_options(package.limits(), source);
+        let snapshot = pages_drawable_order_codec::decode_drawable_order(source, options)
             .map_err(map_pages_drawable_order_error)?;
         for identifier in snapshot.identifiers() {
             find_object_archive(package, identifier)?;
             reachable.insert(identifier);
         }
+        Ok(())
+    })
+}
+
+/// Borrow one strict drawable-order payload and apply a read-only projection.
+///
+/// The archive cache owns the parsed component, so the callback can inspect
+/// the payload without cloning the complete `Archive` or generated protobuf.
+/// Object and payload multiplicity are checked before the callback runs.
+fn with_pages_drawable_order_source<T>(
+    package: &IWorkPackage,
+    object_identifier: u64,
+    read: impl FnOnce(&[u8]) -> Result<T>,
+) -> Result<T> {
+    let mut component_name = None;
+    for name in package.iwa_entry_names() {
+        package.with_parsed_archive(name, |archive| {
+            let Some(object) = archive.object(object_identifier) else {
+                return Ok(());
+            };
+            if component_name.is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "object {object_identifier} occurs in more than one Pages component"
+                )));
+            }
+            let mut payloads = object
+                .messages
+                .iter()
+                .filter(|message| message.type_ == PAGES_DRAWABLE_ORDER_MESSAGE_TYPE);
+            payloads.next().ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "object {object_identifier} has no type-{PAGES_DRAWABLE_ORDER_MESSAGE_TYPE} TP.DrawablesZOrderArchive payload"
+                ))
+            })?;
+            if payloads.next().is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "object {object_identifier} has multiple type-{PAGES_DRAWABLE_ORDER_MESSAGE_TYPE} TP.DrawablesZOrderArchive payloads"
+                )));
+            }
+            component_name = Some(name);
+            Ok(())
+        })?;
     }
-    if !found {
-        return Err(Error::InvalidFormat(format!(
+    let component_name = component_name.ok_or_else(|| {
+        Error::InvalidFormat(format!(
             "object {object_identifier} has no decodable TP.DrawablesZOrderArchive payload"
-        )));
-    }
-    Ok(())
+        ))
+    })?;
+
+    // Retain only the borrowed component name until ownership is proven,
+    // then look up that cached component once before invoking the callback.
+    package.with_parsed_archive(component_name, |archive| {
+        let message = archive
+            .object(object_identifier)
+            .and_then(|object| {
+                object
+                    .messages
+                    .iter()
+                    .find(|message| message.type_ == PAGES_DRAWABLE_ORDER_MESSAGE_TYPE)
+            })
+            .ok_or_else(|| {
+                Error::InvalidFormat(format!(
+                    "object {object_identifier} has no type-{PAGES_DRAWABLE_ORDER_MESSAGE_TYPE} TP.DrawablesZOrderArchive payload"
+                ))
+            })?;
+        read(&message.data)
+    })
+}
+
+/// Count one drawable in a strict, borrowed Pages drawable-order payload.
+///
+/// Body-anchored graph readers only need ownership cardinality.  Keeping this
+/// projection here lets every media graph share the same bounded Buffa codec
+/// and avoids materializing `TP.DrawablesZOrderArchive` for each read.
+fn pages_drawable_z_order_count(
+    package: &IWorkPackage,
+    object_identifier: u64,
+    drawable_identifier: u64,
+) -> Result<usize> {
+    with_pages_drawable_order_source(package, object_identifier, |source| {
+        pages_drawable_z_order_count_from_payload(source, package.limits(), drawable_identifier)
+    })
+}
+
+fn pages_drawable_z_order_count_from_payload(
+    source: &[u8],
+    limits: PackageLimits,
+    drawable_identifier: u64,
+) -> Result<usize> {
+    let options = pages_drawable_order_decode_options(limits, source);
+    let snapshot = pages_drawable_order_codec::decode_drawable_order(source, options)
+        .map_err(map_pages_drawable_order_error)?;
+    Ok(snapshot
+        .identifiers()
+        .filter(|identifier| *identifier == drawable_identifier)
+        .count())
 }
 
 fn pages_drawable_order_decode_options(
@@ -3183,6 +3257,7 @@ fn pages_drawable_order_decode_options(
     let archive_limit = limits
         .archive_limits()
         .max_archive_bytes()
+        .min(limits.archive_limits().max_message_bytes())
         .min(stream_limit)
         .clamp(1, WireLimits::MAX_INPUT_BYTES);
     let max_input_bytes = source.len().max(1).min(archive_limit);
@@ -4904,15 +4979,6 @@ fn package_references_object(package: &IWorkPackage, identifier: u64) -> Result<
     Ok(false)
 }
 
-fn body_storage_id(package: &IWorkPackage) -> Result<TextStorageId> {
-    root_document_body(package)?
-        .body_storage()
-        .map(|reference| reference.identifier().get())
-        .map(crate::text::native_storage_id)
-        .transpose()?
-        .ok_or_else(|| Error::InvalidFormat("Pages document has no body storage".to_owned()))
-}
-
 fn root_document_body(package: &IWorkPackage) -> Result<DocumentBodySnapshot> {
     let archive = package.archive(DOCUMENT_ARCHIVE_NAME)?;
     let object = archive.object(DOCUMENT_OBJECT_ID).ok_or_else(|| {
@@ -5035,9 +5101,8 @@ fn root_document(package: &IWorkPackage) -> Result<DocumentArchive> {
 fn discover_structure(
     package: &IWorkPackage,
     body_storage_id: u64,
+    document: DocumentBodySnapshot,
 ) -> Result<(Vec<PagesSectionInfo>, Vec<HeaderFooterLocation>)> {
-    let document = root_document_body(package)?;
-
     let mut body = None;
     let mut sections = HashMap::<u64, DiscoveredPagesSection>::new();
     let mut section_objects = HashSet::new();
@@ -5549,6 +5614,143 @@ mod document_root_facts_tests {
         append_length_delimited(&mut source, 20, &[0x08, 0x00]);
 
         assert!(pages_document_root_facts_from_payload(&source, PackageLimits::default()).is_err());
+    }
+}
+
+#[cfg(test)]
+mod drawable_order_projection_tests {
+    use super::*;
+    use crate::archive::{Archive, ArchiveObject, RawMessage};
+    use crate::protobuf::{tp, tsp};
+
+    fn reference(identifier: u64) -> tsp::Reference {
+        tsp::Reference {
+            identifier,
+            ..Default::default()
+        }
+    }
+
+    fn order(identifiers: &[u64]) -> Vec<u8> {
+        tp::DrawablesZOrderArchive {
+            drawables: identifiers.iter().copied().map(reference).collect(),
+            ..Default::default()
+        }
+        .encode_to_vec()
+    }
+
+    fn append_unknown_varint(source: &mut Vec<u8>, field: u32, value: u64) {
+        source.extend(litchi_iwa_common::varint::encode_varint(
+            u64::from(field) << 3,
+        ));
+        source.extend(litchi_iwa_common::varint::encode_varint(value));
+    }
+
+    fn package_with_payloads(payloads: Vec<Vec<u8>>) -> IWorkPackage {
+        let object = ArchiveObject::new(
+            7,
+            payloads
+                .into_iter()
+                .map(|data| RawMessage {
+                    type_: PAGES_DRAWABLE_ORDER_MESSAGE_TYPE,
+                    data,
+                })
+                .collect(),
+        )
+        .expect("drawable-order test object");
+        let mut package = IWorkPackage::new();
+        package
+            .replace_archive(
+                "Index/DrawableOrder.iwa",
+                &Archive {
+                    objects: vec![object],
+                },
+            )
+            .expect("drawable-order test archive");
+        package
+    }
+
+    #[test]
+    fn count_projects_borrowed_order_and_preserves_unknown_source_bytes() {
+        let mut source = order(&[11, 22]);
+        append_unknown_varint(&mut source, 99, 7);
+        let package = package_with_payloads(vec![source]);
+        let before = package.to_bytes().expect("test package bytes");
+
+        assert_eq!(pages_drawable_z_order_count(&package, 7, 22).unwrap(), 1);
+        assert_eq!(pages_drawable_z_order_count(&package, 7, 99).unwrap(), 0);
+        assert_eq!(package.to_bytes().expect("unchanged test package"), before);
+    }
+
+    #[test]
+    fn count_rejects_duplicate_identifiers_and_malformed_references() {
+        for source in [
+            order(&[11, 11]),
+            vec![0x0a, 0x02, 0x08, 0x00],
+            vec![0x0a, 0x04, 0x08, 0x01, 0x08, 0x02],
+        ] {
+            assert!(
+                pages_drawable_z_order_count_from_payload(&source, PackageLimits::default(), 11,)
+                    .is_err(),
+                "malformed drawable-order source should fail: {source:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn count_honors_caller_message_limit() {
+        let source = order(&[11]);
+        let archive_limits = PackageLimits::default()
+            .archive_limits()
+            .with_message_bytes(source.len() - 1)
+            .expect("valid message limit");
+        let limits = PackageLimits::default()
+            .with_archive_limits(archive_limits)
+            .expect("valid package limits");
+
+        assert!(pages_drawable_z_order_count_from_payload(&source, limits, 11).is_err());
+    }
+
+    #[test]
+    fn package_projection_rejects_duplicate_payloads_and_components() {
+        let source = order(&[11]);
+        let duplicate_payloads = package_with_payloads(vec![source.clone(), source.clone()]);
+        assert!(pages_drawable_z_order_count(&duplicate_payloads, 7, 11).is_err());
+        let mut callback_called = false;
+        assert!(
+            with_pages_drawable_order_source(&duplicate_payloads, 7, |_| {
+                callback_called = true;
+                Ok(())
+            })
+            .is_err()
+        );
+        assert!(!callback_called);
+
+        let object = ArchiveObject::new(
+            7,
+            vec![RawMessage {
+                type_: PAGES_DRAWABLE_ORDER_MESSAGE_TYPE,
+                data: source,
+            }],
+        )
+        .expect("duplicate component object");
+        let mut duplicate_components = IWorkPackage::new();
+        duplicate_components
+            .replace_archive(
+                "Index/A.iwa",
+                &Archive {
+                    objects: vec![object.clone()],
+                },
+            )
+            .expect("first duplicate component");
+        duplicate_components
+            .replace_archive(
+                "Index/B.iwa",
+                &Archive {
+                    objects: vec![object],
+                },
+            )
+            .expect("second duplicate component");
+        assert!(pages_drawable_z_order_count(&duplicate_components, 7, 11).is_err());
     }
 }
 

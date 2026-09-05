@@ -26,8 +26,20 @@ pub(super) struct SlideTableGraph {
 #[derive(Debug, Clone)]
 pub(super) struct CatalogSlideContext {
     pub(super) slide_id: u64,
-    pub(super) slide: kn::SlideArchive,
+    /// Compact drawable ownership facts projected from `KN.SlideArchive`.
+    ///
+    /// The catalog callback borrows the decompressed payload only while the
+    /// focused decoder runs.  These scalar identifiers are all the existing
+    /// table-listing callers need; no generated archive or nested protobuf
+    /// allocation is retained.
+    pub(super) slide: CatalogSlideFacts,
     pub(super) focused_table_appearance_package: Option<litchi_keynote::Package>,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct CatalogSlideFacts {
+    pub(super) owned_drawables: Vec<u64>,
+    pub(super) drawables_z_order: Vec<u64>,
 }
 
 #[derive(Debug, Clone)]
@@ -92,22 +104,20 @@ pub(super) fn slide_table_graph(
 /// legacy drawable identity to the focused selector.
 fn catalog_table_position(
     catalog: &KeynoteObjectCatalog,
-    references: &[tsp::Reference],
+    references: &[u64],
     drawable_object_id: u64,
 ) -> Result<usize> {
     let mut table_position = None;
     let mut table_count = 0usize;
     for reference in references {
         let is_table = catalog
-            .message_type_count(reference.identifier, TABLE_INFO_MESSAGE_TYPE)
+            .message_type_count(*reference, TABLE_INFO_MESSAGE_TYPE)
             .map_err(map_catalog_error)?
             > 0;
         if !is_table {
             continue;
         }
-        if reference.identifier == drawable_object_id
-            && table_position.replace(table_count).is_some()
-        {
+        if *reference == drawable_object_id && table_position.replace(table_count).is_some() {
             return Err(Error::ParseError(format!(
                 "Keynote slide table {drawable_object_id} has ambiguous z-order position"
             )));
@@ -177,11 +187,10 @@ fn focused_table_appearance(
 
 /// Resolve the root slide objects through the bounded catalog.
 ///
-/// The document's show edge and the selected show slide edge use the focused
-/// generated-free projections. The returned slide value is deliberately
-/// short-lived and owns only the selected slide projection. The catalog
-/// retains object slots and message descriptors, not the package's decompressed
-/// payloads.
+/// The document's show edge, selected show slide edge, and drawable lists use
+/// focused generated-free projections.  The catalog callback borrows each
+/// decompressed payload only for the duration of its strict decoder and keeps
+/// only the scalar facts needed by table discovery.
 pub(super) fn catalog_slide_context(
     package: &IWorkPackage,
     catalog: &mut KeynoteObjectCatalog,
@@ -214,15 +223,35 @@ pub(super) fn catalog_slide_context(
             |source| decode_catalog_slide_node_identifier(source, slide_index, package),
         )
         .map_err(map_catalog_error)?;
-    let slide: kn::SlideArchive = catalog
-        .decode_type(package, slide_id, 5, "KN.SlideArchive")
+    let (owned_drawables, drawables_z_order) = catalog
+        .with_message_data_type(package, slide_id, 5, "KN.SlideArchive", |source| {
+            decode_catalog_slide_drawables(source, slide_index, package)
+        })
         .map_err(map_catalog_error)?;
     let focused_package = focused_table_appearance_package(package)?;
     Ok(CatalogSlideContext {
         slide_id,
-        slide,
+        slide: CatalogSlideFacts {
+            owned_drawables,
+            drawables_z_order,
+        },
         focused_table_appearance_package: focused_package,
     })
+}
+
+fn decode_catalog_slide_drawables(
+    source: &[u8],
+    slide_index: usize,
+    package: &IWorkPackage,
+) -> std::result::Result<(Vec<u64>, Vec<u64>), KeynoteObjectCatalogError> {
+    let wire_limits = keynote_slide_wire_limits(package.limits(), source)?;
+    litchi_keynote::__decode_slide_drawable_projection(source, wire_limits, slide_index).map_err(
+        |error| {
+            KeynoteObjectCatalogError::InvalidSource(format!(
+                "malformed KN.SlideArchive drawable projection: {error}"
+            ))
+        },
+    )
 }
 
 fn decode_catalog_slide_node_identifier(
@@ -230,7 +259,7 @@ fn decode_catalog_slide_node_identifier(
     slide_index: usize,
     package: &IWorkPackage,
 ) -> std::result::Result<u64, KeynoteObjectCatalogError> {
-    let wire_limits = keynote_slide_node_wire_limits(package.limits(), source)?;
+    let wire_limits = keynote_slide_wire_limits(package.limits(), source)?;
     litchi_keynote::__decode_slide_node_projection(source, wire_limits, slide_index)
         .map(|(identifier, _is_skipped)| identifier)
         .map_err(|error| {
@@ -302,7 +331,7 @@ pub(super) fn slide_table_graph_from_catalog_context(
     ] {
         if references
             .iter()
-            .filter(|reference| reference.identifier == drawable_object_id)
+            .filter(|reference| **reference == drawable_object_id)
             .count()
             != 1
         {
@@ -813,7 +842,7 @@ fn keynote_show_options(source: &[u8]) -> keynote_show_codec::DecodeOptions {
         )
 }
 
-fn keynote_slide_node_wire_limits(
+fn keynote_slide_wire_limits(
     limits: crate::package::PackageLimits,
     source: &[u8],
 ) -> std::result::Result<WireLimits, KeynoteObjectCatalogError> {
@@ -827,7 +856,13 @@ fn keynote_slide_node_wire_limits(
     let input_bytes = source_bytes.min(max_input_bytes);
     // Archive header budgets govern framing metadata, not protobuf payloads.
     // Keep a separate source-sized field profile and the common bounded depth.
-    let fields = source_bytes.min(WireLimits::MAX_FIELDS);
+    // The drawable projection charges its strict and deferred Buffa scans
+    // separately. Preserve the source-sized profile for the strict pass by
+    // reserving two aggregate field charges per possible source field while
+    // retaining the common absolute ceiling.
+    let fields = source_bytes
+        .saturating_mul(2)
+        .clamp(1, WireLimits::MAX_FIELDS);
     let rewrite_work = source_bytes
         .saturating_mul(8)
         .clamp(1, WireLimits::MAX_REWRITE_WORK);
@@ -1016,6 +1051,20 @@ mod tests {
         output
     }
 
+    fn slide_drawables_payload(owned_drawables: &[u64], drawables_z_order: &[u64]) -> Vec<u8> {
+        let mut output = Vec::new();
+        bytes_field(1, &reference_payload(1), &mut output);
+        bytes_field(4, &[0x12, 0x00], &mut output);
+        for &identifier in owned_drawables {
+            bytes_field(7, &reference_payload(identifier), &mut output);
+        }
+        varint_field(19, 1, &mut output);
+        for &identifier in drawables_z_order {
+            bytes_field(42, &reference_payload(identifier), &mut output);
+        }
+        output
+    }
+
     #[test]
     fn catalog_slide_node_projection_matches_generated_identifier_without_retaining_source() {
         let package = IWorkPackage::new();
@@ -1073,7 +1122,7 @@ mod tests {
         let limits = crate::package::PackageLimits::default()
             .with_archive_limits(archive_limits)
             .unwrap();
-        let wire = keynote_slide_node_wire_limits(limits, &source).unwrap();
+        let wire = keynote_slide_wire_limits(limits, &source).unwrap();
         assert_eq!(
             litchi_keynote::__decode_slide_node_projection(&source, wire, 0)
                 .unwrap()
@@ -1083,8 +1132,17 @@ mod tests {
         let limits = limits
             .with_archive_limits(archive_limits.with_message_bytes(source.len() - 1).unwrap())
             .unwrap();
-        let wire = keynote_slide_node_wire_limits(limits, &source).unwrap();
+        let wire = keynote_slide_wire_limits(limits, &source).unwrap();
         assert!(litchi_keynote::__decode_slide_node_projection(&source, wire, 0).is_err());
+    }
+
+    #[test]
+    fn slide_drawables_projection_honors_a_lowered_direct_field_budget() {
+        let source = slide_drawables_payload(&[88], &[88]);
+        let wire_limits = WireLimits::default().with_fields(1).unwrap();
+        assert!(
+            litchi_keynote::__decode_slide_drawable_projection(&source, wire_limits, 0).is_err()
+        );
     }
 
     #[test]

@@ -447,38 +447,6 @@ fn is_focused_custom_data_format(format: &DataFormat) -> bool {
     matches!(format, DataFormat::Custom(_))
 }
 
-/// Distinguish the legacy registry route before selecting a focused owner.
-/// Builder packages retain their registry in the TSA base and omit the TN
-/// document's field 9. The compatibility reader has already qualified their
-/// unique registry. Any present field 9 selects focused validation, including
-/// malformed or duplicated references; a focused error never falls back.
-fn has_focused_custom_registry_edge(editor: &NumbersEditor) -> Result<bool> {
-    editor
-        .package
-        .with_parsed_archive("Index/Document.iwa", |archive| {
-            let mut documents = archive
-                .objects
-                .iter()
-                .filter(|object| object.archive_info.identifier == Some(1))
-                .flat_map(|object| object.messages.iter())
-                .filter(|message| message.type_ == 1);
-            let document = documents.next().ok_or_else(|| {
-                Error::InvalidFormat("Numbers Custom-format document is missing".to_owned())
-            })?;
-            if documents.next().is_some() {
-                return Err(Error::InvalidFormat(
-                    "Numbers Custom-format document is ambiguous".to_owned(),
-                ));
-            }
-            let limits = litchi_iwa_common::WireLimits::default()
-                .with_input_bytes(document.data.len().max(1))?
-                .with_fields(document.data.len().max(1))?;
-            let view =
-                litchi_iwa_common::wire::WireView::parse_with_limits(&document.data, limits)?;
-            Ok(view.fields().any(|field| field.number() == 9))
-        })
-}
-
 fn same_custom_format_family(left: &Custom, right: &Custom) -> bool {
     matches!(
         (left, right),
@@ -1151,32 +1119,23 @@ impl NumbersEditor {
     ) -> Result<()> {
         let source_built = !self.package.source_is_exact();
         let current = cell_data_format::cell_data_format(&self.package, table_id, row, column)?;
-        let legacy_custom_registry = !source_built
-            && is_focused_custom_data_format(&current)
-            && uses_focused_data_format_owner(&current, &format)
-            && !has_focused_custom_registry_edge(self)?;
-        if !source_built
-            && current == format
-            && !is_focused_data_format(&format)
-            && (!is_focused_custom_data_format(&format) || legacy_custom_registry)
-        {
+        let focused_owner_requested = uses_focused_data_format_owner(&current, &format);
+        if !source_built && current == format && !focused_owner_requested {
             // Preserve exact-source no-op bytes for formats without an
-            // eligible focused owner: Automatic, NumeralSystem, and legacy
-            // Custom registries without the TN document edge.
-            // Re-running the native writer here would needlessly allocate a
-            // new package and can normalize inherited automatic metadata.
+            // eligible focused owner: Automatic, NumeralSystem, and
+            // cross-family or otherwise unsupported compatibility formats.
+            // Re-running the compatibility writer here would needlessly
+            // allocate a new package and can normalize inherited metadata.
             return Ok(());
         }
-        let focused_owner_context = if !source_built
-            && current == format
-            && is_focused_data_format(&format)
+        let focused_owner_context = if !source_built && current == format && focused_owner_requested
         {
             // A focused no-op still has to enter the focused transaction so
             // malformed family metadata keeps its terminal refusal
             // semantics and a valid no-op can retain the exact source. Shape
             // admission is intentionally skipped for this forced validation.
             Some(focused_cell_location(self, table_id, row, column)?)
-        } else if !source_built && !legacy_custom_registry {
+        } else if !source_built {
             focused_data_format_owner_is_eligible(self, table_id, row, column, &current, &format)?
         } else {
             None
@@ -1294,13 +1253,12 @@ impl NumbersEditor {
             };
         }
 
-        // The focused owner is admitted only for an exact source carrying the
-        // rooted TN.DocumentArchive field-9 registry edge.  Legacy builder
-        // packages keep the registry under the TSA field-12 edge; preserving
-        // that profile through the compatibility writer is required for both
-        // in-memory builder snapshots and their reopened bytes.  A present
-        // but malformed field-9 edge remains a focused terminal error.
-        if self.package.source_is_exact() && has_focused_custom_registry_edge(self)? {
+        // Exact sources are validated by the focused Custom owner. It accepts
+        // both the native TN.DocumentArchive field-9 route and the builder
+        // or Numbers-resaved TSA.custom_format_list field-12 route. A
+        // malformed or ambiguous route remains a terminal focused error;
+        // source-built packages retain the compatibility writer below.
+        if self.package.source_is_exact() {
             let location = focused_data_format_owner_is_eligible(
                 self,
                 table_id,
@@ -3283,8 +3241,10 @@ mod focused_custom_tests {
     use super::*;
     use crate::numbers::cell::CellValue;
     use crate::numbers::{NumbersDocumentBuilder, NumbersEditor};
+    use litchi_iwa_archive::package::Catalog;
     use litchi_numbers::cell::data_format::custom::{
-        Custom, Name, Number as CustomNumber, NumberPattern, Text as CustomText,
+        Custom, DateTime as CustomDateTime, DateTimePattern, Name, Number as CustomNumber,
+        NumberPattern, Text as CustomText,
     };
     use litchi_numbers::{CellPosition, SheetSelector, TableSelector};
     use prost::Message as _;
@@ -3294,6 +3254,374 @@ mod focused_custom_tests {
             Name::try_new(name).expect("valid custom name"),
             NumberPattern::try_new(pattern).expect("valid custom pattern"),
         ))
+    }
+
+    fn custom_text(name: &str, prefix: &str, suffix: &str) -> Custom {
+        Custom::Text(
+            CustomText::try_new(
+                Name::try_new(name).expect("valid custom name"),
+                prefix,
+                suffix,
+            )
+            .expect("valid custom Text"),
+        )
+    }
+
+    fn native_custom_table_id(editor: &NumbersEditor) -> u64 {
+        editor
+            .tables()
+            .expect("native table catalog")
+            .into_iter()
+            .find(|table| table.name == "Table 1")
+            .expect("native Custom-format table")
+            .id()
+    }
+
+    fn focused_package_bytes(package: &FocusedNumbersPackage) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        package.write_to(&mut bytes).expect("focused package bytes");
+        bytes
+    }
+
+    fn assert_native_custom_host_locality(source: &[u8], target: &[u8]) {
+        let before = Catalog::from_bytes(source).expect("native source catalog");
+        let after = Catalog::from_bytes(target).expect("native target catalog");
+        let mut changed = Vec::new();
+        for entry in before.iter() {
+            let candidate = after
+                .iter()
+                .find(|other| other.name() == entry.name())
+                .expect("native edit retained every source member");
+            if entry.data() != candidate.data() {
+                changed.push(entry.name().to_owned());
+            } else {
+                assert_eq!(
+                    entry.raw_record().local_record(),
+                    candidate.raw_record().local_record(),
+                    "unchanged native member {} lost its exact local ZIP record",
+                    entry.name()
+                );
+            }
+        }
+        changed.sort_unstable();
+        assert_eq!(
+            changed,
+            vec![
+                "Index/Document.iwa".to_owned(),
+                "Index/Tables/DataList-904498-2.iwa".to_owned(),
+                "Index/Tables/Tile.iwa".to_owned(),
+            ]
+        );
+        assert_eq!(before.len(), after.len());
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    enum NativeCustomRouteCorruption {
+        DuplicateTsaRegistry,
+        DuplicateDocumentSuper,
+        MixedRoutes,
+        MalformedReference,
+    }
+
+    fn corrupt_native_custom_route(
+        source_bytes: &[u8],
+        corruption: NativeCustomRouteCorruption,
+    ) -> Vec<u8> {
+        let mut editor = NumbersEditor::from_bytes(source_bytes).expect("native source editor");
+        editor
+            .package
+            .update_archive("Index/Document.iwa", |archive| {
+                let object = archive.object_mut(1).expect("native document root");
+                let message = object
+                    .messages
+                    .iter_mut()
+                    .find(|message| message.type_ == 1)
+                    .expect("native document message");
+                let root = message.data.clone();
+                let super_field = crate::wire::parse_wire_fields(&root)?
+                    .into_iter()
+                    .find(|field| field.number() == 8)
+                    .ok_or_else(|| {
+                        Error::InvalidFormat("native TSA super envelope is missing".to_owned())
+                    })?;
+                let super_payload = super_field.payload(&root)?.to_owned();
+                let registry = crate::wire::parse_wire_fields(&super_payload)?
+                    .into_iter()
+                    .find(|field| field.number() == 12)
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "native TSA custom-format registry is missing".to_owned(),
+                        )
+                    })?;
+                let registry_payload = registry.payload(&super_payload)?.to_owned();
+                message.data = match corruption {
+                    NativeCustomRouteCorruption::DuplicateTsaRegistry => {
+                        let mut tsa_payload = super_payload.clone();
+                        crate::wire::append_length_delimited_field(
+                            &mut tsa_payload,
+                            12,
+                            &registry_payload,
+                        )?;
+                        crate::wire::patch_length_delimited_field(
+                            &root,
+                            8,
+                            true,
+                            Some(&tsa_payload),
+                        )?
+                    },
+                    NativeCustomRouteCorruption::DuplicateDocumentSuper => {
+                        let mut root_payload = root;
+                        crate::wire::append_length_delimited_field(
+                            &mut root_payload,
+                            8,
+                            &super_payload,
+                        )?;
+                        root_payload
+                    },
+                    NativeCustomRouteCorruption::MixedRoutes => {
+                        let mut root_payload = root;
+                        crate::wire::append_length_delimited_field(
+                            &mut root_payload,
+                            9,
+                            &registry_payload,
+                        )?;
+                        root_payload
+                    },
+                    NativeCustomRouteCorruption::MalformedReference => {
+                        let tsa_payload = crate::wire::patch_length_delimited_field(
+                            &super_payload,
+                            12,
+                            true,
+                            Some(&[0x80]),
+                        )?;
+                        crate::wire::patch_length_delimited_field(
+                            &root,
+                            8,
+                            true,
+                            Some(&tsa_payload),
+                        )?
+                    },
+                };
+                Ok(())
+            })
+            .expect("native route corruption");
+        editor.to_bytes().expect("corrupted native bytes")
+    }
+
+    #[test]
+    fn native_custom_host_cutover_handles_number_source_and_resaved_routes() {
+        let fixtures = [
+            include_bytes!(
+                "../../../../../../test-data/iwork/numbers/custom-number-native.numbers"
+            )
+            .as_slice(),
+            include_bytes!(
+                "../../../../../../test-data/iwork/numbers/custom-number-native-resaved.numbers"
+            )
+            .as_slice(),
+        ];
+        for source_bytes in fixtures {
+            let mut editor = NumbersEditor::from_bytes(source_bytes).expect("native number editor");
+            let table_id = native_custom_table_id(&editor);
+            let current = editor
+                .table_cell_custom_format(table_id, 1, 1)
+                .expect("native number format read")
+                .expect("native number custom format");
+            assert!(matches!(current, Custom::Number(_)));
+            let replacement = custom_number("Host Grouped", "#,##0.00");
+            editor
+                .set_table_cell_custom_format(table_id, 1, 1, replacement.clone())
+                .expect("host native number replacement");
+            let replacement_bytes = editor.to_bytes().expect("host native number bytes");
+            assert_native_custom_host_locality(source_bytes, &replacement_bytes);
+            assert_eq!(
+                editor
+                    .table_cell_custom_format(table_id, 1, 1)
+                    .expect("host replacement read"),
+                Some(replacement.clone())
+            );
+
+            let before_noop = editor.to_bytes().expect("host replacement source");
+            editor
+                .set_table_cell_custom_format(table_id, 1, 1, replacement.clone())
+                .expect("host native number no-op");
+            assert_eq!(
+                editor.to_bytes().expect("host native number no-op bytes"),
+                before_noop
+            );
+
+            let expected_reset = FocusedNumbersPackage::from_bytes(&before_noop)
+                .expect("focused replacement source")
+                .edit_table_cell_custom_format(
+                    SheetSelector::index(0),
+                    TableSelector::index(0),
+                    CellPosition::new(1, 1),
+                )
+                .expect("focused replacement clear edit")
+                .clear()
+                .commit()
+                .expect("focused replacement clear");
+            let expected_reset = focused_package_bytes(expected_reset.package());
+            assert!(
+                editor
+                    .reset_table_cell_custom_format(table_id, 1, 1)
+                    .expect("host native number reset")
+            );
+            assert_eq!(
+                editor.to_bytes().expect("host native number reset bytes"),
+                expected_reset,
+                "host Custom Number reset must use the focused owner"
+            );
+            assert_eq!(
+                editor
+                    .table_cell_custom_format(table_id, 1, 1)
+                    .expect("host reset read"),
+                None
+            );
+        }
+    }
+
+    #[test]
+    fn native_custom_host_cutover_handles_text_route_and_preserves_value() {
+        let source_bytes =
+            include_bytes!("../../../../../../test-data/iwork/numbers/custom-text-native.numbers");
+        let mut editor = NumbersEditor::from_bytes(source_bytes).expect("native Text editor");
+        let table_id = native_custom_table_id(&editor);
+        let original_value = FocusedNumbersPackage::from_bytes(source_bytes)
+            .expect("focused native Text source")
+            .table_cell(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                CellPosition::new(1, 1),
+            )
+            .expect("native Text cell")
+            .storage()
+            .value()
+            .cloned();
+        assert!(matches!(
+            editor
+                .table_cell_custom_format(table_id, 1, 1)
+                .expect("native Text format read"),
+            Some(Custom::Text(_))
+        ));
+        let replacement = custom_text("Host Text", "Rust <", ">");
+        editor
+            .set_table_cell_custom_format(table_id, 1, 1, replacement.clone())
+            .expect("host native Text replacement");
+        let replacement_bytes = editor.to_bytes().expect("host native Text bytes");
+        assert_native_custom_host_locality(source_bytes, &replacement_bytes);
+        assert_eq!(
+            FocusedNumbersPackage::from_bytes(&editor.to_bytes().expect("Text bytes"))
+                .expect("reopened host Text")
+                .table_cell(
+                    SheetSelector::index(0),
+                    TableSelector::index(0),
+                    CellPosition::new(1, 1)
+                )
+                .expect("reopened Text cell")
+                .storage()
+                .value()
+                .cloned(),
+            original_value
+        );
+
+        let before_noop = editor.to_bytes().expect("host Text source");
+        editor
+            .set_table_cell_custom_format(table_id, 1, 1, replacement)
+            .expect("host native Text no-op");
+        assert_eq!(
+            editor.to_bytes().expect("host native Text no-op bytes"),
+            before_noop
+        );
+
+        assert!(
+            editor
+                .reset_table_cell_custom_format(table_id, 1, 1)
+                .expect("host native Text reset")
+        );
+        let reset =
+            FocusedNumbersPackage::from_bytes(&editor.to_bytes().expect("Text reset bytes"))
+                .expect("reopened Text reset");
+        assert_eq!(
+            reset
+                .table_cell_custom_format(
+                    SheetSelector::index(0),
+                    TableSelector::index(0),
+                    CellPosition::new(1, 1)
+                )
+                .expect("Text reset format"),
+            None
+        );
+        assert_eq!(
+            reset
+                .table_cell(
+                    SheetSelector::index(0),
+                    TableSelector::index(0),
+                    CellPosition::new(1, 1)
+                )
+                .expect("Text reset cell")
+                .storage()
+                .value()
+                .cloned(),
+            original_value
+        );
+    }
+
+    #[test]
+    fn native_custom_host_route_corruption_is_terminal_and_atomic() {
+        let source_bytes = include_bytes!(
+            "../../../../../../test-data/iwork/numbers/custom-number-native.numbers"
+        );
+        let mut accepted = 0;
+        for corruption in [
+            NativeCustomRouteCorruption::DuplicateTsaRegistry,
+            NativeCustomRouteCorruption::DuplicateDocumentSuper,
+            NativeCustomRouteCorruption::MixedRoutes,
+            NativeCustomRouteCorruption::MalformedReference,
+        ] {
+            let hostile_bytes = corrupt_native_custom_route(source_bytes, corruption);
+            let Ok(mut editor) = NumbersEditor::from_bytes(&hostile_bytes) else {
+                continue;
+            };
+            accepted += 1;
+            let table_id = native_custom_table_id(&editor);
+            let current = editor
+                .table_cell_data_format(table_id, 1, 1)
+                .expect("hostile native Custom read");
+            let before = editor.to_bytes().expect("hostile native baseline");
+            for requested in [
+                current.clone(),
+                DataFormat::Automatic,
+                custom_number("Rejected", "#,##0.00").into(),
+            ] {
+                let error = editor
+                    .set_table_cell_data_format(table_id, 1, 1, requested)
+                    .expect_err("hostile native Custom route must refuse");
+                assert!(
+                    error
+                        .to_string()
+                        .contains("focused Numbers cell data-format"),
+                    "unexpected hostile route error: {error}"
+                );
+                assert_eq!(editor.to_bytes().expect("hostile native unchanged"), before);
+            }
+            let error = editor
+                .reset_table_cell_custom_format(table_id, 1, 1)
+                .expect_err("hostile native Custom reset must refuse");
+            assert!(
+                error
+                    .to_string()
+                    .contains("focused Numbers cell data-format")
+            );
+            assert_eq!(
+                editor.to_bytes().expect("hostile native reset unchanged"),
+                before
+            );
+        }
+        assert!(
+            accepted > 0,
+            "all hostile native route profiles were rejected before host admission"
+        );
     }
 
     #[test]
@@ -3817,7 +4145,7 @@ mod focused_custom_tests {
     }
 
     #[test]
-    fn malformed_present_registry_edge_cannot_select_legacy_custom_writer() {
+    fn malformed_present_custom_route_cannot_select_compatibility_writer() {
         let source_bytes = include_bytes!(
             "../../../../../../test-data/iwork/synthetic/numbers/custom-focused.numbers"
         );
@@ -3838,7 +4166,6 @@ mod focused_custom_tests {
             .expect("duplicate registry edge");
         let bytes = malformed.to_bytes().expect("malformed source bytes");
         let mut editor = NumbersEditor::from_bytes(&bytes).expect("discovery defers registry");
-        assert!(has_focused_custom_registry_edge(&editor).expect("present edge"));
         let current = editor
             .table_cell_data_format(4, 0, 0)
             .expect("legacy custom read");
@@ -3878,6 +4205,11 @@ mod focused_custom_tests {
         let text = Custom::Text(
             CustomText::try_new(Name::try_new("Text Prefix").unwrap(), "ID: ", "").unwrap(),
         );
+        let date_time = Custom::DateTime(CustomDateTime::new(
+            Name::try_new("Short Date").unwrap(),
+            DateTimePattern::try_new("yyyy-MM-dd").unwrap(),
+        ));
+        let date_time_format = DataFormat::Custom(date_time);
 
         assert!(uses_focused_data_format_owner(
             &DataFormat::Custom(number.clone()),
@@ -3898,6 +4230,14 @@ mod focused_custom_tests {
         assert!(!uses_focused_data_format_owner(
             &DataFormat::Custom(number),
             &DataFormat::Number(Number::default()),
+        ));
+        assert!(uses_focused_data_format_owner(
+            &date_time_format,
+            &date_time_format,
+        ));
+        assert!(uses_focused_data_format_owner(
+            &date_time_format,
+            &DataFormat::Automatic,
         ));
     }
 }

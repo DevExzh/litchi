@@ -3500,9 +3500,10 @@ fn parse_custom_pattern(
         budget,
         path,
     )?;
-    // The custom pattern is a strict FormatStructArchive shape.  Optional
-    // fields are accepted only when they carry the native custom defaults;
-    // all other known fields belong to a different owner and are rejected.
+    // The custom pattern is a strict FormatStructArchive shape. Optional
+    // fields are accepted only when they carry one of the known native or
+    // source-built custom-format cache profiles; all other known fields
+    // belong to a different owner and are rejected.
     let show_thousands = parse_optional_bool(&view, 5, path)?;
     if expected_type != CUSTOM_NUMBER_FORMAT_TYPE && show_thousands.is_some_and(|value| value) {
         return Err(Error::UnsupportedDependency { path });
@@ -3516,17 +3517,52 @@ fn parse_custom_pattern(
     {
         return Err(Error::UnsupportedDependency { path });
     }
-    for field_number in [27_u32, 28, 29, 30, 31, 34, 35] {
+    for field_number in [27_u32, 28, 29, 30, 34, 35] {
         if parse_optional_varint(&view, field_number, path)?.is_some_and(|value| value != 0) {
             return Err(Error::UnsupportedDependency { path });
         }
     }
+    // Numbers uses field 31 as a cached pattern index. Source-built Number
+    // formats store the UTF-16 width after their final integer placeholder;
+    // native-authored Text stores the final UTF-16 code-unit index, while the
+    // source-built Text writer stores the UTF-16 suffix width after its unique
+    // value token. The zero value remains the canonical empty-cache profile.
+    // Admit only these derived values and keep every other display family on
+    // its previous zero-only profile.
+    let index_from_right_last_integer = parse_optional_varint(&view, 31, path)?;
+    if let Some(value) = index_from_right_last_integer.filter(|value| *value != 0) {
+        let expected_index = match expected_type {
+            CUSTOM_NUMBER_FORMAT_TYPE => custom_number_pattern_suffix_width(&pattern),
+            CUSTOM_TEXT_FORMAT_TYPE => pattern
+                .encode_utf16()
+                .count()
+                .checked_sub(1)
+                .and_then(|index| u64::try_from(index).ok())
+                .ok_or(Error::InvalidSource { path }),
+            _ => Err(Error::UnsupportedDependency { path }),
+        }?;
+        if value != expected_index
+            && (expected_type != CUSTOM_TEXT_FORMAT_TYPE
+                || Some(value) != custom_text_pattern_suffix_width(&pattern))
+        {
+            return Err(Error::UnsupportedDependency { path });
+        }
+    }
     if let Some(contains_integer) = parse_optional_bool(&view, 37, path)? {
-        let expected = expected_type == CUSTOM_NUMBER_FORMAT_TYPE
-            && pattern
-                .chars()
-                .any(|character| matches!(character, '#' | '0'));
-        if contains_integer != expected {
+        // The focused source-built writer stores false, while the legacy host
+        // custom-format writer stores true for Date & Time. The bool parser
+        // already bounds this compatibility profile to the two canonical
+        // wire values.
+        let valid = if expected_type == CUSTOM_DATE_TIME_FORMAT_TYPE {
+            true
+        } else {
+            let expected = expected_type == CUSTOM_NUMBER_FORMAT_TYPE
+                && pattern
+                    .chars()
+                    .any(|character| matches!(character, '#' | '0'));
+            contains_integer == expected
+        };
+        if !valid {
             return Err(Error::UnsupportedDependency { path });
         }
     }
@@ -3609,6 +3645,8 @@ fn custom_fixed64_field_len(field: u32) -> usize {
 }
 
 fn custom_pattern_encoded_len(format_type: u32, pattern: &str) -> Result<usize, Error> {
+    let index_from_right_last_integer =
+        custom_pattern_index_from_right_last_integer(format_type, pattern)?;
     let mut length = 0usize;
     // All constant pattern fields are emitted canonically as varints. Their
     // values are included here (rather than using a blanket overhead) so the
@@ -3626,7 +3664,7 @@ fn custom_pattern_encoded_len(format_type: u32, pattern: &str) -> Result<usize, 
         (28, 0),
         (29, 0),
         (30, 0),
-        (31, 0),
+        (31, index_from_right_last_integer),
         (34, 0),
         (35, 0),
         (36, 0),
@@ -3654,6 +3692,45 @@ fn custom_pattern_encoded_len(format_type: u32, pattern: &str) -> Result<usize, 
             path: Path::Package,
         })?;
     Ok(length)
+}
+
+fn custom_pattern_index_from_right_last_integer(
+    format_type: u32,
+    pattern: &str,
+) -> Result<u64, Error> {
+    match format_type {
+        CUSTOM_NUMBER_FORMAT_TYPE => custom_number_pattern_suffix_width(pattern),
+        CUSTOM_TEXT_FORMAT_TYPE => pattern
+            .encode_utf16()
+            .count()
+            .checked_sub(1)
+            .and_then(|index| u64::try_from(index).ok())
+            .ok_or(Error::InvalidSource {
+                path: Path::Package,
+            }),
+        _ => Ok(0),
+    }
+}
+
+fn custom_number_pattern_suffix_width(pattern: &str) -> Result<u64, Error> {
+    let suffix = pattern
+        .char_indices()
+        .rev()
+        .find(|(_, character)| matches!(character, '#' | '0'))
+        .map_or(pattern, |(offset, character)| {
+            &pattern[offset + character.len_utf8()..]
+        });
+    u64::try_from(suffix.encode_utf16().count()).map_err(|_| Error::InvalidSource {
+        path: Path::Package,
+    })
+}
+
+fn custom_text_pattern_suffix_width(pattern: &str) -> Option<u64> {
+    let (_, suffix) = pattern.split_once(CUSTOM_TEXT_VALUE_TOKEN)?;
+    if suffix.contains(CUSTOM_TEXT_VALUE_TOKEN) {
+        return None;
+    }
+    u64::try_from(suffix.encode_utf16().count()).ok()
 }
 
 fn custom_condition_encoded_len(format_type: u32, pattern: &str) -> Result<usize, Error> {
@@ -3844,7 +3921,16 @@ fn encode_custom_pattern(
     append_custom_string(&mut output, CUSTOM_PATTERN_STRING_FIELD, pattern, path)?;
     append_custom_fixed64(&mut output, 19, 1.0_f64.to_bits(), path)?;
     append_custom_varint(&mut output, 20, 0, path)?;
-    for field in [27_u32, 28, 29, 30, 31, 34, 35] {
+    for field in [27_u32, 28, 29, 30] {
+        append_custom_varint(&mut output, field, 0, path)?;
+    }
+    append_custom_varint(
+        &mut output,
+        31,
+        custom_pattern_index_from_right_last_integer(format_type, pattern)?,
+        path,
+    )?;
+    for field in [34_u32, 35] {
         append_custom_varint(&mut output, field, 0, path)?;
     }
     append_custom_varint(&mut output, 36, 0, path)?;
@@ -5671,14 +5757,32 @@ pub(super) fn rewrite_custom_format(
 mod tests {
     use super::{
         CUSTOM_CONDITION_DOUBLE_FIELD, CUSTOM_CONDITION_FORMAT_FIELD, CUSTOM_CONDITION_TYPE_FIELD,
-        CUSTOM_FRACTION_SENTINEL, CUSTOM_NUMBER_FORMAT_TYPE, CUSTOM_PATTERN_STRING_FIELD,
-        CUSTOM_PATTERN_TYPE_FIELD, CUSTOM_REGISTRY_REFERENCE_FIELD, DOCUMENT_LEGACY_SUPER_FIELD,
-        Path, append_custom_bytes, append_custom_fixed64, append_custom_varint,
-        custom_condition_encoded_len, custom_pattern_encoded_len, validate_text_cell_metadata,
+        CUSTOM_DATE_TIME_FORMAT_TYPE, CUSTOM_FRACTION_SENTINEL, CUSTOM_NUMBER_FORMAT_TYPE,
+        CUSTOM_PATTERN_STRING_FIELD, CUSTOM_PATTERN_TYPE_FIELD, CUSTOM_REGISTRY_REFERENCE_FIELD,
+        CUSTOM_TEXT_FORMAT_TYPE, DOCUMENT_LEGACY_SUPER_FIELD, Package, Path, TransactionBudget,
+        append_custom_bytes, append_custom_fixed64, append_custom_varint,
+        custom_condition_encoded_len, custom_pattern_encoded_len,
+        custom_pattern_index_from_right_last_integer, custom_text_pattern_suffix_width,
+        encode_custom_pattern, parse_custom_pattern, parse_optional_varint,
+        validate_text_cell_metadata,
     };
+    use litchi_iwa_common::wire::WireView;
     use litchi_numbers_wire::BncCell;
 
     fn encoded_custom_pattern(format_type: u32, pattern: &str) -> Vec<u8> {
+        encoded_custom_pattern_with_index(format_type, pattern, 0)
+    }
+
+    fn encoded_custom_pattern_with_index(format_type: u32, pattern: &str, index: u64) -> Vec<u8> {
+        encoded_custom_pattern_with_metadata(format_type, pattern, index, None)
+    }
+
+    fn encoded_custom_pattern_with_metadata(
+        format_type: u32,
+        pattern: &str,
+        index: u64,
+        contains_integer: Option<bool>,
+    ) -> Vec<u8> {
         let path = Path::Package;
         let mut output = Vec::new();
         append_custom_varint(
@@ -5707,23 +5811,40 @@ mod tests {
         .expect("pattern string");
         append_custom_fixed64(&mut output, 19, 1.0_f64.to_bits(), path).expect("default double");
         append_custom_varint(&mut output, 20, 0, path).expect("field 20");
-        for field in [27_u32, 28, 29, 30, 31, 34, 35] {
+        for field in [27_u32, 28, 29, 30] {
+            append_custom_varint(&mut output, field, 0, path).expect("default field");
+        }
+        append_custom_varint(&mut output, 31, index, path).expect("index field");
+        for field in [34_u32, 35] {
             append_custom_varint(&mut output, field, 0, path).expect("default field");
         }
         append_custom_varint(&mut output, 36, 0, path).expect("field 36");
         append_custom_varint(
             &mut output,
             37,
-            u64::from(
+            u64::from(contains_integer.unwrap_or_else(|| {
                 format_type == CUSTOM_NUMBER_FORMAT_TYPE
                     && pattern
                         .chars()
-                        .any(|character| matches!(character, '#' | '0')),
-            ),
+                        .any(|character| matches!(character, '#' | '0'))
+            })),
             path,
         )
         .expect("integer placeholder");
         output
+    }
+
+    fn test_budget() -> TransactionBudget {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/numbers/basic.numbers");
+        let package = Package::open(path).expect("Numbers budget fixture");
+        TransactionBudget::for_cell_control(&package)
+    }
+
+    fn parse_test_pattern(format_type: u32, pattern: &str, index: u64) -> bool {
+        let source = encoded_custom_pattern_with_index(format_type, pattern, index);
+        let mut budget = test_budget();
+        parse_custom_pattern(&source, format_type, &mut budget, Path::Package).is_ok()
     }
 
     fn encoded_custom_condition(format_type: u32, pattern: &str) -> Vec<u8> {
@@ -5794,6 +5915,167 @@ mod tests {
                 custom_pattern_encoded_len(CUSTOM_NUMBER_FORMAT_TYPE, pattern).unwrap(),
                 expected,
                 "pattern {pattern:?} must have an exact preflight length",
+            );
+        }
+    }
+
+    #[test]
+    fn native_text_pattern_index_uses_utf16_units() {
+        assert_eq!(
+            custom_pattern_index_from_right_last_integer(
+                CUSTOM_TEXT_FORMAT_TYPE,
+                "Native [\u{e421}]",
+            )
+            .unwrap(),
+            9,
+        );
+        assert_eq!(
+            custom_pattern_index_from_right_last_integer(
+                CUSTOM_TEXT_FORMAT_TYPE,
+                "Rust <\u{e421}>",
+            )
+            .unwrap(),
+            7,
+        );
+        assert_eq!(
+            custom_pattern_index_from_right_last_integer(
+                CUSTOM_TEXT_FORMAT_TYPE,
+                "😀Native [\u{e421}]",
+            )
+            .unwrap(),
+            11,
+        );
+        assert_eq!(
+            custom_pattern_index_from_right_last_integer(CUSTOM_NUMBER_FORMAT_TYPE, "#,##0")
+                .unwrap(),
+            0,
+        );
+        assert_eq!(
+            custom_pattern_index_from_right_last_integer(CUSTOM_NUMBER_FORMAT_TYPE, "(#,###)")
+                .unwrap(),
+            1,
+        );
+        assert_eq!(
+            custom_text_pattern_suffix_width("😀Prefix \u{e421} Suffix"),
+            Some(7),
+        );
+    }
+
+    #[test]
+    fn native_text_pattern_cache_profiles_are_parsed_strictly() {
+        assert!(parse_test_pattern(
+            CUSTOM_TEXT_FORMAT_TYPE,
+            "Native [\u{e421}]",
+            0
+        ));
+        assert!(parse_test_pattern(
+            CUSTOM_TEXT_FORMAT_TYPE,
+            "Native [\u{e421}]",
+            9
+        ));
+        assert!(parse_test_pattern(
+            CUSTOM_TEXT_FORMAT_TYPE,
+            "😀Native [\u{e421}]",
+            11,
+        ));
+        assert!(!parse_test_pattern(
+            CUSTOM_TEXT_FORMAT_TYPE,
+            "Native [\u{e421}]",
+            8,
+        ));
+        assert!(!parse_test_pattern(
+            CUSTOM_TEXT_FORMAT_TYPE,
+            "😀Native [\u{e421}]",
+            12,
+        ));
+        let source_built_text = "😀Prefix \u{e421} Suffix";
+        assert!(parse_test_pattern(
+            CUSTOM_TEXT_FORMAT_TYPE,
+            source_built_text,
+            custom_text_pattern_suffix_width(source_built_text).unwrap(),
+        ));
+        assert!(!parse_test_pattern(
+            CUSTOM_TEXT_FORMAT_TYPE,
+            source_built_text,
+            8,
+        ));
+        assert!(parse_test_pattern(CUSTOM_NUMBER_FORMAT_TYPE, "(#,###)", 1,));
+        assert!(!parse_test_pattern(CUSTOM_NUMBER_FORMAT_TYPE, "#,##0", 1));
+        assert!(!parse_test_pattern(
+            CUSTOM_DATE_TIME_FORMAT_TYPE,
+            "yyyy-MM-dd",
+            1,
+        ));
+        let source_built_date_time = encoded_custom_pattern_with_metadata(
+            CUSTOM_DATE_TIME_FORMAT_TYPE,
+            "yyyy-MM-dd",
+            0,
+            Some(true),
+        );
+        let mut budget = test_budget();
+        assert!(
+            parse_custom_pattern(
+                &source_built_date_time,
+                CUSTOM_DATE_TIME_FORMAT_TYPE,
+                &mut budget,
+                Path::Package,
+            )
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn native_text_pattern_cache_rejects_duplicate_and_noncanonical_index() {
+        let mut duplicate =
+            encoded_custom_pattern_with_index(CUSTOM_TEXT_FORMAT_TYPE, "Native [\u{e421}]", 9);
+        append_custom_varint(&mut duplicate, 31, 9, Path::Package).expect("duplicate index");
+        let mut budget = test_budget();
+        assert!(
+            parse_custom_pattern(
+                &duplicate,
+                CUSTOM_TEXT_FORMAT_TYPE,
+                &mut budget,
+                Path::Package,
+            )
+            .is_err()
+        );
+
+        let noncanonical = WireView::parse(&[0xf8, 0x01, 0x80, 0x00]).expect("wire view");
+        assert!(parse_optional_varint(&noncanonical, 31, Path::Package).is_err());
+    }
+
+    #[test]
+    fn native_text_pattern_encoder_preflights_index_varint_boundaries() {
+        for length in [127_usize, 129] {
+            let pattern = "x".repeat(length);
+            let mut budget = test_budget();
+            let encoded = encode_custom_pattern(
+                CUSTOM_TEXT_FORMAT_TYPE,
+                &pattern,
+                Path::Package,
+                &mut budget,
+            )
+            .expect("encode native Text pattern");
+            assert_eq!(
+                encoded.len(),
+                custom_pattern_encoded_len(CUSTOM_TEXT_FORMAT_TYPE, &pattern)
+                    .expect("preflight native Text pattern"),
+            );
+            let expected_index = u64::try_from(length - 1).expect("index");
+            let mut parse_budget = test_budget();
+            assert!(
+                parse_custom_pattern(
+                    &encoded,
+                    CUSTOM_TEXT_FORMAT_TYPE,
+                    &mut parse_budget,
+                    Path::Package,
+                )
+                .is_ok()
+            );
+            assert_eq!(
+                custom_pattern_index_from_right_last_integer(CUSTOM_TEXT_FORMAT_TYPE, &pattern,)
+                    .expect("index helper"),
+                expected_index,
             );
         }
     }
