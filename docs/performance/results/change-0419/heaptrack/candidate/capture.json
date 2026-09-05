@@ -1,0 +1,77 @@
+{
+  "role": "candidate",
+  "started_utc": "2026-09-05T09:13:52.306384+00:00",
+  "scope": "heaptrack whole command, including corpus construction, correctness gates, setup and teardown; instrumented elapsed time is not latency evidence",
+  "protocol_sha256": "6735ac84b73836848f8d052da9824381013db616171935d592db7f382c011ae3",
+  "build_sha256": "d2e1154ccb02c4306d8bc65f34343fec095c4b797c998bddddc989769df8099c",
+  "argv": [
+    "taskset",
+    "-c",
+    "2",
+    "heaptrack",
+    "--record-only",
+    "-o",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0419/heaptrack/candidate/trace",
+    "/tmp/litchi-goal-0419-candidate-normal",
+    "--case",
+    "pptx_cross_copy_media_rich_lifecycle",
+    "--shape",
+    "many-small",
+    "--payload",
+    "compressible",
+    "--writer-shape",
+    "large",
+    "--xlsx-shape",
+    "medium",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--xlsx-row-visibility-shape",
+    "medium",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--filesystem-cache",
+    "warm",
+    "--samples",
+    "1",
+    "--warmup",
+    "0",
+    "--json",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0419/heaptrack/candidate/report.json",
+    "--corpus-manifest",
+    "/home/zhuhe/code/litchi/docs/performance/results/change-0419/heaptrack/candidate/catalog.json"
+  ],
+  "status": "pass",
+  "exit_code": 0,
+  "source_unchanged": true,
+  "binary_unchanged": true,
+  "files": [
+    {
+      "name": "catalog.json",
+      "bytes": 4988,
+      "sha256": "2aa1666f9a916eda71b67fbac3ab83e835797c1667e4b46bd18c7650cd67316d"
+    },
+    {
+      "name": "report.json",
+      "bytes": 20731,
+      "sha256": "328578ab2e8c92d660aaf7fb1ee87bd3e78d9d9892b6919ddabc498780ac6cb3"
+    },
+    {
+      "name": "stderr.log",
+      "bytes": 296,
+      "sha256": "5b9e7386ad7cdb75b7c7c36589ea476d31e7b063f0554f94ef8aee1a6876ce24"
+    },
+    {
+      "name": "stdout.log",
+      "bytes": 363,
+      "sha256": "6dbb2156af995a2e91505d75c2d015d2c3bd2eee155974e88482bc57bcc79142"
+    },
+    {
+      "name": "trace.zst",
+      "bytes": 1626704,
+      "sha256": "6d1605bf493b3b9af939913002b49c4eef50414ecec391c6e7390a4ddf2122fc"
+    }
+  ],
+  "finished_utc": "2026-09-05T09:13:57.617302+00:00"
+}

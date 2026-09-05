@@ -1,0 +1,18 @@
+{
+  "change": 419,
+  "classification": "matched allocation/resource diagnostic; no registered latency claim",
+  "order": ["A1", "B1", "B2", "A2"],
+  "roles": {"A1": "control", "B1": "candidate", "B2": "candidate", "A2": "control"},
+  "selectors": ["pptx_cross_copy_media_rich_lifecycle", "pptx_cross_copy_plain_lifecycle"],
+  "normal": {"samples": 100, "warmups": 10},
+  "allocator": {"samples": 30, "warmups": 3},
+  "cpu": 2,
+  "common_flags_source": "protocol.json",
+  "isolation": "fresh process per selector per leg; normal ABBA then allocator ABBA; all task CPU workloads serialized; host background uncontrolled",
+  "correctness": "identical corpus, output bytes, plan topology and refusal gates across both builds; all raw vectors retained",
+  "acceptance": "retain only if cumulative requested allocation volume and allocation count improve with unchanged bytes and typed bounds; review every >5% adverse paired resource or latency metric",
+  "latency_scope": "100 samples is diagnostic only, below the 500-sample release latency claim threshold; no allocator elapsed comparison",
+  "memory_scope": "operation counters are allocator-request volume and live/peak snapshots; high-water snapshots are process-scoped, not per-operation peaks. /usr/bin/time maximum RSS includes corpus construction, gates and teardown",
+  "uncertainty": "report each ABBA leg and same-revision drift; no pooled or universal speedup. Deterministic allocation differences may vary slightly with map iteration. Shared-host timing and RSS are descriptive",
+  "candidate_scope": "if baseline trace confirms exact writer growth attribution, evaluate archive-limit-capped geometric growth and a final fallible exact copy when needed to avoid deliberately retaining spare capacity; no ownership authorization changes"
+}

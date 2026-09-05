@@ -1,0 +1,42 @@
+{
+  "capture": {
+    "artifact_count": 5,
+    "path": "docs/performance/results/change-0419/heaptrack/control/capture.json",
+    "raw_sha256": "55981587deae28e629a1cfe2ed5616814878d53336cc5a89370a232f4244176e"
+  },
+  "change": 419,
+  "claim_authorized": false,
+  "claim_withheld_reason": "a four-leg ABBA comparison is required",
+  "classification": "matched allocation/resource diagnostic",
+  "lane": "normal",
+  "performance_claim": null,
+  "report_count": 1,
+  "reports": [
+    {
+      "allocation": {
+        "status": "unavailable"
+      },
+      "binary_sha256": "7327c1c68af2d36ee694b941281760b0d637a4cc35749fa299fac70964cecda5",
+      "corpus_archive_sha256": "a46fc227c453cbabbe54d6ca35fcad1cf1292c9a11e8e500bb1e4ec6a2708a4d",
+      "elapsed": {
+        "max": 767361455,
+        "mean": 767361455.0,
+        "min": 767361455,
+        "p50": 767361455,
+        "p95": 767361455,
+        "p99": 767361455,
+        "sample_count": 1,
+        "standard_deviation": 0.0
+      },
+      "leg": "single",
+      "output_sha256": "6a3536fc7d9055eefad6eb115294f0157b7f8acd576a4898b4e402e48c3e7b4f",
+      "output_vector_sha256": "62b9f5ec42b2321d347b499f4d080001dd8e4bda09528d258567c10f0d7af8d5",
+      "report_sha256": "7f9440227486d769af450994e84156ba78ced803a2256211b94b9d8d0b46aa45",
+      "revision": "7c7561160bf1e8e93feb739a60e4bf8d36f28906",
+      "sample_order_sha256": "d0bca111f8628137adc4c16f123496dcdd1d590d06cb5d9acd68b39fe656fb97"
+    }
+  ],
+  "samples": 1,
+  "selector": "pptx_cross_copy_media_rich_lifecycle",
+  "warmups": 0
+}

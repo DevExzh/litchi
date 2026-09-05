@@ -1,5 +1,16 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## Change 0419: bounded PPTX archive growth
+
+[0419](changes/0419-pptx-bounded-archive-growth.md) retains a matched resource
+diagnostic for the same plain and media-rich owned lifecycles. Media operation
+requested allocation volume falls from about 36.812 GB to 369.980 MB, while
+live bytes and RSS remain effectively unchanged. Plain requested volume falls
+36.217%, with a 0.38–2.07% adverse median timing observation. The 100-sample
+normal legs establish no release latency claim. The [result table](results/change-0419/result-table.md)
+and [replay bundle](results/change-0419/README.md) retain separate normal and
+allocator ABBA runs, whole-command allocation stacks and all scope limits.
+
 ## Change 0418: reuse proven owned PPTX candidates
 
 [0418](changes/0418-pptx-cross-copy-candidate-reuse.md) measures an owned

@@ -1,0 +1,88 @@
+{
+  "change": 419,
+  "status": "pass_with_scoped_resource_tradeoff",
+  "retained_revision": "0320a6a889b71b0a44030734166df32971f5f7b6",
+  "control_revision": "7c7561160bf1e8e93feb739a60e4bf8d36f28906",
+  "pptx_all_features": {
+    "passed": 843,
+    "failed": 0,
+    "ignored": 2,
+    "groups": 75,
+    "command": [
+      "cargo",
+      "+1.98.1",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-pptx",
+      "--all-features"
+    ]
+  },
+  "focused": {
+    "passed": 552,
+    "failed": 0,
+    "command": [
+      "cargo",
+      "+1.98.1",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--lib",
+      "--test",
+      "source_backed_cross_copy_adversarial"
+    ]
+  },
+  "clippy": {
+    "status": "pass_with_existing_command_exemptions",
+    "command": [
+      "cargo",
+      "+1.98.1",
+      "clippy",
+      "--locked",
+      "-p",
+      "litchi-pptx",
+      "--all-features",
+      "--all-targets",
+      "--no-deps",
+      "--",
+      "-A",
+      "clippy::chunks_exact_to_as_chunks",
+      "-A",
+      "clippy::clone_on_copy",
+      "-A",
+      "clippy::needless_lifetimes"
+    ]
+  },
+  "scoped_rustfmt": "pass",
+  "matched_reports": 16,
+  "matched_normal_observations": 800,
+  "matched_allocator_observations": 240,
+  "heaptrack_reports": 2,
+  "heaptrack_normal_observations": 2,
+  "failed_wrapper_reports_retained_and_semantically_validated": 1,
+  "failed_wrapper_observations_excluded_from_abba": 100,
+  "report_negative_probes": 3,
+  "capture_artifact_selftest_checks": 3,
+  "strict_registered_claims": 9,
+  "new_latency_claims": 0,
+  "boundary_packages": 64,
+  "boundary_internal_dependencies": 240,
+  "existing_boundary_debt_items": 14,
+  "crud_index": {
+    "categories": 15,
+    "selectors": 30
+  },
+  "numerical_and_summary_replay_after_cleanup": true,
+  "isolated_export_replay": true,
+  "temporary_cleanup": "pass",
+  "user_goal_file_unchanged": true,
+  "goal_status": "open",
+  "remaining": [
+    "decoded payload sharing and retained artifact ownership",
+    "operation-local peak and large near-limit memory evidence",
+    "matched source-backed lifecycle baseline",
+    "native producers, physical cold/range I/O and scaling"
+  ]
+}

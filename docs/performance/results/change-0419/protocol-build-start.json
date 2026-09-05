@@ -1,0 +1,17 @@
+{
+  "change": 419,
+  "classification": "allocation attribution before production changes",
+  "control_revision": "7c7561160",
+  "selector": "pptx_cross_copy_media_rich_lifecycle",
+  "samples": 1,
+  "warmups": 0,
+  "cpu": 2,
+  "workers": 1,
+  "scope": "heaptrack whole command, including corpus construction, correctness gates, setup and teardown; instrumented elapsed time is not latency evidence",
+  "hypothesis": "BoundedVecWriter exact per-chunk reservations dominate cumulative requested allocation bytes; successful realloc records count the entire requested new size, not physical copies",
+  "decision": "Attribute retained stacks before modifying production. Preserve output bytes, typed allocation errors, finite output bounds and exact-source authorization. Any candidate requires separate matched validation and resource measurement.",
+  "isolation": "one task CPU workload at a time; shared KVM background uncontrolled",
+  "trace": ["heaptrack", "--record-only", "-o", "TRACE", "BINARY", "--cases", "pptx_cross_copy_media_rich_lifecycle", "--samples", "1", "--warmup", "0", "--output", "REPORT"],
+  "trace_analysis": "heaptrack_print --merge-backtraces 0; cumulative requested volume must not be called physical copies or resident memory",
+  "common_flags": ["--shape", "many-small", "--payload", "compressible", "--writer-shape", "large", "--xlsx-shape", "medium", "--xlsx-cell-crud-shape", "medium", "--xlsx-row-visibility-shape", "medium", "--semantic-shape", "medium", "--workers", "1", "--filesystem-cache", "warm"]
+}

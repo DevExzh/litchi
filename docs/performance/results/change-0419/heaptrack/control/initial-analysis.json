@@ -1,0 +1,36 @@
+{
+  "argv": [
+    "heaptrack_print",
+    "-f",
+    "docs/performance/results/change-0419/heaptrack/control/trace.zst",
+    "--merge-backtraces",
+    "0",
+    "--filter-bt-function",
+    "BoundedVecWriter",
+    "-H",
+    "docs/performance/results/change-0419/heaptrack/control/initial-writer-histogram.tsv",
+    "-n",
+    "5"
+  ],
+  "exit_code": 0,
+  "stdout": "initial-writer.txt",
+  "stderr": "initial-writer.stderr",
+  "limitation": "Histogram is whole-command despite backtrace filter: count464634 matches whole-command total. Do not attribute this histogram solely to BoundedVecWriter. Initial stack evidence confirms repeated writer reallocations; separate per-trace analysis required for byte attribution.",
+  "files": [
+    {
+      "path": "initial-writer-histogram.tsv",
+      "sha256": "9a988af80fcbcbe4715536d6329517d3d0d8afcd5f0a93a7fa2b63aaf32839f1",
+      "bytes": 21995
+    },
+    {
+      "path": "initial-writer.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "initial-writer.txt",
+      "sha256": "f044ef0f65ced7ca2ea8c10dba4ffe25f1485223fa38c3457c8eacfe52b6adfd",
+      "bytes": 118865
+    }
+  ]
+}
