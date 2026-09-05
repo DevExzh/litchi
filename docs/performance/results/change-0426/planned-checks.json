@@ -1,0 +1,139 @@
+[
+  {
+    "tag": "xls-strict-verified",
+    "argv": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "litchi-xls",
+      "--all-targets",
+      "--all-features",
+      "--no-deps",
+      "--",
+      "-D",
+      "warnings"
+    ]
+  },
+  {
+    "tag": "xls-tests-accepted",
+    "argv": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "litchi-xls",
+      "--all-features",
+      "--no-fail-fast",
+      "--",
+      "--test-threads=1"
+    ]
+  },
+  {
+    "tag": "facade-tests-final",
+    "argv": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "litchi",
+      "--no-default-features",
+      "--features",
+      "legacy,ooxml,odf,rtf,sign,encryption,vba-inspection,formula,automatic-fonts,images,eval,web-functions,markdown,yaml",
+      "--no-fail-fast",
+      "--",
+      "--test-threads=1"
+    ]
+  },
+  {
+    "tag": "perf-xls-tests",
+    "argv": [
+      "cargo",
+      "test",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--all-features",
+      "--lib",
+      "xls_",
+      "--",
+      "--test-threads=1"
+    ]
+  },
+  {
+    "tag": "facade-strict",
+    "argv": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "litchi",
+      "--no-default-features",
+      "--features",
+      "legacy,ooxml,odf,rtf,sign,encryption,vba-inspection,formula,automatic-fonts,images,eval,web-functions,markdown,yaml",
+      "--all-targets",
+      "--no-deps",
+      "--",
+      "-D",
+      "warnings"
+    ]
+  },
+  {
+    "tag": "xls-rustdoc",
+    "argv": [
+      "cargo",
+      "doc",
+      "--locked",
+      "-p",
+      "litchi-xls",
+      "--all-features",
+      "--no-deps"
+    ]
+  },
+  {
+    "tag": "facade-rustdoc",
+    "argv": [
+      "cargo",
+      "doc",
+      "--locked",
+      "-p",
+      "litchi",
+      "--no-default-features",
+      "--features",
+      "legacy,ooxml,odf,rtf,sign,encryption,vba-inspection,formula,automatic-fonts,images,eval,web-functions,markdown,yaml",
+      "--no-deps"
+    ]
+  },
+  {
+    "tag": "boundaries",
+    "argv": [
+      "python3",
+      "-B",
+      "tools/check_crate_boundaries.py"
+    ]
+  },
+  {
+    "tag": "crud-index",
+    "argv": [
+      "python3",
+      "-B",
+      "tools/validate_crud_coverage_index.py"
+    ]
+  },
+  {
+    "tag": "claims",
+    "argv": [
+      "python3",
+      "-B",
+      "tools/check_perf_claims.py",
+      "--registry",
+      "docs/performance/claim-registry-v1.json",
+      "--repo-root",
+      ".",
+      "--evidence-root",
+      ".",
+      "--mode",
+      "strict"
+    ]
+  }
+]

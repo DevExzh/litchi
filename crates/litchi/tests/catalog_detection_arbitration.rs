@@ -90,7 +90,8 @@ mod document_limit_arbitration {
     }
 
     #[test]
-    fn ordinary_odt_uses_native_policy_but_polyglot_honors_docx_input_limit() {
+    fn ordinary_odt_uses_native_policy_even_with_ooxml_suffix_but_polyglot_honors_docx_input_limit()
+    {
         let ordinary = odf_package(ODT_MIME, ODT_CONTENT);
         let native_limits = litchi::docx::ReadLimits::builder()
             .max_input_bytes(1)
@@ -110,15 +111,9 @@ mod document_limit_arbitration {
             .tempfile()
             .expect("temporary DOCX-suffixed ODT path");
         std::fs::write(renamed_path.path(), &ordinary).expect("write renamed ODT fixture");
-        let renamed_error = match Document::open_with_limits(renamed_path.path(), native_limits) {
-            Ok(_) => panic!("DOCX-suffixed ODT bypassed the caller's input limit"),
-            Err(error) => error,
-        };
-        assert_input_limit(
-            renamed_error,
-            u64::try_from(ordinary.len()).expect("fixture length fits in u64"),
-            1,
-        );
+        let renamed = Document::open_with_limits(renamed_path.path(), native_limits)
+            .expect("ordinary ODT content must retain its native policy despite the suffix");
+        assert_eq!(renamed.text().expect("renamed ODT text"), "bounded");
 
         for catalog_name in ["[Content_Types].xml", "[content_types].xml"] {
             let bytes = odt_docx_polyglot(catalog_name);

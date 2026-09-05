@@ -4,7 +4,55 @@ use std::sync::Arc;
 
 use super::array::Owner as ArrayOwner;
 use super::shared::{Cell, Owner};
-use crate::CompatibilityProfile;
+use crate::{CompatibilityProfile, Error, Result};
+
+/// Validated source-bound `RgbExtra` attached to one cell Formula.
+///
+/// The owner remains private so callers cannot manufacture an unchecked
+/// suffix. The original cell and token stream are part of the identity because
+/// `PtgExtraMem` contains coordinate-sensitive ranges.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Ancillary {
+    original_cell: (u16, u16),
+    token_len: usize,
+    source: Vec<u8>,
+}
+
+impl Ancillary {
+    pub(crate) fn new(
+        original_cell: (u16, u16),
+        original_tokens: &[u8],
+        bytes: &[u8],
+    ) -> Result<Self> {
+        let length = original_tokens
+            .len()
+            .checked_add(bytes.len())
+            .ok_or(Error::Allocation("retaining Formula RgbExtra"))?;
+        let mut source = Vec::new();
+        source
+            .try_reserve_exact(length)
+            .map_err(|_error| Error::Allocation("retaining Formula RgbExtra"))?;
+        source.extend_from_slice(original_tokens);
+        source.extend_from_slice(bytes);
+        Ok(Self {
+            original_cell,
+            token_len: original_tokens.len(),
+            source,
+        })
+    }
+
+    pub(crate) const fn original_cell(&self) -> (u16, u16) {
+        self.original_cell
+    }
+
+    pub(crate) fn original_tokens(&self) -> &[u8] {
+        &self.source[..self.token_len]
+    }
+
+    pub(crate) fn bytes(&self) -> &[u8] {
+        &self.source[self.token_len..]
+    }
+}
 
 /// A bounded, inert producer defect preserved while opening a workbook.
 ///
@@ -67,6 +115,7 @@ pub struct Metadata {
     calculation_cache: u32,
     shared_owner: Option<Arc<Owner>>,
     array_owner: Option<Arc<ArrayOwner>>,
+    ancillary: Option<Arc<Ancillary>>,
 }
 
 impl Metadata {
@@ -82,6 +131,7 @@ impl Metadata {
             calculation_cache: 0,
             shared_owner: None,
             array_owner: None,
+            ancillary: None,
         }
     }
 
@@ -137,6 +187,11 @@ impl Metadata {
         self.array_owner = Some(owner);
     }
 
+    pub(crate) fn with_ancillary(mut self, ancillary: Ancillary) -> Self {
+        self.ancillary = Some(Arc::new(ancillary));
+        self
+    }
+
     /// Set whether formula error checking is disabled for this cell.
     #[must_use]
     pub const fn with_clear_errors(mut self, value: bool) -> Self {
@@ -189,6 +244,19 @@ impl Metadata {
         self.array_owner.as_deref()
     }
 
+    /// Exact validated `RgbExtra` bytes retained from the source Formula.
+    ///
+    /// The bytes are read-only. A writer also checks the source cell and token
+    /// identity held by the private owner before it can emit this suffix.
+    #[must_use]
+    pub fn ancillary_bytes(&self) -> Option<&[u8]> {
+        self.ancillary.as_deref().map(Ancillary::bytes)
+    }
+
+    pub(crate) fn ancillary(&self) -> Option<&Ancillary> {
+        self.ancillary.as_deref()
+    }
+
     pub(crate) const fn from_wire(flags: u16, calculation_cache: u32) -> Self {
         Self {
             always_calculate: flags & 0x0001 != 0,
@@ -198,6 +266,7 @@ impl Metadata {
             calculation_cache,
             shared_owner: None,
             array_owner: None,
+            ancillary: None,
         }
     }
 

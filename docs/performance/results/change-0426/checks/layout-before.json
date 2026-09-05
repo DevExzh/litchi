@@ -1,0 +1,31 @@
+{
+  "change": 426,
+  "argv": [
+    "rustup",
+    "run",
+    "1.98.1",
+    "rustc",
+    "--edition",
+    "2024",
+    "docs/performance/results/change-0426/layout.rs",
+    "-L",
+    "dependency=target/debug/deps",
+    "--extern",
+    "litchi_xls=target/debug/deps/liblitchi_xls-0ab317c5a0de1e5b.rlib",
+    "-o",
+    "/tmp/litchi-0426-layout-before"
+  ],
+  "compiled_rlib": "target/debug/deps/liblitchi_xls-0ab317c5a0de1e5b.rlib",
+  "compiled_rlib_sha256": "39c708a71b02e35dab3e788929aba0eebb18ef4a27671e66e4429d2d8d290047",
+  "baseline_revision": "f22917bbe",
+  "source_model_sha256": "76643b368eb102aeb6490c4c634e5425a8e907f5bfb9c6d2565c9a7b07308626",
+  "scope": "Rust type layout from retained pre-batch root library; not operation allocations/RSS/performance",
+  "exit_code": 0,
+  "finished_utc": "2026-09-05T19:12:49.844384+00:00",
+  "sizes": {
+    "metadata_bytes": 24,
+    "cell_record_bytes": 80,
+    "cell_bytes": 152
+  },
+  "binary_sha256": "1382c9709bc83667276960efc40d8fa00e81c5968a4b55667d9005d9daa9acbf"
+}

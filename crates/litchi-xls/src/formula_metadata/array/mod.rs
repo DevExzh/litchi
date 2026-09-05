@@ -14,3 +14,4 @@ pub use super::shared::{Cell, Range};
 pub use model::{Cells, Limits, Owner};
 
 pub(crate) use codec::parse_payload;
+pub(crate) use validation::validate_ser_ar;

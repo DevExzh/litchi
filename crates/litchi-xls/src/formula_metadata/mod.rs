@@ -7,6 +7,7 @@
 
 pub mod array;
 mod codec;
+mod extra;
 mod model;
 pub mod shared;
 mod validation;
@@ -18,4 +19,7 @@ pub use model::{Defect, Metadata};
 pub use shared::{Cell, Owner, Range};
 
 pub(crate) use codec::{parse_record, parse_record_preserving};
+pub(crate) use extra::{
+    FormulaExtraKind, formula_payload_parts, scan_list_extra_kinds, validate_formula_extra,
+};
 pub(crate) use validation::{FlagDefect, encode_flags, validate_for_write};

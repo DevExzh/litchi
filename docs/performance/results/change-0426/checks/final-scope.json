@@ -1,0 +1,16 @@
+{
+  "goal_sha256": "bed4058bb76330daab8ce9d4bceff639ab3fbd7ea06634158bef41b133c4d1f1",
+  "goal_untracked": true,
+  "adr_tree": "c950b6c8be822561b498d7bbe87c460873dcbf49",
+  "production_owner": "litchi-xls",
+  "facade_changes": "tests only",
+  "added_lint_allowances": false,
+  "iwork_changes": false,
+  "manifest_changes": false,
+  "preserved_build_trees": [
+    "target",
+    "tools/perf-baseline/target"
+  ],
+  "layout_temporary_binaries": "removed after successful probes",
+  "performance_claim": null
+}

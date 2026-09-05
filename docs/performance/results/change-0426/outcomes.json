@@ -1,0 +1,84 @@
+{
+  "test_counts": {
+    "facade-fixture-corrections": [
+      460,
+      1,
+      11
+    ],
+    "facade-tests-final": [
+      461,
+      0,
+      11
+    ],
+    "perf-xls-tests": [
+      8,
+      0,
+      0
+    ],
+    "xls-ancillary-focused": [
+      0,
+      0,
+      0
+    ],
+    "xls-ancillary-focused-final": [
+      2,
+      3,
+      0
+    ],
+    "xls-ancillary-focused-retry": [
+      0,
+      0,
+      0
+    ],
+    "xls-ancillary-focused-reviewed": [
+      12,
+      0,
+      0
+    ],
+    "xls-tests": [
+      0,
+      0,
+      0
+    ],
+    "xls-tests-accepted": [
+      1341,
+      0,
+      1
+    ],
+    "xls-tests-final": [
+      1341,
+      0,
+      1
+    ],
+    "xls-tests-verified": [
+      1341,
+      0,
+      1
+    ]
+  },
+  "final_source_checks": [
+    "xls-strict-verified",
+    "xls-tests-accepted",
+    "facade-tests-final",
+    "perf-xls-tests",
+    "facade-strict",
+    "xls-rustdoc",
+    "facade-rustdoc",
+    "boundaries",
+    "crud-index",
+    "claims",
+    "rustfmt-final",
+    "diff-check"
+  ],
+  "layout_before": {
+    "metadata_bytes": 24,
+    "cell_record_bytes": 80,
+    "cell_bytes": 152
+  },
+  "layout_after": {
+    "metadata_bytes": 32,
+    "cell_record_bytes": 88,
+    "cell_bytes": 160
+  },
+  "performance_claim": null
+}

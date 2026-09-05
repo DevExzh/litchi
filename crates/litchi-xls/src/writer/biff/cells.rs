@@ -252,6 +252,19 @@ pub(crate) fn write_formula_with_metadata<W: Write>(
             ));
         },
     };
+    let ancillary: &[u8] = match metadata.ancillary() {
+        Some(ancillary) => {
+            if ancillary.original_cell() != (row_u16, col)
+                || ancillary.original_tokens() != formula_tokens
+            {
+                return Err(Error::UnsafeEdit(
+                    "Formula RgbExtra is bound to a different cell or token stream".to_string(),
+                ));
+            }
+            ancillary.bytes()
+        },
+        None => &[],
+    };
     // Materialize and validate the complete Array payload before emitting its
     // anchor Formula, so semantic failures cannot leave an orphan Formula in
     // the caller's stream.
@@ -266,16 +279,19 @@ pub(crate) fn write_formula_with_metadata<W: Write>(
     let flags = crate::formula_metadata::encode_flags(&metadata, formula_tokens)?;
     // A BIFF record payload is limited to 8,224 bytes. FORMULA contributes
     // 22 fixed bytes before the token stream.
-    if formula_tokens.len() > 8_202 {
+    let formula_data_len = 22usize
+        .checked_add(formula_tokens.len())
+        .and_then(|value| value.checked_add(ancillary.len()))
+        .ok_or_else(|| Error::InvalidFormula("Formula record length overflow".to_string()))?;
+    if formula_data_len > 8_224 {
         return Err(Error::InvalidFormula(
-            "Formula token stream exceeds BIFF8 record limit".to_string(),
+            "Formula token and RgbExtra streams exceed the BIFF8 record limit".to_string(),
         ));
     }
     let token_len = u16::try_from(formula_tokens.len())
         .map_err(|_error| Error::InvalidFormula("Formula token length exceeds u16".to_string()))?;
-    let data_len = 22u16
-        .checked_add(token_len)
-        .ok_or_else(|| Error::InvalidFormula("Formula record length overflow".to_string()))?;
+    let data_len = u16::try_from(formula_data_len)
+        .map_err(|_error| Error::InvalidFormula("Formula record length exceeds u16".to_string()))?;
 
     write_record_header(writer, 0x0006, data_len)?;
     writer.write_all(&row_u16.to_le_bytes())?;
@@ -287,6 +303,7 @@ pub(crate) fn write_formula_with_metadata<W: Write>(
     writer.write_all(&metadata.calculation_cache().to_le_bytes())?;
     writer.write_all(&token_len.to_le_bytes())?;
     writer.write_all(formula_tokens)?;
+    writer.write_all(ancillary)?;
 
     if let Some(owner) = shared_owner
         && owner.anchor().row() == row_u16
@@ -356,6 +373,35 @@ mod tests {
     use super::write_formula;
     use crate::formula_metadata::shared::{Cell, Owner, Range, parse};
     use crate::records::{CellRecord, Encoding, FormulaValue};
+    use crate::{Error, FormulaMetadata};
+
+    const MEMORY_TOKENS: [u8; 18] = [
+        0x46, 0x12, 0x34, 0x56, 0x78, 11, 0, 0x24, 0, 0, 0, 0, 0x24, 1, 0, 1, 0, 0x11,
+    ];
+    const MEMORY_EXTRA: [u8; 10] = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0];
+
+    fn metadata_with_memory_extra(row: u16, col: u16) -> FormulaMetadata {
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&row.to_le_bytes());
+        payload.extend_from_slice(&col.to_le_bytes());
+        payload.extend_from_slice(&15u16.to_le_bytes());
+        payload.extend_from_slice(&[3, 0, 0, 0, 0, 0, 0xff, 0xff]);
+        payload.extend_from_slice(&0u16.to_le_bytes());
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        payload.extend_from_slice(&18u16.to_le_bytes());
+        payload.extend_from_slice(&MEMORY_TOKENS);
+        payload.extend_from_slice(&MEMORY_EXTRA);
+        crate::formula_metadata::parse_record(&payload)
+            .expect("synthetic Formula with PtgExtraMem")
+            .metadata
+    }
+
+    fn assert_preflight_refusal(metadata: FormulaMetadata, row: u32, col: u16, tokens: &[u8]) {
+        let mut bytes = vec![0xa5];
+        let result = super::write_formula_with_metadata(&mut bytes, row, col, 15, tokens, metadata);
+        assert!(matches!(result, Err(Error::UnsafeEdit(_))));
+        assert_eq!(bytes, [0xa5]);
+    }
 
     #[test]
     fn writes_formula_record_with_recalculation_and_empty_cache() {
@@ -378,7 +424,7 @@ mod tests {
                     ref formula,
                 } if formula == &tokens
                     && *metadata
-                        == crate::FormulaMetadata::new().with_always_calculate(true)
+                        == FormulaMetadata::new().with_always_calculate(true)
             ),
             "{record:?}"
         );
@@ -391,7 +437,7 @@ mod tests {
             .unwrap()
             .with_participants(&[anchor, Cell::new(1, 0)])
             .unwrap();
-        let metadata = crate::FormulaMetadata::new().with_shared(owner);
+        let metadata = FormulaMetadata::new().with_shared(owner);
         let mut bytes = Vec::new();
 
         super::write_formula_with_metadata(&mut bytes, 0, 0, 15, &[0x1E, 99, 0], metadata).unwrap();
@@ -418,7 +464,7 @@ mod tests {
             .unwrap()
             .with_participants(&[anchor, Cell::new(1, 0)])
             .unwrap();
-        let metadata = crate::FormulaMetadata::new().with_shared(owner);
+        let metadata = FormulaMetadata::new().with_shared(owner);
         let mut bytes = Vec::new();
 
         super::write_formula_with_metadata(&mut bytes, 1, 0, 15, &[], metadata).unwrap();
@@ -431,7 +477,7 @@ mod tests {
         let range = Range::try_new(0, 0, 1, 0).unwrap();
         let owner =
             crate::formula_metadata::array::Owner::from_compiled(range, vec![0x1e, 7, 0]).unwrap();
-        let metadata = crate::FormulaMetadata::new()
+        let metadata = FormulaMetadata::new()
             .with_always_calculate(true)
             .with_array(owner);
 
@@ -457,5 +503,48 @@ mod tests {
         super::write_formula_with_metadata(&mut participant, 1, 0, 15, &[], metadata).unwrap();
         assert_eq!(participant.len(), 31);
         assert_eq!(&participant[26..], &[0x01, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn reemits_rgb_extra_only_for_its_original_cell_and_tokens() {
+        let metadata = metadata_with_memory_extra(2, 3);
+        let mut bytes = Vec::new();
+        super::write_formula_with_metadata(&mut bytes, 2, 3, 15, &MEMORY_TOKENS, metadata.clone())
+            .unwrap();
+
+        assert_eq!(u16::from_le_bytes([bytes[2], bytes[3]]), 50);
+        assert_eq!(&bytes[4 + 22..4 + 22 + MEMORY_TOKENS.len()], &MEMORY_TOKENS);
+        assert_eq!(&bytes[4 + 22 + MEMORY_TOKENS.len()..], &MEMORY_EXTRA);
+        let record = CellRecord::parse(0x0006, &bytes[4..], &Encoding::Utf16Le).unwrap();
+        assert!(
+            matches!(record, CellRecord::Formula { metadata, .. } if metadata == metadata_with_memory_extra(2, 3))
+        );
+
+        assert_preflight_refusal(metadata.clone(), 2, 3, &[0x26, 1, 0, 0, 0, 0, 0]);
+        assert_preflight_refusal(metadata.clone(), 4, 3, &MEMORY_TOKENS);
+        assert_preflight_refusal(metadata, 2, 4, &MEMORY_TOKENS);
+    }
+
+    #[test]
+    fn shared_token_substitution_cannot_reuse_rgb_extra() {
+        let owner = Owner::new(
+            Range::try_new(2, 3, 2, 3).unwrap(),
+            Cell::new(2, 3),
+            &[0x16],
+        )
+        .unwrap();
+        let metadata = metadata_with_memory_extra(2, 3).with_shared(owner);
+        assert_preflight_refusal(metadata, 2, 3, &MEMORY_TOKENS);
+    }
+
+    #[test]
+    fn array_token_substitution_cannot_reuse_rgb_extra() {
+        let owner = crate::formula_metadata::array::Owner::from_compiled(
+            Range::try_new(2, 3, 2, 3).unwrap(),
+            vec![0x1e, 7, 0],
+        )
+        .unwrap();
+        let metadata = metadata_with_memory_extra(2, 3).with_array(owner);
+        assert_preflight_refusal(metadata, 2, 3, &MEMORY_TOKENS);
     }
 }

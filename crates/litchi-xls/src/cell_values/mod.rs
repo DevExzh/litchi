@@ -4170,14 +4170,39 @@ fn authored_formula_record_matches(
         tokens,
     )?;
     let start = entry.kind_offset;
-    let end = start
-        .checked_add(expected.len())
+    let payload_length_offset = start
+        .checked_add(2)
+        .ok_or_else(|| Error::InvalidData("authored Formula length offset overflow".into()))?;
+    let payload_length = usize::from(binary::read_u16_le_at(
+        &snapshot.inner.workbook_stream,
+        payload_length_offset,
+    )?);
+    let payload_start = start
+        .checked_add(4)
+        .ok_or_else(|| Error::InvalidData("authored Formula payload offset overflow".into()))?;
+    let end = payload_start
+        .checked_add(payload_length)
         .ok_or_else(|| Error::InvalidData("authored Formula record range overflow".into()))?;
+    let payload = snapshot
+        .inner
+        .workbook_stream
+        .get(payload_start..end)
+        .ok_or_else(|| {
+            Error::InvalidData("authored Formula record lies outside Workbook".into())
+        })?;
+    let (source_tokens, source_extra) = crate::formula_metadata::formula_payload_parts(payload)?;
+    if !source_extra.is_empty() {
+        crate::formula_metadata::validate_formula_extra(source_tokens, source_extra)?;
+        return Err(Error::UnsafeEdit(
+            "Formula resource matching refuses a source Formula with RgbExtra ancillary bytes"
+                .into(),
+        ));
+    }
     Ok(snapshot
         .inner
         .workbook_stream
         .get(start..end)
-        .is_some_and(|record| record == expected.as_slice()))
+        .is_some_and(|record| record.len() == expected.len() && record == expected.as_slice()))
 }
 
 fn verify_formula_dependency(
@@ -5892,6 +5917,10 @@ fn parse_formula_entry(
             expected: 22,
             found: payload.len(),
         });
+    }
+    let (formula_tokens, formula_extra) = crate::formula_metadata::formula_payload_parts(payload)?;
+    if !formula_extra.is_empty() {
+        crate::formula_metadata::validate_formula_extra(formula_tokens, formula_extra)?;
     }
     let cache = match crate::utils::parse_formula_value(&payload[6..14])? {
         crate::records::FormulaValue::Number(value) => {

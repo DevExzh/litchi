@@ -206,6 +206,45 @@ fn formula_package(formula: &str) -> Vec<u8> {
     output.into_inner()
 }
 
+const ANCILLARY_MEMORY_TOKENS: [u8; 18] = [
+    0x46, 0x12, 0x34, 0x56, 0x78, 11, 0, 0x24, 0, 0, 0, 0, 0x24, 1, 0, 1, 0, 0x11,
+];
+const ANCILLARY_MEMORY_EXTRA: [u8; 10] = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0];
+
+fn ancillary_formula_package() -> Vec<u8> {
+    let source = formula_package("1+1");
+    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    let workbook = ole.open_stream(&["Workbook"]).unwrap();
+    let mut rebuilt = Vec::new();
+    let mut patched = false;
+    for record in Records::new(&workbook) {
+        let record = record.unwrap();
+        let kind = record.kind().get();
+        let mut payload = record.payload().to_vec();
+        if kind == 0x0006 && !patched {
+            payload[20..22].copy_from_slice(
+                &u16::try_from(ANCILLARY_MEMORY_TOKENS.len())
+                    .unwrap()
+                    .to_le_bytes(),
+            );
+            payload.truncate(22);
+            payload.extend_from_slice(&ANCILLARY_MEMORY_TOKENS);
+            payload.extend_from_slice(&ANCILLARY_MEMORY_EXTRA);
+            patched = true;
+        }
+        rebuilt.extend_from_slice(&kind.to_le_bytes());
+        rebuilt.extend_from_slice(&u16::try_from(payload.len()).unwrap().to_le_bytes());
+        rebuilt.extend_from_slice(&payload);
+    }
+    assert!(patched, "seed package has no Formula record");
+
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Workbook"], &rebuilt).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
 fn positioned_formula_package(formula: &str, row: u32, column: u16) -> Vec<u8> {
     let mut writer = crate::Writer::new();
     let sheet = writer.add_worksheet("Formula").unwrap();
@@ -1508,6 +1547,26 @@ fn formula_cache_transfer_requires_identical_tokens() {
     let transfer = patch.plan_transfer(&divergent);
     assert!(!transfer.is_executable());
     assert!(patch.apply(&divergent).is_err());
+}
+
+#[test]
+fn canonical_formula_resource_matching_refuses_rgb_extra_atomically() {
+    let source = Snapshot::from_bytes(ancillary_formula_package()).unwrap();
+    let reference = Reference::new(0, 0).unwrap();
+    let entry = unique_entry(&source.inner.sheets[0].entries, reference)
+        .unwrap()
+        .unwrap();
+    let before = source.bytes().to_vec();
+    let error = authored_formula_record_matches(
+        &source,
+        entry,
+        reference,
+        entry.cell.style,
+        &ANCILLARY_MEMORY_TOKENS,
+    )
+    .expect_err("canonical resource matching must refuse source-bound RgbExtra");
+    assert!(matches!(error, Error::UnsafeEdit(message) if message.contains("RgbExtra")));
+    assert_eq!(source.bytes(), before.as_slice());
 }
 
 #[test]

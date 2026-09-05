@@ -1,5 +1,19 @@
 # Performance program phase report
 
+## Change 0426: XLS Formula ancillary preservation
+
+[0426](changes/0426-xls-formula-ancillary-preservation.md) closes all six
+baseline-reproduced facade test failures. The XLS reader now accepts and
+preserves bounded standard Formula array/range tails, while edits that cannot
+retain their source cell and tokens fail closed. Five facade fixture/assertion
+corrections follow existing content ownership, ZIP framing and OPC contracts.
+The final XLS suite passes 1,341 tests with one ignored doctest; the explicit
+non-iWork facade passes 461 tests with 11 ignored. Scoped XLS strict Clippy
+passes. The [bundle](results/change-0426/README.md) retains native and synthetic
+preservation tests, adversarial wire cases, review corrections, failed attempts
+and static layout costs. This is correctness work with no performance claim;
+global strict-gate and broader performance evidence remain open.
+
 ## Change 0425: non-iWork verification maintenance
 
 [0425](changes/0425-non-iwork-verification-maintenance.md) closes compiler-directed
