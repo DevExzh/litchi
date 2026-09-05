@@ -1,0 +1,38 @@
+{
+  "change": 424,
+  "declared_utc": "2026-09-05T13:11:24.302244+00:00",
+  "classification": "source-backed lifecycle allocation-stack attribution before production edits",
+  "control_revision": "6ca9962c7818e173538a40ed45f3a3c32cc1aa6a",
+  "cpu": 2,
+  "workers": 1,
+  "samples": 1,
+  "warmups": 0,
+  "corpora": [
+    "plain",
+    "media_rich"
+  ],
+  "common_flags": [
+    "--shape",
+    "many-small",
+    "--payload",
+    "compressible",
+    "--writer-shape",
+    "large",
+    "--xlsx-shape",
+    "medium",
+    "--xlsx-cell-crud-shape",
+    "medium",
+    "--xlsx-row-visibility-shape",
+    "medium",
+    "--semantic-shape",
+    "medium",
+    "--workers",
+    "1",
+    "--filesystem-cache",
+    "warm"
+  ],
+  "scope": "Heaptrack whole command including corpus construction, setup, timed lifecycle, independent oracles, report generation and teardown. Instrumented elapsed and RSS are not normal latency or operation-owned memory.",
+  "hypothesis": "Source-backed planner staging and publication reprepare allocate overlapping selected media; identify actual stacks before choosing any production reuse. Required source validation must remain.",
+  "isolation": "All task CPU workloads serialized; CPU2; shared KVM host background uncontrolled",
+  "claims": "No optimization, cross-role, zero-copy, physical-copy, operation-local Heaptrack total or post-drop retention claim. Existing0423 V3 allocation vectors provide separate operation-scope evidence."
+}
