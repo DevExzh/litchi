@@ -1,5 +1,20 @@
 # Performance program phase report
 
+## Change 0423: matched source-backed PPTX lifecycles
+
+[0423](changes/0423-matched-source-backed-pptx-lifecycles.md) adds plain and
+eight-image source-backed opening/planning/publication selectors using the
+owned baseline's exact inputs and bounded sink ceilings. The [bundle](results/change-0423/README.md)
+retains 16 fresh processes and 1,040 observations, with full report replay and
+88 rejected mutation probes. Source-backed p50 is 2.165 / 2.165 ms for plain
+and 272.762 / 261.779 ms for media. Owned media p50/mean repeat drift exceeds
+5%, so those statistics remain descriptive; the other three pairs pass their
+within-role limits. This is a current API baseline, with no cross-role speedup
+or memory-reduction claim. Differing retained objects, logical-read adapter
+overhead and setup-inclusive RSS require explicit scope. Plan/publication/drop
+snapshots, allocation profiles, near-limit and native/range/scaling coverage
+remain open; the full non-iWork goal is incomplete.
+
 ## Change 0422: operation-region allocator peak
 
 [0422](changes/0422-operation-region-allocator-peak.md) adds a serialized

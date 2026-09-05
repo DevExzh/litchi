@@ -1,0 +1,63 @@
+{
+  "catalog_sha256": "5858eb9bdeb0d9bce95b7d1f8047098c61d2835b6f49128571ccb0b137b8d777",
+  "change": 423,
+  "checks": [
+    {
+      "error": "report: shared row validator rejected report: report.pptx_cross_copy_plain_lifecycle.source.pptx_cross_copy.gates.semantic_output_verified must be true",
+      "name": "gate_false",
+      "rejected": true
+    },
+    {
+      "error": "report: shared row validator rejected report: report.pptx_cross_copy_plain_lifecycle.source.pptx_cross_copy.output_sha256[0] differs from expected_output_sha256",
+      "name": "output_digest_mutated",
+      "rejected": true
+    },
+    {
+      "error": "report: shared identity/parallel validator rejected report: report.results[0].elapsed_ns.sample_order must be a complete permutation",
+      "name": "elapsed_or_sample_order_mutated",
+      "rejected": true
+    },
+    {
+      "error": "report: shared row validator rejected report: report.pptx_cross_copy_plain_lifecycle.sink.largest_write exceeds the configured 64 KiB sink ceiling",
+      "name": "sink_write_ceiling_exceeded",
+      "rejected": true
+    },
+    {
+      "error": "report.results[0].source.pptx_cross_copy.planned_part_count: does not match the fixed copy plan",
+      "name": "copy_plan_count_mutated",
+      "rejected": true
+    },
+    {
+      "error": "report.configuration: must match the complete fixed experiment configuration",
+      "name": "unknown_configuration_field",
+      "rejected": true
+    },
+    {
+      "error": "report.configuration: must match the complete fixed experiment configuration",
+      "name": "configuration_shape_mutated",
+      "rejected": true
+    },
+    {
+      "error": "report.results[0].source.pptx_cross_copy.source_archive_sha256: does not match the fixed source archive",
+      "name": "fixed_source_identity_mutated",
+      "rejected": true
+    },
+    {
+      "error": "report.results[0]: operation metrics rejected: report.results[0].operation_metrics.allocation.region_peak_live_bytes.values[0] must be at least live_bytes_before and live_bytes_after",
+      "name": "allocator_region_peak_below_endpoint",
+      "rejected": true
+    },
+    {
+      "error": "report.results[0]: operation metrics rejected: report.results[0].operation_metrics.allocation.region_peak_live_bytes.values[0] must not exceed peak_live_bytes_after",
+      "name": "allocator_region_peak_above_lifetime_peak",
+      "rejected": true
+    }
+  ],
+  "claim_authorized": false,
+  "lane": "allocator",
+  "report_sha256": "2d9b181452b3746656c469c4d74ffdcc34345030d7bd66f1a33ffb8c71d290fe",
+  "samples": 30,
+  "selector": "pptx_cross_copy_plain_lifecycle",
+  "validated_original": true,
+  "warmups": 3
+}

@@ -1,0 +1,48 @@
+[
+  {
+    "argv": [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0423/verify.py",
+      "--repo-root",
+      ".",
+      "--report",
+      "docs/performance/results/change-0422/runs/R1/pptx_cross_copy_plain_lifecycle/report.json",
+      "--catalog",
+      "docs/performance/results/change-0422/runs/R1/pptx_cross_copy_plain_lifecycle/catalog.json",
+      "--selector",
+      "pptx_cross_copy_plain_lifecycle",
+      "--lane",
+      "allocator",
+      "--samples",
+      "30",
+      "--warmups",
+      "3"
+    ],
+    "exit_code": 0,
+    "log": "verifier-preflight-plain.log"
+  },
+  {
+    "argv": [
+      "python3",
+      "-B",
+      "docs/performance/results/change-0423/verify.py",
+      "--repo-root",
+      ".",
+      "--report",
+      "docs/performance/results/change-0422/runs/R1/pptx_cross_copy_media_rich_lifecycle/report.json",
+      "--catalog",
+      "docs/performance/results/change-0422/runs/R1/pptx_cross_copy_media_rich_lifecycle/catalog.json",
+      "--selector",
+      "pptx_cross_copy_media_rich_lifecycle",
+      "--lane",
+      "allocator",
+      "--samples",
+      "30",
+      "--warmups",
+      "3"
+    ],
+    "exit_code": 0,
+    "log": "verifier-preflight-media_rich.log"
+  }
+]

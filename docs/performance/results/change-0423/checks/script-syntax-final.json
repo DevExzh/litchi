@@ -1,0 +1,45 @@
+{
+  "status": "pass",
+  "files": [
+    {
+      "path": "build.py",
+      "sha256": "54fb1d7b647849e3946052b6a8f11ecc6eeb72fbeec4e500f8d94fa4a765b0d2"
+    },
+    {
+      "path": "capture-selftest.py",
+      "sha256": "febf6a3931a8b39605c95e8f807a9505c5894a7cd2f380c014c417f5e43fa0ad"
+    },
+    {
+      "path": "capture.py",
+      "sha256": "18039bbe11323184eebfa12c485f54fb541281de209a9e66e2caf9b88a6ce91d"
+    },
+    {
+      "path": "check-functional.py",
+      "sha256": "884311b6edd0a955a1100b659ef55b817fc81a8188e6296e59c789a48ae02dab"
+    },
+    {
+      "path": "check-portable-tool-binding.py",
+      "sha256": "462ae303ae6a50c2a82756054ec9bb320ce781765fefbbaf9eefbefe91b0c1bc"
+    },
+    {
+      "path": "check-report-guards.py",
+      "sha256": "fbe4a2fc0de2a968fe8d86e2914563d0a3d123099bf4e3c2fde86a726487023b"
+    },
+    {
+      "path": "portable-replay.py",
+      "sha256": "da4b2e04c85455ba6eef4463b94c39b5a1547b830eab1fb66657e373b5ac46dd"
+    },
+    {
+      "path": "summarize.py",
+      "sha256": "94a6d998f9ec1f083619e1cd7476e49e9e2bb67071357cafc3d251834374f582"
+    },
+    {
+      "path": "validate.py",
+      "sha256": "da7f642cce998a9948736a02f3665bc82fed49e151fb3a6d37f81b7f08a74344"
+    },
+    {
+      "path": "verify.py",
+      "sha256": "ddc813db0c297e07239fa6436037aedbb7e0a192ade7e627a030459ed1d6a8f5"
+    }
+  ]
+}

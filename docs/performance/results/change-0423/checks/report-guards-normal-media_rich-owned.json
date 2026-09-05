@@ -1,0 +1,53 @@
+{
+  "catalog_sha256": "2137f4ed76c62d4ac48781d636d03b8b0fe806e2adbc3c81fb4ef6b2d5352417",
+  "change": 423,
+  "checks": [
+    {
+      "error": "report: shared row validator rejected report: report.pptx_cross_copy_media_rich_lifecycle.source.pptx_cross_copy.gates.semantic_output_verified must be true",
+      "name": "gate_false",
+      "rejected": true
+    },
+    {
+      "error": "report: shared row validator rejected report: report.pptx_cross_copy_media_rich_lifecycle.source.pptx_cross_copy.output_sha256[0] differs from expected_output_sha256",
+      "name": "output_digest_mutated",
+      "rejected": true
+    },
+    {
+      "error": "report: shared identity/parallel validator rejected report: report.results[0].elapsed_ns.sample_order must be a complete permutation",
+      "name": "elapsed_or_sample_order_mutated",
+      "rejected": true
+    },
+    {
+      "error": "report: shared row validator rejected report: report.pptx_cross_copy_media_rich_lifecycle.sink.largest_write exceeds the configured 64 KiB sink ceiling",
+      "name": "sink_write_ceiling_exceeded",
+      "rejected": true
+    },
+    {
+      "error": "report.results[0].source.pptx_cross_copy.planned_part_count: does not match the fixed copy plan",
+      "name": "copy_plan_count_mutated",
+      "rejected": true
+    },
+    {
+      "error": "report.configuration: must match the complete fixed experiment configuration",
+      "name": "unknown_configuration_field",
+      "rejected": true
+    },
+    {
+      "error": "report.configuration: must match the complete fixed experiment configuration",
+      "name": "configuration_shape_mutated",
+      "rejected": true
+    },
+    {
+      "error": "report.results[0].source.pptx_cross_copy.source_archive_sha256: does not match the fixed source archive",
+      "name": "fixed_source_identity_mutated",
+      "rejected": true
+    }
+  ],
+  "claim_authorized": false,
+  "lane": "normal",
+  "report_sha256": "ae5440aa780602b3ed8750c710d1980074b2dfe5ea2ced49891ec7d0aed637a2",
+  "samples": 100,
+  "selector": "pptx_cross_copy_media_rich_lifecycle",
+  "validated_original": true,
+  "warmups": 10
+}

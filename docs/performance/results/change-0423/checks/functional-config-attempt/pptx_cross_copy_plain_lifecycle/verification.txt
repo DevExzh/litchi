@@ -1,0 +1,1 @@
+FAIL: report: shared row validator rejected report: report.configuration.samples_per_case must be at least 15

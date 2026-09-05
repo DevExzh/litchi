@@ -1,0 +1,12 @@
+{
+  "change": 423,
+  "claim_rejected": true,
+  "empty_stderr_allowed": true,
+  "empty_stdout_allowed": true,
+  "nonempty_report_required": true,
+  "report_identity_required": true,
+  "status": "pass",
+  "temporary_directory_cleaned_by_context": true,
+  "verifier_envelope_required": true,
+  "wrong_lane_rejected": true
+}

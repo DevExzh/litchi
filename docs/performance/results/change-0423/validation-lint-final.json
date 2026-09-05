@@ -1,0 +1,92 @@
+{
+  "change": 423,
+  "checks": [
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "clippy",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--all-features",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "environment_overrides": {},
+      "exit_code": 101,
+      "finished_utc": "2026-09-05T12:39:46.881999+00:00",
+      "log": "validation-lint-final-clippy-strict.log",
+      "name": "clippy-strict",
+      "required_for_this_batch": false,
+      "started_utc": "2026-09-05T12:39:39.567168+00:00"
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "clippy",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--all-features",
+        "--all-targets",
+        "--no-deps",
+        "--",
+        "-A",
+        "clippy::chunks_exact_to_as_chunks",
+        "-A",
+        "clippy::clone_on_copy",
+        "-A",
+        "clippy::needless_lifetimes"
+      ],
+      "environment_overrides": {},
+      "exit_code": 0,
+      "finished_utc": "2026-09-05T12:39:51.743071+00:00",
+      "log": "validation-lint-final-clippy-diagnostic.log",
+      "name": "clippy-diagnostic",
+      "required_for_this_batch": true,
+      "started_utc": "2026-09-05T12:39:46.882262+00:00"
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "doc",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "--no-deps"
+      ],
+      "environment_overrides": {
+        "RUSTDOCFLAGS": "-D warnings"
+      },
+      "exit_code": 0,
+      "finished_utc": "2026-09-05T12:39:53.861605+00:00",
+      "log": "validation-lint-final-rustdoc.log",
+      "name": "rustdoc",
+      "required_for_this_batch": true,
+      "started_utc": "2026-09-05T12:39:51.743325+00:00"
+    }
+  ],
+  "scope": "lint",
+  "source_sha256_after": {
+    "docs/performance/crud-coverage-index-v1.json": "44c9ee22ff946977c35fb35151d1654a69ecf0e8ec4a49318d9dcf482debc25e",
+    "tools/perf-baseline/src/lib.rs": "db2b572189f03bb216ac74c4b070aa6c737cfb817ed48756b1196e0287a2d05b",
+    "tools/test_crud_coverage_index.py": "a289c5274be43848ea07870627c137204713c62c32181ca0d6a3fe05206cb3f7",
+    "tools/validate_crud_coverage_index.py": "f54473c1fc365e6df1a28a2f84ae12e87bbcaa9fed3f522331329d486314ee42"
+  },
+  "source_sha256_before": {
+    "docs/performance/crud-coverage-index-v1.json": "44c9ee22ff946977c35fb35151d1654a69ecf0e8ec4a49318d9dcf482debc25e",
+    "tools/perf-baseline/src/lib.rs": "db2b572189f03bb216ac74c4b070aa6c737cfb817ed48756b1196e0287a2d05b",
+    "tools/test_crud_coverage_index.py": "a289c5274be43848ea07870627c137204713c62c32181ca0d6a3fe05206cb3f7",
+    "tools/validate_crud_coverage_index.py": "f54473c1fc365e6df1a28a2f84ae12e87bbcaa9fed3f522331329d486314ee42"
+  },
+  "status": "pass_with_strict_lint_debt"
+}

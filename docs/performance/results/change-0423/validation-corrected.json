@@ -1,0 +1,42 @@
+{
+  "change": 423,
+  "checks": [
+    {
+      "argv": [
+        "cargo",
+        "+1.98.1",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--features",
+        "allocator-metrics",
+        "--lib",
+        "cross_copy",
+        "--",
+        "--test-threads=1"
+      ],
+      "environment_overrides": {},
+      "exit_code": 101,
+      "finished_utc": "2026-09-05T12:23:43.038726+00:00",
+      "log": "validation-corrected-cross-copy-tests.log",
+      "name": "cross-copy-tests",
+      "required_for_this_batch": true,
+      "started_utc": "2026-09-05T12:19:20.770326+00:00"
+    }
+  ],
+  "scope": "rust",
+  "source_sha256_after": {
+    "docs/performance/crud-coverage-index-v1.json": "44c9ee22ff946977c35fb35151d1654a69ecf0e8ec4a49318d9dcf482debc25e",
+    "tools/perf-baseline/src/lib.rs": "372b9addd561313491f6e753ccc27b6f57d58726311d162a7afd49ec914ad405",
+    "tools/test_crud_coverage_index.py": "a289c5274be43848ea07870627c137204713c62c32181ca0d6a3fe05206cb3f7",
+    "tools/validate_crud_coverage_index.py": "f54473c1fc365e6df1a28a2f84ae12e87bbcaa9fed3f522331329d486314ee42"
+  },
+  "source_sha256_before": {
+    "docs/performance/crud-coverage-index-v1.json": "44c9ee22ff946977c35fb35151d1654a69ecf0e8ec4a49318d9dcf482debc25e",
+    "tools/perf-baseline/src/lib.rs": "372b9addd561313491f6e753ccc27b6f57d58726311d162a7afd49ec914ad405",
+    "tools/test_crud_coverage_index.py": "a289c5274be43848ea07870627c137204713c62c32181ca0d6a3fe05206cb3f7",
+    "tools/validate_crud_coverage_index.py": "f54473c1fc365e6df1a28a2f84ae12e87bbcaa9fed3f522331329d486314ee42"
+  },
+  "status": "failed"
+}

@@ -1,0 +1,8 @@
+{
+  "change": 423,
+  "empty_stderr_allowed": true,
+  "empty_stdout_allowed": true,
+  "nonempty_report_required": true,
+  "status": "pass",
+  "temporary_directory_cleaned_by_context": true
+}
